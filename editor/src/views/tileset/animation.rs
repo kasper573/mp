@@ -1,6 +1,7 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
 use engine::systems::area::tileset::TileFrame;
 
@@ -295,7 +296,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         ui.add_space(6.0);
         let last = odd.frames.last().map_or(0, |frame| frame.offset);
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("⚠").color(theme::WARN));
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(
                 theme::muted(format!(
                     "Tile {} has {} frames, +0 to {}; the other {} have {}.",
@@ -594,7 +595,12 @@ fn preview_block(
     painter.rect_filled(rect, 0.0, theme::CANVAS);
     draw_block(&painter, rect.min, shown, tileset, selection, index);
     ui.horizontal(|ui| {
-        if widgets::chip(ui, if view.preview.playing { "⏸" } else { "▶" }).clicked() {
+        let (mark, word) = if view.preview.playing {
+            (Mark::Pause, "Pause")
+        } else {
+            (Mark::Play, "Play")
+        };
+        if glyph::button(ui, mark, 14.0, theme::TEXT, word).clicked() {
             view.preview.playing = !view.preview.playing;
         }
         widgets::chip(ui, &format!("frame {} / {}", index + 1, frames.len()));
@@ -629,7 +635,7 @@ fn timeline_card(
         egui::Align2::CENTER_CENTER,
         format!("{} · {} ms", signed(frame.offset), frame.ms),
         egui::FontId::monospace(12.0),
-        if on { Color32::WHITE } else { theme::TEXT },
+        theme::TEXT,
     );
     response
 }

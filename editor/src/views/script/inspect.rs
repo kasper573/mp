@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
@@ -265,7 +266,7 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             .unwrap_or_default();
         let response = ui
             .horizontal(|ui| {
-                ui.label(theme::faint("▸").size(12.0));
+                glyph::show(ui, Mark::ChevronRight, 12.0, theme::FAINT);
                 ui.label(theme::strong(&event).monospace().size(13.0));
                 ui.label(
                     theme::muted(detail.replace(" tiles", ""))
@@ -586,11 +587,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                             script["variables"][name]["default"] = value;
                             changed = FormChange::at(&path);
                         }
-                        if ui
-                            .add(
-                                egui::Label::new(theme::faint("✕").size(11.0))
-                                    .sense(egui::Sense::click()),
-                            )
+                        if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                             .on_hover_text("Drop the default")
                             .clicked()
                         {
@@ -1407,7 +1404,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) 
                     }
                     if ui
                         .add(
-                            egui::Label::new(theme::faint("✕ no condition").size(11.5))
+                            egui::Label::new(theme::faint("remove the condition").size(11.5))
                                 .sense(egui::Sense::click()),
                         )
                         .clicked()
@@ -1618,7 +1615,7 @@ fn speaker_rows(
     else {
         return changed;
     };
-    widgets::kv(ui, "└ npc", |ui| {
+    widgets::kv(ui, "  npc", |ui| {
         if picker::row(ui, cx, "npc", &mut npc, &format!("{path}/npc")) {
             by["npc"] = Value::String(npc.clone());
             changed = FormChange::at(path);
@@ -1639,7 +1636,7 @@ fn speaker_rows(
         .cloned()
         .unwrap_or(serde_json::json!({ "x-face": true, "type": ["string", "null"] }));
     let mut face_value = face.clone().map_or(Value::Null, Value::String);
-    widgets::kv(ui, "└ face", |ui| {
+    widgets::kv(ui, "  face", |ui| {
         let speaker = LineSpeaker::Npc {
             npc: npc.clone(),
             face,

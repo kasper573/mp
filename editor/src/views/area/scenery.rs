@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::Mark;
 use egui::Ui;
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
@@ -359,7 +361,7 @@ pub(super) fn scenery_extras(
     if under > 0 {
         widgets::hint(ui, &format!("{under} cells under it are blocked"));
         if ui
-            .button(format!("⧉ Make the {under} blocked cells its own"))
+            .button(format!("Make the {under} blocked cells its own"))
             .clicked()
         {
             out.actions.push(super::AreaAction::AdoptBlocks(index));
@@ -368,7 +370,7 @@ pub(super) fn scenery_extras(
         widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
-        if ui.button("▣ Make blueprint…").clicked() {
+        if controls::marked(ui, Mark::Grid, "Make blueprint…").clicked() {
             out.actions.push(super::AreaAction::MakeBlueprint);
         }
         if ui.button("Split into tiles").clicked() {

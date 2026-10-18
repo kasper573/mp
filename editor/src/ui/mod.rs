@@ -16,7 +16,8 @@ use std::mem;
 use std::path::Path;
 use std::time::Duration;
 
-use egui::{Align, Context, Key, Layout, Modifiers, RichText};
+use design_tokens::{TextRole, face, ink, sheet, slip};
+use egui::{Align, Context, Key, Layout, Modifiers};
 use egui_dock::{DockArea, DockState, TabViewer};
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
@@ -37,6 +38,7 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
             .layer_id(egui::LayerId::background())
             .max_rect(ctx.viewport_rect()),
     );
+    sheet::vellum(root.painter(), ctx.viewport_rect());
     top_bar(editor, &mut root);
     for tab in mem::take(&mut editor.open_tabs) {
         focus_tab(&mut editor.dock, tab);
@@ -234,15 +236,13 @@ pub fn finish_close(editor: &mut Editor, then: CloseThen) {
 }
 
 fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
-    egui::Panel::top("top")
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(10, 8)),
-        )
+    let bar = egui::Panel::top("top")
+        .exact_size(TOP_BAR_HEIGHT)
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(12, 0)))
         .show(root, |ui| {
-            ui.horizontal(|ui| {
-                ui.menu_button(RichText::new("File").strong().size(15.0), |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.menu_button(face::bold("File"), |ui| {
                     let has_project = editor.project.is_some();
                     if ui
                         .add_enabled(
@@ -282,11 +282,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     }
                 });
                 if let Some(project) = &editor.project {
-                    ui.label(
-                        theme::muted(pretty_path(&project.root))
-                            .monospace()
-                            .size(13.0),
-                    );
+                    ui.label(face::secondary(pretty_path(&project.root)));
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if editor.project.is_none() {
@@ -306,12 +302,13 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         } else if unsaved > 0 {
                             widgets::pill(ui, &format!("{unsaved} unsaved"), theme::TEXT);
                         } else {
-                            widgets::pill(ui, "✔ saved", theme::OK);
+                            widgets::pill(ui, "saved", theme::OK);
                         }
                     }
                 });
             });
         });
+    divide(root, bar.response.rect, Edge::Bottom);
 }
 
 pub fn pretty_path(path: &Path) -> String {
@@ -329,11 +326,12 @@ pub fn pretty_path(path: &Path) -> String {
 
 fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
     status_bar(editor, root);
-    egui::Panel::left("content")
+    let content = egui::Panel::left("content")
         .resizable(true)
         .default_size(270.0)
         .size_range(200.0..=520.0)
-        .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(0.0))
+        .show_separator_line(false)
+        .frame(egui::Frame::new())
         .show(root, |ui| {
             let tabs = [
                 (LeftTab::Content, "Content".to_owned()),
@@ -349,6 +347,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                     });
             });
         });
+    divide(root, content.response.rect, Edge::Right);
     let bottom_tabs = views::bottom_tabs(editor);
     if !bottom_tabs
         .iter()
@@ -359,10 +358,14 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
             .map(|(tab, _)| *tab)
             .unwrap_or(BottomTab::History);
     }
-    egui::Panel::bottom("bottom")
+    let bottom = egui::Panel::bottom("bottom")
         .resizable(true)
         .default_size(200.0)
-        .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(0.0))
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin {
+            top: 6,
+            ..egui::Margin::ZERO
+        }))
         .show(root, |ui| {
             widgets::tab_strip(ui, &bottom_tabs, &mut editor.panels.bottom);
             panel_body(ui, |ui| {
@@ -378,28 +381,16 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                     });
             });
         });
+    divide(root, bottom.response.rect, Edge::Top);
     let mut dock = mem::replace(&mut editor.dock, DockState::new(Vec::new()));
     egui::CentralPanel::default()
-        .frame(egui::Frame::new().fill(theme::BG).inner_margin(0.0))
+        .frame(egui::Frame::new())
         .show(root, |ui| {
             if dock.iter_all_tabs().next().is_none() {
                 empty_centre(ui);
                 return;
             }
-            let mut style = egui_dock::Style::from_egui(ui.style());
-            style.tab_bar.fill_tab_bar = false;
-            style.tab_bar.height = 30.0;
-            style.tab_bar.bg_fill = theme::PANEL;
-            style.tab.active.bg_fill = theme::BG;
-            style.tab.active.text_color = theme::TEXT;
-            style.tab.inactive.bg_fill = theme::PANEL;
-            style.tab.inactive.text_color = theme::MUTED;
-            style.tab.hovered.bg_fill = theme::RAISED;
-            style.tab.focused.bg_fill = theme::BG;
-            style.tab.focused.text_color = theme::TEXT;
-            style.tab.tab_body.bg_fill = theme::BG;
-            style.tab.tab_body.inner_margin = egui::Margin::ZERO;
-            style.tab.tab_body.stroke = egui::Stroke::NONE;
+            let style = dock_style(ui.style());
             let mut viewer = Viewer { editor };
             DockArea::new(&mut dock)
                 .style(style)
@@ -440,7 +431,74 @@ fn empty_centre(ui: &mut egui::Ui) {
     });
 }
 
-const STATUS_HEIGHT: f32 = 28.0;
+const TOP_BAR_HEIGHT: f32 = 42.0;
+const STATUS_HEIGHT: f32 = 24.0;
+
+/// The side of a panel a rule divides it from its neighbour on.
+#[derive(Clone, Copy)]
+pub enum Edge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// The single ink rule between two panels of the one vellum sheet.
+pub fn divide(ui: &egui::Ui, panel: egui::Rect, edge: Edge) {
+    let stroke = egui::Stroke::new(1.0, ink::ink_wash(0.35));
+    let painter = ui.painter();
+    match edge {
+        Edge::Top => painter.hline(panel.x_range(), panel.top() + 0.5, stroke),
+        Edge::Bottom => painter.hline(panel.x_range(), panel.bottom() - 0.5, stroke),
+        Edge::Left => painter.vline(panel.left() + 0.5, panel.y_range(), stroke),
+        Edge::Right => painter.vline(panel.right() - 0.5, panel.y_range(), stroke),
+    };
+}
+
+/// egui_dock's tabs as the sheet's index tabs, on the vellum with no frame of their own.
+fn dock_style(egui_style: &egui::Style) -> egui_dock::Style {
+    let mut style = egui_dock::Style::from_egui(egui_style);
+    let top = egui::CornerRadius {
+        nw: 4,
+        ne: 4,
+        sw: 0,
+        se: 0,
+    };
+    let tab = |fill, outline, text| egui_dock::TabInteractionStyle {
+        outline_color: outline,
+        corner_radius: top,
+        bg_fill: fill,
+        text_color: text,
+    };
+    let lifted = tab(ink::LIGHT, ink::ink_wash(0.5), ink::RUBRIC);
+    let lying = tab(ink::ink_wash(0.05), ink::ink_wash(0.35), ink::INK2);
+    style.main_surface_border_stroke = egui::Stroke::NONE;
+    style.tab_bar.fill_tab_bar = false;
+    style.tab_bar.height = 30.0;
+    style.tab_bar.bg_fill = egui::Color32::TRANSPARENT;
+    style.tab_bar.hline_color = ink::ink_wash(0.35);
+    style.tab_bar.corner_radius = egui::CornerRadius::ZERO;
+    style.tab.active = lifted.clone();
+    style.tab.focused = lifted.clone();
+    style.tab.active_with_kb_focus = lifted.clone();
+    style.tab.focused_with_kb_focus = lifted;
+    style.tab.inactive = lying.clone();
+    style.tab.inactive_with_kb_focus = lying;
+    style.tab.hovered = tab(ink::gold_wash(0.2), ink::ink_wash(0.35), ink::INK);
+    style.tab.hline_below_active_tab_name = false;
+    style.tab.spacing = 4.0;
+    style.tab.tab_body.bg_fill = egui::Color32::TRANSPARENT;
+    style.tab.tab_body.inner_margin = egui::Margin::ZERO;
+    style.tab.tab_body.stroke = egui::Stroke::NONE;
+    style.separator.width = 1.0;
+    style.separator.color_idle = ink::ink_wash(0.35);
+    style.separator.color_hovered = ink::INK;
+    style.separator.color_dragged = ink::INK;
+    style.buttons.close_tab_color = ink::INK3;
+    style.buttons.close_tab_active_color = ink::INK;
+    style.buttons.close_tab_bg_fill = ink::ink_wash(0.08);
+    style
+}
 
 fn report_summary(report: &engine::core::content::LoadReport) -> String {
     const SHOWN: usize = 8;
@@ -495,37 +553,25 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         }
     }
     let right = mem::take(&mut editor.status.right);
-    egui::Panel::bottom("status")
+    let status = egui::Panel::bottom("status")
         .exact_size(STATUS_HEIGHT)
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(10, 4)),
-        )
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(12, 0)))
         .show(root, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 14.0;
                 for segment in &left {
-                    ui.label(
-                        RichText::new(segment)
-                            .monospace()
-                            .size(12.5)
-                            .color(theme::MUTED),
-                    );
+                    ui.label(face::small_faint(segment));
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 14.0;
                     for segment in right.iter().rev() {
-                        ui.label(
-                            RichText::new(segment)
-                                .monospace()
-                                .size(12.5)
-                                .color(theme::MUTED),
-                        );
+                        ui.label(face::small_faint(segment));
                     }
                 });
             });
         });
+    divide(root, status.response.rect, Edge::Top);
 }
 
 struct Viewer<'a> {
@@ -550,18 +596,9 @@ impl TabViewer for Viewer<'_> {
             .as_ref()
             .zip(tab.row())
             .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
-        let mut job = egui::text::LayoutJob::default();
-        job.append(
-            &title,
-            0.0,
-            egui::TextFormat::simple(egui::FontId::proportional(13.5), theme::TEXT),
-        );
+        let mut job = TextRole::Tab.job(&title, egui::Color32::PLACEHOLDER);
         if unsaved {
-            job.append(
-                " ●",
-                0.0,
-                egui::TextFormat::simple(egui::FontId::proportional(11.0), theme::WARN),
-            );
+            job.append(" \u{2022}", 0.0, TextRole::Tab.format(ink::OCHRE));
         }
         job.into()
     }
@@ -658,10 +695,8 @@ fn toast(editor: &mut Editor, ctx: &Context) {
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -40.0))
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .fill(theme::RAISED)
-                .show(ui, |ui| {
-                    ui.label(text);
-                });
+            slip::show(ui, |ui| {
+                ui.label(text);
+            });
         });
 }

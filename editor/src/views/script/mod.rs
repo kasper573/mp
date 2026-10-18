@@ -1036,10 +1036,10 @@ fn callout_card(ui: &Ui, painter: &egui::Painter, anchor: Rect, callout: &Script
         top_left.y = anchor.top() - size.y - 10.0;
     }
     let rect = Rect::from_min_size(top_left, size);
-    painter.rect(
+    design_tokens::slip::paint(painter, rect);
+    painter.rect_stroke(
         rect,
-        6.0,
-        egui::Color32::from_rgb(34, 24, 28),
+        0.0,
         Stroke::new(1.0, theme::DANGER),
         egui::StrokeKind::Inside,
     );

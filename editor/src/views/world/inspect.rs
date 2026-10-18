@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
@@ -484,7 +485,7 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
 fn check(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
         if ok {
-            ui.label(RichText::new("✓").color(theme::OK))
+            glyph::show(ui, Mark::Tick, 14.0, theme::OK)
         } else {
             ui.label(RichText::new("·").color(theme::WARN))
         };

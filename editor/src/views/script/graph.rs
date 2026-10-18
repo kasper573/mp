@@ -1,3 +1,5 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::emath::TSTransform;
@@ -435,16 +437,10 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         self.click_to_select(ui, &name);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let (glyph, color) = kind_glyph(&node);
+            let (mark, color) = kind_mark(&node);
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), egui::Sense::hover());
             ui.painter().rect_filled(rect, 3.0, theme::alpha(color, 70));
-            ui.painter().text(
-                rect.center(),
-                Align2::CENTER_CENTER,
-                glyph,
-                FontId::proportional(10.0),
-                color,
-            );
+            glyph::paint(ui.painter(), mark, rect.shrink(3.0), color);
             let title = card_title(&name, &node);
             ui.add(egui::Label::new(theme::strong(title).monospace().size(12.5)).truncate());
         });
@@ -579,6 +575,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let name = &snarl[id].name;
         let mut frame = default;
         frame.fill = CARD_FILL;
+        frame.shadow = design_tokens::slip::SHADOW;
         frame.corner_radius = CornerRadius::same(6);
         frame.inner_margin = egui::Margin::symmetric(0, 0);
         frame.stroke = if self.current == Some(name.as_str()) {
@@ -805,33 +802,34 @@ fn choice_output(ui: &mut Ui, label: &str, connected: bool) {
     );
 }
 
-const CARD_FILL: Color32 = Color32::from_rgb(30, 31, 38);
-const DOT: Color32 = Color32::from_rgb(44, 45, 54);
-const WIRE: Color32 = Color32::from_rgb(120, 160, 240);
-const DIALOGUE: Color32 = Color32::from_rgb(176, 140, 230);
-const REFUSED: Color32 = Color32::from_rgb(150, 150, 164);
-const LIT: Color32 = Color32::from_rgb(250, 200, 80);
-const CURRENT: Color32 = Color32::from_rgb(255, 240, 140);
-const RUN: Color32 = Color32::from_rgb(240, 150, 70);
-const EFFECT_FILL: Color32 = Color32::from_rgb(30, 54, 42);
+const CARD_FILL: Color32 = ink::LIGHT;
+const DOT: Color32 = ink::INK3;
+const WIRE: Color32 = ink::AZURE;
+const DIALOGUE: Color32 = ink::TYRIAN;
+const REFUSED: Color32 = ink::INK3;
+const LIT: Color32 = ink::GOLD;
+const CURRENT: Color32 = ink::GOLD2;
+const RUN: Color32 = ink::RUBRIC;
+const EFFECT_FILL: Color32 = Color32::from_rgb(221, 219, 194);
 
+/// A node's head: the card's light tinted toward its kind's ink.
 fn kind_fill(node: &Value) -> Color32 {
     match FlowKind::of(node) {
-        Some(FlowKind::On) => Color32::from_rgb(58, 50, 26),
-        Some(FlowKind::Run) => Color32::from_rgb(64, 44, 30),
-        Some(FlowKind::Dialogue) => Color32::from_rgb(54, 42, 74),
-        Some(_) => Color32::from_rgb(38, 44, 62),
+        Some(FlowKind::On) => Color32::from_rgb(225, 211, 180),
+        Some(FlowKind::Run) => Color32::from_rgb(233, 211, 188),
+        Some(FlowKind::Dialogue) => Color32::from_rgb(226, 210, 199),
+        Some(_) => Color32::from_rgb(221, 216, 202),
         None => EFFECT_FILL,
     }
 }
 
-pub fn kind_glyph(node: &Value) -> (&'static str, Color32) {
+pub fn kind_mark(node: &Value) -> (Mark, Color32) {
     match FlowKind::of(node) {
-        Some(FlowKind::On) => ("▶", theme::WARN),
-        Some(FlowKind::Run) => ("▸", RUN),
-        Some(FlowKind::Dialogue) => ("●", DIALOGUE),
-        Some(_) => ("◆", WIRE),
-        None => ("!", theme::OK),
+        Some(FlowKind::On) => (Mark::Play, theme::WARN),
+        Some(FlowKind::Run) => (Mark::ChevronRight, RUN),
+        Some(FlowKind::Dialogue) => (Mark::Dot, DIALOGUE),
+        Some(_) => (Mark::Asterisk, WIRE),
+        None => (Mark::Warning, theme::OK),
     }
 }
 

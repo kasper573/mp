@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
@@ -134,8 +136,7 @@ pub fn placement_card(
                             changed = true;
                         }
                         if default.is_some()
-                            && ui
-                                .small_button("✕")
+                            && glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                                 .on_hover_text("Back to the blueprint's default")
                                 .clicked()
                         {
@@ -736,7 +737,7 @@ pub(super) fn placement_extras(
         widgets::hint(ui, &placement_count(&content, &key));
     }
     ui.horizontal_wrapped(|ui| {
-        if ui.button("▣ Edit blueprint").clicked() {
+        if controls::marked(ui, Mark::Grid, "Edit blueprint").clicked() {
             out.actions
                 .push(super::AreaAction::OpenBlueprint(key.clone()));
         }

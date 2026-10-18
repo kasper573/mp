@@ -811,7 +811,7 @@ impl Editor {
             let loads = project.loads();
             let text = if loads {
                 format!(
-                    "↻ {} rows changed on disk and were reloaded",
+                    "{} rows changed on disk and were reloaded",
                     outcome.taken.len()
                 )
             } else {

@@ -56,94 +56,89 @@ pub fn popover(
             ))
             .layout(egui::Layout::top_down(egui::Align::Min)),
     );
-    egui::Frame::new()
-        .fill(Color32::from_rgba_unmultiplied(24, 26, 30, 235))
-        .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .corner_radius(6.0)
-        .inner_margin(egui::Margin::symmetric(10, 8))
-        .show(&mut panel, |ui| {
-            ui.set_width(WIDTH - 20.0);
-            ui.spacing_mut().item_spacing.y = 2.0;
-            ui.label(
-                RichText::new("LAYERS")
-                    .size(11.0)
-                    .color(theme::MUTED)
-                    .family(theme::medium()),
-            );
-            widgets::section(ui, "Ground · under everyone");
-            let active = editor
-                .views
-                .area
-                .view(view_key)
-                .layer
-                .min(layers.len().saturating_sub(1));
-            let view = editor.views.area.view_mut(view_key);
-            for (index, name) in layers.iter().enumerate() {
-                let hidden = view.hidden_ground.contains(name);
-                let response = eye_row(ui, name, !hidden, index == active, None);
-                if response.eye.clicked() {
-                    if hidden {
-                        view.hidden_ground.remove(name);
-                    } else {
-                        view.hidden_ground.insert(name.clone());
-                    }
+    design_tokens::slip::show(&mut panel, |ui| {
+        ui.set_width(WIDTH - 20.0);
+        ui.spacing_mut().item_spacing.y = 2.0;
+        ui.label(
+            RichText::new("LAYERS")
+                .size(11.0)
+                .color(theme::MUTED)
+                .family(theme::medium()),
+        );
+        widgets::section(ui, "Ground · under everyone");
+        let active = editor
+            .views
+            .area
+            .view(view_key)
+            .layer
+            .min(layers.len().saturating_sub(1));
+        let view = editor.views.area.view_mut(view_key);
+        for (index, name) in layers.iter().enumerate() {
+            let hidden = view.hidden_ground.contains(name);
+            let response = eye_row(ui, name, !hidden, index == active, None);
+            if response.eye.clicked() {
+                if hidden {
+                    view.hidden_ground.remove(name);
+                } else {
+                    view.hidden_ground.insert(name.clone());
                 }
-                if response.row.clicked() {
-                    action = Some(LayerAction::Pick(index));
+            }
+            if response.row.clicked() {
+                action = Some(LayerAction::Pick(index));
+            }
+            response.row.context_menu(|ui| {
+                if ui.button("Rename…").clicked() {
+                    action = Some(LayerAction::Rename(index));
+                    ui.close();
                 }
-                response.row.context_menu(|ui| {
-                    if ui.button("Rename…").clicked() {
-                        action = Some(LayerAction::Rename(index));
-                        ui.close();
-                    }
-                    if index + 1 < layers.len() && ui.button("Move up").clicked() {
-                        action = Some(LayerAction::Swap(index, index + 1));
-                        ui.close();
-                    }
-                    if index > 0 && ui.button("Move down").clicked() {
-                        action = Some(LayerAction::Swap(index, index - 1));
-                        ui.close();
-                    }
-                    if layers.len() > 1 && ui.button("Delete…").clicked() {
-                        action = Some(LayerAction::Delete(index));
-                        ui.close();
-                    }
-                });
-            }
-            if ui
-                .add(egui::Label::new(theme::faint("+ layer").size(12.5)).sense(Sense::click()))
-                .clicked()
-            {
-                action = Some(LayerAction::Add);
-            }
-            widgets::section(ui, "Placed on the ground");
-            let response = eye_row(
-                ui,
-                "blueprints",
-                view.show_blueprints,
-                false,
-                Some(blueprints),
-            );
+                if index + 1 < layers.len() && ui.button("Move up").clicked() {
+                    action = Some(LayerAction::Swap(index, index + 1));
+                    ui.close();
+                }
+                if index > 0 && ui.button("Move down").clicked() {
+                    action = Some(LayerAction::Swap(index, index - 1));
+                    ui.close();
+                }
+                if layers.len() > 1 && ui.button("Delete…").clicked() {
+                    action = Some(LayerAction::Delete(index));
+                    ui.close();
+                }
+            });
+        }
+        if ui
+            .add(egui::Label::new(theme::faint("+ layer").size(12.5)).sense(Sense::click()))
+            .clicked()
+        {
+            action = Some(LayerAction::Add);
+        }
+        widgets::section(ui, "Placed on the ground");
+        let response = eye_row(
+            ui,
+            "blueprints",
+            view.show_blueprints,
+            false,
+            Some(blueprints),
+        );
+        if response.eye.clicked() || response.row.clicked() {
+            view.show_blueprints = !view.show_blueprints;
+        }
+        let response = eye_row(ui, "scenery", view.show_scenery, false, Some(scenery));
+        if response.eye.clicked() || response.row.clicked() {
+            view.show_scenery = !view.show_scenery;
+        }
+        widgets::section(ui, "Overlays");
+        for (name, flag) in [
+            ("modules", &mut view.overlay_modules),
+            ("walk", &mut view.walk_overlay),
+            ("surfaces", &mut view.overlay_surfaces),
+            ("sort lines", &mut view.overlay_sort_lines),
+        ] {
+            let response = eye_row(ui, name, *flag, false, None);
             if response.eye.clicked() || response.row.clicked() {
-                view.show_blueprints = !view.show_blueprints;
+                *flag = !*flag;
             }
-            let response = eye_row(ui, "scenery", view.show_scenery, false, Some(scenery));
-            if response.eye.clicked() || response.row.clicked() {
-                view.show_scenery = !view.show_scenery;
-            }
-            widgets::section(ui, "Overlays");
-            for (name, flag) in [
-                ("modules", &mut view.overlay_modules),
-                ("walk", &mut view.walk_overlay),
-                ("surfaces", &mut view.overlay_surfaces),
-                ("sort lines", &mut view.overlay_sort_lines),
-            ] {
-                let response = eye_row(ui, name, *flag, false, None);
-                if response.eye.clicked() || response.row.clicked() {
-                    *flag = !*flag;
-                }
-            }
-        });
+        }
+    });
     let Some(action) = action else {
         return;
     };
@@ -213,20 +208,14 @@ struct EyeRow {
 fn eye_row(ui: &mut Ui, name: &str, shown: bool, active: bool, count: Option<usize>) -> EyeRow {
     let full = ui.available_width();
     let (rect, row) = ui.allocate_exact_size(Vec2::new(full, 20.0), Sense::click());
-    if active {
-        ui.painter().rect_filled(rect, 3.0, theme::ACCENT);
-    } else if row.hovered() {
-        ui.painter().rect_filled(rect, 3.0, theme::RAISED);
-    }
+    ui.painter().add(design_tokens::controls::row_marks(
+        rect,
+        row.hovered(),
+        active,
+    ));
     let eye_rect = ERect::from_min_size(rect.min + Vec2::new(4.0, 2.0), Vec2::splat(16.0));
     let eye = ui.interact(eye_rect, row.id.with("eye"), Sense::click());
-    let ink = if active {
-        Color32::WHITE
-    } else if shown {
-        theme::TEXT
-    } else {
-        theme::FAINT
-    };
+    let ink = if shown { theme::TEXT } else { theme::FAINT };
     draw_eye(ui.painter(), eye_rect.center(), shown, ink);
     ui.painter().text(
         rect.min + Vec2::new(26.0, 10.0),
@@ -241,7 +230,7 @@ fn eye_row(ui: &mut Ui, name: &str, shown: bool, active: bool, count: Option<usi
             egui::Align2::RIGHT_CENTER,
             count.to_string(),
             egui::FontId::monospace(12.0),
-            if active { Color32::WHITE } else { theme::MUTED },
+            theme::MUTED,
         );
     }
     EyeRow { eye, row }

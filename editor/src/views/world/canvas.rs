@@ -1,3 +1,5 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use std::collections::{BTreeMap, HashSet};
 
 use egui::epaint::QuadraticBezierShape;
@@ -25,18 +27,18 @@ const LABEL: f32 = 28.0;
 const PAD: f32 = 3.0;
 const DOT_STEP: f32 = 32.0;
 const EDGE_HIT: f32 = 7.0;
-const ROUTE: Color32 = Color32::from_rgb(90, 160, 255);
-const WARP: Color32 = Color32::from_rgb(150, 150, 170);
-const DIM: Color32 = Color32::from_rgb(70, 70, 78);
-const DOT: Color32 = Color32::from_rgb(34, 34, 40);
+const ROUTE: Color32 = ink::AZURE;
+const WARP: Color32 = ink::INK3;
+const DIM: Color32 = Color32::from_rgb(120, 112, 96);
+const DOT: Color32 = ink::HONEY2;
 const POPULATION: Color32 = Color32::from_rgb(240, 140, 60);
 const NO_VALUE: Color32 = Color32::from_rgb(110, 110, 120);
-const NOTE_PAPER: Color32 = Color32::from_rgb(250, 230, 150);
-const NOTE_EDGE: Color32 = Color32::from_rgb(200, 180, 100);
-const NOTE_INK: Color32 = Color32::from_rgb(40, 36, 20);
+const NOTE_PAPER: Color32 = ink::LIGHT;
+const NOTE_EDGE: Color32 = ink::HONEY2;
+const NOTE_INK: Color32 = ink::INK;
 const NOTE_WIDTH: f32 = 188.0;
 const NOTE_PAD: f32 = 6.0;
-const MINIMAP_CARD: Color32 = Color32::from_rgb(140, 150, 180);
+const MINIMAP_CARD: Color32 = ink::INK3;
 
 pub struct MapCard {
     pub area: AreaId,
@@ -331,8 +333,8 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
                     card.art.center(),
                     Align2::CENTER_CENTER,
                     &range.text(),
-                    theme::alpha(theme::CANVAS, 200),
-                    Color32::WHITE,
+                    theme::RAISED,
+                    theme::TEXT,
                     12.0,
                 );
             }
@@ -389,11 +391,13 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         }
     }
     if drawing.shown.cards[&card.area].pinned {
-        painter.text(
-            card.art.right_top() + Vec2::new(-3.0, 2.0),
-            Align2::RIGHT_TOP,
-            "📍",
-            FontId::proportional(11.0),
+        glyph::paint(
+            painter,
+            Mark::Pin,
+            egui::Rect::from_min_size(
+                card.art.right_top() + Vec2::new(-14.0, 2.0),
+                Vec2::splat(11.0),
+            ),
             Color32::WHITE,
         );
     }
@@ -403,13 +407,13 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
             .get(&card.area)
             .map_or_else(|| "–".to_owned(), u32::to_string);
         let at = card.art.center();
-        painter.circle_filled(at, 9.0, theme::alpha(theme::CANVAS, 210));
+        painter.circle(at, 9.0, theme::RAISED, Stroke::new(1.0, theme::BORDER));
         painter.text(
             at,
             Align2::CENTER_CENTER,
             text,
             FontId::monospace(11.0),
-            Color32::WHITE,
+            theme::TEXT,
         );
     }
     if !drawing.zoomed {
@@ -462,8 +466,8 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
                 card.frame.right_top() + Vec2::new(-4.0, -4.0),
                 Align2::RIGHT_BOTTOM,
                 &filters::tag_line(sources),
+                theme::RAISED,
                 theme::WARN,
-                Color32::BLACK,
                 11.0,
             )
         });
@@ -473,7 +477,7 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
             painter,
             Pos2::new(card.frame.left(), bottom),
             Align2::LEFT_BOTTOM,
-            "⚑ initial spawn",
+            "initial spawn",
             theme::PANEL,
             theme::OK,
             11.0,
@@ -981,11 +985,11 @@ fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], cat
 
 pub fn line_badge(painter: &Painter, at: Pos2, badge: &str, branch: bool) {
     let (fill, ink) = if branch {
-        (theme::DANGER, Color32::WHITE)
+        (theme::DANGER, ink::LIGHT)
     } else {
-        (theme::WARN, Color32::BLACK)
+        (theme::WARN, ink::LIGHT)
     };
-    painter.circle(at, 9.0, fill, Stroke::new(1.0, Color32::BLACK));
+    painter.circle(at, 9.0, fill, Stroke::new(1.0, ink::INK));
     painter.text(
         at,
         Align2::CENTER_CENTER,
@@ -1209,13 +1213,7 @@ fn minimap(
         rect.right_bottom() - Vec2::new(192.0, 132.0),
         Vec2::new(180.0, 120.0),
     );
-    painter.rect_filled(box_rect, 3.0, theme::alpha(Color32::BLACK, 170));
-    painter.rect_stroke(
-        box_rect,
-        3.0,
-        Stroke::new(1.0, theme::BORDER),
-        StrokeKind::Outside,
-    );
+    design_tokens::slip::paint(painter, box_rect);
     let scale = ((box_rect.width() - 8.0) / bounds.width().max(1.0))
         .min((box_rect.height() - 8.0) / bounds.height().max(1.0));
     let to_box = |p: Pos2| box_rect.center() + (p - bounds.center()) * scale;

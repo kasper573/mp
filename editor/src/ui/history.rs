@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::time::SystemTime;
 
 use egui::{Align2, FontId, Sense, Ui};
@@ -35,7 +36,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     editor
         .status
         .left
-        .push("Ctrl Z undo · Ctrl ⇧ Z redo · click a step to go back to it".to_owned());
+        .push("Ctrl Z undo · Ctrl Shift Z redo · click a step to go back to it".to_owned());
     let mut jump = None;
     let card_width = if focus.is_some() {
         (ui.available_width() * 0.4).clamp(240.0, 420.0)
@@ -118,24 +119,19 @@ fn row(
 ) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), ROW), Sense::click());
-    if current {
-        ui.painter().rect(
-            rect,
-            4.0,
-            theme::ACCENT_SOFT,
-            egui::Stroke::new(1.0, theme::ACCENT),
-            egui::StrokeKind::Inside,
-        );
-    } else if focused || response.hovered() {
-        ui.painter().rect_filled(rect, 4.0, theme::RAISED);
-    }
+    ui.painter().add(design_tokens::controls::row_marks(
+        rect,
+        focused || response.hovered(),
+        current,
+    ));
     let ink = if done { theme::TEXT } else { theme::FAINT };
-    let glyph = glyph_of(label);
-    ui.painter().text(
-        rect.left_center() + egui::vec2(14.0, 0.0),
-        Align2::LEFT_CENTER,
-        glyph,
-        FontId::proportional(13.0),
+    glyph::paint(
+        ui.painter(),
+        mark_of(label),
+        egui::Rect::from_center_size(
+            rect.left_center() + egui::vec2(20.0, 0.0),
+            egui::vec2(12.0, 12.0),
+        ),
         if done { theme::MUTED } else { theme::FAINT },
     );
     ui.painter().text(
@@ -179,17 +175,17 @@ fn row(
     response
 }
 
-fn glyph_of(label: &str) -> &'static str {
+fn mark_of(label: &str) -> Mark {
     let verb = label.split_whitespace().next().unwrap_or("").to_lowercase();
     match verb.as_str() {
-        "move" | "drag" | "place" | "stamp" | "resize" => "➚",
-        "delete" | "remove" | "erase" | "clear" => "✕",
-        "paint" | "fill" => "✸",
-        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => "✱",
-        "add" | "new" | "duplicate" | "paste" | "make" | "import" => "+",
-        "rename" => "▤",
-        "open" | "recover" => "▭",
-        _ => "•",
+        "move" | "drag" | "place" | "stamp" | "resize" => Mark::Move,
+        "delete" | "remove" | "erase" | "clear" => Mark::Cross,
+        "paint" | "fill" => Mark::Spark,
+        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => Mark::Asterisk,
+        "add" | "new" | "duplicate" | "paste" | "make" | "import" => Mark::Plus,
+        "rename" => Mark::Tag,
+        "open" | "recover" => Mark::Page,
+        _ => Mark::Dot,
     }
 }
 

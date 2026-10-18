@@ -1,3 +1,5 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{controls, face};
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{Align, Layout, Modifiers, Sense, Ui};
@@ -19,7 +21,7 @@ pub struct TreeNode<A> {
 }
 
 pub struct TreeAction<A> {
-    pub glyph: &'static str,
+    pub mark: Mark,
     pub tip: String,
     pub menu_label: String,
     pub action: A,
@@ -27,7 +29,7 @@ pub struct TreeAction<A> {
 
 pub enum TreeIcon {
     None,
-    Glyph(&'static str),
+    Mark(Mark),
     Thumb(String),
 }
 
@@ -141,7 +143,7 @@ pub fn show<A: Clone>(
     out
 }
 
-const LINE: f32 = 22.0;
+const LINE: f32 = 26.0;
 const INDENT: f32 = 14.0;
 const BUTTON: f32 = 18.0;
 
@@ -167,15 +169,8 @@ fn node_line<A: Clone>(
     };
     let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), sense);
     let visible = ui.clip_rect().intersects(rect);
-    if node.selected {
-        ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
-    } else if response.hovered() {
-        ui.painter().rect_filled(
-            rect,
-            3.0,
-            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-        );
-    }
+    ui.painter()
+        .add(controls::row_marks(rect, response.hovered(), node.selected));
     let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)
@@ -226,11 +221,20 @@ fn node_line<A: Clone>(
 }
 
 fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut TreeOutput<A>) {
-    ui.label(theme::muted(if open { "▾" } else { "▸" }).size(11.0));
-    let label = ui.label(theme::mono(&node.label).color(if node.note.is_some() {
+    glyph::show(
+        ui,
+        if open {
+            Mark::ChevronDown
+        } else {
+            Mark::ChevronRight
+        },
+        11.0,
+        theme::FAINT,
+    );
+    let label = ui.label(face::body(&node.label).color(if node.note.is_some() {
         theme::MUTED
     } else {
-        theme::CODE
+        theme::TEXT
     }));
     if let Some(note) = &node.note {
         label.on_hover_text(note);
@@ -239,7 +243,7 @@ fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut 
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 4.0;
         for action in &node.actions {
-            if line_button(ui, action.glyph, &action.tip).clicked() {
+            if line_button(ui, action.mark, &action.tip).clicked() {
                 out.action = Some((node.id.clone(), action.action.clone()));
             }
         }
@@ -255,16 +259,22 @@ fn folder_menu<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, out: &mut TreeOutput<A
     }
 }
 
-fn line_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
-    ui.spacing_mut().button_padding = egui::vec2(0.0, 0.0);
-    ui.add(
-        egui::Button::new(egui::RichText::new(glyph).size(13.0).color(theme::TEXT))
-            .fill(theme::RAISED)
-            .stroke(egui::Stroke::new(1.0, theme::BORDER))
-            .corner_radius(3.0)
-            .min_size(egui::vec2(BUTTON, BUTTON)),
-    )
-    .on_hover_text(tip)
+fn line_button(ui: &mut Ui, mark: Mark, tip: &str) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(BUTTON, BUTTON), egui::Sense::click());
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
+    ui.painter().rect(
+        rect,
+        3.0,
+        if response.hovered() {
+            theme::ACCENT_SOFT
+        } else {
+            theme::RAISED
+        },
+        egui::Stroke::new(1.0, theme::BORDER),
+        egui::StrokeKind::Inside,
+    );
+    glyph::paint(ui.painter(), mark, rect.shrink(4.0), theme::TEXT);
+    response.on_hover_text(tip)
 }
 
 fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
@@ -276,8 +286,8 @@ fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeTh
     ui.add_space(14.0);
     let image = match &node.icon {
         TreeIcon::None => None,
-        TreeIcon::Glyph(glyph) => {
-            ui.label(theme::muted(*glyph));
+        TreeIcon::Mark(mark) => {
+            glyph::show(ui, *mark, 13.0, theme::MUTED);
             None
         }
         TreeIcon::Thumb(path) => thumbs

@@ -94,19 +94,19 @@ const MIN_ROWS: usize = 12;
 
 const THEME: ColorTheme = ColorTheme {
     name: "rift",
-    dark: true,
-    bg: "141417",
-    cursor: "e4e4e8",
-    selection: "1e3260",
-    comments: "60626e",
-    functions: "84acf0",
-    keywords: "be9bf0",
-    literals: "f6c960",
-    numerics: "f6c960",
-    punctuation: "8e909c",
-    strs: "72b46f",
-    types: "68a8eb",
-    special: "e97578",
+    dark: false,
+    bg: "e8dcbe",
+    cursor: "2a1f15",
+    selection: "e0cc99",
+    comments: "8e7b60",
+    functions: "2d4e8c",
+    keywords: "6b3a7a",
+    literals: "7a5212",
+    numerics: "7a5212",
+    punctuation: "5e4a33",
+    strs: "2e6245",
+    types: "2d4e8c",
+    special: "8e1f14",
 };
 
 static WGSL: LazyLock<Syntax> = LazyLock::new(|| {

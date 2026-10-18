@@ -129,7 +129,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         let character =
             play::current_character(editor).unwrap_or_else(|| "a test character".to_owned());
         if ui
-            .add(egui::Button::new(format!("▸ Play here as {character}")).shortcut_text("F6"))
+            .add(egui::Button::new(format!("Play here as {character}")).shortcut_text("F6"))
             .clicked()
         {
             action = Some(MenuAction::PlayHere);

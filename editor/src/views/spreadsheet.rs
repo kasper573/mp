@@ -629,7 +629,7 @@ fn toolbar(
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(theme::muted(format!("{shown} of {total} rows")));
-            ui.menu_button("columns ▾", |ui| {
+            ui.menu_button("columns", |ui| {
                 ui.set_min_width(220.0);
                 egui::ScrollArea::vertical()
                     .max_height(400.0)
@@ -715,8 +715,8 @@ fn table_body(
             let painter = ui.painter();
             let sorted = view.sort.as_ref().filter(|(id, _)| *id == column.id);
             let title = match sorted {
-                Some((_, true)) => format!("{} ▾", column.title.to_uppercase()),
-                Some((_, false)) => format!("{} ▴", column.title.to_uppercase()),
+                Some((_, true)) => format!("{} ↓", column.title.to_uppercase()),
+                Some((_, false)) => format!("{} ↑", column.title.to_uppercase()),
                 None => column.title.to_uppercase(),
             };
             let align = if column.numeric {

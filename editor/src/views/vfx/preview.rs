@@ -3,6 +3,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use design_tokens::controls;
+
 use egui::{Pos2, Stroke, Ui};
 use engine::core::geometry::{Degrees, Footprint, Shape};
 use engine::core::math::Pos;
@@ -156,7 +158,11 @@ pub fn preview(
             ui.end_row();
             ui.label(theme::faint("actors").size(12.0));
             ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
-            design_tokens::widgets::slider(ui, egui::Slider::new(count, 1..=MOST_ACTORS));
+            let mut crowd = *count as f32;
+            if controls::slider(ui, &mut crowd, 1.0..=MOST_ACTORS as f32).changed() {
+                *count = crowd.round() as u32;
+            }
+            ui.label(theme::faint(count.to_string()).size(12.0));
             ui.end_row();
             action_combo(ui, action);
         }

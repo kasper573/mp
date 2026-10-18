@@ -15,11 +15,7 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     let ctx = root.ctx().clone();
     let ctx = &ctx;
     egui::CentralPanel::default()
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(60, 40)),
-        )
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(60, 40)))
         .show(root, |ui| {
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
@@ -121,11 +117,8 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
             })
             .response;
         if response.hovered() {
-            ui.painter().rect_filled(
-                response.rect,
-                4.0,
-                egui::Color32::from_rgba_unmultiplied(255, 255, 255, 6),
-            );
+            ui.painter()
+                .rect_filled(response.rect, 0.0, design_tokens::ink::gold_wash(0.2));
         }
         if response.double_clicked() {
             picks.open = Some(folder.clone());
@@ -172,7 +165,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
         ui.label(
-            egui::RichText::new("⟲ Recover unsaved work?")
+            egui::RichText::new("Recover unsaved work?")
                 .strong()
                 .size(18.0),
         );

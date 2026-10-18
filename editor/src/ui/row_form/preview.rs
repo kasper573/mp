@@ -1,4 +1,8 @@
-use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use design_tokens::card::{self, Art, Card};
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Kind, Mark};
+use design_tokens::{TextRole, ink};
+use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::content::Content;
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
@@ -7,10 +11,11 @@ use engine::systems::actor::Action;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::actor::plate::PlateLabel;
 use engine::systems::dialogue::ChoiceReveal;
-use engine::systems::item::ItemDef;
-use engine::systems::quest::{ActiveQuest, Parties, QuestDef};
+use engine::systems::item::card::CardLook;
+use engine::systems::item::{self, ItemDef};
+use engine::systems::quest::{self, ActiveQuest, Parties, QuestDef};
 use engine::systems::script::{Reach, RiftScripts};
-use engine::systems::skill::SkillDef;
+use engine::systems::skill::{self, SkillDef};
 use engine::systems::status::StatusEffectDef;
 use serde_json::Value;
 use strum::VariantArray;
@@ -117,7 +122,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
                         ui.selectable_value(&mut state.direction, direction, direction.as_ref());
                     }
                 });
-            if ui.button(if state.playing { "⏸" } else { "▸" }).clicked() {
+            let (mark, word) = if state.playing {
+                (Mark::Pause, "Pause")
+            } else {
+                (Mark::Play, "Play")
+            };
+            if glyph::button(ui, mark, 14.0, theme::TEXT, word).clicked() {
                 state.playing = !state.playing;
                 state.started = now;
             }
@@ -253,6 +263,10 @@ pub(super) fn draw_preview(
         });
         return;
     }
+    if table == "item" {
+        item_card(editor, ui, &content, key);
+        ui.add_space(12.0);
+    }
     let center = stage::center(&content);
     let mut posed = Posed::default();
     if table == "item" {
@@ -338,8 +352,10 @@ pub(super) fn quest_card(
     let def = id.get(content);
     let parties = Parties::of(content, content.built::<RiftScripts>());
     let progress = def.progress(content, &parties, &ActiveQuest::fresh(content, id), None);
-    let ink = Color32::from_rgb(236, 230, 214);
-    let soft = Color32::from_rgba_unmultiplied(236, 230, 214, 150);
+    let art = form
+        .thumbnails
+        .image(ctx, files, def.icon(content).as_str())
+        .map(|thumb| thumb.texture.id());
     let mut icon = |ui: &mut Ui, path: &str, size: f32| {
         if let Some(thumb) = form.thumbnails.image(ctx, files, path) {
             ui.add(egui::Image::from_texture((
@@ -350,83 +366,112 @@ pub(super) fn quest_card(
             ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
         }
     };
-    egui::Frame::new()
-        .fill(Color32::from_rgb(38, 32, 28))
-        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(120, 96, 60)))
-        .corner_radius(8.0)
-        .inner_margin(14.0)
-        .show(ui, |ui| {
-            ui.set_width(width - 28.0);
-            ui.spacing_mut().item_spacing.y = 8.0;
+    let band = format!("quest offer · {}", def.category.to_lowercase());
+    let mut shown = Card::new(Kind::Quest, &def.title);
+    shown.band = &band;
+    shown.art = Art {
+        icon: art,
+        height: card::ART_QUEST,
+    };
+    shown.width = width.min(card::DOCKED_WIDTH);
+    shown.show(ui, |ui, plate| {
+        if plate.name_cut {
+            card::full_name(ui, &def.title);
+        }
+        card::overview(ui, &quest::card::overview(def));
+        card::overview(ui, &def.meta(&parties, id));
+        card::heading(ui, "objectives");
+        for (objective, progress) in def.objectives().zip(&progress) {
             ui.horizontal(|ui| {
-                icon(ui, def.icon(content).as_str(), 28.0);
-                ui.label(RichText::new(&def.title).size(17.0).color(ink).strong());
-            });
-            ui.label(
-                RichText::new(format!("{} · {}", def.kinds(), def.meta(&parties, id)))
-                    .size(12.0)
-                    .color(soft),
-            );
-            ui.label(RichText::new(&def.blurb).size(13.0).color(ink));
-            ui.label(RichText::new("OBJECTIVES").size(11.0).color(soft));
-            for (objective, progress) in def.objectives().zip(&progress) {
-                ui.horizontal(|ui| {
-                    icon(ui, objective.icon(content).as_str(), 20.0);
-                    ui.label(RichText::new(&progress.label).size(13.0).color(ink));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if progress.counted {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!("{} / {}", progress.have, progress.need))
-                                    .size(12.5)
-                                    .color(ink),
-                            );
-                        });
-                    }
-                });
-            }
-            if def.reveals(ChoiceReveal::Gains) {
-                ui.label(RichText::new("REWARDS").size(11.0).color(soft));
-                ui.horizontal_wrapped(|ui| {
-                    if def.xp > 0 {
-                        widgets::chip_colored(
-                            ui,
-                            &format!("{} XP", def.xp),
-                            Color32::TRANSPARENT,
-                            ink,
+                        ui.label(
+                            TextRole::CardBody
+                                .rich(format!("{} / {}", progress.have, progress.need)),
                         );
                     }
-                    for stack in def.rewards() {
-                        let item = stack.item.get(content);
-                        ui.horizontal(|ui| {
-                            icon(ui, item.icon.as_str(), 16.0);
-                            let label = if stack.count == 1 {
-                                item.name.clone()
-                            } else {
-                                format!("{} ×{}", item.name, stack.count)
-                            };
-                            widgets::chip_colored(ui, &label, Color32::TRANSPARENT, ink);
-                        });
-                    }
-                });
-                if !def.pick_one().is_empty() {
-                    ui.label(
-                        RichText::new("PICK ONE WHEN YOU RETURN")
-                            .size(11.0)
-                            .color(soft),
-                    );
-                    ui.horizontal(|ui| {
-                        for stack in def.pick_one() {
-                            icon(ui, stack.item.get(content).icon.as_str(), 28.0);
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 5.0;
+                        glyph::show(ui, Mark::Flag, 13.0, ink::INK);
+                        if let Some(asset) = objective.icon(content) {
+                            icon(ui, asset.as_str(), 20.0);
                         }
+                        ui.add(
+                            egui::Label::new(TextRole::CardBody.rich(progress.label.as_str()))
+                                .wrap(),
+                        );
+                    });
+                });
+            });
+        }
+        if def.reveals(ChoiceReveal::Gains) {
+            card::heading(ui, "rewards");
+            ui.horizontal_wrapped(|ui| {
+                if def.xp > 0 {
+                    controls::pill(ui, &format!("{} XP", def.xp), Pill::Gold);
+                }
+                for stack in def.rewards() {
+                    let item = stack.item.get(content);
+                    controls::pill_with(ui, Pill::Gold, |ui| {
+                        icon(ui, item.icon.as_str(), 16.0);
+                        ui.label(quest::card::counted(content, *stack));
                     });
                 }
+            });
+            if !def.pick_one().is_empty() {
+                card::heading(ui, "pick one when you return");
+                ui.horizontal(|ui| {
+                    for stack in def.pick_one() {
+                        icon(ui, stack.item.get(content).icon.as_str(), 28.0);
+                    }
+                });
             }
-            ui.label(
-                RichText::new("Accept or decline in the conversation")
-                    .size(12.0)
-                    .color(soft),
-            );
-        });
+        }
+        card::foot(ui, "Accept or decline in the conversation");
+    });
+}
+
+/// The item's card as a player reads it when nobody in particular holds it.
+fn item_card(editor: &mut Editor, ui: &mut Ui, content: &Content, key: &str) {
+    let Some(item) = content.by_key::<ItemDef>(key) else {
+        return;
+    };
+    let ctx = ui.ctx().clone();
+    let Editor { project, form, .. } = editor;
+    let files = &project.as_ref().expect("a project").files;
+    let def = item.get(content);
+    let art = form
+        .thumbnails
+        .image(&ctx, files, def.icon.as_str())
+        .map(|thumb| thumb.texture.id());
+    let look = CardLook {
+        width: ui.available_width().min(card::WIDTH),
+        closable: false,
+        ..CardLook::PINNED
+    };
+    item::card::face_of(def, art, look).show(ui, |ui, plate| {
+        item::card::describe(ui, content, item, plate, |_| None);
+        let granted = skill::grants_of(content, item);
+        if !granted.is_empty() {
+            card::heading(ui, "grants while worn");
+        }
+        for granted in granted {
+            let skill = granted.get(content);
+            item::card::grant_line(ui, skill, |ui| {
+                match form.thumbnails.image(&ctx, files, skill.icon.as_str()) {
+                    Some(thumb) => {
+                        ui.add(egui::Image::from_texture((
+                            thumb.texture.id(),
+                            Vec2::splat(card::GRANT_ICON),
+                        )));
+                    }
+                    None => {
+                        ui.allocate_exact_size(Vec2::splat(card::GRANT_ICON), Sense::hover());
+                    }
+                }
+            });
+        }
+    });
 }
 
 fn attitude(content: &Content, table: &str, key: &str, value: &Value) -> Option<bool> {

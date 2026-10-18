@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 
 use egui::{Align2, Key, Pos2, Ui};
@@ -180,7 +181,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                 .stroke(egui::Stroke::new(1.0, theme::BORDER))
                 .corner_radius(6.0)
                 .inner_margin(egui::Margin::same(8))
-                .shadow(theme::SHADOW)
+                .shadow(design_tokens::slip::SHADOW)
                 .show(ui, |ui| {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
@@ -427,11 +428,17 @@ fn group_row(
     }
     let font = egui::FontId::monospace(12.5);
     let ink = if selected { theme::TEXT } else { theme::MUTED };
-    ui.painter().text(
-        rect.left_center() + egui::vec2(6.0, 0.0),
-        Align2::LEFT_CENTER,
-        if open { "▾" } else { "▸" },
-        egui::FontId::proportional(11.0),
+    glyph::paint(
+        ui.painter(),
+        if open {
+            Mark::ChevronDown
+        } else {
+            Mark::ChevronRight
+        },
+        egui::Rect::from_min_size(
+            rect.left_center() + egui::vec2(6.0, -4.5),
+            egui::vec2(9.0, 9.0),
+        ),
         theme::FAINT,
     );
     let name = ui.painter().text(

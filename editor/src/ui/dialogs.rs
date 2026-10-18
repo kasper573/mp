@@ -1,3 +1,5 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{TextRole, sheet};
 use std::path::{Path, PathBuf};
 
 use egui::{Context, RichText, Ui};
@@ -31,17 +33,26 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
 }
 
 fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
-    egui::Window::new(RichText::new(title).strong().size(16.0))
+    let mut under = None;
+    let shown = egui::Window::new(title)
+        .title_bar(false)
         .collapsible(false)
         .resizable(true)
-        .frame(
-            egui::Frame::window(&ctx.global_style())
-                .fill(theme::RAISED)
-                .inner_margin(16.0),
-        )
+        .frame(egui::Frame::new().inner_margin(NOTE_PADDING))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-        .show(ctx, body);
+        .show(ctx, |ui| {
+            under = Some(ui.painter().add(egui::Shape::Noop));
+            ui.label(TextRole::NoteTitle.rich(title).color(theme::TEXT));
+            ui.add_space(6.0);
+            body(ui);
+        });
+    if let Some((shown, under)) = shown.zip(under) {
+        let painter = ctx.layer_painter(shown.response.layer_id);
+        sheet::paint_note(&painter, under, shown.response.rect);
+    }
 }
+
+const NOTE_PADDING: i8 = 20;
 
 #[derive(Default)]
 pub struct DialogKeys {
@@ -81,15 +92,10 @@ pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .order(egui::Order::Middle)
         .show(ctx, |ui| {
-            egui::Frame::window(&ctx.global_style())
-                .fill(theme::RAISED)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(8.0)
-                .inner_margin(20.0)
-                .show(ui, |ui| {
-                    ui.set_width(width);
-                    body(ui);
-                });
+            sheet::note(ui, egui::Margin::same(NOTE_PADDING), |ui| {
+                ui.set_width(width);
+                body(ui);
+            });
         });
 }
 
@@ -764,7 +770,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             card(ctx, "delete", 620.0, |ui| {
                 pressed = keys(ui);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("✕").color(theme::DANGER).size(16.0));
+                    glyph::show(ui, Mark::Cross, 16.0, theme::DANGER);
                     ui.label(
                         RichText::new(format!(
                             "Delete {}/{}",
@@ -1027,11 +1033,11 @@ const KEY_SHEET: [(&str, &[(&str, &str)]); 4] = [
         &[
             ("Ctrl P", "search rows, keys and files"),
             ("Ctrl S", "save every unsaved file"),
-            ("Ctrl Z  Ctrl ⇧ Z", "undo · redo"),
+            ("Ctrl Z  Ctrl Shift Z", "undo · redo"),
             ("F5  F6", "play from its own start · play here"),
             ("Ctrl W", "close the tab"),
             ("F2", "rename the selected row's key"),
-            ("⇧ F12", "show usages"),
+            ("Shift F12", "show usages"),
             ("Ctrl D", "duplicate"),
             ("Del", "delete, after showing usages"),
             ("F1", "this sheet"),
@@ -1056,13 +1062,13 @@ const KEY_SHEET: [(&str, &[(&str, &str)]); 4] = [
             ("Alt click", "listen at a spot"),
             ("Ctrl C  Ctrl V", "copy · paste at the cursor"),
             ("Space drag  wheel", "pan · zoom"),
-            ("Arrows", "nudge the selection a tile; ⇧ for 1/16"),
+            ("Arrows", "nudge the selection a tile; Shift for 1/16"),
         ],
     ),
     (
         "World map",
         &[
-            ("−  =", "selected cards 10% smaller · bigger; ⇧ for 1%"),
+            ("−  =", "selected cards 10% smaller · bigger; Shift for 1%"),
             ("Arrows", "move the selection"),
             ("Ctrl A", "select every card"),
             ("P", "pin · unpin"),
@@ -1075,7 +1081,10 @@ const KEY_SHEET: [(&str, &[(&str, &str)]); 4] = [
         &[
             ("Space", "play or pause the strip"),
             (",  .", "step a frame"),
-            ("Alt ←  Alt →", "frames 10 ms shorter · longer; ⇧ for 1 ms"),
+            (
+                "Alt ←  Alt →",
+                "frames 10 ms shorter · longer; Shift for 1 ms",
+            ),
             ("Ctrl ←  Ctrl →", "move the frame"),
             ("Ctrl D", "duplicate the frame"),
             ("A  S  T", "apex · sound · step cue on the frame"),

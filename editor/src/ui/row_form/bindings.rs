@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
 use serde_json::Value;
 
@@ -43,10 +44,7 @@ pub(super) fn bindings_section(
                     ui.horizontal(|ui| {
                         widgets::key_hint(ui, &keys);
                         ui.label(theme::mono(kind).size(12.5));
-                        if ui
-                            .add(egui::Label::new(theme::faint("✕")).sense(Sense::click()))
-                            .clicked()
-                        {
+                        if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove").clicked() {
                             remove = Some(index);
                         }
                     });

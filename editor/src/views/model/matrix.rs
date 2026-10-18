@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
@@ -96,7 +98,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             let out_of_step: usize = timings.values().map(super::ActionTiming::stragglers).sum();
             ui.horizontal(|ui| {
                 if out_of_step == 0 {
-                    ui.label(RichText::new("✓").color(theme::OK));
+                    glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                     ui.label(theme::muted(format!(
                         "{strips} strips · {frames_total} frames · all match"
                     )));
@@ -107,7 +109,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     )));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("🗋 Import onto this model…").clicked() {
+                    if controls::marked(ui, Mark::Page, "Import onto this model…").clicked() {
                         import::start_for_model(editor, key);
                     }
                 });
@@ -116,7 +118,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 ui.horizontal(|ui| {
                     let export = import::show_path(editor, &record.export);
                     if record.missing() {
-                        ui.label(theme::warn("⚠"));
+                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted(format!(
                             "imported from {export}, which is missing now"
                         )));
@@ -302,11 +304,11 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.horizontal(|ui| {
                         for cue in frame.cues() {
                             let text = match cue {
-                                super::FrameCueKind::Apex => "◆ apex".to_owned(),
+                                super::FrameCueKind::Apex => "apex".to_owned(),
                                 super::FrameCueKind::Sound => {
-                                    format!("♫ {}", frame.sound.clone().unwrap_or_default())
+                                    format!("sound {}", frame.sound.clone().unwrap_or_default())
                                 }
-                                super::FrameCueKind::Step => "● step".to_owned(),
+                                super::FrameCueKind::Step => "step".to_owned(),
                             };
                             widgets::chip_colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }

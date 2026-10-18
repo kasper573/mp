@@ -664,7 +664,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         }
         if ui.available_width() > 120.0 {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.menu_button("🗋 Import ▾", |ui| {
+                ui.menu_button("Import", |ui| {
                     if ui.button("Onto this tileset…").clicked() {
                         import = Some(Reimport::Tiles);
                         ui.close();

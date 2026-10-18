@@ -1,67 +1,35 @@
-use design_tokens::ThemeFonts;
-use egui::{Color32, Context, FontData, FontDefinitions, FontFamily, RichText};
+//! The editor's names for the parchment inks, so its panels speak of what a colour is for.
 
-pub use design_tokens::SHADOW;
-pub use design_tokens::color::{
-    ACCENT, ACCENT_SOFT, BG, BORDER, CODE, DANGER, FAINT, INPUT, MUTED, OK, OVERLAY, PANEL, RAISED,
-    SELECTION, TEXT, WARN,
-};
-pub use design_tokens::family::medium;
+use design_tokens::{Face, ink};
+use egui::{Color32, Context, FontFamily, RichText};
 
-pub const VARIABLE: Color32 = Color32::from_rgb(176, 140, 230);
-pub const VARIABLE_FILL: Color32 = Color32::from_rgba_premultiplied(21, 16, 27, 30);
-pub const CANVAS: Color32 = Color32::from_rgb(20, 20, 24);
-pub const BLOCKED: Color32 = Color32::from_rgb(220, 60, 60);
-pub const SORT_LINE: Color32 = Color32::from_rgb(120, 170, 255);
+pub const TEXT: Color32 = ink::INK;
+pub const MUTED: Color32 = ink::INK2;
+pub const FAINT: Color32 = ink::INK3;
+pub const CODE: Color32 = ink::INK2;
+pub const DANGER: Color32 = ink::RUBRIC;
+pub const OK: Color32 = ink::VERDIGRIS;
+pub const WARN: Color32 = ink::OCHRE;
+pub const ACCENT: Color32 = ink::RUBRIC;
+pub const ACCENT_SOFT: Color32 = Color32::from_rgba_premultiplied(37, 29, 9, 51);
+pub const SELECTION: Color32 = Color32::from_rgba_premultiplied(51, 40, 12, 71);
+pub const BORDER: Color32 = Color32::from_rgba_premultiplied(15, 11, 7, 89);
+pub const INPUT: Color32 = Color32::from_rgba_premultiplied(2, 1, 1, 10);
+pub const PANEL: Color32 = ink::CREAM;
+pub const RAISED: Color32 = ink::LIGHT;
+pub const OVERLAY: Color32 = ink::CREAM;
+pub const VARIABLE: Color32 = ink::TYRIAN;
+pub const VARIABLE_FILL: Color32 = Color32::from_rgba_premultiplied(8, 5, 10, 20);
+pub const CANVAS: Color32 = Color32::from_rgb(219, 207, 178);
+pub const BLOCKED: Color32 = ink::RUBRIC;
+pub const SORT_LINE: Color32 = ink::AZURE;
 
 pub fn apply(ctx: &Context) {
-    ctx.set_fonts(fonts());
     design_tokens::apply(ctx);
 }
 
-/// The theme's faces, bundled from the new-game template, and a symbols face for the editor's
-/// glyphs (arrows, music notes, box marks). The named families reach it before egui's built-ins.
-fn fonts() -> FontDefinitions {
-    let face = |bytes: &'static [u8]| FontData::from_static(bytes);
-    let mut fonts = design_tokens::fonts(ThemeFonts {
-        circular_400: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/circular-400-normal.ttf"
-        )),
-        circular_500: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/circular-500-normal.ttf"
-        )),
-        circular_700: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/circular-700-normal.ttf"
-        )),
-        lato_400: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/lato-400-normal.ttf"
-        )),
-        lato_400_italic: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/lato-400-italic.ttf"
-        )),
-        lato_700: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/lato-700-normal.ttf"
-        )),
-        lato_700_italic: face(include_bytes!(
-            "../../templates/new_game/assets/fonts/lato-700-italic.ttf"
-        )),
-    });
-    fonts.font_data.insert(
-        "symbols".to_owned(),
-        FontData::from_static(include_bytes!("../../assets/DejaVuSans.ttf")).into(),
-    );
-    let builtins: Vec<String> = FontDefinitions::default().font_data.into_keys().collect();
-    for (family, faces) in fonts.families.iter_mut() {
-        let at = match family {
-            FontFamily::Name(_) => faces
-                .iter()
-                .position(|face| builtins.contains(face))
-                .unwrap_or(faces.len()),
-            _ => faces.len(),
-        };
-        faces.insert(at, "symbols".to_owned());
-    }
-    fonts
+pub fn medium() -> FontFamily {
+    Face::BookMedium.family()
 }
 
 pub fn ok(text: impl Into<String>) -> RichText {
@@ -98,22 +66,14 @@ pub fn strong(text: impl Into<String>) -> RichText {
 
 pub fn badge_color(kind: &str) -> Color32 {
     match kind {
-        "population" | "resident" | "npc" | "player" | "nameplate" | "tint" | "voice" => {
-            Color32::from_rgb(214, 168, 42)
-        }
-        "object" | "safe_zone" | "area" | "walk" => Color32::from_rgb(76, 170, 96),
-        "shared_script" | "inline_script" | "script" | "shown" | "requires" => {
-            Color32::from_rgb(204, 96, 164)
-        }
-        "soundscape" | "sfx" | "babble" | "step" => Color32::from_rgb(134, 110, 220),
-        "loot" | "item" | "stack" | "reward" | "hold" | "deliver" | "offer" | "shop" => {
-            Color32::from_rgb(52, 160, 184)
-        }
-        "blueprint" | "scenery" | "tileset" | "model" | "bust" => Color32::from_rgb(96, 128, 196),
-        "respawn" | "quest" | "defeat" | "hand_in" | "task" | "decide" | "pick_one" => {
-            Color32::from_rgb(222, 112, 96)
-        }
-        _ => Color32::from_rgb(120, 124, 136),
+        "population" | "resident" | "npc" | "player" | "nameplate" | "tint" | "voice" => ink::OCHRE,
+        "object" | "safe_zone" | "area" | "walk" => ink::VERDIGRIS,
+        "shared_script" | "inline_script" | "script" | "shown" | "requires" => ink::TYRIAN,
+        "soundscape" | "sfx" | "babble" | "step" => ink::GOLD,
+        "loot" | "item" | "stack" | "reward" | "hold" | "deliver" | "offer" | "shop" => ink::AZURE,
+        "blueprint" | "scenery" | "tileset" | "model" | "bust" => ink::INK2,
+        "respawn" | "quest" | "defeat" | "hand_in" | "task" | "decide" | "pick_one" => ink::RUBRIC,
+        _ => ink::INK3,
     }
 }
 
@@ -123,7 +83,7 @@ pub fn badge_letter(kind: &str) -> String {
         "population" | "resident" | "npc" => "N".to_owned(),
         "object" => "P".to_owned(),
         "safe_zone" => "Z".to_owned(),
-        "soundscape" => "♪".to_owned(),
+        "soundscape" => "A".to_owned(),
         "blueprint" | "scenery" => "L".to_owned(),
         "loot" | "item" => "I".to_owned(),
         "respawn" => "F".to_owned(),

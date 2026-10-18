@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
 use egui::Ui;
@@ -89,8 +90,7 @@ fn rank_card(
                 ui.label(theme::muted(format!("at this rank: {}", summed.join(" · "))).size(12.0));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                     .on_hover_text("Remove this rank")
                     .clicked()
                 {
@@ -139,8 +139,7 @@ fn rank_card(
                     &stat_path,
                     false,
                 );
-                if ui
-                    .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                     .on_hover_text(format!("Unset {key}"))
                     .clicked()
                 {

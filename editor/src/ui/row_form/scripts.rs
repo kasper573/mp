@@ -1,6 +1,7 @@
+use design_tokens::glyph;
 use std::str::FromStr;
 
-use egui::{Align, Layout, RichText, Ui};
+use egui::{Align, Layout, Ui};
 use engine::core::script::VariableType;
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
@@ -65,11 +66,7 @@ pub fn script_cards(
         ui.add_space(2.0);
     }
     ui.horizontal(|ui| {
-        let button = ui.add(
-            egui::Button::new(RichText::new("+ Add script").color(theme::TEXT))
-                .fill(theme::RAISED)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER)),
-        );
+        let button = design_tokens::controls::button(ui, "+ Add script");
         egui::Popup::from_toggle_button_response(&button)
             .id(ui.id().with(("add-script", path)))
             .width(300.0)
@@ -258,8 +255,8 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
                     if let Some(via) = &row.via {
                         ui.label(theme::code(format!("{via} →")).size(12.0));
                     }
-                    let (glyph, color) = graph::kind_glyph(node);
-                    ui.label(RichText::new(glyph).color(color).size(12.0));
+                    let (mark, color) = graph::kind_mark(node);
+                    glyph::show(ui, mark, 11.0, color);
                     ui.label(theme::mono(node.kind()).size(12.5).strong());
                     ui.label(theme::mono(&row.name).size(12.5).color(theme::CODE));
                     if !summary.is_empty() {

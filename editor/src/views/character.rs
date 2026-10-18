@@ -1,6 +1,8 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
-use egui::{Align, Layout, RichText, Ui, Vec2};
+use egui::{Align, Layout, Ui, Vec2};
 use engine::core::content::Content;
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -153,7 +155,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.label(theme::faint(key.to_uppercase()).monospace().size(11.5));
-                ui.menu_button(theme::faint("▾"), |ui| {
+                ui.menu_button(theme::faint("other…"), |ui| {
                     for other in &characters {
                         if ui
                             .selectable_label(other == key, theme::mono(other).size(12.5))
@@ -846,7 +848,7 @@ fn start(
             );
         }
         ui.horizontal(|ui| {
-            if ui.button("📍 Pick on the map").clicked() {
+            if controls::marked(ui, Mark::Pin, "Pick on the map").clicked() {
                 if at_spawn {
                     value["start"] = serde_json::json!({ "area": area_key, "x": at.x, "y": at.y });
                     changed = FormChange::at("/start");
@@ -1193,11 +1195,7 @@ fn quests(
                 view.more_quests = true;
             }
             ui.add_space(6.0);
-            let response = ui.add(
-                egui::Button::new(RichText::new("Set up for… ▾").color(egui::Color32::WHITE))
-                    .fill(theme::ACCENT)
-                    .corner_radius(4.0),
-            );
+            let response = controls::marked(ui, Mark::ChevronDown, "Set up for…");
             egui::Popup::from_toggle_button_response(&response)
                 .width(300.0)
                 .show(|ui| {
@@ -1515,8 +1513,7 @@ fn memories(
                     .monospace(),
                 );
                 if entry.is_some()
-                    && ui
-                        .add(egui::Label::new(theme::faint("✕")).sense(egui::Sense::click()))
+                    && glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                         .on_hover_text("Unset")
                         .clicked()
                 {
@@ -1646,12 +1643,12 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     widgets::kv_code(ui, "file", row_file(TABLE, key));
     ui.add_space(6.0);
     ui.horizontal(|ui| {
-        if widgets::primary(ui, &format!("▸ Play as {key}")).clicked() {
+        if controls::marked_primary(ui, Mark::Play, format!("Play as {key}")).clicked() {
             editor.play.character = Some(key.to_owned());
             editor.settings.last_play = Some(key.to_owned());
             play::start(editor, None);
         }
-        if ui.button("⑂ Duplicate").clicked() {
+        if controls::marked(ui, Mark::Fork, "Duplicate").clicked() {
             row_form::act(
                 editor,
                 FormAction::RowAction(BrowserAction::Duplicate),

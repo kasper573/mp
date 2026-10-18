@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, RichText, Sense, Ui, Vec2};
 use serde_json::Value;
 
@@ -29,10 +30,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         ui.label(RichText::new("◆").color(theme::WARN));
         ui.label(theme::strong("apex"));
         ui.label(theme::muted("the hit lands ·"));
-        ui.label(RichText::new("♫").color(theme::ACCENT));
+        glyph::show(ui, Mark::Note, 14.0, theme::ACCENT);
         ui.label(theme::strong("sound"));
         ui.label(theme::muted("plays a sound row ·"));
-        ui.label(RichText::new("●").color(theme::WARN));
+        glyph::show(ui, Mark::Dot, 10.0, theme::WARN);
         ui.label(theme::strong("step"));
         ui.label(theme::muted(
             "plays the footstep of the surface underfoot. Each rides its frame.",

@@ -2,6 +2,8 @@ pub mod bindings;
 pub mod preview;
 
 use self::preview::PreviewPlace;
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -10,7 +12,7 @@ pub mod usages;
 
 use std::collections::BTreeMap;
 
-use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::ModuleRule;
 use serde_json::Value;
 
@@ -360,11 +362,7 @@ fn modules_column(
             shown,
         );
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let button = ui.add(
-                egui::Button::new(RichText::new("+ Add module").color(Color32::WHITE))
-                    .fill(theme::ACCENT)
-                    .stroke(egui::Stroke::NONE),
-            );
+            let button = controls::primary(ui, "+ Add module");
             let popup = egui::Popup::from_toggle_button_response(&button)
                 .id(ui.id().with("add-module"))
                 .width(330.0);
@@ -492,7 +490,16 @@ fn modules_column(
                                 ui.close();
                             }
                         });
-                        ui.label(theme::faint(if folded { "▸" } else { "▾" }).size(11.0));
+                        glyph::show(
+                            ui,
+                            if folded {
+                                Mark::ChevronRight
+                            } else {
+                                Mark::ChevronDown
+                            },
+                            11.0,
+                            theme::FAINT,
+                        );
                     });
                 })
                 .response

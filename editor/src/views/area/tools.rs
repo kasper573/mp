@@ -26,26 +26,28 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         let (rect, response) = ui.allocate_exact_size(Vec2::new(32.0, 34.0), egui::Sense::click());
         let painter = ui.painter();
         if selected {
-            painter.rect_filled(rect, 5.0, theme::ACCENT);
+            painter.rect(
+                rect,
+                4.0,
+                theme::SELECTION,
+                egui::Stroke::new(1.0, theme::TEXT),
+                egui::StrokeKind::Inside,
+            );
         } else if response.hovered() {
-            painter.rect_filled(rect, 5.0, theme::RAISED);
+            painter.rect_filled(rect, 4.0, theme::ACCENT_SOFT);
         }
-        let ink = if selected {
-            Color32::WHITE
-        } else {
-            theme::TEXT
-        };
-        tool_icon(painter, tool, rect.center() - Vec2::new(0.0, 3.0), ink);
+        tool_icon(
+            painter,
+            tool,
+            rect.center() - Vec2::new(0.0, 3.0),
+            theme::TEXT,
+        );
         painter.text(
             rect.right_bottom() - Vec2::new(4.0, 2.0),
             egui::Align2::RIGHT_BOTTOM,
             tool.icon(),
             egui::FontId::monospace(9.0),
-            if selected {
-                Color32::WHITE
-            } else {
-                theme::MUTED
-            },
+            theme::MUTED,
         );
         if response
             .on_hover_text(format!("{} ({})", tool.label(), tool.icon()))
@@ -296,7 +298,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         editor
             .status
             .left
-            .push("Ctrl ⇧ V pastes at the same tiles".to_owned());
+            .push("Ctrl Shift V pastes at the same tiles".to_owned());
     }
     let view = editor.views.area.view(view_key);
     let Some(cell) = frame.pointer_cell() else {

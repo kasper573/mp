@@ -109,7 +109,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .as_ref()
                     .is_some_and(|lengths| *lengths != super::lengths(&frames));
                 if ui
-                    .add_enabled(can_revert, egui::Button::new("↶ Revert to the import"))
+                    .add_enabled(can_revert, egui::Button::new("Revert to the import"))
                     .on_disabled_hover_text(if recorded.is_some() {
                         "The lengths are the import's"
                     } else {
@@ -184,7 +184,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
             let on = direction == strip.direction;
             let marked = timing.out_of_step(direction);
             let text = if marked {
-                format!("{} ●", direction.as_ref())
+                format!("{} •", direction.as_ref())
             } else {
                 direction.as_ref().to_owned()
             };
@@ -617,7 +617,7 @@ pub fn lanes(
                             }
                         }
                         let galley = painter.layout_no_wrap(
-                            format!("♫ {sound}"),
+                            sound.to_string(),
                             egui::FontId::monospace(11.0),
                             theme::TEXT,
                         );
@@ -1147,8 +1147,8 @@ pub fn confirm(
         .collect();
     let others = Direction::VARIANTS.len() - 1 - mismatched.len();
     let (title, noun) = match what {
-        StripConfirm::Timing => ("⑂ Apply timing to the other directions", "lengths"),
-        StripConfirm::Cues => ("⑂ Copy cues to the other directions", "cues"),
+        StripConfirm::Timing => ("Apply timing to the other directions", "lengths"),
+        StripConfirm::Cues => ("Copy cues to the other directions", "cues"),
     };
     let mut answer = None;
     dialogs::card(ctx, "model-confirm", 420.0, |ui| {

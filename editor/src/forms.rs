@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::{HashMap, HashSet};
 
 use egui::Ui;
@@ -503,11 +504,7 @@ pub fn object_without(
                 }
                 if optional {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Label::new(theme::faint("✕").size(11.0))
-                                    .sense(egui::Sense::click()),
-                            )
+                        if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                             .on_hover_text(format!("Unset {name}"))
                             .clicked()
                         {
@@ -594,8 +591,7 @@ fn params_map(ui: &mut Ui, cx: &mut FormCx, at: ParamsMapField, parent: &mut Val
                     ui.set_min_width(ui.available_width() - 24.0);
                     changed |= self::value(ui, cx, value_schema, entry, &entry_path);
                 });
-                if ui
-                    .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                     .on_hover_text("Leave it to the vfx")
                     .clicked()
                 {
@@ -625,8 +621,7 @@ fn params_map(ui: &mut Ui, cx: &mut FormCx, at: ParamsMapField, parent: &mut Val
         .collect();
     for key in stale {
         ui.horizontal(|ui| {
-            if ui
-                .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+            if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                 .on_hover_text("Drop it")
                 .clicked()
             {
@@ -972,12 +967,9 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                             }
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let response = ui
-                                .add(
-                                    egui::Label::new(theme::faint("✕").size(11.0))
-                                        .sense(egui::Sense::click()),
-                                )
-                                .on_hover_text("Remove");
+                            let response =
+                                glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
+                                    .on_hover_text("Remove");
                             if response.clicked() {
                                 remove = Some(index);
                             }
@@ -1538,7 +1530,7 @@ fn place(
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
-                .button("⌖ pick")
+                .add(egui::Button::new("pick"))
                 .on_hover_text("Pick the place on its area")
                 .clicked()
             {

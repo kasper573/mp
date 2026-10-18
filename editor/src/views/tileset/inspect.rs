@@ -1,4 +1,6 @@
-use egui::{RichText, Ui};
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
+use egui::Ui;
 use engine::systems::area::tileset::TileData;
 use serde_json::Value;
 use strum::VariantArray;
@@ -172,7 +174,7 @@ fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     widgets::section(ui, &format!("Selection · {}", selection.text()));
     ui.horizontal(|ui| {
-        if ui.button("▣ Make blueprint from these tiles…").clicked() {
+        if controls::marked(ui, Mark::Grid, "Make blueprint from these tiles…").clicked() {
             let dialog = TileBlueprintDialog {
                 name: format!("{key}_{}_{}", selection.x, selection.y),
                 error: None,
@@ -180,8 +182,7 @@ fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str) {
             editor.views.tileset.view_mut(key).dialog =
                 Some(TileSheetDialog::MakeBlueprint(dialog));
         }
-        if ui
-            .small_button("✕")
+        if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
             .on_hover_text("Clear the selection")
             .clicked()
         {
@@ -258,7 +259,7 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 widgets::kv_text(ui, "tiles", tile_text);
                 widgets::kv(ui, "mixes", |ui| {
                     if mixes.missing.is_empty() {
-                        ui.label(RichText::new("✓").color(theme::OK));
+                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                         ui.label(format!("all {} beyond its base", mixes.total));
                         return;
                     }

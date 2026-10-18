@@ -178,13 +178,13 @@ fn code_pane(
         editor.apply(edit);
     }
     let status = match &verdict {
-        Ok(()) => theme::ok("✓ compiles"),
+        Ok(()) => theme::ok("compiles"),
         Err(error) => {
             let place = match error.place {
                 ErrorPlace::Text { line, column } => format!("line {line}:{column} · "),
                 _ => String::new(),
             };
-            theme::warn(format!("✗ {place}{}", error.message))
+            theme::warn(format!("{place}{}", error.message))
         }
     };
     let heading = egui::Rect::from_min_size(

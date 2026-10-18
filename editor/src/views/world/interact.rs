@@ -338,7 +338,7 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
     if area::load(&map.content, id).grid.walkable(cell) {
         let character = play::current_character(editor).unwrap_or_else(|| "…".to_owned());
         if ui
-            .add(egui::Button::new(format!("▸ Play here as {character}")).shortcut_text("F6"))
+            .add(egui::Button::new(format!("Play here as {character}")).shortcut_text("F6"))
             .clicked()
         {
             play::start(editor, Some(place));

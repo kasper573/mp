@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
 use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
@@ -96,7 +98,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let searching = !state.search.trim().is_empty();
     if searching || state.only_unsaved || state.only_fixtures {
         ui.horizontal(|ui| {
-            if widgets::toggle_chip(ui, "● unsaved", state.only_unsaved).clicked() {
+            if widgets::toggle_chip(ui, "unsaved", state.only_unsaved).clicked() {
                 state.only_unsaved = !state.only_unsaved;
             }
             if widgets::toggle_chip(ui, "fixtures", state.only_fixtures).clicked() {
@@ -156,7 +158,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
             },
             &mut |folder| {
                 let open = TreeAction {
-                    glyph: "▦",
+                    mark: Mark::Grid,
                     tip: "Open table".to_owned(),
                     menu_label: "Open table".to_owned(),
                     action: FolderAction::OpenTable,
@@ -168,7 +170,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 } else {
                     folder.actions = vec![
                         TreeAction {
-                            glyph: "+",
+                            mark: Mark::Plus,
                             tip: format!("New {}", folder.label),
                             menu_label: format!("New {}…", folder.label),
                             action: FolderAction::New,
@@ -184,7 +186,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         let unsaved = project.is_unsaved(GAME_FILE);
         if !only_unsaved || unsaved {
             let mut game = TreeNode::leaf(GAME_FILE, "game");
-            game.icon = TreeIcon::Glyph("⚙");
+            game.icon = TreeIcon::Mark(Mark::Gear);
             game.selected = selection.is_game();
             game.unsaved = unsaved;
             nodes.insert(0, game);
@@ -623,11 +625,15 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                         }
                     }
                     Hit::File { path, folder } => {
-                        let icon = if *folder { "▸" } else { "▫" };
+                        let icon = if *folder {
+                            Mark::ChevronRight
+                        } else {
+                            Mark::Page
+                        };
                         let response = ui
                             .horizontal(|ui| {
                                 ui.add_space(6.0);
-                                ui.label(theme::muted(icon));
+                                glyph::show(ui, icon, 11.0, theme::MUTED);
                                 let sense = if *folder {
                                     Sense::click()
                                 } else {
@@ -719,15 +725,8 @@ fn result_line(
             },
         );
     }
-    if selected {
-        ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
-    } else if response.hovered() {
-        ui.painter().rect_filled(
-            rect,
-            3.0,
-            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-        );
-    }
+    ui.painter()
+        .add(controls::row_marks(rect, response.hovered(), selected));
     let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)

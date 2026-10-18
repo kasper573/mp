@@ -46,15 +46,11 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
         let full = ui.available_rect_before_wrap();
         let (rect, response) =
             ui.allocate_exact_size(Vec2::new(full.width(), 22.0), Sense::click());
-        if on {
-            ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
-        } else if response.hovered() {
-            ui.painter().rect_filled(
-                rect,
-                3.0,
-                egui::Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-            );
-        }
+        ui.painter().add(design_tokens::controls::row_marks(
+            rect,
+            response.hovered(),
+            on,
+        ));
         let mut child = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(rect.shrink2(Vec2::new(6.0, 0.0)))

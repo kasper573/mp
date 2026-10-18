@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, HashMap};
 
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
@@ -306,7 +308,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     let width = 1130.0;
     dialogs::card(ctx, "import-model", width, |ui| {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("🗋").size(16.0).color(theme::MUTED));
+            glyph::show(ui, Mark::Page, 16.0, theme::MUTED);
             ui.label(
                 theme::strong(if dialog.new_row {
                     "Import a model".to_owned()
@@ -518,7 +520,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label("");
                         ui.label("");
                         ui.horizontal(|ui| {
-                            ui.label(theme::ok("✓"));
+                            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                             ui.label(theme::muted("by name"));
                         });
                         ui.end_row();
@@ -586,7 +588,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 ui.label("");
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
-                        ui.label(theme::warn("⚠"));
+                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted("every model needs this strip"));
                     });
                     let mut picked = None;
@@ -642,7 +644,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
         > 0;
     if mapped_twice {
         ui.horizontal(|ui| {
-            ui.label(theme::warn("⚠"));
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(theme::muted(format!(
                 "another tag already lands on {}; the first wins",
                 model::pretty(&target)
@@ -661,7 +663,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
         }
         any = true;
         ui.horizontal_wrapped(|ui| {
-            ui.label(theme::warn("⚠"));
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(theme::muted(format!(
                 "was {was} frames; the {} cue on frame {} has no frame now",
                 cue.cue.label(),
@@ -697,7 +699,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
     if let Some(retimed) = &mut strip.retimed {
         any = true;
         ui.horizontal_wrapped(|ui| {
-            ui.label(theme::warn("⚠"));
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(theme::muted("retimed here since the last import"));
         });
         ui.horizontal(|ui| {
@@ -736,7 +738,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
             .map(MappingNote::text)
             .unwrap_or_default();
         ui.horizontal(|ui| {
-            ui.label(theme::ok("✓"));
+            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
             ui.label(theme::muted(note));
         });
     }
@@ -808,9 +810,9 @@ fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
     let line = |ui: &mut Ui, ok: bool, text: String| {
         ui.horizontal_wrapped(|ui| {
             if ok {
-                ui.label(theme::ok("✓"));
+                glyph::show(ui, Mark::Tick, 14.0, theme::OK);
             } else {
-                ui.label(theme::warn("⚠"));
+                glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             }
             ui.label(theme::muted(text).size(12.5));
         });
@@ -1312,7 +1314,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         followed.push(format!("{} {} → {}", cue.cue.label(), cue.from + 1, to + 1));
                     } else if cue.to.is_some() {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(theme::ok("✓"));
+                            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                             ui.label(theme::muted(format!(
                                 "{} on frame {} stays.",
                                 cue.cue.label(),
@@ -1323,7 +1325,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 }
                 if !followed.is_empty() {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(theme::ok("✓"));
+                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                         ui.label(theme::muted(format!(
                             "{} follow{} their frame{}. Found by its pixels.",
                             followed.join(", "),
@@ -1337,7 +1339,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         continue;
                     }
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(theme::warn("⚠"));
+                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted(format!(
                             "{} on frame {}: its frame is gone.",
                             cue.cue.label(),
@@ -1437,7 +1439,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                     .map(|frame| frame.to_string())
                     .collect();
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(theme::warn("⚠"));
+                    glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                     ui.label(theme::muted(format!(
                         "Frame{} {} {} retimed here since the last import.",
                         widgets::plural(differing.len()),
@@ -1481,11 +1483,10 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ready = draft.plan.ready();
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(
-                ready.is_ok(),
-                egui::Button::new(egui::RichText::new("Import, as one step").color(Color32::WHITE))
-                    .fill(theme::ACCENT),
-            )
+            .add_enabled_ui(ready.is_ok(), |ui| {
+                controls::primary(ui, "Import, as one step")
+            })
+            .inner
             .clicked()
         {
             apply = true;

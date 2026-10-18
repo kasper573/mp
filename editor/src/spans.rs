@@ -1,3 +1,4 @@
+use design_tokens::ink;
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
 use engine::systems::text::{Ink, Motion, Voice};
@@ -162,7 +163,7 @@ pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) ->
                     format.color = ink_color(ink);
                 }
                 if map.contains_key("voice") || map.contains_key("motion") {
-                    format.background = Color32::from_rgba_unmultiplied(255, 255, 255, 14);
+                    format.background = ink::gold_wash(0.2);
                 }
                 if map.get("slow").and_then(Value::as_bool).unwrap_or(false) {
                     format.underline = Stroke::new(1.0, format.color);
@@ -181,11 +182,11 @@ pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) ->
 
 pub fn ink_color(ink: &str) -> Color32 {
     match ink {
-        "danger" => theme::DANGER,
-        "item" => Color32::from_rgb(86, 196, 176),
-        "place" => theme::CODE,
-        "name" => theme::WARN,
-        "magic" => Color32::from_rgb(180, 140, 240),
+        "danger" => ink::DANGER,
+        "item" => ink::ITEM,
+        "place" => ink::PLACE,
+        "name" => ink::NAME,
+        "magic" => ink::MAGIC,
         _ => theme::TEXT,
     }
 }
@@ -305,7 +306,7 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                     ("voice", names::<Voice>()),
                     ("motion", names::<Motion>()),
                 ] {
-                    ui.menu_button(RichText::new(format!("{field} ▾")).size(12.0), |ui| {
+                    ui.menu_button(RichText::new(field).size(12.0), |ui| {
                         for option in options {
                             if ui.button(option).clicked() {
                                 outcome = Some(restyle(spans, (start, end), |map| {

@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
@@ -248,7 +250,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             });
         if running {
-            if ui.button("↻ Restart").clicked() {
+            if controls::marked(ui, Mark::Reload, "Restart").clicked() {
                 start = true;
             }
             if ui
@@ -262,7 +264,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 stop = true;
             }
         }
-        ui.menu_button(theme::faint("⋯"), |ui| {
+        ui.menu_button(theme::faint("…"), |ui| {
             ui.set_min_width(220.0);
             ui.horizontal(|ui| {
                 ui.label(theme::muted("clock"));
@@ -431,7 +433,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 if matches!(run.state, ScriptRunState::Waiting { .. })
-                    && ui.button("⏩ Skip the wait").clicked()
+                    && controls::marked(ui, Mark::Skip, "Skip the wait").clicked()
                 {
                     skip = true;
                 }
@@ -493,72 +495,67 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .fixed_pos(egui::pos2(rect.max.x - width - 16.0, rect.max.y - 16.0))
         .pivot(egui::Align2::LEFT_BOTTOM)
         .show(ui.ctx(), |ui| {
-            egui::Frame::new()
-                .fill(theme::OVERLAY)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(6.0)
-                .inner_margin(12.0)
-                .show(ui, |ui| {
-                    ui.set_width(width);
-                    ui.label(
-                        RichText::new("CONVERSATION · the client's box")
-                            .size(10.5)
-                            .color(theme::FAINT),
-                    );
-                    for line in &conversation.lines {
-                        let who = dialogue::speaker_name(run.world(), run.subject, line.by);
-                        let text = line.text.words(&inputs);
-                        let Some(who) = who else {
-                            ui.add(
-                                egui::Label::new(
-                                    RichText::new(text).size(13.5).color(theme::TEXT).italics(),
-                                )
-                                .wrap(),
-                            );
-                            continue;
-                        };
+            design_tokens::slip::show(ui, |ui| {
+                ui.set_width(width);
+                ui.label(
+                    RichText::new("CONVERSATION · the client's box")
+                        .size(10.5)
+                        .color(theme::FAINT),
+                );
+                for line in &conversation.lines {
+                    let who = dialogue::speaker_name(run.world(), run.subject, line.by);
+                    let text = line.text.words(&inputs);
+                    let Some(who) = who else {
                         ui.add(
                             egui::Label::new(
-                                RichText::new(format!("{who}: {text}"))
-                                    .size(13.5)
-                                    .color(theme::TEXT),
+                                RichText::new(text).size(13.5).color(theme::TEXT).italics(),
                             )
                             .wrap(),
                         );
+                        continue;
+                    };
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("{who}: {text}"))
+                                .size(13.5)
+                                .color(theme::TEXT),
+                        )
+                        .wrap(),
+                    );
+                }
+                ui.add_space(6.0);
+                for (index, choice) in conversation.choices.iter().enumerate() {
+                    let mut text = format!("{}  {}", index + 1, choice.label.words(&inputs));
+                    if let Some(warn) = &choice.warn {
+                        text.push_str(&format!("  ({warn})"));
                     }
-                    ui.add_space(6.0);
-                    for (index, choice) in conversation.choices.iter().enumerate() {
-                        let mut text = format!("{}  {}", index + 1, choice.label.words(&inputs));
-                        if let Some(warn) = &choice.warn {
-                            text.push_str(&format!("  ⚠ {warn}"));
-                        }
-                        if choice.locked {
-                            text.push_str("  locked");
-                        }
-                        if ui
-                            .add_enabled(
-                                !choice.locked,
-                                egui::Button::new(RichText::new(text).size(13.0)).frame(false),
-                            )
-                            .clicked()
-                        {
-                            pick = Some(index);
-                        }
+                    if choice.locked {
+                        text.push_str("  locked");
                     }
-                    ui.horizontal(|ui| {
-                        if ui
-                            .add(egui::Button::new(theme::muted("Leave").size(12.5)).frame(false))
-                            .clicked()
-                        {
-                            leave = true;
-                        }
-                        ui.label(
-                            theme::faint("1 – 9 pick · Esc leaves")
-                                .size(11.5)
-                                .monospace(),
-                        );
-                    });
+                    if ui
+                        .add_enabled(
+                            !choice.locked,
+                            egui::Button::new(RichText::new(text).size(13.0)).frame(false),
+                        )
+                        .clicked()
+                    {
+                        pick = Some(index);
+                    }
+                }
+                ui.horizontal(|ui| {
+                    if ui
+                        .add(egui::Button::new(theme::muted("Leave").size(12.5)).frame(false))
+                        .clicked()
+                    {
+                        leave = true;
+                    }
+                    ui.label(
+                        theme::faint("1 – 9 pick · Esc leaves")
+                            .size(11.5)
+                            .monospace(),
+                    );
                 });
+            });
         });
     if let Some(index) = pick {
         run.pick(index);
@@ -795,8 +792,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
                     memory::set(run.world_mut(), subject, id, value);
                 }
                 if is_set
-                    && ui
-                        .add(egui::Button::new(theme::faint("✕").size(12.0)).frame(false))
+                    && glyph::button(ui, Mark::Cross, 12.0, theme::FAINT, "Remove")
                         .on_hover_text("Forget it · reads as unset")
                         .clicked()
                     && let Some(mut memory) = run.world_mut().get_mut::<Memory>(subject)
@@ -1295,7 +1291,7 @@ impl ScriptRun {
             self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
             self.log
-                .push(RunLogLine::Note(format!("⏩ skipped {seconds:.1} s")));
+                .push(RunLogLine::Note(format!("skipped {seconds:.1} s")));
         }
     }
 
@@ -1325,7 +1321,7 @@ impl ScriptRun {
                 })
                 .map(|message| {
                     let text = message.message.notification.text.words(inputs);
-                    RunLogLine::Note(format!("🔔 {text}"))
+                    RunLogLine::Note(format!("notice: {text}"))
                 })
                 .collect()
         };

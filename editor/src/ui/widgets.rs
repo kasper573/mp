@@ -1,13 +1,86 @@
 use std::fmt::Display;
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{Face, TextRole, controls, ink, sheet};
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::theme;
 
-pub use design_tokens::widgets::{
-    card_frame, chip, chip_colored, combo_box, danger, key_hint, pill, primary, section,
-    section_heading, tab_strip, toggle,
-};
+pub use design_tokens::controls::{danger, key_hint, primary};
+pub use design_tokens::sheet::section;
+
+pub fn section_heading(text: &str) -> RichText {
+    RichText::new(text)
+        .font(Face::SmallCapsBold.id(TextRole::Section.size()))
+        .color(ink::RUBRIC)
+}
+
+pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
+    sheet::tabs(ui, tabs, active);
+}
+
+pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
+    controls::combo(id_salt)
+}
+
+/// A checkbox without words of its own, for a row whose label stands beside it.
+pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
+    controls::checkbox(ui, on, "")
+}
+
+pub fn chip(ui: &mut Ui, text: &str) -> Response {
+    chip_colored(ui, text, theme::RAISED, theme::TEXT)
+}
+
+pub fn chip_colored(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Response {
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(Stroke::new(1.0, theme::BORDER))
+        .corner_radius(3.0)
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.label(RichText::new(text).size(12.5).color(ink));
+        })
+        .response
+        .interact(Sense::click())
+}
+
+/// A 20 px pill bordered in `color` on a white wash.
+pub fn pill(ui: &mut Ui, text: &str, color: Color32) -> Response {
+    egui::Frame::new()
+        .fill(ink::white_wash(0.25))
+        .stroke(Stroke::new(1.0, color))
+        .corner_radius(controls::PILL_HEIGHT / 2.0)
+        .inner_margin(egui::Margin::symmetric(8, 1))
+        .show(ui, |ui| {
+            ui.label(
+                RichText::new(text)
+                    .font(Face::BookBold.id(12.0))
+                    .color(color),
+            );
+        })
+        .response
+}
+
+/// Something laid on the page as a unit: ruled in ink, in rubric while it is the one chosen.
+pub fn card_frame(selected: bool) -> egui::Frame {
+    egui::Frame::new()
+        .fill(if selected {
+            theme::ACCENT_SOFT
+        } else {
+            ink::ink_wash(0.03)
+        })
+        .stroke(Stroke::new(
+            1.0,
+            if selected {
+                theme::ACCENT
+            } else {
+                theme::BORDER
+            },
+        ))
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(10, 8))
+}
 
 pub fn section_count(ui: &mut Ui, text: &str, count: impl Display) {
     section(ui, &format!("{text} · {count}"));
@@ -25,11 +98,12 @@ pub fn kv(ui: &mut Ui, key: &str, value: impl FnOnce(&mut Ui)) {
 
 pub fn verdict(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(if ok { "✓" } else { "!" }).color(if ok {
-            theme::OK
+        let (mark, color) = if ok {
+            (Mark::Tick, theme::OK)
         } else {
-            theme::WARN
-        }));
+            (Mark::Warning, theme::WARN)
+        };
+        glyph::show(ui, mark, 13.0, color);
         ui.label(RichText::new(text).size(12.5));
     });
 }
@@ -131,13 +205,7 @@ pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.label(RichText::new(text).size(12.5).monospace());
-                if ui
-                    .add(
-                        egui::Label::new(RichText::new("✕").size(11.0).color(theme::MUTED))
-                            .sense(Sense::click()),
-                    )
-                    .clicked()
-                {
+                if glyph::button(ui, Mark::Cross, 11.0, theme::MUTED, "Remove").clicked() {
                     closed = true;
                 }
             });
@@ -158,7 +226,7 @@ pub fn badge(ui: &mut Ui, kind: &str) {
         egui::Align2::CENTER_CENTER,
         letter,
         FontId::monospace(11.0),
-        Color32::BLACK,
+        ink::CREAM,
     );
 }
 
@@ -172,11 +240,7 @@ pub fn card_header(
         .horizontal(|ui| {
             ui.label(theme::strong(title).monospace());
             if !subtitle.is_empty() {
-                ui.label(
-                    RichText::new(subtitle.to_uppercase())
-                        .size(11.0)
-                        .color(theme::MUTED),
-                );
+                ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.menu_button(theme::faint("…"), menu);
@@ -215,7 +279,7 @@ pub fn search_box(
         .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(theme::muted("🔍"));
+                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
                 let width = ui.available_width() - key.map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
                 let response = ui.add(
                     egui::TextEdit::singleline(text)
@@ -247,9 +311,9 @@ pub fn toggle_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
 
 pub fn mode_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
     let (fill, ink) = if on {
-        (theme::ACCENT, Color32::WHITE)
+        (ink::LIGHT, ink::RUBRIC)
     } else {
-        (theme::RAISED, theme::TEXT)
+        (ink::ink_wash(0.05), ink::INK2)
     };
     chip_colored(ui, text, fill, ink)
 }

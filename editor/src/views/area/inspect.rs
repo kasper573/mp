@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -173,17 +175,13 @@ fn paint_card(
 }
 
 fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
-    let fill = if on { theme::ACCENT } else { theme::INPUT };
-    let ink = if on {
-        egui::Color32::WHITE
-    } else {
-        theme::TEXT
-    };
+    let fill = if on { theme::SELECTION } else { theme::INPUT };
+    let ink = theme::TEXT;
     let response = egui::Frame::new()
         .fill(fill)
         .stroke(egui::Stroke::new(
             1.0,
-            if on { theme::ACCENT } else { theme::BORDER },
+            if on { theme::TEXT } else { theme::BORDER },
         ))
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(7, 2))
@@ -296,7 +294,7 @@ fn terrain_card(
     own.truncate(6);
     for set in own {
         ui.horizontal(|ui| {
-            ui.label(theme::faint("▣").size(12.0));
+            glyph::show(ui, Mark::Grid, 12.0, theme::FAINT);
             ui.label(theme::mono(&set.set).size(13.0));
             ui.label(theme::muted(set.terrains.join(" · ")).size(12.5));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -325,7 +323,7 @@ fn terrain_card(
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             if ui
-                .button(format!("▣ Repaint with {set}"))
+                .button(format!("Repaint with {set}"))
                 .on_hover_text("Re-picks a tile for every cell of this layer painted from the set, as the set is now")
                 .clicked()
             {
@@ -383,8 +381,12 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 if widgets::chip_colored(
                     ui,
                     label,
-                    if on { color } else { theme::INPUT },
-                    if on { egui::Color32::WHITE } else { color },
+                    if on {
+                        design_tokens::ink::wash(color, 0.2)
+                    } else {
+                        theme::INPUT
+                    },
+                    color,
                 )
                 .clicked()
                 {
@@ -754,7 +756,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         widgets::kv(ui, "at", |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
-                    .button("⌖ pick")
+                    .add(egui::Button::new("pick"))
                     .on_hover_text("Click a walkable cell on the area")
                     .clicked()
                 {
@@ -969,7 +971,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             });
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                if ui.button("⧉ Make blueprint…").clicked() {
+                if controls::marked(ui, Mark::Copy, "Make blueprint…").clicked() {
                     out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
@@ -1080,7 +1082,7 @@ fn module_inspector(
                         if widgets::toggle(ui, &mut shown).changed() {
                             preview.hidden = !shown;
                         }
-                        if ui.button("↻ Re-roll").clicked() {
+                        if controls::marked(ui, Mark::Reload, "Re-roll").clicked() {
                             preview.seed = preview.seed.wrapping_add(1);
                         }
                     });
