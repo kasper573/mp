@@ -6,5 +6,6 @@
       "shader": "frost_lance",
       "duration": 0.9
     }
-  ]
+  ],
+  "on_actors_inside": "frost_lance"
 }

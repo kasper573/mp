@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use engine::core::content::Content;
 use engine::core::geometry::{Footprint, Shape};
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::core::vfx::VfxInstance;
 use engine::systems::actor::plate::{self, PlateLabel};
@@ -38,6 +38,7 @@ const WAIT_FOR_A_VFX: Seconds = Seconds(3.0);
 const TARGET_REACH: f32 = 2.0;
 const AREA_REACH: f32 = 3.0;
 const CROWD: u32 = 3;
+const CLEAR_OF_CASTER: f32 = 1.3;
 const STURDY: f32 = 1_000_000.0;
 const STATUS_POWER: f32 = 1.0;
 
@@ -337,7 +338,12 @@ fn skill_setup(
             let shape = def.area.unwrap_or(Shape::Circle { radius: Tiles(1.5) });
             let footprint = Footprint::cast(shape, spawn.at, point);
             let mut targets = Vec::new();
-            for (index, spot) in spread(&footprint, CROWD).into_iter().enumerate() {
+            let spots: Vec<Pos<Tiles>> = spread(&footprint, CROWD * 2)
+                .into_iter()
+                .filter(|spot| spot.distance(spawn.at).0 >= CLEAR_OF_CASTER)
+                .take(CROWD as usize)
+                .collect();
+            for (index, spot) in spots.into_iter().enumerate() {
                 let at = free(spot);
                 targets.push(if def.target == Targeting::AreaEnemy {
                     spawn_sturdy(
