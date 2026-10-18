@@ -168,7 +168,6 @@ pub fn show(
         height: card::ART,
     };
     shown.closable = closable;
-    shown.faded = !learned;
     shown.stamp = maxed.then_some("maxed");
     shown.depth = depth;
     shown.show(ui, |ui, plate| {

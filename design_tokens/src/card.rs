@@ -70,7 +70,6 @@ pub struct Card<'a> {
     pub width: f32,
     pub max_height: f32,
     pub closable: bool,
-    pub faded: bool,
     pub stamp: Option<&'a str>,
     pub depth: Depth,
 }
@@ -102,7 +101,6 @@ impl<'a> Card<'a> {
             width: WIDTH,
             max_height: MAX_HEIGHT,
             closable: false,
-            faded: false,
             stamp: None,
             depth: Depth::Front,
         }
@@ -324,10 +322,6 @@ impl<'a> Card<'a> {
         );
         self.kind.paint(painter, top, ink::INK, false);
         self.kind.paint(painter, bottom, ink::INK, true);
-        if self.faded {
-            painter.rect_filled(outer, CORNER, ink::wash(ink::CREAM, 0.45));
-            glyph::padlock(painter, art.center(), 36.0, ink::CREAM);
-        }
         if let Some(stamp) = self.stamp {
             controls::stamp(
                 painter,
