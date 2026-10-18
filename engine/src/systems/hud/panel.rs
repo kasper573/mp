@@ -4,10 +4,10 @@ use bevy::prelude::*;
 use design_tokens::ink;
 use design_tokens::motion::{Clock, SheetPose};
 use design_tokens::sheet::{self, Depth, Sheet};
-use egui::{Color32, Id, LayerId, Pos2, Rect, Sense, Stroke, Ui, UiBuilder, Vec2};
+use egui::{Color32, Id, LayerId, Order, Pos2, Rect, Sense, Stroke, Ui, UiBuilder, Vec2};
 
 use super::WindowsDrawn;
-use crate::core::gui::{self, Band};
+use crate::core::gui::{self, Band, Tier};
 use crate::core::math::{Pos, Size};
 use crate::systems::settings::{Placement, UserSettings};
 
@@ -33,12 +33,13 @@ pub(crate) fn widget<R>(
     let rest = Rect::from_min_size(saved.unwrap_or(start), drawn_size(gui, id));
     let at = standing(world, gui, (key, Kept::Spot), rest, None).min;
     let shown = egui::Area::new(id)
-        .order(Band::Hud.order())
+        .order(Order::Background)
         .fixed_pos(at)
         .constrain(false)
         .fade_in(false)
         .sense(Sense::drag())
         .show(gui, |ui| add(ui, world));
+    gui::stack(gui, Tier::Mid, shown.response.layer_id);
     let rect = shown.response.rect;
     grab(
         world,

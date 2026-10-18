@@ -8,7 +8,7 @@ use design_tokens::controls::{self, Pill, RowLook};
 use design_tokens::glyph::{self, Mark};
 use design_tokens::motion::SheetPose;
 use design_tokens::sheet::{self, Sheet};
-use design_tokens::{TextRole, ink};
+use design_tokens::{TextRole, ink, slip};
 use egui::{
     Align, Align2, Color32, Id, LayerId, Layout, Pos2, Rect, Sense, Ui, UiBuilder, Vec2,
     WidgetInfo, WidgetType,
@@ -22,7 +22,7 @@ use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
-use crate::core::gui::{self, Afterimage, Band};
+use crate::core::gui::{self, Afterimage, Band, Tier};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece, Typewriter};
 use crate::systems::actor::model::{BustFigure, Busts, Face, GenericExpression, ModelId};
 use crate::systems::actor::{ActorModel, Name};
@@ -47,7 +47,7 @@ const CHOICE_SHORTCUTS: [InputAction; 9] = [
     InputAction::Choice9,
 ];
 const SHEET_WIDTH: f32 = 800.0;
-const SHEET_MIN_HEIGHT: f32 = 254.0;
+const NAME_INSET: f32 = 40.0;
 const SHEET_LIFT: f32 = 14.0;
 const PANEL_GAP: f32 = 12.0;
 const SCREEN_SHARE: f32 = 0.94;
@@ -617,9 +617,10 @@ fn draw_stage(world: &mut World) {
             .fixed_pos(Pos2::ZERO)
             .interactable(false)
             .show(&gui, |ui| busts(ui, world, dialogue, screen));
-        let cast_layer = cast.response.layer_id;
-        gui.move_to_top(cast_layer);
-        gui.set_sublayer(cast_layer, layer());
+        gui::stack(&gui, Tier::Back, cast.response.layer_id);
+    }
+    for key in [DIALOGUE, DOCKED] {
+        gui::stack(&gui, Tier::Front, sheet_layer(key));
     }
 }
 
@@ -761,10 +762,7 @@ fn dialogue_sheet(
     before: &StageDrawn,
 ) -> Rect {
     let width = SHEET_WIDTH.min(screen.width() * SCREEN_SHARE);
-    let height = world
-        .resource::<StageSheets>()
-        .dialogue_height
-        .max(SHEET_MIN_HEIGHT);
+    let height = world.resource::<StageSheets>().dialogue_height;
     let rect = Rect::from_min_size(
         Pos2::new(
             screen.center().x - width / 2.0,
@@ -772,7 +770,7 @@ fn dialogue_sheet(
         ),
         Vec2::new(width, height),
     );
-    let title = world
+    let speaker = world
         .resource::<Stage>()
         .shown
         .as_ref()
@@ -788,16 +786,14 @@ fn dialogue_sheet(
             ui.multiply_opacity(pose.opacity);
             let (outer, held) = ui.allocate_exact_size(rect.size(), Sense::click());
             let sheet = Sheet {
-                title: title.as_deref(),
+                title: None,
                 closable: false,
                 curl: false,
                 depth: sheet::Depth::Front,
             };
-            let parts = sheet.paint_at(ui.painter(), outer, pose.shadow, Color32::WHITE);
-            if let Some(title) = &title {
-                titled(ui, parts.band, title);
-            }
-            let body = parts.body;
+            let body = sheet
+                .paint_at(ui.painter(), outer, pose.shadow, Color32::WHITE)
+                .body;
             let written = ui
                 .scope_builder(
                     UiBuilder::new()
@@ -814,15 +810,17 @@ fn dialogue_sheet(
                 )
                 .response
                 .rect;
-            let needed = (written.bottom() - outer.top() + HINT_ROOM + outer.bottom()
-                - body.bottom())
-            .max(SHEET_MIN_HEIGHT);
+            let needed =
+                written.bottom() - outer.top() + HINT_ROOM + outer.bottom() - body.bottom();
             let mut sheets = world.resource_mut::<StageSheets>();
-            if (needed - sheets.dialogue_height.max(SHEET_MIN_HEIGHT)).abs() > 0.5 {
+            if (needed - sheets.dialogue_height).abs() > 0.5 {
                 sheets.dialogue_height = needed;
                 gui.request_discard("the conversation grew or shrank");
             }
             foot(ui, world, body);
+            if let Some(speaker) = &speaker {
+                name_tag(ui, outer, speaker);
+            }
             if map::clicked(world, InputAction::Advance, &held) {
                 press_advance(world);
             }
@@ -835,6 +833,27 @@ fn dialogue_sheet(
 fn titled(ui: &Ui, band: Rect, title: &str) {
     ui.interact(band, ui.id().with(("title", title)), Sense::hover())
         .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, title));
+}
+
+/// The speaker's name on a slip of its own over the sheet's top edge, so it takes no room from the
+/// line beneath.
+fn name_tag(ui: &Ui, sheet: Rect, name: &str) {
+    let galley = ui
+        .painter()
+        .layout_job(TextRole::Title.job(name, ink::RUBRIC));
+    let padding = Vec2::new(f32::from(slip::PADDING.left), f32::from(slip::PADDING.top));
+    let size = galley.size() + 2.0 * padding;
+    let rect = Rect::from_min_size(
+        Pos2::new(
+            sheet.right() - NAME_INSET - size.x,
+            sheet.top() - size.y / 2.0,
+        ),
+        size,
+    );
+    slip::paint(ui.painter(), rect);
+    ui.painter().galley(rect.min + padding, galley, ink::RUBRIC);
+    ui.interact(rect, ui.id().with(("speaker", name)), Sense::hover())
+        .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, name));
 }
 
 fn line(ui: &mut Ui, world: &mut World) {

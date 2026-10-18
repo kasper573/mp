@@ -39,6 +39,29 @@ impl Band {
     }
 }
 
+/// The background stacks in tiers over what floats over the world: whatever a tier holds lies over
+/// everything in the tiers before it, however recently either was drawn or clicked. egui would
+/// otherwise stack the background by whichever layer it saw first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Tier {
+    Back,
+    Mid,
+    Front,
+}
+
+impl Tier {
+    const ALL: [Tier; 3] = [Tier::Back, Tier::Mid, Tier::Front];
+
+    fn anchor(self) -> LayerId {
+        LayerId::new(Order::Background, egui::Id::new(("tier", self)))
+    }
+}
+
+/// Puts a background layer in its tier for this pass.
+pub fn stack(gui: &egui::Context, tier: Tier, layer: LayerId) {
+    gui.set_sublayer(tier.anchor(), layer);
+}
+
 #[derive(Resource, Clone)]
 pub struct GuiContext(pub egui::Context);
 
@@ -99,7 +122,7 @@ impl Plugin for GuiPlugin {
             .add_systems(PreUpdate, adopt_context)
             .add_systems(
                 EguiPrimaryContextPass,
-                forget_world_layers.before(Band::Stage),
+                (forget_world_layers, raise_tiers).before(Band::Stage),
             )
             .add_systems(
                 PostUpdate,
@@ -314,6 +337,15 @@ fn adopt_context(
 fn forget_world_layers(mut layers: ResMut<WorldLayers>, mut widgets: ResMut<WidgetRects>) {
     layers.0.clear();
     widgets.0.clear();
+}
+
+fn raise_tiers(gui: Option<Res<GuiContext>>) {
+    let Some(gui) = gui else {
+        return;
+    };
+    for tier in Tier::ALL {
+        gui.0.move_to_top(tier.anchor());
+    }
 }
 
 /// bevy_egui blends every texture as premultiplied but samples a Bevy image as stored, which would
