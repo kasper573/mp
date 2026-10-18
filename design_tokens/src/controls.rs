@@ -2,13 +2,14 @@
 //! fields, pills, key hints and stamps.
 
 use std::ops::RangeInclusive;
+use std::sync::Arc;
 
 use egui::emath::Rot2;
 use egui::epaint::{Shadow, TextShape};
 use egui::{
-    Align2, Color32, CornerRadius, InnerResponse, Key, Margin, Painter, Pos2, Rangef, Rect,
-    Response, Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, WidgetInfo,
-    WidgetText, WidgetType,
+    Align, Align2, Color32, CornerRadius, InnerResponse, Key, Margin, Painter, Pos2, Rangef, Rect,
+    Response, Sense, Shape, Stroke, StrokeKind, Ui, UiBuilder, Vec2, WidgetInfo, WidgetText,
+    WidgetType,
 };
 
 use crate::face::{Face, TextRole};
@@ -271,11 +272,22 @@ pub fn row<R>(ui: &mut Ui, look: RowLook, add: impl FnOnce(&mut Ui) -> R) -> Inn
             .inner
     });
     let rect = shown.response.rect;
+    let shapes = row_marks(rect, shown.response.hovered(), look.selected);
+    ui.painter().set(under, shapes);
+    if shown.response.has_focus() {
+        focus_ring(ui.painter(), rect, 0.0);
+    }
+    shown
+}
+
+/// What a ruled row paints under its content in `rect`: the gold wash while hovered or selected,
+/// the rubric bar at its left while selected, and the rule beneath.
+pub fn row_marks(rect: Rect, hovered: bool, selected: bool) -> Shape {
     let mut shapes = Vec::new();
-    if shown.response.hovered() || look.selected {
+    if hovered || selected {
         shapes.push(Shape::rect_filled(rect, 0.0, ink::gold_wash(0.2)));
     }
-    if look.selected {
+    if selected {
         shapes.push(Shape::rect_filled(
             Rect::from_min_size(rect.min, Vec2::new(3.0, rect.height())),
             0.0,
@@ -287,11 +299,7 @@ pub fn row<R>(ui: &mut Ui, look: RowLook, add: impl FnOnce(&mut Ui) -> R) -> Inn
         [Pos2::new(rect.min.x, y), Pos2::new(rect.max.x, y)],
         Stroke::new(1.0, ink::ink_wash(0.18)),
     ));
-    ui.painter().set(under, Shape::Vec(shapes));
-    if shown.response.has_focus() {
-        focus_ring(ui.painter(), rect, 0.0);
-    }
-    shown
+    Shape::Vec(shapes)
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -344,28 +352,17 @@ pub fn slot_frame(painter: &Painter, rect: Rect, look: SlotLook) {
 
 /// A stack's count in the slot's bottom-right corner, haloed to read over the icon.
 pub fn slot_count(painter: &Painter, rect: Rect, count: u32) {
-    let text = count.to_string();
-    let at = rect.right_bottom() - Vec2::new(2.0, 1.0);
-    for offset in [
-        Vec2::new(-1.0, 0.0),
-        Vec2::new(1.0, 0.0),
-        Vec2::new(0.0, -1.0),
-        Vec2::new(0.0, 1.0),
-    ] {
-        painter.text(
-            at + offset,
-            Align2::RIGHT_BOTTOM,
-            &text,
-            TextRole::Count.font_id(),
-            ink::CREAM,
-        );
-    }
-    painter.text(
-        at,
+    glyph::haloed(
+        painter,
+        rect.right_bottom() - Vec2::new(2.0, 1.0),
         Align2::RIGHT_BOTTOM,
-        text,
+        &count.to_string(),
         TextRole::Count.font_id(),
         ink::INK,
+        glyph::Halo {
+            color: ink::CREAM,
+            width: 1.0,
+        },
     );
 }
 
@@ -418,12 +415,17 @@ enum Look {
 }
 
 fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) -> Response {
-    let galley = text.into_galley(
-        ui,
-        Some(TextWrapMode::Extend),
-        f32::INFINITY,
-        TextRole::Button.font_id(),
-    );
+    let mut job = Arc::unwrap_or_clone(text.into_layout_job(
+        ui.style(),
+        TextRole::Button.font_id().into(),
+        Align::Center,
+    ));
+    // The look decides the text's ink: a primary's cream would vanish under any ink the text brings.
+    for section in &mut job.sections {
+        section.format.color = Color32::PLACEHOLDER;
+    }
+    job.wrap.max_width = f32::INFINITY;
+    let galley = ui.painter().layout_job(job);
     let mark_room = if mark.is_some() { 20.0 } else { 0.0 };
     let size = Vec2::new(
         galley.size().x + mark_room + BUTTON_PADDING.x * 2.0,

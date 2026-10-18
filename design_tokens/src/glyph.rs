@@ -2,7 +2,7 @@
 //! crosses, flags, padlocks and chevrons painted beside words.
 
 use egui::{
-    Align2, Color32, ColorImage, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
+    Align2, Color32, ColorImage, FontId, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
     TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
 };
 
@@ -491,6 +491,37 @@ pub fn button(ui: &mut Ui, mark: Mark, size: f32, color: Color32, label: &str) -
         }
     }
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// The ring around text that reads over any picture.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Halo {
+    pub color: Color32,
+    pub width: f32,
+}
+
+/// `text` in `color` within its `halo`. Says where it landed.
+pub fn haloed(
+    painter: &Painter,
+    at: Pos2,
+    anchor: Align2,
+    text: &str,
+    font: FontId,
+    color: Color32,
+    halo: Halo,
+) -> Rect {
+    let galley = painter.layout_no_wrap(text.to_owned(), font, color);
+    let rect = anchor.anchor_size(at, galley.size());
+    for offset in [
+        Vec2::new(-halo.width, 0.0),
+        Vec2::new(halo.width, 0.0),
+        Vec2::new(0.0, -halo.width),
+        Vec2::new(0.0, halo.width),
+    ] {
+        painter.galley_with_override_text_color(rect.min + offset, galley.clone(), halo.color);
+    }
+    painter.galley(rect.min, galley, color);
+    rect
 }
 
 /// A padlock `width` across, centred at `at`.

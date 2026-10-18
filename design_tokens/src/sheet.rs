@@ -2,9 +2,11 @@
 //! curl, with the index tabs and section headings cut into the page.
 
 use egui::epaint::{Mesh, Shadow};
+use egui::layers::ShapeIdx;
 use egui::{
-    Align2, Color32, ColorImage, CornerRadius, Id, Painter, Pos2, Rect, Response, Sense, Shape,
-    Stroke, StrokeKind, TextureHandle, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
+    Align2, Color32, ColorImage, CornerRadius, Id, InnerResponse, Margin, Painter, Pos2, Rect,
+    Response, Sense, Shape, Stroke, StrokeKind, TextureHandle, TextureOptions, Ui, Vec2,
+    WidgetInfo, WidgetType,
 };
 
 use crate::face::TextRole;
@@ -175,6 +177,26 @@ pub fn vellum_shapes(ctx: &egui::Context, rect: Rect) -> Vec<Shape> {
         y += tile.y;
     }
     shapes
+}
+
+/// A note laid around `add`, as a confirm note is: vellum under a front shadow, and the rule, with
+/// no title band, cross or curl.
+pub fn note<R>(ui: &mut Ui, padding: Margin, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+    let under = ui.painter().add(Shape::Noop);
+    let framed = egui::Frame::new().inner_margin(padding).show(ui, add);
+    paint_note(ui.painter(), under, framed.response.rect);
+    framed
+}
+
+/// The note's sheet over `rect`, set into the place `under` kept beneath what was laid on it.
+pub fn paint_note(painter: &Painter, under: ShapeIdx, rect: Rect) {
+    let mut shapes = vec![
+        Shape::Rect(shadow(Depth::Front).as_shape(rect, CornerRadius::ZERO)),
+        Shape::Rect(CONTACT_SHADOW.as_shape(rect, CornerRadius::ZERO)),
+    ];
+    shapes.extend(vellum_shapes(painter.ctx(), rect));
+    painter.set(under, Shape::Vec(shapes));
+    rule(painter, rect, RULE_INSET);
 }
 
 /// The double hairline inside the edge: ink at 50% `inset` in, and at 16% two further.
