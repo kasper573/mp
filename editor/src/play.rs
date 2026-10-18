@@ -699,11 +699,12 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let folder = binaries_folder(editor);
     let build = version::build();
     let content_version = content_version();
-    let folder_version = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .map(|c| c.built::<GameSettings>().content_version.0.clone());
+    let open_folder = editor.project.as_ref().map(|project| {
+        project
+            .content
+            .as_ref()
+            .map(|content| content.built::<GameSettings>().content_version.0.clone())
+    });
     let ok = checked
         .as_ref()
         .is_some_and(|binaries| binaries.matches(content_version));
@@ -767,7 +768,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     row(
         ui,
         "editor",
-        &format!("{build} · content {content_version}"),
+        &format!("build {build} · writes content version {content_version}"),
         None,
     );
     let builds_agree = checked.as_ref().is_some_and(|binaries| {
@@ -781,38 +782,37 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
             Some(Ok(info)) => row(
                 ui,
                 name,
-                &format!("{} · content {}", info.build, info.content_version),
+                &format!(
+                    "build {} · reads content version {}",
+                    info.build, info.content_version
+                ),
                 Some(builds_agree && info.content_version == content_version),
             ),
             Some(Err(error)) => row(ui, name, error, Some(false)),
             None => row(ui, name, "checking…", None),
         }
     }
-    let folder_note = match &folder_version {
-        Some(folder) if *folder == content_version => " · the folder's too".to_owned(),
-        Some(folder) => format!(" · the folder has {folder}"),
-        None => String::new(),
-    };
-    row(
-        ui,
-        "content version",
-        &format!("{content_version}{folder_note}"),
-        Some(
-            folder_version
-                .as_deref()
-                .is_none_or(|folder| folder == content_version),
-        ),
-    );
+    if let Some(version) = &open_folder {
+        match version {
+            Some(version) => row(
+                ui,
+                "open folder",
+                &format!("written for content version {version}"),
+                Some(version == content_version),
+            ),
+            None => row(ui, "open folder", "does not load", None),
+        }
+    }
     ui.add_space(8.0);
-    if ok || checked.is_none() {
-        ui.label(
-            theme::muted(
-                "Each binary answers --build-info. The client joins only a server of its own build, \
-                 and both must read this editor's content version.",
-            )
-            .size(13.0),
-        );
-    } else if let Some(binaries) = &checked {
+    ui.label(
+        theme::muted(
+            "A content version names the shape of the rows: a game binary loads a folder written \
+             for its own. A play-test needs the server and the client to read the editor's, and \
+             the client to be of the server's build.",
+        )
+        .size(13.0),
+    );
+    if let Some(binaries) = checked.as_ref().filter(|_| !ok) {
         let culprit = culprit(binaries, content_version);
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new("⚠").color(theme::DANGER));
@@ -864,7 +864,8 @@ fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
     };
     if server.build != client.build {
         return format!(
-            "{SERVER} and {CLIENT} are from different builds: the client joins only a server of its own."
+            "{SERVER} is build {} and {CLIENT} is build {}: the client joins only a server of its own build.",
+            server.build, client.build
         );
     }
     [(SERVER, server), (CLIENT, client)]
@@ -872,7 +873,7 @@ fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
         .find(|(_, info)| info.content_version != content_version)
         .map(|(name, info)| {
             format!(
-                "{name} reads content version {}, not this editor's: rows this editor writes may not load in it.",
+                "{name} reads content version {}, and this editor writes {content_version}: rows saved here would not load in it.",
                 info.content_version
             )
         })
