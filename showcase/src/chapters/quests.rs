@@ -47,7 +47,7 @@ fn play(shoot: &mut Shoot) {
         noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
     me.caption(
-        "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
+        "Accepted: a line over your head says so, the letter is in your bag, the quest on your tracker",
     );
     if !heard_news {
         hear_out_tobb(&mut me, Duration::from_secs(12));
@@ -137,7 +137,7 @@ fn play(shoot: &mut Shoot) {
         noticed(snapshot, "+10 Gold")
     });
     me.caption(
-        "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
+        "Delivered: the letter goes and the pay arrives over your head, the finished quest lands in the middle",
     );
     me.wait_until("the finished quest", |snapshot| {
         told_by(snapshot, "Quest complete")

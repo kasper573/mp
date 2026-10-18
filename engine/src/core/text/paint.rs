@@ -27,11 +27,15 @@ pub struct TextLook {
     pub hand: Hand,
     pub line_height: Option<f32>,
     pub ground: Ground,
+    /// A soft ring of this color around every letter, for text set straight over the world.
+    pub halo: Option<Color32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hand {
     Book,
+    /// The book face set heavy, for a line that stands over the world rather than on a page.
+    Bold,
     Quill,
 }
 
@@ -43,6 +47,7 @@ impl TextLook {
             hand: Hand::Book,
             line_height: None,
             ground: Ground::Paper,
+            halo: None,
         }
     }
 
@@ -55,6 +60,20 @@ impl TextLook {
 
     pub const fn on(self, ground: Ground) -> TextLook {
         TextLook { ground, ..self }
+    }
+
+    pub const fn haloed(self, halo: Color32) -> TextLook {
+        TextLook {
+            halo: Some(halo),
+            ..self
+        }
+    }
+
+    pub const fn bold(self) -> TextLook {
+        TextLook {
+            hand: Hand::Bold,
+            ..self
+        }
     }
 
     pub const fn quill(self) -> TextLook {
@@ -121,6 +140,9 @@ pub fn measure(
     plan.footprint(&galley)
 }
 
+const HALO_STEPS: usize = 8;
+const HALO_REACH: f32 = 1.5;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextShadow {
     pub offset: Vec2,
@@ -162,6 +184,7 @@ struct Plan {
     caps: Vec<Cap>,
     units: usize,
     pad: f32,
+    halo: Option<Color32>,
 }
 
 struct Letter {
@@ -199,6 +222,7 @@ impl Plan {
             caps: Vec::new(),
             units: 0,
             pad,
+            halo: look.halo,
         };
         let mut letter = 0;
         let mut owed = 0.0;
@@ -293,6 +317,7 @@ impl Plan {
 fn span_format(voice: TextVoice, color: Color32, look: TextLook) -> TextFormat {
     let (normal, whisper, shout) = match look.hand {
         Hand::Book => (Face::Book, Face::BookItalic, Face::BookBold),
+        Hand::Bold => (Face::BookBold, Face::BookItalic, Face::BookBold),
         Hand::Quill => (Face::Quill, Face::Quill, Face::Quill),
     };
     let format = match voice {
@@ -393,6 +418,15 @@ fn paint_word(
             let scale = 1.0 + (time * 3.0 - phase * 0.4).sin() * 0.05;
             let center = shape.visual_bounding_rect().center().to_vec2();
             shape.transform(TSTransform::new(center * (1.0 - scale), scale));
+        }
+    }
+    if let Some(halo) = plan.halo {
+        for step in 0..HALO_STEPS {
+            let turn = step as f32 / HALO_STEPS as f32 * std::f32::consts::TAU;
+            let mut ring = shape.clone();
+            ring.pos += Vec2::angled(turn) * HALO_REACH;
+            ring.override_text_color = Some(halo);
+            ui.painter().add(Shape::Text(ring));
         }
     }
     ui.painter().add(Shape::Text(shape));

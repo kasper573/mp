@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use design_tokens::ink::Ground;
 use design_tokens::{TextRole, face, ink, sheet};
 use egui::{Color32, Id, Rect, Ui, Vec2};
 use strum::{IntoStaticStr, VariantArray};
@@ -136,13 +137,23 @@ impl HudWindow for HistoryWindow {
     }
 }
 
-pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: bool, ink: Color32) {
+/// A record's line with its tally written in, inked to read on `ground`.
+pub(crate) fn tallied(
+    text: &mut StyledLine,
+    tally: Option<RecordTally>,
+    icon: bool,
+    ground: Ground,
+) {
+    let (base, gained, earned) = match ground {
+        Ground::Paper => (ink::INK, ink::VERDIGRIS, ink::OCHRE),
+        Ground::Dusk => (ink::LIGHT, ink::SPRING, ink::HONEY),
+    };
     match tally {
         Some(RecordTally::Change(change)) => {
             let color = match (change > 0, icon) {
-                (true, true) => ink::VERDIGRIS,
-                (true, false) => ink::OCHRE,
-                (false, _) => ink.gamma_multiply(0.6),
+                (true, true) => gained,
+                (true, false) => earned,
+                (false, _) => base.gamma_multiply(0.6),
             };
             prefix(text, format!("{} ", signed(change)), color);
         }
@@ -314,7 +325,7 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
 
 fn record_line(entry: &HistoryEntry) -> StyledLine {
     let mut line = entry.text.styled();
-    tallied(&mut line, entry.tally, entry.icon.is_some(), ink::INK);
+    tallied(&mut line, entry.tally, entry.icon.is_some(), Ground::Paper);
     if entry.repeats > 1 {
         line.pieces.push(
             StyledSpan::plain(format!(" \u{d7}{}", entry.repeats))

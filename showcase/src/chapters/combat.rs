@@ -36,6 +36,7 @@ fn play(shoot: &mut Shoot) {
     me.caption(
         "Hover a monster to target it; a click uses the basic attack in the slot by your hotbar",
     );
+    me.caption("Every hit bursts its damage out of whoever takes it");
     let loot = slay(&mut me);
     me.wait_until("the kill's XP in the feed", |snapshot| {
         snapshot
@@ -44,7 +45,7 @@ fn play(shoot: &mut Shoot) {
             .iter()
             .any(|record| record.text.ends_with(" XP"))
     });
-    me.caption("Small news collects in the corner: experience, loot, gone in a few seconds");
+    me.caption("Small news rises over your head: experience, loot, gone in a few seconds");
     me.caption(
         "Monsters drop loot — click it to pick it up. The same thing again counts up on one row",
     );

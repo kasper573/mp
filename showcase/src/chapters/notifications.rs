@@ -48,7 +48,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the pass in the feed", |snapshot| {
         noticed(snapshot, "+1 Road Pass")
     });
-    me.caption("The trade shows in the corner, over her bust: the fish goes, the pass arrives");
+    me.caption("The trade rises over your head: the fish goes, the pass arrives");
     me.read_to_choices();
     me.pick("Enjoy it.");
     me.conversation_over();
