@@ -26,7 +26,6 @@ pub const SHADER_TABLE: &str = "vfx_shader";
 const FORM_WIDTH: f32 = 440.0;
 const COLUMN_GAP: f32 = 16.0;
 const MIN_CODE_WIDTH: f32 = 260.0;
-const MIN_PREVIEW_WIDTH: f32 = 220.0;
 const HEADING_HEIGHT: f32 = 24.0;
 const MIN_TITLE_WIDTH: f32 = 60.0;
 
@@ -93,8 +92,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .and_then(|project| project.files.text(&file))
         .unwrap_or_default();
     let room = ui.available_width() - 2.0 * COLUMN_GAP;
-    let preview_width =
-        (room - FORM_WIDTH - MIN_CODE_WIDTH).clamp(MIN_PREVIEW_WIDTH, crate::stage::SIZE[0] as f32);
+    let preview_width = crate::stage::preview_width(room - FORM_WIDTH - MIN_CODE_WIDTH);
     let code_width = (room - FORM_WIDTH - preview_width).max(MIN_CODE_WIDTH);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {

@@ -33,6 +33,7 @@ use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::rows::new_row_into;
 use crate::schema;
+use crate::stage;
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
@@ -42,8 +43,6 @@ use crate::views::{class, model, script, skill, tileset, vfx};
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
 const SINGLE_COLUMN: f32 = 560.0;
-const PREVIEW: f32 = 384.0;
-const MIN_PREVIEW: f32 = 240.0;
 const COLUMN_GAP: f32 = 16.0;
 
 pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
@@ -66,7 +65,7 @@ pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
             });
         return;
     }
-    let preview_width = (ui.available_width() / 3.0).clamp(MIN_PREVIEW, PREVIEW);
+    let preview_width = stage::preview_width(ui.available_width() / 3.0);
     let form_width = ui.available_width() - preview_width - COLUMN_GAP;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {

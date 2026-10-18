@@ -15,11 +15,11 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
+use crate::stage;
 use crate::ui::{theme, widgets};
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
-const PREVIEW: Vec2 = Vec2::new(180.0, 350.0);
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
@@ -132,7 +132,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         });
         ui.add_space(12.0);
         ui.vertical(|ui| {
-            ui.set_width(PREVIEW.x);
+            ui.set_width(stage::preview_width(ui.available_width()));
             ui.label(
                 theme::mono(strip.name())
                     .color(theme::CODE),

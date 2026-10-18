@@ -34,6 +34,7 @@ use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
+const NARROWEST: f32 = 240.0;
 const SPREAD_CANDIDATES: usize = 4096;
 const SPREAD_ROUNDS: usize = 12;
 
@@ -151,6 +152,12 @@ pub fn center(content: &Content) -> Pos<Tiles> {
 
 /// Draws the stage for `key` as wide as the window allows, with the game's starting area behind
 /// when `ground` is on, and asks for the scene to be rendered for the next frame.
+/// How wide a view sets its preview, out of `room` it could give it: the stage's own width, every
+/// preview alike, narrowing only as far as the stage stays readable.
+pub fn preview_width(room: f32) -> f32 {
+    room.clamp(NARROWEST, SIZE[0] as f32)
+}
+
 pub fn show(
     editor: &mut Editor,
     ui: &mut Ui,

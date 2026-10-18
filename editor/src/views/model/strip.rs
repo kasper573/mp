@@ -11,11 +11,11 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
+use crate::stage;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 
-pub const PREVIEW: Vec2 = Vec2::new(170.0, 200.0);
 const CARD_H: f32 = 128.0;
 const LANE_LABEL: f32 = 56.0;
 const LANE_H: f32 = 22.0;
@@ -75,7 +75,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.add_space(6.0);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
-            ui.set_width(PREVIEW.x);
+            ui.set_width(stage::preview_width(ui.available_width() / 2.0));
             super::preview::draw(
                 editor,
                 ui,

@@ -26,7 +26,7 @@ use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
-use crate::{condition, forms, picker, play, schema};
+use crate::{condition, forms, picker, play, schema, stage};
 
 pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;
@@ -190,7 +190,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
         });
         ui.add_space(14.0);
-        let preview_width = (ui.available_width() / 3.0).clamp(240.0, 384.0);
+        let preview_width = stage::preview_width(ui.available_width() / 3.0);
         ui.vertical(|ui| {
             ui.set_width(ui.available_width() - preview_width - 16.0);
             let Editor {
