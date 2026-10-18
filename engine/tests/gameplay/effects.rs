@@ -26,12 +26,12 @@ fn statuses_come_from_items_skills_and_gear_and_go_by_category_or_time() {
             .iter()
             .any(|status| status.effect == "poisoned" && status.category == StatusCategory::Debuff)
     );
+    player.find_ui(UiTarget::starting("Status Poisoned"));
     player.act(InputAction::ToggleInventory);
     let full = poisoned.me.expect("the player").health;
     player.wait_until("the poison to bite", |snapshot| {
         snapshot.me.as_ref().is_some_and(|me| me.health < full)
     });
-    player.find_ui(UiTarget::starting("Status Poisoned"));
 
     player.act(InputAction::Hotbar6);
     let warded = player.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
