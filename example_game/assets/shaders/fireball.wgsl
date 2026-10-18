@@ -2,7 +2,8 @@
 // body, flames roar up behind it in ragged tongues and lick just past the edge, then die down to
 // embers and smoke. The flames fill whatever the body is: a circle, a cone, a line, the length of
 // a path, or the sprite it engulfs; embers and smoke lift off the body and drift out over the
-// margin, where they dissolve. Drawn on the pixel grid in banded color, animated at twelve frames
+// margin, where they dissolve. A sprite caught in the blast burns bright and red in the fire's
+// light, under tongues of flame and puffs of smoke. Drawn on the pixel grid in banded color, animated at twelve frames
 // a second, so it sits with the sprites rather than over them.
 //   heat   how fiercely the flames burn: 1 is a full fireball, less a smoulder
 //   smoke  the color of the smoke left behind
@@ -38,7 +39,22 @@ fn vfx(uv: vec2<f32>) -> vec4<f32> {
     let fire_alpha = max(fire * select(1.0, 0.85, on_sprite), sparks);
     let rgb = mix(params.smoke.rgb, mix(color, vec3<f32>(1.0, 0.85, 0.5), sparks), clamp(fire_alpha * 1.6, 0.0, 1.0));
     let blaze = vec4<f32>(rgb, max(fire_alpha, puff * params.smoke.a));
-    return over(blaze, image);
+    let light = select(0.0, firelight(t, flicker) * heat, on_sprite);
+    return over(blaze, vec4<f32>(burnished(image.rgb, light), image.a));
+}
+
+// How strongly the fire lights a sprite it engulfs: flaring with the blast, wavering with the
+// flames and fading as they die, in flat steps like the flames themselves.
+fn firelight(t: f32, flicker: f32) -> f32 {
+    let flare = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.55, 0.95, t));
+    return bands(flare * (0.75 + 0.35 * flicker), 3.0);
+}
+
+// A sprite's colors brightened toward the fire's: reds glow, blues sink, and the darkest pixels
+// catch an ember glow of their own.
+fn burnished(rgb: vec3<f32>, light: f32) -> vec3<f32> {
+    let burning = rgb * vec3<f32>(2.1, 1.0, 0.55) + vec3<f32>(0.3, 0.06, 0.0);
+    return clamp(mix(rgb, burning, light), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 // How much of a sprite burns at a site uv: its own pixels and the air just above them, so the

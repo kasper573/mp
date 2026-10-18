@@ -39,9 +39,7 @@ fn play(shoot: &mut Shoot) {
     friend.in_world();
     let mut me = shoot.roll(player);
     friend.walk_toward(beside_other_player);
-    me.caption(
-        "Every effect is a vfx row: layers of sprite sheets, floating text and shaders, played on a site",
-    );
+    me.caption("Every effect is a vfx row: layers of sprite sheets and shaders, played on a site");
     me.caption(
         "A path site threads the targets: Chain Lightning arcs from you through each one it hit, nearest first",
     );
@@ -53,7 +51,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.hold();
     me.caption(
-        "A shader on an area reads its geometry: Fireball's flames fill the circle exactly, whatever its radius.",
+        "A shader on an area reads its geometry: Fireball's flames fill the circle exactly, and whoever stands in it burns bright inside the fire",
     );
     let here = me.snapshot().me.expect("the player").at;
     me.cast_at(InputAction::Hotbar1, here, |snapshot| {
