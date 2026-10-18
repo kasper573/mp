@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use egui::{Color32, FontId, Pos2, Ui, Vec2 as EVec2};
+use egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 use engine::core::content::Content;
 use engine::core::geometry::{Footprint, Radians};
 use engine::core::math::{Direction, Pos, Rgba};
@@ -104,15 +104,6 @@ pub enum Scenario {
     Skill {
         skill: SkillId,
     },
-}
-
-/// A text the stage letters over its picture, in world pixels.
-pub struct Overlay {
-    pub text: String,
-    pub color: Rgba,
-    pub size: f32,
-    pub at: Vec2,
-    pub alpha: f32,
 }
 
 /// Where a stage was drawn, for a window to draw over it.
@@ -225,15 +216,6 @@ pub fn show(
             egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
             Color32::WHITE,
         );
-        for overlay in &stage.overlays {
-            painter.text(
-                shown.screen(overlay.at),
-                egui::Align2::CENTER_BOTTOM,
-                &overlay.text,
-                FontId::proportional(overlay.size),
-                Color32::from(overlay.color).gamma_multiply(overlay.alpha),
-            );
-        }
         for (top, label) in &stage.plates {
             plate::draw_label(ui, shown.screen(*top), label);
         }

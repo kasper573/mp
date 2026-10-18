@@ -6,6 +6,7 @@ mod fonts;
 pub mod glyph;
 pub mod ink;
 pub mod motion;
+pub mod raster;
 pub mod sheet;
 pub mod slip;
 

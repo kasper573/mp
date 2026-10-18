@@ -5,9 +5,10 @@ use bevy::prelude::*;
 use bevy_egui::helpers::bevy_to_egui_physical_key;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
-use strum::{IntoStaticStr, VariantArray};
+use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
-use crate::core::content::{Content, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::content::fixture::FixtureLock;
+use crate::core::content::{Content, ContentRow, Fixture};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -76,6 +77,19 @@ pub enum InputAction {
 
 impl Fixture for InputAction {
     type Row = InputDef;
+
+    fn locks(self) -> Vec<FixtureLock> {
+        let variants = self
+            .gestures()
+            .iter()
+            .flat_map(|gesture| gesture.bindings())
+            .map(|kind| <&'static str>::from(*kind))
+            .collect();
+        vec![FixtureLock::Variants {
+            list: "/bindings",
+            variants,
+        }]
+    }
 }
 
 impl InputAction {
@@ -102,7 +116,7 @@ impl InputAction {
     }
 }
 
-/// The ways the game reads an action. A binding the action's reader never sees is rejected at load.
+/// The ways the game reads an action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GestureKind {
     Press,
@@ -112,46 +126,18 @@ pub enum GestureKind {
 }
 
 impl GestureKind {
-    fn accepts(self, binding: InputBinding) -> bool {
+    /// The bindings the game reads for the gesture.
+    pub fn bindings(self) -> &'static [InputBindingKind] {
         match self {
-            GestureKind::Press => matches!(
-                binding,
-                InputBinding::Key(_) | InputBinding::AnyKey | InputBinding::Mouse { .. }
-            ),
-            GestureKind::Click => matches!(binding, InputBinding::Click(_)),
-            GestureKind::Drag => matches!(binding, InputBinding::Drag(_)),
-            GestureKind::Shortcut => matches!(binding, InputBinding::Key(_)),
+            GestureKind::Press => &[
+                InputBindingKind::Key,
+                InputBindingKind::AnyKey,
+                InputBindingKind::Mouse,
+            ],
+            GestureKind::Click => &[InputBindingKind::Click],
+            GestureKind::Drag => &[InputBindingKind::Drag],
+            GestureKind::Shortcut => &[InputBindingKind::Key],
         }
-    }
-}
-
-pub fn check_all(loading: &mut Loading) {
-    let content = loading.content();
-    for (id, def) in loading.rows::<InputDef>(&content) {
-        let key = id.key(&content);
-        let Some(action) = InputAction::VARIANTS
-            .iter()
-            .copied()
-            .find(|action| action.key() == key)
-        else {
-            continue;
-        };
-        let mut check = RowCheck::default();
-        for (index, binding) in def.bindings.iter().enumerate() {
-            if !action
-                .gestures()
-                .iter()
-                .any(|gesture| gesture.accepts(*binding))
-            {
-                check.error(
-                    format!("/bindings/{index}"),
-                    "unread binding",
-                    binding.name(),
-                    "a binding the game reads for this action",
-                );
-            }
-        }
-        loading.row_errors(id, check);
     }
 }
 
@@ -165,8 +151,15 @@ impl ContentRow for InputDef {
     const TABLE: &'static str = "input";
 }
 
-#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, EnumDiscriminants,
+)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(
+    name(InputBindingKind),
+    derive(IntoStaticStr),
+    strum(serialize_all = "snake_case")
+)]
 pub enum InputBinding {
     Key(KeyGesture),
     AnyKey,

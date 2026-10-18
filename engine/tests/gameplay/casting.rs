@@ -40,6 +40,14 @@ fn every_targeting_kind_and_shape_lands_where_it_is_aimed() {
         |_, actor| npc_is(actor, PREY),
         |snapshot| !played(snapshot, "spark_hit").is_empty(),
     );
+    me.wait_until("the hit pops out of the one struck", |snapshot| {
+        snapshot.pops.iter().any(|pop| {
+            snapshot
+                .actors
+                .iter()
+                .any(|actor| actor.id == pop.actor && npc_is(actor, PREY))
+        })
+    });
 
     me.cast_at(InputAction::Hotbar1, ring, |snapshot| {
         played(snapshot, "fireball_blast")

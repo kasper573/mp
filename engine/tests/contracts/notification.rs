@@ -1,7 +1,10 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
+use engine::core::vfx::{VfxParams, VfxShaderId};
 use engine::systems::area::AreaId;
 use engine::systems::area::transition::{self, Crossing};
+use engine::systems::class;
+use engine::systems::combat;
 use engine::systems::dialogue::Conversation;
 use engine::systems::history::{History, HistoryTopic};
 use engine::systems::input::map::InputMap;
@@ -10,11 +13,13 @@ use engine::systems::notification::{self, Notification, NotificationKind, Notifi
 use engine::systems::npc::{self, Pack};
 use engine::systems::player::{AreaDrawn, Xp, commands_locked};
 use engine::systems::quest::{self, QuestId};
+use engine::systems::stat;
+use engine::systems::status;
 use engine::systems::text::LineText;
 
 use testkit::{
     Sim, content, conversation, later, object_center, open_with, place, remembered, row, settle,
-    spawn_area, spoken, told, townsperson,
+    spawn_area, spoken, target_dummy, told, townsperson,
 };
 
 #[test]
@@ -124,7 +129,7 @@ fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
             .collect::<Vec<_>>(),
         vec![spoken(row("ChiefChallenge")), spoken(row("ChiefThreat"))]
     );
-    assert!(said.iter().all(|sent| sent.speaker == Some(chief)));
+    assert!(said.iter().all(|sent| sent.actor == Some(chief)));
     assert!(sim.world().get::<Conversation>(player).is_none());
     assert!(!commands_locked(sim.world(), player));
     assert!(
@@ -150,7 +155,7 @@ fn speech_names_no_body_when_the_speaker_is_someone_else() {
     assert_eq!(
         sim.notified(1)
             .into_iter()
-            .map(|sent| sent.speaker)
+            .map(|sent| sent.actor)
             .collect::<Vec<_>>(),
         vec![None]
     );
@@ -286,6 +291,86 @@ fn errors_and_feed_lines_answer_every_action() {
         notification::notify(sim.world(), player, refused.clone());
     }
     assert_eq!(told(&sim, 1), vec![refused; 20]);
+}
+
+#[test]
+fn a_hit_pops_its_amount_out_of_the_one_struck_for_everyone_who_sees_it() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    sim.join(2);
+    settle(&mut sim);
+    let at = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_toward(at, Offset::new(1.0, 0.0));
+    let orc = target_dummy(&mut sim, row("Orc"), spot);
+    settle(&mut sim);
+    sim.forget_notified();
+
+    combat::inflict(sim.world(), orc, Some(player), 4.0);
+    sim.tick();
+
+    let damage_pop = Some(row::<VfxShaderId>("DamagePop"));
+    for client in [1, 2] {
+        assert_eq!(
+            pops(&sim, client),
+            vec![(Some(orc), "4".to_owned(), damage_pop)]
+        );
+    }
+}
+
+#[test]
+fn healing_a_level_and_a_status_each_pop_with_their_own_look() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    stat::apply_damage(sim.world(), player, 6.0);
+    sim.tick();
+    sim.forget_notified();
+
+    stat::heal(sim.world(), player, 3.0);
+    class::grant_xp(sim.world(), player, 30);
+    status::apply(sim.world(), player, row("Guarded"), 10.0, None);
+    settle(&mut sim);
+
+    let guarded = content()
+        .table::<status::StatusEffectDef>()
+        .get(row("Guarded"))
+        .expect("guarded")
+        .name
+        .clone();
+    assert_eq!(
+        pops(&sim, 1),
+        vec![
+            (Some(player), "+3".to_owned(), Some(row("HealPop"))),
+            (Some(player), "Level 2".to_owned(), Some(row("LevelPop"))),
+            (Some(player), guarded, Some(row("StatusPop"))),
+        ]
+    );
+}
+
+#[test]
+fn a_pop_is_never_kept_in_history() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    let before = recorded(&mut sim, player);
+
+    notification::pop(sim.world(), player, "Ouch", None, VfxParams::default());
+    sim.tick();
+
+    assert_eq!(pops(&sim, 1).len(), 1);
+    assert_eq!(recorded(&mut sim, player), before);
+}
+
+fn pops(sim: &Sim, client: u32) -> Vec<(Option<Entity>, String, Option<VfxShaderId>)> {
+    sim.notified(client)
+        .into_iter()
+        .filter_map(|sent| match sent.notification.kind {
+            NotificationKind::Pop { shader, .. } => {
+                Some((sent.actor, sent.notification.text.plain_words(), shader))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn recorded(sim: &mut Sim, player: Entity) -> Vec<(HistoryTopic, Option<String>, String, u32)> {

@@ -3,9 +3,11 @@ pub mod budget;
 pub mod error;
 pub mod feed;
 pub mod intro;
+pub mod pop;
 mod rows;
 
 pub use intro::IntroAppearance;
+pub use pop::{pop, pop_as};
 pub use rows::{NotificationRow, NotificationRows};
 
 use std::borrow::Cow;
@@ -27,6 +29,7 @@ use crate::core::math::Rgba;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
+use crate::core::vfx::{VfxParams, VfxShaderId};
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
@@ -93,6 +96,10 @@ pub enum NotificationKind {
         failure: bool,
         sfx: Option<SfxId>,
     },
+    Pop {
+        shader: Option<VfxShaderId>,
+        params: VfxParams,
+    },
 }
 
 impl NotificationKind {
@@ -104,7 +111,7 @@ impl NotificationKind {
 
     fn sfx(&self) -> Option<SfxId> {
         match self {
-            NotificationKind::Speech { .. } => None,
+            NotificationKind::Speech { .. } | NotificationKind::Pop { .. } => None,
             NotificationKind::Narration { sfx, .. }
             | NotificationKind::Alert { sfx, .. }
             | NotificationKind::Error { sfx }
@@ -118,8 +125,9 @@ impl NotificationKind {
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Debug, PartialEq)]
 pub struct NotificationSent {
     pub notification: Notification,
+    /// The actor the notification comes from, when it has one in the world.
     #[entities]
-    pub speaker: Option<Entity>,
+    pub actor: Option<Entity>,
     pub at: UnixMillis,
 }
 
@@ -134,7 +142,7 @@ pub fn local_error(world: &mut World, text: impl Into<String>) {
         world,
         NotificationSent {
             notification: Notification::new(kind, LineText::plain(text.into())),
-            speaker: None,
+            actor: None,
             at: UnixMillis(0),
         },
     );
@@ -170,7 +178,7 @@ pub fn notify_from(
             player,
             NotificationSent {
                 notification,
-                speaker,
+                actor: speaker,
                 at,
             },
         );
@@ -178,8 +186,9 @@ pub fn notify_from(
 }
 
 pub fn record(world: &mut World, player: Entity, notification: &Notification) {
-    let entry = notification.history_entry(world.resource::<Content>());
-    history::record(world, player, entry);
+    if let Some(entry) = notification.history_entry(world.resource::<Content>()) {
+        history::record(world, player, entry);
+    }
 }
 
 pub fn captions(world: &World) -> NotificationRows {
@@ -259,11 +268,11 @@ impl Notification {
         }
     }
 
-    fn history_entry(&self, content: &Content) -> HistoryEntry {
+    fn history_entry(&self, content: &Content) -> Option<HistoryEntry> {
         let entry = |topic: HistoryTopic, by: Option<&str>| {
             HistoryEntry::of(topic, self.text.clone()).by(by.map(str::to_owned))
         };
-        match &self.kind {
+        Some(match &self.kind {
             NotificationKind::Speech { speaker } => entry(
                 HistoryTopic::Notification,
                 Some(speaker.get(content).name.as_str()),
@@ -284,7 +293,8 @@ impl Notification {
                 .icon(icon.clone())
                 .tally(*tally)
                 .mark(failure.then_some(HistoryMark::Failed)),
-        }
+            NotificationKind::Pop { .. } => return None,
+        })
     }
 }
 
@@ -502,19 +512,24 @@ impl Plugin for NotificationPlugin {
         rows::plugin::<rows::Alerts>(app);
         rows::plugin::<rows::Milestones>(app);
         error::plugin(app);
-        app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
-            .init_resource::<Occlusion>()
-            .add_systems(Update, track_occlusion)
-            .add_systems(
-                Update,
-                (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
-            )
-            .add_systems(
-                EguiPrimaryContextPass,
-                draw_column
-                    .in_set(Band::Notices)
-                    .run_if(in_state(ClientScreen::Area)),
-            );
+        app.add_plugins((
+            bubble::BubblePlugin,
+            intro::IntroPlugin,
+            feed::FeedPlugin,
+            pop::PopPlugin,
+        ))
+        .init_resource::<Occlusion>()
+        .add_systems(Update, track_occlusion)
+        .add_systems(
+            Update,
+            (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
+        )
+        .add_systems(
+            EguiPrimaryContextPass,
+            draw_column
+                .in_set(Band::Notices)
+                .run_if(in_state(ClientScreen::Area)),
+        );
     }
 }
 
@@ -594,6 +609,7 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
         }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
+        NotificationKind::Pop { .. } => pop::show(world, notification_sent),
     }
 }
 

@@ -20,7 +20,7 @@ pub(crate) fn definitions() -> FontDefinitions {
     fonts
 }
 
-fn bytes(face: Face) -> &'static [u8] {
+pub(crate) fn bytes(face: Face) -> &'static [u8] {
     match face {
         Face::Book => include_bytes!("../fonts/Alegreya-Regular.ttf"),
         Face::BookMedium => include_bytes!("../fonts/Alegreya-Medium.ttf"),

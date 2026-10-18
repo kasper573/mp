@@ -81,7 +81,7 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
         return;
     };
     let body = notification_sent
-        .speaker
+        .actor
         .filter(|&body| world.get_entity(body).is_ok());
     let mut bubbles = world.resource_mut::<Bubbles>();
     let line = SpokenLine {

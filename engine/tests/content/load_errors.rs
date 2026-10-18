@@ -150,11 +150,33 @@ fn a_binding_the_game_never_reads_for_its_action_is_refused() {
         .iter()
         .map(|error| (error.problem.rule, error.problem.expected.as_str()))
         .collect();
-    assert_eq!(
-        rules,
-        vec![("unread binding", "a binding the game reads for this action")]
-    );
+    assert_eq!(rules, vec![("variant the engine never reads", "drag")]);
     assert_eq!(report.errors[0].file, "tables/input/carry_item.json");
+}
+
+#[test]
+fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.edit("tables/vfx_shader/skill_area.json", |row| {
+        row["params"]
+            .as_array_mut()
+            .expect("params")
+            .retain(|param| param["name"] != "hostile");
+    });
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "tables/vfx_shader/skill_area.json")
+        .expect("the shader row is refused");
+    assert_eq!(error.problem.rule, "fixture entry missing");
+    assert!(
+        matches!(&error.at, ErrorPlace::Json { pointer, .. } if pointer == "/params"),
+        "{:?}",
+        error.at
+    );
 }
 
 #[test]
@@ -200,7 +222,7 @@ fn a_shader_row_without_its_file_is_refused() {
 fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
     let folder = TempFolder::of_template();
     folder.edit("tables/vfx/healed.json", |row| {
-        row["layers"][1]["params"]["glow"] = json!(1.0);
+        row["layers"][0]["params"]["glow"] = json!(1.0);
     });
 
     let report = load(folder.path()).err().expect("refused");
@@ -212,7 +234,7 @@ fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
         .expect("the layer is refused");
     assert_eq!(error.problem.rule, "unknown shader parameter");
     assert!(
-        matches!(&error.at, ErrorPlace::Json { pointer, .. } if pointer == "/layers/1/params/glow"),
+        matches!(&error.at, ErrorPlace::Json { pointer, .. } if pointer == "/layers/0/params/glow"),
         "{:?}",
         error.at
     );

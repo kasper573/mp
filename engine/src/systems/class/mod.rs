@@ -14,6 +14,7 @@ use crate::core::assets::AssetRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
 use crate::core::script::{Compiler, EffectDef, EffectStep, NEXT, Name, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
+use crate::systems::notification;
 use crate::systems::player::Xp;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
@@ -21,7 +22,7 @@ use crate::systems::script::{
 };
 use crate::systems::skill::{self, Learned};
 use crate::systems::stat::{self, Stat, StatMap};
-use crate::systems::vfx::{self, VfxFixture};
+use crate::systems::vfx::{self, VfxFixture, VfxShaderFixture};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -194,9 +195,10 @@ pub fn grant_xp(world: &mut World, entity: Entity, amount: u32) {
     }
     let reached = level(world, entity);
     if reached > before {
-        let level = &[(vfx::fixture::LEVEL, reached as f32)];
-        vfx::fixture::play(world, VfxFixture::LevelUp, VfxSite::Actor(entity), level);
-        vfx::fixture::play_for(world, entity, VfxFixture::LevelUp, VfxSite::Screen, level);
+        vfx::fixture::play(world, VfxFixture::LevelUp, VfxSite::Actor(entity));
+        vfx::fixture::play_for(world, entity, VfxFixture::LevelUp, VfxSite::Screen);
+        let shown = format!("Level {reached}");
+        notification::pop_as(world, entity, shown, VfxShaderFixture::LevelPop);
         let owner = area_owner(world);
         world.resource_mut::<RiftInstances>().raise(
             owner,

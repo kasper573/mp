@@ -2,7 +2,8 @@ use bevy_ecs::prelude::*;
 
 use super::{StatKind, Stats, base, effective};
 use crate::core::vfx::VfxSite;
-use crate::systems::vfx::{VfxFixture, fixture};
+use crate::systems::notification;
+use crate::systems::vfx::{VfxFixture, VfxShaderFixture, fixture};
 
 pub fn current_health(world: &World, entity: Entity) -> f32 {
     base(world, entity, StatKind::Health)
@@ -40,13 +41,9 @@ pub fn apply_damage(world: &mut World, entity: Entity, amount: f32) {
     }
     set_health(world, entity, |health, _| (health - amount).max(0.0));
     if amount > 0.0 {
-        let site = VfxSite::Actor(entity);
-        fixture::play(
-            world,
-            VfxFixture::DamageTaken,
-            site,
-            &[(fixture::AMOUNT, amount)],
-        );
+        fixture::play(world, VfxFixture::DamageTaken, VfxSite::Actor(entity));
+        let shown = whole(amount).to_string();
+        notification::pop_as(world, entity, shown, VfxShaderFixture::DamagePop);
     }
 }
 
@@ -59,13 +56,9 @@ pub fn heal(world: &mut World, entity: Entity, amount: f32) {
     let before = current_health(world, entity);
     regenerate(world, entity, amount);
     if current_health(world, entity) > before {
-        let site = VfxSite::Actor(entity);
-        fixture::play(
-            world,
-            VfxFixture::Healed,
-            site,
-            &[(fixture::AMOUNT, amount)],
-        );
+        fixture::play(world, VfxFixture::Healed, VfxSite::Actor(entity));
+        let shown = format!("+{}", whole(amount));
+        notification::pop_as(world, entity, shown, VfxShaderFixture::HealPop);
     }
 }
 
@@ -113,4 +106,9 @@ fn set_health(world: &mut World, entity: Entity, f: impl Fn(f32, f32) -> f32) {
             stat.value = f(stat.value.min(max), max);
         }
     }
+}
+
+/// An amount as players read it: whole, and never a zero for something that landed.
+fn whole(amount: f32) -> u32 {
+    amount.round().max(1.0) as u32
 }

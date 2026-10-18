@@ -504,8 +504,6 @@ pub fn registry() -> ContentRegistry {
     registry
         .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)
-        .hook(LoadStep::Across, vfx::fixture::check_all)
-        .hook(LoadStep::Across, input::map::check_all)
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)

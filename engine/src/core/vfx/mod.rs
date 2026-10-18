@@ -2,7 +2,7 @@ pub mod play;
 pub mod render;
 pub mod shader;
 
-pub use play::{LayerTime, TextFloat, sprite_cell};
+pub use play::{LayerTime, sprite_cell};
 pub use shader::{
     BodyShape, CompiledVfxShaders, ParamKind, ShaderError, ShaderParam, SiteKind, VfxShaderDef,
     VfxShaderId, prelude_names, shader_file,
@@ -80,22 +80,6 @@ pub enum VfxLayer {
         scale: f32,
         #[serde(default, skip_serializing_if = "SpritePlay::is_once")]
         play: SpritePlay,
-        #[serde(default, skip_serializing_if = "is_no_time")]
-        delay: Seconds,
-    },
-    Text {
-        template: String,
-        color: Rgba,
-        #[serde(
-            default = "default_text_size",
-            skip_serializing_if = "is_default_text_size"
-        )]
-        #[schemars(extend("default" = default_text_size()))]
-        size: f32,
-        #[serde(default = "default_rise", skip_serializing_if = "is_default_rise")]
-        #[schemars(extend("default" = default_rise()))]
-        rise: Tiles,
-        duration: Seconds,
         #[serde(default, skip_serializing_if = "is_no_time")]
         delay: Seconds,
     },
@@ -189,21 +173,6 @@ impl ParamValue {
             ParamValue::Color(_) => ParamKind::Color,
         }
     }
-
-    pub fn text(self) -> String {
-        match self {
-            ParamValue::Bool(flag) => flag.to_string(),
-            ParamValue::Number(number) => {
-                let rounded = (number * 100.0).round() / 100.0;
-                if rounded.fract() == 0.0 {
-                    format!("{rounded:.0}")
-                } else {
-                    format!("{rounded:.2}").trim_end_matches('0').to_owned()
-                }
-            }
-            ParamValue::Color(color) => format!("{:08x}", color.0),
-        }
-    }
 }
 
 impl VfxParams {
@@ -228,9 +197,7 @@ impl ParamFill {
 impl VfxLayer {
     pub fn delay(&self) -> Seconds {
         match self {
-            VfxLayer::Sprite { delay, .. }
-            | VfxLayer::Text { delay, .. }
-            | VfxLayer::Shader { delay, .. } => *delay,
+            VfxLayer::Sprite { delay, .. } | VfxLayer::Shader { delay, .. } => *delay,
         }
     }
 
@@ -242,7 +209,7 @@ impl VfxLayer {
                 SpritePlay::Once => Seconds(*frames as f32 / fps.0.max(0.001)),
                 SpritePlay::Loop { seconds } => *seconds,
             },
-            VfxLayer::Text { duration, .. } | VfxLayer::Shader { duration, .. } => *duration,
+            VfxLayer::Shader { duration, .. } => *duration,
         }
     }
 
@@ -270,22 +237,6 @@ impl VfxDef {
             .iter()
             .find(|param| param.name == name)
             .map(|param| param.kind)
-    }
-
-    /// Every `{name}` a text template reads.
-    pub fn placeholders(template: &str) -> Vec<String> {
-        let mut names = Vec::new();
-        fill_template(template, |name| {
-            names.push(name.to_owned());
-            None
-        });
-        names
-    }
-
-    /// The template with each `{name}` the caller filled written in; one they left out stays as
-    /// written.
-    pub fn fill(template: &str, params: &VfxParams) -> String {
-        fill_template(template, |name| params.get(name).map(ParamValue::text))
     }
 }
 
@@ -329,28 +280,6 @@ impl ContentRow for VfxDef {
                     check.range(at("scale"), *scale, 0.1, 10.0, "a scale");
                     if let SpritePlay::Loop { seconds } = play {
                         check_run(check, at("play/seconds"), *seconds);
-                    }
-                }
-                VfxLayer::Text {
-                    template,
-                    size,
-                    rise,
-                    duration,
-                    ..
-                } => {
-                    check.text(at("template"), template, 1, 40);
-                    check.range(at("size"), *size, 6.0, 64.0, "points");
-                    check.range(at("rise"), rise.0, -4.0, 4.0, "tiles");
-                    check_run(check, at("duration"), *duration);
-                    for name in VfxDef::placeholders(template) {
-                        if self.declares(&name).is_none() {
-                            check.error(
-                                at("template"),
-                                "undeclared parameter",
-                                format!("{{{name}}}"),
-                                "a name the row declares under params",
-                            );
-                        }
                     }
                 }
                 VfxLayer::Shader {
@@ -508,7 +437,6 @@ fn check_all(loading: &mut Loading) {
                         }
                     }
                 }
-                VfxLayer::Text { .. } => {}
             }
         }
         loading.row_errors(id, check);
@@ -519,57 +447,12 @@ fn check_run(check: &mut RowCheck, pointer: String, run: Seconds) {
     check.range(pointer, run.0, SHORTEST_RUN.0, LONGEST_RUN.0, "seconds");
 }
 
-/// Walks a template's `{name}` placeholders in order, writing in what `fill` gives for each and
-/// leaving the rest of the text as it is.
-fn fill_template(template: &str, mut fill: impl FnMut(&str) -> Option<String>) -> String {
-    let mut text = String::with_capacity(template.len());
-    let mut rest = template;
-    while let Some((before, after)) = rest.split_once('{') {
-        text.push_str(before);
-        match after.split_once('}') {
-            Some((name, tail)) => {
-                match fill(name) {
-                    Some(value) => text.push_str(&value),
-                    None => {
-                        text.push('{');
-                        text.push_str(name);
-                        text.push('}');
-                    }
-                }
-                rest = tail;
-            }
-            None => {
-                text.push('{');
-                rest = after;
-            }
-        }
-    }
-    text.push_str(rest);
-    text
-}
-
 fn one() -> f32 {
     1.0
 }
 
 fn is_one(scale: &f32) -> bool {
     *scale == 1.0
-}
-
-fn default_text_size() -> f32 {
-    14.0
-}
-
-fn is_default_text_size(size: &f32) -> bool {
-    *size == default_text_size()
-}
-
-fn default_rise() -> Tiles {
-    Tiles(1.0)
-}
-
-fn is_default_rise(rise: &Tiles) -> bool {
-    *rise == default_rise()
 }
 
 fn is_no_time(seconds: &Seconds) -> bool {

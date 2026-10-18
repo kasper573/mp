@@ -19,7 +19,7 @@ use engine::systems::visibility::Presence;
 use testkit::{Sim, content, later, row, settle, spawn_area, target_dummy};
 
 #[test]
-fn damage_shows_its_amount_on_the_one_hit_and_the_effect_passes() {
+fn damage_shows_on_the_one_hit_and_the_effect_passes() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     settle(&mut sim);
@@ -31,7 +31,6 @@ fn damage_shows_its_amount_on_the_one_hit_and_the_effect_passes() {
     let shown = instances(&mut sim, row("DamageTaken"));
     assert_eq!(shown.len(), 1);
     assert_eq!(shown[0].site, VfxSite::Actor(orc));
-    assert_eq!(shown[0].params.get("amount"), Some(ParamValue::Number(4.0)));
 
     later(&mut sim, 3.0);
     assert!(instances(&mut sim, row("DamageTaken")).is_empty());
@@ -54,7 +53,6 @@ fn healing_shows_but_regeneration_does_not() {
     let shown = instances(&mut sim, row("Healed"));
     assert_eq!(shown.len(), 1);
     assert_eq!(shown[0].site, VfxSite::Actor(player));
-    assert_eq!(shown[0].params.get("amount"), Some(ParamValue::Number(3.0)));
 }
 
 #[test]
@@ -80,10 +78,6 @@ fn a_level_reached_plays_on_the_actor_for_everyone_and_on_the_screen_for_the_pla
         .find(|(instance, _)| instance.site == VfxSite::Actor(player))
         .expect("one on the actor");
     assert!(on_actor.1.is_none());
-    assert_eq!(
-        on_actor.0.params.get("level"),
-        Some(ParamValue::Number(2.0))
-    );
     let on_screen = shown
         .iter()
         .find(|(instance, _)| instance.site == VfxSite::Screen)

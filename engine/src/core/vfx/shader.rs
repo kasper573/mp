@@ -72,6 +72,7 @@ pub enum SiteKind {
     Area,
     Path,
     Screen,
+    Text,
 }
 
 /// The body of an area site, as the prelude's `site.shape` and `SHAPE_*` constants name it; a site

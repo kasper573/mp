@@ -34,7 +34,7 @@ use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
 use crate::systems::movement::{Position, RenderPosition};
-use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro};
+use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro, pop};
 use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
@@ -87,6 +87,7 @@ pub struct ProbeSnapshot {
     pub stage: Option<ProbeStage>,
     pub notifications: ProbeNotifications,
     pub feed: Vec<String>,
+    pub pops: Vec<pop::ShownPop>,
     pub history: ProbeHistory,
     pub shop: Option<ProbeShop>,
     pub item_card: Option<ProbeItemCard>,
@@ -549,6 +550,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         }),
         notifications: notifications(world),
         feed: feed::rows(world),
+        pops: pop::shown(world),
         history: ProbeHistory {
             open: history_tab.is_some(),
             tab: history_tab.map(|tab| tab.title().to_owned()),
