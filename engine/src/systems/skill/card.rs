@@ -121,10 +121,10 @@ pub fn tooltip(
     card: &SkillCard,
     hint: Option<&StyledLine>,
 ) {
-    let content = world.resource::<Content>().clone();
-    let def = card.skill.get(&content);
-    let line = overview(world, &content, def, card);
     gui::tooltip(response, |ui| {
+        let content = world.resource::<Content>().clone();
+        let def = card.skill.get(&content);
+        let line = overview(world, &content, def, card);
         ui.set_max_width(hud::TOOLTIP_WIDTH);
         ui.spacing_mut().item_spacing.y = 2.0;
         ui.label(face::bold(def.name.as_str()).size(TextRole::Tooltip.size()));

@@ -365,7 +365,7 @@ fn launcher(
         response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, ""));
         let painter = ui.painter();
         painter.add(slip::SHADOW.as_shape(rect, 3.0));
-        sheet::vellum(painter, rect);
+        sheet::radial(painter, rect);
         let hovered = response.hovered();
         painter.rect(
             rect,
@@ -488,9 +488,10 @@ fn draw_confirm(world: &mut World) {
                     });
                 });
             let note = framed.response.rect;
-            let mut shapes = Vec::new();
-            shapes.push(Shape::Rect(pose.shadow.as_shape(note, 0.0)));
-            shapes.extend(sheet::vellum_shapes(ui.ctx(), note));
+            let shapes = vec![
+                Shape::Rect(pose.shadow.as_shape(note, 0.0)),
+                sheet::vellum_shape(ui.ctx(), note),
+            ];
             ui.painter().set(under, Shape::Vec(shapes));
             sheet::rule(ui.painter(), note, sheet::RULE_INSET);
         });
