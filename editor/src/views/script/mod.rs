@@ -21,7 +21,7 @@ use crate::forms::{FormAction, FormCx};
 use crate::project::{ContentEdit, Project, RowSelection, catalogue_of, row_file};
 use crate::tabs::EditorTab;
 use crate::thumbs;
-use crate::ui::{dialogs, theme, widgets};
+use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
 use crate::value::RowValue;
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
@@ -619,6 +619,17 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     let mut actions = Vec::new();
     keys(editor, ui, &doc, &mut actions);
     status(editor, &doc);
+    sidebar::right(ui, "script", |ui| {
+        let (table, key) = owner.row();
+        let selection = if editor.selection.table == table
+            && editor.selection.keys.first().is_some_and(|k| *k == key)
+        {
+            editor.selection.clone()
+        } else {
+            RowSelection::row(&table, &key)
+        };
+        inspect::show(editor, ui, &selection);
+    });
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)
         .show(ui, |ui| {
@@ -1628,37 +1639,4 @@ pub fn open_inline_or_row(editor: &mut Editor, table: &str, key: &str, pointer: 
     } else {
         editor.open_tab(EditorTab::for_row(table, key));
     }
-}
-
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    inspect::show(editor, ui, selection);
-}
-
-pub fn inspect_row(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let owner = ScriptOwner::Shared {
-        key: key.to_owned(),
-    };
-    let Some(doc) = ScriptDoc::load(editor, &owner) else {
-        ui.label(RichText::new(format!("script/{key} is gone")).weak());
-        return;
-    };
-    sync_with_content(editor);
-    let open = !editor
-        .dock
-        .iter_all_tabs()
-        .any(|(_, tab)| *tab == EditorTab::Script(owner.clone()));
-    egui::ScrollArea::vertical()
-        .id_salt(("script-row", key))
-        .show(ui, |ui| {
-            if open {
-                ui.horizontal(|ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Open the script").clicked() {
-                            editor.open_tab(EditorTab::Script(owner.clone()));
-                        }
-                    });
-                });
-            }
-            inspect::script_inspector(editor, ui, &doc);
-        });
 }

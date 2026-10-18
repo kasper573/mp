@@ -8,7 +8,7 @@ use crate::app::Editor;
 use crate::audio::Waveform;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
 
@@ -116,7 +116,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         widgets::kv(ui, "footstep", |ui| {
             play = widgets::chip(ui, "▶").clicked();
             let mut picked = footstep.clone();
-            let changed = inspector::with_row_form(editor, TABLE, surface, |cx| {
+            let changed = row_form::with_row_form(editor, TABLE, surface, |cx| {
                 picker::row(ui, cx, "sfx", &mut picked, "/footstep")
             });
             if changed && !picked.is_empty() && picked != footstep {

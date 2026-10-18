@@ -2,12 +2,16 @@ use egui::{Key, Sense, Ui};
 use serde_json::Value;
 
 use super::{theme, widgets};
-use crate::app::Editor;
 use crate::forms::FormChange;
-use crate::project::row_file;
+use crate::project::{ProjectFiles, row_file};
 use crate::value::RowValue;
 
-pub(super) fn bindings_section(ui: &mut Ui, value: &mut Value) -> FormChange {
+pub(super) fn bindings_section(
+    ui: &mut Ui,
+    files: &ProjectFiles,
+    key: &str,
+    value: &mut Value,
+) -> FormChange {
     let mut changed = FormChange::default();
     widgets::section(ui, "Bindings");
     if !value["bindings"].is_array() {
@@ -22,9 +26,17 @@ pub(super) fn bindings_section(ui: &mut Ui, value: &mut Value) -> FormChange {
             .enumerate()
         {
             let (keys, kind) = binding_label(binding);
+            let shared_with = also_bound(files, key, binding);
             egui::Frame::new()
                 .fill(theme::RAISED)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if shared_with.is_empty() {
+                        theme::BORDER
+                    } else {
+                        theme::WARN
+                    },
+                ))
                 .corner_radius(4.0)
                 .inner_margin(egui::Margin::symmetric(6, 3))
                 .show(ui, |ui| {
@@ -38,9 +50,33 @@ pub(super) fn bindings_section(ui: &mut Ui, value: &mut Value) -> FormChange {
                             remove = Some(index);
                         }
                     });
+                })
+                .response
+                .on_hover_text(if shared_with.is_empty() {
+                    format!("Only this input uses {keys}.")
+                } else {
+                    format!("Also bound to {}.", shared_with.join(", "))
                 });
         }
     });
+    let conflicts: Vec<String> = value["bindings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|binding| {
+            let others = also_bound(files, key, binding);
+            (!others.is_empty()).then(|| {
+                format!(
+                    "{} is also bound to {}",
+                    binding_label(binding).0,
+                    others.join(", ")
+                )
+            })
+        })
+        .collect();
+    for conflict in conflicts {
+        ui.label(theme::warn(conflict).size(12.5));
+    }
     if let Some(index) = remove {
         value["bindings"]
             .as_array_mut()
@@ -231,41 +267,18 @@ pub(super) fn key_code_name(key: egui::Key) -> String {
     }
 }
 
-pub fn show_conflicts(editor: &mut Editor, ui: &mut Ui) {
-    let selection = editor.selection.clone();
-    let Some(key) = selection.keys.first() else {
-        return;
-    };
-    let Some(value) = editor.row_value("input", key) else {
-        return;
-    };
-    let Some(project) = &editor.project else {
-        return;
-    };
-    for binding in value["bindings"].as_array().into_iter().flatten() {
-        let (label, _) = binding_label(binding);
-        widgets::section(ui, &format!("Also bound to {label}"));
-        let others: Vec<&str> = project
-            .files
-            .keys_of("input")
-            .filter(|other| *other != key)
-            .filter(|other| {
-                project
-                    .files
-                    .json(&row_file("input", other))
-                    .is_some_and(|row| {
-                        row["bindings"]
-                            .as_array()
-                            .is_some_and(|list| list.contains(binding))
-                    })
+/// The other inputs that carry this same binding.
+fn also_bound(files: &ProjectFiles, key: &str, binding: &Value) -> Vec<String> {
+    files
+        .keys_of("input")
+        .filter(|other| *other != key)
+        .filter(|other| {
+            files.json(&row_file("input", other)).is_some_and(|row| {
+                row["bindings"]
+                    .as_array()
+                    .is_some_and(|list| list.contains(binding))
             })
-            .collect();
-        if others.is_empty() {
-            widgets::hint(ui, &format!("No other input uses {label}."));
-        } else {
-            for other in others {
-                ui.label(theme::mono(format!("input/{other}")).color(theme::WARN));
-            }
-        }
-    }
+        })
+        .map(|other| format!("input/{other}"))
+        .collect()
 }

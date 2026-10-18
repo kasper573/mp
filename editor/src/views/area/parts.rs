@@ -12,7 +12,7 @@ use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection, row_file};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema};
 
@@ -281,7 +281,7 @@ pub(super) fn part_cards(
                     *part = plain;
                 }
                 if module_kind == Some(AreaModuleKind::Object) {
-                    changed |= crate::ui::inspector::scripts::script_cards(
+                    changed |= crate::ui::row_form::scripts::script_cards(
                         ui, &mut cx, "area", part, "scripts", &path,
                     )
                     .is_some();
@@ -338,7 +338,7 @@ pub(super) fn part_cards(
         editor.apply(edit);
     }
     for action in actions {
-        inspector::act(editor, action, "blueprint", key);
+        row_form::act(editor, action, "blueprint", key);
     }
 }
 
@@ -505,7 +505,7 @@ pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row
     widgets::section_count(ui, "Modules", count);
     let changed = editor
         .with_form("blueprint", Some(key), shape, |cx| {
-            crate::ui::inspector::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
+            crate::ui::row_form::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
                 .is_some()
         })
         .unwrap_or(false);

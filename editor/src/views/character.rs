@@ -21,7 +21,7 @@ use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserAction;
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
 use crate::{condition, forms, picker, play, schema};
@@ -188,8 +188,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
         });
         ui.add_space(14.0);
+        let preview_width = (ui.available_width() / 3.0).clamp(240.0, 384.0);
         ui.vertical(|ui| {
-            ui.set_width(ui.available_width());
+            ui.set_width(ui.available_width() - preview_width - 16.0);
             let Editor {
                 project,
                 form,
@@ -275,6 +276,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             });
         });
+        ui.vertical(|ui| {
+            ui.set_width(preview_width);
+            widgets::section(ui, "preview");
+            row_form::preview::show_beside(editor, ui, TABLE, key);
+        });
     });
     editor.status.left.push(format!(
         "test character {key} › {}",
@@ -308,7 +314,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.apply(edit);
     }
     for action in actions {
-        inspector::act(editor, action, TABLE, key);
+        row_form::act(editor, action, TABLE, key);
     }
     if let Some(other) = switch {
         editor.select(RowSelection::row(TABLE, &other));
@@ -1646,7 +1652,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             play::start(editor, None);
         }
         if ui.button("⑂ Duplicate").clicked() {
-            inspector::act(
+            row_form::act(
                 editor,
                 FormAction::RowAction(BrowserAction::Duplicate),
                 TABLE,

@@ -13,7 +13,7 @@ use crate::forms::FormChange;
 use crate::project::{ContentEdit, RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::assets::AssetKind;
-use crate::ui::{dialogs, inspector, theme, widgets};
+use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::{forms, picker};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
@@ -41,7 +41,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
                 if page == ModelPage::Matrix {
-                    inspector::show_row(editor, ui, super::TABLE, &key);
+                    row_form::show_row(editor, ui, super::TABLE, &key);
                     ui.add_space(8.0);
                 }
                 match (
@@ -93,7 +93,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         egui::ScrollArea::vertical()
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
-                inspector::show_row(editor, ui, super::TABLE, &key);
+                row_form::show_row(editor, ui, super::TABLE, &key);
             });
         return;
     }
@@ -646,7 +646,7 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    inspector::with_row_form(editor, super::TABLE, key, |cx| {
+    row_form::with_row_form(editor, super::TABLE, key, |cx| {
         picker::row(ui, cx, "sfx", sound, path)
     })
 }
@@ -658,7 +658,7 @@ fn asset_picker(
     file: &mut String,
     path: &str,
 ) -> bool {
-    inspector::with_row_form(editor, super::TABLE, key, |cx| {
+    row_form::with_row_form(editor, super::TABLE, key, |cx| {
         picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
     })
 }

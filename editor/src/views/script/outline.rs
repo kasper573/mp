@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
 use super::nodes::{self, LineSpeaker, OutlineRow};
 use super::{ScriptDoc, select_nodes};
-use crate::app::{Editor, RightTab};
+use crate::app::Editor;
 use crate::project::{RowSelection, catalogue_of};
 use crate::spans;
 use crate::ui::{theme, widgets};
@@ -112,7 +112,6 @@ pub fn show(
             Some(target) => select_nodes(editor, doc, std::slice::from_ref(target)),
             None => select(editor, doc, row),
         }
-        editor.panels.right = RightTab::Inspector;
     }
     if keys.tab {
         let link = match row.choice {

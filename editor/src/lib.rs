@@ -14,7 +14,7 @@ mod spans;
 mod tabs;
 pub mod templates;
 pub mod thumbs;
-mod ui;
+pub mod ui;
 mod usages;
 pub mod user;
 mod value;

@@ -4,9 +4,10 @@ use egui::Ui;
 
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Editor, RightTab};
+use crate::app::Editor;
 use crate::picker::Dragged;
 use crate::project::RowSelection;
+use crate::tabs::EditorTab;
 use crate::thumbs;
 
 #[derive(Default)]
@@ -119,7 +120,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .inner;
     if let Some((path, _)) = out.clicked {
         editor.select(RowSelection::row("asset", &path));
-        editor.panels.right = RightTab::Inspector;
+        editor.open_tab(EditorTab::Asset { path });
     }
     if !needle.is_empty() {
         editor.status.left.push(format!(

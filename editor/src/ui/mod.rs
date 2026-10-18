@@ -2,10 +2,11 @@ pub mod assets;
 pub mod browser;
 pub mod dialogs;
 pub mod history;
-pub mod inspector;
 pub mod output;
 pub mod patterns;
 pub mod report;
+pub mod row_form;
+pub mod sidebar;
 pub mod start;
 pub mod theme;
 pub mod tree;
@@ -18,7 +19,7 @@ use std::time::Duration;
 use egui::{Align, Context, Key, Layout, Modifiers, RichText};
 use egui_dock::{DockArea, DockState, TabViewer};
 
-use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog, RightTab};
+use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::project::{RowSelection, row_file};
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::ScriptKeys;
@@ -348,38 +349,6 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                     });
             });
         });
-    egui::Panel::right("inspector")
-        .resizable(true)
-        .default_size(360.0)
-        .size_range(260.0..=720.0)
-        .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(0.0))
-        .show(root, |ui| {
-            let tabs = inspector::right_tabs(editor);
-            if !tabs.iter().any(|(tab, _)| *tab == editor.panels.right) {
-                editor.panels.right = tabs
-                    .first()
-                    .map(|(tab, _)| *tab)
-                    .unwrap_or(RightTab::Inspector);
-            }
-            widgets::tab_strip(ui, &tabs, &mut editor.panels.right);
-            panel_body(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt("right-panel")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        egui::Frame::new()
-                            .inner_margin(egui::Margin::symmetric(10, 8))
-                            .show(ui, |ui| match editor.panels.right {
-                                RightTab::Inspector => inspector::show(editor, ui),
-                                RightTab::UsedBy => inspector::usages::show_used_by(editor, ui),
-                                RightTab::Preview => inspector::preview::show_preview(editor, ui),
-                                RightTab::Conflicts => {
-                                    inspector::bindings::show_conflicts(editor, ui)
-                                }
-                            });
-                    });
-            });
-        });
     let bottom_tabs = views::bottom_tabs(editor);
     if !bottom_tabs
         .iter()
@@ -564,7 +533,7 @@ struct Viewer<'a> {
 }
 
 /// The gutter every tab's content keeps from the tab body's edge, so views line up.
-const CONTENT_PADDING: egui::Margin = egui::Margin::symmetric(16, 10);
+pub const CONTENT_PADDING: egui::Margin = egui::Margin::symmetric(16, 10);
 
 impl TabViewer for Viewer<'_> {
     type Tab = EditorTab;
@@ -605,7 +574,14 @@ impl TabViewer for Viewer<'_> {
             EditorTab::Script(owner) => script::show(self.editor, ui, owner),
             EditorTab::Model { key } => model::show(self.editor, ui, key),
             EditorTab::Tileset { key } => tileset::show(self.editor, ui, key),
-            EditorTab::Row { .. } | EditorTab::Rows { .. } | EditorTab::Spreadsheet { .. } => {
+            EditorTab::Row { table, key } if table == class::TABLE => {
+                class::show(self.editor, ui, key)
+            }
+            EditorTab::Spreadsheet { table } => spreadsheet::show(self.editor, ui, table),
+            EditorTab::Row { .. }
+            | EditorTab::Rows { .. }
+            | EditorTab::Game
+            | EditorTab::Asset { .. } => {
                 egui::Frame::new()
                     .inner_margin(CONTENT_PADDING)
                     .show(ui, |ui| {
@@ -614,9 +590,6 @@ impl TabViewer for Viewer<'_> {
                             EditorTab::Row { table, key } if table == character::TABLE => {
                                 character::show(self.editor, ui, key)
                             }
-                            EditorTab::Row { table, key } if table == class::TABLE => {
-                                class::show(self.editor, ui, key)
-                            }
                             EditorTab::Row { table, key } if table == vfx::TABLE => {
                                 vfx::show_vfx(self.editor, ui, key)
                             }
@@ -624,13 +597,14 @@ impl TabViewer for Viewer<'_> {
                                 vfx::show_shader(self.editor, ui, key)
                             }
                             EditorTab::Row { table, key } => {
-                                inspector::show_row_tab(self.editor, ui, table, key)
+                                row_form::show_row_tab(self.editor, ui, table, key)
                             }
                             EditorTab::Rows { table, keys } => {
-                                inspector::show_rows_tab(self.editor, ui, table, keys)
+                                row_form::show_rows_tab(self.editor, ui, table, keys)
                             }
-                            EditorTab::Spreadsheet { table } => {
-                                spreadsheet::show(self.editor, ui, table)
+                            EditorTab::Game => row_form::settings::show_game(self.editor, ui),
+                            EditorTab::Asset { path } => {
+                                row_form::usages::show_asset(self.editor, ui, path)
                             }
                             _ => {}
                         }
@@ -661,7 +635,12 @@ impl TabViewer for Viewer<'_> {
             | EditorTab::World
             | EditorTab::Script(_)
             | EditorTab::Model { .. }
-            | EditorTab::Tileset { .. } => [false, false],
+            | EditorTab::Tileset { .. }
+            | EditorTab::Spreadsheet { .. } => [false, false],
+            EditorTab::Row { table, key } if table == class::TABLE => [
+                false,
+                self.editor.views.class.page(key) == class::ClassPage::Levels,
+            ],
             _ => [false, true],
         }
     }

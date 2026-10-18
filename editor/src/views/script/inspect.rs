@@ -14,7 +14,7 @@ use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
-use crate::ui::{dialogs, inspector, theme, widgets};
+use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
@@ -1674,7 +1674,7 @@ fn speaker_rows(
 }
 
 fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
-    inspector::act(editor, action, doc.owner.table(), doc.owner.key());
+    row_form::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
 #[derive(Clone, Debug)]

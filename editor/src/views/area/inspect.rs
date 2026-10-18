@@ -23,10 +23,30 @@ use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{inspector, patterns, theme, widgets};
+use crate::ui::{patterns, row_form, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
+
+/// The area window's inspector: the selected modules, the blueprint parts edited in place, or
+/// else the card of the tool in hand.
+pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let selection = editor.selection.clone();
+    let of_this_area =
+        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
+    if of_this_area
+        && selection
+            .parts
+            .iter()
+            .any(|part| super::module_index(part).is_some())
+    {
+        show_parts(editor, ui, &selection);
+    } else if selection.table == "blueprint" && !selection.parts.is_empty() {
+        super::inspect_parts(editor, ui, &selection);
+    } else {
+        show(editor, ui, key);
+    }
+}
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
@@ -445,7 +465,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             });
         }
         for action in actions {
-            inspector::act(editor, action, "area", "");
+            row_form::act(editor, action, "area", "");
         }
         let Some(stamp) = editor.views.area.view(view_key).stamp.clone() else {
             widgets::hint(
@@ -761,7 +781,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         pins::set_spawn(editor, &picked, middle);
     }
     for action in actions {
-        inspector::act(editor, action, "area", key);
+        row_form::act(editor, action, "area", key);
     }
     if pick {
         editor.pick = Some(PlacePick {
@@ -962,7 +982,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         editor.apply(edit);
     }
     for action in actions {
-        inspector::act(editor, action, "area", &area_key);
+        row_form::act(editor, action, "area", &area_key);
     }
     for action in out.actions {
         if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &area_key) {
@@ -1095,7 +1115,7 @@ fn module_inspector(
         Some(AreaModuleKind::Population | AreaModuleKind::Resident) => from_npc(ui, cx, module),
         Some(AreaModuleKind::Object) => {
             ui.add_space(4.0);
-            changed |= crate::ui::inspector::scripts::script_cards(
+            changed |= crate::ui::row_form::scripts::script_cards(
                 ui, cx, "area", module, "scripts", &path,
             )
             .is_some();

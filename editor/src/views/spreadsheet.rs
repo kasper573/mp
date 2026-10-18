@@ -15,7 +15,7 @@ use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;
 use crate::ui::assets::ICON_DECODES_PER_FRAME;
 use crate::ui::widgets;
-use crate::ui::{browser, theme};
+use crate::ui::{self, browser, sidebar, theme};
 use crate::user::SpreadsheetView;
 
 const ROW_H: f32 = 29.0;
@@ -520,6 +520,24 @@ fn columns_cached(
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
+    let selection = editor.selection.clone();
+    if selection.table == table
+        && selection
+            .parts
+            .first()
+            .is_some_and(|part| part.starts_with("#sheet/"))
+    {
+        sidebar::right(ui, "sheet-column", |ui| inspect(editor, ui, &selection));
+    }
+    egui::Frame::new()
+        .inner_margin(ui::CONTENT_PADDING)
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            sheet(editor, ui, table);
+        });
+}
+
+fn sheet(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let (rows, columns, mut view, total) = shown_rows(editor, table);
     let shown: Vec<&SpreadsheetColumn> = view
         .columns

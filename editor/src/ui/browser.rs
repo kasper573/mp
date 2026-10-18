@@ -6,7 +6,7 @@ use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
+use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget};
 use crate::picker::Dragged;
 use crate::picker::{self, PictureFrame};
 use crate::project::{GAME_FILE, Project, RowSelection, row_of};
@@ -235,15 +235,17 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         .is_some_and(|(path, _)| path == GAME_FILE)
     {
         editor.select(RowSelection::game());
-        editor.panels.right = RightTab::Inspector;
+        editor.open_tab(EditorTab::Game);
     }
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
         if table == WorldMapDef::TABLE {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
+        } else if modifiers.ctrl || modifiers.shift {
+            select_rows(editor, table, key, modifiers.ctrl, modifiers.shift);
         } else {
-            select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
+            action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         }
     }
     if let Some(path) = out.double_clicked
@@ -388,8 +390,9 @@ fn row_menu(
     }
 }
 
-fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bool) {
-    let mut selection = if editor.selection.table == table && (ctrl || shift) {
+/// Ctrl or Shift adds to a selection of rows, shown together in one window.
+fn select_rows(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bool) {
+    let mut selection = if editor.selection.table == table {
         editor.selection.clone()
     } else {
         RowSelection::rows(table, Vec::new())
@@ -420,8 +423,16 @@ fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bo
     } else if !selection.keys.contains(&key.to_owned()) {
         selection.keys.push(key.to_owned());
     }
+    let keys = selection.keys.clone();
     editor.select(selection);
-    editor.panels.right = RightTab::Inspector;
+    match keys.as_slice() {
+        [] => {}
+        [key] => editor.open_tab(EditorTab::for_row(table, key)),
+        _ => editor.open_tab(EditorTab::Rows {
+            table: table.to_owned(),
+            keys,
+        }),
+    }
 }
 
 pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
@@ -447,7 +458,8 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         BrowserAction::Duplicate => rows::duplicate(editor, table, key),
         BrowserAction::Usages => {
             editor.select(RowSelection::row(table, key));
-            editor.panels.right = RightTab::UsedBy;
+            editor.open_tab(EditorTab::for_row(table, key));
+            editor.panels.bottom = BottomTab::UsedBy;
         }
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
     }
@@ -655,7 +667,11 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         }
     }
     if let Some((table, key, ctrl, shift)) = clicked {
-        select_row(editor, &table, &key, ctrl, shift);
+        if ctrl || shift {
+            select_rows(editor, &table, &key, ctrl, shift);
+        } else {
+            act(editor, &table, &key, BrowserAction::Open);
+        }
     }
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
@@ -667,14 +683,13 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
             parts: vec![format!("/modules/{index}")],
         });
         editor.open_tab(EditorTab::for_row(&table, &key));
-        editor.panels.right = RightTab::Inspector;
     }
     if let Some(path) = open_file {
         editor.panels.left = LeftTab::Assets;
         editor.views.assets.search = path.trim_end_matches('/').to_owned();
         if !path.ends_with('/') {
             editor.select(RowSelection::row("asset", &path));
-            editor.panels.right = RightTab::Inspector;
+            editor.open_tab(EditorTab::Asset { path });
         }
     }
 }

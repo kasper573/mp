@@ -12,7 +12,6 @@ use serde_json::Value;
 use strum::VariantArray;
 
 use super::quests::quest_parties_sections;
-use super::usages::show_usages_grouped;
 use super::{theme, widgets};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
@@ -21,16 +20,16 @@ use crate::views::model::preview;
 use crate::views::script::panel;
 use crate::{forms, thumbs, value};
 
-pub struct InspectorPreviewState {
+pub struct RowPreviewState {
     pub action: Action,
     pub direction: Direction,
     pub playing: bool,
     pub started: f64,
 }
 
-impl Default for InspectorPreviewState {
-    fn default() -> InspectorPreviewState {
-        InspectorPreviewState {
+impl Default for RowPreviewState {
+    fn default() -> RowPreviewState {
+        RowPreviewState {
             action: Action::Idle,
             direction: Direction::S,
             playing: true,
@@ -45,16 +44,19 @@ pub(super) struct Pose {
     elapsed: f32,
 }
 
-pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
-    let selection = editor.selection.clone();
-    let keys: Vec<String> = selection.keys.clone();
-    if keys.is_empty() {
+pub fn has_preview(table: &str) -> bool {
+    matches!(
+        table,
+        "npc" | "player" | "model" | "item" | "quest" | "test_character"
+    )
+}
+
+/// The row as the game shows it, beside its form: the actor, item or quest card it stands for.
+pub fn show_beside(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
+    let Some(value) = editor.row_value(table, key) else {
         return;
-    }
-    let several = keys.len() > 1;
-    let columns = if several { 2 } else { 1 };
-    let width = (ui.available_width() - if several { 8.0 } else { 0.0 }) / columns as f32;
-    let height = if several { width * 0.7 } else { width * 0.72 };
+    };
+    let width = ui.available_width();
     let now = ui.input(|i| i.time);
     let state = &editor.views.preview;
     let elapsed = if state.playing {
@@ -67,35 +69,22 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
         direction: state.direction,
         elapsed: elapsed as f32,
     };
-    egui::Grid::new("previews")
-        .num_columns(columns)
-        .spacing([8.0, 8.0])
-        .show(ui, |ui| {
-            for (index, key) in keys.iter().enumerate() {
-                let Some(value) = editor.row_value(&selection.table, key) else {
-                    continue;
-                };
-                draw_preview(
-                    editor,
-                    ui,
-                    &selection.table,
-                    key,
-                    &value,
-                    Vec2::new(width, height),
-                    &pose,
-                );
-                if (index + 1) % columns == 0 {
-                    ui.end_row();
-                }
-            }
-        });
-    if selection.table == "quest" && keys.len() == 1 {
-        quest_parties_sections(editor, ui, &keys[0]);
+    draw_preview(
+        editor,
+        ui,
+        table,
+        key,
+        &value,
+        Vec2::new(width, width * 0.72),
+        &pose,
+    );
+    if table == "quest" {
+        quest_parties_sections(editor, ui, key);
     }
-    if selection.table == "test_character" && keys.len() == 1 {
-        character::preview_extras(editor, ui, &keys[0]);
+    if table == "test_character" {
+        character::preview_extras(editor, ui, key);
     }
-    if matches!(selection.table.as_str(), "npc" | "player" | "model") {
+    if matches!(table, "npc" | "player" | "model") {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
             widgets::combo_box("preview-action")
@@ -122,10 +111,6 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
         if editor.views.preview.playing {
             ui.ctx().request_repaint();
         }
-    }
-    ui.add_space(6.0);
-    for key in &keys {
-        show_usages_grouped(editor, ui, &selection.table, key, several);
     }
 }
 
@@ -219,7 +204,7 @@ pub(super) fn draw_preview(
         editor,
         &painter,
         rect,
-        format!("inspector-preview:{table}/{key}"),
+        format!("row-preview:{table}/{key}"),
         scale,
     );
     let sprite = preview::sprite_rect(feet, shown);

@@ -12,7 +12,7 @@ use super::{
     AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
     blueprint_part, module_index, module_part, pick, pins, shapes,
 };
-use crate::app::{Clipboard, Editor, RightTab};
+use crate::app::{Clipboard, Editor};
 use crate::project::RowSelection;
 use crate::rows;
 use crate::value::RowValue;
@@ -216,8 +216,6 @@ impl SelectScope<'_> {
             (SelectScope::Area, Some(index)) => {
                 if frame.modules[index].is_module(AreaModuleKind::Blueprint) {
                     placement::edit_in_place(editor, view_key, frame, index);
-                } else {
-                    editor.panels.right = RightTab::Inspector;
                 }
                 true
             }

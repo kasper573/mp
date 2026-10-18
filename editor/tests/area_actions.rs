@@ -120,6 +120,7 @@ fn escape_over_the_area_ends_the_stroke_held() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     let ctx = egui::Context::default();
+    editor::ui::theme::apply(&ctx);
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
     let over_the_area = vec![egui::Event::PointerMoved(screen.center())];
     show_area(&ctx, &mut editor, screen, over_the_area.clone());

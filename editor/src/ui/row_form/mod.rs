@@ -9,8 +9,7 @@ pub mod usages;
 use std::collections::BTreeMap;
 
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, ModuleRule};
-use engine::systems::area::world_map::WorldMapDef;
+use engine::core::content::ModuleRule;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
@@ -19,13 +18,13 @@ use self::scripts::{
     is_objective, module_lines, outline_block, script_extras, script_summary, script_values,
     speaker_of, summary_of,
 };
-use self::usages::show_asset;
 use super::{theme, widgets};
 use crate::app::{
-    BottomTab, Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, RightTab,
-    TextComparison, registry,
+    Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
+    registry,
 };
 use crate::drafts::{clear_draft, draft_of, set_draft};
+use crate::forms;
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::rows::new_row_into;
@@ -33,155 +32,45 @@ use crate::schema;
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
-use crate::views::area::{inspect, parts};
 use crate::views::script::{PendingScriptAction, ScriptOwner};
-use crate::views::{class, model, script, skill, tileset, vfx, world};
-use crate::{forms, views};
+use crate::views::{class, model, script, skill, tileset, vfx};
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
 const SINGLE_COLUMN: f32 = 560.0;
-
-pub fn show(editor: &mut Editor, ui: &mut Ui) {
-    if editor.panels.bottom == BottomTab::History && editor.history_focus.is_some() {
-        super::history::step_card(editor, ui);
-        ui.add_space(8.0);
-    }
-    let selection = editor.selection.clone();
-    if editor.project.is_none() {
-        return;
-    }
-    if selection.is_game() {
-        egui::ScrollArea::vertical()
-            .id_salt("inspector-game")
-            .show(ui, |ui| settings::show_game(editor, ui));
-        return;
-    }
-    if selection.keys.is_empty() || selection.table == WorldMapDef::TABLE {
-        if matches!(super::active_tab(editor), Some(EditorTab::World)) {
-            world::inspect_parts(editor, ui, &selection);
-            return;
-        }
-        ui.label(theme::muted(
-            "Select a row, a module or a result to see it here.",
-        ));
-        return;
-    }
-    if selection.table == "asset" {
-        show_asset(editor, ui, &selection.keys[0]);
-        return;
-    }
-    let module_part = selection.parts.len() == 1
-        && selection.parts[0]
-            .strip_prefix("/modules/")
-            .is_some_and(|rest| rest.parse::<usize>().is_ok())
-        && !matches!(selection.table.as_str(), "area" | "blueprint");
-    if !selection.parts.is_empty() && !module_part {
-        views::inspect_parts(editor, ui, &selection);
-        return;
-    }
-    if selection.keys.len() == 1 {
-        let (table, key) = (selection.table.clone(), selection.keys[0].clone());
-        if table == "script" {
-            script::inspect_row(editor, ui, &key);
-            return;
-        }
-        if let Some(EditorTab::Script(owner)) = super::active_tab(editor)
-            && owner.is_row(&table, &key)
-        {
-            script::inspect_parts(editor, ui, &selection);
-            return;
-        }
-        if table == "area"
-            && matches!(super::active_tab(editor), Some(EditorTab::Area { key: open }) if open == key)
-        {
-            inspect::show(editor, ui, &key);
-            return;
-        }
-        if table == "blueprint" {
-            egui::ScrollArea::vertical()
-                .id_salt(("inspector-blueprint", &key))
-                .show(ui, |ui| {
-                    parts::show_blueprint(editor, ui, &key, &[]);
-                });
-            return;
-        }
-        egui::ScrollArea::vertical()
-            .id_salt(("inspector", &table, &key))
-            .show(ui, |ui| {
-                row_form(editor, ui, &table, &key, false);
-            });
-    } else {
-        egui::ScrollArea::vertical()
-            .id_salt(("inspector-rows", &selection.table))
-            .show(ui, |ui| {
-                show_rows(editor, ui, &selection, false);
-            });
-    }
-}
-
-pub fn right_tabs(editor: &Editor) -> Vec<(RightTab, String)> {
-    let selection = &editor.selection;
-    let mut tabs = Vec::new();
-    let shown_in_centre = selection.parts.is_empty()
-        && match super::active_tab(editor) {
-            Some(EditorTab::Row { table, key }) => {
-                selection.keys.len() == 1 && table == selection.table && key == selection.keys[0]
-            }
-            Some(EditorTab::Rows { table, keys }) => {
-                table == selection.table && keys == selection.keys
-            }
-            _ => false,
-        };
-    if selection.table == "input" && selection.parts.is_empty() && !selection.keys.is_empty() {
-        tabs.push((RightTab::Conflicts, "Conflicts".to_owned()));
-        if !shown_in_centre {
-            tabs.push((RightTab::Inspector, "Inspector".to_owned()));
-        }
-    } else if has_preview(editor) {
-        tabs.push((
-            RightTab::Preview,
-            if selection.table == "quest" {
-                "Quest log".to_owned()
-            } else {
-                "Preview".to_owned()
-            },
-        ));
-        if !shown_in_centre {
-            tabs.push((RightTab::Inspector, "Inspector".to_owned()));
-        }
-    } else if !(shown_in_centre && views_with_own_form(&selection.table)) {
-        tabs.push((RightTab::Inspector, "Inspector".to_owned()));
-    }
-    if !selection.is_game() {
-        tabs.push((RightTab::UsedBy, "Used by".to_owned()));
-    }
-    tabs
-}
-
-/// The tables whose centre view lays the row's form out beside what it previews, so the panel
-/// would only repeat it.
-fn views_with_own_form(table: &str) -> bool {
-    table == vfx::TABLE || table == vfx::SHADER_TABLE
-}
-
-pub fn has_preview(editor: &Editor) -> bool {
-    let selection = &editor.selection;
-    !selection.keys.is_empty()
-        && selection.parts.is_empty()
-        && matches!(
-            selection.table.as_str(),
-            "npc" | "player" | "model" | "item" | "quest" | "test_character"
-        )
-}
+const PREVIEW: f32 = 384.0;
+const MIN_PREVIEW: f32 = 240.0;
+const COLUMN_GAP: f32 = 16.0;
 
 pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
-    egui::ScrollArea::vertical()
-        .id_salt(("row-tab", table, key))
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            row_form(editor, ui, table, key, ui.available_width() >= WIDE);
+    if !preview::has_preview(table) {
+        egui::ScrollArea::vertical()
+            .id_salt(("row-tab", table, key))
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                row_form(editor, ui, table, key, ui.available_width() >= WIDE);
+            });
+        return;
+    }
+    let preview_width = (ui.available_width() / 3.0).clamp(MIN_PREVIEW, PREVIEW);
+    let form_width = ui.available_width() - preview_width - COLUMN_GAP;
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(form_width);
+            egui::ScrollArea::vertical()
+                .id_salt(("row-tab", table, key))
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    row_form(editor, ui, table, key, form_width >= WIDE);
+                });
         });
+        ui.add_space(COLUMN_GAP);
+        ui.vertical(|ui| {
+            ui.set_width(preview_width);
+            widgets::section(ui, "preview");
+            preview::show_beside(editor, ui, table, key);
+        });
+    });
 }
 
 pub fn show_rows_tab(editor: &mut Editor, ui: &mut Ui, table: &str, keys: &[String]) {
@@ -250,7 +139,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
                         if table == "input" {
-                            changed |= bindings_section(ui, &mut value);
+                            changed |= bindings_section(ui, cx.files, key, &mut value);
                         } else {
                             changed |= modules_column(
                                 ui,
@@ -271,7 +160,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
                 if table == "input" {
                     ui.add_space(10.0);
-                    changed |= bindings_section(ui, &mut value);
+                    changed |= bindings_section(ui, cx.files, key, &mut value);
                 }
                 if has_modules {
                     ui.add_space(10.0);

@@ -29,7 +29,7 @@ use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
-use crate::ui::inspector;
+use crate::ui::row_form;
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
 use crate::views::area::placement::ReplaceScope;
 use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
@@ -170,7 +170,6 @@ impl OutputLog {
 #[derive(Default)]
 pub struct DockTabs {
     pub left: LeftTab,
-    pub right: RightTab,
     pub bottom: BottomTab,
 }
 
@@ -179,15 +178,6 @@ pub enum LeftTab {
     #[default]
     Content,
     Assets,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum RightTab {
-    #[default]
-    Inspector,
-    UsedBy,
-    Preview,
-    Conflicts,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -780,7 +770,7 @@ impl Editor {
             show(&mut cx)
         };
         for action in actions {
-            inspector::act(self, action, table, key.unwrap_or_default());
+            row_form::act(self, action, table, key.unwrap_or_default());
         }
         Some(shown)
     }

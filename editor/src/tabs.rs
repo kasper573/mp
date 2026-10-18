@@ -15,6 +15,8 @@ pub enum EditorTab {
     Model { key: String },
     Tileset { key: String },
     Spreadsheet { table: String },
+    Game,
+    Asset { path: String },
 }
 
 /// What a tab's context menu asked to close, done once the dock is no longer being drawn.
@@ -40,6 +42,8 @@ impl EditorTab {
             EditorTab::Model { key } => format!("model/{key}"),
             EditorTab::Tileset { key } => format!("tileset/{key}"),
             EditorTab::Spreadsheet { table } => format!("{table} table"),
+            EditorTab::Game => "game".to_owned(),
+            EditorTab::Asset { path } => path.rsplit('/').next().unwrap_or(path).to_owned(),
         }
     }
 
@@ -56,7 +60,7 @@ impl EditorTab {
             EditorTab::Script(owner) => Some(owner.row()),
             EditorTab::Model { key } => Some(("model".to_owned(), key.clone())),
             EditorTab::Tileset { key } => Some(("tileset".to_owned(), key.clone())),
-            EditorTab::Spreadsheet { .. } => None,
+            EditorTab::Spreadsheet { .. } | EditorTab::Game | EditorTab::Asset { .. } => None,
         }
     }
 

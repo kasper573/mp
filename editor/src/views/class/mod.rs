@@ -11,7 +11,7 @@ use strum::VariantArray;
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{self, row_form, sidebar, theme, widgets};
 
 pub const TABLE: &str = "class";
 pub const TREE_PART: &str = "/tree/";
@@ -57,6 +57,22 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     }
     let page = editor.views.class.page(key);
+    let selection = editor.selection.clone();
+    if page == ClassPage::Tree
+        && selection.keys.first().is_some_and(|k| k == key)
+        && node_of(&selection).is_some()
+    {
+        sidebar::right(ui, "class-node", |ui| inspect::show(editor, ui, &selection));
+    }
+    egui::Frame::new()
+        .inner_margin(ui::CONTENT_PADDING)
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            page_body(editor, ui, key, page);
+        });
+}
+
+fn page_body(editor: &mut Editor, ui: &mut Ui, key: &str, page: ClassPage) {
     ui.horizontal(|ui| {
         for (target, label) in [
             (ClassPage::Levels, "levels"),
@@ -72,7 +88,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     });
     ui.add_space(4.0);
     match page {
-        ClassPage::Levels => inspector::show_row_tab(editor, ui, TABLE, key),
+        ClassPage::Levels => row_form::show_row_tab(editor, ui, TABLE, key),
         ClassPage::Tree => tree::show(editor, ui, key),
     }
 }

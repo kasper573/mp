@@ -48,7 +48,7 @@ use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
 use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{theme, widgets};
+use crate::ui::{sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
@@ -447,6 +447,7 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
+    sidebar::right(ui, "area", |ui| inspect::sidebar(editor, ui, key));
     show_canvas(editor, ui, &view_key, key, None);
     play::banner(editor, ui);
 }
@@ -499,6 +500,20 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label("No area to preview the blueprint on");
         return;
     };
+    sidebar::right(ui, "blueprint", |ui| {
+        let selection = editor.selection.clone();
+        let indices: Vec<usize> =
+            if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
+                selection
+                    .parts
+                    .iter()
+                    .filter_map(|p| blueprint_part_index(p))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        parts::show_blueprint(editor, ui, key, &indices);
+    });
     show_canvas(editor, ui, &view_key, &preview, Some(key));
 }
 

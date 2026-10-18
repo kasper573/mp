@@ -15,7 +15,7 @@ use crate::picker;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::assets::AssetKind;
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
 
@@ -46,7 +46,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     }
                 } else {
                     ui.add_space(8.0);
-                    inspector::show_row(editor, ui, super::TABLE, key);
+                    row_form::show_row(editor, ui, super::TABLE, key);
                 }
                 used_by(editor, ui, key);
             } else if part == TERRAINS_PART {

@@ -18,7 +18,7 @@ pub use preview::{Target, VfxViews, sync};
 use self::preview::preview;
 use crate::app::Editor;
 use crate::project::{ContentEdit, row_file};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 
 pub const TABLE: &str = "vfx";
 pub const SHADER_TABLE: &str = "vfx_shader";
@@ -49,7 +49,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
             egui::ScrollArea::vertical()
                 .id_salt(("vfx-form", key))
                 .auto_shrink([false, false])
-                .show(ui, |ui| inspector::show_row(editor, ui, TABLE, key));
+                .show(ui, |ui| row_form::show_row(editor, ui, TABLE, key));
         });
         ui.add_space(16.0);
         ui.vertical(|ui| {
@@ -84,7 +84,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             egui::ScrollArea::vertical()
                 .id_salt(("shader-form", key))
                 .auto_shrink([false, false])
-                .show(ui, |ui| inspector::show_row(editor, ui, SHADER_TABLE, key));
+                .show(ui, |ui| row_form::show_row(editor, ui, SHADER_TABLE, key));
         });
         ui.add_space(COLUMN_GAP);
         ui.vertical(|ui| {

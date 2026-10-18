@@ -18,9 +18,10 @@ use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{AreaCameraState, RowSelection};
+use crate::project::AreaCameraState;
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserState;
+use crate::ui::row_form::usages;
 use crate::ui::theme;
 use crate::{play, ui};
 
@@ -42,7 +43,7 @@ pub struct EditorViews {
     pub class: class::ClassViews,
     pub vfx: vfx::VfxViews,
     pub assets: crate::ui::assets::AssetsState,
-    pub preview: crate::ui::inspector::preview::InspectorPreviewState,
+    pub preview: crate::ui::row_form::preview::RowPreviewState,
 }
 
 impl EditorViews {
@@ -86,6 +87,9 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
         Some(EditorTab::Tileset { key }) => tileset::bottom_tabs(editor, &key),
         _ => Vec::new(),
     };
+    if used_by_subject(editor).is_some() && !tabs.contains(&BottomTab::UsedBy) {
+        tabs.push(BottomTab::UsedBy);
+    }
     tabs.push(BottomTab::History);
     tabs.push(BottomTab::Output);
     tabs.into_iter()
@@ -95,6 +99,11 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
                     "{}   {}",
                     tab.title(),
                     script::panel::used_by_count(editor, &owner)
+                ),
+                (BottomTab::UsedBy, _) => format!(
+                    "{}   {}",
+                    tab.title(),
+                    used_by_subject(editor).map_or(0, |subject| subject.count(editor))
                 ),
                 _ => tab.title().to_owned(),
             };
@@ -128,9 +137,54 @@ pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
             Some(EditorTab::Tileset { key }),
             BottomTab::Surfaces | BottomTab::Mixes | BottomTab::Timeline,
         ) => tileset::bottom(editor, ui, &key, tab),
+        (_, BottomTab::UsedBy) => match used_by_subject(editor) {
+            Some(UsedBySubject::Row { table, key }) => {
+                egui::ScrollArea::vertical()
+                    .id_salt("used-by")
+                    .show(ui, |ui| {
+                        usages::show_usages_grouped(editor, ui, &table, &key, false);
+                    })
+                    .inner
+            }
+            Some(UsedBySubject::Asset { path }) => {
+                egui::ScrollArea::vertical()
+                    .id_salt("used-by")
+                    .show(ui, |ui| usages::show_asset_usages(editor, ui, &path))
+                    .inner
+            }
+            None => {}
+        },
         _ => {
             ui.label(theme::muted("nothing to show here"));
         }
+    }
+}
+
+/// What the active window's Used by panel lists the users of: the row or file it shows.
+enum UsedBySubject {
+    Row { table: String, key: String },
+    Asset { path: String },
+}
+
+impl UsedBySubject {
+    fn count(&self, editor: &Editor) -> usize {
+        let Some(project) = &editor.project else {
+            return 0;
+        };
+        match self {
+            UsedBySubject::Row { table, key } => project.usages.of_row(table, key).len(),
+            UsedBySubject::Asset { path } => project.usages.of_asset(path).len(),
+        }
+    }
+}
+
+fn used_by_subject(editor: &Editor) -> Option<UsedBySubject> {
+    match ui::active_tab(editor)? {
+        EditorTab::World | EditorTab::Rows { .. } | EditorTab::Spreadsheet { .. } => None,
+        EditorTab::Asset { path } => Some(UsedBySubject::Asset { path }),
+        tab => tab
+            .row()
+            .map(|(table, key)| UsedBySubject::Row { table, key }),
     }
 }
 
@@ -152,34 +206,4 @@ pub fn play_here(editor: &mut Editor) {
             at: hover.tile.snap(),
         }),
     );
-}
-
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    if script::is_node_selection(selection) {
-        script::inspect_parts(editor, ui, selection);
-        return;
-    }
-    if selection
-        .parts
-        .first()
-        .is_some_and(|part| part.starts_with("#sheet/"))
-    {
-        egui::ScrollArea::vertical()
-            .id_salt(("sheet-inspect", &selection.table))
-            .show(ui, |ui| spreadsheet::inspect(editor, ui, selection));
-        return;
-    }
-    match selection.table.as_str() {
-        "area" | "blueprint" => area::inspect_parts(editor, ui, selection),
-        "model" => model::inspect_parts(editor, ui, selection),
-        "tileset" => tileset::inspect_parts(editor, ui, selection),
-        class::TABLE => class::inspect::show(editor, ui, selection),
-        _ => {
-            ui.label(format!(
-                "{} parts of {}",
-                selection.parts.len(),
-                selection.table
-            ));
-        }
-    }
 }

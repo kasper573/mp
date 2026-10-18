@@ -86,6 +86,8 @@ pub enum Step {
     },
     Save,
     Dialog(DialogName),
+    Game,
+    Asset(String),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -379,6 +381,14 @@ fn open_one(editor: &mut Editor, step: &Step) {
         }
         Step::Save => {
             editor.save();
+        }
+        Step::Game => {
+            editor.select(RowSelection::game());
+            editor.open_tab(EditorTab::Game);
+        }
+        Step::Asset(path) => {
+            editor.select(RowSelection::row("asset", path));
+            editor.open_tab(EditorTab::Asset { path: path.clone() });
         }
         Step::Dialog(DialogName::Keys) => editor.dialogs.push(ModalDialog::Keys),
         Step::Dialog(DialogName::Binaries) => editor.dialogs.push(ModalDialog::Binaries),

@@ -5,21 +5,6 @@ use crate::app::Editor;
 use crate::project::{RowSelection, row_of};
 use crate::tabs::EditorTab;
 
-pub fn show_used_by(editor: &mut Editor, ui: &mut Ui) {
-    let selection = editor.selection.clone();
-    if selection.table == "asset" {
-        if let Some(path) = selection.keys.first() {
-            show_asset_usages(editor, ui, path);
-        }
-        return;
-    }
-    let Some(key) = selection.keys.first().cloned() else {
-        ui.label(theme::muted("Select a row to see who uses it."));
-        return;
-    };
-    show_usages_grouped(editor, ui, &selection.table, &key, selection.keys.len() > 1);
-}
-
 pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, titled: bool) {
     let Some(project) = &editor.project else {
         return;
@@ -82,7 +67,7 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &
     }
 }
 
-pub(super) fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
+pub fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
     ui.label(theme::mono(format!("assets/{path}")).color(theme::CODE));
     let ctx = ui.ctx().clone();
     let (thumb, size) = {
@@ -114,11 +99,9 @@ pub(super) fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
             thumb.size[0], thumb.size[1]
         )));
     }
-    ui.separator();
-    show_asset_usages(editor, ui, path);
 }
 
-pub(super) fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
+pub fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
     let usages: Vec<(String, String)> = editor
         .project
         .as_ref()
