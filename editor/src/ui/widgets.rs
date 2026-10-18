@@ -7,7 +7,7 @@ use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stro
 use super::theme;
 
 pub use design_tokens::controls::{danger, key_hint, primary};
-pub use design_tokens::sheet::section;
+pub use design_tokens::sheet::{section, section_with};
 
 pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)
@@ -42,22 +42,6 @@ pub fn chip_colored(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Res
         })
         .response
         .interact(Sense::click())
-}
-
-pub fn pill(ui: &mut Ui, text: &str, color: Color32) -> Response {
-    egui::Frame::new()
-        .fill(ink::white_wash(0.25))
-        .stroke(Stroke::new(1.0, color))
-        .corner_radius(controls::PILL_HEIGHT / 2.0)
-        .inner_margin(egui::Margin::symmetric(8, 1))
-        .show(ui, |ui| {
-            ui.label(
-                RichText::new(text)
-                    .font(Face::BookBold.id(12.0))
-                    .color(color),
-            );
-        })
-        .response
 }
 
 pub fn card_frame(selected: bool) -> egui::Frame {

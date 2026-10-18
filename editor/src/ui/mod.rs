@@ -16,6 +16,7 @@ use std::mem;
 use std::path::Path;
 use std::time::Duration;
 
+use design_tokens::controls::{self, Pill};
 use design_tokens::{TextRole, face, ink, sheet, slip};
 use egui::{Align, Context, Key, Layout, Modifiers};
 use egui_dock::{DockArea, DockState, TabViewer};
@@ -292,17 +293,17 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     if let Some(project) = &editor.project {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {
-                            widgets::pill(ui, "read-only", theme::WARN).on_hover_text(reason);
+                            controls::pill(ui, "read-only", Pill::Gold).on_hover_text(reason);
                         } else if project.loading() {
-                            widgets::pill(ui, "applying…", theme::MUTED);
+                            controls::pill(ui, "applying…", Pill::Ink);
                             ui.ctx().request_repaint_after(Duration::from_millis(50));
                         } else if let Some(report) = &project.report {
-                            widgets::pill(ui, "does not load", theme::DANGER)
+                            controls::pill(ui, "does not load", Pill::Rubric)
                                 .on_hover_text(report_summary(report));
                         } else if unsaved > 0 {
-                            widgets::pill(ui, &format!("{unsaved} unsaved"), theme::TEXT);
+                            controls::pill(ui, &format!("{unsaved} unsaved"), Pill::Ink);
                         } else {
-                            widgets::pill(ui, "saved", theme::OK);
+                            controls::pill(ui, "saved", Pill::Verdigris);
                         }
                     }
                 });

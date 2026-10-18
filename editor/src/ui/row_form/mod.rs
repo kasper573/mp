@@ -351,47 +351,41 @@ fn modules_column(
     } else {
         count
     };
-    ui.horizontal(|ui| {
-        widgets::section_count(
-            ui,
-            if scripts_only {
-                "Area scripts"
-            } else {
-                "Modules"
-            },
-            shown,
-        );
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let button = controls::primary(ui, "+ Add module");
-            let popup = egui::Popup::from_toggle_button_response(&button)
-                .id(ui.id().with("add-module"))
-                .width(330.0);
-            popup.show(|ui| {
-                if let Some(template) = add_module_popup(
-                    ui,
-                    cx,
-                    table,
-                    &variants,
-                    value["modules"].as_array().expect("modules"),
-                    scripts_only,
-                    status,
-                ) {
-                    let list = value["modules"].as_array_mut().expect("modules");
-                    list.push(template);
-                    let path = format!("{table}/modules/{}", list.len() - 1);
-                    cx.state.folded.remove(&path);
-                    changed = FormChange::at("/modules");
-                    ui.close();
-                }
-            });
-            if ui
-                .small_button("Paste")
-                .on_hover_text("Paste copied modules")
-                .clicked()
-            {
-                ops.push(ModuleOp::Paste);
+    let heading = if scripts_only {
+        "Area scripts"
+    } else {
+        "Modules"
+    };
+    widgets::section_with(ui, &format!("{heading} · {shown}"), |ui| {
+        let button = controls::primary(ui, "+ Add module");
+        let popup = egui::Popup::from_toggle_button_response(&button)
+            .id(ui.id().with("add-module"))
+            .width(330.0);
+        popup.show(|ui| {
+            if let Some(template) = add_module_popup(
+                ui,
+                cx,
+                table,
+                &variants,
+                value["modules"].as_array().expect("modules"),
+                scripts_only,
+                status,
+            ) {
+                let list = value["modules"].as_array_mut().expect("modules");
+                list.push(template);
+                let path = format!("{table}/modules/{}", list.len() - 1);
+                cx.state.folded.remove(&path);
+                changed = FormChange::at("/modules");
+                ui.close();
             }
         });
+        if ui
+            .small_button("Paste")
+            .on_hover_text("Paste copied modules")
+            .clicked()
+        {
+            ops.push(ModuleOp::Paste);
+        }
     });
     let free = free_singles(cx, table, &variants, value);
     if !free.is_empty() {
@@ -447,24 +441,6 @@ fn modules_column(
             ui.set_width(ui.available_width());
             let header = ui
                 .horizontal(|ui| {
-                    ui.label(
-                        theme::strong(if is_script {
-                            tag.replace('_', " ")
-                        } else {
-                            tag.clone()
-                        })
-                        .monospace(),
-                    );
-                    if folded || !is_script {
-                        ui.add(
-                            egui::Label::new(
-                                RichText::new(summary.to_uppercase())
-                                    .size(11.0)
-                                    .color(theme::MUTED),
-                            )
-                            .truncate(),
-                        );
-                    }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.menu_button(theme::faint("…"), |ui| {
                             if ui.button("Copy").clicked() {
@@ -500,6 +476,26 @@ fn modules_column(
                             11.0,
                             theme::FAINT,
                         );
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                            ui.label(
+                                theme::strong(if is_script {
+                                    tag.replace('_', " ")
+                                } else {
+                                    tag.clone()
+                                })
+                                .monospace(),
+                            );
+                            if folded || !is_script {
+                                ui.add(
+                                    egui::Label::new(
+                                        RichText::new(summary.to_uppercase())
+                                            .size(11.0)
+                                            .color(theme::MUTED),
+                                    )
+                                    .truncate(),
+                                );
+                            }
+                        });
                     });
                 })
                 .response

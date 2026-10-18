@@ -1,4 +1,4 @@
-use design_tokens::controls;
+use design_tokens::controls::{self, Pill};
 use design_tokens::glyph::{self, Mark};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr};
@@ -462,7 +462,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
             crate::ui::widgets::plural(changes)
         ),
     );
-    widgets::pill(
+    controls::pill(
         ui,
         if stopping {
             "stopping"
@@ -471,7 +471,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         } else {
             "starting"
         },
-        if playing { theme::OK } else { theme::WARN },
+        if playing { Pill::Verdigris } else { Pill::Gold },
     );
     if stop_now {
         stop(editor);

@@ -183,18 +183,22 @@ pub fn settle<'a>(root: &'a Value, schema: &'a Value, value: &Value) -> &'a Valu
     }
 }
 
+/// What an optional schema holds when it holds something: the one alternative beside null, its
+/// own nesting left whole.
 pub fn non_null<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
     let schema = resolve(root, schema);
-    match kind(root, schema) {
-        SchemaKind::Choice(alternatives) if is_optional(schema) => {
-            let mut taken = alternatives
-                .into_iter()
-                .filter(|alternative| type_names(alternative) != ["null"]);
-            match (taken.next(), taken.next()) {
-                (Some(only), None) => resolve(root, only),
-                _ => schema,
-            }
-        }
+    let Some(alternatives) = schema
+        .get("anyOf")
+        .or_else(|| schema.get("oneOf"))
+        .and_then(Value::as_array)
+    else {
+        return schema;
+    };
+    let mut taken = alternatives
+        .iter()
+        .filter(|alternative| type_names(resolve(root, alternative)) != ["null"]);
+    match (taken.next(), taken.next()) {
+        (Some(only), None) if alternatives.len() > 1 => resolve(root, only),
         _ => schema,
     }
 }

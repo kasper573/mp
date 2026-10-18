@@ -356,6 +356,7 @@ fn plain(
             _ => {}
         }
     }
+    let schema = schema::non_null(cx.root, schema);
     if let Some(marker) = schema::marker(schema) {
         match marker {
             "x-table" => {
@@ -468,18 +469,17 @@ pub fn object_without(
             continue;
         }
         if nested {
-            ui.horizontal(|ui| {
-                widgets::section(ui, name);
-                if optional
+            let unset = widgets::section_with(ui, name, |ui| {
+                optional
                     && ui
                         .small_button("×")
                         .on_hover_text(format!("Unset {name}"))
                         .clicked()
-                {
-                    value.as_object_mut().expect("object").remove(name);
-                    changed = FormChange::at(&field_path);
-                }
             });
+            if unset {
+                value.as_object_mut().expect("object").remove(name);
+                changed = FormChange::at(&field_path);
+            }
             if let Some(child) = value.get_mut(name) {
                 changed |= object(ui, cx, field, child, &field_path);
             }

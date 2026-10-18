@@ -12,6 +12,7 @@ use crate::face::TextRole;
 use crate::{controls, ink};
 
 pub const RULE_INSET: f32 = 7.0;
+const RULE_GAP: f32 = 8.0;
 pub const SMALL_RULE_INSET: f32 = 4.0;
 pub const TITLE_BAND: f32 = 36.0;
 pub const CROSS: f32 = 24.0;
@@ -355,26 +356,53 @@ pub fn tabs<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut
 }
 
 pub fn section(ui: &mut Ui, text: &str) {
+    section_with(ui, text, |_| ());
+}
+
+/// A section heading with `actions` set at its right end, the heading's rule running between the
+/// two and stopping short of the actions.
+pub fn section_with<R>(ui: &mut Ui, text: &str, actions: impl FnOnce(&mut Ui) -> R) -> R {
     ui.add_space(6.0);
     let galley = ui
         .painter()
         .layout_job(TextRole::Section.job(text, ink::RUBRIC));
     let width = ui.available_width();
-    let (rect, response) =
-        ui.allocate_exact_size(Vec2::new(width, galley.size().y + 2.0), Sense::hover());
+    let band = Rect::from_min_size(ui.cursor().min, Vec2::new(width, controls::CONTROL_HEIGHT));
+    let mut tools = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(band)
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    let made = actions(&mut tools);
+    let used = tools.min_rect();
+    let height = if used.width() > 0.0 {
+        band.height()
+    } else {
+        galley.size().y + 2.0
+    };
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, text));
     let at = Pos2::new(rect.min.x, rect.center().y - galley.size().y / 2.0);
     let text_width = galley.size().x;
     ui.painter().galley(at, galley, ink::RUBRIC);
+    let end = if used.width() > 0.0 {
+        used.min.x - RULE_GAP
+    } else {
+        rect.max.x
+    };
     let y = rect.center().y + 0.5;
-    fading_line(
-        ui.painter(),
-        Pos2::new(rect.min.x + text_width + 8.0, y),
-        Pos2::new(rect.max.x, y),
-        ink::RUBRIC,
-        1.0,
-    );
+    let start = rect.min.x + text_width + RULE_GAP;
+    if end > start {
+        fading_line(
+            ui.painter(),
+            Pos2::new(start, y),
+            Pos2::new(end, y),
+            ink::RUBRIC,
+            1.0,
+        );
+    }
     ui.add_space(4.0);
+    made
 }
 
 pub fn scroll<R>(
