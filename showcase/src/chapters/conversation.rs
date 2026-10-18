@@ -94,7 +94,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the round's price in the feed", |snapshot| {
         noticed(snapshot, "−10 Gold")
     });
-    me.caption_top("What it took shows in the corner, over Grisha's bust");
+    me.caption_top("What it took drops in as slips at the top");
     me.read_to_choices();
     me.caption_top(
         "Can't afford it? Pick it anyway: it turns rubric, an error says why, and you can pick again",

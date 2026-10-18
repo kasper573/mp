@@ -35,7 +35,7 @@ fn play(shoot: &mut Shoot) {
     me.pick("A Letter for the Captain");
     me.on_stage("letter_offer");
     me.caption_top(
-        "A panel above the conversation lays out objectives and rewards. Accept or decline below",
+        "A quest card docks above the conversation with its objectives and rewards. Accept or decline below",
     );
     me.read_to_choices();
     me.hold();
@@ -47,7 +47,7 @@ fn play(shoot: &mut Shoot) {
         noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
     me.caption_top(
-        "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
+        "Accepted: a slip at the top says so, the letter is in your bag, the quest on your tracker",
     );
     if !heard_news {
         hear_out_tobb(&mut me, Duration::from_secs(12));
@@ -72,10 +72,14 @@ fn play(shoot: &mut Shoot) {
     });
     me.caption_top("The tracker counts it down");
 
-    me.caption_top("L opens the quest log, grouped by category");
+    me.caption_top(
+        "L opens the quest log, grouped by category; the chosen quest lies on the page as a card",
+    );
     me.act(InputAction::ToggleQuestLog);
     me.find_ui("Active quests");
     me.click_ui(UiTarget::button("Low Tide"));
+    me.caption_top("A long card scrolls its plate under the name band, down to the rewards");
+    me.scroll_until("objectives", UiTarget::image(BAIT));
     me.caption_top("Right-click a reward for its item card");
     me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
     me.wait_until("the bait's card", |snapshot| {
@@ -133,7 +137,7 @@ fn play(shoot: &mut Shoot) {
         noticed(snapshot, "+10 Gold")
     });
     me.caption_top(
-        "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
+        "Delivered: the letter goes and the pay arrives in slips at the top, the finished quest lands in the middle",
     );
     me.wait_until("the finished quest", |snapshot| {
         told_by(snapshot, "Quest complete")

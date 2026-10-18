@@ -84,7 +84,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the failed quest in the feed", |snapshot| {
         noticed(snapshot, "Quest failed · Tusks for the Chief")
     });
-    me.caption_top("Mara's quest fails, in red in the corner, and the choice is remembered");
+    me.caption_top("Mara's quest fails, a rubric slip at the top, and the choice is remembered");
     me.read_to_choices();
     me.pick("Rest easy, Ugra.");
     me.conversation_over();

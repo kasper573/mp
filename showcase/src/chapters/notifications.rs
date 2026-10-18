@@ -48,7 +48,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the pass in the feed", |snapshot| {
         noticed(snapshot, "+1 Road Pass")
     });
-    me.caption_top("The trade shows in the corner, over her bust: the fish goes, the pass arrives");
+    me.caption_top("The trade drops in as slips at the top: the fish goes, the pass arrives");
     me.read_to_choices();
     me.pick("Enjoy it.");
     me.conversation_over();
@@ -57,7 +57,7 @@ fn play(shoot: &mut Shoot) {
     });
 
     me.caption(
-        "Narration plays as captions at the top and never blocks: gulls squabble at the pier",
+        "Narration drops in as slips at the top, lifts off when read, and never blocks: gulls squabble at the pier",
     );
     // With the pass in the bag the road would take the player now, so the way to the pier keeps clear
     // of it.
@@ -79,7 +79,9 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);
 
-    me.caption("What you can't do is an error, in red at the top: the Tribal Helmet wants level 3");
+    me.caption(
+        "What you can't do is an error, a rubric slip at the top: the Tribal Helmet wants level 3",
+    );
     me.click_ui(UiTarget::image(BAG));
     me.act_on_ui(InputAction::UseItem, UiTarget::image(HELMET));
     me.wait_until("the helmet refused", |snapshot| {

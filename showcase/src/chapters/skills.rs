@@ -1,6 +1,6 @@
 use driver::{
-    UiTarget, bare_spot, holding, learned, planned, reset_prompted, resident_home, slot_skill,
-    to_spend, tree_view,
+    UiTarget, bare_spot, content, holding, learned, planned, reset_prompted, resident_home,
+    slot_skill, to_spend, tree_view,
 };
 use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
@@ -53,6 +53,20 @@ fn play(shoot: &mut Shoot) {
     });
     me.caption_top("Learned. Second Wind, which needed both, is open now, and one point is left");
     me.hold();
+    me.caption_top(
+        "Right-click a node and its card is dealt from it; the node stays ringed in gold while the card is up",
+    );
+    me.act_on_ui(InputAction::InspectItem, UiTarget::starting("Cleave node"));
+    me.wait_until("Cleave's card", |snapshot| {
+        snapshot
+            .skill_card
+            .is_some_and(|card| card.skill.key(content()) == "cleave")
+    });
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.wait_until("the skill card to close", |snapshot| {
+        snapshot.skill_card.is_none()
+    });
     me.caption_top(
         "Skills come in two kinds. Toughness is passive: nothing to cast, it simply holds while it is known",
     );

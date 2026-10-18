@@ -33,7 +33,9 @@ fn play(shoot: &mut Shoot) {
         "the shop panel stays put"
     );
 
-    me.caption_top("Prices are lists of items — each part turns red when you can't cover it");
+    me.caption_top(
+        "The chosen ware lies on the page as a card, its price beneath: a part you can't cover turns rubric",
+    );
     me.click_ui("Greater Health Potion");
     me.caption_top("The list stays as narrow as its wares, and browsing never shifts it");
     let listed = row_x(&mut me, "Bone Shield");
