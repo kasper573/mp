@@ -85,14 +85,12 @@ pub struct SheetPose {
 }
 
 impl SheetPose {
-    pub fn rest() -> SheetPose {
-        SheetPose {
-            opacity: 1.0,
-            scale: 1.0,
-            dy: 0.0,
-            shadow: sheet::shadow(sheet::Depth::Front),
-        }
-    }
+    pub const REST: SheetPose = SheetPose {
+        opacity: 1.0,
+        scale: 1.0,
+        dy: 0.0,
+        shadow: sheet::shadow(sheet::Depth::Front),
+    };
 
     /// The sheet's transform about its own centre.
     pub fn transform(self, rect: Rect) -> TSTransform {

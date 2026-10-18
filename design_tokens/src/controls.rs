@@ -45,6 +45,11 @@ pub fn danger(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Danger)
 }
 
+/// A faint outline that still answers a click: something on offer the player can't take yet.
+pub fn faded(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
+    button_look(ui, text.into(), None, Look::Faded)
+}
+
 /// A button with a mark painted before its label.
 pub fn marked(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), Some(mark), Look::Outline)
@@ -183,6 +188,14 @@ impl Pill {
 
 /// A 20 px pill bordered in its colour on a white wash.
 pub fn pill(ui: &mut Ui, text: &str, pill: Pill) -> Response {
+    pill_with(ui, pill, |ui| {
+        ui.add(egui::Label::new(text).selectable(false));
+    })
+    .response
+}
+
+/// A pill holding what `add` writes in it, such as an icon beside a count, in the pill's ink.
+pub fn pill_with<R>(ui: &mut Ui, pill: Pill, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     let color = pill.color();
     egui::Frame::new()
         .fill(ink::white_wash(0.25))
@@ -190,16 +203,14 @@ pub fn pill(ui: &mut Ui, text: &str, pill: Pill) -> Response {
         .corner_radius(PILL_HEIGHT / 2.0)
         .inner_margin(Margin::symmetric(8, 1))
         .show(ui, |ui| {
-            ui.add(
-                egui::Label::new(
-                    egui::RichText::new(text)
-                        .font(Face::BookBold.id(12.0))
-                        .color(color),
-                )
-                .selectable(false),
-            );
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 3.0;
+                ui.style_mut().override_font_id = Some(Face::BookBold.id(12.0));
+                ui.visuals_mut().override_text_color = Some(color);
+                add(ui)
+            })
+            .inner
         })
-        .response
 }
 
 /// A key's name in mono, faint, in an ink-outlined chip.
@@ -403,6 +414,7 @@ enum Look {
     Outline,
     Primary,
     Danger,
+    Faded,
 }
 
 fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) -> Response {
@@ -436,7 +448,7 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
         painter.add(LIFT.as_shape(drawn, RADIUS));
     }
     let (fill, line, text_color) = match (look, enabled) {
-        (_, false) => (Color32::TRANSPARENT, ink::ink_wash(0.3), ink::INK3),
+        (_, false) | (Look::Faded, true) => (Color32::TRANSPARENT, ink::ink_wash(0.3), ink::INK3),
         (Look::Outline, true) => (
             if pressed {
                 ink::ink_wash(0.08)

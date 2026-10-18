@@ -105,7 +105,29 @@ impl Sheet<'_> {
     }
 }
 
-pub fn shadow(depth: Depth) -> Shadow {
+/// Where a sheet's content goes: inside the rule, under the title band when there is one.
+pub fn body(rect: Rect, titled: bool) -> Rect {
+    let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
+    let margin = if small { SMALL_RULE_INSET } else { RULE_INSET } + 4.0;
+    let top = if titled {
+        rect.min.y + TITLE_BAND
+    } else {
+        rect.min.y + margin
+    };
+    Rect::from_min_max(
+        Pos2::new(rect.min.x + margin, top),
+        rect.max - Vec2::splat(margin),
+    )
+    .intersect(rect)
+}
+
+/// What a full-size sheet adds around its body.
+pub fn chrome(titled: bool) -> Vec2 {
+    let rect = Rect::from_min_size(Pos2::ZERO, Vec2::splat(4.0 * SMALL_SHEET));
+    rect.size() - body(rect, titled).size()
+}
+
+pub const fn shadow(depth: Depth) -> Shadow {
     match depth {
         Depth::Front => Shadow {
             offset: [0, 12],

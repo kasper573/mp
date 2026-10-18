@@ -118,7 +118,7 @@ fn a_sheet_rests_flat_once_open_and_starts_small_faint_and_lifted() {
     assert_eq!(open.opacity, 1.0);
     assert_eq!(open.scale, 1.0);
     assert_eq!(open.dy, 0.0);
-    assert_eq!(open.shadow, motion::SheetPose::rest().shadow);
+    assert_eq!(open.shadow, motion::SheetPose::REST.shadow);
     let mut mid = Clock::CLOSED;
     mid.run(true, 0.09);
     let pose = mid.pose();
