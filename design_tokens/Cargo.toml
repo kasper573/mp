@@ -2,12 +2,13 @@
 name = "design_tokens"
 version.workspace = true
 edition.workspace = true
-description = "The look the editor and the game share: colors, shapes, text roles, fonts and the themed egui helpers"
+description = "The look the editor and the game share: parchment sheets, playing cards, inks, faces and the themed egui controls"
 repository = "https://github.com/kasper573/rift"
 authors = ["kasper573"]
 
 [dependencies]
 egui.workspace = true
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [lints]
 workspace = true

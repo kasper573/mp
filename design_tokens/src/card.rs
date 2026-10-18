@@ -1,0 +1,410 @@
+//! The card: every thing the interface describes, as a playing card on pasteboard.
+
+use egui::epaint::{Mesh, Shadow};
+use egui::{
+    Align2, Color32, CornerRadius, Margin, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
+    StrokeKind, TextureId, Ui, UiBuilder, Vec2, WidgetInfo, WidgetType,
+};
+
+use crate::face::{Face, TextRole};
+use crate::glyph::{self, Kind, Mark};
+use crate::sheet::{self, Depth};
+use crate::{controls, ink};
+
+pub const WIDTH: f32 = 300.0;
+pub const DOCKED_WIDTH: f32 = 480.0;
+pub const QUESTS_PAGE_WIDTH: f32 = 320.0;
+pub const SHOP_PAGE_WIDTH: f32 = 290.0;
+pub const MAX_HEIGHT: f32 = 420.0;
+pub const MARGIN: f32 = 6.0;
+pub const CORNER: f32 = 10.0;
+pub const FRAME_STROKE: f32 = 2.5;
+pub const FRAME_RADIUS: f32 = 6.0;
+pub const GLYPH: f32 = 18.0;
+pub const KIND_BAND: f32 = 26.0;
+pub const NAME_BAND: f32 = 34.0;
+pub const ART: f32 = 118.0;
+pub const ART_QUEST: f32 = 80.0;
+pub const ART_SHORT: f32 = 70.0;
+pub const PLATE_PADDING: Margin = Margin::symmetric(12, 10);
+pub const LINE_GAP: f32 = 6.0;
+pub const GRANT_ICON: f32 = 22.0;
+const CROSS_AT: Vec2 = Vec2::new(8.0, 7.0);
+const BAND_TEXT_INSET: f32 = 28.0;
+
+pub const SHADOW: Shadow = Shadow {
+    offset: [0, 10],
+    blur: 14,
+    spread: 0,
+    color: Color32::from_black_alpha(140),
+};
+pub const BEHIND_SHADOW: Shadow = Shadow {
+    offset: [0, 5],
+    blur: 8,
+    spread: 0,
+    color: Color32::from_black_alpha(90),
+};
+pub const CONTACT_SHADOW: Shadow = Shadow {
+    offset: [0, 1],
+    blur: 2,
+    spread: 0,
+    color: Color32::from_black_alpha(80),
+};
+
+/// The art window: the row's own pixel icon on the kind's ground, or the kind's glyph without one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Art {
+    pub icon: Option<TextureId>,
+    pub height: f32,
+}
+
+impl Art {
+    pub fn icon_size(self) -> f32 {
+        if self.height >= ART { 96.0 } else { 60.0 }
+    }
+}
+
+pub struct Card<'a> {
+    pub kind: Kind,
+    /// The kind band's words: the kind, a quest's category, or "quest offer · <category>".
+    pub band: &'a str,
+    /// A Roman numeral at the band's right: a rank over the ranks there are, a stack count.
+    pub numeral: Option<&'a str>,
+    pub name: &'a str,
+    pub art: Art,
+    pub width: f32,
+    /// How tall the card may grow before its plate scrolls.
+    pub max_height: f32,
+    pub closable: bool,
+    /// Not learned: the whole card faded and a padlock over the art.
+    pub faded: bool,
+    /// An askew ochre word over the plate's top right.
+    pub stamp: Option<&'a str>,
+    pub depth: Depth,
+}
+
+/// What the plate is told as it is written.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Plate {
+    /// The name overran its band and was cut: the plate's first line writes it in full.
+    pub name_cut: bool,
+}
+
+pub struct CardResponse {
+    pub rect: Rect,
+    pub frame: Rect,
+    /// The kind band, which drags the card.
+    pub band: Response,
+    pub close: Option<Response>,
+}
+
+impl<'a> Card<'a> {
+    pub fn new(kind: Kind, name: &'a str) -> Card<'a> {
+        Card {
+            kind,
+            band: kind.word(),
+            numeral: None,
+            name,
+            art: Art {
+                icon: None,
+                height: ART,
+            },
+            width: WIDTH,
+            max_height: MAX_HEIGHT,
+            closable: false,
+            faded: false,
+            stamp: None,
+            depth: Depth::Front,
+        }
+    }
+
+    pub fn show(self, ui: &mut Ui, plate: impl FnOnce(&mut Ui, Plate)) -> CardResponse {
+        let outer_min = ui.cursor().min;
+        let frame_width = self.width - 2.0 * MARGIN;
+        let under = ui.painter().add(Shape::Noop);
+        let frame_min = outer_min + Vec2::splat(MARGIN);
+        let room = Rect::from_min_size(
+            frame_min,
+            Vec2::new(frame_width, (self.max_height - 2.0 * MARGIN).max(0.0)),
+        );
+        let mut inner = ui.new_child(
+            UiBuilder::new()
+                .max_rect(Rect::from_min_size(
+                    frame_min,
+                    Vec2::new(frame_width, f32::INFINITY),
+                ))
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+        );
+        inner.set_clip_rect(room.intersect(ui.clip_rect()));
+        inner.spacing_mut().item_spacing = Vec2::ZERO;
+        let (band_rect, band) =
+            inner.allocate_exact_size(Vec2::new(frame_width, KIND_BAND), Sense::click_and_drag());
+        band.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, self.band));
+        let (art_rect, _) =
+            inner.allocate_exact_size(Vec2::new(frame_width, self.art.height), Sense::hover());
+        let (name_rect, _) =
+            inner.allocate_exact_size(Vec2::new(frame_width, NAME_BAND), Sense::hover());
+        let painter = inner.painter().clone();
+        self.paint_kind_band(&painter, band_rect);
+        self.paint_art(&painter, art_rect);
+        let name_cut = self.paint_name_band(&painter, name_rect);
+        inner.put(
+            name_rect,
+            egui::Label::new(
+                egui::RichText::new(self.name)
+                    .size(0.1)
+                    .color(Color32::TRANSPARENT),
+            )
+            .selectable(false),
+        );
+        let close = self.closable.then(|| {
+            let rect = Rect::from_min_size(
+                Pos2::new(
+                    outer_min.x + self.width - CROSS_AT.x - sheet::CROSS,
+                    outer_min.y + CROSS_AT.y,
+                ),
+                Vec2::splat(sheet::CROSS),
+            );
+            let response = inner.interact(rect, inner.id().with("close"), Sense::click());
+            response.widget_info(|| {
+                WidgetInfo::labeled(WidgetType::Button, inner.is_enabled(), "Close")
+            });
+            sheet::cross(&painter, rect, response.hovered());
+            response
+        });
+        let used = KIND_BAND + self.art.height + NAME_BAND;
+        let plate_room = (self.max_height - 2.0 * MARGIN - used).max(0.0);
+        let write = |ui: &mut Ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(6.0, LINE_GAP);
+            egui::Frame::new()
+                .inner_margin(PLATE_PADDING)
+                .show(ui, |ui| {
+                    ui.set_width(frame_width - PLATE_PADDING.sum().x);
+                    plate(ui, Plate { name_cut });
+                });
+        };
+        if self.max_height.is_finite() {
+            sheet::scroll(
+                &mut inner,
+                egui::ScrollArea::vertical()
+                    .max_height(plate_room)
+                    .auto_shrink([false, true])
+                    .id_salt(("card plate", self.name)),
+                write,
+            );
+        } else {
+            write(&mut inner);
+        }
+        let frame = Rect::from_min_max(
+            frame_min,
+            Pos2::new(
+                frame_min.x + frame_width,
+                inner.min_rect().max.y.min(room.max.y),
+            ),
+        );
+        let outer = frame.expand(MARGIN);
+        ui.allocate_rect(outer, Sense::hover());
+        ui.painter()
+            .set(under, Shape::Vec(self.board(outer, frame)));
+        self.paint_over(ui.painter(), outer, frame, art_rect);
+        CardResponse {
+            rect: outer,
+            frame,
+            band,
+            close,
+        }
+    }
+
+    /// What lies under everything: the shadows, the pasteboard and the frame.
+    fn board(&self, outer: Rect, frame: Rect) -> Vec<Shape> {
+        let shadow = match self.depth {
+            Depth::Front => SHADOW,
+            Depth::Behind => BEHIND_SHADOW,
+        };
+        vec![
+            Shape::Rect(shadow.as_shape(outer, CORNER)),
+            Shape::Rect(CONTACT_SHADOW.as_shape(outer, CORNER)),
+            Shape::rect_filled(outer, CORNER, ink::CREAM),
+            Shape::rect_stroke(
+                frame.shrink(FRAME_STROKE),
+                FRAME_RADIUS - FRAME_STROKE,
+                Stroke::new(1.0, ink::LIGHT),
+                StrokeKind::Outside,
+            ),
+            Shape::rect_stroke(
+                frame,
+                FRAME_RADIUS,
+                Stroke::new(FRAME_STROKE, ink::FRAME),
+                StrokeKind::Inside,
+            ),
+        ]
+    }
+
+    fn paint_kind_band(&self, painter: &Painter, band: Rect) {
+        painter.rect_filled(band, CornerRadius::ZERO, ink::white_wash(0.22));
+        painter.line_segment(
+            [
+                Pos2::new(band.min.x, band.max.y - 1.0),
+                Pos2::new(band.max.x, band.max.y - 1.0),
+            ],
+            Stroke::new(2.0, ink::INK),
+        );
+        sheet::text(
+            painter,
+            Pos2::new(band.min.x + BAND_TEXT_INSET, band.center().y),
+            Align2::LEFT_CENTER,
+            TextRole::Band,
+            self.band,
+            ink::INK,
+        );
+        if let Some(numeral) = self.numeral {
+            let right = if self.closable {
+                band.max.x - sheet::CROSS - 10.0
+            } else {
+                band.max.x - 10.0
+            };
+            sheet::text(
+                painter,
+                Pos2::new(right, band.center().y),
+                Align2::RIGHT_CENTER,
+                TextRole::Numeral,
+                numeral,
+                ink::INK,
+            );
+        }
+    }
+
+    fn paint_art(&self, painter: &Painter, art: Rect) {
+        let [top, bottom] = self.kind.ground();
+        let mut mesh = Mesh::default();
+        mesh.colored_vertex(art.left_top(), top);
+        mesh.colored_vertex(art.right_top(), top);
+        mesh.colored_vertex(art.right_bottom(), bottom);
+        mesh.colored_vertex(art.left_bottom(), bottom);
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        painter.add(Shape::mesh(mesh));
+        match self.art.icon {
+            Some(icon) => {
+                let size = Vec2::splat(self.art.icon_size());
+                let rect = Rect::from_center_size(art.center(), size);
+                let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+                for offset in [
+                    Vec2::new(-1.0, 0.0),
+                    Vec2::new(1.0, 0.0),
+                    Vec2::new(0.0, -1.0),
+                    Vec2::new(0.0, 1.0),
+                ] {
+                    painter.add(Shape::image(icon, rect.translate(offset), uv, ink::CREAM));
+                }
+                painter.add(Shape::image(icon, rect, uv, Color32::WHITE));
+            }
+            None => {
+                let rect = Rect::from_center_size(
+                    art.center(),
+                    Vec2::splat(72.0_f32.min(art.height() - 8.0)),
+                );
+                self.kind
+                    .paint(painter, rect, ink::wash(ink::CREAM, 0.85), false);
+            }
+        }
+    }
+
+    /// Paints the name band and tells whether the name had to be cut.
+    fn paint_name_band(&self, painter: &Painter, band: Rect) -> bool {
+        painter.rect_filled(band, CornerRadius::ZERO, ink::white_wash(0.25));
+        for y in [band.min.y + 1.0, band.max.y - 1.0] {
+            painter.line_segment(
+                [Pos2::new(band.min.x, y), Pos2::new(band.max.x, y)],
+                Stroke::new(2.0, ink::INK),
+            );
+        }
+        let room = band.width() - 16.0;
+        let mut job = TextRole::Name.job(self.name, ink::INK);
+        job.wrap = egui::text::TextWrapping::truncate_at_width(room);
+        let galley = painter.layout_job(job);
+        let cut = galley.elided;
+        painter.galley(band.center() - galley.size() / 2.0, galley, ink::INK);
+        cut
+    }
+
+    /// The pips on the margins, the padlock and the veil of a card not learned, and the stamp.
+    fn paint_over(&self, painter: &Painter, outer: Rect, frame: Rect, art: Rect) {
+        let top = Rect::from_min_size(outer.min + Vec2::new(9.0, 10.0), Vec2::splat(GLYPH));
+        let bottom = Rect::from_min_size(
+            outer.max - Vec2::new(9.0, 10.0) - Vec2::splat(GLYPH),
+            Vec2::splat(GLYPH),
+        );
+        self.kind.paint(painter, top, ink::INK, false);
+        self.kind.paint(painter, bottom, ink::INK, true);
+        if self.faded {
+            painter.rect_filled(outer, CORNER, ink::wash(ink::CREAM, 0.45));
+            glyph::padlock(painter, art.center(), 36.0, ink::CREAM);
+        }
+        if let Some(stamp) = self.stamp {
+            controls::stamp(
+                painter,
+                Pos2::new(frame.max.x - 44.0, art.max.y + NAME_BAND + 22.0),
+                stamp,
+                ink::OCHRE,
+            );
+        }
+    }
+}
+
+/// The overview line under the name, in the secondary ink.
+pub fn overview(ui: &mut Ui, text: &str) {
+    sheet::label(ui, TextRole::CardBody, text, ink::INK2);
+}
+
+/// The name written in full when its band had to cut it.
+pub fn full_name(ui: &mut Ui, name: &str) {
+    ui.add(
+        egui::Label::new(crate::face::bold(name).size(TextRole::CardBody.size())).selectable(false),
+    );
+}
+
+/// The flavour line in the quill italic.
+pub fn flavour(ui: &mut Ui, text: &str) {
+    ui.add(egui::Label::new(TextRole::Flavour.rich(text).color(ink::INK2)).wrap());
+}
+
+/// A fact in ink, one per line.
+pub fn fact(ui: &mut Ui, text: &str) {
+    ui.add(egui::Label::new(TextRole::CardBody.rich(text).color(ink::INK)).wrap());
+}
+
+/// A section heading in rubric small caps.
+pub fn heading(ui: &mut Ui, text: &str) {
+    ui.add_space(2.0);
+    sheet::label(ui, TextRole::Section, text, ink::RUBRIC);
+}
+
+/// A requirement: verdigris with a tick when met, rubric with a cross and what you are when not.
+pub fn requirement(ui: &mut Ui, met: bool, text: &str) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        let (mark, color) = if met {
+            (Mark::Tick, ink::VERDIGRIS)
+        } else {
+            (Mark::Cross, ink::RUBRIC)
+        };
+        glyph::show(ui, mark, 12.0, color);
+        ui.add(egui::Label::new(TextRole::CardBody.rich(text).color(color)).wrap());
+    });
+}
+
+/// A line at the foot in faint ink: key hints, or what to do next.
+pub fn foot(ui: &mut Ui, text: &str) {
+    ui.add_space(2.0);
+    ui.add(egui::Label::new(TextRole::Small.rich(text).color(ink::INK3)).wrap());
+}
+
+/// A line in the faint ink inside a row of pills or hints.
+pub fn faint(text: &str) -> egui::RichText {
+    TextRole::CardBody.rich(text).color(ink::INK3)
+}
+
+pub fn bold(text: &str) -> egui::RichText {
+    egui::RichText::new(text).font(Face::BookBold.id(TextRole::CardBody.size()))
+}
