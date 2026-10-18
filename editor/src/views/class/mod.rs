@@ -58,7 +58,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     let page = editor.views.class.page(key);
     ui.horizontal(|ui| {
-        for (target, label) in [(ClassPage::Levels, "levels"), (ClassPage::Tree, "tree")] {
+        for (target, label) in [
+            (ClassPage::Levels, "levels"),
+            (ClassPage::Tree, "skill tree"),
+        ] {
             if widgets::mode_chip(ui, label, page == target).clicked() {
                 editor.views.class.pages.insert(key.to_owned(), target);
                 if target == ClassPage::Levels {

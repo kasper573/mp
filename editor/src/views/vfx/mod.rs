@@ -17,7 +17,6 @@ pub use preview::{Target, VfxViews, sync};
 
 use self::preview::preview;
 use crate::app::Editor;
-use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::project::{ContentEdit, row_file};
 use crate::ui::{inspector, theme, widgets};
 
@@ -25,7 +24,6 @@ pub const TABLE: &str = "vfx";
 pub const SHADER_TABLE: &str = "vfx_shader";
 
 const FORM_WIDTH: f32 = 440.0;
-const CODE_FOOTER: f32 = 40.0;
 const COLUMN_GAP: f32 = 16.0;
 const MIN_CODE_WIDTH: f32 = 260.0;
 const MIN_PREVIEW_WIDTH: f32 = 220.0;
@@ -76,8 +74,6 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .as_ref()
         .and_then(|project| project.files.text(&file))
         .unwrap_or_default();
-    let code_id = egui::Id::new(("shader-code", key));
-    let draft = draft_or(ui, code_id, current.clone());
     let room = ui.available_width() - 2.0 * COLUMN_GAP;
     let preview_width =
         (room - FORM_WIDTH - MIN_CODE_WIDTH).clamp(MIN_PREVIEW_WIDTH, preview::PREVIEW[0] as f32);
@@ -94,18 +90,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(code_width);
             match def.as_ref() {
-                Some(def) => {
-                    code_pane(
-                        editor,
-                        ui,
-                        code_id,
-                        def,
-                        key,
-                        &file,
-                        &current,
-                        draft.clone(),
-                    );
-                }
+                Some(def) => code_pane(editor, ui, def, key, &file, &current),
                 None => {
                     widgets::section(ui, &format!("code · {file}"));
                     ui.label(theme::warn("the row does not parse as a shader yet"));
@@ -139,7 +124,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 delay: Seconds(0.0),
             };
             let specs: Vec<ParamSpec> = def.params.iter().map(ParamSpec::from).collect();
-            let drafts = [(key.to_owned(), draft)];
+            let drafts = [(key.to_owned(), current.clone())];
             preview(
                 editor,
                 ui,
@@ -152,26 +137,26 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
     });
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one shader's code as it stands, read once"
-)]
+/// The shader's code, edited in place: every change is a step in the editor's history, merged with
+/// the last, so the preview follows the typing and undo takes it back.
 fn code_pane(
     editor: &mut Editor,
     ui: &mut Ui,
-    id: egui::Id,
     def: &VfxShaderDef,
     key: &str,
     file: &str,
     current: &str,
-    mut draft: String,
 ) {
     let heading_slot = ui.available_rect_before_wrap();
     ui.add_space(HEADING_HEIGHT);
-    let height = ui.available_height() - CODE_FOOTER;
-    let (response, verdict) = shader_code::show(ui, id, &mut draft, def, height);
+    let height = ui.available_height();
+    let mut text = current.to_owned();
+    let id = egui::Id::new(("shader-code", key));
+    let (response, verdict) = shader_code::show(ui, id, &mut text, def, height);
     if response.changed() {
-        set_draft(ui, id, &draft);
+        let mut edit = ContentEdit::new(format!("Edit shader {key}")).merging();
+        edit.write(file.to_owned(), Arc::from(text.as_bytes()));
+        editor.apply(edit);
     }
     let status = match &verdict {
         Ok(()) => theme::ok("✓ compiles"),
@@ -214,23 +199,6 @@ fn code_pane(
             ui.add(egui::Label::new(status).truncate());
         },
     );
-    let dirty = draft != current;
-    if !dirty {
-        return;
-    }
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let apply = widgets::primary(ui, "Apply").clicked();
-        if ui.button("Revert").clicked() {
-            clear_draft(ui, id);
-        }
-        if apply || (response.lost_focus() && verdict.is_ok()) {
-            let mut edit = ContentEdit::new(format!("Edit shader {key}")).merging();
-            edit.write(file.to_owned(), Arc::from(draft.as_bytes()));
-            if editor.apply(edit) {
-                clear_draft(ui, id);
-            }
-        }
-    });
 }
 
 /// The row's layers that parse, each against the content that last loaded, so a row being worked
