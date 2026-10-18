@@ -5,8 +5,10 @@ use strum::VariantArray;
 
 use super::{
     FrameCueKind, MAX_FRAME_MS, MAX_FRAMES, ModelPage, ModelStrip, StripFrame, action_timing,
-    play_rule, strip_of, total_ms,
+    play_rule, starts_at, strip_of, total_ms,
 };
+use engine::core::time::Millis;
+
 use crate::app::Editor;
 use crate::import;
 use crate::project::ContentEdit;
@@ -74,18 +76,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(PREVIEW.x);
-            let frame = frames.get(tick.index).map(|frame| frame.frame);
             super::preview::draw(
                 editor,
                 ui,
                 key,
-                &sheet,
-                row,
-                frame,
-                super::preview::PreviewFit {
-                    size: PREVIEW,
-                    zoom: 2.0,
-                },
+                strip,
+                Millis(starts_at(&frames, tick.index) as f32 + 1.0),
             );
             let view = editor.views.model.view_mut(key);
             super::preview::controls(ui, &mut view.preview, tick.index, frames.len(), true);

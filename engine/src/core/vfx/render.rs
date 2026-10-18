@@ -26,6 +26,7 @@ use super::{
     BodyShape, CompiledVfxShaders, ParamKind, ParamValue, SiteKind, TextFloat, VfxDef, VfxInstance,
     VfxLayer, VfxParams, VfxShaderDef, VfxShaderId, VfxSite, sprite_cell,
 };
+use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
@@ -304,6 +305,85 @@ pub fn hide(world: &mut World, piece: Entity) {
     if let Some(mut visibility) = world.get_mut::<Visibility>(piece) {
         visibility.set_if_neq(Visibility::Hidden);
     }
+}
+
+/// One vfx's layers as they stand at a moment, on the site they play on.
+pub struct Presentation<'a> {
+    pub layers: &'a [VfxLayer],
+    pub pieces: &'a [Option<Entity>],
+    pub frame: Option<&'a SiteFrame>,
+    pub elapsed: Seconds,
+    pub params: &'a VfxParams,
+    pub content: &'a Content,
+    /// The layer a screen piece is drawn on, where the frame it draws over is presented.
+    pub screen_layer: &'a RenderLayers,
+}
+
+/// Shows a vfx's sprite and shader layers on their pieces as the game draws them: each layer at
+/// its own time, placed on the frame and sorted into its depth, hidden before it starts and once
+/// it is over. `shader` answers with a shader's compiled handle, or nothing while it has none. The
+/// sprites a shader layer repaints join `overdrawn`, for `settle_overdrawn` to hide. Text layers
+/// draw through the interface, not here.
+pub fn present_layers(
+    world: &mut World,
+    shown: &Presentation,
+    shader: &dyn Fn(VfxShaderId) -> Option<Handle<Shader>>,
+    overdrawn: &mut HashSet<Entity>,
+) {
+    for (layer, piece) in shown.layers.iter().zip(shown.pieces) {
+        let Some(piece) = *piece else {
+            continue;
+        };
+        let Some((frame, time)) = shown.frame.zip(layer.at(shown.elapsed)) else {
+            hide(world, piece);
+            continue;
+        };
+        match layer {
+            VfxLayer::Sprite { .. } => {
+                if present_sprite(world, piece, frame, layer, time.local) {
+                    place_in_depth(world, piece, frame, 2.0, shown.screen_layer);
+                }
+            }
+            VfxLayer::Shader {
+                shader: id, params, ..
+            } => {
+                let Some(compiled) = shader(*id) else {
+                    hide(world, piece);
+                    continue;
+                };
+                let packed = ParamsUniform::pack(id.get(shown.content), |name| {
+                    params.get(name)?.resolve(shown.params)
+                });
+                let run = Run {
+                    progress: time.progress,
+                    time: shown.elapsed,
+                };
+                present_shader(world, piece, frame, compiled, packed, run);
+                place_in_depth(world, piece, frame, 1.0, shown.screen_layer);
+                overdrawn.extend(frame.sprite);
+            }
+            VfxLayer::Text { .. } => {}
+        }
+    }
+}
+
+/// A piece per layer, each on the sheet `image_of` loads for it; a text layer has none.
+pub fn pieces_for(
+    world: &mut World,
+    layers: &[VfxLayer],
+    image_of: &mut dyn FnMut(&mut World, &AssetRef) -> Handle<Image>,
+) -> Vec<Option<Entity>> {
+    layers
+        .iter()
+        .map(|layer| match layer {
+            VfxLayer::Sprite { sheet, .. } => {
+                let image = image_of(world, sheet);
+                Some(sprite_piece(world, image))
+            }
+            VfxLayer::Shader { .. } => Some(shader_piece(world)),
+            VfxLayer::Text { .. } => None,
+        })
+        .collect()
 }
 
 /// The color a shader layer paints with, for drawing it where no shader runs: the first color
@@ -714,6 +794,7 @@ fn sync(world: &mut World) {
         .map(|(entity, instance)| (entity, instance.clone()))
         .collect();
     let mut overdrawn = HashSet::new();
+    let screen_layer = RenderLayers::layer(PRESENT_LAYER);
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let pieces = match world.get::<VfxView>(entity) {
@@ -722,40 +803,21 @@ fn sync(world: &mut World) {
         };
         let frame = SiteFrame::of(world, &instance.site);
         let elapsed = now.since(instance.started);
-        for (layer, piece) in def.layers.iter().zip(pieces) {
-            let Some(piece) = piece else {
-                continue;
-            };
-            let Some((frame, time)) = frame.as_ref().zip(layer.at(elapsed)) else {
-                hide(world, piece);
-                continue;
-            };
-            match layer {
-                VfxLayer::Sprite { .. } => {
-                    if present_sprite(world, piece, frame, layer, time.local) {
-                        place_in_depth(world, piece, frame, 2.0);
-                    }
-                }
-                VfxLayer::Shader { shader, params, .. } => {
-                    let Some(compiled) = world.resource::<VfxShaders>().by_id.get(shader).cloned()
-                    else {
-                        hide(world, piece);
-                        continue;
-                    };
-                    let packed = ParamsUniform::pack(shader.get(&content), |name| {
-                        params.get(name)?.resolve(&instance.params)
-                    });
-                    let run = Run {
-                        progress: time.progress,
-                        time: elapsed,
-                    };
-                    present_shader(world, piece, frame, compiled, packed, run);
-                    place_in_depth(world, piece, frame, 1.0);
-                    overdrawn.extend(frame.sprite);
-                }
-                VfxLayer::Text { .. } => {}
-            }
-        }
+        let shaders = world.resource::<VfxShaders>().by_id.clone();
+        present_layers(
+            world,
+            &Presentation {
+                layers: &def.layers,
+                pieces: &pieces,
+                frame: frame.as_ref(),
+                elapsed,
+                params: &instance.params,
+                content: &content,
+                screen_layer: &screen_layer,
+            },
+            &|shader| shaders.get(&shader).cloned(),
+            &mut overdrawn,
+        );
     }
     let uptime = Seconds(world.resource::<Time>().elapsed_secs());
     let overlays: Vec<(Entity, ShaderOverlay)> = world
@@ -792,7 +854,7 @@ fn sync(world: &mut World) {
             time: uptime - overlay.since,
         };
         present_shader(world, piece, &frame, compiled, packed, run);
-        place_in_depth(world, piece, &frame, 1.0);
+        place_in_depth(world, piece, &frame, 1.0, &screen_layer);
         overdrawn.extend(frame.sprite);
     }
     settle_overdrawn(world, &overdrawn);
@@ -800,15 +862,9 @@ fn sync(world: &mut World) {
 
 fn attach(world: &mut World, entity: Entity, def: &VfxDef) -> Vec<Option<Entity>> {
     let assets = world.resource::<AssetServer>().clone();
-    let pieces: Vec<Option<Entity>> = def
-        .layers
-        .iter()
-        .map(|layer| match layer {
-            VfxLayer::Sprite { sheet, .. } => Some(sprite_piece(world, assets.load(sheet.path()))),
-            VfxLayer::Shader { .. } => Some(shader_piece(world)),
-            VfxLayer::Text { .. } => None,
-        })
-        .collect();
+    let pieces = pieces_for(world, &def.layers, &mut |_, sheet| {
+        assets.load(sheet.path())
+    });
     attach_pieces(world, entity, pieces.clone());
     pieces
 }
@@ -824,8 +880,15 @@ fn attach_pieces(world: &mut World, entity: Entity, pieces: Vec<Option<Entity>>)
     ));
 }
 
-/// A world piece sorts just above its site's row; a screen piece sits over the presented frame.
-fn place_in_depth(world: &mut World, piece: Entity, frame: &SiteFrame, screen_z: f32) {
+/// A world piece sorts just above its site's row; a screen piece sits over the presented frame,
+/// on the layer the frame is presented on.
+pub fn place_in_depth(
+    world: &mut World,
+    piece: Entity,
+    frame: &SiteFrame,
+    screen_z: f32,
+    screen_layer: &RenderLayers,
+) {
     let mut entity = world.entity_mut(piece);
     match frame.depth {
         Some(depth) => {
@@ -836,12 +899,14 @@ fn place_in_depth(world: &mut World, piece: Entity, frame: &SiteFrame, screen_z:
             if let Some(mut transform) = entity.get_mut::<Transform>() {
                 transform.translation.z = screen_z;
             }
-            entity.insert(RenderLayers::layer(PRESENT_LAYER));
+            entity.insert(screen_layer.clone());
         }
     }
 }
 
-fn settle_overdrawn(world: &mut World, overdrawn: &HashSet<Entity>) {
+/// Hides the sprites a shader layer is drawing over this frame and shows again those it no longer
+/// is, so a sprite is never seen twice.
+pub fn settle_overdrawn(world: &mut World, overdrawn: &HashSet<Entity>) {
     let was: Vec<Entity> = world
         .query_filtered::<Entity, With<Overdrawn>>()
         .iter(world)

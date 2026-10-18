@@ -44,6 +44,7 @@ pub struct EditorViews {
     pub vfx: vfx::VfxViews,
     pub assets: crate::ui::assets::AssetsState,
     pub preview: crate::ui::row_form::preview::RowPreviewState,
+    pub stage: crate::stage::Stages,
 }
 
 impl EditorViews {
@@ -70,7 +71,7 @@ impl EditorViews {
 pub fn sync(editor: &mut Editor, world: &mut World) {
     area::sync(editor, world);
     model::sounds::sync(editor, world);
-    vfx::sync(editor, world);
+    crate::stage::sync(editor, world);
 }
 
 pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {

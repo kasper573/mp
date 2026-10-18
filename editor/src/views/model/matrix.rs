@@ -6,7 +6,11 @@ use engine::systems::actor::Action;
 use serde_json::Value;
 use strum::VariantArray;
 
-use super::{ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, strip_of};
+use super::{
+    ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, starts_at, strip_of,
+};
+use engine::core::time::Millis;
+
 use crate::app::Editor;
 use crate::import;
 use crate::ui::{theme, widgets};
@@ -131,18 +135,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 theme::mono(strip.name())
                     .color(theme::CODE),
             );
-            let frame = frames.get(tick.index).map(|frame| frame.frame);
             super::preview::draw(
                 editor,
                 ui,
                 key,
-                &sheet,
-                row,
-                frame,
-                super::preview::PreviewFit {
-                    size: PREVIEW,
-                    zoom: 3.0,
-                },
+                strip,
+                Millis(starts_at(&frames, tick.index) as f32 + 1.0),
             );
             let view = editor.views.model.view_mut(key);
             super::preview::controls(ui, &mut view.preview, tick.index, frames.len(), false);

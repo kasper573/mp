@@ -13,7 +13,7 @@ use engine::core::vfx::{ParamFill, VfxLayer, VfxShaderDef, shader_file};
 use serde_json::Value;
 
 pub use params::{ParamSpec, param_fill, params_of, shader_params};
-pub use preview::{Target, VfxViews, sync};
+pub use preview::{Target, VfxViews};
 
 use self::preview::preview;
 use crate::app::Editor;
@@ -76,7 +76,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .unwrap_or_default();
     let room = ui.available_width() - 2.0 * COLUMN_GAP;
     let preview_width =
-        (room - FORM_WIDTH - MIN_CODE_WIDTH).clamp(MIN_PREVIEW_WIDTH, preview::PREVIEW[0] as f32);
+        (room - FORM_WIDTH - MIN_CODE_WIDTH).clamp(MIN_PREVIEW_WIDTH, crate::stage::SIZE[0] as f32);
     let code_width = (room - FORM_WIDTH - preview_width).max(MIN_CODE_WIDTH);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {

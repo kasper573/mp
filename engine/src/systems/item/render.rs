@@ -63,6 +63,15 @@ fn use_sounds(
     }
 }
 
+/// An item lying in the world: its icon, drawn small on the ground.
+pub fn drop_sprite(icon: Handle<Image>) -> Sprite {
+    Sprite {
+        image: icon,
+        custom_size: Some(Vec2::splat(DROP_SIZE.0)),
+        ..default()
+    }
+}
+
 fn attach_drop_sprite(
     add: On<Add<DroppedItem>>,
     drops: Query<&DroppedItem>,
@@ -75,11 +84,7 @@ fn attach_drop_sprite(
     };
     let image = assets.load(dropped.item.get(&content).icon.path());
     commands.entity(add.entity).insert((
-        Sprite {
-            image,
-            custom_size: Some(Vec2::splat(DROP_SIZE.0)),
-            ..default()
-        },
+        drop_sprite(image),
         Transform::default(),
         RowDepth::default(),
         Visibility::default(),

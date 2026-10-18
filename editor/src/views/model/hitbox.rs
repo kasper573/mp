@@ -1,9 +1,14 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use engine::core::time::Seconds;
+use engine::systems::GameSettings;
+use engine::systems::actor::ModelDef;
+use engine::systems::actor::render::ACTOR_ANCHOR;
 use serde_json::Value;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection};
+use crate::stage::{self, Posed, PosedActor, Scene};
 use crate::ui::{theme, widgets};
 use crate::views::area::TILE_PX;
 
@@ -106,7 +111,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 sheet.frame_width as f32 * ZOOM * scale_of(row),
                 sheet.frame_height as f32 * ZOOM * scale_of(row),
             );
-            let sprite = super::preview::sprite_rect(feet, shown);
+            let sprite = sprite_rect(feet, shown);
             widgets::dashed_rect(
                 &painter,
                 sprite,
@@ -207,7 +212,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         ui.add_space(12.0);
         ui.vertical(|ui| {
             ui.set_width(INSET.x);
-            inset(editor, ui, key, &sheet, row, frame);
+            inset(editor, ui, key, row);
         });
     });
     editor.status.left.push(format!("model/{key}"));
@@ -217,27 +222,44 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .push("drag the hitbox handles · Shift snaps to quarter tiles".to_owned());
 }
 
-fn inset(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    key: &str,
-    sheet: &super::ModelSheet,
-    row: &Value,
-    frame: Option<u32>,
-) {
-    let Some(ground) = super::preview::spawn_ground(editor) else {
+fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+    let Some(content) = editor.loaded() else {
         return;
     };
+    let Some(model) = content.by_key::<ModelDef>(key) else {
+        return;
+    };
+    let center = stage::center(&content);
+    let name = content
+        .built::<GameSettings>()
+        .initial_spawn
+        .area
+        .get(&content)
+        .name
+        .clone();
     ui.label(
-        theme::mono(format!("In {}", ground.name))
+        theme::mono(format!("In {name}"))
             .color(theme::CODE)
             .size(13.0),
     );
-    let zoom = 2.0;
-    let (rect, _) = ui.allocate_exact_size(INSET, Sense::hover());
-    let painter = ui.painter_at(rect);
-    let feet = super::preview::backdrop(editor, &painter, rect, format!("model-inset:{key}"), zoom);
+    let posed = Posed {
+        actors: vec![PosedActor {
+            held: Some(Seconds(0.0)),
+            ..PosedActor::standing(model, center)
+        }],
+        ..Posed::default()
+    };
+    let Some(shown) = stage::show(
+        editor,
+        ui,
+        &format!("model/{key}/inset"),
+        Scene::Posed(posed),
+        true,
+    ) else {
+        return;
+    };
     if airborne(row) {
+        let rect = shown.rect;
         let from = rect.left_bottom() + Vec2::new(20.0, -20.0);
         let to = rect.right_top() + Vec2::new(-20.0, 20.0);
         let mut points = Vec::new();
@@ -247,21 +269,22 @@ fn inset(
             let y = from.y + (to.y - from.y) * (t * t * (3.0 - 2.0 * t));
             points.push(egui::pos2(x, y));
         }
-        painter.extend(egui::Shape::dashed_line(
+        ui.painter().extend(egui::Shape::dashed_line(
             &points,
             egui::Stroke::new(2.0, Color32::WHITE),
             8.0,
             6.0,
         ));
     }
-    super::preview::draw_sprite(&painter, sheet, row, frame, feet, zoom);
-    painter.rect_stroke(
-        rect,
-        4.0,
-        egui::Stroke::new(1.0, theme::BORDER),
-        egui::StrokeKind::Outside,
-    );
     ui.add_space(4.0);
+}
+
+fn sprite_rect(feet: egui::Pos2, shown: Vec2) -> ERect {
+    let anchor = ACTOR_ANCHOR.0;
+    ERect::from_min_max(
+        feet - Vec2::new(shown.x / 2.0, (0.5 - anchor.y) * shown.y),
+        feet + Vec2::new(shown.x / 2.0, (0.5 + anchor.y) * shown.y),
+    )
 }
 
 // Feet stand at a tile's center, so the cell edges lie half a tile to either side of them.

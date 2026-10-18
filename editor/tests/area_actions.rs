@@ -150,7 +150,8 @@ fn show_area(
         events,
         ..Default::default()
     };
-    let _ = ctx.run_ui(input, |ui| editor::views::area::show(editor, ui, AREA));
+    let mut output = ctx.run_ui(input, |ui| editor::views::area::show(editor, ui, AREA));
+    output.textures_delta.clear();
 }
 
 fn hold_a_stroke(editor: &mut Editor) {

@@ -83,7 +83,11 @@ impl Plugin for EditorPlugin {
             theme_context.after(EguiPreUpdateSet::InitContexts),
         )
         .add_systems(EguiPrimaryContextPass, editor_ui)
-        .add_systems(Update, background);
+        .add_systems(Update, background)
+        .add_systems(
+            PostUpdate,
+            engine::core::render::order_rows.before(bevy::transform::TransformSystems::Propagate),
+        );
     }
 }
 
