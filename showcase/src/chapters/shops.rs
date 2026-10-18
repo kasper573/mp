@@ -1,4 +1,4 @@
-use driver::{Player, UiTarget, content, holding};
+use driver::{Player, UiTarget, content, holding, input_name};
 use engine::core::math::Offset;
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::ProbeSnapshot;
@@ -73,7 +73,7 @@ fn play(shoot: &mut Shoot) {
     me.caption("With a shop open, your bag shows what sells and dims what doesn't");
     me.act(InputAction::ToggleInventory);
     me.drag_ui("Inventory", Offset::new(384.0, -260.0));
-    me.caption("Right-click to sell…");
+    me.caption(&format!("{} to sell…", input_name(InputAction::SellItem)));
     me.act_on_ui(
         InputAction::SellItem,
         UiTarget::image("icons/monster_part/skull.png"),
@@ -81,7 +81,10 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the tusks to sell", |snapshot| {
         holding(snapshot, "orc_tusk") == 0
     });
-    me.caption("…or drag onto the shop. Equipment asks first");
+    me.caption(&format!(
+        "…or {} onto the shop. Equipment asks first",
+        input_name(InputAction::CarryItem)
+    ));
     me.carry_onto(
         UiTarget::image("icons/weapon_and_tool/iron_sword.png"),
         UiTarget::starting("Buys "),

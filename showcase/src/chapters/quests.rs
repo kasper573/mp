@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use driver::{
-    Player, UiTarget, WaitBudget, content, erred, finished, holding, marked, noticed, on_quest,
-    told_by,
+    Player, UiTarget, WaitBudget, content, erred, finished, holding, input_name, marked, noticed,
+    on_quest, told_by,
 };
 use engine::systems::attention::AttentionMark;
 use engine::systems::input::map::InputAction;
@@ -80,7 +80,10 @@ fn play(shoot: &mut Shoot) {
     me.click_ui(UiTarget::button("Low Tide"));
     me.caption("A long card scrolls its plate under the name band, down to the rewards");
     me.scroll_until("objectives", UiTarget::image(BAIT));
-    me.caption("Right-click a reward for its item card");
+    me.caption(&format!(
+        "{} a reward for its item card",
+        input_name(InputAction::InspectItem)
+    ));
     me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
     me.wait_until("the bait's card", |snapshot| {
         snapshot
@@ -96,7 +99,10 @@ fn play(shoot: &mut Shoot) {
     me.click_ui(UiTarget::button("A Letter for the Captain"));
     me.hold();
     me.click_ui(UiTarget::button("Low Tide"));
-    me.caption("Abandoning always asks, and Keep quest is the default — Enter keeps it");
+    me.caption(&format!(
+        "Abandoning always asks, and Keep quest is the default — {} keeps it",
+        input_name(InputAction::TakeDefault)
+    ));
     me.click_ui("Abandon");
     me.find_ui("Abandon Low Tide?");
     me.hold();
@@ -172,7 +178,10 @@ fn play(shoot: &mut Shoot) {
     me.caption("Rest the pointer on a reward to see what it is");
     me.hover_ui(reward_on("I'll take the Bone Shield."));
     me.hold();
-    me.caption("Right-click it for its card");
+    me.caption(&format!(
+        "{} it for its card",
+        input_name(InputAction::InspectItem)
+    ));
     me.act_on_ui(
         InputAction::InspectItem,
         reward_on("I'll take the Bone Shield."),
@@ -196,7 +205,10 @@ fn play(shoot: &mut Shoot) {
     me.pick("Not yet.");
     me.conversation_over();
 
-    me.caption("Make some room: Ctrl-click drops");
+    me.caption(&format!(
+        "Make some room: {} drops",
+        input_name(InputAction::DropItem)
+    ));
     me.act(InputAction::ToggleInventory);
     for _ in 0..2 {
         let before = holding(&me.snapshot(), "rusty_sword");

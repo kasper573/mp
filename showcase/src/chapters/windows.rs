@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use driver::{Player, UiTarget, content, holding};
+use driver::{Player, UiTarget, content, holding, input_name};
 use engine::core::math::{Offset, Pos, WindowPx};
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::ProbeSnapshot;
@@ -29,9 +29,19 @@ const SHIELD: &str = "icons/weapon_and_tool/wooden_shield.png";
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("armed", None);
     let mut me = shoot.roll(player);
-    me.caption(
-        "Every window has a hotkey: I, E, K, L, O and C. A window drops onto the table as it opens",
-    );
+    me.caption(&format!(
+        "Every window has a hotkey: {}. A window drops onto the table as it opens",
+        [
+            InputAction::ToggleInventory,
+            InputAction::ToggleEquipment,
+            InputAction::ToggleStats,
+            InputAction::ToggleQuestLog,
+            InputAction::ToggleSettings,
+            InputAction::ToggleTerminal,
+        ]
+        .map(input_name)
+        .join(", ")
+    ));
     for (toggle, title, (x, y)) in LAYOUT {
         me.act(toggle);
         if title == "Inventory" {
@@ -43,13 +53,17 @@ fn play(shoot: &mut Shoot) {
     me.caption("Rest the pointer on an item to see what it is");
     me.hover_ui(outside_card(SHIELD));
     me.hold();
-    me.caption(
-        "Right-click an item and its card is dealt from the slot: what it does, and a line of lore",
-    );
+    me.caption(&format!(
+        "{} an item and its card is dealt from the slot: what it does, and a line of lore",
+        input_name(InputAction::InspectItem)
+    ));
     inspect(&mut me, SHIELD, "bone_shield");
     me.caption("One card at a time: the next is dealt on top, and the old one drops away under it");
     inspect(&mut me, SWORD, "rusty_sword");
-    me.caption("Double-click an item to use it — or, for gear, to wear it");
+    me.caption(&format!(
+        "{} an item to use it — or, for gear, to wear it",
+        input_name(InputAction::UseItem)
+    ));
     me.act_on_ui(InputAction::UseItem, outside_card(SWORD));
     me.wait_until("the sword to be worn", |snapshot| {
         holding(snapshot, "rusty_sword") == 0
@@ -57,12 +71,19 @@ fn play(shoot: &mut Shoot) {
     me.caption("Worn gear has a card too…");
     inspect(&mut me, SHIELD, "bone_shield");
     inspect(&mut me, SWORD, "rusty_sword");
-    me.caption("…and a double-click takes it off");
+    me.caption(&format!(
+        "…and {} takes it off",
+        input_name(InputAction::UseItem)
+    ));
     me.act_on_ui(InputAction::UseItem, outside_card(SWORD));
     me.wait_until("the sword to be taken off", |snapshot| {
         holding(snapshot, "rusty_sword") == 1
     });
-    me.caption("A right-click brings the card in front, and Esc flicks away what's in front");
+    me.caption(&format!(
+        "{} brings the card in front, and {} flicks away what's in front",
+        input_name(InputAction::InspectItem),
+        input_name(InputAction::Dismiss)
+    ));
     inspect(&mut me, SHIELD, "bone_shield");
     me.wait_until("the card in front", card_in_front);
     me.hold();
@@ -117,7 +138,10 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.hide_mixer();
     me.caption("Where you put them is remembered for next time");
-    me.caption("Esc closes the window you used last, and it lifts off the table");
+    me.caption(&format!(
+        "{} closes the window you used last, and it lifts off the table",
+        input_name(InputAction::Dismiss)
+    ));
     for _ in LAYOUT {
         me.act(InputAction::Dismiss);
     }

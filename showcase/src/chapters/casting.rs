@@ -1,5 +1,5 @@
 use driver::{
-    Player, UiTarget, aiming, beside_other_player, east_of, npc_is, other_player,
+    Player, UiTarget, aiming, beside_other_player, east_of, input_name, npc_is, other_player,
     other_player_within, pack_ground, played, played_on, status_on_me,
 };
 use engine::core::math::Pos;
@@ -34,9 +34,10 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
     me.hold();
-    me.caption(
-        "One ally: Mend arms, and the click must land on a friend. Allies are the other players",
-    );
+    me.caption(&format!(
+        "One ally: Mend arms, and {} must land on a friend. Allies are the other players",
+        input_name(InputAction::Interact)
+    ));
     me.act(InputAction::Hotbar4);
     me.wait_until("Mend armed", aiming);
     let ally = other_player(&me.snapshot())
@@ -49,9 +50,10 @@ fn play(shoot: &mut Shoot) {
         played_on(snapshot, "mend_glow", ally.id)
     });
     me.hold();
-    me.caption(
-        "One enemy: a click on a monster uses the basic attack, Spark; any other single-target skill is aimed the same way",
-    );
+    me.caption(&format!(
+        "One enemy: {} on a monster uses the basic attack, Spark; any other single-target skill is aimed the same way",
+        input_name(InputAction::Interact)
+    ));
     me.fight(
         |_, actor| npc_is(actor, PREY),
         |snapshot| !played(snapshot, "spark_hit").is_empty(),

@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
 use driver::{
-    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding, npc_is,
-    resident_home,
+    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding,
+    input_name, npc_is, resident_home,
 };
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::{TilePos, Tiles};
@@ -33,9 +33,10 @@ fn play(shoot: &mut Shoot) {
     // Read in town: out there, monsters don't wait for the viewer.
     me.hold();
     me.look_out(PREY, |snapshot| nearest_prey(snapshot).is_some());
-    me.caption(
-        "Hover a monster to target it; a click uses the basic attack in the slot by your hotbar",
-    );
+    me.caption(&format!(
+        "Hover a monster to target it; {} uses the basic attack in the slot by your hotbar",
+        input_name(InputAction::Interact)
+    ));
     me.caption("Every hit bursts its damage out of whoever takes it");
     let loot = slay(&mut me);
     me.wait_until("the kill's XP in the feed", |snapshot| {
@@ -46,9 +47,10 @@ fn play(shoot: &mut Shoot) {
             .any(|record| record.text.ends_with(" XP"))
     });
     me.caption("Small news rises over your head: experience, loot, gone in a few seconds");
-    me.caption(
-        "Monsters drop loot — click it to pick it up. The same thing again counts up on one row",
-    );
+    me.caption(&format!(
+        "Monsters drop loot — {} picks it up. The same thing again counts up on one row",
+        input_name(InputAction::Interact)
+    ));
     let before = carried(&me.snapshot());
     for item in &loot {
         me.pick_up(item.id, LOOTING);
@@ -57,12 +59,18 @@ fn play(shoot: &mut Shoot) {
         carried(snapshot) > before
     });
 
-    me.caption("Press I to open the inventory");
+    me.caption(&format!(
+        "Press {} to open the inventory",
+        input_name(InputAction::ToggleInventory)
+    ));
     me.act(InputAction::ToggleInventory);
     me.find_ui("Inventory");
     me.find_ui(UiTarget::image(GREATER_POTION));
     let potions = holding(&me.snapshot(), "greater_health_potion");
-    me.caption("Double-click a potion to drink it");
+    me.caption(&format!(
+        "{} a potion to drink it",
+        input_name(InputAction::UseItem)
+    ));
     me.act_on_ui(InputAction::UseItem, UiTarget::image(GREATER_POTION));
     me.wait_until("the potion drunk", |snapshot| {
         holding(snapshot, "greater_health_potion") < potions

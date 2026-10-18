@@ -1,4 +1,4 @@
-use driver::{UiTarget, erred, noticed, open_ground_beside};
+use driver::{UiTarget, erred, input_name, input_names, noticed, open_ground_beside};
 use engine::systems::input::gestures::ClickClaim;
 use engine::systems::input::map::InputAction;
 
@@ -15,13 +15,27 @@ pub const CHAPTER: Chapter = Chapter {
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("talker", None);
     let mut me = shoot.roll(player);
-    me.caption("Click a townsperson to talk — you walk into reach and the conversation opens");
+    me.caption(&format!(
+        "{} a townsperson to talk — you walk into reach and the conversation opens",
+        input_name(InputAction::Interact)
+    ));
     me.talk_to("tobb");
-    me.caption("Busts show who is speaking. Space, Enter or a click reads on");
+    me.caption(&format!(
+        "Busts show who is speaking. {} reads on",
+        spoken_list(&input_names(InputAction::Advance))
+    ));
     let stage = me.read_to_choices();
-    me.caption("No buttons on the frame: Esc leaves, and the choices say the rest");
+    me.caption(&format!(
+        "No buttons on the frame: {} leaves, and the choices say the rest",
+        input_name(InputAction::Dismiss)
+    ));
     me.caption("A choice shows its words and nothing more, unless the writer reveals more");
-    me.caption("↑ ↓ choose and Enter picks, and a pointer at rest never takes the choice back");
+    me.caption(&format!(
+        "{} {} choose and {} picks, and a pointer at rest never takes the choice back",
+        input_name(InputAction::ChoosePrevious),
+        input_name(InputAction::ChooseNext),
+        input_name(InputAction::PickChoice)
+    ));
     me.hover_choice(&stage.choices[0].label);
     let catch = stage
         .choices
@@ -35,7 +49,7 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::PickChoice);
     me.on_stage("catch");
     me.read_to_choices();
-    me.caption("…or click a choice");
+    me.caption("…or pick it with the pointer");
     me.pick("Good luck out there.");
     me.on_stage("news");
     me.caption("Tobb held his news while you talked — once you're free, he calls you over");
@@ -104,7 +118,10 @@ fn play(shoot: &mut Shoot) {
     me.caption("History is a window like any other: H opens it here too, over the conversation");
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
-    me.caption("Esc closes the history, then leaves the conversation");
+    me.caption(&format!(
+        "{} closes the history, then leaves the conversation",
+        input_name(InputAction::Dismiss)
+    ));
     me.act(InputAction::Dismiss);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);
     me.act(InputAction::Dismiss);
@@ -115,4 +132,11 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Close the lid.");
     me.conversation_over();
+}
+
+fn spoken_list(names: &[String]) -> String {
+    match names {
+        [rest @ .., last] if !rest.is_empty() => format!("{} or {last}", rest.join(", ")),
+        _ => names.concat(),
+    }
 }

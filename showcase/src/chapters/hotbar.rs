@@ -1,4 +1,6 @@
-use driver::{UiTarget, aiming, blocked, cooling, holding, pressed, resident_home, slot_item};
+use driver::{
+    UiTarget, aiming, blocked, cooling, holding, input_name, pressed, resident_home, slot_item,
+};
 use engine::core::math::Offset;
 use engine::systems::input::map::InputAction;
 use engine::systems::skill::bar::HotbarPress;
@@ -50,9 +52,10 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the knife refused", |snapshot| {
         pressed(snapshot, 3) == Some(HotbarPress::Denied)
     });
-    me.caption(
-        "An area skill is aimed: its shape follows the pointer over the ground, and a click casts it",
-    );
+    me.caption(&format!(
+        "An area skill is aimed: its shape follows the pointer over the ground, and {} casts it",
+        input_name(InputAction::Interact)
+    ));
     me.act(InputAction::Hotbar1);
     me.wait_until("Cleave armed", aiming);
     let at = me.snapshot().me.expect("the player").at + Offset::new(2.0, 0.0);
@@ -82,7 +85,10 @@ fn play(shoot: &mut Shoot) {
         pressed(snapshot, 2) == Some(HotbarPress::Denied)
     });
     me.hold();
-    me.caption("Items go on the bar too: shift-click one in the bag. Its count stays live");
+    me.caption(&format!(
+        "Items go on the bar too: {} one in the bag. Its count stays live",
+        input_name(InputAction::PinToHotbar)
+    ));
     me.act(InputAction::ToggleInventory);
     me.act_on_ui(InputAction::PinToHotbar, UiTarget::image(POTION));
     me.wait_until("the potion on the bar", |snapshot| {
@@ -93,7 +99,10 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("a potion drunk", |snapshot| {
         holding(snapshot, "health_potion") == 1
     });
-    me.caption("Right-click a slot to rebind its key, or to clear it");
+    me.caption(&format!(
+        "{} a slot to rebind its key, or to clear it",
+        input_name(InputAction::SlotOptions)
+    ));
     me.act_on_ui(
         InputAction::SlotOptions,
         UiTarget::starting("Hotbar slot 2"),
@@ -126,9 +135,10 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.drag_ui("Resize", Offset::new(200.0, 44.0));
     me.wait_until("one row of nine", |snapshot| snapshot.hotbar.len() == 9);
-    me.caption(
-        "Left of the bar sits the basic attack slot: a click on an enemy uses it, a weapon that grants one fills it, and no press rings it",
-    );
+    me.caption(&format!(
+        "Left of the bar sits the basic attack slot: {} on an enemy uses it, a weapon that grants one fills it, and no press rings it",
+        input_name(InputAction::Interact)
+    ));
     me.hover_ui(UiTarget::starting("Basic attack slot"));
     me.hold();
 }

@@ -8,6 +8,7 @@ use engine::core::content::{
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::{self, Area, AreaDef, AreaModule};
+use engine::systems::input::map::{InputAction, InputMap};
 use engine::systems::load_content;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::script::Place;
@@ -34,6 +35,21 @@ pub(crate) fn load(folder: &Path) {
 }
 
 static CONTENT: OnceLock<Content> = OnceLock::new();
+
+pub fn input_name(action: InputAction) -> String {
+    input_names(action)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| panic!("{action:?} has no binding"))
+}
+
+pub fn input_names(action: InputAction) -> Vec<String> {
+    InputMap::new(content())
+        .bindings(action)
+        .iter()
+        .map(|binding| binding.name())
+        .collect()
+}
 
 pub fn id<Row: ContentRow>(name: &str) -> ContentId<Row> {
     content()

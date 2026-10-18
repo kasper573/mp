@@ -1,4 +1,4 @@
-use driver::{UiTarget, finished, holding, noticed, on_quest};
+use driver::{UiTarget, finished, holding, input_name, noticed, on_quest};
 use engine::core::tiling::Tiles;
 use engine::systems::input::map::InputAction;
 use engine::systems::quest::QuestResult;
@@ -28,7 +28,10 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "tattered_map") == 1
     });
 
-    me.caption("The map begins a quest — double-click it in your bag to use it");
+    me.caption(&format!(
+        "The map begins a quest — {} it in your bag to use it",
+        input_name(InputAction::UseItem)
+    ));
     me.act(InputAction::ToggleInventory);
     me.hover_ui(UiTarget::image(MAP));
     me.hold();

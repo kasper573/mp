@@ -1,4 +1,4 @@
-use driver::{Player, UiTarget};
+use driver::{Player, UiTarget, input_name};
 use engine::core::math::Offset;
 use engine::systems::input::map::InputAction;
 
@@ -22,7 +22,11 @@ fn play(shoot: &mut Shoot) {
     friend.walk_by(Offset::new(-3.0, -1.0));
     me.caption("Every player's name floats over their head");
     me.find_ui(name.as_str());
-    me.caption("Press C for the terminal, where everyone can chat: type, and Enter sends");
+    me.caption(&format!(
+        "Press {} for the terminal, where everyone can chat: type, and {} sends",
+        input_name(InputAction::ToggleTerminal),
+        input_name(InputAction::SubmitText)
+    ));
     me.act(InputAction::ToggleTerminal);
     submit(&mut me, "hello! anyone around?");
     friend.act(InputAction::ToggleTerminal);
@@ -30,7 +34,11 @@ fn play(shoot: &mut Shoot) {
     me.find_ui(UiTarget::containing("let's go hunt some orcs"));
     me.caption("It also takes commands — /commands lists them");
     submit(&mut me, "/commands");
-    me.caption("Esc hands the keys back to the game, and C closes the terminal");
+    me.caption(&format!(
+        "{} hands the keys back to the game, and {} closes the terminal",
+        input_name(InputAction::Dismiss),
+        input_name(InputAction::ToggleTerminal)
+    ));
     me.act(InputAction::Dismiss);
     me.wait_until("the field to let go of the keys", |snapshot| {
         UiTarget::typing_field().find(snapshot).is_none()

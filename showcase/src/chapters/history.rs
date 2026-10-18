@@ -1,4 +1,4 @@
-use driver::{UiTarget, on_quest, told_by};
+use driver::{UiTarget, input_name, on_quest, told_by};
 use engine::core::tiling::Tiles;
 use engine::systems::history::HistoryMark;
 use engine::systems::input::map::InputAction;
@@ -51,7 +51,10 @@ fn play(shoot: &mut Shoot) {
         told_by(snapshot, "Gulls")
     });
 
-    me.caption("History has its own slot in the toolbar, or press H");
+    me.caption(&format!(
+        "History has its own slot in the toolbar, or press {}",
+        input_name(InputAction::ToggleHistory)
+    ));
     me.hover_ui(UiTarget::image(HISTORY));
     me.hold();
     me.click_ui(UiTarget::image(HISTORY));
