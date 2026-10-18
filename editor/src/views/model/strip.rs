@@ -11,8 +11,8 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
-use crate::stage;
 use crate::project::ContentEdit;
+use crate::stage;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 
