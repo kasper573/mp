@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
-use design_tokens::sheet::{self, Depth};
+use design_tokens::sheet;
 use design_tokens::{TextRole, controls, face, ink};
-use egui::{Shape, TextStyle, Ui};
+use egui::{TextStyle, Ui};
 use renet2::RenetClient;
 
 use crate::core::gui::{self, Band};
@@ -174,25 +174,17 @@ pub(crate) fn system_screen<R>(
 /// The note every screen between screens speaks in: a ruled sheet under a plain `title`, with no
 /// cross and no curl.
 pub(crate) fn panel<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
-    let under = ui.painter().add(Shape::Noop);
-    let framed = egui::Frame::new()
-        .inner_margin(NOTE_PADDING)
-        .show(ui, |ui| {
-            ui.set_width(NOTICE_WIDTH);
-            ui.set_min_height(notice_height(ui));
-            ui.vertical_centered(|ui| {
-                ui.spacing_mut().item_spacing.y = LINE_GAP;
-                ui.label(TextRole::NoteTitle.rich(title).color(ink::INK));
-                add(ui)
-            })
-            .inner
-        });
-    let rect = framed.response.rect;
-    let mut shapes = vec![Shape::Rect(sheet::shadow(Depth::Front).as_shape(rect, 0.0))];
-    shapes.extend(sheet::vellum_shapes(ui.ctx(), rect));
-    ui.painter().set(under, Shape::Vec(shapes));
-    sheet::rule(ui.painter(), rect, sheet::RULE_INSET);
-    framed.inner
+    sheet::note(ui, egui::Margin::same(NOTE_PADDING), |ui| {
+        ui.set_width(NOTICE_WIDTH);
+        ui.set_min_height(notice_height(ui));
+        ui.vertical_centered(|ui| {
+            ui.spacing_mut().item_spacing.y = LINE_GAP;
+            ui.label(TextRole::NoteTitle.rich(title).color(ink::INK));
+            add(ui)
+        })
+        .inner
+    })
+    .inner
 }
 
 pub(crate) fn note(ui: &mut Ui, text: &str) {

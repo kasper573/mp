@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::card::{self, Art, Card, CardResponse};
+use design_tokens::card::{self, Art, Card, CardResponse, Plate};
 use design_tokens::controls::{self, Pill};
 use design_tokens::glyph::Kind;
 use design_tokens::sheet::Depth;
 use design_tokens::{TextRole, face, ink};
-use egui::{Rect, Response, Ui};
+use egui::{Rect, Response, TextureId, Ui};
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
@@ -15,8 +15,8 @@ use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::item::{Inventory, ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
-use crate::systems::script::condition;
-use crate::systems::skill;
+use crate::systems::script::{Condition, condition};
+use crate::systems::skill::{self, SkillDef};
 use crate::systems::stat::StatKind;
 use crate::systems::status;
 
@@ -129,33 +129,18 @@ pub fn show(
         .map_or(0, |bag| bag.count(item));
     let numeral = (def.stack_max() > 1 && held > 0).then(|| face::roman(held));
     let icon = gui::image(world, &def.icon).map(|image| image.texture);
-    let mut card = Card::new(kind(def), &def.name);
+    let mut card = face_of(def, icon, look);
     card.numeral = numeral.as_deref();
-    card.art = Art {
-        icon,
-        height: look.art,
-    };
-    card.width = look.width;
-    card.max_height = look.max_height;
-    card.closable = look.closable;
-    card.depth = look.depth;
     card.show(ui, |ui, plate| {
-        if plate.name_cut {
-            card::full_name(ui, &def.name);
-        }
-        card::overview(ui, &overview(def));
-        let tags = tags(def);
-        if !tags.is_empty() {
-            ui.horizontal_wrapped(|ui| {
-                for (label, pill) in tags {
-                    controls::pill(ui, label, pill);
-                }
-            });
-        }
-        if let Some(flavor) = def.flavor() {
-            card::flavour(ui, flavor);
-        }
-        facts(ui, world, item, def);
+        let viewer = session::me(world);
+        describe(ui, &content, item, plate, |requirement| {
+            let viewer = viewer?;
+            Some(if condition::holds(world, viewer, requirement) {
+                Judgement::Met
+            } else {
+                Judgement::Unmet(condition::standing(world, viewer, requirement))
+            })
+        });
         grants(ui, world, item);
         more(ui, world);
         if let Some(verb) = use_verb(def) {
@@ -166,6 +151,75 @@ pub fn show(
             foot(ui, world, &hint);
         }
     })
+}
+
+/// The item's card before its plate is written: its kind, name and art, laid by `look`.
+pub fn face_of(def: &ItemDef, icon: Option<TextureId>, look: CardLook) -> Card<'_> {
+    let mut card = Card::new(kind(def), &def.name);
+    card.art = Art {
+        icon,
+        height: look.art,
+    };
+    card.width = look.width;
+    card.max_height = look.max_height;
+    card.closable = look.closable;
+    card.depth = look.depth;
+    card
+}
+
+/// Whether the one reading a card meets a requirement it states.
+pub enum Judgement {
+    Met,
+    /// Not met, with where they stand when that can be said ("you are level 1").
+    Unmet(Option<String>),
+}
+
+/// The plate everyone reads alike: the full name when the band cut it, the overview, the flags,
+/// the flavour and the facts. `judge` holds a requirement against the one reading, or is `None`
+/// when nobody is.
+pub fn describe(
+    ui: &mut Ui,
+    content: &Content,
+    item: ItemId,
+    plate: Plate,
+    judge: impl Fn(&Condition) -> Option<Judgement>,
+) {
+    let def = item.get(content);
+    if plate.name_cut {
+        card::full_name(ui, &def.name);
+    }
+    card::overview(ui, &overview(def));
+    let tags = tags(def);
+    if !tags.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            for (label, pill) in tags {
+                controls::pill(ui, label, pill);
+            }
+        });
+    }
+    if let Some(flavor) = def.flavor() {
+        card::flavour(ui, flavor);
+    }
+    facts(ui, content, item, def, judge);
+}
+
+/// A skill the item grants while worn, as its card lists it: `icon`, then the skill's name, what
+/// it targets, and the basic attack's pill.
+pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Response {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        icon(ui);
+        ui.label(card::bold(&def.name));
+        ui.label(
+            TextRole::CardBody
+                .rich(def.target.describe())
+                .color(ink::INK2),
+        );
+        if def.basic_attack {
+            controls::pill(ui, skill::card::BASIC_ATTACK_MARK, Pill::Gold);
+        }
+    })
+    .response
 }
 
 /// How a card is laid where it is shown.
@@ -214,22 +268,10 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
     card::heading(ui, "grants while worn");
     for &granted in granted {
         let def = granted.get(&content);
-        let response = ui
-            .horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                hud::icon(ui, world, &def.icon, card::GRANT_ICON);
-                ui.label(card::bold(&def.name));
-                ui.label(
-                    TextRole::CardBody
-                        .rich(def.target.describe())
-                        .color(ink::INK2),
-                );
-                if def.basic_attack {
-                    controls::pill(ui, skill::card::BASIC_ATTACK_MARK, Pill::Gold);
-                }
-            })
-            .response
-            .interact(egui::Sense::click_and_drag());
+        let response = grant_line(ui, def, |ui| {
+            hud::icon(ui, world, &def.icon, card::GRANT_ICON);
+        })
+        .interact(egui::Sense::click_and_drag());
         if map::drag_started(world, InputAction::CarryItem, &response) {
             hud::carry(ui.ctx(), Carried::Skill(granted));
         } else if map::clicked(world, InputAction::PinToHotbar, &response) {
@@ -266,8 +308,13 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Pill)> {
     .collect()
 }
 
-fn facts(ui: &mut Ui, world: &World, item: ItemId, def: &ItemDef) {
-    let content = world.resource::<Content>();
+fn facts(
+    ui: &mut Ui,
+    content: &Content,
+    item: ItemId,
+    def: &ItemDef,
+    judge: impl Fn(&Condition) -> Option<Judgement>,
+) {
     let boosts = status::boosts_of(content, item);
     match &def.kind {
         ItemKind::Equipment { slot, requires, .. } => {
@@ -275,20 +322,14 @@ fn facts(ui: &mut Ui, world: &World, item: ItemId, def: &ItemDef) {
             for boost in &boosts {
                 card::fact(ui, &modifier(*boost));
             }
-            let viewer = session::me(world);
             if let Some(requirement) = requires {
                 let line = format!("Requires {}", condition::describe(content, requirement));
-                match viewer {
-                    Some(viewer) if condition::holds(world, viewer, requirement) => {
-                        card::requirement(ui, true, &line);
+                match judge(requirement) {
+                    Some(Judgement::Met) => card::requirement(ui, true, &line),
+                    Some(Judgement::Unmet(Some(standing))) => {
+                        card::requirement(ui, false, &format!("{line} · {standing}"));
                     }
-                    Some(viewer) => {
-                        let line = match condition::standing(world, viewer, requirement) {
-                            Some(standing) => format!("{line} · {standing}"),
-                            None => line,
-                        };
-                        card::requirement(ui, false, &line);
-                    }
+                    Some(Judgement::Unmet(None)) => card::requirement(ui, false, &line),
                     None => card::fact(ui, &line),
                 }
             }

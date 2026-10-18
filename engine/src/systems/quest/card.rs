@@ -80,7 +80,7 @@ pub(super) fn show(
 }
 
 /// What kind of errand the quest is and what it pays: "Delivery · 40 xp".
-pub(super) fn overview(def: &QuestDef) -> String {
+pub fn overview(def: &QuestDef) -> String {
     let kinds = def.kinds();
     let mut letters = kinds.chars();
     let kinds = letters
@@ -321,7 +321,7 @@ pub(super) fn caption(ui: &mut Ui, text: impl Into<String>) {
     ui.add(Label::new(face::small_faint(text.into())).wrap());
 }
 
-pub(super) fn counted(content: &Content, stack: ItemStack) -> String {
+pub fn counted(content: &Content, stack: ItemStack) -> String {
     let name = &stack.item.get(content).name;
     match stack.count {
         1 => name.to_owned(),

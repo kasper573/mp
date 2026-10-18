@@ -606,18 +606,18 @@ fn draw_node(
     } else {
         ink::LIGHT
     };
-    let at = center + Vec2::new(0.0, NODE_RADIUS + 10.0);
-    let galley = painter.layout_no_wrap(def.name.clone(), TextRole::Small.font_id(), color);
-    let name = Align2::CENTER_CENTER.anchor_size(at, galley.size());
-    for offset in [
-        Vec2::new(-NAME_HALO, 0.0),
-        Vec2::new(NAME_HALO, 0.0),
-        Vec2::new(0.0, -NAME_HALO),
-        Vec2::new(0.0, NAME_HALO),
-    ] {
-        painter.galley_with_override_text_color(name.min + offset, galley.clone(), ink::INK);
-    }
-    painter.galley(name.min, galley, color);
+    let name = glyph::haloed(
+        painter,
+        center + Vec2::new(0.0, NODE_RADIUS + 10.0),
+        Align2::CENTER_CENTER,
+        &def.name,
+        TextRole::Small.font_id(),
+        color,
+        glyph::Halo {
+            color: ink::INK,
+            width: NAME_HALO,
+        },
+    );
     if state == NodeState::Locked {
         let mark = Rect::from_min_size(
             Pos2::new(name.max.x + 3.0, name.center().y - 5.0),
