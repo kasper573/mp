@@ -41,7 +41,6 @@ impl Plugin for ItemCardPlugin {
     }
 }
 
-/// Deals the item's card from `from`, the widget it was asked for from.
 pub fn open(world: &mut World, item: ItemId, from: Option<Rect>) {
     hud::pin(world, item, from);
 }
@@ -113,14 +112,12 @@ pub fn kind(def: &ItemDef) -> Kind {
     }
 }
 
-/// The item's card in `width`, its plate scrolling past `max_height`; `closable` gives it a cross.
-/// `more` writes what the place showing it adds at the foot of the plate.
 pub fn show(
     ui: &mut Ui,
     world: &mut World,
     item: ItemId,
     look: CardLook,
-    more: impl FnOnce(&mut Ui, &mut World),
+    lead: impl FnOnce(&mut Ui, &mut World),
 ) -> CardResponse {
     let content = world.resource::<Content>().clone();
     let def = item.get(&content);
@@ -132,17 +129,20 @@ pub fn show(
     let mut card = face_of(def, icon, look);
     card.numeral = numeral.as_deref();
     card.show(ui, |ui, plate| {
+        summary(ui, &content, item, plate);
+        lead(ui, world);
         let viewer = session::me(world);
-        describe(ui, &content, item, plate, |requirement| {
+        details(ui, &content, item, |requirement| {
             let viewer = viewer?;
             Some(if condition::holds(world, viewer, requirement) {
                 Judgement::Met
             } else {
-                Judgement::Unmet(condition::standing(world, viewer, requirement))
+                Judgement::Unmet {
+                    standing: condition::standing(world, viewer, requirement),
+                }
             })
         });
         grants(ui, world, item);
-        more(ui, world);
         if let Some(verb) = use_verb(def) {
             let hint = StyledLine::new(vec![
                 input(InputAction::UseItem),
@@ -153,7 +153,6 @@ pub fn show(
     })
 }
 
-/// The item's card before its plate is written: its kind, name and art, laid by `look`.
 pub fn face_of(def: &ItemDef, icon: Option<TextureId>, look: CardLook) -> Card<'_> {
     let mut card = Card::new(kind(def), &def.name);
     card.art = Art {
@@ -167,23 +166,12 @@ pub fn face_of(def: &ItemDef, icon: Option<TextureId>, look: CardLook) -> Card<'
     card
 }
 
-/// Whether the one reading a card meets a requirement it states.
 pub enum Judgement {
     Met,
-    /// Not met, with where they stand when that can be said ("you are level 1").
-    Unmet(Option<String>),
+    Unmet { standing: Option<String> },
 }
 
-/// The plate everyone reads alike: the full name when the band cut it, the overview, the flags,
-/// the flavour and the facts. `judge` holds a requirement against the one reading, or is `None`
-/// when nobody is.
-pub fn describe(
-    ui: &mut Ui,
-    content: &Content,
-    item: ItemId,
-    plate: Plate,
-    judge: impl Fn(&Condition) -> Option<Judgement>,
-) {
+pub fn summary(ui: &mut Ui, content: &Content, item: ItemId, plate: Plate) {
     let def = item.get(content);
     if plate.name_cut {
         card::full_name(ui, &def.name);
@@ -197,14 +185,22 @@ pub fn describe(
             }
         });
     }
+}
+
+/// `judge` answers `None` when nobody in particular is reading.
+pub fn details(
+    ui: &mut Ui,
+    content: &Content,
+    item: ItemId,
+    judge: impl Fn(&Condition) -> Option<Judgement>,
+) {
+    let def = item.get(content);
     if let Some(flavor) = def.flavor() {
         card::flavour(ui, flavor);
     }
     facts(ui, content, item, def, judge);
 }
 
-/// A skill the item grants while worn, as its card lists it: `icon`, then the skill's name, what
-/// it targets, and the basic attack's pill.
 pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Response {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
@@ -222,7 +218,6 @@ pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Re
     .response
 }
 
-/// How a card is laid where it is shown.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CardLook {
     pub width: f32,
@@ -242,7 +237,6 @@ impl CardLook {
     };
 }
 
-/// A line of key hints at the foot of a card, in faint ink.
 pub fn foot(ui: &mut Ui, world: &World, hint: &StyledLine) {
     ui.add_space(2.0);
     let look = TextLook::new(TextRole::Small.size(), ink::INK3);
@@ -326,10 +320,14 @@ fn facts(
                 let line = format!("Requires {}", condition::describe(content, requirement));
                 match judge(requirement) {
                     Some(Judgement::Met) => card::requirement(ui, true, &line),
-                    Some(Judgement::Unmet(Some(standing))) => {
+                    Some(Judgement::Unmet {
+                        standing: Some(standing),
+                    }) => {
                         card::requirement(ui, false, &format!("{line} · {standing}"));
                     }
-                    Some(Judgement::Unmet(None)) => card::requirement(ui, false, &line),
+                    Some(Judgement::Unmet { standing: None }) => {
+                        card::requirement(ui, false, &line)
+                    }
                     None => card::fact(ui, &line),
                 }
             }

@@ -431,7 +431,6 @@ pub(super) fn quest_card(
     });
 }
 
-/// The item's card as a player reads it when nobody in particular holds it.
 fn item_card(editor: &mut Editor, ui: &mut Ui, content: &Content, key: &str) {
     let Some(item) = content.by_key::<ItemDef>(key) else {
         return;
@@ -450,7 +449,8 @@ fn item_card(editor: &mut Editor, ui: &mut Ui, content: &Content, key: &str) {
         ..CardLook::PINNED
     };
     item::card::face_of(def, art, look).show(ui, |ui, plate| {
-        item::card::describe(ui, content, item, plate, |_| None);
+        item::card::summary(ui, content, item, plate);
+        item::card::details(ui, content, item, |_| None);
         let granted = skill::grants_of(content, item);
         if !granted.is_empty() {
             card::heading(ui, "grants while worn");

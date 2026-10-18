@@ -90,6 +90,7 @@ pub struct ProbeSnapshot {
     pub history: ProbeHistory,
     pub shop: Option<ProbeShop>,
     pub item_card: Option<ProbeItemCard>,
+    pub skill_card: Option<ProbeSkillCard>,
     pub bag: Vec<ProbeStack>,
     pub quests: ProbeQuests,
     pub hotbar: Vec<SlotReport>,
@@ -291,6 +292,12 @@ pub struct ProbeStack {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct ProbeItemCard {
     pub item: ItemId,
+    pub rect: Rect<WindowPx>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct ProbeSkillCard {
+    pub skill: SkillId,
     pub rect: Rect<WindowPx>,
 }
 
@@ -556,6 +563,12 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             item,
             rect: window_rect(rect),
         }),
+        skill_card: skill::card::shown(world)
+            .zip(hud::pinned_rect::<SkillId>(world))
+            .map(|(skill, rect)| ProbeSkillCard {
+                skill,
+                rect: window_rect(rect),
+            }),
         shop: shop::counter::view(world).map(|shown| ProbeShop {
             shop: shown.shop,
             offers: shown
@@ -1070,12 +1083,14 @@ fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
     };
     let layers: Vec<egui::LayerId> =
         gui.memory(|memory| memory.areas().visible_layer_ids().into_iter().collect());
+    // egui hands a click to a widget this close to it as well as one under it.
+    let reach = gui.global_style().interaction.interact_radius;
     layers
         .into_iter()
         .filter(|&layer| layer != egui::LayerId::background())
         .filter_map(|layer| egui::AreaState::load(&gui, layer.id))
         .filter(|area| area.interactable)
-        .map(|area| area.rect())
+        .map(|area| area.rect().expand(reach))
         .filter(|rect| rect.width() > 0.0 && rect.height() > 0.0)
         .map(window_rect)
         .collect()

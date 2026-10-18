@@ -141,8 +141,6 @@ fn shelf(world: &World) -> Option<Shelf> {
     })
 }
 
-/// The index tabs and what the trader buys across the top, the wares down the left over the hint
-/// line, and the chosen ware's card lying on the page at the right.
 fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
     let content = world.resource::<Content>().clone();
     let wares = shelf.wares(&content);
@@ -267,7 +265,6 @@ fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui
     response
 }
 
-/// The ware's card on the page, its plate carrying the price and the button that pays it.
 fn ware_card(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize, most: f32) {
     let look = CardLook {
         width: card::SHOP_PAGE_WIDTH,
@@ -342,7 +339,6 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
     InterfaceSound::UiPick.play(world);
 }
 
-/// A part of a price: gold while it is covered, rubric while it is not.
 fn price_pill(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
     let pill = if have >= stack.count {
         Pill::Gold
