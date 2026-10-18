@@ -199,8 +199,9 @@ record out title seconds input hook +command:
       # The window maps before bevy has rendered into it.
       sleep 2
       { parecord --raw --format=s16le --channels=2 --rate=48000 --latency-msec=10 "--device=$sink.monitor" || true; } \
-        | ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
-            -f s16le -ar 48000 -ac 2 -i pipe:0 \
+        | ffmpeg -v error -y \
+            -use_wallclock_as_timestamps 1 -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
+            -use_wallclock_as_timestamps 1 -probesize 32 -analyzeduration 0 -f s16le -ar 48000 -ac 2 -i pipe:0 \
             -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 -c:a libopus -b:a 128k "$out" & recording=$!
       [ -z "$hook" ] || bash -c "$hook" &
       [ -z "$input" ] || xdotool $input

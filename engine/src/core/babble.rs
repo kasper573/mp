@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::AudioSource;
 use bevy_replicon::prelude::AppRuleExt;
@@ -11,7 +13,9 @@ use crate::core::content::{
     Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
 };
 use crate::core::math::Rng;
-use crate::core::text::{StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal};
+use crate::core::text::{
+    StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal, TypewriterSpeed, reveal_times,
+};
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
 pub type BabbleId = ContentId<BabbleDef>;
@@ -153,13 +157,22 @@ fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut
         .collect();
 }
 
+/// Which letters of a line sound is decided on the line's own clock, the moment the typewriter
+/// reveals each letter, never on the frames the reveals happen to arrive in, so a line babbles
+/// the same way every time it is spoken.
+#[derive(Default)]
+struct Mouth {
+    speaker: Option<Entity>,
+    busy_until: Duration,
+}
+
 fn babble(
     content: Res<Content>,
     mut revealed: MessageReader<TypewriterReveal>,
     typing: Query<(Entity, &Babbling, &Typewriter, &StyledLine)>,
     clips: Res<BabbleClips>,
-    time: Res<Time>,
-    mut free_at: Local<Seconds>,
+    speed: Res<TypewriterSpeed>,
+    mut mouth: Local<Mouth>,
     mut sounds: MessageWriter<PlayClip>,
 ) {
     let reveals: Vec<TypewriterReveal> = revealed.read().copied().collect();
@@ -172,21 +185,30 @@ fn babble(
     let Some((speaker, babbling, _, text)) = heard else {
         return;
     };
+    if mouth.speaker != Some(speaker) {
+        *mouth = Mouth {
+            speaker: Some(speaker),
+            busy_until: Duration::ZERO,
+        };
+    }
     let babble = babbling.babble.get(&content);
     let babble_bank = babble.babble_bank.get(&content);
-    let now = Seconds(time.elapsed_secs());
+    let moments = reveal_times(&text.pieces, *speed);
     for reveal in reveals.iter().filter(|reveal| reveal.entity == speaker) {
-        if now < *free_at {
+        let Some(moment) = moments.get(reveal.index).copied() else {
+            continue;
+        };
+        if moment < mouth.busy_until {
             continue;
         }
         let Some(syllable) = Syllable::at(text, reveal.index) else {
             continue;
         };
         let Some(letter) = syllable.letter else {
-            *free_at = now + syllable.pause;
+            mouth.busy_until = moment + Duration::from_secs_f32(syllable.pause.0);
             continue;
         };
-        *free_at = now + Seconds(babble.pace.period().as_secs_f32());
+        mouth.busy_until = moment + babble.pace.period();
         let Some(clip) = clips.letter(babble.babble_bank, letter) else {
             continue;
         };
