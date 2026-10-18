@@ -6,12 +6,10 @@ use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, Wa
 use crate::core::content::Content;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
-use crate::systems::hud::{self, Confirm};
+use crate::systems::hud::{self, Carried, Confirm};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::widget::{
-    CarriedSlot, SlotAction, SlotVerdict, slot_action, slot_verdict_source,
-};
+use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
 use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
@@ -121,8 +119,8 @@ fn show_counter(ui: &mut Ui, world: &mut World) {
         return;
     };
     let shown = ui.scope(|ui| counter(ui, world, &shelf)).response;
-    if let Some(dropped) = shown.dnd_release_payload::<CarriedSlot>() {
-        request_sale(world, dropped.0);
+    if let Some(Carried::BagSlot(slot)) = hud::dropped(&shown) {
+        request_sale(world, slot);
     }
 }
 
@@ -526,7 +524,11 @@ fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemS
             ],
             confirm: "Sell".to_owned(),
             cancel: "Keep".to_owned(),
-            on_confirm: Box::new(move |world| sell(world, slot, stack)),
+            answer: Box::new(move |world, sold| {
+                if sold {
+                    sell(world, slot, stack);
+                }
+            }),
         },
     );
 }

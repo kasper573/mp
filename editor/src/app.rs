@@ -18,7 +18,7 @@ use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::forms::FormState;
+use crate::forms::{FormCx, FormState};
 use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
@@ -29,6 +29,7 @@ use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
+use crate::ui::inspector;
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
 use crate::views::area::placement::ReplaceScope;
 use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
@@ -732,6 +733,14 @@ impl Editor {
         self.form.thumbnails.image(ctx, &project.files, path)
     }
 
+    pub fn thumb_icon(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {
+        let project = self.project.as_ref()?;
+        let mut budget = u32::MAX;
+        self.form
+            .thumbnails
+            .icon(ctx, &project.files, path, &mut budget)
+    }
+
     pub fn update_brush(&mut self, change: impl FnOnce(&mut BrushSettings)) {
         change(&mut self.settings.brush);
         self.save_settings();
@@ -746,6 +755,34 @@ impl Editor {
         self.project
             .as_ref()
             .and_then(|project| project.content.clone())
+    }
+
+    /// Shows a form owned by `key` of `table` against the schema `root`, then carries out the
+    /// actions its fields raised; nothing is shown without a project.
+    pub fn with_form<R>(
+        &mut self,
+        table: &str,
+        key: Option<&str>,
+        root: &Value,
+        show: impl FnOnce(&mut FormCx) -> R,
+    ) -> Option<R> {
+        let mut actions = Vec::new();
+        let shown = {
+            let Editor {
+                project,
+                form,
+                shapes,
+                ..
+            } = self;
+            let project = project.as_ref()?;
+            let mut cx =
+                FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, key);
+            show(&mut cx)
+        };
+        for action in actions {
+            inspector::act(self, action, table, key.unwrap_or_default());
+        }
+        Some(shown)
     }
 
     fn poll_project(&mut self) {

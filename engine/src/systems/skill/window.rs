@@ -1,19 +1,20 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use design_tokens::{HAIRLINE, TextRole, color, widgets};
+use design_tokens::{TextRole, color, paint, widgets};
 use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
+use egui::{Align2, Color32, Pos2, Rect, RichText, Sense, Stroke, Ui, UiBuilder, Vec2};
 
-use super::card::{self, NodeAccess, SkillCard};
+use super::card;
 use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::class::{self, ClassDef, NodeKey, SkillPoints};
-use crate::systems::hud::HudWindow;
+use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
+use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::skill::bar;
@@ -22,8 +23,6 @@ use crate::systems::text::counted;
 const WINDOW_SIZE: Vec2 = Vec2::new(560.0, 440.0);
 const NODE_RADIUS: f32 = 24.0;
 const NODE_ICON: f32 = 28.0;
-const GRANTED_ICON: f32 = 28.0;
-const ARROW_HEAD: f32 = 7.0;
 const DOCK_HEIGHT: f32 = 34.0;
 
 pub struct SkillsWindow;
@@ -56,13 +55,8 @@ impl HudWindow for SkillsWindow {
         let room = ui.available_rect_before_wrap();
         let viewport =
             Rect::from_min_max(room.min, Pos2::new(room.max.x, room.max.y - DOCK_HEIGHT));
-        let panned = tree(ui, world, &sheet, viewport);
-        *world.resource_mut::<TreeView>() = TreeView {
-            body: ui.max_rect().size(),
-            viewport,
-            content: panned.content,
-            offset: panned.offset,
-        };
+        let view = tree(ui, world, &sheet, viewport);
+        *world.resource_mut::<TreeView>() = view;
         dock(ui, world, &sheet, room);
     }
 }
@@ -89,18 +83,9 @@ impl Default for TreeView {
     }
 }
 
-struct Panned {
-    content: Vec2,
-    offset: Vec2,
-}
-
 /// The ranks picked in the window and not yet confirmed, one rank per node.
 #[derive(Resource, Default, Clone, Debug, PartialEq)]
 pub struct Plan(pub BTreeMap<NodeKey, Rank>);
-
-/// A skill being dragged out of the tree or an item card, toward a slot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CarriedSkill(pub SkillId);
 
 /// Picks the server has since learned, or that lost their footing, leave the plan.
 pub fn settle_plan(world: &mut World) {
@@ -225,17 +210,13 @@ fn header(ui: &mut Ui, world: &mut World, sheet: &Sheet) {
 fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
-    let (rect, response) =
-        ui.allocate_exact_size(Vec2::splat(GRANTED_ICON + 8.0), Sense::click_and_drag());
-    let painter = ui.painter();
-    painter.rect_stroke(rect, 4.0, HAIRLINE, StrokeKind::Inside);
-    painter.rect_stroke(rect.shrink(2.0), 3.0, HAIRLINE, StrokeKind::Inside);
-    if let Some(image) = gui::image(world, &def.icon) {
-        ui.put(
-            Rect::from_center_size(rect.center(), Vec2::splat(GRANTED_ICON)),
-            image.widget(Vec2::splat(GRANTED_ICON)),
-        );
-    }
+    let look = SlotLook {
+        icon: Some(&def.icon),
+        count: 0,
+        outline: None,
+        faded: false,
+    };
+    let response = slot(ui, world, look, Sense::click_and_drag());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
@@ -243,15 +224,15 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
             format!("{} granted by gear", def.name),
         )
     });
-    let passive = skill.get(world.resource::<Content>()).kind == SkillKind::Passive;
+    let passive = def.kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, &response) {
         if !passive {
-            egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(skill));
+            hud::carry(ui.ctx(), Carried::Skill(skill));
         }
     } else if map::clicked(world, InputAction::PinToHotbar, &response) && !passive {
         bar::pin(world, super::HotbarEntry::Skill(skill));
     } else if response.secondary_clicked() {
-        card::open(world, card::of(world, skill));
+        card::open(world, skill);
     }
     let hint = StyledLine::new(vec![
         TextPiece::text("Known while the gear is worn · "),
@@ -263,7 +244,7 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
 
 /// The designer's canvas at its own scale, panned by dragging its background, and never past
 /// its edges: the viewport is always full of canvas.
-fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, viewport: Rect) -> Panned {
+fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, viewport: Rect) -> TreeView {
     let content = world.resource::<Content>().clone();
     let def = sheet.class.get(&content);
     let canvas = def
@@ -302,7 +283,9 @@ fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, viewport: Rect) -> Panned
             draw_canvas(ui, world, sheet, def, Placement { origin });
         })
     });
-    Panned {
+    TreeView {
+        body: ui.max_rect().size(),
+        viewport,
         content: shown.inner.content_size,
         offset: shown.inner.state.offset,
     }
@@ -356,7 +339,18 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
             .get(arrow.from)
             .is_some_and(|held| *held >= arrow.rank);
         let color = if opened { color::WARN } else { color::BORDER };
-        draw_arrow(&painter, place.at(from.at), place.at(to.at), color);
+        let (tail, head) = (place.at(from.at), place.at(to.at));
+        let span = head - tail;
+        if span.length() > NODE_RADIUS * 2.0 {
+            let dir = span.normalized();
+            paint::arrow(
+                &painter,
+                tail + dir * (NODE_RADIUS + 4.0),
+                head - dir * (NODE_RADIUS + 6.0),
+                Stroke::new(2.0, color),
+                false,
+            );
+        }
     }
     for (key, node) in &tree.0 {
         let state = states[key];
@@ -396,7 +390,7 @@ fn node_input(
     let passive = skill.get(world.resource::<Content>()).kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, response) {
         if held > Rank::NONE && !passive {
-            egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(skill));
+            hud::carry(ui.ctx(), Carried::Skill(skill));
         }
     } else if map::clicked(world, InputAction::PinToHotbar, response) {
         if passive {
@@ -413,17 +407,7 @@ fn node_input(
             InterfaceSound::UiRefuse.play(world);
         }
     } else if response.secondary_clicked() {
-        card::open(
-            world,
-            SkillCard {
-                skill,
-                rank: held,
-                node: Some(NodeAccess {
-                    class: sheet.class,
-                    node: key.clone(),
-                }),
-            },
-        );
+        card::open(world, skill);
     } else if response.clicked() {
         pick(world, sheet, key, state);
     }
@@ -432,15 +416,7 @@ fn node_input(
         input(InputAction::PinToHotbar),
         TextPiece::text(" puts it on the hotbar · drag it to a slot"),
     ]);
-    let card = SkillCard {
-        skill,
-        rank: held,
-        node: Some(NodeAccess {
-            class: sheet.class,
-            node: key.clone(),
-        }),
-    };
-    card::tooltip(response, world, &card, Some(&hint));
+    card::tooltip(response, world, &card::of(world, skill), Some(&hint));
 }
 
 fn pick(world: &mut World, sheet: &Sheet, key: &NodeKey, state: NodeState) {
@@ -565,7 +541,7 @@ fn draw_node(
     }
     painter.circle_filled(center, NODE_RADIUS, fill);
     if state == NodeState::Locked {
-        dashed_circle(painter, center, NODE_RADIUS, stroke);
+        paint::dashed_circle(painter, center, NODE_RADIUS, stroke);
     } else {
         painter.circle_stroke(center, NODE_RADIUS, stroke);
     }
@@ -588,15 +564,18 @@ fn draw_node(
         );
     }
     let painter = ui.painter();
+    let corner = center + Vec2::splat(NODE_RADIUS - 4.0);
     match state {
-        NodeState::Locked => padlock(
+        NodeState::Locked => paint::padlock(
             painter,
             center + Vec2::new(NODE_RADIUS - 6.0, NODE_RADIUS - 8.0),
+            9.0,
         ),
         NodeState::Available => {}
-        NodeState::Learned | NodeState::Maxed => badge(
+        NodeState::Learned | NodeState::Maxed => paint::badge(
             painter,
-            center + Vec2::splat(NODE_RADIUS - 4.0),
+            corner,
+            Align2::CENTER_CENTER,
             &format!("{}/{}", held.0, def.rank_count()),
             if state == NodeState::Maxed {
                 color::WARN
@@ -604,9 +583,10 @@ fn draw_node(
                 color::TEXT
             },
         ),
-        NodeState::Picked(rank) => badge(
+        NodeState::Picked(rank) => paint::badge(
             painter,
-            center + Vec2::splat(NODE_RADIUS - 4.0),
+            corner,
+            Align2::CENTER_CENTER,
             &format!("{}→{}", held.0, rank.0),
             color::SELECTION,
         ),
@@ -622,61 +602,6 @@ fn draw_node(
             color::TEXT
         },
     );
-}
-
-fn draw_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32) {
-    let delta = to - from;
-    let length = delta.length();
-    if length <= NODE_RADIUS * 2.0 {
-        return;
-    }
-    let dir = delta / length;
-    let start = from + dir * (NODE_RADIUS + 4.0);
-    let end = to - dir * (NODE_RADIUS + 6.0);
-    let stroke = Stroke::new(2.0, color);
-    painter.line_segment([start, end], stroke);
-    let side = Vec2::new(-dir.y, dir.x);
-    let tip = end + dir * ARROW_HEAD;
-    painter.add(egui::Shape::convex_polygon(
-        vec![
-            tip,
-            end - dir * 2.0 + side * ARROW_HEAD * 0.6,
-            end - dir * 2.0 - side * ARROW_HEAD * 0.6,
-        ],
-        color,
-        Stroke::NONE,
-    ));
-}
-
-fn dashed_circle(painter: &egui::Painter, center: Pos2, radius: f32, stroke: Stroke) {
-    let points: Vec<Pos2> = (0..=48)
-        .map(|step| {
-            let angle = std::f32::consts::TAU * step as f32 / 48.0;
-            center + Vec2::new(angle.cos(), angle.sin()) * radius
-        })
-        .collect();
-    painter.add(egui::Shape::dashed_line(&points, stroke, 4.0, 3.0));
-}
-
-fn padlock(painter: &egui::Painter, at: Pos2) {
-    let body = Rect::from_center_size(at + Vec2::new(0.0, 2.0), Vec2::new(9.0, 7.0));
-    painter.rect_filled(body, 1.5, color::MUTED);
-    let shackle: Vec<Pos2> = (0..=10)
-        .map(|step| {
-            let angle = std::f32::consts::PI * step as f32 / 10.0;
-            at + Vec2::new(-angle.cos() * 3.0, -2.0 - angle.sin() * 4.0)
-        })
-        .collect();
-    painter.add(egui::Shape::line(shackle, Stroke::new(1.5, color::MUTED)));
-}
-
-fn badge(painter: &egui::Painter, at: Pos2, text: &str, ink: Color32) {
-    let font = egui::FontId::monospace(10.0);
-    let galley = painter.layout_no_wrap(text.to_owned(), font, ink);
-    let size = galley.size() + Vec2::new(6.0, 2.0);
-    let rect = Rect::from_center_size(at, size);
-    painter.rect(rect, 3.0, color::INPUT, HAIRLINE, StrokeKind::Inside);
-    painter.galley(rect.center() - galley.size() / 2.0, galley, ink);
 }
 
 fn gold_fill() -> Color32 {

@@ -1,16 +1,15 @@
 use bevy::prelude::*;
-use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{HAIRLINE, WIDGET_RADIUS, color};
 use egui::{
-    Align, Color32, Id, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
+    Align, Color32, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
     Vec2,
 };
 
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
-use crate::core::gui::{self, Band};
+use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
-use crate::systems::hud::{self, HudWindow};
+use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
@@ -18,11 +17,9 @@ use crate::systems::item::{
     UseItemRequest, card,
 };
 use crate::systems::player::session;
-use crate::systems::screen::ClientScreen;
 
 pub(crate) const SLOT: f32 = 36.0;
 const SLOT_ICON: f32 = 32.0;
-const CARRIED: f32 = 40.0;
 const SLOT_GAP: f32 = 2.0;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -62,22 +59,6 @@ pub fn slot_action(app: &mut App, slot_action: SlotAction) {
         .get_resource_or_init::<SlotActions>()
         .0
         .push(slot_action);
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CarriedSlot(pub u32);
-
-pub struct CarryPlugin;
-
-impl Plugin for CarryPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(
-            EguiPrimaryContextPass,
-            draw_carried
-                .in_set(Band::Pointer)
-                .run_if(in_state(ClientScreen::Area)),
-        );
-    }
 }
 
 pub struct InventoryWindow;
@@ -226,7 +207,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         act(world, cell.slot, filled.stack.item, &matched);
     }
     if map::drag_started(world, InputAction::CarryItem, &response) {
-        egui::DragAndDrop::set_payload(ui.ctx(), CarriedSlot(cell.slot));
+        hud::carry(ui.ctx(), Carried::BagSlot(cell.slot));
     }
     let lines: Vec<String> = std::iter::once(card::overview(def))
         .chain(filled.notes.iter().cloned())
@@ -234,32 +215,6 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         .collect();
     let hint = StyledLine::new(hint_pieces(&filled.hints));
     hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
-}
-
-fn draw_carried(world: &mut World) {
-    let Some(gui) = gui::context(world) else {
-        return;
-    };
-    let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(&gui) else {
-        return;
-    };
-    let content = world.resource::<Content>().clone();
-    let Some(stack) = session::my_character(world)
-        .and_then(|me| me.get::<Inventory>())
-        .and_then(|inventory| inventory.slots.get(carried.0 as usize).copied())
-    else {
-        return;
-    };
-    let Some(image) = gui::image(world, &stack.item.get(&content).icon) else {
-        return;
-    };
-    gui::at_pointer(
-        &gui,
-        Id::new("carried item"),
-        Band::Pointer,
-        -Vec2::splat(CARRIED / 2.0),
-        |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
-    );
 }
 
 fn inventory_cells(world: &World) -> Vec<CellData> {

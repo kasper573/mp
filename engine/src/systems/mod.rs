@@ -362,7 +362,6 @@ pub fn client_app(
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,
             item::card::ItemCardPlugin,
-            item::widget::CarryPlugin,
             skill::client::SkillClientPlugin,
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,

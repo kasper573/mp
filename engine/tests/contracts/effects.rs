@@ -8,7 +8,7 @@ use engine::systems::class::{self, NodeKey};
 use engine::systems::equipment::{self, EquipmentSlot, UnequipRequest};
 use engine::systems::item::{Inventory, ItemId, UseItemRequest};
 use engine::systems::skill::{
-    self, AssignHotbarRequest, CastAim, Hotbar, HotbarEntry, Rank, UseSkillRequest,
+    self, AssignHotbarRequest, CastAim, Hotbar, HotbarEntry, HotbarSlot, Rank, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::status::{self, StatusCategory, Statuses};
@@ -213,7 +213,7 @@ fn a_passive_skill_holds_its_boost_while_known_and_cannot_be_cast_or_slotted() {
     sim.send(
         1,
         AssignHotbarRequest {
-            slot: 8,
+            slot: HotbarSlot(8),
             entry: HotbarEntry::Skill(row("Toughness")),
         },
     );
@@ -223,7 +223,7 @@ fn a_passive_skill_holds_its_boost_while_known_and_cannot_be_cast_or_slotted() {
         .get::<Hotbar>(player)
         .cloned()
         .unwrap_or_default();
-    assert_eq!(hotbar.entry(8), HotbarEntry::Empty);
+    assert_eq!(hotbar.entry(HotbarSlot(8)), HotbarEntry::Empty);
 
     skill::reset::reset(sim.world(), player);
     settle(&mut sim);

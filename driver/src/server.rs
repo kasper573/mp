@@ -16,7 +16,7 @@ use engine::systems::script::Place;
 
 use crate::content::to_json;
 
-// The game server binary, run natively on fake auth so any account signs in with roles of its choice.
+// The game server binary, run natively on fake auth, where an unsigned token names the account that signs in.
 pub struct Server {
     process: Child,
     binary: PathBuf,

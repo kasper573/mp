@@ -239,7 +239,9 @@ pub fn check_all(loading: &mut Loading) {
     }
 }
 
+/// Grants experience as kills do.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "class"))]
 pub struct GrantXp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

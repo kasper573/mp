@@ -18,6 +18,7 @@ use crate::systems::text::counted;
 /// Asks the player before forgetting every learned rank and returning the points. The answer
 /// picks the output, so whatever the reset costs is wired after it by the script.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "skill"))]
 pub struct ResetSkills {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

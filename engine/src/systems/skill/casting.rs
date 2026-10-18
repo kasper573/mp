@@ -44,6 +44,7 @@ pub enum CastAim {
 
 /// A script casts a skill as a player would: aimed, checked, walked into range and performed.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "skill"))]
 pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

@@ -52,6 +52,17 @@ pub enum ParamKind {
     Color,
 }
 
+impl ParamKind {
+    /// The value a parameter of the kind holds before anything fills it.
+    pub fn blank(self) -> ParamValue {
+        match self {
+            ParamKind::Number => ParamValue::Number(1.0),
+            ParamKind::Bool => ParamValue::Bool(false),
+            ParamKind::Color => ParamValue::Color(crate::core::math::Rgba::WHITE),
+        }
+    }
+}
+
 /// What a shader is drawn on, as the prelude's `site.kind` and `SITE_*` constants name it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, VariantArray, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]

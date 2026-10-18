@@ -40,7 +40,7 @@ use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
-use crate::systems::skill::{self, HotbarEntry, Rank, SkillId, bar::HotbarPress};
+use crate::systems::skill::{self, Rank, SkillId, bar::SlotReport};
 use crate::systems::stat::{StatKind, Stats};
 use crate::systems::status::{self, StatusCategory};
 
@@ -92,7 +92,7 @@ pub struct ProbeSnapshot {
     pub item_card: Option<ProbeItemCard>,
     pub bag: Vec<ProbeStack>,
     pub quests: ProbeQuests,
-    pub hotbar: Vec<ProbeSlot>,
+    pub hotbar: Vec<SlotReport>,
     pub statuses: Vec<ProbeStatus>,
     pub vfx: Vec<ProbeVfx>,
     pub basic_attack: Option<SkillId>,
@@ -292,17 +292,6 @@ pub struct ProbeStack {
 pub struct ProbeItemCard {
     pub item: ItemId,
     pub rect: Rect<WindowPx>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct ProbeSlot {
-    pub entry: HotbarEntry,
-    pub key: Option<String>,
-    pub cooling: bool,
-    pub blocked: bool,
-    pub dimmed: bool,
-    pub rebinding: bool,
-    pub pressed: Option<HotbarPress>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -623,18 +612,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             })
             .unwrap_or_default(),
         vfx: vfx_seen(world),
-        hotbar: skill::bar::report(world)
-            .into_iter()
-            .map(|slot| ProbeSlot {
-                entry: slot.entry,
-                key: slot.key,
-                cooling: slot.cooling,
-                blocked: slot.blocked,
-                dimmed: slot.dimmed,
-                rebinding: slot.rebinding,
-                pressed: slot.pressed,
-            })
-            .collect(),
+        hotbar: skill::bar::report(world),
         basic_attack: me
             .and_then(|me| world.get::<skill::BasicAttack>(me))
             .and_then(|slot| slot.0),

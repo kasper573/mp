@@ -21,14 +21,18 @@ const RING: Tiles = Tiles(1.5);
 const MAX_SPAWNED: u32 = 20;
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
 
+/// Hostile or friendly, until set again.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc"))]
 pub struct SetAttitude {
     pub attitude: Attitude,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
+/// Spawns a pack of npcs nearby.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc"))]
 pub struct SpawnNpcs {
     pub npc: NpcId,
     #[schemars(extend("x-count" = true))]
@@ -53,7 +57,9 @@ pub enum ShownFor {
     Everyone,
 }
 
+/// Removes an npc that spawn_npcs made.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc"))]
 pub struct Despawn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

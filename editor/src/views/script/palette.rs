@@ -15,7 +15,7 @@ pub struct NodePalette {
     search: String,
     frames: u32,
     cursor: usize,
-    unfolded: HashSet<&'static str>,
+    unfolded: HashSet<String>,
 }
 
 impl NodePalette {
@@ -25,28 +25,28 @@ impl NodePalette {
             search: String::new(),
             frames: 0,
             cursor: 0,
-            unfolded: HashSet::from(["flow"]),
+            unfolded: HashSet::from(["flow".to_owned()]),
         }
     }
 }
 
 const WIDTH: f32 = 292.0;
 
-enum Row {
+enum Row<'a> {
     Group {
-        system: &'static str,
+        system: &'a str,
         count: usize,
         kinds: Vec<String>,
     },
     Entry {
         kind: String,
-        system: &'static str,
+        system: &'a str,
         detail: String,
     },
 }
 
-struct Refused {
-    system: &'static str,
+struct Refused<'a> {
+    system: &'a str,
     count: usize,
     reason: String,
 }
@@ -114,7 +114,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     if up {
         palette.cursor = palette.cursor.saturating_sub(1);
     }
-    let mut toggle: Option<(&'static str, bool)> = None;
+    let mut toggle: Option<(&str, bool)> = None;
     match rows.get(palette.cursor) {
         Some(Row::Group { system, .. }) => {
             if right {
@@ -124,7 +124,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                 toggle = Some((system, false));
             }
             if enter {
-                toggle = Some((system, !palette.unfolded.contains(system)));
+                toggle = Some((system, !palette.unfolded.contains(*system)));
             }
         }
         Some(Row::Entry { kind, .. }) if enter => picked = Some(kind.clone()),
@@ -212,7 +212,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                                         system,
                                         *count,
                                         kinds,
-                                        palette.unfolded.contains(system),
+                                        palette.unfolded.contains(*system),
                                         selected,
                                     ),
                                     Row::Entry {
@@ -273,7 +273,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     if let Some(index) = clicked_row {
         match &rows[index] {
             Row::Group { system, .. } => {
-                toggle = Some((system, !palette.unfolded.contains(system)));
+                toggle = Some((system, !palette.unfolded.contains(*system)));
             }
             Row::Entry { kind, .. } => picked = Some(kind.clone()),
         }
@@ -281,7 +281,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     }
     if let Some((system, open)) = toggle {
         if open {
-            palette.unfolded.insert(system);
+            palette.unfolded.insert(system.to_owned());
         } else {
             palette.unfolded.remove(system);
         }
@@ -320,11 +320,11 @@ fn sorted<'a>(
     (fits, refused)
 }
 
-fn grouped(fits: &[&NodeEntry], unfolded: &HashSet<&'static str>) -> Vec<Row> {
-    let mut systems: Vec<&'static str> = Vec::new();
+fn grouped<'a>(fits: &[&'a NodeEntry], unfolded: &HashSet<String>) -> Vec<Row<'a>> {
+    let mut systems: Vec<&'a str> = Vec::new();
     for entry in fits {
-        if !systems.contains(&entry.system) {
-            systems.push(entry.system);
+        if !systems.contains(&entry.system.as_str()) {
+            systems.push(&entry.system);
         }
     }
     let mut rows = Vec::new();
@@ -343,7 +343,7 @@ fn grouped(fits: &[&NodeEntry], unfolded: &HashSet<&'static str>) -> Vec<Row> {
     rows
 }
 
-fn searched(fits: &[&NodeEntry], needle: &str) -> Vec<Row> {
+fn searched<'a>(fits: &[&'a NodeEntry], needle: &str) -> Vec<Row<'a>> {
     let mut scored: Vec<(u8, &&NodeEntry)> = fits
         .iter()
         .filter_map(|entry| {
@@ -371,7 +371,7 @@ fn searched(fits: &[&NodeEntry], needle: &str) -> Vec<Row> {
         .collect()
 }
 
-fn entry_of(entry: &NodeEntry) -> Row {
+fn entry_of(entry: &NodeEntry) -> Row<'_> {
     let fields: Vec<&str> = entry
         .fields
         .iter()
@@ -390,18 +390,18 @@ fn entry_of(entry: &NodeEntry) -> Row {
     }
     Row::Entry {
         kind: entry.kind.clone(),
-        system: entry.system,
+        system: &entry.system,
         detail,
     }
 }
 
-fn refused_groups(refused: &[(&NodeEntry, String)]) -> Vec<Refused> {
-    let mut groups: Vec<Refused> = Vec::new();
+fn refused_groups<'a>(refused: &[(&'a NodeEntry, String)]) -> Vec<Refused<'a>> {
+    let mut groups: Vec<Refused<'a>> = Vec::new();
     for (entry, reason) in refused {
         match groups.iter_mut().find(|group| group.system == entry.system) {
             Some(group) => group.count += 1,
             None => groups.push(Refused {
-                system: entry.system,
+                system: &entry.system,
                 count: 1,
                 reason: reason.clone(),
             }),

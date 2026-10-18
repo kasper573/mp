@@ -316,7 +316,9 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
     }
 }
 
+/// Walks to a random reachable spot.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc body"))]
 pub struct Wander {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leash: Option<Condition>,
@@ -325,7 +327,9 @@ pub struct Wander {
     pub next: Arrow,
 }
 
+/// Walks to a place, an object or an actor.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc body"))]
 pub struct WalkTo {
     pub to: WalkTarget,
     pub within: Condition,
@@ -346,7 +350,9 @@ pub enum WalkTarget {
     Actor(Condition),
 }
 
+/// Chases and swings at a target.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc body"))]
 pub struct Attack {
     pub target: Condition,
     pub within: Condition,
@@ -359,7 +365,9 @@ pub struct Attack {
     pub interrupted: Arrow,
 }
 
+/// Interrupts the body.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "npc body"))]
 pub struct Stop {
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -369,6 +377,7 @@ pub struct Stop {
 /// Turns an actor toward a place, an actor or a point: the owner when it is an actor such as an
 /// npc, else the subject, unless `who` names someone.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "actor"))]
 pub struct FaceToward {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

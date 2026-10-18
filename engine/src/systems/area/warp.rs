@@ -13,7 +13,9 @@ use crate::systems::reach;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{EffectCall, Fill, Place, Reach, RiftScripting};
 
+/// Moves an actor to a place, setting its spawn point.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "area"))]
 pub struct Warp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

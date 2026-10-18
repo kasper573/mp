@@ -11,8 +11,8 @@ use engine::systems::npc::{self, Pack};
 use engine::systems::reach;
 use engine::systems::skill::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, CastAim, Cooldowns, Hotbar,
-    HotbarEntry, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest, ResetPrompt, SkillId,
-    UseSkillRequest,
+    HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest, ResetPrompt,
+    SkillId, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 
@@ -85,14 +85,14 @@ fn a_slot_takes_only_what_you_have_and_keeps_it_when_it_goes() {
     sim.send(
         1,
         AssignHotbarRequest {
-            slot: 0,
+            slot: HotbarSlot(0),
             entry: skill_entry("Cleave"),
         },
     );
     sim.send(
         1,
         AssignHotbarRequest {
-            slot: 1,
+            slot: HotbarSlot(1),
             entry: HotbarEntry::Item(potion),
         },
     );
@@ -104,21 +104,21 @@ fn a_slot_takes_only_what_you_have_and_keeps_it_when_it_goes() {
     sim.send(
         1,
         AssignHotbarRequest {
-            slot: 0,
+            slot: HotbarSlot(0),
             entry: skill_entry("Slash"),
         },
     );
     sim.send(
         1,
         AssignHotbarRequest {
-            slot: 1,
+            slot: HotbarSlot(1),
             entry: HotbarEntry::Item(potion),
         },
     );
     settle(&mut sim);
     let bar = sim.world().get::<Hotbar>(player).expect("hotbar");
-    assert_eq!(bar.entry(0), skill_entry("Slash"));
-    assert_eq!(bar.entry(1), HotbarEntry::Item(potion));
+    assert_eq!(bar.entry(HotbarSlot(0)), skill_entry("Slash"));
+    assert_eq!(bar.entry(HotbarSlot(1)), HotbarEntry::Item(potion));
 
     sim.send(
         1,
@@ -129,7 +129,9 @@ fn a_slot_takes_only_what_you_have_and_keeps_it_when_it_goes() {
     settle(&mut sim);
     let world = sim.world();
     assert_eq!(
-        world.get::<Hotbar>(player).map(|bar| bar.entry(0)),
+        world
+            .get::<Hotbar>(player)
+            .map(|bar| bar.entry(HotbarSlot(0))),
         Some(skill_entry("Slash"))
     );
     assert_eq!(world.get::<BasicAttack>(player), Some(&BasicAttack(None)));
@@ -412,7 +414,7 @@ fn a_filled_hotbar_and_its_requests_survive_the_wire() {
     let bytes = postcard::to_allocvec(&bar).expect("serializes");
     assert_eq!(postcard::from_bytes::<Hotbar>(&bytes).expect("reads"), bar);
     let request = AssignHotbarRequest {
-        slot: 2,
+        slot: HotbarSlot(2),
         entry: HotbarEntry::Item(row("HealthPotion")),
     };
     let bytes = postcard::to_allocvec(&request).expect("serializes");

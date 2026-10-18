@@ -15,6 +15,7 @@ use crate::core::text::{MotionPreference, TypewriterSpeed};
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{InputAction, KeyGesture};
 use crate::systems::interface::InterfaceIcon;
+use crate::systems::skill::HotbarSlot;
 
 const WINDOW_SIZE: egui::Vec2 = egui::Vec2::new(400.0, 410.0);
 const SLIDER_WIDTH: f32 = 150.0;
@@ -65,6 +66,14 @@ impl HotbarShape {
     pub(crate) fn slots(self) -> u32 {
         self.columns * self.rows
     }
+}
+
+/// What key a hotbar slot answers to: the game's own for the slot, none, or one the player chose.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HotbarKey {
+    Default,
+    Unbound,
+    Custom(KeyGesture),
 }
 
 pub struct SettingsWindow;
@@ -290,13 +299,20 @@ impl UserSettings {
         self.ui.hotbar.shape = Some(shape);
     }
 
-    /// `None` when the slot keeps the game's default key, `Some(None)` when its key was taken away.
-    pub(crate) fn hotbar_key(&self, slot: u32) -> Option<Option<KeyGesture>> {
-        self.ui.hotbar.keys.get(&slot).copied()
+    pub(crate) fn hotbar_key(&self, slot: HotbarSlot) -> HotbarKey {
+        match self.ui.hotbar.keys.get(&slot) {
+            None => HotbarKey::Default,
+            Some(None) => HotbarKey::Unbound,
+            Some(Some(gesture)) => HotbarKey::Custom(*gesture),
+        }
     }
 
-    pub(crate) fn set_hotbar_key(&mut self, slot: u32, key: Option<KeyGesture>) {
-        self.ui.hotbar.keys.insert(slot, key);
+    pub(crate) fn set_hotbar_key(&mut self, slot: HotbarSlot, key: HotbarKey) {
+        match key {
+            HotbarKey::Default => self.ui.hotbar.keys.remove(&slot),
+            HotbarKey::Unbound => self.ui.hotbar.keys.insert(slot, None),
+            HotbarKey::Custom(gesture) => self.ui.hotbar.keys.insert(slot, Some(gesture)),
+        };
     }
 
     fn load(platform: &dyn Platform) -> UserSettings {
@@ -362,7 +378,8 @@ struct HotbarSettings {
     #[serde(default)]
     shape: Option<HotbarShape>,
     #[serde(default)]
-    keys: BTreeMap<u32, Option<KeyGesture>>,
+    /// A slot absent keeps the game's key; one listed with no gesture has none.
+    keys: BTreeMap<HotbarSlot, Option<KeyGesture>>,
 }
 
 fn default_snap() -> Option<WindowPx> {

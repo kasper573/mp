@@ -819,25 +819,9 @@ pub fn with_row_form(
     let Some(root) = editor.row_value(table, key) else {
         return false;
     };
-    let mut actions = Vec::new();
-    let changed = {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let Some(project) = project.as_ref() else {
-            return false;
-        };
-        let mut cx =
-            FormCx::new(project, &root, shapes, form, &mut actions).owned_by(table, Some(key));
-        show(&mut cx)
-    };
-    for action in actions {
-        act(editor, action, table, key);
-    }
-    changed
+    editor
+        .with_form(table, Some(key), &root, show)
+        .unwrap_or(false)
 }
 
 pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {

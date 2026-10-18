@@ -1,71 +1,65 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color, widgets};
-use egui::{Color32, Pos2, Rect, Response, RichText, Ui, Vec2};
+use egui::{Color32, Rect, Response, RichText, Ui};
 
 use crate::core::content::Content;
-use crate::core::gui::{self, Band, GuiContext};
+use crate::core::gui::Band;
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook, TextPiece, TextVoice};
-use crate::systems::hud::{self, Sizing, WindowFrame};
+use crate::systems::hud::{self, Carried};
 use crate::systems::input::map::{self, InputAction, input};
-use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
-use crate::systems::skill::{self, window::CarriedSkill};
+use crate::systems::skill;
 use crate::systems::stat::StatKind;
 use crate::systems::status;
 
 const WINDOW_KEY: &str = "Item";
-const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 360.0);
-const WINDOW_TOP: f32 = 96.0;
-const WINDOW_MARGIN: f32 = 72.0;
 const ICON: f32 = 48.0;
+const GRANT_ICON: f32 = 24.0;
 
 pub struct ItemCardPlugin;
 
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ItemCard>()
-            .add_systems(Update, bring_to_front.run_if(in_state(ClientScreen::Area)))
+        app.init_resource::<hud::Pinned<ItemId>>()
+            .add_systems(
+                Update,
+                hud::raise_pinned::<ItemId>(WINDOW_KEY).run_if(in_state(ClientScreen::Area)),
+            )
             .add_systems(
                 EguiPrimaryContextPass,
                 draw_card
                     .in_set(Band::Hud)
                     .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(ClientScreen::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), hud::forget_pinned::<ItemId>);
     }
 }
 
 pub fn open(world: &mut World, item: ItemId) {
-    let mut card = world.resource_mut::<ItemCard>();
-    let was_shown = card.wanted.replace(item);
-    card.to_front = true;
-    if was_shown.is_none() {
-        InterfaceSound::UiOpen.play(world);
-    }
+    hud::pin(world, item);
 }
 
 pub fn close(world: &mut World) -> bool {
-    let closed = world.resource_mut::<ItemCard>().wanted.take().is_some();
-    if closed {
-        InterfaceSound::UiClose.play(world);
-    }
-    closed
+    hud::unpin::<ItemId>(world)
 }
 
 pub fn showing(world: &World) -> bool {
-    world.resource::<ItemCard>().wanted.is_some()
+    hud::pinned::<ItemId>(world).is_some()
 }
 
 pub fn layer() -> egui::LayerId {
-    crate::systems::hud::window_layer(WINDOW_KEY)
+    hud::window_layer(WINDOW_KEY)
 }
 
 pub fn shown(world: &World) -> Option<(ItemId, Rect)> {
-    world.resource::<ItemCard>().drawn
+    Some((
+        hud::pinned::<ItemId>(world)?,
+        hud::pinned_rect::<ItemId>(world)?,
+    ))
 }
 
 /// `response` must sense clicks.
@@ -152,7 +146,9 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
     grants(ui, world, item);
 }
 
-const GRANT_ICON: f32 = 24.0;
+fn draw_card(world: &mut World) {
+    hud::draw_pinned::<ItemId>(world, WINDOW_KEY, |ui, world, item| sheet(ui, world, *item));
+}
 
 fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
     let content = world.resource::<Content>().clone();
@@ -185,7 +181,7 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
             .response
             .interact(egui::Sense::click_and_drag());
         if map::drag_started(world, InputAction::CarryItem, &response) {
-            egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(granted));
+            hud::carry(ui.ctx(), Carried::Skill(granted));
         } else if map::clicked(world, InputAction::PinToHotbar, &response) {
             skill::bar::pin(world, skill::HotbarEntry::Skill(granted));
         }
@@ -209,68 +205,6 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
             .size(TextRole::Small.size())
             .color(color::FAINT),
         );
-    }
-}
-
-#[derive(Resource, Default)]
-struct ItemCard {
-    wanted: Option<ItemId>,
-    to_front: bool,
-    drawn: Option<(ItemId, Rect)>,
-}
-
-fn forget(mut card: ResMut<ItemCard>) {
-    *card = ItemCard::default();
-}
-
-// A press brings the area it lands on to the front as its pass ends, and areas brought to the front
-// in the same pass keep their order. So the card comes to the front a pass after it was asked for,
-// to end up above the window it was asked for from.
-fn bring_to_front(mut card: ResMut<ItemCard>, gui: Option<Res<GuiContext>>) {
-    if !card.to_front {
-        return;
-    }
-    card.to_front = false;
-    if let Some(gui) = gui
-        && card.wanted.is_some()
-    {
-        gui.0.move_to_top(layer());
-    }
-}
-
-fn draw_card(world: &mut World) {
-    let Some(item) = world.resource::<ItemCard>().wanted else {
-        world.resource_mut::<ItemCard>().drawn = None;
-        return;
-    };
-    let Some(gui) = gui::context(world) else {
-        return;
-    };
-    let screen = gui.content_rect();
-    let start = Rect::from_min_size(
-        Pos2::new(
-            (screen.right() - WINDOW_SIZE.x - WINDOW_MARGIN).max(8.0),
-            screen.top() + WINDOW_TOP,
-        ),
-        WINDOW_SIZE,
-    );
-    let mut open = true;
-    let frame = WindowFrame {
-        key: WINDOW_KEY,
-        title: None,
-        start,
-        sizing: Sizing::FitsContent,
-        body_limit: None,
-    };
-    let shown = hud::window(world, &gui, frame, &mut open, |ui, world| {
-        egui::ScrollArea::vertical()
-            .max_height(WINDOW_SIZE.y)
-            .auto_shrink([false, true])
-            .show(ui, |ui| sheet(ui, world, item));
-    });
-    world.resource_mut::<ItemCard>().drawn = Some((item, shown.response.rect));
-    if !open {
-        close(world);
     }
 }
 

@@ -1,99 +1,34 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
+use design_tokens::paint;
 use egui::{Color32, CursorIcon, Key, Modifiers, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
-use engine::systems::class::{BackdropFit, NODE_EXTENT};
-use serde::Deserialize;
+use engine::core::content::Content;
+use engine::systems::class::{
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NodeKey, SkillNode, SkillTree,
+    TreeBackdrop,
+};
+use engine::systems::skill::Rank;
 use serde_json::{Map, Value, json};
+use strum::VariantArray;
 
 use super::{TABLE, node_of, select_node, write};
 use crate::app::Editor;
-use crate::forms::FormCx;
-use crate::project::{ProjectFiles, row_file};
 use crate::ui::assets::AssetKind;
-use crate::ui::{inspector, theme, widgets};
-use crate::{picker, thumbs};
+use crate::ui::{theme, widgets};
+use crate::value::{self, RowValue};
+use crate::{picker, rows, thumbs};
 
 pub const NODE_RADIUS: f32 = 24.0;
 const ICON: f32 = 28.0;
 const GRID: f32 = 20.0;
 const MARGIN: f32 = 80.0;
-const ARROW_HEAD: f32 = 7.0;
 const GHOST_OFFSET: Vec2 = Vec2::new(-150.0, -40.0);
-const FIRST_SPOT: Point = Point { x: 80.0, y: 60.0 };
+const FIRST_SPOT: CanvasPoint = CanvasPoint { x: 80.0, y: 60.0 };
 const SPOT_STEP: Vec2 = Vec2::new(80.0, 140.0);
 const SPOTS_PER_ROW: u32 = 8;
 const HANDLE: f32 = 10.0;
 const FRAME_AROUND_NODES: f32 = 40.0;
 const DEFAULT_FRAME: Rect = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(800.0, 600.0));
-const FITS: [(BackdropFit, &str); 3] = [
-    (BackdropFit::Contain, "contain"),
-    (BackdropFit::Cover, "cover"),
-    (BackdropFit::Stretch, "stretch"),
-];
-
-/// A node of a class tree as the canvas reads it from the row.
-#[derive(Clone, Deserialize)]
-pub struct Node {
-    pub skill: String,
-    #[serde(default)]
-    pub requires: Vec<Requirement>,
-    pub at: Point,
-}
-
-#[derive(Clone, Copy, Deserialize, Default, PartialEq, Debug)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Requirement {
-    Skill {
-        node: String,
-        #[serde(default = "first_rank")]
-        rank: u8,
-    },
-    Level {
-        level: u32,
-    },
-    Condition {
-        #[serde(default)]
-        condition: Value,
-    },
-}
-
-pub type Nodes = BTreeMap<String, Node>;
-
-/// The art behind the tree as the canvas reads it from the row.
-#[derive(Clone, Deserialize)]
-pub struct Backdrop {
-    pub image: String,
-    pub frame: Frame,
-    #[serde(default)]
-    pub fit: BackdropFit,
-}
-
-#[derive(Clone, Copy, Deserialize, PartialEq, Debug)]
-pub struct Frame {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-}
-
-impl Frame {
-    fn rect(self) -> Rect {
-        Rect::from_min_size(
-            Pos2::new(self.x, self.y),
-            Vec2::new(self.width, self.height),
-        )
-    }
-
-    fn json(rect: Rect) -> Value {
-        json!({ "x": rect.min.x, "y": rect.min.y, "width": rect.width(), "height": rect.height() })
-    }
-}
 
 /// The backdrop's frame taken hold of, by a corner or its middle, until it is let go of.
 pub struct FrameDrag {
@@ -109,97 +44,70 @@ enum FrameGrip {
     Corner(usize),
 }
 
-pub fn backdrop_of(row: &Value) -> Option<Backdrop> {
-    serde_json::from_value(row["backdrop"].clone()).ok()
-}
-
 /// A node picked up off the canvas, drawn under the pointer until it is let go of.
 pub struct NodeDrag {
-    pub node: String,
+    pub node: NodeKey,
     offset: Vec2,
-    at: Point,
+    at: CanvasPoint,
 }
 
 /// The payload of a node drag, which the node inspector takes as a skill requirement.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CarriedNode(pub String);
+pub struct CarriedNode(pub NodeKey);
 
-pub fn nodes_of(row: &Value) -> Nodes {
-    row["tree"]
-        .as_object()
-        .into_iter()
-        .flatten()
-        .filter_map(|(key, node)| {
-            serde_json::from_value(node.clone())
-                .ok()
-                .map(|node| (key.clone(), node))
-        })
-        .collect()
-}
-
-/// Whether making `node` require `named` would close a loop: `named` already needs `node`.
-pub fn would_cycle(nodes: &Nodes, node: &str, named: &str) -> bool {
-    let mut stack = vec![named.to_owned()];
-    let mut seen = BTreeSet::new();
-    while let Some(key) = stack.pop() {
-        if key == node {
-            return true;
-        }
-        let Some(next) = nodes.get(&key) else {
-            continue;
-        };
-        for requirement in &next.requires {
-            if let Requirement::Skill { node: further, .. } = requirement
-                && seen.insert(further.clone())
-            {
-                stack.push(further.clone());
-            }
-        }
-    }
-    false
-}
-
-pub fn skill_ranks(files: &ProjectFiles, skill: &str) -> u8 {
-    files
-        .json(&row_file("skill", skill))
-        .and_then(|row| row["levels"].as_array().map(Vec::len))
-        .unwrap_or(1)
-        .max(1) as u8
-}
-
-pub fn skill_cost(files: &ProjectFiles, skill: &str) -> u32 {
-    files
-        .json(&row_file("skill", skill))
-        .and_then(|row| {
-            row["levels"].as_array().map(|levels| {
-                levels
-                    .iter()
-                    .map(|level| level["cost"].as_u64().unwrap_or(0) as u32)
-                    .sum()
+/// The row's tree as far as it parses against the content last loaded, node by node, so a node
+/// being worked on leaves the others on the canvas.
+pub fn tree_of(content: &Content, row: &Value) -> SkillTree {
+    SkillTree(
+        row["tree"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter_map(|(key, node)| {
+                let node: SkillNode = value::typed(content, node.clone())?;
+                Some((NodeKey::from(key.as_str()), node))
             })
-        })
-        .unwrap_or(0)
+            .collect(),
+    )
 }
 
-pub fn granted_points(row: &Value) -> u32 {
-    row["levels"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|level| level["skill_points"].as_u64().unwrap_or(0) as u32)
-        .sum()
+pub fn backdrop_of(content: &Content, row: &Value) -> Option<TreeBackdrop> {
+    value::typed(content, row["backdrop"].clone())
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(mut row) = editor.row_value(TABLE, key) else {
         return;
     };
-    let nodes = nodes_of(&row);
+    let Some(content) = editor.loaded() else {
+        ui.label(theme::muted("waiting for the content to load"));
+        return;
+    };
+    let tree = tree_of(&content, &row);
+    let backdrop = backdrop_of(&content, &row);
     let mut changed: Option<&str> = None;
-    toolbar(editor, ui, key, &mut row, &nodes, &mut changed);
+    toolbar(editor, ui, key, &content, &mut row, &tree, &mut changed);
+    backdrop_bar(
+        editor,
+        ui,
+        key,
+        &mut row,
+        &tree,
+        backdrop.as_ref(),
+        &mut changed,
+    );
     ui.add_space(4.0);
     if changed.is_none() {
-        canvas(editor, ui, key, &mut row, &nodes, &mut changed);
+        canvas(
+            editor,
+            ui,
+            key,
+            &content,
+            &mut row,
+            &tree,
+            backdrop.as_ref(),
+            &mut changed,
+        );
     }
     if let Some(label) = changed {
         write(editor, key, label, &row);
@@ -217,7 +125,7 @@ pub fn remove_node(row: &mut Value, node: &str) {
                 !(requirement["type"] == "skill" && requirement["node"] == node)
             });
             if requires.is_empty() {
-                other.as_object_mut().expect("object").remove("requires");
+                other.remove_field("requires");
             }
         }
     }
@@ -227,25 +135,29 @@ fn toolbar(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
+    content: &Content,
     row: &mut Value,
-    nodes: &Nodes,
+    tree: &SkillTree,
     changed: &mut Option<&'static str>,
 ) {
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(TABLE);
-    let mut actions = Vec::new();
-    let mut snap = editor.views.class.snaps();
+    let mut snap = editor.views.class.snap;
     let mut picked = String::new();
-    {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let project = project.as_ref().expect("a project");
-        let mut cx =
-            FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
+    let granted: u32 =
+        value::typed::<Vec<engine::systems::class::ClassLevel>>(content, row["levels"].clone())
+            .unwrap_or_default()
+            .iter()
+            .map(|level| level.skill_points.0)
+            .sum();
+    let cost: u32 = tree
+        .0
+        .values()
+        .map(|node| {
+            let def = node.skill.get(content);
+            def.cost_to(Rank(def.rank_count())).0
+        })
+        .sum();
+    editor.with_form(TABLE, Some(key), shapes.shape_of(TABLE), |cx| {
         ui.horizontal(|ui| {
             ui.checkbox(&mut snap, "snap to grid")
                 .on_hover_text("A dragged node lands on the grid under the pointer");
@@ -253,14 +165,9 @@ fn toolbar(
             ui.label(theme::muted("add node").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(220.0);
-                picker::row(ui, &mut cx, "skill", &mut picked, "/tree/new/skill");
+                picker::row(ui, cx, "skill", &mut picked, "/tree/new/skill");
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let granted = granted_points(row);
-                let cost: u32 = nodes
-                    .values()
-                    .map(|node| skill_cost(cx.files, &node.skill))
-                    .sum();
                 let line = format!(
                     "levels grant {granted} point{} · the tree costs {cost}",
                     widgets::plural(granted)
@@ -277,21 +184,18 @@ fn toolbar(
                 }
             });
         });
-    }
-    editor.views.class.snap = Some(snap);
-    backdrop_bar(editor, ui, key, row, nodes, changed);
+    });
+    editor.views.class.snap = snap;
     if !picked.is_empty() {
-        let node = fresh_key(nodes, &picked);
-        let at = free_spot(nodes);
+        let taken = tree.0.keys().map(|key| key.0.clone()).collect();
+        let node = rows::free_name(&picked, &taken);
+        let at = free_spot(tree);
         if !row["tree"].is_object() {
             row["tree"] = Value::Object(Map::new());
         }
-        row["tree"][&node] = serde_json::json!({ "skill": picked, "at": { "x": at.x, "y": at.y } });
+        row["tree"][&node] = json!({ "skill": picked, "at": point_json(at) });
         *changed = Some("Add node");
         select_node(editor, key, Some(&node));
-    }
-    for action in actions {
-        inspector::act(editor, action, TABLE, key);
     }
 }
 
@@ -300,44 +204,28 @@ fn backdrop_bar(
     ui: &mut Ui,
     key: &str,
     row: &mut Value,
-    nodes: &Nodes,
+    tree: &SkillTree,
+    backdrop: Option<&TreeBackdrop>,
     changed: &mut Option<&'static str>,
 ) {
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(TABLE);
-    let mut actions = Vec::new();
-    let backdrop = backdrop_of(row);
-    let mut image = backdrop
-        .as_ref()
-        .map(|backdrop| backdrop.image.clone())
-        .unwrap_or_default();
-    let mut fit = backdrop
-        .as_ref()
-        .map_or(BackdropFit::Contain, |backdrop| backdrop.fit);
+    let mut image = backdrop.map_or(String::new(), |backdrop| backdrop.image.as_str().to_owned());
+    let mut fit = backdrop.map_or(BackdropFit::Contain, |backdrop| backdrop.fit);
     let mut framed = false;
     let mut removed = false;
-    {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let project = project.as_ref().expect("a project");
-        let mut cx =
-            FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
+    editor.with_form(TABLE, Some(key), shapes.shape_of(TABLE), |cx| {
         ui.horizontal(|ui| {
             ui.label(theme::muted("backdrop").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(260.0);
-                picker::asset_of(ui, &mut cx, &[AssetKind::Image], &mut image, "/backdrop/image");
+                picker::asset_of(ui, cx, &[AssetKind::Image], &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
                 design_tokens::widgets::combo_box(ui.id().with("backdrop-fit"))
-                    .selected_text(fit_label(fit))
+                    .selected_text(<&str>::from(fit))
                     .show_ui(ui, |ui| {
-                        for (option, label) in FITS {
-                            ui.selectable_value(&mut fit, option, label);
+                        for &option in BackdropFit::VARIANTS {
+                            ui.selectable_value(&mut fit, option, <&str>::from(option));
                         }
                     })
                     .response
@@ -349,72 +237,57 @@ fn backdrop_bar(
                 removed = ui.button("remove").clicked();
             }
         });
-    }
-    for action in actions {
-        inspector::act(editor, action, TABLE, key);
-    }
-    match &backdrop {
+    });
+    match backdrop {
         None if !image.is_empty() => {
             row["backdrop"] = json!({
                 "image": image,
-                "frame": Frame::json(nodes_frame(nodes)),
-                "fit": "contain",
+                "frame": frame_json(nodes_frame(tree)),
+                "fit": <&str>::from(BackdropFit::Contain),
             });
             *changed = Some("Add backdrop");
         }
         Some(_) if removed => {
-            row.as_object_mut().expect("object").remove("backdrop");
+            row.remove_field("backdrop");
             *changed = Some("Remove backdrop");
         }
-        Some(backdrop) if image != backdrop.image => {
+        Some(backdrop) if image != backdrop.image.as_str() => {
             row["backdrop"]["image"] = Value::String(image);
             *changed = Some("Change backdrop image");
         }
         Some(backdrop) if fit != backdrop.fit => {
-            row["backdrop"]["fit"] = Value::String(fit_label(fit).to_owned());
+            row["backdrop"]["fit"] = Value::String(<&str>::from(fit).to_owned());
             *changed = Some("Change backdrop fit");
         }
         Some(_) if framed => {
-            row["backdrop"]["frame"] = Frame::json(nodes_frame(nodes));
+            row["backdrop"]["frame"] = frame_json(nodes_frame(tree));
             *changed = Some("Frame the nodes");
         }
         _ => {}
     }
 }
 
-fn fit_label(fit: BackdropFit) -> &'static str {
-    FITS.iter()
-        .find(|(option, _)| *option == fit)
-        .map_or("contain", |(_, label)| label)
+fn nodes_frame(tree: &SkillTree) -> Rect {
+    tree.bounds()
+        .map_or(DEFAULT_FRAME, |nodes| nodes.expand(FRAME_AROUND_NODES))
 }
 
-fn nodes_frame(nodes: &Nodes) -> Rect {
-    nodes
-        .values()
-        .map(|node| {
-            Rect::from_center_size(
-                Pos2::new(node.at.x, node.at.y),
-                Vec2::splat(NODE_EXTENT * 2.0),
-            )
-        })
-        .reduce(|all, next| all.union(next))
-        .map_or(DEFAULT_FRAME, |rect| rect.expand(FRAME_AROUND_NODES))
-}
-
+#[expect(clippy::too_many_arguments)]
 fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
+    content: &Content,
     row: &mut Value,
-    nodes: &Nodes,
+    tree: &SkillTree,
+    backdrop: Option<&TreeBackdrop>,
     changed: &mut Option<&'static str>,
 ) {
     let selected = node_of(&editor.selection)
         .filter(|_| editor.selection.keys.first().is_some_and(|k| k == key))
-        .map(str::to_owned);
-    let snap = editor.views.class.snaps();
-    let backdrop = backdrop_of(row);
-    let saved_frame = backdrop.as_ref().map(|backdrop| backdrop.frame.rect());
+        .map(NodeKey::from);
+    let snap = editor.views.class.snap;
+    let saved_frame = backdrop.map(|backdrop| backdrop.frame.rect());
     // The canvas keeps the extent of the saved frame while one is dragged, so what is under
     // the pointer stays put until it is let go of.
     let frame = editor
@@ -424,7 +297,8 @@ fn canvas(
         .as_ref()
         .map(|drag| drag.now)
         .or(saved_frame);
-    let (low, high) = nodes
+    let (low, high) = tree
+        .0
         .values()
         .map(|node| Vec2::new(node.at.x, node.at.y))
         .chain(
@@ -436,9 +310,9 @@ fn canvas(
             (low.min(at), high.max(at))
         });
     let wanted = high - low + Vec2::splat(MARGIN * 2.0);
-    let mut released: Option<(String, Point)> = None;
-    let mut clicked: Option<Option<String>> = None;
-    let mut removed: Option<String> = None;
+    let mut released: Option<(NodeKey, CanvasPoint)> = None;
+    let mut clicked: Option<Option<NodeKey>> = None;
+    let mut removed: Option<NodeKey> = None;
     let mut started: Option<NodeDrag> = None;
     let mut frame_started: Option<FrameDrag> = None;
     let mut frame_released: Option<Rect> = None;
@@ -451,19 +325,12 @@ fn canvas(
             let (rect, background) = ui.allocate_exact_size(size, Sense::click());
             hovering_canvas = ui.rect_contains_pointer(rect);
             let origin = rect.min + Vec2::splat(MARGIN) - low;
-            let to_screen = |at: Point| origin + Vec2::new(at.x, at.y);
+            let to_screen = |at: CanvasPoint| origin + Vec2::new(at.x, at.y);
             let painter = ui.painter_at(rect);
             painter.rect_filled(rect, 0.0, theme::CANVAS);
-            if let (Some(backdrop), Some(frame)) = (&backdrop, frame) {
+            if let (Some(backdrop), Some(frame)) = (backdrop, frame) {
                 let on_screen = frame.translate(origin.to_vec2());
-                let files = editor.project.as_ref().map(|project| &project.files);
-                let image = files.and_then(|files| {
-                    editor
-                        .form
-                        .thumbnails
-                        .image(ui.ctx(), files, &backdrop.image)
-                });
-                if let Some(image) = image {
+                if let Some(image) = editor.thumb(ui.ctx(), backdrop.image.as_str()) {
                     let drawn = backdrop.fit.place(
                         on_screen,
                         Vec2::new(image.size[0] as f32, image.size[1] as f32),
@@ -502,34 +369,42 @@ fn canvas(
             if background.clicked() {
                 clicked = Some(None);
             }
-            let dragging = editor.views.class.drag.as_ref();
-            let placed = |node: &str| -> Option<Point> {
-                match dragging {
-                    Some(drag) if drag.node == node => Some(drag.at),
-                    _ => nodes.get(node).map(|node| node.at),
+            let lifted = editor
+                .views
+                .class
+                .drag
+                .as_ref()
+                .map(|drag| (drag.node.clone(), drag.at));
+            let placed = |node: &NodeKey| -> Option<CanvasPoint> {
+                match &lifted {
+                    Some((dragged, at)) if dragged == node => Some(*at),
+                    _ => tree.node(node).map(|node| node.at),
                 }
             };
-            let cycles = cycles(nodes);
-            for (to, node) in nodes {
-                for (index, requirement) in node.requires.iter().enumerate() {
-                    let Requirement::Skill { node: from, .. } = requirement else {
-                        continue;
-                    };
-                    let head = to_screen(placed(to).unwrap_or(node.at));
+            let cycles = tree.cycles();
+            for (to, node) in &tree.0 {
+                let head = to_screen(placed(to).unwrap_or(node.at));
+                let required = node
+                    .requires
+                    .iter()
+                    .filter_map(|requirement| match requirement {
+                        AccessRequirement::Skill { node, .. } => Some(node),
+                        _ => None,
+                    });
+                for (index, from) in required.enumerate() {
                     match placed(from) {
                         Some(at) => {
-                            let on_cycle =
-                                cycles.contains(to.as_str()) && cycles.contains(from.as_str());
+                            let on_cycle = cycles.contains(to) && cycles.contains(from);
                             let color = if on_cycle {
                                 theme::DANGER
                             } else {
                                 theme::MUTED
                             };
-                            arrow(&painter, to_screen(at), head, color, false);
+                            node_arrow(&painter, to_screen(at), head, color, false);
                         }
                         None => {
                             let ghost = head + GHOST_OFFSET + Vec2::new(0.0, index as f32 * 30.0);
-                            dashed_circle(
+                            paint::dashed_circle(
                                 &painter,
                                 ghost,
                                 NODE_RADIUS * 0.6,
@@ -542,21 +417,22 @@ fn canvas(
                                 egui::FontId::monospace(10.5),
                                 theme::DANGER,
                             );
-                            arrow(&painter, ghost, head, theme::DANGER, true);
+                            node_arrow(&painter, ghost, head, theme::DANGER, true);
                         }
                     }
                 }
             }
-            let overlapping: BTreeSet<&str> = nodes
+            let overlapping: BTreeSet<&NodeKey> = tree
+                .0
                 .iter()
-                .flat_map(|(a, node)| {
-                    nodes.iter().filter_map(move |(b, other)| {
-                        (a != b && overlaps(node.at, other.at)).then_some(a.as_str())
-                    })
+                .filter(|(a, node)| {
+                    tree.0
+                        .iter()
+                        .any(|(b, other)| a != &b && node.at.overlaps(other.at))
                 })
+                .map(|(key, _)| key)
                 .collect();
-            let files = editor.project.as_ref().map(|project| &project.files);
-            for (node_key, node) in nodes {
+            for (node_key, node) in &tree.0 {
                 let at = placed(node_key).unwrap_or(node.at);
                 let center = to_screen(at);
                 let node_rect = Rect::from_center_size(center, Vec2::splat(NODE_RADIUS * 2.0));
@@ -566,29 +442,20 @@ fn canvas(
                     Sense::click_and_drag(),
                 );
                 let look = NodeLook {
-                    selected: selected.as_deref() == Some(node_key),
+                    selected: selected.as_ref() == Some(node_key),
                     hovered: response.hovered(),
-                    overlapping: overlapping.contains(node_key.as_str()),
-                    lifted: dragging.is_some_and(|drag| drag.node == *node_key),
+                    overlapping: overlapping.contains(node_key),
+                    lifted: lifted
+                        .as_ref()
+                        .is_some_and(|(dragged, _)| dragged == node_key),
                 };
-                let icon = files.and_then(|files| {
-                    let skill = files.json(&row_file("skill", &node.skill))?;
-                    let path = skill["icon"].as_str()?.to_owned();
-                    let mut budget = u32::MAX;
-                    editor
-                        .form
-                        .thumbnails
-                        .icon(ui.ctx(), files, &path, &mut budget)
-                });
+                let skill = node.skill.get(content);
+                let icon = editor.thumb_icon(ui.ctx(), skill.icon.as_str());
                 draw_node(&painter, center, look, icon.as_ref());
-                let name = files
-                    .and_then(|files| files.json(&row_file("skill", &node.skill)))
-                    .and_then(|skill| skill["name"].as_str().map(str::to_owned))
-                    .unwrap_or_else(|| node.skill.clone());
                 painter.text(
                     center + Vec2::new(0.0, NODE_RADIUS + 4.0),
                     egui::Align2::CENTER_TOP,
-                    &name,
+                    &skill.name,
                     egui::FontId::proportional(11.5),
                     if look.selected {
                         theme::TEXT
@@ -597,7 +464,7 @@ fn canvas(
                     },
                 );
                 if look.lifted && snap {
-                    dashed_circle(
+                    paint::dashed_circle(
                         &painter,
                         to_screen(snapped(at)),
                         NODE_RADIUS,
@@ -605,12 +472,19 @@ fn canvas(
                     );
                 }
                 let response = response.on_hover_ui(|ui| {
-                    ui.label(theme::strong(&name));
+                    ui.label(theme::strong(&skill.name));
                     ui.label(
-                        theme::muted(format!("node {node_key} · skill/{}", node.skill)).size(12.0),
+                        theme::muted(format!(
+                            "node {node_key} · skill/{}",
+                            node.skill.key(content)
+                        ))
+                        .size(12.0),
                     );
                     for requirement in &node.requires {
-                        ui.label(theme::muted(describe(requirement, nodes, files)).size(12.0));
+                        ui.label(
+                            theme::muted(format!("needs {}", requirement.describe(content, tree)))
+                                .size(12.0),
+                        );
                     }
                     ui.label(
                         theme::faint("drag to move · drop on the inspector's list to require it")
@@ -642,7 +516,7 @@ fn canvas(
                     ui.input(|input| (input.pointer.latest_pos(), input.pointer.any_released()));
                 if let Some(at) = pointer.0 {
                     let canvas_at = at - drag.offset - origin.to_vec2();
-                    drag.at = Point {
+                    drag.at = CanvasPoint {
                         x: canvas_at.x.max(0.0),
                         y: canvas_at.y.max(0.0),
                     };
@@ -667,26 +541,25 @@ fn canvas(
         editor.views.class.frame_drag = None;
     }
     if let Some(now) = frame_released
-        && backdrop
-            .as_ref()
-            .is_some_and(|backdrop| backdrop.frame.rect() != now)
+        && backdrop.is_some_and(|backdrop| backdrop.frame.rect() != now)
     {
-        row["backdrop"]["frame"] = Frame::json(now);
+        row["backdrop"]["frame"] = frame_json(now);
         *changed = Some("Reframe backdrop");
     }
     if let Some((node, at)) = released {
-        let blocked = nodes
+        let blocked = tree
+            .0
             .iter()
-            .any(|(other, placed)| *other != node && overlaps(at, placed.at));
+            .any(|(other, placed)| *other != node && at.overlaps(placed.at));
         if blocked {
             editor.toast("Nodes can't overlap");
-        } else if nodes.get(&node).is_some_and(|node| node.at != at) {
-            row["tree"][&node]["at"] = serde_json::json!({ "x": at.x, "y": at.y });
+        } else if tree.node(&node).is_some_and(|node| node.at != at) {
+            row["tree"][node.as_str()]["at"] = point_json(at);
             *changed = Some("Move node");
         }
     }
     if let Some(node) = clicked {
-        select_node(editor, key, node.as_deref());
+        select_node(editor, key, node.as_ref().map(NodeKey::as_str));
     }
     if hovering_canvas
         && let Some(node) = selected.clone()
@@ -695,7 +568,7 @@ fn canvas(
         removed = Some(node);
     }
     if let Some(node) = removed {
-        remove_node(row, &node);
+        remove_node(row, node.as_str());
         *changed = Some("Remove node");
         select_node(editor, key, None);
     }
@@ -720,7 +593,7 @@ fn frame_handles(
     origin: Pos2,
     held: Option<FrameGrip>,
     started: &mut Option<FrameDrag>,
-    clicked: &mut Option<Option<String>>,
+    clicked: &mut Option<Option<NodeKey>>,
 ) {
     let on_screen = frame.translate(origin.to_vec2());
     let color = if held.is_some() {
@@ -833,42 +706,20 @@ fn draw_node(
     }
 }
 
-fn describe(requirement: &Requirement, nodes: &Nodes, files: Option<&ProjectFiles>) -> String {
-    match requirement {
-        Requirement::Skill { node, rank } => {
-            let name = nodes
-                .get(node)
-                .and_then(|node| files?.json(&row_file("skill", &node.skill)))
-                .and_then(|skill| skill["name"].as_str().map(str::to_owned))
-                .unwrap_or_else(|| node.clone());
-            format!("needs {name} rank {rank}")
-        }
-        Requirement::Level { level } => format!("needs level {level}"),
-        Requirement::Condition { .. } => "needs a condition".to_owned(),
+/// An arrow between two node centres, trimmed to clear the circles.
+fn node_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32, dashed: bool) {
+    let span = to - from;
+    if span.length() <= NODE_RADIUS * 2.0 {
+        return;
     }
-}
-
-fn cycles(nodes: &Nodes) -> BTreeSet<&str> {
-    let mut on_cycle = BTreeSet::new();
-    for start in nodes.keys() {
-        let mut stack = vec![start.as_str()];
-        let mut seen = BTreeSet::new();
-        while let Some(key) = stack.pop() {
-            let Some(node) = nodes.get(key) else {
-                continue;
-            };
-            for requirement in &node.requires {
-                if let Requirement::Skill { node: next, .. } = requirement {
-                    if next == start {
-                        on_cycle.insert(start.as_str());
-                    } else if seen.insert(next.as_str()) {
-                        stack.push(next.as_str());
-                    }
-                }
-            }
-        }
-    }
-    on_cycle
+    let dir = span.normalized();
+    paint::arrow(
+        painter,
+        from + dir * (NODE_RADIUS + 4.0),
+        to - dir * (NODE_RADIUS + 6.0),
+        Stroke::new(2.0, color),
+        dashed,
+    );
 }
 
 fn dragged_frame(drag: &FrameDrag, pointer: Pos2) -> Rect {
@@ -899,35 +750,35 @@ fn snapped_rect(rect: Rect) -> Rect {
     Rect::from_min_max(min, max.max(min + Vec2::splat(GRID)))
 }
 
-fn overlaps(a: Point, b: Point) -> bool {
-    (a.x - b.x).abs() < NODE_EXTENT && (a.y - b.y).abs() < NODE_EXTENT
-}
-
-fn snapped(at: Point) -> Point {
-    Point {
+fn snapped(at: CanvasPoint) -> CanvasPoint {
+    CanvasPoint {
         x: (at.x / GRID).round() * GRID,
         y: (at.y / GRID).round() * GRID,
     }
 }
 
-fn free_spot(nodes: &Nodes) -> Point {
+fn free_spot(tree: &SkillTree) -> CanvasPoint {
     (0..)
-        .map(|index| Point {
+        .map(|index| CanvasPoint {
             x: FIRST_SPOT.x + (index % SPOTS_PER_ROW) as f32 * SPOT_STEP.x,
             y: FIRST_SPOT.y + (index / SPOTS_PER_ROW) as f32 * SPOT_STEP.y,
         })
-        .find(|spot| !nodes.values().any(|node| overlaps(*spot, node.at)))
+        .find(|spot| !tree.0.values().any(|node| spot.overlaps(node.at)))
         .unwrap_or(FIRST_SPOT)
 }
 
-fn fresh_key(nodes: &Nodes, skill: &str) -> String {
-    if !nodes.contains_key(skill) {
-        return skill.to_owned();
-    }
-    (2..)
-        .map(|n| format!("{skill}_{n}"))
-        .find(|key| !nodes.contains_key(key))
-        .expect("an unused key")
+fn point_json(at: CanvasPoint) -> Value {
+    value::json(&at).unwrap_or_default()
+}
+
+fn frame_json(rect: Rect) -> Value {
+    value::json(&CanvasRect {
+        x: rect.min.x,
+        y: rect.min.y,
+        width: rect.width(),
+        height: rect.height(),
+    })
+    .unwrap_or_default()
 }
 
 fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {
@@ -941,46 +792,4 @@ fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {
         }
         x += GRID;
     }
-}
-
-fn arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32, dashed: bool) {
-    let delta = to - from;
-    let length = delta.length();
-    if length <= NODE_RADIUS * 2.0 {
-        return;
-    }
-    let dir = delta / length;
-    let start = from + dir * (NODE_RADIUS + 4.0);
-    let end = to - dir * (NODE_RADIUS + 6.0);
-    let stroke = Stroke::new(2.0, color);
-    if dashed {
-        painter.add(egui::Shape::dashed_line(&[start, end], stroke, 6.0, 4.0));
-    } else {
-        painter.line_segment([start, end], stroke);
-    }
-    let side = Vec2::new(-dir.y, dir.x);
-    let tip = end + dir * ARROW_HEAD;
-    painter.add(egui::Shape::convex_polygon(
-        vec![
-            tip,
-            end - dir * 2.0 + side * ARROW_HEAD * 0.6,
-            end - dir * 2.0 - side * ARROW_HEAD * 0.6,
-        ],
-        color,
-        Stroke::NONE,
-    ));
-}
-
-fn dashed_circle(painter: &egui::Painter, center: Pos2, radius: f32, stroke: Stroke) {
-    let points: Vec<Pos2> = (0..=48)
-        .map(|step| {
-            let angle = std::f32::consts::TAU * step as f32 / 48.0;
-            center + Vec2::new(angle.cos(), angle.sin()) * radius
-        })
-        .collect();
-    painter.add(egui::Shape::dashed_line(&points, stroke, 4.0, 3.0));
-}
-
-fn first_rank() -> u8 {
-    1
 }

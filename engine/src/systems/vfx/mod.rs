@@ -82,6 +82,7 @@ pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstanc
 /// the screen of each character named.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-system" = "vfx"))]
 pub struct PlayVfx {
     pub vfx: VfxId,
     #[serde(default, skip_serializing_if = "Option::is_none")]

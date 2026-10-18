@@ -1,7 +1,9 @@
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::{BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, Learned, SkillId, SkillKind};
+use super::{
+    BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, SkillId, SkillKind,
+};
 use crate::core::content::Content;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::HistoryTopic;
@@ -11,7 +13,7 @@ use crate::systems::player::player_requests;
 
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct AssignHotbarRequest {
-    pub slot: u32,
+    pub slot: HotbarSlot,
     pub entry: HotbarEntry,
 }
 
@@ -33,11 +35,11 @@ pub fn requests(world: &mut World) {
 pub fn assign(
     world: &mut World,
     player: Entity,
-    slot: u32,
+    slot: HotbarSlot,
     entry: HotbarEntry,
 ) -> Result<(), String> {
     let content = world.resource::<Content>().clone();
-    if slot >= HOTBAR_SLOTS {
+    if slot.0 >= HOTBAR_SLOTS {
         return Err("No such slot".to_owned());
     }
     match entry {

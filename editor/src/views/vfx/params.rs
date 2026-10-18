@@ -43,11 +43,7 @@ impl From<&VfxParam> for ParamSpec {
         ParamSpec {
             name: param.name.clone(),
             kind: param.kind,
-            default: match param.kind {
-                ParamKind::Bool => ParamValue::Bool(false),
-                ParamKind::Number => ParamValue::Number(1.0),
-                ParamKind::Color => ParamValue::Color(Rgba::WHITE),
-            },
+            default: param.kind.blank(),
             range: None,
         }
     }

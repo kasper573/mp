@@ -19,12 +19,23 @@ pub const TREE_PART: &str = "/tree/";
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
 
-#[derive(Default)]
 pub struct ClassViews {
     pub pages: HashMap<String, ClassPage>,
-    pub snap: Option<bool>,
+    /// Whether a dragged node or frame lands on the grid.
+    pub snap: bool,
     pub drag: Option<tree::NodeDrag>,
     pub frame_drag: Option<tree::FrameDrag>,
+}
+
+impl Default for ClassViews {
+    fn default() -> ClassViews {
+        ClassViews {
+            pages: HashMap::new(),
+            snap: true,
+            drag: None,
+            frame_drag: None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
@@ -37,10 +48,6 @@ pub enum ClassPage {
 impl ClassViews {
     pub fn page(&self, key: &str) -> ClassPage {
         self.pages.get(key).copied().unwrap_or_default()
-    }
-
-    pub fn snaps(&self) -> bool {
-        self.snap.unwrap_or(true)
     }
 }
 

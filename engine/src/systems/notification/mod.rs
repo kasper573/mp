@@ -371,7 +371,9 @@ impl From<&NotificationDefKind> for NotificationKind {
     }
 }
 
+/// Shows a notification.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

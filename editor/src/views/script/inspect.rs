@@ -803,7 +803,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         (
             nodes::ports(&node, catalogue),
             ins,
-            entry.map_or("", |e| e.blurb),
+            entry.map_or(String::new(), |e| e.blurb.clone()),
         )
     };
     let mut draft = node.clone();
@@ -904,7 +904,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                 node: &node,
                 kind: &kind,
                 ins: &ins,
-                blurb,
+                blurb: &blurb,
             },
         );
     }

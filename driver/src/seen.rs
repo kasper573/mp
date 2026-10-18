@@ -405,7 +405,6 @@ pub fn status_on_me(snapshot: &ProbeSnapshot, effect: &str) -> bool {
         .any(|status| status.effect == effect)
 }
 
-// Every instance of the vfx row in view.
 /// Every instance of a vfx the client saw start lately, over or not: what a wait for a cast to land
 /// looks for, since a short vfx may come and go between two frames of a slow client.
 pub fn played<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> {

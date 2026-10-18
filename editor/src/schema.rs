@@ -393,6 +393,15 @@ pub fn required(schema: &Value) -> Vec<&str> {
         .unwrap_or_default()
 }
 
+pub fn description(schema: &Value) -> Option<&str> {
+    schema.get("description")?.as_str()
+}
+
+/// The game system a node belongs to, as its definition declares it.
+pub fn system_of(schema: &Value) -> Option<&str> {
+    schema.get("x-system")?.as_str()
+}
+
 pub fn marker(schema: &Value) -> Option<&str> {
     schema
         .as_object()?

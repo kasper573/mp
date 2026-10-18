@@ -8,8 +8,8 @@ use crate::systems::input::map::InputAction;
 use crate::systems::item::widget::{SlotAction, slot_action};
 use crate::systems::screen::ClientScreen;
 
-/// The client's side of skills: the tree window's plan, the hotbar's keys and drags, aiming, the
-/// pinned card and the reset prompt.
+/// The client's side of skills: the tree window's plan, the hotbar's keys and drops, aiming, the
+/// pinned card and the reset question.
 pub struct SkillClientPlugin;
 
 impl Plugin for SkillClientPlugin {
@@ -28,6 +28,7 @@ impl Plugin for SkillClientPlugin {
                     window::settle_plan,
                     aim::settle,
                     aim::surface,
+                    prompt::ask,
                 )
                     .run_if(in_state(ClientScreen::Area)),
             )
@@ -35,10 +36,7 @@ impl Plugin for SkillClientPlugin {
                 EguiPrimaryContextPass,
                 (
                     aim::draw_aim.in_set(Band::World),
-                    prompt::draw_prompt.in_set(Band::Modal),
-                    (bar::drop_off_bar, bar::draw_carried)
-                        .chain()
-                        .in_set(Band::Pointer),
+                    bar::drop_off_bar.in_set(Band::Pointer),
                 )
                     .run_if(in_state(ClientScreen::Area)),
             )

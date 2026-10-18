@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use egui::{Id, LayerId, Pos2, Rect, RichText, Sense, Stroke, Ui, UiBuilder, Vec2};
 
-use super::{HudDrawn, WindowsDrawn};
+use super::WindowsDrawn;
 use crate::core::gui::{self, Band};
 use crate::core::math::{Pos, Size};
 use crate::systems::settings::{Placement, UserSettings};
@@ -46,7 +46,6 @@ pub(crate) fn widget<R>(
         &shown.response,
         Held::new(key, Kept::Spot, Grip::Move, rect, None),
     );
-    world.resource_mut::<HudDrawn>().0.push(rect);
     world
         .resource_mut::<gui::WidgetRects>()
         .0
@@ -120,7 +119,10 @@ pub(crate) fn window<R>(
         );
     }
     world.resource_mut::<WindowsDrawn>().now.insert(key);
-    world.resource_mut::<HudDrawn>().0.push(outer);
+    world
+        .resource_mut::<gui::WidgetRects>()
+        .0
+        .insert(key.to_owned(), outer);
     egui::InnerResponse::new(inner, shown.response)
 }
 

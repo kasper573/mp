@@ -16,8 +16,8 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest, open,
-    passed_by, portal, taken, townsperson,
+    UiTarget, aiming, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest,
+    open, passed_by, portal, taken, townsperson,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -516,6 +516,71 @@ impl Player {
 
     // Chases the nearest of `foes` and swings at whichever of them the click lands on, until `done`:
     // monsters crowd, and the one in front takes the click.
+    /// Arms the skill in the slot and points at the tile, ready to cast.
+    pub fn aim_skill(&mut self, slot: InputAction, at: Pos<Tiles>) {
+        self.act(slot);
+        self.wait_until("the skill armed", aiming);
+        self.point_at_tile(at);
+    }
+
+    /// Casts the aimed skill where the pointer rests, until `done` shows the cast landed.
+    pub fn cast(&mut self, done: impl Fn(&ProbeSnapshot) -> bool) {
+        self.click();
+        self.wait_until("the cast landed", done);
+    }
+
+    pub fn cast_at(
+        &mut self,
+        slot: InputAction,
+        at: Pos<Tiles>,
+        done: impl Fn(&ProbeSnapshot) -> bool,
+    ) {
+        self.aim_skill(slot, at);
+        self.cast(done);
+    }
+
+    /// Casts the skill in the slot on the actor `pick` names, clicking only once the pointer rests
+    /// on that actor, since it may wander while the pointer glides; a click that still misses arms
+    /// the skill again.
+    pub fn cast_on(
+        &mut self,
+        slot: InputAction,
+        pick: impl Fn(&ProbeSnapshot) -> Option<(Entity, Pos<Tiles>)>,
+        done: impl Fn(&ProbeSnapshot) -> bool,
+    ) {
+        let deadline = Deadline::from(&self.desktop, LONG);
+        loop {
+            let seen = self.snapshot();
+            if done(&seen) {
+                return;
+            }
+            if deadline.passed(&self.desktop) {
+                self.desktop.give_up("the cast on its target");
+            }
+            if !aiming(&seen) {
+                self.act(slot);
+                self.wait_until("the skill armed", aiming);
+            }
+            let Some((target, at)) = pick(&seen) else {
+                continue;
+            };
+            let Some(point) = clickable_point(&seen, at) else {
+                continue;
+            };
+            let pointed = self.point_at(point);
+            if !matches!(pointed.claim, ClickClaim::Aim(aimed) if aimed == target) {
+                continue;
+            }
+            self.click();
+            if self
+                .try_wait_for(BUDGET, |snapshot| done(snapshot).then_some(()))
+                .is_some()
+            {
+                return;
+            }
+        }
+    }
+
     pub fn fight(
         &mut self,
         foes: impl Fn(&ProbeSnapshot, &ProbeBody) -> bool,

@@ -1,20 +1,22 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, color};
+use design_tokens::color;
 use egui::load::SizedTexture;
-use egui::{Color32, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
+use egui::{Color32, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use super::{StatusCategory, StatusInstance, Statuses};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::time::UnixMillis;
+use crate::systems::hud;
 use crate::systems::player::session;
+use crate::systems::text::duration;
 
 const ICON: f32 = 24.0;
 const GAP: f32 = 4.0;
 
 /// The statuses on the character as rows of icons hanging below the character panel, as wide as
-/// the panel, a buff ringed green and a debuff red, each with a card of what it is and how long it
-/// has left.
+/// the panel, a buff ringed green and a debuff red, each with a tooltip of what it is and how long
+/// it has left.
 pub fn grid(ui: &mut Ui, world: &mut World) {
     let Some(me) = session::my_character(world) else {
         return;
@@ -45,7 +47,18 @@ pub fn grid(ui: &mut Ui, world: &mut World) {
             response.widget_info(|| {
                 egui::WidgetInfo::labeled(egui::WidgetType::Label, true, label.clone())
             });
-            response.on_hover_ui(|ui| card(ui, def, status, now));
+            let lines: Vec<String> = [
+                Some(format!(
+                    "{} · {}",
+                    def.category.label(),
+                    time_left(status, now)
+                )),
+                (!def.description.is_empty()).then(|| def.description.clone()),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            hud::tooltip(&response, world, &def.name, &lines, None);
         }
     });
 }
@@ -59,38 +72,8 @@ pub fn ring(category: StatusCategory) -> Color32 {
 
 pub fn time_left(status: &StatusInstance, now: Option<UnixMillis>) -> String {
     match (status.until, now) {
-        (Some(until), Some(now)) if until > now => {
-            let left = until.since(now).0;
-            if left >= 60.0 {
-                format!("{:.0} min left", (left / 60.0).ceil())
-            } else {
-                format!("{:.0} s left", left.ceil())
-            }
-        }
+        (Some(until), Some(now)) if until > now => format!("{} left", duration(until.since(now))),
         (Some(_), _) => "Ending".to_owned(),
         (None, _) => "Until removed".to_owned(),
     }
-}
-
-fn card(
-    ui: &mut Ui,
-    def: &super::StatusEffectDef,
-    status: &StatusInstance,
-    now: Option<UnixMillis>,
-) {
-    ui.set_max_width(220.0);
-    ui.label(RichText::new(&def.name).font(TextRole::Heading.font_id()));
-    ui.label(
-        RichText::new(def.category.label())
-            .size(TextRole::Small.size())
-            .color(ring(def.category)),
-    );
-    if !def.description.is_empty() {
-        ui.label(RichText::new(&def.description).size(TextRole::Prose.size()));
-    }
-    ui.label(
-        RichText::new(time_left(status, now))
-            .size(TextRole::Small.size())
-            .color(color::MUTED),
-    );
 }

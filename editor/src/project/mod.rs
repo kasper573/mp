@@ -393,7 +393,7 @@ impl Project {
         };
         let label = step.label.clone();
         let changes = step.before.clone();
-        self.restore(&changes)?;
+        self.restore(&changes);
         self.history.undone();
         Ok(Some(AppliedStep { viewpoint, label }))
     }
@@ -408,7 +408,7 @@ impl Project {
         };
         let label = step.label.clone();
         let changes = step.after.clone();
-        self.restore(&changes)?;
+        self.restore(&changes);
         self.history.redone();
         Ok(Some(AppliedStep { viewpoint, label }))
     }
@@ -430,10 +430,9 @@ impl Project {
         Ok(last)
     }
 
-    fn restore(&mut self, changes: &[FileChange]) -> Result<(), Box<EditRefusal>> {
+    fn restore(&mut self, changes: &[FileChange]) {
         let next = self.files.with(changes);
         self.adopt(next);
-        Ok(())
     }
 
     pub fn check(&self, edit: &ContentEdit) -> Result<(), Box<EditRefusal>> {
@@ -541,12 +540,7 @@ impl Project {
             }
         }
         if !taken.is_empty() {
-            self.history.reset();
-            self.reload();
-            self.outside_rewrote = match self.report {
-                Some(_) => taken.len(),
-                None => 0,
-            };
+            self.reload_after_outside(taken.len());
         }
         OutsideChanges { taken, conflicts }
     }
@@ -556,12 +550,15 @@ impl Project {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
             None => self.files.remove(&conflict.file),
         }
+        self.reload_after_outside(1);
+    }
+
+    /// Files rewritten from outside start the history over and are loaded again; if that load
+    /// fails, the count says how many files the failure came in with.
+    fn reload_after_outside(&mut self, rewrote: usize) {
         self.history.reset();
         self.reload();
-        self.outside_rewrote = match self.report {
-            Some(_) => 1,
-            None => 0,
-        };
+        self.outside_rewrote = if self.report.is_some() { rewrote } else { 0 };
     }
 }
 

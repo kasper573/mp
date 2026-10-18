@@ -9,7 +9,9 @@ use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
 use crate::systems::stat;
 
+/// Restores health up to the maximum.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "stat"))]
 pub struct Heal {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -31,7 +33,9 @@ pub enum Fully {
     Full,
 }
 
+/// Takes health, credited to an npc owner.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "stat"))]
 pub struct Damage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

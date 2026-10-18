@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use design_tokens::{TextRole, color};
-use egui::{Color32, FontId, Pos2, Stroke, Vec2};
+use egui::{Color32, FontId, Rect, Stroke, Vec2};
 
 use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};
@@ -44,13 +44,7 @@ pub fn arm(world: &mut World, skill: SkillId, rank: Rank) {
 pub fn cast_at_pointer(world: &mut World, skill: SkillId) -> bool {
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
-    let aim = render::cursor_tile(world).and_then(|tile| match def.target {
-        Targeting::SingleAlly | Targeting::SingleEnemy => {
-            actor_at(world, tile, def.target).map(CastAim::Actor)
-        }
-        Targeting::AreaAlly | Targeting::AreaEnemy => Some(CastAim::Point(tile)),
-        Targeting::Caster => None,
-    });
+    let aim = render::cursor_tile(world).and_then(|tile| aim_at(world, tile, def.target));
     match aim {
         Some(aim) => {
             world.write_message(UseSkillRequest { skill, aim });
@@ -139,16 +133,15 @@ impl Gesture for AimGesture {
             return None;
         }
         let tile = tile?;
-        let content = world.resource::<Content>().clone();
-        let targeting = aimed.skill.get(&content).target;
-        match targeting {
-            Targeting::SingleAlly | Targeting::SingleEnemy => Some(
-                actor_at(world, tile, targeting)
-                    .map_or(ClickClaim::AimAt(tile.snap()), ClickClaim::Aim),
-            ),
-            Targeting::AreaAlly | Targeting::AreaEnemy => Some(ClickClaim::AimAt(tile)),
-            Targeting::Caster => None,
+        let targeting = aimed.skill.get(world.resource::<Content>()).target;
+        if targeting == Targeting::Caster {
+            return None;
         }
+        Some(match aim_at(world, tile, targeting) {
+            Some(CastAim::Actor(target)) => ClickClaim::Aim(target),
+            Some(CastAim::Point(point)) => ClickClaim::AimAt(point),
+            Some(CastAim::None) | None => ClickClaim::AimAt(tile.snap()),
+        })
     }
 
     fn drive(&self, world: &mut World, claim: Option<ClickClaim>, start: bool) {
@@ -209,35 +202,55 @@ pub fn draw_aim(world: &mut World) {
     let Some(from) = movement::position(world, me) else {
         return;
     };
-    let area = gui::world_area(world, "aim preview");
     let range = super::range_of(world, me, aimed.skill, aimed.rank);
-    let mut lines: Vec<(Vec<Pos2>, Color32, f32)> = Vec::new();
     let reach = Footprint::cast(Shape::Circle { radius: range }, from, from);
-    if let Some(ring) = project(world, &reach.outline()) {
-        lines.push((ring, color::WARN.gamma_multiply(0.35), 1.0));
-    }
-    let label = def
+    let ring: Option<Vec<egui::Pos2>> = reach
+        .outline()
+        .iter()
+        .map(|point| render::tile_to_window(world, *point).map(|at| egui::Pos2::new(at.x, at.y)))
+        .collect();
+    let hint = def
         .target
         .aimed_at_actor()
         .then(|| format!("{}: click a target · Esc cancels", def.name));
     let screen = gui.content_rect();
+    let area = gui::world_area(world, "aim preview");
     area.fixed_pos(screen.min).show(&gui, |ui| {
         let painter = ui.painter();
-        for (points, color, width) in lines {
-            painter.add(egui::Shape::closed_line(points, Stroke::new(width, color)));
+        if let Some(ring) = ring {
+            painter.add(egui::Shape::closed_line(
+                ring,
+                Stroke::new(1.0, color::WARN.gamma_multiply(0.35)),
+            ));
         }
-        let Some(label) = label else {
+        let Some(hint) = hint else {
             return;
         };
         let at = gui
             .pointer_latest_pos()
             .map_or(screen.center(), |at| at + Vec2::new(16.0, 18.0));
         let font = FontId::proportional(TextRole::Small.size());
-        let galley = painter.layout_no_wrap(label, font, color::TEXT);
-        let rect = egui::Rect::from_min_size(at, galley.size() + Vec2::new(10.0, 6.0));
+        let galley = painter.layout_no_wrap(hint, font, color::TEXT);
+        let rect = Rect::from_min_size(at, galley.size() + Vec2::new(10.0, 6.0));
         painter.rect_filled(rect, 4.0, Color32::from_black_alpha(180));
         painter.galley(rect.min + Vec2::new(5.0, 3.0), galley, color::TEXT);
     });
+}
+
+/// What a skill of the targeting cast at a tile lands on: the fitting actor there, the point
+/// itself for an area, or nothing fitting.
+fn aim_at(world: &mut World, tile: Pos<Tiles>, targeting: Targeting) -> Option<CastAim> {
+    match targeting {
+        Targeting::SingleAlly | Targeting::SingleEnemy => {
+            let me = session::me(world)?;
+            actor::frontmost_at(world, tile, None, |world, entity| {
+                world.get::<Actor>(entity).is_some() && casting::fits(world, me, entity, targeting)
+            })
+            .map(CastAim::Actor)
+        }
+        Targeting::AreaAlly | Targeting::AreaEnemy => Some(CastAim::Point(tile)),
+        Targeting::Caster => None,
+    }
 }
 
 fn clear_surface(world: &mut World) {
@@ -257,18 +270,4 @@ fn aimed_area(world: &mut World, aimed: Aimed) -> Option<(Footprint, bool)> {
     let from = movement::position(world, me)?;
     let point = render::cursor_tile(world)?;
     Some((Footprint::cast(shape, from, point), def.target.hostile()))
-}
-
-fn actor_at(world: &mut World, point: Pos<Tiles>, targeting: Targeting) -> Option<Entity> {
-    let me = session::me(world)?;
-    actor::frontmost_at(world, point, None, |world, entity| {
-        world.get::<Actor>(entity).is_some() && casting::fits(world, me, entity, targeting)
-    })
-}
-
-fn project(world: &mut World, points: &[Pos<Tiles>]) -> Option<Vec<Pos2>> {
-    points
-        .iter()
-        .map(|point| render::tile_to_window(world, *point).map(|at| Pos2::new(at.x, at.y)))
-        .collect()
 }

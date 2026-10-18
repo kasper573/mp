@@ -11,8 +11,9 @@ mod seen;
 mod server;
 
 pub use content::{
-    area_named, beside_object, beside_resident, content, from_json, ground_near, hunting_ground,
-    id, marker_at, object_at, open_ground_beside, pack_ground, resident_home, to_json,
+    area_named, beside_object, beside_resident, content, east_of, from_json, ground_near,
+    hunting_ground, id, marker_at, object_at, open_ground_beside, pack_ground, resident_home,
+    to_json,
 };
 pub use desktop::{BUDGET, WaitBudget};
 pub use player::{LONG, Pace, Player, reading};

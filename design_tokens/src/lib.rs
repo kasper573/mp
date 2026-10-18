@@ -1,3 +1,4 @@
+pub mod paint;
 pub mod widgets;
 
 use egui::epaint::Shadow;

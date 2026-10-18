@@ -14,7 +14,7 @@ use crate::project::{ProjectFiles, row_of};
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
 use crate::value::RowValue;
-use crate::{condition, spans};
+use crate::{condition, rows, spans};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
 #[strum(serialize_all = "snake_case")]
@@ -218,8 +218,8 @@ pub struct NodePort {
 #[derive(Clone, Debug)]
 pub struct NodeEntry {
     pub kind: String,
-    pub system: &'static str,
-    pub blurb: &'static str,
+    pub system: String,
+    pub blurb: String,
     pub owners: Vec<OwnerKind>,
     pub outputs: Vec<String>,
     pub fields: Vec<(String, Option<String>)>,
@@ -231,8 +231,8 @@ impl NodeEntry {
         (self.kind == FlowKind::On.name()) != linking
     }
 
-    pub fn badge(&self) -> &'static str {
-        match self.system {
+    pub fn badge(&self) -> &str {
+        match self.system.as_str() {
             "flow" | "dialogue" => "script",
             "memory" => "quest",
             "area" => "object",
@@ -284,8 +284,8 @@ impl NodeCatalogue {
             .iter()
             .map(|&kind| NodeEntry {
                 kind: kind.name().to_owned(),
-                system: kind.system(),
-                blurb: kind.blurb(),
+                system: kind.system().to_owned(),
+                blurb: kind.blurb().to_owned(),
                 owners: Vec::new(),
                 outputs: kind.arrows().iter().map(|&s| s.to_owned()).collect(),
                 fields: Vec::new(),
@@ -321,14 +321,14 @@ impl NodeCatalogue {
                 Some(Node::Effect(effect)) => (effect.owners().to_vec(), effect.pauses()),
                 _ => (Vec::new(), false),
             };
-            let (system, blurb) = EFFECT_BLURBS
-                .iter()
-                .find(|(kind, _, _)| *kind == variant.tag)
-                .map_or(("other", ""), |(_, system, blurb)| (*system, *blurb));
             entries.push(NodeEntry {
                 kind: variant.tag.clone(),
-                system,
-                blurb,
+                system: schema::system_of(variant.schema)
+                    .unwrap_or("other")
+                    .to_owned(),
+                blurb: schema::description(variant.schema)
+                    .map(first_sentence)
+                    .unwrap_or_default(),
                 owners,
                 outputs,
                 fields,
@@ -557,18 +557,8 @@ pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
     let base = base
         .trim()
         .replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_");
-    let base = if base.is_empty() {
-        "node".to_owned()
-    } else {
-        base
-    };
-    if !nodes.contains_key(&base) {
-        return base;
-    }
-    (2..)
-        .map(|n| format!("{base}_{n}"))
-        .find(|name| !nodes.contains_key(name))
-        .expect("a free suffix")
+    let base = if base.is_empty() { "node" } else { &base };
+    rows::free_name(base, &nodes.keys().cloned().collect())
 }
 
 pub fn template(root: &Value, kind: &str) -> Option<Value> {
@@ -955,111 +945,11 @@ impl NodeReads {
     }
 }
 
-const EFFECT_BLURBS: [(&str, &str, &str); 39] = [
-    (
-        "warp",
-        "area",
-        "Moves an actor to a place, setting its spawn point",
-    ),
-    ("heal", "stat", "Restores health up to the maximum"),
-    ("damage", "stat", "Takes health, credited to an npc owner"),
-    (
-        "apply_status",
-        "status",
-        "Puts a status on actors, at a power, for a time or until removed",
-    ),
-    (
-        "remove_status",
-        "status",
-        "Takes a status off actors: one effect, a category or all",
-    ),
-    (
-        "boost",
-        "status",
-        "Holds a stat modifier while this status, item or passive skill is active",
-    ),
-    (
-        "items",
-        "item",
-        "Takes and gives items in one exchange, all or nothing",
-    ),
-    ("use_item", "item", "Uses an item as the player would"),
-    ("equip", "item", "Puts an item on, swapping with the slot"),
-    ("unequip", "item", "Takes an item or slot off"),
-    (
-        "drop_items",
-        "item",
-        "Drops items to the ground at their feet",
-    ),
-    (
-        "spawn_ground_items",
-        "item",
-        "Scatters items as loot at a place or actor",
-    ),
-    (
-        "clear_ground_items",
-        "item",
-        "Removes ground items in range",
-    ),
-    ("move_items", "item", "Moves items from one bag to another"),
-    ("grant_xp", "class", "Grants experience as kills do"),
-    ("remember", "memory", "Sets a memory, timed now"),
-    ("forget", "memory", "Sets memories back to zero"),
-    ("offer_quest", "quest", "Shows the offer card and pauses"),
-    ("accept_quest", "quest", "Takes the quest at once"),
-    ("turn_in", "quest", "Shows the turn-in card and pauses"),
-    ("fail_quest", "quest", "Fails an active quest"),
-    ("complete_task", "quest", "Completes a task objective"),
-    ("decide", "quest", "Decides a quest's path"),
-    ("open_shop", "shop", "Opens the shop until it closes"),
-    ("notify", "notification", "Shows a notification"),
-    (
-        "say",
-        "chat",
-        "A chat line and a speech bubble from the owner",
-    ),
-    ("wander", "npc body", "Walks to a random reachable spot"),
-    (
-        "walk_to",
-        "npc body",
-        "Walks to a place, an object or an actor",
-    ),
-    ("attack", "npc body", "Chases and swings at a target"),
-    ("stop", "npc body", "Interrupts the body"),
-    ("face", "actor", "Turns an actor toward something"),
-    (
-        "animate",
-        "actor",
-        "Plays a model action, waiting for its apex or end when asked",
-    ),
-    (
-        "use_skill",
-        "skill",
-        "Casts a skill as a player would, aimed at an actor or a point",
-    ),
-    (
-        "reset_skills",
-        "skill",
-        "Asks, then forgets every learned rank and returns the points",
-    ),
-    (
-        "vfx",
-        "vfx",
-        "Plays a vfx row on each actor, a point or an area named, along a path through the actors, or on a player's screen or widget",
-    ),
-    (
-        "set_attitude",
-        "npc",
-        "Hostile or friendly, until set again",
-    ),
-    ("spawn_npcs", "npc", "Spawns a pack of npcs nearby"),
-    ("despawn", "npc", "Removes an npc that spawn_npcs made"),
-    (
-        "play_sound",
-        "audio",
-        "Plays a sound at the owner or the subject",
-    ),
-];
+/// A description's opening sentence, without its full stop: what a palette row says.
+fn first_sentence(text: &str) -> String {
+    let first = text.split_once(". ").map_or(text, |(first, _)| first);
+    first.trim_end_matches('.').to_owned()
+}
 
 pub fn arrow_meaning(kind: &str, label: &str) -> &'static str {
     match (kind, label) {

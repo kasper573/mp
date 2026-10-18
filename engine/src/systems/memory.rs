@@ -132,7 +132,9 @@ pub fn forget(world: &mut World, player: Entity, key: MemoryId) {
     }
 }
 
+/// Sets a memory, timed now.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "memory"))]
 pub struct Remember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -143,7 +145,9 @@ pub struct Remember {
     pub next: Arrow,
 }
 
+/// Sets memories back to zero.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "memory"))]
 pub struct Forget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

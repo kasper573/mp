@@ -483,8 +483,10 @@ fn confirm_abandon(world: &mut World, quest: QuestId) {
             body,
             confirm: "Abandon quest".to_owned(),
             cancel: "Keep quest".to_owned(),
-            on_confirm: Box::new(move |world| {
-                world.write_message(QuestRequest::Abandon { quest });
+            answer: Box::new(move |world, abandoned| {
+                if abandoned {
+                    world.write_message(QuestRequest::Abandon { quest });
+                }
             }),
         },
     );

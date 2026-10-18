@@ -43,7 +43,6 @@ enum Dismissal {
     Window(&'static str),
     ItemCard,
     SkillCard,
-    ResetPrompt,
     Conversation,
 }
 
@@ -54,7 +53,6 @@ impl Dismissal {
             Dismissal::Window(title) => hud::close_window(world, title),
             Dismissal::ItemCard => item::card::close(world),
             Dismissal::SkillCard => skill::card::close(world),
-            Dismissal::ResetPrompt => skill::prompt::keep(world),
             Dismissal::Conversation => stage::leave(world),
         }
     }
@@ -72,9 +70,6 @@ fn dismissals(world: &World) -> Vec<(LayerId, Dismissal)> {
     }
     if skill::card::showing(world) {
         open.push((skill::card::layer(), Dismissal::SkillCard));
-    }
-    if skill::prompt::showing(world) {
-        open.push((skill::prompt::layer(), Dismissal::ResetPrompt));
     }
     if stage::leavable(world) {
         open.push((stage::layer(), Dismissal::Conversation));

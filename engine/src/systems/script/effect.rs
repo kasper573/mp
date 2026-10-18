@@ -170,8 +170,10 @@ pub fn show_error(world: &mut World, cx: &FlowCx, reason: impl Into<String>) {
     }
 }
 
+/// Plays a sound at the owner or the subject.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-system" = "audio"))]
 pub struct PlaySound {
     pub sfx: super::Fill<SfxId>,
     #[serde(rename = "for")]

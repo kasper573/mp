@@ -1,27 +1,25 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color};
-use egui::{Pos2, Rect, Response, RichText, Ui, Vec2};
+use egui::{Response, RichText, Ui};
 
 use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::class::{self, ClassId, NodeKey};
-use crate::systems::hud::{self, Sizing, WindowFrame};
-use crate::systems::interface::InterfaceSound;
+use crate::systems::hud;
 use crate::systems::item::Inventory;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
 use crate::systems::skill::Learned;
+use crate::systems::text::counted;
+
+pub(crate) const BASIC_ATTACK_MARK: &str = "basic attack";
 
 const WINDOW_KEY: &str = "Skill";
-const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 380.0);
-const WINDOW_TOP: f32 = 96.0;
-const WINDOW_MARGIN: f32 = 72.0;
 const ICON: f32 = 40.0;
-const TOOLTIP_WIDTH: f32 = 280.0;
 
 /// One skill as the player sees it: the row at the rank they hold, with the node that unlocks it
 /// when it sits in their tree.
@@ -42,34 +40,31 @@ pub struct SkillCardPlugin;
 
 impl Plugin for SkillCardPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PinnedCard>()
+        app.init_resource::<hud::Pinned<SkillId>>()
+            .add_systems(
+                Update,
+                hud::raise_pinned::<SkillId>(WINDOW_KEY).run_if(in_state(ClientScreen::Area)),
+            )
             .add_systems(
                 EguiPrimaryContextPass,
                 draw_card
                     .in_set(Band::Hud)
                     .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(ClientScreen::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), hud::forget_pinned::<SkillId>);
     }
 }
 
-pub fn open(world: &mut World, card: SkillCard) {
-    let was_shown = world.resource_mut::<PinnedCard>().wanted.replace(card);
-    if was_shown.is_none() {
-        InterfaceSound::UiOpen.play(world);
-    }
+pub fn open(world: &mut World, skill: SkillId) {
+    hud::pin(world, skill);
 }
 
 pub fn close(world: &mut World) -> bool {
-    let closed = world.resource_mut::<PinnedCard>().wanted.take().is_some();
-    if closed {
-        InterfaceSound::UiClose.play(world);
-    }
-    closed
+    hud::unpin::<SkillId>(world)
 }
 
 pub fn showing(world: &World) -> bool {
-    world.resource::<PinnedCard>().wanted.is_some()
+    hud::pinned::<SkillId>(world).is_some()
 }
 
 pub fn layer() -> egui::LayerId {
@@ -101,7 +96,7 @@ pub fn tooltip(
     hint: Option<&StyledLine>,
 ) {
     gui::tooltip(response, |ui| {
-        ui.set_max_width(TOOLTIP_WIDTH);
+        ui.set_max_width(hud::TOOLTIP_WIDTH);
         sheet(ui, world, card);
         if let Some(hint) = hint {
             ui.add_space(4.0);
@@ -159,6 +154,13 @@ pub fn sheet(ui: &mut Ui, world: &mut World, card: &SkillCard) {
     }
 }
 
+fn draw_card(world: &mut World) {
+    hud::draw_pinned::<SkillId>(world, WINDOW_KEY, |ui, world, skill| {
+        let card = of(world, *skill);
+        sheet(ui, world, &card);
+    });
+}
+
 fn use_line(def: &SkillDef, rank: Rank) -> String {
     if def.kind == SkillKind::Passive {
         return "Passive · holds while known".to_owned();
@@ -183,8 +185,7 @@ fn use_line(def: &SkillDef, rank: Rank) -> String {
 
 fn rank_line(def: &SkillDef, rank: Rank, cost: u32) -> String {
     let level = &def.levels[usize::from(rank.0) - 1];
-    let points = if cost == 1 { "point" } else { "points" };
-    let mut line = format!("Rank {} · {cost} {points}", rank.0);
+    let mut line = format!("Rank {} · {}", rank.0, counted(cost, "point"));
     let changes: Vec<String> = level
         .stats
         .iter()
@@ -284,49 +285,3 @@ fn trim(value: f32) -> String {
         format!("{rounded}")
     }
 }
-
-#[derive(Resource, Default)]
-struct PinnedCard {
-    wanted: Option<SkillCard>,
-}
-
-fn forget(mut card: ResMut<PinnedCard>) {
-    card.wanted = None;
-}
-
-fn draw_card(world: &mut World) {
-    let Some(card) = world.resource::<PinnedCard>().wanted.clone() else {
-        return;
-    };
-    let Some(gui) = gui::context(world) else {
-        return;
-    };
-    let screen = gui.content_rect();
-    let start = Rect::from_min_size(
-        Pos2::new(
-            (screen.right() - WINDOW_SIZE.x - WINDOW_MARGIN).max(8.0),
-            screen.top() + WINDOW_TOP,
-        ),
-        WINDOW_SIZE,
-    );
-    let mut open = true;
-    let frame = WindowFrame {
-        key: WINDOW_KEY,
-        title: None,
-        start,
-        sizing: Sizing::FitsContent,
-        body_limit: None,
-    };
-    let fresh = of(world, card.skill);
-    hud::window(world, &gui, frame, &mut open, |ui, world| {
-        egui::ScrollArea::vertical()
-            .max_height(WINDOW_SIZE.y)
-            .auto_shrink([false, true])
-            .show(ui, |ui| sheet(ui, world, &fresh));
-    });
-    if !open {
-        close(world);
-    }
-}
-
-pub(crate) const BASIC_ATTACK_MARK: &str = "basic attack";

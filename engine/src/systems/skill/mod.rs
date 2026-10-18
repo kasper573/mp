@@ -427,6 +427,28 @@ impl Cooldowns {
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Hotbar(pub Vec<HotbarEntry>);
 
+/// A place on the hotbar, counted from zero; the player sees it numbered from one.
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
+#[serde(transparent)]
+pub struct HotbarSlot(pub u32);
+
+impl HotbarSlot {
+    pub fn index(self) -> usize {
+        self.0 as usize
+    }
+
+    pub fn number(self) -> u32 {
+        self.0 + 1
+    }
+
+    /// The first `count` slots, in order.
+    pub fn first(count: u32) -> impl Iterator<Item = HotbarSlot> {
+        (0..count).map(HotbarSlot)
+    }
+}
+
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum HotbarEntry {
@@ -437,30 +459,29 @@ pub enum HotbarEntry {
 }
 
 impl Hotbar {
-    pub fn entry(&self, slot: u32) -> HotbarEntry {
-        self.0.get(slot as usize).copied().unwrap_or_default()
+    pub fn entry(&self, slot: HotbarSlot) -> HotbarEntry {
+        self.0.get(slot.index()).copied().unwrap_or_default()
     }
 
-    pub fn set(&mut self, slot: u32, entry: HotbarEntry) {
-        let slot = slot as usize;
-        if self.0.len() <= slot {
-            self.0.resize(slot + 1, HotbarEntry::Empty);
+    pub fn set(&mut self, slot: HotbarSlot, entry: HotbarEntry) {
+        if self.0.len() <= slot.index() {
+            self.0.resize(slot.index() + 1, HotbarEntry::Empty);
         }
-        self.0[slot] = entry;
+        self.0[slot.index()] = entry;
         while self.0.last() == Some(&HotbarEntry::Empty) {
             self.0.pop();
         }
     }
 
-    pub fn first_free(&self, within: u32) -> Option<u32> {
-        (0..within).find(|slot| self.entry(*slot) == HotbarEntry::Empty)
+    pub fn first_free(&self, within: u32) -> Option<HotbarSlot> {
+        HotbarSlot::first(within).find(|slot| self.entry(*slot) == HotbarEntry::Empty)
     }
 
-    pub fn slot_of(&self, entry: HotbarEntry) -> Option<u32> {
+    pub fn slot_of(&self, entry: HotbarEntry) -> Option<HotbarSlot> {
         self.0
             .iter()
             .position(|held| *held == entry)
-            .map(|slot| slot as u32)
+            .map(|slot| HotbarSlot(slot as u32))
     }
 }
 

@@ -16,6 +16,7 @@ use crate::systems::stat::{Stat, StatKind};
 
 /// Puts a status on actors, at a power and for a time; without seconds it holds until removed.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "status"))]
 pub struct ApplyStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -30,6 +31,7 @@ pub struct ApplyStatus {
 
 /// Takes a status off actors: one effect, every status of a category, or every status at all.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "status"))]
 pub struct RemoveStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -44,6 +46,7 @@ pub struct RemoveStatus {
 /// A stat modifier held on the subject for as long as the aspect whose script this is stays
 /// active on it: a status, a worn or carried item, a passive skill.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "status"))]
 pub struct Boost {
     pub stat: StatKind,
     pub by: Condition,

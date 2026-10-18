@@ -1,15 +1,16 @@
 use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Ui, Vec2};
+use engine::core::content::Content;
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::class::{ClassDef, ClassLevel};
+use engine::systems::class::{ClassDef, SkillTree};
 use engine::systems::npc::NpcId;
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
-use engine::systems::skill::HOTBAR_SLOTS;
+use engine::systems::skill::{HOTBAR_SLOTS, Rank};
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -23,7 +24,6 @@ use crate::ui::browser::BrowserAction;
 use crate::ui::{inspector, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
-use crate::views::class;
 use crate::{condition, forms, picker, play, schema};
 
 pub const TABLE: &str = "test_character";
@@ -510,9 +510,14 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     if !value["skills"].is_array() {
         value["skills"] = Value::Array(Vec::new());
     }
-    let class = value.text("class").to_owned();
-    let tree = tree_of(cx, &class);
-    let granted = class_points(cx, &class, value["xp"].as_u64().unwrap_or(0) as u32);
+    let xp = value["xp"].as_u64().unwrap_or(0) as u32;
+    let class = class_def(cx, value.text("class"));
+    let tree = class
+        .as_ref()
+        .map_or_else(SkillTree::default, |(_, def)| def.tree.clone());
+    let granted = class
+        .as_ref()
+        .map_or(0, |(_, def)| def.granted_points(xp).0);
     let count = value["skills"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     let mut spent = 0;
@@ -521,13 +526,13 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             let path = format!("/skills/{index}");
             let learned = &mut value["skills"][index];
             let node = learned.text("node").to_owned();
-            let ranks = tree
-                .get(&node)
-                .map_or(1, |skill| class::tree::skill_ranks(cx.files, skill));
+            let skill = class
+                .as_ref()
+                .zip(tree.node(node.as_str()))
+                .map(|((content, _), node)| node.skill.get(content));
+            let ranks = skill.map_or(1, |skill| skill.rank_count());
             let held = learned["rank"].as_u64().unwrap_or(1) as u8;
-            spent += tree
-                .get(&node)
-                .map_or(0, |skill| rank_cost(cx, skill, held));
+            spent += skill.map_or(0, |skill| skill.cost_to(Rank(held)).0);
             ui.horizontal(|ui| {
                 if ui
                     .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
@@ -545,8 +550,8 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                         theme::mono(&node).size(13.0)
                     })
                     .show_ui(ui, |ui| {
-                        for key in tree.keys() {
-                            ui.selectable_value(&mut picked, key.clone(), key);
+                        for key in tree.0.keys() {
+                            ui.selectable_value(&mut picked, key.to_string(), key.as_str());
                         }
                     });
                 if picked != node {
@@ -569,10 +574,10 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         if tree.is_empty() {
             ui.label(theme::faint("the class has no tree to learn from").size(12.0));
         } else if ui.button("+ skill").clicked()
-            && let Some(first) = tree.keys().next()
+            && let Some(first) = tree.0.keys().next()
             && let Some(list) = value["skills"].as_array_mut()
         {
-            list.push(serde_json::json!({ "node": first, "rank": 1 }));
+            list.push(serde_json::json!({ "node": first.as_str(), "rank": 1 }));
             changed = FormChange::at("/skills");
         }
         let line = format!("{spent} of {granted} points spent");
@@ -704,47 +709,11 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     changed
 }
 
-fn tree_of(cx: &FormCx, class: &str) -> BTreeMap<String, String> {
-    cx.files
-        .json(&row_file("class", class))
-        .and_then(|row| {
-            row["tree"].as_object().map(|tree| {
-                tree.iter()
-                    .map(|(node, held)| (node.clone(), held.text("skill").to_owned()))
-                    .collect()
-            })
-        })
-        .unwrap_or_default()
-}
-
-fn class_points(cx: &FormCx, class: &str, xp: u32) -> u32 {
-    cx.files
-        .json(&row_file("class", class))
-        .and_then(|row| {
-            row["levels"].as_array().map(|levels| {
-                levels
-                    .iter()
-                    .filter(|level| level["xp"].as_u64().unwrap_or(0) <= u64::from(xp))
-                    .map(|level| level["skill_points"].as_u64().unwrap_or(0) as u32)
-                    .sum()
-            })
-        })
-        .unwrap_or(0)
-}
-
-fn rank_cost(cx: &FormCx, skill: &str, rank: u8) -> u32 {
-    cx.files
-        .json(&row_file("skill", skill))
-        .and_then(|row| {
-            row["levels"].as_array().map(|levels| {
-                levels
-                    .iter()
-                    .take(usize::from(rank))
-                    .map(|level| level["cost"].as_u64().unwrap_or(0) as u32)
-                    .sum()
-            })
-        })
-        .unwrap_or(0)
+/// The character's class as the content last loaded knows it, with that content.
+fn class_def(cx: &FormCx, class: &str) -> Option<(Content, ClassDef)> {
+    let content = cx.content.clone()?;
+    let def = content.by_key::<ClassDef>(class)?.get(&content).clone();
+    Some((content, def))
 }
 
 fn start(
@@ -1603,17 +1572,7 @@ fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
 }
 
 pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
-    let Some(content) = cx.content.clone() else {
-        return 0;
-    };
-    content
-        .by_key::<ClassDef>(class)
-        .map(|class| levels_reached(&class.get(&content).levels, xp))
-        .unwrap_or(0)
-}
-
-fn levels_reached(tiers: &[ClassLevel], xp: u32) -> u32 {
-    tiers.iter().filter(|tier| tier.xp <= xp).count() as u32
+    class_def(cx, class).map_or(0, |(_, def)| def.level_at(xp))
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -1625,11 +1584,11 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;
     let class = row.text("class");
-    let tiers = content
+    let def = content
         .by_key::<ClassDef>(class)
-        .map(|id| id.get(&content).levels.clone())
-        .unwrap_or_default();
-    let level = levels_reached(&tiers, xp);
+        .map(|id| id.get(&content).clone());
+    let tiers = def.as_ref().map_or(&[][..], |def| def.levels.as_slice());
+    let level = def.as_ref().map_or(0, |def| def.level_at(xp));
     let next = tiers
         .iter()
         .find(|tier| tier.xp > xp)
@@ -1657,29 +1616,15 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ),
     };
     widgets::kv_text(ui, "level", format!("{level}{next}"));
-    let granted: u32 = tiers
-        .iter()
-        .filter(|tier| tier.xp <= xp)
-        .map(|tier| tier.skill_points.0)
-        .sum();
+    let granted = def.as_ref().map_or(0, |def| def.granted_points(xp).0);
     let spent: u32 = row["skills"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(|learned| {
-            let node = content
-                .by_key::<ClassDef>(class)?
-                .get(&content)
-                .tree
-                .0
-                .get(learned.text("node"))?
-                .skill;
+            let node = def.as_ref()?.tree.node(learned.text("node"))?;
             let rank = learned["rank"].as_u64().unwrap_or(1) as u8;
-            Some(
-                node.get(&content)
-                    .cost_to(engine::systems::skill::Rank(rank))
-                    .0,
-            )
+            Some(node.skill.get(&content).cost_to(Rank(rank)).0)
         })
         .sum();
     widgets::kv_text(

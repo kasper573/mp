@@ -24,7 +24,8 @@ use crate::systems::script::Place;
 use crate::systems::shop::{Sale, ShopId, ShopLedger};
 use crate::systems::skill::learn::{PlanRefusal, plan};
 use crate::systems::skill::{
-    self, BasicAttack, Cooldowns, HOTBAR_SLOTS, Hotbar, HotbarEntry, Learned, Rank, SkillId,
+    self, BasicAttack, Cooldowns, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, Rank,
+    SkillId,
 };
 use crate::systems::stat::StatMap;
 
@@ -124,7 +125,7 @@ pub struct SnapshotSkill {
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotSlot {
-    pub slot: u32,
+    pub slot: HotbarSlot,
     pub entry: HotbarEntry,
 }
 
@@ -533,11 +534,11 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             || snapshot.equipment.values().any(|worn| *worn == item)
     };
     for (index, slot) in snapshot.hotbar.iter().enumerate() {
-        if slot.slot >= HOTBAR_SLOTS {
+        if slot.slot.0 >= HOTBAR_SLOTS {
             check.error(
                 format!("/hotbar/{index}/slot"),
                 "out of range",
-                slot.slot,
+                slot.slot.0,
                 format!("0 to {}", HOTBAR_SLOTS - 1),
             );
         }
@@ -548,7 +549,7 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             check.error(
                 format!("/hotbar/{index}/slot"),
                 "slot listed twice",
-                slot.slot,
+                slot.slot.0,
                 "each slot once",
             );
         }

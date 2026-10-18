@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use egui::{Pos2, Rect, Vec2};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, ContentProblem, RowCheck, id};
@@ -80,8 +81,21 @@ pub struct CanvasRect {
 }
 
 /// How a backdrop image meets its frame, as a stylesheet's object-fit would put it.
-#[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    VariantArray,
+    IntoStaticStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum BackdropFit {
     /// Scaled to show whole within the frame, leaving the frame bare along one axis.
     #[default]
@@ -142,28 +156,34 @@ impl SkillTree {
             .reduce(|all, next| all.union(next))
     }
 
-    /// The nodes on every cycle of node requirements.
-    pub fn cycles(&self) -> BTreeSet<&NodeKey> {
-        let mut on_cycle = BTreeSet::new();
-        for start in self.0.keys() {
-            let mut stack = vec![start];
-            let mut seen = BTreeSet::new();
-            while let Some(key) = stack.pop() {
-                let Some(node) = self.0.get(key) else {
-                    continue;
-                };
-                for requirement in &node.requires {
-                    if let AccessRequirement::Skill { node: next, .. } = requirement {
-                        if next == start {
-                            on_cycle.insert(start);
-                        } else if seen.insert(next) {
-                            stack.push(next);
-                        }
-                    }
-                }
+    /// Whether reaching `node` takes `on` first, through any chain of node requirements.
+    pub fn depends_on<K: Ord + ?Sized>(&self, node: &K, on: &K) -> bool
+    where
+        NodeKey: Borrow<K>,
+    {
+        let mut stack: Vec<&NodeKey> = self.0.get(node).map_or(Vec::new(), |node| {
+            node.requires.iter().filter_map(required_node).collect()
+        });
+        let mut seen = BTreeSet::new();
+        while let Some(key) = stack.pop() {
+            if key.borrow() == on {
+                return true;
+            }
+            if let Some(node) = self.0.get::<NodeKey>(key)
+                && seen.insert(key)
+            {
+                stack.extend(node.requires.iter().filter_map(required_node));
             }
         }
-        on_cycle
+        false
+    }
+
+    /// The nodes on every cycle of node requirements.
+    pub fn cycles(&self) -> BTreeSet<&NodeKey> {
+        self.0
+            .keys()
+            .filter(|key| self.depends_on(*key, *key))
+            .collect()
     }
 
     pub fn check(&self, check: &mut RowCheck) {
@@ -220,6 +240,13 @@ impl SkillTree {
                 }
             }
         }
+    }
+}
+
+fn required_node(requirement: &AccessRequirement) -> Option<&NodeKey> {
+    match requirement {
+        AccessRequirement::Skill { node, .. } => Some(node),
+        AccessRequirement::Level { .. } | AccessRequirement::Condition { .. } => None,
     }
 }
 

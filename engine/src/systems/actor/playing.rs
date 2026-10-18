@@ -47,7 +47,9 @@ pub enum Wait {
     End,
 }
 
+/// Plays a model action, waiting for its apex or end when asked.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "actor"))]
 pub struct Animate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

@@ -503,35 +503,16 @@ pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row
     let shape = shapes.shape_of("blueprint");
     let count = row["modules"].as_array().map_or(0, Vec::len);
     widgets::section_count(ui, "Modules", count);
-    let mut changed = false;
-    let mut actions = Vec::new();
-    {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by("blueprint", Some(key));
-        changed |= crate::ui::inspector::scripts::script_cards(
-            ui,
-            &mut cx,
-            "blueprint",
-            row,
-            "modules",
-            "",
-        )
-        .is_some();
-    }
+    let changed = editor
+        .with_form("blueprint", Some(key), shape, |cx| {
+            crate::ui::inspector::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
+                .is_some()
+        })
+        .unwrap_or(false);
     if changed {
         let mut edit = ContentEdit::new(format!("Edit modules · blueprint/{key}"));
         edit.write_json(row_file("blueprint", key), row);
         editor.apply(edit);
-    }
-    for action in actions {
-        inspector::act(editor, action, "blueprint", key);
     }
 }
 
