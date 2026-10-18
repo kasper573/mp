@@ -428,9 +428,6 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
     if carried.is_some() && response.contains_pointer() {
         drop_wash(ui, response.rect);
     }
-    if let Some(key) = key_name(world, index) {
-        slot_key_mark(ui, response.rect, &key);
-    }
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
@@ -766,30 +763,6 @@ fn drop_wash(ui: &Ui, rect: Rect) {
         ink::gold_wash(0.28),
         Stroke::new(1.0, ink::OCHRE),
         StrokeKind::Inside,
-    );
-}
-
-fn slot_key_mark(ui: &Ui, rect: Rect, key: &str) {
-    let at = rect.left_top() + Vec2::new(3.0, 1.0);
-    for offset in [
-        Vec2::new(-1.0, 0.0),
-        Vec2::new(1.0, 0.0),
-        Vec2::new(0.0, 1.0),
-    ] {
-        ui.painter().text(
-            at + offset,
-            Align2::LEFT_TOP,
-            key,
-            TextRole::Launcher.font_id(),
-            ink::CREAM,
-        );
-    }
-    ui.painter().text(
-        at,
-        Align2::LEFT_TOP,
-        key,
-        TextRole::Launcher.font_id(),
-        ink::INK2,
     );
 }
 
