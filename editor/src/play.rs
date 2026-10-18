@@ -768,7 +768,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     row(
         ui,
         "editor",
-        &format!("build {build} · writes content version {content_version}"),
+        &format!("build {build}, content version {content_version}"),
         None,
     );
     let builds_agree = checked.as_ref().is_some_and(|binaries| {
@@ -783,7 +783,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
                 ui,
                 name,
                 &format!(
-                    "build {} · reads content version {}",
+                    "build {}, content version {}",
                     info.build, info.content_version
                 ),
                 Some(builds_agree && info.content_version == content_version),
@@ -797,21 +797,13 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
             Some(version) => row(
                 ui,
                 "open folder",
-                &format!("written for content version {version}"),
+                &format!("content version {version}"),
                 Some(version == content_version),
             ),
             None => row(ui, "open folder", "does not load", None),
         }
     }
     ui.add_space(8.0);
-    ui.label(
-        theme::muted(
-            "A content version names the shape of the rows: a game binary loads a folder written \
-             for its own. A play-test needs the server and the client to read the editor's, and \
-             the client to be of the server's build.",
-        )
-        .size(13.0),
-    );
     if let Some(binaries) = checked.as_ref().filter(|_| !ok) {
         let culprit = culprit(binaries, content_version);
         ui.horizontal_wrapped(|ui| {
@@ -863,20 +855,12 @@ fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
         (Ok(server), Ok(client)) => (server, client),
     };
     if server.build != client.build {
-        return format!(
-            "{SERVER} is build {} and {CLIENT} is build {}: the client joins only a server of its own build.",
-            server.build, client.build
-        );
+        return format!("{SERVER} and {CLIENT} are different builds.");
     }
     [(SERVER, server), (CLIENT, client)]
         .into_iter()
         .find(|(_, info)| info.content_version != content_version)
-        .map(|(name, info)| {
-            format!(
-                "{name} reads content version {}, and this editor writes {content_version}: rows saved here would not load in it.",
-                info.content_version
-            )
-        })
+        .map(|(name, _)| format!("{name} is of a different content version than the editor."))
         .unwrap_or_default()
 }
 
