@@ -6,7 +6,8 @@ use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
+use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget};
+use crate::picker::Dragged;
 use crate::picker::{self, PictureFrame};
 use crate::project::{GAME_FILE, Project, RowSelection, row_of};
 use crate::tabs::EditorTab;
@@ -147,6 +148,10 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 node.selected = selection.table == table && selection.keys.iter().any(|k| k == key);
                 node.icon = TreeIcon::Thumb(file.clone());
                 node.unsaved = project.is_unsaved(&file);
+                node.drag = Some(Dragged::Row {
+                    table: table.to_owned(),
+                    key: key.to_owned(),
+                });
                 Some(node)
             },
             &mut |folder| {
@@ -157,9 +162,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                     action: FolderAction::OpenTable,
                 };
                 if shapes.has_fixtures(&folder.id) {
-                    folder.note = Some(
-                        "Fixtures: the engine names these rows, so none can be added".to_owned(),
-                    );
+                    folder.note =
+                        Some("Fixtures: a fixed set of rows, so none can be added".to_owned());
                     folder.actions = vec![open];
                 } else {
                     folder.actions = vec![
@@ -195,6 +199,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 project,
                 form,
                 views,
+                shapes,
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
@@ -206,7 +211,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 tree::TreeHooks {
                     menu: Some(&mut |ui, id| {
                         if let Some((table, key)) = row_of(id) {
-                            row_menu(ui, &mut action, table, key);
+                            let fixture = shapes.is_fixture(table, key);
+                            row_menu(ui, &mut action, table, key, fixture);
                         }
                     }),
                     thumbs: Some(&mut |ctx, file| {
@@ -229,15 +235,17 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         .is_some_and(|(path, _)| path == GAME_FILE)
     {
         editor.select(RowSelection::game());
-        editor.panels.right = RightTab::Inspector;
+        editor.open_tab(EditorTab::Game);
     }
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
         if table == WorldMapDef::TABLE {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
+        } else if modifiers.ctrl || modifiers.shift {
+            select_rows(editor, table, key, modifiers.ctrl, modifiers.shift);
         } else {
-            select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
+            action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         }
     }
     if let Some(path) = out.double_clicked
@@ -333,6 +341,7 @@ fn row_menu(
     action: &mut Option<(String, String, BrowserAction)>,
     table: &str,
     key: &str,
+    fixture: bool,
 ) {
     let mut pick = |what: BrowserAction, ui: &mut Ui| {
         *action = Some((table.to_owned(), key.to_owned(), what));
@@ -357,9 +366,10 @@ fn row_menu(
     {
         pick(BrowserAction::Duplicate, ui);
     }
-    if ui
-        .add(egui::Button::new("Rename key…").shortcut_text("F2"))
-        .clicked()
+    if !fixture
+        && ui
+            .add(egui::Button::new("Rename key…").shortcut_text("F2"))
+            .clicked()
     {
         pick(BrowserAction::Rename, ui);
     }
@@ -369,17 +379,20 @@ fn row_menu(
     {
         pick(BrowserAction::Usages, ui);
     }
-    ui.separator();
-    if ui
-        .add(egui::Button::new("Delete…").shortcut_text("Del"))
-        .clicked()
-    {
-        pick(BrowserAction::Delete, ui);
+    if !fixture {
+        ui.separator();
+        if ui
+            .add(egui::Button::new("Delete…").shortcut_text("Del"))
+            .clicked()
+        {
+            pick(BrowserAction::Delete, ui);
+        }
     }
 }
 
-fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bool) {
-    let mut selection = if editor.selection.table == table && (ctrl || shift) {
+/// Ctrl or Shift adds to a selection of rows, shown together in one window.
+fn select_rows(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bool) {
+    let mut selection = if editor.selection.table == table {
         editor.selection.clone()
     } else {
         RowSelection::rows(table, Vec::new())
@@ -410,8 +423,16 @@ fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bo
     } else if !selection.keys.contains(&key.to_owned()) {
         selection.keys.push(key.to_owned());
     }
+    let keys = selection.keys.clone();
     editor.select(selection);
-    editor.panels.right = RightTab::Inspector;
+    match keys.as_slice() {
+        [] => {}
+        [key] => editor.open_tab(EditorTab::for_row(table, key)),
+        _ => editor.open_tab(EditorTab::Rows {
+            table: table.to_owned(),
+            keys,
+        }),
+    }
 }
 
 pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
@@ -422,9 +443,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         }
         BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
-                editor.toast(format!(
-                    "{table}/{key} is a fixture: the engine names it in code"
-                ));
+                editor.toast(format!("{table}/{key} is a fixture and keeps its key"));
             } else {
                 editor.dialogs.push(ModalDialog::Rename(RenameDialog {
                     target: RenameTarget::Row {
@@ -439,7 +458,8 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         BrowserAction::Duplicate => rows::duplicate(editor, table, key),
         BrowserAction::Usages => {
             editor.select(RowSelection::row(table, key));
-            editor.panels.right = RightTab::UsedBy;
+            editor.open_tab(EditorTab::for_row(table, key));
+            editor.panels.bottom = BottomTab::UsedBy;
         }
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
     }
@@ -579,7 +599,8 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                         if response.double_clicked() {
                             action = Some((table.clone(), key.clone(), BrowserAction::Open));
                         }
-                        response.context_menu(|ui| row_menu(ui, &mut action, table, key));
+                        let fixture = editor.shapes.is_fixture(table, key);
+                        response.context_menu(|ui| row_menu(ui, &mut action, table, key, fixture));
                     }
                     Hit::Module {
                         table,
@@ -607,12 +628,21 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             .horizontal(|ui| {
                                 ui.add_space(6.0);
                                 ui.label(theme::muted(icon));
-                                ui.add(
+                                let sense = if *folder {
+                                    Sense::click()
+                                } else {
+                                    Sense::click_and_drag()
+                                };
+                                let response = ui.add(
                                     egui::Label::new(
                                         theme::mono(path).color(theme::CODE).size(13.0),
                                     )
-                                    .sense(Sense::click()),
-                                )
+                                    .sense(sense),
+                                );
+                                if !*folder {
+                                    picker::carry(ui, &response, &Dragged::Asset(path.clone()));
+                                }
+                                response
                             })
                             .inner;
                         if response.clicked() {
@@ -637,7 +667,11 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         }
     }
     if let Some((table, key, ctrl, shift)) = clicked {
-        select_row(editor, &table, &key, ctrl, shift);
+        if ctrl || shift {
+            select_rows(editor, &table, &key, ctrl, shift);
+        } else {
+            act(editor, &table, &key, BrowserAction::Open);
+        }
     }
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
@@ -649,14 +683,13 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
             parts: vec![format!("/modules/{index}")],
         });
         editor.open_tab(EditorTab::for_row(&table, &key));
-        editor.panels.right = RightTab::Inspector;
     }
     if let Some(path) = open_file {
         editor.panels.left = LeftTab::Assets;
         editor.views.assets.search = path.trim_end_matches('/').to_owned();
         if !path.ends_with('/') {
             editor.select(RowSelection::row("asset", &path));
-            editor.panels.right = RightTab::Inspector;
+            editor.open_tab(EditorTab::Asset { path });
         }
     }
 }
@@ -670,7 +703,22 @@ fn result_line(
     selected: bool,
 ) -> egui::Response {
     let full = ui.available_rect_before_wrap();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), 22.0), Sense::click());
+    let sense = if row.is_some() {
+        Sense::click_and_drag()
+    } else {
+        Sense::click()
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), 22.0), sense);
+    if let Some((table, key)) = row {
+        picker::carry(
+            ui,
+            &response,
+            &Dragged::Row {
+                table: table.to_owned(),
+                key: key.to_owned(),
+            },
+        );
+    }
     if selected {
         ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
     } else if response.hovered() {

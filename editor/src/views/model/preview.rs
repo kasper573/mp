@@ -1,15 +1,11 @@
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
-use engine::systems::GameSettings;
-use engine::systems::actor::Action;
-use engine::systems::actor::render::ACTOR_ANCHOR;
-use serde_json::Value;
+use egui::Ui;
+use engine::core::time::Millis;
+use engine::systems::actor::{Action, ModelDef};
 
-use super::{ModelSheet, StripFrame};
+use super::{ModelStrip, StripFrame};
 use crate::app::Editor;
-use crate::ui::{theme, widgets};
-use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use crate::stage::{self, Posed, PosedActor, Scene};
+use crate::ui::widgets;
 
 pub struct StripPreview {
     pub playing: bool,
@@ -131,44 +127,41 @@ pub fn fire(editor: &mut Editor, key: &str, frames: &[StripFrame], passed: &[usi
             continue;
         };
         if let Some(sound) = &frame.sound {
-            editor.views.model.sfx_to_play.push(sound.clone());
+            editor.views.sound.play.push(sound.clone());
         }
         if frame.step && !stepped {
             stepped = true;
             if let Some(footstep) = super::sounds::footstep_of(editor, surface.as_deref()) {
-                editor.views.model.sfx_to_play.push(footstep);
+                editor.views.sound.play.push(footstep);
             }
         }
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct PreviewFit {
-    pub size: Vec2,
-    pub zoom: f32,
-}
-
-pub fn draw(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    key: &str,
-    sheet: &ModelSheet,
-    row: &Value,
-    frame: Option<u32>,
-    fit: PreviewFit,
-) -> ERect {
-    let PreviewFit { size, zoom } = fit;
-    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-    let painter = ui.painter_at(rect);
-    let feet = backdrop(editor, &painter, rect, format!("model-preview:{key}"), zoom);
-    draw_sprite(&painter, sheet, row, frame, feet, zoom);
-    painter.rect_stroke(
-        rect,
-        6.0,
-        egui::Stroke::new(1.0, theme::BORDER),
-        egui::StrokeKind::Outside,
+/// The strip's frame at `at` into it, drawn as the game draws the model on its starting ground.
+pub fn draw(editor: &mut Editor, ui: &mut Ui, key: &str, strip: ModelStrip, at: Millis) {
+    let Some(content) = editor.loaded() else {
+        return;
+    };
+    let Some(model) = content.by_key::<ModelDef>(key) else {
+        return;
+    };
+    let posed = Posed {
+        actors: vec![PosedActor {
+            action: strip.action,
+            dir: strip.direction,
+            held: Some(at.seconds()),
+            ..PosedActor::standing(model, stage::center(&content))
+        }],
+        ..Posed::default()
+    };
+    stage::show(
+        editor,
+        ui,
+        &format!("model/{key}/strip"),
+        Scene::Posed(posed),
+        true,
     );
-    rect
 }
 
 pub fn controls(
@@ -231,91 +224,4 @@ pub fn keys(ui: &Ui, preview: &mut StripPreview, frames: &[StripFrame]) {
         };
         preview.position = (super::starts_at(frames, next) as f32).min(total - 1.0);
     }
-}
-
-pub struct SpawnGround {
-    pub area: String,
-    pub at: Pos<Tiles>,
-    pub name: String,
-}
-
-pub fn spawn_ground(editor: &Editor) -> Option<SpawnGround> {
-    let content = editor.project.as_ref()?.content.clone()?;
-    let place = &content.built::<GameSettings>().initial_spawn;
-    Some(SpawnGround {
-        area: place.area.key(&content).to_owned(),
-        at: place.at,
-        name: place.area.get(&content).name.clone(),
-    })
-}
-
-pub fn backdrop(
-    editor: &mut Editor,
-    painter: &egui::Painter,
-    rect: ERect,
-    scene_key: String,
-    zoom: f32,
-) -> egui::Pos2 {
-    painter.rect_filled(rect, 6.0, Color32::from_rgb(78, 128, 52));
-    let feet = rect.center();
-    let Some(SpawnGround { area, at, .. }) = spawn_ground(editor) else {
-        return feet;
-    };
-    let ppp = painter.ctx().pixels_per_point();
-    let generation = editor
-        .project
-        .as_ref()
-        .map_or(0, |project| project.generation);
-    editor.views.area.requests.push(AreaSceneRequest {
-        key: scene_key.clone(),
-        spec: AreaSceneSpec {
-            ground: area,
-            scenery: SceneryOf::Area,
-            hidden_ground: Vec::new(),
-            show_blueprints: true,
-            show_scenery: true,
-        },
-        width: (rect.width() * ppp) as u32,
-        height: (rect.height() * ppp) as u32,
-        center: at,
-        zoom: zoom * ppp,
-        generation,
-        live: true,
-    });
-    if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
-        painter.image(scene.texture, rect, scene.uv(), Color32::WHITE);
-    }
-    feet
-}
-
-pub fn draw_sprite(
-    painter: &egui::Painter,
-    sheet: &ModelSheet,
-    row: &Value,
-    frame: Option<u32>,
-    feet: egui::Pos2,
-    zoom: f32,
-) {
-    let (Some(frame), Some(thumb)) = (frame, &sheet.thumb) else {
-        return;
-    };
-    let scale = zoom * super::hitbox::scale_of(row);
-    let shown = Vec2::new(
-        sheet.frame_width as f32 * scale,
-        sheet.frame_height as f32 * scale,
-    );
-    painter.image(
-        thumb.texture.id(),
-        sprite_rect(feet, shown),
-        sheet.uv(frame),
-        Color32::WHITE,
-    );
-}
-
-pub fn sprite_rect(feet: egui::Pos2, shown: Vec2) -> ERect {
-    let anchor = ACTOR_ANCHOR.0;
-    ERect::from_min_max(
-        feet - Vec2::new(shown.x / 2.0, (0.5 - anchor.y) * shown.y),
-        feet + Vec2::new(shown.x / 2.0, (0.5 + anchor.y) * shown.y),
-    )
 }

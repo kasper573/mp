@@ -189,7 +189,9 @@ pub struct ShopReactions {
     pub cant_afford: Vec<Line>,
 }
 
+/// Opens the shop until it closes.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "shop"))]
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

@@ -19,9 +19,9 @@ use crate::views::tileset::{
     TilesetMode, WalkBrush,
 };
 use crate::views::world::{
-    ColourBy, ColourField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
+    ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::views::{model, tileset, world};
+use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -80,8 +80,14 @@ pub enum Step {
     World(WorldStep),
     Import(ImportStep),
     Section(CharacterSection),
+    Tree {
+        key: String,
+        node: Option<String>,
+    },
     Save,
     Dialog(DialogName),
+    Game,
+    Asset(String),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -220,7 +226,7 @@ pub enum SortOrder {
 pub enum WorldStep {
     Open,
     Lens(WorldLens),
-    Colour(Option<ColourField>),
+    Color(Option<ColorField>),
     Line(String),
     Route(Option<MapRoute>),
     Look {
@@ -364,8 +370,25 @@ fn open_one(editor: &mut Editor, step: &Step) {
         }
         Step::Import(step) => editor.jobs.script.push_back(step.clone()),
         Step::Section(section) => editor.views.character.section = *section,
+        Step::Tree { key, node } => {
+            editor.open_tab(EditorTab::for_row(class::TABLE, key));
+            editor
+                .views
+                .class
+                .pages
+                .insert(key.clone(), class::ClassPage::Tree);
+            class::select_node(editor, key, node.as_deref());
+        }
         Step::Save => {
             editor.save();
+        }
+        Step::Game => {
+            editor.select(RowSelection::game());
+            editor.open_tab(EditorTab::Game);
+        }
+        Step::Asset(path) => {
+            editor.select(RowSelection::row("asset", path));
+            editor.open_tab(EditorTab::Asset { path: path.clone() });
         }
         Step::Dialog(DialogName::Keys) => editor.dialogs.push(ModalDialog::Keys),
         Step::Dialog(DialogName::Binaries) => editor.dialogs.push(ModalDialog::Binaries),
@@ -619,7 +642,7 @@ fn world_step(editor: &mut Editor, step: &WorldStep) {
             },
             WorldLens::Text(text) => MapLens::Text(text.clone()),
         }),
-        WorldStep::Colour(field) => editor.views.world.colour = field.clone().map(ColourBy::new),
+        WorldStep::Color(field) => editor.views.world.color = field.clone().map(ColorBy::new),
         WorldStep::Line(line) => editor.views.world.quest_line = Some(line.clone()),
         WorldStep::Route(route) => editor.views.world.route = route.clone(),
         WorldStep::Look { area, zoom } => {
@@ -647,7 +670,7 @@ fn world_step(editor: &mut Editor, step: &WorldStep) {
                 layout.regions.push(Region {
                     name: name.clone(),
                     cards: cards.iter().filter_map(|key| map.atlas.id(key)).collect(),
-                    colour: None,
+                    color: None,
                 });
             });
         }

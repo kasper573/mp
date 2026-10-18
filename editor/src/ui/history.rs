@@ -37,41 +37,60 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .left
         .push("Ctrl Z undo · Ctrl ⇧ Z redo · click a step to go back to it".to_owned());
     let mut jump = None;
-    egui::ScrollArea::vertical()
-        .id_salt("history")
-        .show(ui, |ui| {
-            ui.add_space(4.0);
-            if rows.is_empty() {
-                ui.label(theme::muted("No steps yet.").size(13.0));
-            }
-            for (number, label, time, done) in rows.iter().rev() {
-                let current = *number == applied;
-                let response = row(
-                    ui,
-                    label,
-                    time,
-                    *done,
-                    current,
-                    saved_at == Some(*number),
-                    focus == Some(*number),
-                );
-                if response.clicked() {
-                    jump = Some(*number);
-                }
-            }
-            let response = row(
-                ui,
-                &format!("Open {opened}"),
-                "",
-                true,
-                applied == 0,
-                saved_at == Some(0),
-                focus == Some(0),
-            );
-            if response.clicked() {
-                jump = Some(0);
-            }
+    let card_width = if focus.is_some() {
+        (ui.available_width() * 0.4).clamp(240.0, 420.0)
+    } else {
+        0.0
+    };
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(ui.available_width() - card_width);
+            egui::ScrollArea::vertical()
+                .id_salt("history")
+                .show(ui, |ui| {
+                    ui.add_space(4.0);
+                    if rows.is_empty() {
+                        ui.label(theme::muted("No steps yet.").size(13.0));
+                    }
+                    for (number, label, time, done) in rows.iter().rev() {
+                        let current = *number == applied;
+                        let response = row(
+                            ui,
+                            label,
+                            time,
+                            *done,
+                            current,
+                            saved_at == Some(*number),
+                            focus == Some(*number),
+                        );
+                        if response.clicked() {
+                            jump = Some(*number);
+                        }
+                    }
+                    let response = row(
+                        ui,
+                        &format!("Open {opened}"),
+                        "",
+                        true,
+                        applied == 0,
+                        saved_at == Some(0),
+                        focus == Some(0),
+                    );
+                    if response.clicked() {
+                        jump = Some(0);
+                    }
+                });
         });
+        if focus.is_some() {
+            ui.add_space(12.0);
+            ui.vertical(|ui| {
+                ui.set_width(card_width - 12.0);
+                egui::ScrollArea::vertical()
+                    .id_salt("history-step")
+                    .show(ui, |ui| step_card(editor, ui));
+            });
+        }
+    });
     if let Some(index) = jump
         && let Some(project) = &mut editor.project
     {
@@ -174,7 +193,7 @@ fn glyph_of(label: &str) -> &'static str {
     }
 }
 
-pub fn step_card(editor: &Editor, ui: &mut Ui) {
+fn step_card(editor: &Editor, ui: &mut Ui) {
     let Some(project) = &editor.project else {
         return;
     };

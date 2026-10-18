@@ -12,7 +12,8 @@ use crate::app::Editor;
 use crate::forms::FormChange;
 use crate::project::{ContentEdit, RowSelection, row_of};
 use crate::tabs::EditorTab;
-use crate::ui::{dialogs, inspector, theme, widgets};
+use crate::ui::assets::AssetKind;
+use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::{forms, picker};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
@@ -40,7 +41,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
                 if page == ModelPage::Matrix {
-                    inspector::show_row(editor, ui, super::TABLE, &key);
+                    row_form::show_row(editor, ui, super::TABLE, &key);
                     ui.add_space(8.0);
                 }
                 match (
@@ -92,7 +93,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         egui::ScrollArea::vertical()
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
-                inspector::show_row(editor, ui, super::TABLE, &key);
+                row_form::show_row(editor, ui, super::TABLE, &key);
             });
         return;
     }
@@ -178,7 +179,7 @@ fn frame_card(
     let mut label = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "frame", "frame");
+        widgets::card_title(ui, "frame");
         ui.add_space(4.0);
         widgets::kv(ui, "lasts", |ui| {
             let mut text = frame.ms.to_string();
@@ -293,13 +294,7 @@ fn frames_card(
     let planned = plan(frames, indices, set_by, &text);
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(
-            ui,
-            "frame",
-            &format!("{} frames", indices.len()),
-            "",
-            |_| {},
-        );
+        widgets::card_header(ui, &format!("{} frames", indices.len()), "", |_| {});
         ui.add_space(4.0);
         widgets::kv(ui, "set by", |ui| {
             for (option, label) in [
@@ -438,7 +433,7 @@ fn cue_card(
     let mut play = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "cue", kind.key(), "", |ui| {
+        widgets::card_header(ui, kind.key(), "", |ui| {
             if ui.button("Remove this cue").clicked() {
                 remove = true;
                 ui.close();
@@ -548,7 +543,7 @@ fn cue_card(
         view.confirm = Some(super::strip::StripConfirm::Cues);
     }
     if let Some(sound) = play {
-        editor.views.model.sfx_to_play.push(sound);
+        editor.views.sound.play.push(sound);
     }
     if let Some(sound) = new_sound {
         let mut written = frames.to_vec();
@@ -651,7 +646,7 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    inspector::with_row_form(editor, super::TABLE, key, |cx| {
+    row_form::with_row_form(editor, super::TABLE, key, |cx| {
         picker::row(ui, cx, "sfx", sound, path)
     })
 }
@@ -663,8 +658,8 @@ fn asset_picker(
     file: &mut String,
     path: &str,
 ) -> bool {
-    inspector::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::asset(ui, cx, file, path)
+    row_form::with_row_form(editor, super::TABLE, key, |cx| {
+        picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
     })
 }
 
@@ -702,7 +697,7 @@ fn face_card(
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         let kind = if face.own.is_some() { "" } else { "generic" };
-        widgets::card_header(ui, "bust", &face.name, kind, |ui| {
+        widgets::card_header(ui, &face.name, kind, |ui| {
             if face.own.is_some() && ui.button("Remove this face…").clicked() {
                 remove_with = Some(String::new());
                 ui.close();
@@ -904,7 +899,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     }
 }
 
-pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
     let width = value["hitbox"]["width"].as_f64().unwrap_or(1.0);
     let height = value["hitbox"]["height"].as_f64().unwrap_or(1.0);
@@ -944,7 +939,7 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Form
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if picker::asset(ui, cx, &mut file, "/sprites/image") {
+        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
             changed = FormChange::at("/sprites/image");
         }

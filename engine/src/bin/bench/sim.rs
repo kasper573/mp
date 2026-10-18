@@ -1,13 +1,18 @@
+use std::collections::HashMap;
+
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::ConnectedClient;
+use bevy_replicon::shared::backend::channels::{ClientChannel, ServerChannel};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use engine::core::content::Content;
-use engine::core::time::{UnixMillis, UtcHour, WallClock};
+use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::systems::area::AreaModule;
 use engine::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
-use engine::systems::{GameSettings, from_client, server_app, start_server, step_areas};
+use engine::systems::{GameSettings, TICK_HZ, from_client, server_app, start_server, step_areas};
 use strum::AsRefStr;
+
+use crate::play;
 
 pub const PLAYERS_PER_AREA: usize = 25;
 
@@ -15,6 +20,15 @@ const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
     reset: UtcHour::MIDNIGHT,
 };
+
+/// The wall clock ticks with the worlds, so cooldowns and played actions run their course as they
+/// do on the live server.
+fn clock_after(ticks: usize) -> WallClock {
+    WallClock {
+        now: CLOCK.now.after(Seconds(ticks as f32 / TICK_HZ.0)),
+        ..CLOCK
+    }
+}
 
 /// Ticks stepped before sampling, so spawn waves and connect churn settle out of the measurement.
 pub const WARMUP: usize = 30;
@@ -85,31 +99,55 @@ pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
 }
 
 /// Advances every world one tick across all cores — the same parallel area fan-out the real server
-/// uses, so the benchmark's capacity reflects the threaded server.
-pub fn step(worlds: &mut [App]) {
-    step_areas(worlds, CLOCK);
-    consume_sent(worlds);
+/// uses, so the benchmark's capacity reflects the threaded server — after its players have made
+/// their moves.
+pub fn step(worlds: &mut [App], rosters: &[Roster], content: &Content) {
+    let ticks = TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    for (app, roster) in worlds.iter_mut().zip(rosters) {
+        play::act(app.world_mut(), content, roster, ticks);
+    }
+    step_areas(worlds, clock_after(ticks));
+    acknowledge_sent(worlds);
 }
+
+static TICKS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Advances every world one tick on the calling thread only. Used by the profiler so CPU samples
 /// attribute cleanly to game systems instead of being scattered across rayon worker frames.
 #[cfg(feature = "profiling")]
 pub fn step_single_threaded(worlds: &mut [App]) {
+    let ticks = TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
     for app in worlds.iter_mut() {
+        app.insert_resource(clock_after(ticks));
         app.update();
     }
-    consume_sent(worlds);
+    acknowledge_sent(worlds);
 }
 
-/// What the server's transport does with outgoing messages once they are on the wire.
-fn consume_sent(worlds: &mut [App]) {
+/// What the wire and the clients do with the server's outgoing messages: they go out, and every
+/// mutate message comes back acknowledged, as a client acknowledges each one it receives. Left
+/// unacknowledged, the server would resend every changed component each replication tick and keep
+/// the bookkeeping for all of them, a load no connected client puts on it.
+fn acknowledge_sent(worlds: &mut [App]) {
     for app in worlds.iter_mut() {
-        app.world_mut()
-            .resource_mut::<ServerMessages>()
-            .drain_sent()
-            .for_each(drop);
+        let mut messages = app.world_mut().resource_mut::<ServerMessages>();
+        let mut acks: HashMap<Entity, Vec<u8>> = HashMap::new();
+        for (client, channel, message) in messages.drain_sent() {
+            if channel == usize::from(ServerChannel::Mutations) {
+                acks.entry(client)
+                    .or_default()
+                    .extend_from_slice(&message[MUTATE_INDEX]);
+            }
+        }
+        for (client, ack) in acks {
+            messages.insert_received(client, ClientChannel::MutationAcks, ack);
+        }
     }
 }
+
+/// Where a mutate message carries its index, which is what an acknowledgement quotes: right after
+/// the flags byte.
+const MUTATE_INDEX: std::ops::Range<usize> = 1..3;
 
 fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster) {
     let mut app = server_app(
@@ -125,10 +163,12 @@ fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster)
     });
     start_server(&mut app);
 
+    let zone = content.built::<GameSettings>().initial_spawn.area;
     let world = app.world_mut();
     let mut roster = Vec::with_capacity(PLAYERS_PER_AREA);
     for index in 0..PLAYERS_PER_AREA {
         let conn = world.spawn(ClientId(index as u32 + 1)).id();
+        play::join_as(world, content, zone, conn, index);
         from_client(world, conn, JoinRequest);
         roster.push(conn);
     }

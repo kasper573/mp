@@ -15,8 +15,7 @@ test:
 
 # The website and game server binaries, and the roles the auth stack syncs from.
 build:
-    cargo build --release -p website -p engine --bin website --bin game-server --bin kc-roles
-    target/release/kc-roles > docker/keycloak/roles.conf
+    cargo build --release -p website -p engine --bin website --bin game-server
 
 # The browser client bundle the website serves; content syncs from the game server at boot.
 wasm:
@@ -33,7 +32,7 @@ archive out="target/archive":
     cargo build --release -p editor -p engine --bin editor --bin game-server --bin desktop-client
     rm -rf {{quote(out)}} && mkdir -p {{quote(out)}}
     cp target/release/{editor,game-server,desktop-client}{{ if os_family() == "windows" { ".exe" } else { "" } }} {{quote(out)}}
-    cp -r example_game {{quote(out / "content")}}
+    cp -rL example_game {{quote(out / "content")}}
 
 # The archive's pieces as separate downloads: the editor, game server and desktop client, stripped of
 # the symbol tables a profiler reads, the example game's content folder as rift-example-game.zip, and
@@ -93,9 +92,6 @@ reset:
 logs:
     {{compose}} logs --no-color
 
-kc-provision: build
-    {{compose}} up -d --build keycloak
-
 # No service names: compose's build sections are the single source of truth for what we publish.
 [doc("Builds and pushes the production images.")]
 push-images:
@@ -145,7 +141,7 @@ editor-showcase name scene seconds="8" input="" hook="":
     cargo build --release -p editor
     export WORK=$(mktemp -d)
     trap 'rm -rf "$WORK"' EXIT
-    cp -r example_game "$WORK/game"
+    cp -rL example_game "$WORK/game"
     just record {{quote(showcase_dir / "editor-" + kebabcase(name) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
@@ -176,12 +172,13 @@ loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
 # The content copy is synced in place, never replaced, so a running game server keeps the folder it mounted.
 [private]
 up flags services="":
-    mkdir -p target/stack/content && rsync -a --delete example_game/ target/stack/content/
+    mkdir -p target/stack/content && rsync -aL --delete example_game/ target/stack/content/
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
     {{compose}} {{flags}} up -d --build --wait {{services}}
 
 # Films COMMAND's window titled TITLE on a private virtual display to OUT, playing INPUT (an xdotool
-# command chain in window pixels) and running HOOK (a shell line) while it records.
+# command chain in window pixels) and running HOOK (a shell line) while it records. The app plays
+# into a sink of its own, whose monitor is the recording's sound track.
 [private]
 [positional-arguments]
 record out title seconds input hook +command:
@@ -190,16 +187,22 @@ record out title seconds input hook +command:
     export out=$1 title=$2 seconds=$3 input=$4 hook=$5
     shift 5
     mkdir -p "$(dirname "$out")"
+    export sink="rift-record-$$"
+    module=$(pactl load-module module-null-sink "sink_name=$sink")
+    trap 'pactl unload-module "$module"' EXIT
     xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
-      "$@" & app=$!
+      PULSE_SINK="$sink" "$@" & app=$!
       window=$(xdotool search --sync --name "$title" | head -1)
       xdotool windowmove --sync "$window" 0 0
       xdotool windowfocus --sync "$window"
       eval "$(xdotool getwindowgeometry --shell "$window")"
       # The window maps before bevy has rendered into it.
       sleep 2
-      ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
-        -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 "$out" & recording=$!
+      { parecord --raw --format=s16le --channels=2 --rate=48000 --latency-msec=10 "--device=$sink.monitor" || true; } \
+        | ffmpeg -v error -y \
+            -use_wallclock_as_timestamps 1 -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
+            -use_wallclock_as_timestamps 1 -probesize 32 -analyzeduration 0 -f s16le -ar 48000 -ac 2 -i pipe:0 \
+            -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 -c:a libopus -b:a 128k "$out" & recording=$!
       [ -z "$hook" ] || bash -c "$hook" &
       [ -z "$input" ] || xdotool $input
       wait $recording

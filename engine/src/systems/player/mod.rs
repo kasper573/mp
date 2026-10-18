@@ -2,39 +2,40 @@ pub mod session;
 pub mod snapshot;
 pub mod widget;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ClientId as Sender, Replicated};
+use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
+use crate::core::math::Rgba;
 use crate::core::math::{Direction, Pos, Rng};
-use crate::core::tiling::Tiles;
-use crate::core::time::{PlaybackRate, Seconds, WallClock};
+use crate::core::tiling::{CellPos, TilePos, Tiles};
+use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
 use crate::systems::GameSettings;
 use crate::systems::account::Identity;
 use crate::systems::actor::model::ModelId;
-use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint};
+use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Tint};
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::belongings;
+use crate::systems::class::{Class, ClassId};
 use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
-use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
-use crate::systems::item::Inventory;
-use crate::systems::job::{Job, JobId};
+use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{HeardMove, Position};
+use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
-use crate::systems::spectate::Spectators;
+use crate::systems::skill::{BasicAttack, Hotbar, Learned};
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
@@ -82,7 +83,7 @@ pub struct Xp {
 
 impl Xp {
     pub fn gain(&mut self, amount: u32) {
-        self.amount += amount;
+        self.amount = self.amount.saturating_add(amount);
     }
 }
 
@@ -111,6 +112,7 @@ pub struct RespawnRequest;
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Welcome {
     pub id: ClientId,
+    pub now: UnixMillis,
 }
 
 /// High enough that nothing in the world can grind it down.
@@ -121,8 +123,11 @@ pub type PlayerDefId = ContentId<PlayerDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
     pub model: ModelId,
-    pub job: JobId,
+    pub class: ClassId,
     pub stats: StatMap,
+    #[schemars(extend("x-usage" = "worn at creation"))]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wearing: Vec<ItemId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<PlayerModule>,
 }
@@ -192,6 +197,26 @@ pub fn held(world: &World, entity: Entity) -> bool {
     world.get::<ArrivalHold>(entity).is_some()
 }
 
+/// Answers every request of a kind for the player who sent it, telling them what refused one;
+/// `commanding` requests are dropped while the player may not command their character.
+pub(crate) fn player_requests<M: Message>(
+    world: &mut World,
+    commanding: bool,
+    mut answer: impl FnMut(&mut World, Entity, M) -> Result<(), String>,
+) {
+    for request in drain_requests::<M>(world) {
+        let Some(player) = sender_player(world, request.client_id) else {
+            continue;
+        };
+        if commanding && !may_command(world, player) {
+            continue;
+        }
+        if let Err(reason) = answer(world, player, request.message) {
+            notification::error(world, player, reason);
+        }
+    }
+}
+
 pub fn arrival_holds(world: &mut World) {
     for request in drain_requests::<AreaDrawn>(world) {
         if let Some(player) = sender_player(world, request.client_id)
@@ -222,7 +247,10 @@ pub fn greet(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Co
         return;
     };
     let conn = add.entity;
-    commands.queue(move |world: &mut World| visibility::send_to(world, conn, Welcome { id }));
+    commands.queue(move |world: &mut World| {
+        let now = world.resource::<WallClock>().now;
+        visibility::send_to(world, conn, Welcome { id, now });
+    });
 }
 
 pub fn client_left(
@@ -266,32 +294,37 @@ pub struct SpawnRules {
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
     let content = world.resource::<Content>().clone();
-    let area = area::load(&content, zone);
     let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
-    for request in drain_requests::<JoinRequest>(world) {
+    let requests = drain_requests::<JoinRequest>(world);
+    if requests.is_empty() {
+        return;
+    }
+    let area = area::load(&content, zone);
+    for request in requests {
         let Some(client_entity) = request.client_id.entity() else {
             continue;
         };
         let Some(&client) = world.get::<ClientId>(client_entity) else {
             continue;
         };
-        let playing = world.resource::<Players>().0.contains_key(&client);
-        let spectating = world.resource::<Spectators>().0.contains_key(&client);
-        if playing || spectating {
+        if world.resource::<Players>().0.contains_key(&client) {
             continue;
         }
         let clock = *world.resource::<WallClock>();
         let (at, state) = match world.get::<JoinAs>(client_entity) {
-            Some(JoinAs { snapshot, start }) if start.area == zone => (
-                start.at,
-                snapshot::materialize(&content, snapshot, *start, clock, immortal),
-            ),
+            Some(JoinAs { snapshot, start }) if start.area == zone => {
+                let (snapshot, start) = (snapshot.clone(), *start);
+                (
+                    beside_anyone_standing_there(world, area, start.at),
+                    snapshot::materialize(&content, &snapshot, start, clock, immortal),
+                )
+            }
             _ => {
                 let name = world
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let at = spawn_position(world, policy, zone, area);
-                let fresh = CharacterSnapshot::fresh(&name, def(&content).job);
+                let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
                 let start = Place { area: zone, at };
                 let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
                 (at, state)
@@ -304,6 +337,23 @@ pub fn join(world: &mut World) {
 
 pub fn spawned(world: &mut World, player: Entity) {
     transition::raise_area(world, EventKind::Entered, player);
+}
+
+/// A character asked to start on a tile someone already stands on is put down on the nearest
+/// free one instead, so neither hides the other.
+fn beside_anyone_standing_there(
+    world: &mut World,
+    area: &area::Area,
+    at: Pos<Tiles>,
+) -> Pos<Tiles> {
+    let taken: HashSet<CellPos> = world
+        .query::<&Position>()
+        .iter(world)
+        .map(|position| position.pos.cell())
+        .collect();
+    area.grid
+        .nearest_walkable_where(at, |cell| !taken.contains(&cell))
+        .unwrap_or(at)
 }
 
 fn spawn_position(
@@ -336,8 +386,10 @@ pub struct CharacterState {
     pub inventory: Inventory,
     pub xp: Xp,
     pub equipment: Equipment,
-    pub job: Job,
-    pub timed: TimedEffects,
+    pub class: Class,
+    pub learned: Learned,
+    pub hotbar: Hotbar,
+    pub basic_attack: BasicAttack,
     pub memory: Memory,
     pub heard: Heard,
     pub ledger: ShopLedger,
@@ -355,10 +407,12 @@ impl CharacterState {
             inventory: world.get::<Inventory>(entity)?.clone(),
             xp: world.get::<Xp>(entity)?.clone(),
             equipment: world.get::<Equipment>(entity)?.clone(),
-            job: *world.get::<Job>(entity)?,
-            timed: world
-                .get::<TimedEffects>(entity)
-                .cloned()
+            class: *world.get::<Class>(entity)?,
+            learned: world.get::<Learned>(entity).cloned().unwrap_or_default(),
+            hotbar: world.get::<Hotbar>(entity).cloned().unwrap_or_default(),
+            basic_attack: world
+                .get::<BasicAttack>(entity)
+                .copied()
                 .unwrap_or_default(),
             memory: world.get::<Memory>(entity).cloned().unwrap_or_default(),
             heard: world.get::<Heard>(entity).cloned().unwrap_or_default(),
@@ -394,21 +448,20 @@ pub(crate) fn place(
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let entity = world
         .spawn((
-            Character {
-                replicated: Replicated,
-                position: Position::at(at),
-                actor: Actor {
+            Character::new(
+                Position::at(at),
+                Actor {
                     color: def.tint(),
                     dir: Direction::S,
                     action: Action::Idle,
                     model,
                     attack_rate: PlaybackRate::default(),
                 },
-                hitbox: Hitbox {
+                Hitbox {
                     size: ActorModel::get(&content, model).hitbox(),
                 },
-                area: AreaTag { area: zone },
-            },
+                AreaTag { area: zone },
+            ),
             OwnedBy(client),
             Owner { client },
             HeardMove::default(),
@@ -426,19 +479,16 @@ pub(crate) fn place(
 
 pub fn respawn(world: &mut World) {
     let content = world.resource::<Content>().clone();
-    for request in drain_requests::<RespawnRequest>(world) {
-        let Some(entity) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !stat::is_dead(world, entity) {
-            continue;
+    player_requests::<RespawnRequest>(world, false, |world, player, _| {
+        let spawn = world.get::<SpawnPoint>(player).map(|spawn| spawn.0);
+        if let Some(spawn) = spawn
+            && stat::is_dead(world, player)
+        {
+            if let Some(mut memory) = world.get_mut::<Memory>(player) {
+                memory.leave_area(&content);
+            }
+            combat::revive(world, player, spawn);
         }
-        let Some(spawn) = world.get::<SpawnPoint>(entity).map(|spawn| spawn.0) else {
-            continue;
-        };
-        if let Some(mut memory) = world.get_mut::<Memory>(entity) {
-            memory.leave_area(&content);
-        }
-        combat::revive(world, entity, spawn);
-    }
+        Ok(())
+    });
 }

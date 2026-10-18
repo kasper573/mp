@@ -15,7 +15,9 @@ use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
 use crate::systems::text::LineText;
 
+/// Shows the offer card and pauses.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct OfferQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -28,7 +30,9 @@ pub struct OfferQuest {
     pub refused: Arrow,
 }
 
+/// Takes the quest at once.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct AcceptQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -39,7 +43,9 @@ pub struct AcceptQuest {
     pub refused: Arrow,
 }
 
+/// Shows the turn-in card and pauses.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct TurnIn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -52,7 +58,9 @@ pub struct TurnIn {
     pub cancelled: Arrow,
 }
 
+/// Fails an active quest.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct FailQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -61,7 +69,9 @@ pub struct FailQuest {
     pub next: Arrow,
 }
 
+/// Completes a task objective.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct CompleteTask {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -71,7 +81,9 @@ pub struct CompleteTask {
     pub next: Arrow,
 }
 
+/// Decides a quest's path.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "quest"))]
 pub struct Decide {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

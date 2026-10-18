@@ -244,7 +244,7 @@ fn plan(content: &Content, models: &[ModelId], animations: &str, loops: usize) -
 fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     let longest = COLUMNS
         .iter()
-        .map(|&dir| model.timing(action, dir).duration)
+        .map(|&dir| model.timing(action, dir, AUTHORED_RATE).duration)
         .fold(Seconds(0.0), |a, b| if b > a { b } else { a });
     let length = if action == Action::Dead {
         longest + DEATH_HOLD

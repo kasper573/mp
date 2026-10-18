@@ -36,7 +36,9 @@ pub fn rebroadcast(world: &mut World) {
     }
 }
 
+/// A chat line and a speech bubble from the owner.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "chat"))]
 pub struct Say {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text: Vec<Span>,

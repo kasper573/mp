@@ -16,8 +16,8 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest, open,
-    passed_by, portal, taken, townsperson,
+    UiTarget, aiming, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest,
+    open, passed_by, portal, taken, townsperson,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,6 +39,11 @@ pub struct Player {
 pub const LONG: WaitBudget = WaitBudget {
     time: Duration::from_secs(120),
     frames: 3600,
+};
+
+const NUDGE: WaitBudget = WaitBudget {
+    time: Duration::from_secs(2),
+    frames: 120,
 };
 
 impl Player {
@@ -188,6 +193,11 @@ impl Player {
     pub fn drag_ui(&mut self, ui: impl Into<UiTarget>, by: Offset<WindowPx>) -> ProbeSnapshot {
         let from = self.aim_at_ui(&ui.into(), Aim::Click);
         let from = from.input.cursor.expect("the pointer is over the window");
+        self.drag(Button::Left, KeyModifiers::NONE, from + by)
+    }
+
+    pub fn drag_from(&mut self, from: Pos<WindowPx>, by: Offset<WindowPx>) -> ProbeSnapshot {
+        self.point_at(from);
         self.drag(Button::Left, KeyModifiers::NONE, from + by)
     }
 
@@ -440,8 +450,11 @@ impl Player {
     }
 
     // The first frame with the player standing in an area, done crossing into it.
+    // In the world and free to act: a newcomer's commands are held for a moment after arriving.
     pub fn in_world(&mut self) -> ProbeSnapshot {
-        self.wait_until("the player in the world", in_world)
+        self.wait_until("the player in the world", |snapshot| {
+            in_world(snapshot) && snapshot.me.as_ref().is_some_and(|me| !me.locked)
+        })
     }
 
     pub fn come_to_rest(&mut self) -> Pos<Tiles> {
@@ -503,6 +516,71 @@ impl Player {
 
     // Chases the nearest of `foes` and swings at whichever of them the click lands on, until `done`:
     // monsters crowd, and the one in front takes the click.
+    /// Arms the skill in the slot and points at the tile, ready to cast.
+    pub fn aim_skill(&mut self, slot: InputAction, at: Pos<Tiles>) {
+        self.act(slot);
+        self.wait_until("the skill armed", aiming);
+        self.point_at_tile(at);
+    }
+
+    /// Casts the aimed skill where the pointer rests, until `done` shows the cast landed.
+    pub fn cast(&mut self, done: impl Fn(&ProbeSnapshot) -> bool) {
+        self.click();
+        self.wait_until("the cast landed", done);
+    }
+
+    pub fn cast_at(
+        &mut self,
+        slot: InputAction,
+        at: Pos<Tiles>,
+        done: impl Fn(&ProbeSnapshot) -> bool,
+    ) {
+        self.aim_skill(slot, at);
+        self.cast(done);
+    }
+
+    /// Casts the skill in the slot on the actor `pick` names, clicking only once the pointer rests
+    /// on that actor, since it may wander while the pointer glides; a click that still misses arms
+    /// the skill again.
+    pub fn cast_on(
+        &mut self,
+        slot: InputAction,
+        pick: impl Fn(&ProbeSnapshot) -> Option<(Entity, Pos<Tiles>)>,
+        done: impl Fn(&ProbeSnapshot) -> bool,
+    ) {
+        let deadline = Deadline::from(&self.desktop, LONG);
+        loop {
+            let seen = self.snapshot();
+            if done(&seen) {
+                return;
+            }
+            if deadline.passed(&self.desktop) {
+                self.desktop.give_up("the cast on its target");
+            }
+            if !aiming(&seen) {
+                self.act(slot);
+                self.wait_until("the skill armed", aiming);
+            }
+            let Some((target, at)) = pick(&seen) else {
+                continue;
+            };
+            let Some(point) = clickable_point(&seen, at) else {
+                continue;
+            };
+            let pointed = self.point_at(point);
+            if !matches!(pointed.claim, ClickClaim::Aim(aimed) if aimed == target) {
+                continue;
+            }
+            self.click();
+            if self
+                .try_wait_for(BUDGET, |snapshot| done(snapshot).then_some(()))
+                .is_some()
+            {
+                return;
+            }
+        }
+    }
+
     pub fn fight(
         &mut self,
         foes: impl Fn(&ProbeSnapshot, &ProbeBody) -> bool,
@@ -606,20 +684,26 @@ impl Player {
 
     // A walk click can land on a townsperson who strolled under it, and leaving one conversation can
     // open another that someone held until the player was free.
+    // Presses Dismiss again whenever a press went unanswered, since one can land in a frame the
+    // stage is still settling and be lost.
     pub fn leave_conversation(&mut self) {
-        for _ in 0..5 {
+        let deadline = Deadline::from(&self.desktop, BUDGET);
+        loop {
             let Some(before) = self.snapshot().stage else {
                 return;
             };
             self.act(InputAction::Dismiss);
-            self.wait_until("the conversation to end", |snapshot| {
+            let moved_on = self.try_wait_for(NUDGE, |snapshot| {
                 snapshot
                     .stage
                     .as_ref()
                     .is_none_or(|stage| stage.with != before.with || stage.node != before.node)
+                    .then_some(())
             });
+            if moved_on.is_none() && deadline.passed(&self.desktop) {
+                self.desktop.give_up("the conversation to end");
+            }
         }
-        self.desktop.fail("conversations kept opening");
     }
 
     pub fn conversation_over(&mut self) {

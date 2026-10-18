@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 use engine::core::content::{
     Content, ContentId, ContentRow, ContentScope, FilesystemFolder, key_of, with_content,
 };
-use engine::core::math::{Pos, Rect};
+use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::{self, Area, AreaDef, AreaModule};
 use engine::systems::load_content;
@@ -85,6 +85,28 @@ pub fn hunting_ground(area: &str, npc: &str) -> Pos<Tiles> {
             _ => None,
         })
         .unwrap_or_else(|| panic!("no {npc:?} roams {area}"))
+}
+
+// The middle of the tightest ground a pack of the monster keeps to: where several of them stand
+// close enough together for one cast to reach them all.
+pub fn pack_ground(area: &str, npc: &str) -> Pos<Tiles> {
+    let npc = id(npc);
+    area::modules(content(), id(area))
+        .filter_map(|module| match module {
+            AreaModule::Population(population) if population.npc == npc => population.roams,
+            _ => None,
+        })
+        .min_by(|a, b| (a.size.width * a.size.height).total_cmp(&(b.size.width * b.size.height)))
+        .map(|roams| roams.center())
+        .unwrap_or_else(|| panic!("no {npc:?} keeps to a ground in {area}"))
+}
+
+/// A place `by` tiles east of a spot and a tile down from its row, clear of whoever stands there.
+pub fn east_of(area: &str, spot: Pos<Tiles>, by: f32) -> Place {
+    Place {
+        area: id(area),
+        at: spot + Offset::new(by, 1.0),
+    }
 }
 
 pub fn beside_resident(area: &str, npc: &str) -> Place {

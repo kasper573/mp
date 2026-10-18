@@ -7,33 +7,34 @@ use bevy_app::App;
 use bevy_ecs::message::{MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
-use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
-use crate::core::math::{Direction, Percent, Pos, Rect, Rng};
+use crate::core::content::{
+    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
+};
+use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::model::ModelId;
-use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint};
+use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;
-use crate::systems::effect::{self, Effect, TimedEffects};
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
-use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
 };
+use crate::systems::skill::{self, Rank, SkillId};
 use crate::systems::stat::{StatMap, Stats};
+use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
@@ -44,7 +45,24 @@ const CORPSE_LINGER: Seconds = Seconds(5.0);
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate_once::<Npc>();
-    effect::source(app, chase);
+}
+
+/// The ranks an npc holds its skills at lie within those skills' ranks.
+pub fn check_all(loading: &mut Loading) {
+    let content = loading.content();
+    for (id, def) in loading.rows::<NpcDef>(&content) {
+        let mut check = RowCheck::default();
+        for (index, listed) in def.skills.iter().enumerate() {
+            skill::check_rank(
+                &mut check,
+                format!("/skills/{index}/rank"),
+                &content,
+                listed.skill,
+                listed.rank,
+            );
+        }
+        loading.row_errors(id, check);
+    }
 }
 
 pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
@@ -56,16 +74,6 @@ pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
         })
         .reaches
         .contains(&Reach::Hostile)
-}
-
-pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
-    if world.get::<Npc>(entity).is_some()
-        && reach::intent(world, entity, ReachAct::Attack).is_some()
-    {
-        vec![Effect::Chasing]
-    } else {
-        Vec::new()
-    }
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -90,12 +98,49 @@ pub struct NpcDef {
     pub name: String,
     pub model: ModelId,
     pub stats: StatMap,
+    #[schemars(extend("x-usage" = "the skill a click on a target uses"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basic_attack: Option<SkillId>,
+    #[schemars(extend("x-usage" = "known at these ranks, for the scripts that will cast them"))]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<NpcSkill>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,
 }
 
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct NpcSkill {
+    pub skill: SkillId,
+    #[schemars(extend("default" = 1))]
+    #[serde(default = "Rank::first", skip_serializing_if = "Rank::is_first")]
+    pub rank: Rank,
+}
+
 impl ContentRow for NpcDef {
     const TABLE: &'static str = "npc";
+
+    fn check(&self, check: &mut RowCheck) {
+        let mut seen = std::collections::BTreeSet::new();
+        for (index, known) in self.skills.iter().enumerate() {
+            if !seen.insert(known.skill) {
+                check.error(
+                    format!("/skills/{index}/skill"),
+                    "skill twice",
+                    known.skill.raw(),
+                    "each skill listed once, at one rank",
+                );
+            }
+            if known.rank == Rank::NONE {
+                check.error(
+                    format!("/skills/{index}/rank"),
+                    "out of range",
+                    0,
+                    "1 or more",
+                );
+            }
+        }
+    }
 }
 
 impl ModuleSet for NpcDef {
@@ -269,36 +314,35 @@ fn spawn_wild(
     }
     .expect("validated at startup: populations have ground outside the safe zones");
     let entity = spawn(world, npc, at, area_id, pack);
-    world.entity_mut(entity).insert(Wild);
-    if let Some(bounds) = roams {
-        world.entity_mut(entity).insert(Roams(bounds));
-    }
+    match roams {
+        Some(bounds) => world.entity_mut(entity).insert((Wild, Roams(bounds))),
+        None => world.entity_mut(entity).insert(Wild),
+    };
 }
 
+/// A bare actor of the definition, as a test stands one up; `spawn` makes a whole NPC of it.
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
     let content = world.resource::<Content>().clone();
-    let entity = world.spawn(character(&content, def, at, area)).id();
-    world
-        .entity_mut(entity)
-        .insert(Stats(def.stats.listed().collect()));
-    entity
+    world.spawn(actor_bundle(&content, def, at, area)).id()
 }
 
 pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: Pack) -> Entity {
     let content = world.resource::<Content>().clone();
-    let entity = spawn_actor(world, def.get(&content), at, area);
-    world.entity_mut(entity).insert((
+    let row = def.get(&content);
+    let mut entity = world.spawn((
+        actor_bundle(&content, row, at, area),
         Npc { def },
         pack,
         Attitude::Friendly,
         body::Body::default(),
         actor::Name {
-            name: def.get(&content).name.to_owned(),
+            name: row.name.to_owned(),
         },
     ));
-    if let Some(babble) = def.get(&content).voice() {
-        world.entity_mut(entity).insert(Babbler(babble));
+    if let Some(babble) = row.voice() {
+        entity.insert(Babbler(babble));
     }
+    let entity = entity.id();
     start_scripts(world, entity, def);
     entity
 }
@@ -449,22 +493,22 @@ pub fn approach(world: &mut World) {
     }
 }
 
-fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Character {
-    Character {
-        replicated: Replicated,
-        position: Position::at(at),
-        actor: Actor {
+fn actor_bundle(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> impl Bundle {
+    let character = Character::new(
+        Position::at(at),
+        Actor {
             color: def.tint(),
             dir: Direction::S,
             action: Action::Idle,
             model: def.model,
             attack_rate: PlaybackRate::default(),
         },
-        hitbox: Hitbox {
+        Hitbox {
             size: ActorModel::get(content, def.model).hitbox(),
         },
-        area: AreaTag { area },
-    }
+        AreaTag { area },
+    );
+    (character, Stats(def.stats.listed().collect()))
 }
 
 fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
@@ -542,7 +586,7 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 .entity_mut(id)
                 .insert((Attitude::Friendly, body::Body::default(), Near::default()))
                 .remove::<Reservation>()
-                .remove::<TimedEffects>();
+                .insert(Statuses::default());
             start_scripts(world, id, npc);
         }
     });

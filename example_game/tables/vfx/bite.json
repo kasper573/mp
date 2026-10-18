@@ -1,0 +1,10 @@
+{
+  "name": "Bite",
+  "layers": [
+    {
+      "type": "shader",
+      "shader": "jaws",
+      "duration": 0.45
+    }
+  ]
+}

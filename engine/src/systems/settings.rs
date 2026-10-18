@@ -12,9 +12,10 @@ use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
 use crate::core::text::{MotionPreference, TypewriterSpeed};
-use crate::systems::hud::{HudAudience, HudWindow};
-use crate::systems::input::map::InputAction;
+use crate::systems::hud::HudWindow;
+use crate::systems::input::map::{InputAction, KeyGesture};
 use crate::systems::interface::InterfaceIcon;
+use crate::systems::skill::HotbarSlot;
 
 const WINDOW_SIZE: egui::Vec2 = egui::Vec2::new(400.0, 410.0);
 const SLIDER_WIDTH: f32 = 150.0;
@@ -37,6 +38,8 @@ pub(crate) struct UserSettings {
     sound: AudioMix,
     #[serde(default)]
     screen: ScreenSettings,
+    #[serde(default)]
+    skills: SkillSettings,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -48,12 +51,34 @@ pub(crate) struct Placement {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub(crate) struct LettersPerSecond(pub f32);
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HotbarShape {
+    pub columns: u32,
+    pub rows: u32,
+}
+
+impl HotbarShape {
+    pub(crate) const DEFAULT: HotbarShape = HotbarShape {
+        columns: 9,
+        rows: 1,
+    };
+
+    pub(crate) fn slots(self) -> u32 {
+        self.columns * self.rows
+    }
+}
+
+/// What key a hotbar slot answers to: the game's own for the slot, none, or one the player chose.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HotbarKey {
+    Default,
+    Unbound,
+    Custom(KeyGesture),
+}
+
 pub struct SettingsWindow;
 
 impl HudWindow for SettingsWindow {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Everyone
-    }
     fn title(&self) -> &'static str {
         "Settings"
     }
@@ -89,6 +114,14 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     let mut frame_rate = settings.frame_rate_shown();
     if ui.checkbox(&mut frame_rate, "Show FPS").changed() {
         settings.toggle_frame_rate();
+    }
+    let mut quick_cast = settings.quick_cast();
+    if ui
+        .checkbox(&mut quick_cast, "Quick cast skills")
+        .on_hover_text("A skill is cast the moment it is used, at what the pointer rests on")
+        .changed()
+    {
+        settings.toggle_quick_cast();
     }
     ui.add_space(4.0);
     form(ui, "interface", |ui| {
@@ -234,6 +267,14 @@ impl UserSettings {
         self.screen.frame_rate = !self.screen.frame_rate;
     }
 
+    pub(crate) fn quick_cast(&self) -> bool {
+        self.skills.quick_cast
+    }
+
+    pub(crate) fn toggle_quick_cast(&mut self) {
+        self.skills.quick_cast = !self.skills.quick_cast;
+    }
+
     pub(crate) fn widget_pos(&self, id: &str) -> Option<Pos<WindowPx>> {
         self.ui.widgets.get(id).copied()
     }
@@ -248,6 +289,30 @@ impl UserSettings {
 
     pub(crate) fn set_window_placement(&mut self, id: &str, placement: Placement) {
         self.ui.windows.insert(id.to_owned(), placement);
+    }
+
+    pub(crate) fn hotbar_shape(&self) -> HotbarShape {
+        self.ui.hotbar.shape.unwrap_or(HotbarShape::DEFAULT)
+    }
+
+    pub(crate) fn set_hotbar_shape(&mut self, shape: HotbarShape) {
+        self.ui.hotbar.shape = Some(shape);
+    }
+
+    pub(crate) fn hotbar_key(&self, slot: HotbarSlot) -> HotbarKey {
+        match self.ui.hotbar.keys.get(&slot) {
+            None => HotbarKey::Default,
+            Some(None) => HotbarKey::Unbound,
+            Some(Some(gesture)) => HotbarKey::Custom(*gesture),
+        }
+    }
+
+    pub(crate) fn set_hotbar_key(&mut self, slot: HotbarSlot, key: HotbarKey) {
+        match key {
+            HotbarKey::Default => self.ui.hotbar.keys.remove(&slot),
+            HotbarKey::Unbound => self.ui.hotbar.keys.insert(slot, None),
+            HotbarKey::Custom(gesture) => self.ui.hotbar.keys.insert(slot, Some(gesture)),
+        };
     }
 
     fn load(platform: &dyn Platform) -> UserSettings {
@@ -293,6 +358,8 @@ struct UiSettings {
     widgets: BTreeMap<String, Pos<WindowPx>>,
     #[serde(default)]
     windows: BTreeMap<String, Placement>,
+    #[serde(default)]
+    hotbar: HotbarSettings,
 }
 
 impl Default for UiSettings {
@@ -301,8 +368,18 @@ impl Default for UiSettings {
             snap: default_snap(),
             widgets: BTreeMap::new(),
             windows: BTreeMap::new(),
+            hotbar: HotbarSettings::default(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct HotbarSettings {
+    #[serde(default)]
+    shape: Option<HotbarShape>,
+    #[serde(default)]
+    /// A slot absent keeps the game's key; one listed with no gesture has none.
+    keys: BTreeMap<HotbarSlot, Option<KeyGesture>>,
 }
 
 fn default_snap() -> Option<WindowPx> {
@@ -315,6 +392,12 @@ struct TextSettings {
     letters_per_second: LettersPerSecond,
     #[serde(default)]
     reduced_motion: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct SkillSettings {
+    #[serde(default)]
+    quick_cast: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]

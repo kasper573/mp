@@ -22,20 +22,18 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
-use crate::core::time::{Seconds, WallClock};
+use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaId, AreaTag};
-use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
+use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
-use crate::systems::notification;
 use crate::systems::npc::Npc;
-use crate::systems::player::{self, ClientId, Owner, Players, sender_player};
-use crate::systems::reach::{self, Pursuit, ReachAct};
+use crate::systems::player::{ClientId, Owner, Players, player_requests};
+use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
-use crate::systems::stat::{self, Stat};
+use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
-use crate::systems::{drain_requests, equipment};
 
 pub const INVENTORY_MAX: u32 = 25;
 const RESERVATION_TTL: Seconds = Seconds(60.0);
@@ -54,7 +52,6 @@ pub fn register(app: &mut App) {
         .add_mapped_client_message::<PickupRequest>(Channel::Ordered)
         .add_mapped_server_message::<ItemConsumed>(Channel::Ordered)
         .add_mapped_server_message::<ItemsDropped>(Channel::Ordered);
-    effect::source(app, carried);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -345,11 +342,8 @@ impl ModuleSet for ItemDef {
         &self.modules
     }
 
-    fn rule(module: &ItemModule) -> ModuleRule {
-        match module {
-            ItemModule::Stat(_) => ModuleRule::AnyNumber,
-            _ => ModuleRule::AtMostOne,
-        }
+    fn rule(_: &ItemModule) -> ModuleRule {
+        ModuleRule::AtMostOne
     }
 }
 
@@ -369,8 +363,6 @@ impl ScriptedRow for ItemDef {
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
-    Stat(Stat),
-    Chasing,
     QuestItem,
     Bound,
     Currency,
@@ -437,21 +429,6 @@ impl ItemDef {
             .unwrap_or(1)
     }
 
-    pub fn stats(&self) -> impl Iterator<Item = Stat> + '_ {
-        self.modules.iter().filter_map(|module| match module {
-            ItemModule::Stat(stat) => Some(*stat),
-            _ => None,
-        })
-    }
-
-    pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
-        self.modules.iter().filter_map(|module| match module {
-            ItemModule::Stat(stat) => Some(Effect::StatModifier(*stat)),
-            ItemModule::Chasing => Some(Effect::Chasing),
-            _ => None,
-        })
-    }
-
     pub fn has(&self, flag: ItemFlag) -> bool {
         self.modules.iter().any(|module| {
             matches!(
@@ -472,9 +449,9 @@ impl ItemDef {
             return ItemCategory::Currency;
         }
         match self.kind {
-            ItemKind::Consumable { .. } => ItemCategory::Consumable,
+            ItemKind::Usable => ItemCategory::Consumable,
             ItemKind::Equipment { .. } => ItemCategory::Equipment,
-            ItemKind::Resource | ItemKind::Usable => ItemCategory::Material,
+            ItemKind::Resource => ItemCategory::Material,
         }
     }
 }
@@ -482,23 +459,16 @@ impl ItemDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemKind {
-    Consumable {
-        health_bonus: f32,
-        lasts: Seconds,
-    },
     Equipment {
         slot: equipment::EquipmentSlot,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         requires: Option<Condition>,
+        #[schemars(extend("x-usage" = "known while worn"))]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        grants: Vec<SkillId>,
     },
     Usable,
     Resource,
-}
-
-impl ItemKind {
-    fn carried(&self) -> bool {
-        matches!(self, ItemKind::Resource)
-    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -511,17 +481,9 @@ pub struct ItemSfx {
 }
 
 pub fn use_item(world: &mut World) {
-    for request in drain_requests::<UseItemRequest>(world) {
-        let Some(entity) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !player::may_command(world, entity) {
-            continue;
-        }
-        if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
-            notification::error(world, entity, refusal);
-        }
-    }
+    player_requests::<UseItemRequest>(world, true, |world, player, request| {
+        use_slot(world, player, request.slot as usize)
+    });
 }
 
 pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), String> {
@@ -544,18 +506,9 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
         .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
         .ok_or_else(|| "Nothing there".to_owned())?;
     match item.get(&content).kind {
-        ItemKind::Consumable {
-            health_bonus,
-            lasts,
-        } => {
-            stat::heal(world, actor, health_bonus);
-            consume_slot(world, actor, slot);
-            announce_consumed(world, actor, item);
-            instantiate_effects(world, actor, item, lasts);
-            Ok(())
-        }
         ItemKind::Equipment { .. } => equipment::equip(world, actor, slot),
         ItemKind::Usable => {
+            announce_consumed(world, actor, item);
             raise(world, item, EventKind::Used, actor);
             Ok(())
         }
@@ -575,14 +528,8 @@ pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
 
 pub fn drop_item(world: &mut World) {
     let content = world.resource::<Content>().clone();
-    for request in drain_requests::<DropItemRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !player::may_command(world, player) {
-            continue;
-        }
-        let slot = request.message.slot as usize;
+    player_requests::<DropItemRequest>(world, true, |world, player, request| {
+        let slot = request.slot as usize;
         let removed = match world.get_mut::<Inventory>(player) {
             Some(mut inventory)
                 if inventory
@@ -594,27 +541,22 @@ pub fn drop_item(world: &mut World) {
             }
             _ => None,
         };
-        let Some(slot) = removed else {
-            continue;
-        };
-        scatter_drop(world, player, &[(slot.item, slot.count)], None, None);
-    }
+        if let Some(slot) = removed {
+            scatter_drop(world, player, &[(slot.item, slot.count)], None, None);
+        }
+        Ok(())
+    });
 }
 
 pub fn pickup_request(world: &mut World) {
-    for request in drain_requests::<PickupRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        let target = request.message.target;
-        if !player::may_command(world, player)
-            || world.get::<DroppedItem>(target).is_none()
-            || !visibility::present(world, target, player)
+    player_requests::<PickupRequest>(world, true, |world, player, request| {
+        let target = request.target;
+        if world.get::<DroppedItem>(target).is_some() && visibility::present(world, target, player)
         {
-            continue;
+            reach::intend(world, player, ReachTarget::Actor(target), ReachAct::Pickup);
         }
-        reach::intend(world, player, target, ReachAct::Pickup);
-    }
+        Ok(())
+    });
 }
 
 pub fn pickable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
@@ -752,36 +694,9 @@ pub fn scatter_at(
     }
 }
 
-fn carried(world: &World, entity: Entity) -> Vec<Effect> {
-    let content = world.resource::<Content>();
-    world
-        .get::<Inventory>(entity)
-        .map(|inventory| {
-            inventory
-                .slots
-                .iter()
-                .map(|slot| slot.item.get(content))
-                .filter(|def| def.kind.carried())
-                .flat_map(|def| def.effects())
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 fn announce_consumed(world: &mut World, actor: Entity, item: ItemId) {
     for client in seen_by(world, actor) {
         visibility::send_to(world, client, ItemConsumed { item, actor });
-    }
-}
-
-fn consume_slot(world: &mut World, entity: Entity, slot: usize) {
-    if let Some(mut inventory) = world.get_mut::<Inventory>(entity)
-        && let Some(stack) = inventory.slots.get_mut(slot)
-    {
-        stack.count -= 1;
-        if stack.count == 0 {
-            inventory.slots.remove(slot);
-        }
     }
 }
 
@@ -807,25 +722,6 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     if collected {
         world.entity_mut(item).despawn();
         raise(world, drop.item, EventKind::PickedUp, player);
-    }
-}
-
-fn instantiate_effects(world: &mut World, actor: Entity, item: ItemId, duration: Seconds) {
-    let content = world.resource::<Content>().clone();
-    let until = world.resource::<WallClock>().now.after(duration);
-    let entries = item
-        .get(&content)
-        .effects()
-        .map(|effect| TimedEffect { effect, until })
-        .collect::<Vec<_>>();
-    if entries.is_empty() {
-        return;
-    }
-    match world.get_mut::<TimedEffects>(actor) {
-        Some(mut timed) => timed.0.extend(entries),
-        None => {
-            world.entity_mut(actor).insert(TimedEffects(entries));
-        }
     }
 }
 

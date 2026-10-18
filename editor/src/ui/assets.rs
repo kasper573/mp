@@ -4,8 +4,10 @@ use egui::Ui;
 
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Editor, RightTab};
+use crate::app::Editor;
+use crate::picker::Dragged;
 use crate::project::RowSelection;
+use crate::tabs::EditorTab;
 use crate::thumbs;
 
 #[derive(Default)]
@@ -14,11 +16,27 @@ pub struct AssetsState {
     pub tree: TreeState,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AssetKind {
     Image,
     Audio,
     Font,
+}
+
+impl AssetKind {
+    pub const ALL: &[AssetKind] = &[AssetKind::Image, AssetKind::Audio, AssetKind::Font];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            AssetKind::Image => "image",
+            AssetKind::Audio => "audio",
+            AssetKind::Font => "font",
+        }
+    }
+
+    pub fn named(id: &str) -> Option<AssetKind> {
+        AssetKind::ALL.iter().copied().find(|kind| kind.id() == id)
+    }
 }
 
 pub fn kind(path: &str) -> Option<AssetKind> {
@@ -61,6 +79,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             let mut node = TreeNode::leaf(path, name);
             node.selected = selected.as_deref() == Some(path);
             node.unsaved = project.is_unsaved(&format!("assets/{path}"));
+            node.drag = Some(Dragged::Asset(path.to_owned()));
             node.icon = match kind(path)? {
                 AssetKind::Image => TreeIcon::Thumb(path.to_owned()),
                 AssetKind::Audio => TreeIcon::Glyph("♪"),
@@ -101,7 +120,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .inner;
     if let Some((path, _)) = out.clicked {
         editor.select(RowSelection::row("asset", &path));
-        editor.panels.right = RightTab::Inspector;
+        editor.open_tab(EditorTab::Asset { path });
     }
     if !needle.is_empty() {
         editor.status.left.push(format!(

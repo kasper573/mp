@@ -7,7 +7,7 @@ mod interact;
 mod toolbar;
 
 pub use arrange::{ArrangeDialog, dialog as arrange_dialog};
-pub use filters::{ColourBy, ColourField, MapLens};
+pub use filters::{ColorBy, ColorField, MapLens};
 pub use inspect::inspect_parts;
 
 use std::fmt;
@@ -17,14 +17,14 @@ use egui::{Color32, Pos2, Rect, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, Fixture};
 use engine::core::math::{Pos, Size};
 use engine::core::tiling::Tiles;
-use engine::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
+use engine::systems::area::world_map::{Card, Note, Region, RegionColor, WorldMap, WorldMapDef};
 use engine::systems::area::{self, AreaDef, AreaId};
 use serde::Deserialize;
 use std::str::FromStr;
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection, row_file};
-use crate::ui::theme;
+use crate::ui::{sidebar, theme};
 use crate::value;
 use crate::views::area::TILE_PX;
 use crate::views::navigation;
@@ -45,7 +45,7 @@ pub struct WorldView {
     pub fitted: bool,
     pub lenses: Vec<MapLens>,
     pub search: String,
-    pub colour: Option<ColourBy>,
+    pub color: Option<ColorBy>,
     pub route: Option<MapRoute>,
     pub route_from: Option<String>,
     pub quest_line: Option<String>,
@@ -134,19 +134,19 @@ impl FromStr for MapPart {
     }
 }
 
-pub fn region_colour(colour: Option<RegionColour>) -> Color32 {
-    match colour {
+pub fn region_color(color: Option<RegionColor>) -> Color32 {
+    match color {
         None => Color32::from_rgb(150, 150, 170),
-        Some(RegionColour::Amber) => theme::WARN,
-        Some(RegionColour::Green) => theme::OK,
-        Some(RegionColour::Blue) => Color32::from_rgb(90, 160, 255),
-        Some(RegionColour::Red) => theme::DANGER,
-        Some(RegionColour::Violet) => Color32::from_rgb(170, 120, 240),
+        Some(RegionColor::Amber) => theme::WARN,
+        Some(RegionColor::Green) => theme::OK,
+        Some(RegionColor::Blue) => Color32::from_rgb(90, 160, 255),
+        Some(RegionColor::Red) => theme::DANGER,
+        Some(RegionColor::Violet) => Color32::from_rgb(170, 120, 240),
     }
 }
 
-pub fn region_colour_name(colour: Option<RegionColour>) -> &'static str {
-    colour.map_or("grey", <&str>::from)
+pub fn region_color_name(color: Option<RegionColor>) -> &'static str {
+    color.map_or("grey", <&str>::from)
 }
 
 pub struct OpenWorldMap {
@@ -271,6 +271,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
+    sidebar::right(ui, "world", |ui| {
+        let selection = if editor.selection.table == WorldMapDef::TABLE {
+            editor.selection.clone()
+        } else {
+            RowSelection::row(WorldMapDef::TABLE, WorldMap::World.key())
+        };
+        inspect::inspect_parts(editor, ui, &selection);
+    });
     toolbar::show(editor, ui, &map);
     canvas::show(editor, ui, &map);
 }
@@ -426,7 +434,7 @@ fn region_from_selection(editor: &mut Editor, map: &OpenWorldMap) {
     next.regions.push(Region {
         name: name.clone(),
         cards,
-        colour: None,
+        color: None,
     });
     if map.write(
         editor,

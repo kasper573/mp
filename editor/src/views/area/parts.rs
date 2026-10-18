@@ -12,7 +12,7 @@ use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection, row_file};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema};
 
@@ -226,7 +226,7 @@ pub(super) fn part_cards(
             let holeable = holes::holeable_fields(shapes, part);
             widgets::card_frame(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &kind, &kind.replace('_', " "), "", |ui| {
+                widgets::card_header(ui, &kind.replace('_', " "), "", |ui| {
                     if ui.button("Duplicate").clicked() {
                         duplicate = Some(index);
                         ui.close();
@@ -281,7 +281,7 @@ pub(super) fn part_cards(
                     *part = plain;
                 }
                 if module_kind == Some(AreaModuleKind::Object) {
-                    changed |= crate::ui::inspector::scripts::script_cards(
+                    changed |= crate::ui::row_form::scripts::script_cards(
                         ui, &mut cx, "area", part, "scripts", &path,
                     )
                     .is_some();
@@ -338,7 +338,7 @@ pub(super) fn part_cards(
         editor.apply(edit);
     }
     for action in actions {
-        inspector::act(editor, action, "blueprint", key);
+        row_form::act(editor, action, "blueprint", key);
     }
 }
 
@@ -503,35 +503,16 @@ pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row
     let shape = shapes.shape_of("blueprint");
     let count = row["modules"].as_array().map_or(0, Vec::len);
     widgets::section_count(ui, "Modules", count);
-    let mut changed = false;
-    let mut actions = Vec::new();
-    {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by("blueprint", Some(key));
-        changed |= crate::ui::inspector::scripts::script_cards(
-            ui,
-            &mut cx,
-            "blueprint",
-            row,
-            "modules",
-            "",
-        )
-        .is_some();
-    }
+    let changed = editor
+        .with_form("blueprint", Some(key), shape, |cx| {
+            crate::ui::row_form::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
+                .is_some()
+        })
+        .unwrap_or(false);
     if changed {
         let mut edit = ContentEdit::new(format!("Edit modules · blueprint/{key}"));
         edit.write_json(row_file("blueprint", key), row);
         editor.apply(edit);
-    }
-    for action in actions {
-        inspector::act(editor, action, "blueprint", key);
     }
 }
 

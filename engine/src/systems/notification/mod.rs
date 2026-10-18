@@ -23,10 +23,10 @@ use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
+use crate::core::math::Rgba;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::systems::actor::Rgba;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
@@ -127,6 +127,19 @@ pub fn notify(world: &mut World, player: Entity, notification: Notification) {
     notify_from(world, player, None, notification);
 }
 
+/// An error the client raises for itself, shown like one the server sent.
+pub fn local_error(world: &mut World, text: impl Into<String>) {
+    let kind = NotificationKind::error(world.resource::<Content>());
+    show(
+        world,
+        NotificationSent {
+            notification: Notification::new(kind, LineText::plain(text.into())),
+            speaker: None,
+            at: UnixMillis(0),
+        },
+    );
+}
+
 pub fn error(world: &mut World, player: Entity, text: impl Into<String>) {
     let kind = NotificationKind::error(world.resource::<Content>());
     notify(
@@ -188,6 +201,48 @@ impl Notification {
             text,
             lasts: None,
         }
+    }
+
+    /// A row of the feed under a topic, bare until given an icon, a tally, a sound or a failure.
+    pub fn feed(topic: HistoryTopic, text: impl Into<String>) -> Notification {
+        Notification::new(
+            NotificationKind::Feed {
+                topic,
+                icon: None,
+                tally: None,
+                failure: false,
+                sfx: None,
+            },
+            LineText::plain(text),
+        )
+    }
+
+    pub fn icon(mut self, path: String) -> Notification {
+        if let NotificationKind::Feed { icon, .. } = &mut self.kind {
+            *icon = Some(path);
+        }
+        self
+    }
+
+    pub fn tally(mut self, counted: RecordTally) -> Notification {
+        if let NotificationKind::Feed { tally, .. } = &mut self.kind {
+            *tally = Some(counted);
+        }
+        self
+    }
+
+    pub fn failed(mut self) -> Notification {
+        if let NotificationKind::Feed { failure, .. } = &mut self.kind {
+            *failure = true;
+        }
+        self
+    }
+
+    pub fn sound(mut self, heard: SfxId) -> Notification {
+        if let NotificationKind::Feed { sfx, .. } = &mut self.kind {
+            *sfx = Some(heard);
+        }
+        self
     }
 
     pub fn stays(&self) -> Seconds {
@@ -316,7 +371,9 @@ impl From<&NotificationDefKind> for NotificationKind {
     }
 }
 
+/// Shows a notification.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,

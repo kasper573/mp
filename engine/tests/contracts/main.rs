@@ -1,3 +1,4 @@
+mod babble;
 mod backoff;
 mod busts;
 mod clock;
@@ -19,10 +20,11 @@ mod quest;
 mod reach;
 mod safe_zone;
 mod shop;
+mod skills;
 mod snapshot;
-mod spectate;
 mod summon;
 mod templates;
 mod travel;
 mod typewriter;
+mod vfx;
 mod walking;

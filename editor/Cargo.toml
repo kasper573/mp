@@ -12,12 +12,12 @@ path = "src/main.rs"
 engine = { path = "../engine" }
 design_tokens = { path = "../design_tokens" }
 bevy_tilemap = { path = "../bevy/tilemap" }
-bevy_kira_audio = { version = "0.27", default-features = false }
 bevy = { workspace = true, features = ["x11", "multi_threaded"] }
 bevy_egui.workspace = true
 egui.workspace = true
 egui_dock = "0.21"
 egui-snarl = "0.12"
+egui_code_editor = "0.4.2"
 bevy_replicon = { workspace = true, features = ["server"] }
 serde.workspace = true
 serde_json.workspace = true

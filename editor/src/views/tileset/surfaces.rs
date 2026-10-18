@@ -8,7 +8,7 @@ use crate::app::Editor;
 use crate::audio::Waveform;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{inspector, theme, widgets};
+use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
 
@@ -71,7 +71,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.views.tileset.view_mut(key).surface = Some(surface);
     }
     if let Some(footstep) = play {
-        editor.views.model.sfx_to_play.push(footstep);
+        editor.views.sound.play.push(footstep);
     }
     if new {
         let dialog = NewSurfaceDialog {
@@ -97,7 +97,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
     let mut play = false;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "surface", &def.name, "first-class", |_| {});
+        widgets::card_header(ui, &def.name, "", |_| {});
         ui.add_space(4.0);
         widgets::kv(ui, "name", |ui| {
             let id = ui.id().with(("surface-name", surface));
@@ -116,7 +116,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         widgets::kv(ui, "footstep", |ui| {
             play = widgets::chip(ui, "▶").clicked();
             let mut picked = footstep.clone();
-            let changed = inspector::with_row_form(editor, TABLE, surface, |cx| {
+            let changed = row_form::with_row_form(editor, TABLE, surface, |cx| {
                 picker::row(ui, cx, "sfx", &mut picked, "/footstep")
             });
             if changed && !picked.is_empty() && picked != footstep {
@@ -148,7 +148,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         editor.views.tileset.surface_use(surface).text(),
     );
     if play {
-        editor.views.model.sfx_to_play.push(footstep);
+        editor.views.sound.play.push(footstep);
     }
     if let Some(name) = renamed {
         let label = format!("Name surface {surface} {name}");

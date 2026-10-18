@@ -98,6 +98,10 @@ impl Typewriter {
     pub fn shown(&self) -> Option<usize> {
         (!self.finished).then_some(self.shown)
     }
+
+    pub fn elapsed(&self) -> Duration {
+        self.elapsed
+    }
 }
 
 impl StyledLine {
@@ -226,7 +230,7 @@ impl Plugin for TextPlugin {
     }
 }
 
-fn advance_typewriters(
+pub(crate) fn advance_typewriters(
     time: Res<Time>,
     speed: Res<TypewriterSpeed>,
     mut lines: Query<(Entity, Ref<StyledLine>, &mut Typewriter)>,

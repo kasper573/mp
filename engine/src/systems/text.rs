@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::core::script::{Expr, Value};
 use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice};
-use crate::core::time::Millis;
+use crate::core::time::{Millis, Seconds};
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::script::RiftScripting;
 use design_tokens::ink;
@@ -110,6 +110,24 @@ impl From<Span> for SpanRow {
             }
         }
         SpanRow::Styled(row)
+    }
+}
+
+/// A count of a noun: "1 rank", "3 ranks".
+pub fn counted(count: u32, noun: &str) -> String {
+    if count == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{count} {noun}s")
+    }
+}
+
+/// A span of time at a glance: whole seconds under a minute, whole minutes from there.
+pub fn duration(span: Seconds) -> String {
+    if span.0 >= 60.0 {
+        format!("{} min", (span.0 / 60.0).ceil() as u32)
+    } else {
+        format!("{} s", span.0.ceil().max(1.0) as u32)
     }
 }
 

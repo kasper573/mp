@@ -23,10 +23,30 @@ use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{inspector, patterns, theme, widgets};
+use crate::ui::{patterns, row_form, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
+
+/// The area window's inspector: the selected modules, the blueprint parts edited in place, or
+/// else the card of the tool in hand.
+pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let selection = editor.selection.clone();
+    let of_this_area =
+        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
+    if of_this_area
+        && selection
+            .parts
+            .iter()
+            .any(|part| super::module_index(part).is_some())
+    {
+        show_parts(editor, ui, &selection);
+    } else if selection.table == "blueprint" && !selection.parts.is_empty() {
+        super::inspect_parts(editor, ui, &selection);
+    } else {
+        show(editor, ui, key);
+    }
+}
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
@@ -86,7 +106,6 @@ fn tool_card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            ui.label(theme::faint("≡"));
             ui.label(theme::strong(title).monospace());
         });
         ui.add_space(4.0);
@@ -355,17 +374,17 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     tool_card(ui, "Paint walkability", |ui| {
         let view = editor.views.area.view_mut(view_key);
         widgets::kv(ui, "paint", |ui| {
-            for (value, label, colour) in [
+            for (value, label, color) in [
                 (Some(false), "blocked", theme::DANGER),
                 (Some(true), "walkable", theme::OK),
                 (None, "clear", theme::MUTED),
             ] {
                 let on = view.walk_value == value;
-                if widgets::chip_coloured(
+                if widgets::chip_colored(
                     ui,
                     label,
-                    if on { colour } else { theme::INPUT },
-                    if on { egui::Color32::WHITE } else { colour },
+                    if on { color } else { theme::INPUT },
+                    if on { egui::Color32::WHITE } else { color },
                 )
                 .clicked()
                 {
@@ -388,18 +407,18 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
 
 fn overlays_legend(ui: &mut Ui) {
     widgets::section(ui, "Overlays");
-    let swatch = |ui: &mut Ui, colour: egui::Color32, hatch: bool| {
+    let swatch = |ui: &mut Ui, color: egui::Color32, hatch: bool| {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
         ui.painter().rect_stroke(
             rect,
             2.0,
-            egui::Stroke::new(1.0, colour),
+            egui::Stroke::new(1.0, color),
             egui::StrokeKind::Inside,
         );
         if hatch {
-            patterns::hatch(ui.painter(), rect, colour, 4.0);
+            patterns::hatch(ui.painter(), rect, color, 4.0);
         } else {
-            ui.painter().rect_filled(rect.shrink(3.0), 1.0, colour);
+            ui.painter().rect_filled(rect.shrink(3.0), 1.0, color);
         }
     };
     ui.horizontal(|ui| {
@@ -446,7 +465,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             });
         }
         for action in actions {
-            inspector::act(editor, action, "area", "");
+            row_form::act(editor, action, "area", "");
         }
         let Some(stamp) = editor.views.area.view(view_key).stamp.clone() else {
             widgets::hint(
@@ -589,29 +608,23 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
     let mut menu_action: Option<AreaMenu> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(
-            ui,
-            "area",
-            row["name"].as_str().unwrap_or(key),
-            "first-class",
-            |ui| {
-                if ui.button("Resize…").clicked() {
-                    menu_action = Some(AreaMenu::Resize);
-                    ui.close();
-                }
-                if ui
-                    .add(egui::Button::new("Play here").shortcut_text("F6"))
-                    .clicked()
-                {
-                    menu_action = Some(AreaMenu::Play);
-                    ui.close();
-                }
-                if ui.button("Open as row").clicked() {
-                    menu_action = Some(AreaMenu::OpenRow);
-                    ui.close();
-                }
-            },
-        );
+        widgets::card_header(ui, row["name"].as_str().unwrap_or(key), "", |ui| {
+            if ui.button("Resize…").clicked() {
+                menu_action = Some(AreaMenu::Resize);
+                ui.close();
+            }
+            if ui
+                .add(egui::Button::new("Play here").shortcut_text("F6"))
+                .clicked()
+            {
+                menu_action = Some(AreaMenu::Play);
+                ui.close();
+            }
+            if ui.button("Open as row").clicked() {
+                menu_action = Some(AreaMenu::OpenRow);
+                ui.close();
+            }
+        });
         ui.add_space(4.0);
         widgets::kv(ui, "name", |ui| {
             let response = forms::boxed_input(ui, None, |ui| {
@@ -716,7 +729,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
     let mut pick = false;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "place", "initial spawn");
+        widgets::card_title(ui, "initial spawn");
         ui.add_space(4.0);
         {
             let Editor {
@@ -768,7 +781,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         pins::set_spawn(editor, &picked, middle);
     }
     for action in actions {
-        inspector::act(editor, action, "area", key);
+        row_form::act(editor, action, "area", key);
     }
     if pick {
         editor.pick = Some(PlacePick {
@@ -934,29 +947,23 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             ui.add_space(4.0);
             widgets::card_frame(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(
-                    ui,
-                    "modules",
-                    &format!("{} modules", indices.len()),
-                    "",
-                    |ui| {
-                        if ui.button("Copy as JSON").clicked() {
-                            out.actions.push(super::AreaAction::Copy);
-                            ui.close();
-                        }
-                        if ui.button("Duplicate").clicked() {
-                            out.actions.push(super::AreaAction::Duplicate);
-                            ui.close();
-                        }
-                        if ui
-                            .add(egui::Button::new("Remove all").shortcut_text("Del"))
-                            .clicked()
-                        {
-                            out.actions.push(super::AreaAction::Delete);
-                            ui.close();
-                        }
-                    },
-                );
+                widgets::card_header(ui, &format!("{} modules", indices.len()), "", |ui| {
+                    if ui.button("Copy as JSON").clicked() {
+                        out.actions.push(super::AreaAction::Copy);
+                        ui.close();
+                    }
+                    if ui.button("Duplicate").clicked() {
+                        out.actions.push(super::AreaAction::Duplicate);
+                        ui.close();
+                    }
+                    if ui
+                        .add(egui::Button::new("Remove all").shortcut_text("Del"))
+                        .clicked()
+                    {
+                        out.actions.push(super::AreaAction::Delete);
+                        ui.close();
+                    }
+                });
                 ui.add_space(4.0);
                 changed |= placement::shared_values(ui, &mut cx, &mut row, &indices);
             });
@@ -975,7 +982,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         editor.apply(edit);
     }
     for action in actions {
-        inspector::act(editor, action, "area", &area_key);
+        row_form::act(editor, action, "area", &area_key);
     }
     for action in out.actions {
         if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &area_key) {
@@ -1024,7 +1031,7 @@ fn module_inspector(
     let content = cx.content.clone();
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, &kind, &shown_kind, "", |ui| {
+        widgets::card_header(ui, &shown_kind, "", |ui| {
             if ui.button("Copy as JSON").clicked() {
                 out.actions.push(super::AreaAction::Copy);
                 ui.close();
@@ -1098,7 +1105,7 @@ fn module_inspector(
                 widgets::section(ui, &format!("Values · {blueprint}"));
                 widgets::card_frame(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    widgets::card_title(ui, "values", "values");
+                    widgets::card_title(ui, "values");
                     ui.add_space(4.0);
                     changed |= placement::placement_card(ui, cx, content.as_ref(), module, &path);
                 });
@@ -1108,7 +1115,7 @@ fn module_inspector(
         Some(AreaModuleKind::Population | AreaModuleKind::Resident) => from_npc(ui, cx, module),
         Some(AreaModuleKind::Object) => {
             ui.add_space(4.0);
-            changed |= crate::ui::inspector::scripts::script_cards(
+            changed |= crate::ui::row_form::scripts::script_cards(
                 ui, cx, "area", module, "scripts", &path,
             )
             .is_some();

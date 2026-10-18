@@ -15,7 +15,7 @@ use strum::{EnumString, IntoStaticStr, VariantArray};
 use crate::app::{BottomTab, Editor};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::thumbs::{self, Thumbnail};
-use crate::ui::{theme, widgets};
+use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::views::area;
 use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
@@ -521,6 +521,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
+    sidebar::right(ui, "tileset", |ui| sidebar(editor, ui, key));
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
@@ -541,6 +542,20 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         status(editor, &tileset);
     }
     dialogs(editor, &ctx, &tileset);
+}
+
+/// The tileset window's inspector: the selected tile, terrain, animation or surface, or else the
+/// tileset row itself.
+fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let selection = editor.selection.clone();
+    if selection.table == TABLE
+        && selection.keys.first().is_some_and(|k| k == key)
+        && !selection.parts.is_empty()
+    {
+        inspect_parts(editor, ui, &selection);
+    } else {
+        row_form::show_row(editor, ui, TABLE, key);
+    }
 }
 
 pub fn set_mode(editor: &mut Editor, key: &str, mode: TilesetMode) {

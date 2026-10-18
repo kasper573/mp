@@ -20,9 +20,6 @@ fn main() {
     }
     let settings = LaunchSettings::of_this_binary();
     let config: ClientConfig = settings.get(CLIENT_ENV_PREFIX);
-    if config.exit_on_stdin_eof {
-        exit_when_stdin_closes();
-    }
     let agent = platform::agent();
     let sign_in = match (config.access_token, config.auth) {
         (Some(token), _) => SignIn::Token(token),
@@ -47,6 +44,9 @@ fn main() {
     );
     if let Some(driver) = config.probe {
         probe::install(&mut app, platform::SocketProbe::connect(driver));
+    }
+    if config.exit_on_stdin_eof {
+        exit_when_stdin_closes(&mut app);
     }
     app.run();
 }

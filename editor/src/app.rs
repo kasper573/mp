@@ -18,7 +18,7 @@ use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::forms::FormState;
+use crate::forms::{FormCx, FormState};
 use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
@@ -27,8 +27,9 @@ use crate::project::{
 };
 use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
-use crate::tabs::EditorTab;
+use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
+use crate::ui::row_form;
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
 use crate::views::area::placement::ReplaceScope;
 use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
@@ -37,6 +38,7 @@ use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, ui, views};
+use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
@@ -68,15 +70,24 @@ impl Plugin for EditorPlugin {
         if let Some(folder) = &self.launch.folder {
             editor.open_folder(folder);
         }
-        app.add_plugins((EguiPlugin::default(), bevy_tilemap::TilemapPlugin))
-            .insert_resource(editor)
-            .add_systems(Startup, setup_camera)
-            .add_systems(
-                PreUpdate,
-                theme_context.after(EguiPreUpdateSet::InitContexts),
-            )
-            .add_systems(EguiPrimaryContextPass, editor_ui)
-            .add_systems(Update, background);
+        app.add_plugins((
+            EguiPlugin::default(),
+            bevy_tilemap::TilemapPlugin,
+            bevy::sprite_render::Material2dPlugin::<VfxMaterial>::default(),
+        ))
+        .insert_resource(editor)
+        .init_resource::<VfxAssets>()
+        .add_systems(Startup, setup_camera)
+        .add_systems(
+            PreUpdate,
+            theme_context.after(EguiPreUpdateSet::InitContexts),
+        )
+        .add_systems(EguiPrimaryContextPass, editor_ui)
+        .add_systems(Update, background)
+        .add_systems(
+            PostUpdate,
+            engine::core::render::order_rows.before(bevy::transform::TransformSystems::Propagate),
+        );
     }
 }
 
@@ -114,6 +125,7 @@ pub struct Editor {
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
+    pub close_tabs: Option<CloseTabs>,
     pub scene: Option<Vec<Step>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
@@ -162,7 +174,6 @@ impl OutputLog {
 #[derive(Default)]
 pub struct DockTabs {
     pub left: LeftTab,
-    pub right: RightTab,
     pub bottom: BottomTab,
 }
 
@@ -171,15 +182,6 @@ pub enum LeftTab {
     #[default]
     Content,
     Assets,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum RightTab {
-    #[default]
-    Inspector,
-    UsedBy,
-    Preview,
-    Conflicts,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -412,6 +414,7 @@ impl Editor {
             toast: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
+            close_tabs: None,
             scene: None,
             clipboard: None,
             views: EditorViews::default(),
@@ -657,6 +660,24 @@ impl Editor {
             self.toast("Read-only: nothing saved");
             return false;
         }
+        let was_loading = project.loading();
+        project.settle();
+        if was_loading {
+            self.views.content_changed();
+        }
+        let Some(project) = &mut self.project else {
+            return false;
+        };
+        if let Some(report) = &project.report {
+            let first = EditRefusal::of(report);
+            let at = if first.pointer.is_empty() {
+                first.file.clone()
+            } else {
+                format!("{} at {}", first.file, first.pointer)
+            };
+            self.toast(format!("Not saved · {at}: {}", first.sentence()));
+            return false;
+        }
         match project.save() {
             Ok(outcome) => {
                 let count = outcome.written.len() + outcome.removed.len();
@@ -706,6 +727,14 @@ impl Editor {
         self.form.thumbnails.image(ctx, &project.files, path)
     }
 
+    pub fn thumb_icon(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {
+        let project = self.project.as_ref()?;
+        let mut budget = u32::MAX;
+        self.form
+            .thumbnails
+            .icon(ctx, &project.files, path, &mut budget)
+    }
+
     pub fn update_brush(&mut self, change: impl FnOnce(&mut BrushSettings)) {
         change(&mut self.settings.brush);
         self.save_settings();
@@ -720,6 +749,43 @@ impl Editor {
         self.project
             .as_ref()
             .and_then(|project| project.content.clone())
+    }
+
+    /// Shows a form owned by `key` of `table` against the schema `root`, then carries out the
+    /// actions its fields raised; nothing is shown without a project.
+    pub fn with_form<R>(
+        &mut self,
+        table: &str,
+        key: Option<&str>,
+        root: &Value,
+        show: impl FnOnce(&mut FormCx) -> R,
+    ) -> Option<R> {
+        let mut actions = Vec::new();
+        let shown = {
+            let Editor {
+                project,
+                form,
+                shapes,
+                ..
+            } = self;
+            let project = project.as_ref()?;
+            let mut cx =
+                FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, key);
+            show(&mut cx)
+        };
+        for action in actions {
+            row_form::act(self, action, table, key.unwrap_or_default());
+        }
+        Some(shown)
+    }
+
+    fn poll_project(&mut self) {
+        let Some(project) = &mut self.project else {
+            return;
+        };
+        if project.poll() {
+            self.views.content_changed();
+        }
     }
 
     fn poll_outside(&mut self) {
@@ -831,6 +897,7 @@ fn editor_ui(world: &mut World) {
 
 fn background(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
+        editor.poll_project();
         editor.poll_outside();
         editor.tick_journal();
         play::poll(&mut editor);
@@ -870,5 +937,9 @@ impl<T> ChannelInbox<T> {
             Ok(receiver) => receiver.try_recv(),
             Err(_) => Err(TryRecvError::Disconnected),
         }
+    }
+
+    pub fn recv(&self) -> Option<T> {
+        self.0.lock().ok().and_then(|receiver| receiver.recv().ok())
     }
 }

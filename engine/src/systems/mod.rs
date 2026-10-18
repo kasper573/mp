@@ -4,9 +4,9 @@ pub mod area;
 pub mod attention;
 pub mod belongings;
 pub mod chat;
+pub mod class;
 pub mod combat;
 pub mod dialogue;
-pub mod effect;
 pub mod equipment;
 pub mod frame_rate;
 pub mod history;
@@ -15,7 +15,6 @@ pub mod input;
 pub mod interact;
 pub mod interface;
 pub mod item;
-pub mod job;
 pub mod launch;
 pub mod memory;
 pub mod movement;
@@ -30,10 +29,12 @@ pub mod screen;
 pub mod script;
 pub mod settings;
 pub mod shop;
-pub mod spectate;
+pub mod skill;
 pub mod stat;
+pub mod status;
 pub mod terminal;
 pub mod text;
+pub mod vfx;
 pub mod view;
 pub mod visibility;
 
@@ -56,6 +57,8 @@ use crate::systems::player::PlayerDefId;
 use actor::{Actor, Hitbox};
 use area::AreaTag;
 use movement::Position;
+use skill::Cooldowns;
+use status::{ActiveAspects, Boosts, Statuses};
 use terminal::TerminalKind;
 
 pub const TICK_HZ: Hertz = Hertz(30.0);
@@ -75,19 +78,21 @@ pub fn protocol(app: &mut App) {
     combat::register(app);
     dialogue::register(app);
     stat::register(app);
-    effect::register(app);
+    status::register(app);
     equipment::register(app);
     history::register(app);
     item::register(app);
-    job::register(app);
+    class::register(app);
+    skill::register(app);
     movement::register(app);
     interact::register(app);
     npc::register(app);
     shop::register(app);
     quest::register(app);
     player::register(app);
-    spectate::register(app);
+    reach::register(app);
     terminal::register(app);
+    vfx::register(app);
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -102,6 +107,9 @@ pub struct GameSettings {
     pub player: PlayerDefId,
 }
 
+/// What every character in the world is made of, player and NPC alike, spawned whole so a character
+/// takes one archetype: its standing in the world, and the statuses, boosts, aspects and cooldowns it
+/// starts without.
 #[derive(Bundle)]
 pub struct Character {
     pub replicated: Replicated,
@@ -109,6 +117,26 @@ pub struct Character {
     pub actor: Actor,
     pub hitbox: Hitbox,
     pub area: AreaTag,
+    pub statuses: Statuses,
+    pub boosts: Boosts,
+    pub aspects: ActiveAspects,
+    pub cooldowns: Cooldowns,
+}
+
+impl Character {
+    pub fn new(position: Position, actor: Actor, hitbox: Hitbox, area: AreaTag) -> Character {
+        Character {
+            replicated: Replicated,
+            position,
+            actor,
+            hitbox,
+            area,
+            statuses: Statuses::default(),
+            boosts: Boosts::default(),
+            aspects: ActiveAspects::default(),
+            cooldowns: Cooldowns::default(),
+        }
+    }
 }
 
 pub fn server_app(
@@ -155,9 +183,9 @@ pub fn server_app(
     protocol(&mut app);
     visibility::register(&mut app);
     app.init_resource::<player::Players>()
-        .init_resource::<spectate::Spectators>()
         .init_resource::<area::transition::Departures>()
         .init_resource::<combat::RegenAt>()
+        .init_resource::<skill::reset::PendingResets>()
         // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
         // serialization load across ticks instead of spiking every Nth tick in lockstep.
         .insert_resource(ReplicationClock(ordinal))
@@ -165,7 +193,6 @@ pub fn server_app(
         .add_message::<rewards::KillCredited>()
         .add_observer(player::greet)
         .add_observer(player::client_left)
-        .add_observer(spectate::client_left)
         .add_systems(
             Startup,
             (
@@ -187,11 +214,13 @@ pub fn server_app(
             Update,
             (
                 (
-                    effect::expire,
+                    (status::expire, status::aspect::settle, status::aspect::tick).chain(),
+                    vfx::expire,
                     player::arrival_holds,
                     combat::regen,
                     movement::move_request,
                     combat::request,
+                    skill::requests,
                     item::use_item,
                     item::drop_item,
                     item::pickup_request,
@@ -200,7 +229,10 @@ pub fn server_app(
                     shop::requests,
                     quest::requests,
                     equipment::unequip,
-                    combat::combat,
+                    skill::reset::expire,
+                    actor::playing::progress,
+                    skill::casting::casts,
+                    reach::mirror_engaged,
                 )
                     .chain(),
                 (
@@ -227,13 +259,13 @@ pub fn server_app(
                     item::expire_drops,
                     player::join,
                     player::respawn,
-                    spectate::requests,
                     (npc::run_respawn, npc::dismiss).chain(),
                 )
                     .chain(),
                 (
                     stat::settle_health,
                     combat::defeats,
+                    skill::hotbar::settle_basic_attack,
                     actor::settle,
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,
@@ -331,6 +363,7 @@ pub fn client_app(
                 period: REPLICATION_PERIOD,
             },
             crate::core::render::RenderPlugin,
+            crate::core::vfx::render::VfxRenderPlugin,
             crate::core::audio::playback::SfxPlugin,
             crate::core::audio::soundscape::SoundscapePlugin,
             crate::core::babble::BabblePlugin,
@@ -354,11 +387,10 @@ pub fn client_app(
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,
             item::card::ItemCardPlugin,
-            item::widget::CarryPlugin,
+            skill::client::SkillClientPlugin,
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,
             quest::tracker::QuestTrackerPlugin,
-            spectate::widget::SpectatorPlugin,
             terminal::TerminalPlugin,
             frame_rate::FrameRatePlugin,
         ));
@@ -442,7 +474,7 @@ pub fn registry() -> ContentRegistry {
         .row::<interface::InterfaceIconDef>()
         .row::<item::ItemDef>()
         .modules::<item::ItemDef>()
-        .row::<job::JobDef>()
+        .row::<class::ClassDef>()
         .row::<memory::MemoryDef>()
         .row::<notification::NotificationDef>()
         .row::<npc::NpcDef>()
@@ -455,6 +487,10 @@ pub fn registry() -> ContentRegistry {
         .row::<script::ScriptDef>()
         .row::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
+        .row::<skill::SkillDef>()
+        .modules::<skill::SkillDef>()
+        .row::<status::StatusEffectDef>()
+        .modules::<status::StatusEffectDef>()
         .list_kind("modules", "unknown module type", "a module type")
         .fixture::<input::map::InputAction>()
         .fixture::<attention::AttentionMark>()
@@ -462,18 +498,25 @@ pub fn registry() -> ContentRegistry {
         .fixture::<interface::CursorShape>()
         .fixture::<interface::InterfaceIcon>()
         .fixture::<interface::FontFace>()
+        .fixture::<vfx::VfxFixture>()
+        .fixture::<vfx::VfxShaderFixture>()
         .settings::<GameSettings>()
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);
     actor::content(&mut registry);
     area::content(&mut registry);
+    crate::core::vfx::content(&mut registry);
     registry
         .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)
+        .hook(LoadStep::Across, vfx::fixture::check_all)
         .hook(LoadStep::Across, input::map::check_all)
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)
+        .hook(LoadStep::Across, class::check_all)
+        .hook(LoadStep::Across, npc::check_all)
+        .hook(LoadStep::Across, skill::check_all)
         .hook(LoadStep::Across, player::snapshot::check_all)
         .hook(LoadStep::Settings, check_settings);
     registry

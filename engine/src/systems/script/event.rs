@@ -1,10 +1,13 @@
+use bevy_ecs::entity::Entity;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use crate::core::content::serial;
-use crate::core::script::{EventDef, Name, ValueType};
+use crate::core::math::Pos;
+use crate::core::script::{EventDef, Name, ScriptFault, Value, ValueType};
 use crate::core::tiling::Tiles;
+use crate::core::time::Seconds;
 use crate::systems::attention::AttentionId;
 use crate::systems::interact::Verb;
 use crate::systems::item::ItemId;
@@ -63,8 +66,11 @@ pub enum RiftEvent {
     Defeated,
     Used,
     PickedUp,
-    Equipped,
-    Unequipped,
+    Activated,
+    Deactivated,
+    Interval {
+        seconds: Seconds,
+    },
     Accepted,
     Completed,
     Failed,
@@ -89,12 +95,34 @@ const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
 const AREA: &[OwnerKind] = &[OwnerKind::Area];
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
 const ITEM: &[OwnerKind] = &[OwnerKind::Item];
+const ITEM_OR_SKILL: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill];
+const ASPECT: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill, OwnerKind::StatusEffect];
 const QUEST: &[OwnerKind] = &[OwnerKind::Quest];
 const SHOP: &[OwnerKind] = &[OwnerKind::Shop];
 const ANY: &[OwnerKind] = &[OwnerKind::Any];
 
 const TRADE_FIELDS: &[(Name, ValueType)] =
     &[("item", ValueType::Integer), ("count", ValueType::Integer)];
+
+/// What a use hands its script: the aimed actor, the aimed point and the rank used at. An item
+/// raises it with none of them.
+pub const USED_FIELDS: &[(Name, ValueType)] = &[
+    ("target", ValueType::Actor),
+    ("point", ValueType::Point),
+    ("rank", ValueType::Integer),
+];
+pub const USED_TARGET: usize = 0;
+pub const USED_POINT: usize = 1;
+pub const USED_RANK: usize = 2;
+
+/// A `Used` payload laid out as `USED_FIELDS` lists it.
+pub fn used_payload(target: Option<Entity>, point: Option<Pos<Tiles>>, rank: i64) -> Vec<Value> {
+    let mut fields = vec![Value::Actor(None); USED_FIELDS.len()];
+    fields[USED_TARGET] = Value::Actor(target);
+    fields[USED_POINT] = Value::Point(point);
+    fields[USED_RANK] = Value::Int(rank);
+    fields
+}
 
 impl EventDef<RiftScripting> for RiftEvent {
     type Kind = EventKind;
@@ -112,9 +140,9 @@ impl EventDef<RiftScripting> for RiftEvent {
             RiftEvent::Discovered | RiftEvent::Died { .. } | RiftEvent::LeveledUp => AREA,
             RiftEvent::Interacted { .. } | RiftEvent::Heard { .. } => OBJECT_OR_NPC,
             RiftEvent::CameNear { .. } | RiftEvent::Attacked | RiftEvent::Defeated => NPC,
-            RiftEvent::Used | RiftEvent::PickedUp | RiftEvent::Equipped | RiftEvent::Unequipped => {
-                ITEM
-            }
+            RiftEvent::Used => ITEM_OR_SKILL,
+            RiftEvent::PickedUp => ITEM,
+            RiftEvent::Activated | RiftEvent::Deactivated | RiftEvent::Interval { .. } => ASPECT,
             RiftEvent::Accepted | RiftEvent::Completed | RiftEvent::Failed => QUEST,
             RiftEvent::Bought { .. } | RiftEvent::Sold { .. } => SHOP,
         }
@@ -131,10 +159,26 @@ impl EventDef<RiftScripting> for RiftEvent {
     fn fields(&self) -> &'static [(Name, ValueType)] {
         match self {
             RiftEvent::Bought { .. } | RiftEvent::Sold { .. } => TRADE_FIELDS,
+            RiftEvent::Used => USED_FIELDS,
             _ => &[],
         }
     }
+
+    fn check(&self) -> Result<(), ScriptFault> {
+        match self {
+            RiftEvent::Interval { seconds } if *seconds < SHORTEST_INTERVAL => {
+                Err(ScriptFault::new(
+                    "interval too short",
+                    format!("{} seconds or more, got {}", SHORTEST_INTERVAL.0, seconds.0),
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
 }
+
+/// An interval fires at most this often, so no script can beat a tick.
+pub const SHORTEST_INTERVAL: Seconds = Seconds(0.1);
 
 impl EventKind {
     pub fn name(self) -> &'static str {

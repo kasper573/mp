@@ -1,0 +1,365 @@
+//! The vfx preview: a row's layers played on a site of the designer's choosing (an actor, an area,
+//! a crowd in an area, or the screen), on the stage every preview shares.
+
+use std::collections::{BTreeMap, HashMap};
+
+use egui::{Pos2, Stroke, Ui};
+use engine::core::geometry::{Degrees, Footprint, Shape};
+use engine::core::math::Pos;
+use engine::core::render::ToScreen;
+use engine::core::tiling::Tiles;
+use engine::core::time::Seconds;
+use engine::core::vfx::{ParamValue, VfxLayer, VfxParams};
+use engine::systems::actor::{Action, ModelDef};
+use strum::VariantArray;
+
+use super::params::{ParamSpec, param_control};
+use crate::app::Editor;
+use crate::stage::{self, Posed, PosedActor, PosedSite, PosedVfx, Scene};
+use crate::ui::{theme, widgets};
+
+const REST_BETWEEN_PLAYS: f32 = 0.5;
+const SLIDER_SURROUND: f32 = 130.0;
+const MOST_ACTORS: u32 = 100;
+const FIRST_CROWD: u32 = 3;
+
+/// The vfx previews: what the open row asked to see, and the values tried for its parameters.
+pub struct VfxViews {
+    pub target: Target,
+    pub background: bool,
+    started: Option<(String, f64)>,
+    pub fills: HashMap<String, BTreeMap<String, ParamValue>>,
+}
+
+impl Default for VfxViews {
+    fn default() -> VfxViews {
+        VfxViews {
+            target: Target::default(),
+            background: true,
+            started: None,
+            fills: HashMap::new(),
+        }
+    }
+}
+
+/// What the vfx plays on: one actor, an area, actors standing in an area, or the whole screen.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Target {
+    Actor {
+        model: String,
+        action: Action,
+    },
+    Area {
+        shape: Shape,
+        facing: Degrees,
+    },
+    Crowd {
+        shape: Shape,
+        facing: Degrees,
+        count: u32,
+        action: Action,
+    },
+    Screen,
+}
+
+impl Default for Target {
+    fn default() -> Target {
+        Target::Actor {
+            model: String::new(),
+            action: Action::Idle,
+        }
+    }
+}
+
+pub fn preview(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    key: &str,
+    layers: Vec<VfxLayer>,
+    inside: Option<Vec<VfxLayer>>,
+    specs: &[ParamSpec],
+    drafts: &[(String, String)],
+) {
+    let Some(content) = editor.loaded() else {
+        ui.label(theme::muted("the preview plays once the content loads"));
+        return;
+    };
+    let models: Vec<String> = content.table::<ModelDef>().keys().to_vec();
+    let total = layers
+        .iter()
+        .map(|layer| layer.ends().0)
+        .fold(0.5_f32, f32::max);
+    let now = ui.input(|input| input.time);
+    let views = &mut editor.views.vfx;
+    if let Target::Actor { model, .. } = &mut views.target
+        && model.is_empty()
+        && let Some(first) = models.first()
+    {
+        *model = first.clone();
+    }
+    ui.horizontal_wrapped(|ui| {
+        for (label, on) in [
+            ("actor", matches!(views.target, Target::Actor { .. })),
+            ("area", matches!(views.target, Target::Area { .. })),
+            (
+                "area + actors",
+                matches!(views.target, Target::Crowd { .. }),
+            ),
+            ("screen", views.target == Target::Screen),
+        ] {
+            if widgets::mode_chip(ui, label, on).clicked() && !on {
+                views.target = match label {
+                    "actor" => Target::Actor {
+                        model: models.first().cloned().unwrap_or_default(),
+                        action: Action::Idle,
+                    },
+                    "area" => Target::Area {
+                        shape: Shape::Circle { radius: Tiles(1.5) },
+                        facing: Degrees(0.0),
+                    },
+                    "area + actors" => Target::Crowd {
+                        shape: Shape::Circle { radius: Tiles(2.5) },
+                        facing: Degrees(0.0),
+                        count: FIRST_CROWD,
+                        action: Action::Idle,
+                    },
+                    _ => Target::Screen,
+                };
+            }
+        }
+    });
+    ui.horizontal_wrapped(|ui| match &mut views.target {
+        Target::Actor { model, action } => {
+            widgets::combo_box("preview-model")
+                .width(160.0)
+                .selected_text(theme::mono(model.as_str()).size(13.0))
+                .show_ui(ui, |ui| {
+                    for candidate in &models {
+                        ui.selectable_value(model, candidate.clone(), candidate);
+                    }
+                });
+            ui.end_row();
+            action_combo(ui, action);
+        }
+        Target::Area { shape, facing } => {
+            shape_fields(ui, shape);
+            facing_field(ui, facing);
+        }
+        Target::Crowd {
+            shape,
+            facing,
+            count,
+            action,
+        } => {
+            shape_fields(ui, shape);
+            facing_field(ui, facing);
+            ui.end_row();
+            ui.label(theme::faint("actors").size(12.0));
+            ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
+            design_tokens::widgets::slider(ui, egui::Slider::new(count, 1..=MOST_ACTORS));
+            ui.end_row();
+            action_combo(ui, action);
+        }
+        Target::Screen => {}
+    });
+    let started = match &views.started {
+        Some((playing, started)) if playing == key => *started,
+        _ => {
+            views.started = Some((key.to_owned(), now));
+            now
+        }
+    };
+    let elapsed = ((now - started) as f32)
+        .rem_euclid(total + REST_BETWEEN_PLAYS)
+        .min(total);
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut views.background, "background");
+        ui.label(theme::faint(format!("{elapsed:.2} s of {total:.2}")).size(12.0));
+    });
+    let fills = views.fills.entry(key.to_owned()).or_default();
+    for spec in specs {
+        fills.entry(spec.name.clone()).or_insert(spec.default);
+    }
+    if !specs.is_empty() && ui.button("reset to defaults").clicked() {
+        for spec in specs {
+            fills.insert(spec.name.clone(), spec.default);
+        }
+    }
+    ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
+    for spec in specs {
+        ui.horizontal(|ui| {
+            ui.label(theme::muted(&spec.name).monospace().size(12.5));
+            let mut value = fills.get(&spec.name).copied().unwrap_or(spec.default);
+            if param_control(ui, spec, &mut value) {
+                fills.insert(spec.name.clone(), value);
+            }
+        });
+    }
+    let params = VfxParams(fills.iter().map(|(k, v)| (k.clone(), *v)).collect());
+    let background = views.background;
+    let target = views.target.clone();
+    let center = stage::center(&content);
+    let footprint = target.footprint(center);
+    let mut posed = Posed::default();
+    let on = match &target {
+        Target::Actor { model, action } => {
+            let Some(model) = content.by_key::<ModelDef>(model) else {
+                ui.label(theme::warn("pick a model to play the vfx on"));
+                return;
+            };
+            posed.actors.push(PosedActor {
+                action: *action,
+                ..PosedActor::standing(model, center)
+            });
+            PosedSite::Actor(0)
+        }
+        Target::Area { .. } => PosedSite::Area(footprint.expect("an area has a footprint")),
+        Target::Crowd { count, action, .. } => {
+            let footprint = footprint.expect("a crowd has a footprint");
+            let models: Vec<_> = content.table::<ModelDef>().ids().collect();
+            if !models.is_empty() {
+                for (index, at) in stage::spread(&footprint, *count).into_iter().enumerate() {
+                    posed.actors.push(PosedActor {
+                        action: *action,
+                        ..PosedActor::standing(models[index % models.len()], at)
+                    });
+                }
+            }
+            PosedSite::Area(footprint)
+        }
+        Target::Screen => PosedSite::Screen,
+    };
+    posed.vfx = Some(PosedVfx {
+        layers,
+        on,
+        inside,
+        params,
+        elapsed: Seconds(elapsed),
+        drafts: drafts.to_vec(),
+    });
+    let Some(shown) = stage::show(
+        editor,
+        ui,
+        &format!("vfx/{key}"),
+        Scene::Posed(posed),
+        background,
+    ) else {
+        return;
+    };
+    if let Some(footprint) = footprint {
+        let outline: Vec<Pos2> = footprint
+            .outline()
+            .into_iter()
+            .map(|point| shown.screen(point.to_screen()))
+            .collect();
+        if let (Some(first), true) = (outline.first().copied(), outline.len() > 1) {
+            let mut closed = outline.clone();
+            closed.push(first);
+            ui.painter().add(egui::Shape::dashed_line(
+                &closed,
+                Stroke::new(1.0, theme::WARN),
+                4.0,
+                3.0,
+            ));
+        }
+    }
+}
+
+impl Target {
+    fn footprint(&self, at: Pos<Tiles>) -> Option<Footprint> {
+        match self {
+            Target::Area { shape, facing } | Target::Crowd { shape, facing, .. } => {
+                Some(Footprint {
+                    at,
+                    facing: facing.radians(),
+                    shape: *shape,
+                })
+            }
+            Target::Actor { .. } | Target::Screen => None,
+        }
+    }
+}
+
+fn action_combo(ui: &mut Ui, action: &mut Action) {
+    widgets::combo_box("preview-action")
+        .width(90.0)
+        .selected_text(theme::mono(action.as_ref()).size(13.0))
+        .show_ui(ui, |ui| {
+            for candidate in Action::VARIANTS {
+                ui.selectable_value(action, *candidate, candidate.as_ref());
+            }
+        });
+}
+
+fn facing_field(ui: &mut Ui, facing: &mut Degrees) {
+    ui.add(
+        egui::DragValue::new(&mut facing.0)
+            .range(0.0..=360.0)
+            .suffix("°"),
+    );
+}
+
+fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
+    let kinds = ["circle", "rect", "cone", "line"];
+    let current = match shape {
+        Shape::Circle { .. } => "circle",
+        Shape::Rect { .. } => "rect",
+        Shape::Cone { .. } => "cone",
+        Shape::Line { .. } => "line",
+    };
+    let mut picked = current;
+    widgets::combo_box("preview-shape")
+        .width(80.0)
+        .selected_text(theme::mono(current).size(13.0))
+        .show_ui(ui, |ui| {
+            for kind in kinds {
+                ui.selectable_value(&mut picked, kind, kind);
+            }
+        });
+    if picked != current {
+        *shape = match picked {
+            "rect" => Shape::Rect {
+                width: Tiles(3.0),
+                height: Tiles(2.0),
+            },
+            "cone" => Shape::Cone {
+                angle: Degrees(90.0),
+                length: Tiles(2.5),
+            },
+            "line" => Shape::Line {
+                length: Tiles(4.0),
+                width: Tiles(1.0),
+            },
+            _ => Shape::Circle { radius: Tiles(1.5) },
+        };
+    }
+    let tiles = |ui: &mut Ui, label: &str, value: &mut Tiles| {
+        ui.label(theme::faint(label).size(12.0));
+        ui.add(
+            egui::DragValue::new(&mut value.0)
+                .speed(0.1)
+                .range(0.1..=12.0)
+                .fixed_decimals(1),
+        );
+    };
+    match shape {
+        Shape::Circle { radius } => tiles(ui, "radius", radius),
+        Shape::Rect { width, height } => {
+            tiles(ui, "width", width);
+            tiles(ui, "height", height);
+        }
+        Shape::Cone { angle, length } => {
+            ui.label(theme::faint("angle").size(12.0));
+            ui.add(
+                egui::DragValue::new(&mut angle.0)
+                    .range(5.0..=360.0)
+                    .suffix("°"),
+            );
+            tiles(ui, "length", length);
+        }
+        Shape::Line { length, width } => {
+            tiles(ui, "length", length);
+            tiles(ui, "width", width);
+        }
+    }
+}

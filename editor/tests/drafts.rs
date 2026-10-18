@@ -2,7 +2,8 @@ use editor::drafts;
 use egui::{Context, Id, RawInput, Ui};
 
 fn frame(ctx: &Context, mut body: impl FnMut(&mut Ui)) {
-    let _ = ctx.run_ui(RawInput::default(), |ui| body(ui));
+    let mut output = ctx.run_ui(RawInput::default(), |ui| body(ui));
+    output.textures_delta.clear();
 }
 
 #[test]

@@ -1,8 +1,13 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy_kira_audio::prelude::{Audio, AudioControl, AudioSource};
+use bevy_kira_audio::prelude::{
+    Audio, AudioApp, AudioChannel, AudioControl, AudioInstance, AudioSource, AudioTween,
+    PlaybackState,
+};
+use kira::StartTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -29,13 +34,17 @@ impl Plugin for SfxPlugin {
             .init_resource::<AudioMix>()
             .init_resource::<Catalog>()
             .init_resource::<Played>()
+            .init_resource::<Sounding>()
+            .add_audio_channel::<VoiceTrack>()
             .add_message::<PlaySfx>()
             .add_message::<PlayClip>()
+            .add_message::<HushVoice>()
             .add_systems(
                 Update,
                 (
                     load.run_if(resource_exists_and_changed::<Content>),
                     mix,
+                    hush,
                     play_clips,
                 )
                     .chain(),
@@ -89,13 +98,20 @@ pub struct PlaySfx {
     pub place: SfxPlace,
 }
 
+/// A clip to sound at `due` on the app's clock (`Time::elapsed`): asked for ahead of its moment,
+/// it starts on that moment whatever the frame rate, since the audio engine holds it until then.
 #[derive(Message)]
 pub struct PlayClip {
     pub clip: Handle<AudioSource>,
     pub category: AudioCategory,
     pub place: SfxPlace,
     pub tune: SfxTune,
+    pub due: Duration,
 }
+
+/// Silences the voice, clips sounding and clips due alike, so a line cut short stops at once.
+#[derive(Message)]
+pub struct HushVoice;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SfxTune {
@@ -151,6 +167,99 @@ impl PositionalAudio {
     }
 }
 
+/// Asks for an sfx as a `PlaySfx` message does, and counts it as sounding from this moment, so
+/// whoever asked sees it sound before the mixer has reached the request.
+pub fn play(world: &mut World, request: PlaySfx) {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    world
+        .resource_mut::<Sounding>()
+        .0
+        .entry(request.id)
+        .or_default()
+        .push(Voice {
+            instance: None,
+            asked: now,
+            begun: false,
+        });
+    world.write_message(request);
+}
+
+/// Whether an sfx asked for still sounds.
+pub fn is_sounding(world: &mut World, id: SfxId) -> bool {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    world.resource_scope(|world, mut sounding: Mut<Sounding>| {
+        sounding.settle(world.resource::<Assets<AudioInstance>>(), now);
+        sounding.0.contains_key(&id)
+    })
+}
+
+/// Stops every instance of an sfx still sounding.
+pub fn stop(world: &mut World, id: SfxId) {
+    world.resource_scope(|world, mut sounding: Mut<Sounding>| {
+        let mut instances = world.resource_mut::<Assets<AudioInstance>>();
+        for voice in sounding.0.remove(&id).unwrap_or_default() {
+            if let Some(mut instance) = voice
+                .instance
+                .and_then(|instance| instances.get_mut(&instance))
+            {
+                instance.stop(AudioTween::default());
+            }
+        }
+    });
+}
+
+/// The sfx still sounding, by row: each instance played from a `PlaySfx`, from the moment it is
+/// asked for until it has ended.
+#[derive(Resource, Default)]
+struct Sounding(HashMap<SfxId, Vec<Voice>>);
+
+/// One asked-for sound: its instance once the mixer has started it, which `begun` records having
+/// been seen among the loaded instances, so its later absence means it ended.
+struct Voice {
+    instance: Option<Handle<AudioInstance>>,
+    asked: Seconds,
+    begun: bool,
+}
+
+/// How long an instance may stay unheard of after it was asked for, while its clip loads, before
+/// it counts as never having played.
+const STARTS_WITHIN: Seconds = Seconds(2.0);
+
+impl Sounding {
+    fn settle(&mut self, instances: &Assets<AudioInstance>, now: Seconds) {
+        for voices in self.0.values_mut() {
+            voices.retain_mut(|voice| {
+                match voice
+                    .instance
+                    .as_ref()
+                    .and_then(|handle| instances.get(handle))
+                {
+                    Some(instance) => {
+                        voice.begun = true;
+                        instance.state() != PlaybackState::Stopped
+                    }
+                    None => !voice.begun && now - voice.asked < STARTS_WITHIN,
+                }
+            });
+        }
+        self.0.retain(|_, voices| !voices.is_empty());
+    }
+
+    /// Hands the mixer's instance to the oldest ask for `id` still waiting for one, else records a
+    /// sound no ask preceded.
+    fn begun(&mut self, id: SfxId, instance: Handle<AudioInstance>, now: Seconds) {
+        let voices = self.0.entry(id).or_default();
+        match voices.iter_mut().find(|voice| voice.instance.is_none()) {
+            Some(asked) => asked.instance = Some(instance),
+            None => voices.push(Voice {
+                instance: Some(instance),
+                asked: now,
+                begun: false,
+            }),
+        }
+    }
+}
+
 #[derive(Resource, Default)]
 struct Catalog(Vec<Sound>);
 
@@ -190,13 +299,12 @@ fn load(assets: Res<AssetServer>, content: Res<Content>, mut catalog: ResMut<Cat
 fn mix(
     mut requests: MessageReader<PlaySfx>,
     listener: Res<Listener>,
-    time: Res<Time>,
-    speakers: Speakers,
+    mut speakers: Speakers,
     catalog: Res<Catalog>,
     mut played: ResMut<Played>,
     mut rng: ResMut<Rng>,
 ) {
-    let clock = Seconds(time.elapsed_secs());
+    let clock = speakers.now();
     let mut frame: HashMap<SfxId, Cue> = HashMap::new();
     for req in requests.read() {
         let Some(sound) = catalog.0.get(req.id.index()) else {
@@ -225,11 +333,17 @@ fn mix(
             pitch: PlaybackRate(cue.pitch.resolve(&mut rng)),
             volume: cue.volume.resolve(&mut rng) * cue.proximity,
         };
-        speakers.play(cue.handle, AudioCategory::Effects, tune, cue.pan);
+        speakers.play_sfx(id, cue.handle, tune, cue.pan);
     }
 }
 
-fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, speakers: Speakers) {
+fn hush(mut hushes: MessageReader<HushVoice>, voice: Res<AudioChannel<VoiceTrack>>) {
+    if hushes.read().next().is_some() {
+        voice.stop();
+    }
+}
+
+fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, mut speakers: Speakers) {
     for clip in clips.read() {
         let Some(PositionalAudio { proximity, pan }) = heard_at(clip.place, listener.0) else {
             continue;
@@ -238,27 +352,72 @@ fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, speak
             volume: clip.tune.volume * proximity,
             ..clip.tune
         };
-        speakers.play(clip.clip.clone(), clip.category, tune, pan);
+        let delay = clip.due.saturating_sub(speakers.time.elapsed());
+        speakers.play(clip.clip.clone(), clip.category, tune, pan, delay);
     }
 }
+
+/// The track every voice clip sounds on, so the voice can be hushed as one.
+#[derive(Resource)]
+struct VoiceTrack;
 
 #[derive(SystemParam)]
 struct Speakers<'w> {
     audio: Res<'w, Audio>,
+    voice: Res<'w, AudioChannel<VoiceTrack>>,
     audio_mix: Res<'w, AudioMix>,
+    time: Res<'w, Time>,
+    sounding: ResMut<'w, Sounding>,
+    sources: ResMut<'w, Assets<AudioSource>>,
 }
 
 impl Speakers<'_> {
-    fn play(&self, clip: Handle<AudioSource>, category: AudioCategory, tune: SfxTune, pan: f32) {
+    fn now(&self) -> Seconds {
+        Seconds(self.time.elapsed_secs())
+    }
+
+    fn play_sfx(&mut self, id: SfxId, clip: Handle<AudioSource>, tune: SfxTune, pan: f32) {
+        if let Some(instance) = self.play(clip, AudioCategory::Effects, tune, pan, Duration::ZERO) {
+            let now = self.now();
+            self.sounding.begun(id, instance, now);
+        }
+    }
+
+    fn play(
+        &mut self,
+        clip: Handle<AudioSource>,
+        category: AudioCategory,
+        tune: SfxTune,
+        pan: f32,
+        delay: Duration,
+    ) -> Option<Handle<AudioInstance>> {
         let volume = tune.volume * self.audio_mix.gain(category);
         if volume <= 0.0 {
-            return;
+            return None;
         }
-        self.audio
-            .play(clip)
+        let clip = self.delayed(clip, delay);
+        let mut command = match category {
+            AudioCategory::Voice => self.voice.play(clip),
+            _ => self.audio.play(clip),
+        };
+        command
             .with_volume(decibels(volume))
             .with_playback_rate(f64::from(tune.pitch.0))
             .with_panning(pan);
+        Some(command.handle())
+    }
+
+    /// The clip as a sound the audio engine starts `delay` after it is handed over, or the clip
+    /// itself when it starts at once or is not loaded yet.
+    fn delayed(&mut self, clip: Handle<AudioSource>, delay: Duration) -> Handle<AudioSource> {
+        if delay.is_zero() {
+            return clip;
+        }
+        let Some(source) = self.sources.get(&clip) else {
+            return clip;
+        };
+        let sound = source.sound.clone().start_time(StartTime::Delayed(delay));
+        self.sources.add(AudioSource { sound })
     }
 }
 

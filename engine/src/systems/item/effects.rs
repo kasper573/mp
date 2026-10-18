@@ -18,7 +18,9 @@ use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{Condition, EffectCall, Place, Reach, RiftScripting};
 use crate::systems::visibility::Presence;
 
+/// Takes and gives items in one exchange, all or nothing.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct Items {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -32,7 +34,9 @@ pub struct Items {
     pub refused: Arrow,
 }
 
+/// Uses an item as the player would.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct UseItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -43,7 +47,9 @@ pub struct UseItem {
     pub refused: Arrow,
 }
 
+/// Puts an item on, swapping with the slot.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct Equip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -54,7 +60,9 @@ pub struct Equip {
     pub refused: Arrow,
 }
 
+/// Takes an item or slot off.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct Unequip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -65,7 +73,9 @@ pub struct Unequip {
     pub refused: Arrow,
 }
 
+/// Drops items to the ground at their feet.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
@@ -78,7 +88,9 @@ pub struct DropItems {
     pub refused: Arrow,
 }
 
+/// Scatters items as loot at a place or actor.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct SpawnGroundItems {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub items: Vec<ItemStack>,
@@ -92,7 +104,9 @@ pub struct SpawnGroundItems {
     pub next: Arrow,
 }
 
+/// Removes ground items in range.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct ClearGroundItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
@@ -101,7 +115,9 @@ pub struct ClearGroundItems {
     pub next: Arrow,
 }
 
+/// Moves items from one bag to another.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[schemars(extend("x-system" = "item"))]
 pub struct MoveItems {
     pub from: Condition,
     pub to: Condition,

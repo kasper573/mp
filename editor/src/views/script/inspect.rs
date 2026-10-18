@@ -14,7 +14,7 @@ use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
-use crate::ui::{dialogs, inspector, theme, widgets};
+use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
@@ -61,7 +61,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                 );
                 widgets::card_frame(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    widgets::card_title(ui, "script", &format!("{} nodes", many.len()));
+                    widgets::card_title(ui, &format!("{} nodes", many.len()));
                     for name in many {
                         if let Some(node) = doc.nodes().get(name) {
                             let summary =
@@ -141,22 +141,16 @@ fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut make = false;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(
-            ui,
-            "inline_script",
-            "inline script",
-            "in its owner's row",
-            |ui| {
-                if ui.button("Open the owner's row").clicked() {
-                    open_owner = true;
-                    ui.close();
-                }
-                if ui.button("Make shared…").clicked() {
-                    make = true;
-                    ui.close();
-                }
-            },
-        );
+        widgets::card_header(ui, "inline script", "in its owner's row", |ui| {
+            if ui.button("Open the owner's row").clicked() {
+                open_owner = true;
+                ui.close();
+            }
+            if ui.button("Make shared…").clicked() {
+                make = true;
+                ui.close();
+            }
+        });
         widgets::kv(ui, "owner", |ui| {
             if ui
                 .add(
@@ -203,7 +197,7 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, "script", &key, "shared script", |ui| {
+                widgets::card_header(ui, &key, "shared script", |ui| {
                     if ui.button("Make inline…").clicked() {
                         make = true;
                         ui.close();
@@ -551,7 +545,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .collect();
             widgets::card_frame(false).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, "script", name, "", |ui| {
+                widgets::card_header(ui, name, "", |ui| {
                     if ui.button("Remove the variable").clicked() {
                         script["variables"].remove_field(name);
                         changed = FormChange::at("/variables");
@@ -796,7 +790,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let (outs, ins, badge_kind, blurb) = {
+    let (outs, ins, blurb) = {
         let catalogue = catalogue_of(editor.project.as_ref());
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
             .into_iter()
@@ -809,8 +803,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         (
             nodes::ports(&node, catalogue),
             ins,
-            entry.map_or("script", nodes::NodeEntry::badge),
-            entry.map_or("", |e| e.blurb),
+            entry.map_or(String::new(), |e| e.blurb.clone()),
         )
     };
     let mut draft = node.clone();
@@ -825,7 +818,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         widgets::card_frame(true)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, badge_kind, &title, "", |ui| {
+                widgets::card_header(ui, &title, "", |ui| {
                     if ui.button("Rename…  F2").clicked() {
                         rename = true;
                         ui.close();
@@ -911,7 +904,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                 node: &node,
                 kind: &kind,
                 ins: &ins,
-                blurb,
+                blurb: &blurb,
             },
         );
     }
@@ -1044,7 +1037,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, "quest", &format!("memory/{memory}"), "row", |ui| {
+                widgets::card_header(ui, &format!("memory/{memory}"), "row", |ui| {
                     if ui.button("Open the row").clicked() {
                         cx.actions.push(FormAction::OpenRow {
                             table: "memory".to_owned(),
@@ -1075,14 +1068,14 @@ fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
     ] {
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_title(ui, "script", title);
+            widgets::card_title(ui, title);
             let names = names_of(&doc.script[field]);
             ui.label(theme::muted(format!("{names} · {sentence}")).size(13.0));
         });
     }
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "script", "variables");
+        widgets::card_title(ui, "variables");
         let text = if doc.is_shared() {
             format!(
                 "{} · each owner's values",
@@ -1138,7 +1131,7 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, no
     };
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "quest", "bounds", "compiler", |_| {});
+        widgets::card_header(ui, "bounds", "compiler", |_| {});
         widgets::kv_text(ui, "steps", format!("at most {steps} between two waits"));
         widgets::kv_text(
             ui,
@@ -1220,7 +1213,7 @@ fn dialogue_form(
         let line = &mut node["lines"][index];
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_header(ui, "script", &format!("line {}", index + 1), "", |ui| {
+            widgets::card_header(ui, &format!("line {}", index + 1), "", |ui| {
                 if index > 0 && ui.button("Move up").clicked() {
                     swap_line = Some((index, index - 1));
                     ui.close();
@@ -1363,8 +1356,6 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) 
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            ui.label(theme::faint("≡"));
-            widgets::badge(ui, "script");
             let id = ui.id().with(choice_path).with("label");
             let edit = spans::line(
                 ui,
@@ -1683,7 +1674,7 @@ fn speaker_rows(
 }
 
 fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
-    inspector::act(editor, action, doc.owner.table(), doc.owner.key());
+    row_form::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
 #[derive(Clone, Debug)]

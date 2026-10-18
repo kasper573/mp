@@ -1,3 +1,4 @@
+mod card;
 mod panel;
 
 use std::collections::HashSet;
@@ -5,28 +6,34 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::{HAIRLINE, SHADOW, TextRole, WINDOW_RADIUS, color, widgets};
-use egui::{Id, LayerId, Pos2, Rect, Ui, Vec2};
+use design_tokens::{HAIRLINE, SHADOW, TextRole, WINDOW_RADIUS, color, paint, widgets};
+use egui::{Align2, Id, LayerId, Pos2, Rect, Ui, Vec2};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
-use crate::core::gui::{self, Band};
+use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::WindowPx;
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::input::map::{ActionInput, InputAction, InputMap};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::player::session::{ClientMode, SpectateStatus};
+use crate::systems::item::Inventory;
+use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::settings;
-use crate::systems::{equipment, history, item, player, quest, spectate, stat, terminal};
+use crate::systems::skill::{HotbarEntry, HotbarSlot, SkillId};
+use crate::systems::{equipment, history, item, player, quest, skill, stat, terminal};
 
-pub(crate) use panel::{Sizing, WindowFrame, widget, window};
+pub(crate) use card::{
+    Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
+};
+pub(crate) use panel::{GripCorner, Sizing, WindowFrame, corner_grip, widget, window};
 
 pub(crate) const WIDGET: WindowPx = WindowPx(48.0);
+pub(crate) const TOOLTIP_WIDTH: f32 = 260.0;
 const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 200.0);
 const LAUNCHER_ICON: f32 = 32.0;
 const MARGIN: f32 = 8.0;
-const TOOLTIP_WIDTH: f32 = 260.0;
+const CARRIED: f32 = 40.0;
 const CONFIRM: &str = "confirm";
 
 pub struct HudPlugin;
@@ -37,7 +44,6 @@ impl Plugin for HudPlugin {
         app.init_resource::<Open>()
             .init_resource::<panel::Arranging>()
             .init_resource::<WindowsDrawn>()
-            .init_resource::<HudDrawn>()
             .init_resource::<Confirming>()
             .add_systems(
                 Update,
@@ -53,51 +59,71 @@ impl Plugin for HudPlugin {
                         .in_set(Band::Hud)
                         .run_if(in_state(ClientScreen::Area)),
                     draw_confirm.in_set(Band::Modal),
+                    draw_carried
+                        .in_set(Band::Pointer)
+                        .run_if(in_state(ClientScreen::Area)),
                 ),
             );
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum HudAudience {
-    Players,
-    Spectators,
-    Everyone,
-}
-
-impl HudAudience {
-    fn includes(self, mode: ClientMode) -> bool {
-        match self {
-            HudAudience::Players => mode == ClientMode::Play,
-            HudAudience::Spectators => mode == ClientMode::Spectate,
-            HudAudience::Everyone => true,
-        }
-    }
-}
-
 pub trait HudWidget: Send + Sync {
-    fn audience(&self) -> HudAudience;
     fn fallback(&self, screen: Rect) -> Pos2;
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
 pub trait HudWindow: Send + Sync {
-    fn audience(&self) -> HudAudience;
     fn title(&self) -> &'static str;
     fn toggle(&self) -> InputAction;
     fn icon(&self) -> InterfaceIcon;
     fn size(&self) -> Vec2 {
         WINDOW_SIZE
     }
+    /// The most body the window may be given, when its content has an edge it must never
+    /// show past.
+    fn body_limit(&self, _world: &World) -> Option<Vec2> {
+        None
+    }
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
+/// A question put to the player, answered with `true` for the confirming button and `false` for the
+/// cancelling one or a dismissal.
 pub(crate) struct Confirm {
     pub title: String,
     pub body: Vec<String>,
     pub confirm: String,
     pub cancel: String,
-    pub on_confirm: Box<dyn FnOnce(&mut World) + Send + Sync>,
+    pub answer: Answer,
+}
+
+pub(crate) type Answer = Box<dyn FnOnce(&mut World, bool) + Send + Sync>;
+
+/// What the player drags across the interface, drawn under the pointer until it is dropped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Carried {
+    Skill(SkillId),
+    BagSlot(u32),
+    HotbarEntry {
+        from: HotbarSlot,
+        entry: HotbarEntry,
+    },
+}
+
+pub(crate) fn carry(gui: &egui::Context, carried: Carried) {
+    egui::DragAndDrop::set_payload(gui, carried);
+}
+
+pub(crate) fn carried(gui: &egui::Context) -> Option<Carried> {
+    egui::DragAndDrop::payload::<Carried>(gui).map(|carried| *carried)
+}
+
+/// What was let go of over the widget this frame, if anything; taking it leaves nothing for
+/// whatever else lies under the pointer.
+pub(crate) fn dropped(response: &egui::Response) -> Option<Carried> {
+    let carried = *response.dnd_release_payload::<Carried>()?;
+    egui::DragAndDrop::clear_payload(&response.ctx);
+    Some(carried)
 }
 
 pub(crate) fn panel() -> egui::Frame {
@@ -125,7 +151,13 @@ pub(crate) fn confirming(world: &World) -> bool {
 }
 
 pub(crate) fn dismiss_confirm(world: &mut World) -> bool {
-    world.resource_mut::<Confirming>().0.take().is_some()
+    match world.resource_mut::<Confirming>().0.take() {
+        Some(pending) => {
+            (pending.confirm.answer)(world, false);
+            true
+        }
+        None => false,
+    }
 }
 
 pub(crate) fn close_window(world: &mut World, window: &'static str) -> bool {
@@ -152,8 +184,14 @@ pub(crate) fn confirm_layer() -> LayerId {
     LayerId::new(Band::Modal.order(), Id::new(CONFIRM))
 }
 
+/// Where every widget and window of the interface stood when last drawn.
 pub(crate) fn pieces(world: &World) -> Vec<Rect> {
-    world.resource::<HudDrawn>().0.clone()
+    world
+        .resource::<WidgetRects>()
+        .0
+        .values()
+        .copied()
+        .collect()
 }
 
 pub(crate) fn tooltip(
@@ -191,10 +229,26 @@ pub(crate) fn file_icon(ui: &mut Ui, world: &mut World, file: &str, size: f32) -
     sized(ui, gui::image_file(world, file), size)
 }
 
+/// Where a window stands this frame, while it is open.
+pub(crate) fn window_rect(world: &World, window: &dyn HudWindow) -> Option<Rect> {
+    let title = window.title();
+    if !window_open(world, title) {
+        return None;
+    }
+    panel::shown_rect(&gui::context(world)?, title)
+}
+
+/// The most a window may be given, when its content bounds it.
+pub(crate) fn window_limit(world: &World, window: &dyn HudWindow) -> Option<Vec2> {
+    let body = window.body_limit(world)?;
+    Some(body + panel::chrome(&gui::context(world)?))
+}
+
 static WIDGETS: &[(&str, &dyn HudWidget)] = &[
     ("character", &player::widget::CharacterWidget),
     ("quests", &quest::tracker::QuestTrackerWidget),
-    ("spectator", &spectate::widget::SpectatorWidget),
+    (skill::bar::HOTBAR, &skill::bar::HotbarWidget),
+    (skill::bar::BASIC_ATTACK, &skill::bar::BasicAttackWidget),
 ];
 
 // Their launchers line up in this order.
@@ -202,25 +256,12 @@ static WINDOWS: &[&dyn HudWindow] = &[
     &item::widget::InventoryWindow,
     &equipment::widget::EquipmentWindow,
     &stat::widget::StatsWindow,
+    &skill::window::SkillsWindow,
     &quest::log::QuestLogWindow,
     &history::widget::HistoryWindow,
     &settings::SettingsWindow,
     &terminal::widget::TerminalWindow,
 ];
-
-fn widgets(mode: ClientMode) -> impl Iterator<Item = (&'static str, &'static dyn HudWidget)> {
-    WIDGETS
-        .iter()
-        .copied()
-        .filter(move |(_, widget)| widget.audience().includes(mode))
-}
-
-fn windows(mode: ClientMode) -> impl Iterator<Item = &'static dyn HudWindow> {
-    WINDOWS
-        .iter()
-        .copied()
-        .filter(move |window| window.audience().includes(mode))
-}
 
 #[derive(Resource, Default)]
 struct Open(HashSet<&'static str>);
@@ -232,9 +273,6 @@ struct WindowsDrawn {
 }
 
 #[derive(Resource, Default)]
-struct HudDrawn(Vec<Rect>);
-
-#[derive(Resource, Default)]
 struct Confirming(Option<Pending>);
 
 struct Pending {
@@ -242,24 +280,22 @@ struct Pending {
     focused: bool,
 }
 
-fn forget_drawn(mut drawn: ResMut<WindowsDrawn>, mut hud: ResMut<HudDrawn>) {
+fn forget_drawn(mut drawn: ResMut<WindowsDrawn>) {
     let drawn = &mut *drawn;
     drawn.last = std::mem::take(&mut drawn.now);
-    hud.0.clear();
 }
 
 fn draw_hud(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let mode = world.resource::<SpectateStatus>().mode();
     let screen = gui.content_rect();
-    for (name, shown) in widgets(mode) {
+    for &(name, shown) in WIDGETS {
         widget(world, &gui, name, shown.fallback(screen), |ui, world| {
             shown.show(ui, world);
         });
     }
-    for (slot, shown) in windows(mode).enumerate() {
+    for (slot, &shown) in WINDOWS.iter().enumerate() {
         let title = shown.title();
         if !window_open(world, title) {
             launcher(world, &gui, shown, launcher_pos(slot, screen));
@@ -275,6 +311,7 @@ fn draw_hud(world: &mut World) {
             title: Some(title),
             start: centered,
             sizing: Sizing::Resizable,
+            body_limit: shown.body_limit(world),
         };
         let mut open = true;
         window(world, &gui, frame, &mut open, |ui, world| {
@@ -299,7 +336,13 @@ fn launcher(world: &mut World, gui: &egui::Context, opens: &'static dyn HudWindo
             let at = Rect::from_center_size(response.rect.center(), Vec2::splat(LAUNCHER_ICON));
             ui.put(at, icon.widget(Vec2::splat(LAUNCHER_ICON)));
         }
-        key_badge(ui, response.rect, &key);
+        paint::badge(
+            ui.painter(),
+            response.rect.right_bottom() - Vec2::splat(2.0),
+            Align2::RIGHT_BOTTOM,
+            &key,
+            color::MUTED,
+        );
         gui::tooltip(&response, |ui| {
             ui.label(title);
         });
@@ -308,19 +351,6 @@ fn launcher(world: &mut World, gui: &egui::Context, opens: &'static dyn HudWindo
     if button.clicked() {
         world.resource_mut::<Open>().0.insert(title);
     }
-}
-
-fn key_badge(ui: &Ui, button: Rect, key: &str) {
-    let font = egui::FontId::monospace(10.0);
-    let galley = ui
-        .painter()
-        .layout_no_wrap(key.to_owned(), font, color::MUTED);
-    let size = galley.size() + Vec2::new(6.0, 2.0);
-    let rect = Rect::from_min_size(button.right_bottom() - size - Vec2::splat(2.0), size);
-    ui.painter()
-        .rect(rect, 3.0, color::INPUT, HAIRLINE, egui::StrokeKind::Inside);
-    ui.painter()
-        .galley(rect.center() - galley.size() / 2.0, galley, color::MUTED);
 }
 
 fn draw_confirm(world: &mut World) {
@@ -364,10 +394,47 @@ fn draw_confirm(world: &mut World) {
         decided = Some(false);
     }
     match decided {
-        Some(true) => (pending.confirm.on_confirm)(world),
-        Some(false) => {}
+        Some(decided) => (pending.confirm.answer)(world, decided),
         None => world.resource_mut::<Confirming>().0 = Some(pending),
     }
+}
+
+/// The icon of what is carried, under the pointer.
+fn draw_carried(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let Some(carried) = carried(&gui) else {
+        return;
+    };
+    let content = world.resource::<Content>().clone();
+    let icon = match carried {
+        Carried::Skill(skill) => skill.get(&content).icon.clone(),
+        Carried::BagSlot(slot) => {
+            let Some(stack) = session::my_character(world)
+                .and_then(|me| me.get::<Inventory>())
+                .and_then(|inventory| inventory.slots.get(slot as usize).copied())
+            else {
+                return;
+            };
+            stack.item.get(&content).icon.clone()
+        }
+        Carried::HotbarEntry { entry, .. } => match entry {
+            HotbarEntry::Skill(skill) => skill.get(&content).icon.clone(),
+            HotbarEntry::Item(item) => item.get(&content).icon.clone(),
+            HotbarEntry::Empty => return,
+        },
+    };
+    let Some(image) = gui::image(world, &icon) else {
+        return;
+    };
+    gui::at_pointer(
+        &gui,
+        Id::new("carried"),
+        Band::Pointer,
+        -Vec2::splat(CARRIED / 2.0),
+        |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
+    );
 }
 
 fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {
@@ -377,8 +444,8 @@ fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {
     )
 }
 
-fn toggle_keys(input: ActionInput, status: Res<SpectateStatus>, mut open: ResMut<Open>) {
-    for window in windows(status.mode()) {
+fn toggle_keys(input: ActionInput, mut open: ResMut<Open>) {
+    for window in WINDOWS {
         let title = window.title();
         if input.just_pressed(window.toggle()) && !open.0.remove(title) {
             open.0.insert(title);

@@ -198,7 +198,7 @@ const METER_CELLS: usize = 12;
 const METER_RANGE_DB: f32 = 48.0;
 const VEIL: &str = "{\\p1}m 0 0 l 1280 0 1280 720 0 720{\\p0}";
 
-// ASS colours are &HAABBGGRR, with 00 opaque.
+// ASS colors are &HAABBGGRR, with 00 opaque.
 const SCRIPT_HEAD: &str = "[Script Info]
 ScriptType: v4.00+
 PlayResX: 1280

@@ -8,7 +8,7 @@ use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band, GuiImage};
-use crate::core::math::Pos;
+use crate::core::math::{Pos, Size};
 use crate::core::render::tile_to_window;
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::text::{self, TextShadow};
@@ -20,7 +20,7 @@ use crate::systems::combat::Attitude;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
@@ -58,7 +58,7 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
                 .get::<RenderPosition>(actor)
                 .map(|rendered| rendered.0)
                 .or_else(|| world.get::<Position>(actor).map(|position| position.pos))?;
-            tile_to_window(world, head(at, world.get::<Hitbox>(actor)?))
+            tile_to_window(world, head(at, world.get::<Hitbox>(actor)?.size))
         }
     }
 }
@@ -66,15 +66,66 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
 #[derive(Resource, Default)]
 struct Plates(HashMap<Entity, egui::Rect>);
 
-struct Label {
-    name: Option<String>,
-    role: Option<String>,
-    color: Color32,
+/// What an actor's plate says: a name in the colour of its standing, and an npc's role under it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlateLabel {
+    pub name: Option<String>,
+    pub role: Option<String>,
+    pub color: Color32,
+}
+
+impl PlateLabel {
+    pub fn npc(name: &str, role: &str, hostile: bool) -> PlateLabel {
+        PlateLabel {
+            name: Some(name.to_owned()),
+            role: Some(role.to_owned()),
+            color: if hostile { HOSTILE } else { Color32::WHITE },
+        }
+    }
+
+    pub fn player(name: &str) -> PlateLabel {
+        PlateLabel {
+            name: Some(name.to_owned()),
+            role: None,
+            color: PLAYER,
+        }
+    }
+}
+
+/// The plate `actor` wears in `world`, if it wears one.
+pub fn label_of(world: &World, content: &Content, actor: Entity) -> Option<PlateLabel> {
+    label(
+        content,
+        world.get::<Name>(actor),
+        world.get::<Npc>(actor),
+        world.get::<Owner>(actor),
+        world.get::<Attitude>(actor),
+        world.get::<AreaObject>(actor).is_some(),
+    )
+}
+
+/// Where a plate hangs from: the top of the hitbox of an actor standing at `at`.
+pub fn head(at: Pos<Tiles>, hitbox: Size<Tiles>) -> Pos<Tiles> {
+    Pos::new(at.x, at.y + 0.5 - hitbox.height)
+}
+
+/// Draws a plate without marks, hanging over `top` as the game hangs them over an actor's head.
+pub fn draw_label(ui: &mut egui::Ui, top: egui::Pos2, label: &PlateLabel) {
+    let size = plate_size(ui.ctx(), label, &[]);
+    draw_plate(
+        ui,
+        &Plate {
+            actor: Entity::PLACEHOLDER,
+            label: label.clone(),
+            icons: Vec::new(),
+            rect: plate_rect(ui.ctx(), top, size),
+        },
+    );
 }
 
 struct Plate {
     actor: Entity,
-    label: Label,
+    label: PlateLabel,
     icons: Vec<Option<GuiImage>>,
     rect: egui::Rect,
 }
@@ -94,8 +145,8 @@ pub fn draw_plates(world: &mut World) {
         return;
     }
     let content = world.resource::<Content>().clone();
-    let viewer = world.resource::<Viewpoint>().0;
-    let labelled: Vec<(Entity, Label, Pos<Tiles>, Hitbox)> = world
+    let viewer = session::me(world);
+    let labelled: Vec<(Entity, PlateLabel, Pos<Tiles>, Hitbox)> = world
         .query_filtered::<(
             Entity,
             Option<&Name>,
@@ -122,7 +173,7 @@ pub fn draw_plates(world: &mut World) {
     let plates: Vec<Plate> = labelled
         .into_iter()
         .filter_map(|(actor, label, at, hitbox)| {
-            let top = tile_to_window(world, head(at, &hitbox))?;
+            let top = tile_to_window(world, head(at, hitbox.size))?;
             let icons: Vec<Option<GuiImage>> = attention::plate_marks(world, viewer, actor)
                 .into_iter()
                 .map(|mark| gui::image(world, &mark.get(&content).icon))
@@ -131,11 +182,7 @@ pub fn draw_plates(world: &mut World) {
                 return None;
             }
             let size = plate_size(&gui, &label, &icons);
-            let rect = egui::Rect::from_min_size(
-                egui::pos2(top.x - size.x / 2.0, top.y - HEAD_ROOM - size.y)
-                    .round_to_pixels(gui.pixels_per_point()),
-                size,
-            );
+            let rect = plate_rect(&gui, egui::pos2(top.x, top.y), size);
             Some(Plate {
                 actor,
                 label,
@@ -201,7 +248,15 @@ fn draw_plate(ui: &mut egui::Ui, plate: &Plate) {
     }
 }
 
-fn plate_size(gui: &egui::Context, label: &Label, icons: &[Option<GuiImage>]) -> egui::Vec2 {
+fn plate_rect(gui: &egui::Context, top: egui::Pos2, size: egui::Vec2) -> egui::Rect {
+    egui::Rect::from_min_size(
+        egui::pos2(top.x - size.x / 2.0, top.y - HEAD_ROOM - size.y)
+            .round_to_pixels(gui.pixels_per_point()),
+        size,
+    )
+}
+
+fn plate_size(gui: &egui::Context, label: &PlateLabel, icons: &[Option<GuiImage>]) -> egui::Vec2 {
     let text = |text: String, font: FontId| {
         gui.fonts_mut(|fonts| fonts.layout_no_wrap(text, font, Color32::WHITE))
             .size()
@@ -232,9 +287,9 @@ fn label(
     owner: Option<&Owner>,
     attitude: Option<&Attitude>,
     object: bool,
-) -> Option<Label> {
+) -> Option<PlateLabel> {
     if object {
-        return Some(Label {
+        return Some(PlateLabel {
             name: None,
             role: None,
             color: Color32::WHITE,
@@ -243,26 +298,13 @@ fn label(
     match (npc, owner) {
         (Some(npc), _) => {
             let def = npc.def.get(content);
-            def.nameplate().map(|role| Label {
-                name: Some(def.name.to_owned()),
-                role: Some(role.to_owned()),
-                color: match attitude {
-                    Some(Attitude::Hostile) => HOSTILE,
-                    _ => Color32::WHITE,
-                },
+            def.nameplate().map(|role| {
+                PlateLabel::npc(&def.name, role, matches!(attitude, Some(Attitude::Hostile)))
             })
         }
-        (None, Some(_)) => Some(Label {
-            name: Some(name?.name.clone()),
-            role: None,
-            color: PLAYER,
-        }),
+        (None, Some(_)) => Some(PlateLabel::player(&name?.name)),
         (None, None) => None,
     }
-}
-
-fn head(at: Pos<Tiles>, hitbox: &Hitbox) -> Pos<Tiles> {
-    Pos::new(at.x, at.y + 0.5 - hitbox.size.height)
 }
 
 fn role_text(role: &str) -> String {

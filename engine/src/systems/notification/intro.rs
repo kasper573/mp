@@ -11,8 +11,8 @@ use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
+use crate::core::math::Rgba;
 use crate::core::text::{self, TextShadow};
-use crate::systems::actor::Rgba;
 use crate::systems::screen::ClientScreen;
 use crate::systems::screen::area;
 use crate::systems::text::Motion;
@@ -97,7 +97,7 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
             continue;
         };
         let line = notification.text.styled();
-        let tint = appearance.tint.map_or(Color32::WHITE, color_of);
+        let tint = appearance.tint.map_or(Color32::WHITE, Color32::from);
         let title_font = FontId::new(TITLE_SIZE, family::bold());
         let title_size = gui
             .fonts_mut(|fonts| fonts.layout_no_wrap(title.to_string(), title_font.clone(), tint))
@@ -260,9 +260,4 @@ fn title_motion(motion: Option<Motion>, now: f64, still: bool) -> TSTransform {
             TSTransform::from_translation(Vec2::new((t * 53.0).sin() * 1.5, (t * 47.0).cos() * 1.5))
         }
     }
-}
-
-fn color_of(rgba: Rgba) -> Color32 {
-    let [r, g, b, a] = rgba.0.to_be_bytes();
-    Color32::from_rgba_unmultiplied(r, g, b, a)
 }

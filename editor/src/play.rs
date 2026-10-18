@@ -9,7 +9,7 @@ use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentScope, version, with_content};
 use engine::core::time::UtcHour;
 use engine::systems::GameSettings;
-use engine::systems::job::JobDef;
+use engine::systems::class::ClassDef;
 use engine::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
     SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest, fake_token,
@@ -106,10 +106,17 @@ impl GameBinaries {
         }
     }
 
-    pub fn matches(&self, build: &str) -> bool {
-        [&self.server, &self.client]
-            .iter()
-            .all(|info| info.as_ref().is_ok_and(|info| info.build == build))
+    /// Whether a play-test can run on them: the client joins only a server of its own build, and
+    /// both must read the rows this editor writes, which its content version tells.
+    pub fn matches(&self, content_version: &str) -> bool {
+        match (&self.server, &self.client) {
+            (Ok(server), Ok(client)) => {
+                server.build == client.build
+                    && server.content_version == content_version
+                    && client.content_version == content_version
+            }
+            _ => false,
+        }
     }
 }
 
@@ -278,8 +285,9 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         editor.toast("No test character: add a test_character row first");
         return;
     };
-    let build = version::build();
-    let Some(binaries) = check_binaries(editor).filter(|binaries| binaries.matches(build)) else {
+    let Some(binaries) =
+        check_binaries(editor).filter(|binaries| binaries.matches(content_version()))
+    else {
         editor.dialogs.push(ModalDialog::Binaries);
         return;
     };
@@ -355,9 +363,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let (play, arrow) = ui
         .scope(|ui| {
             ui.spacing_mut().item_spacing.x = 1.0;
-            let arrow = ui
-                .add(egui::Button::new(RichText::new("▾").size(12.0)).fill(theme::ACCENT))
-                .on_hover_text("Pick the test character");
+            let arrow = widgets::primary(ui, "▾").on_hover_text("Pick the test character");
             let play = widgets::primary(ui, "▸ Play").on_hover_text(
                 "Save, then play as the picked test character from its own start (F5)",
             );
@@ -591,16 +597,10 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
             let level = content
                 .as_ref()
                 .and_then(|content| {
-                    row["job"]
+                    row["class"]
                         .as_str()
-                        .and_then(|job| content.by_key::<JobDef>(job))
-                        .map(|job| {
-                            job.get(content)
-                                .levels
-                                .iter()
-                                .filter(|tier| tier.xp <= xp)
-                                .count() as u32
-                        })
+                        .and_then(|class| content.by_key::<ClassDef>(class))
+                        .map(|class| class.get(content).level_at(xp))
                 })
                 .unwrap_or(0);
             let area = match &row["start"] {
@@ -699,14 +699,15 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let folder = binaries_folder(editor);
     let build = version::build();
     let content_version = content_version();
-    let folder_version = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .map(|c| c.built::<GameSettings>().content_version.0.clone());
+    let open_folder = editor.project.as_ref().map(|project| {
+        project
+            .content
+            .as_ref()
+            .map(|content| content.built::<GameSettings>().content_version.0.clone())
+    });
     let ok = checked
         .as_ref()
-        .is_some_and(|binaries| binaries.matches(build));
+        .is_some_and(|binaries| binaries.matches(content_version));
     if checked.is_none() {
         ui.ctx().request_repaint_after(Duration::from_millis(50));
     }
@@ -764,48 +765,47 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
             );
         });
     };
-    row(ui, "editor", build, None);
+    row(
+        ui,
+        "editor",
+        &format!("build {build}, content version {content_version}"),
+        None,
+    );
+    let builds_agree = checked.as_ref().is_some_and(|binaries| {
+        matches!(
+            (&binaries.server, &binaries.client),
+            (Ok(server), Ok(client)) if server.build == client.build
+        )
+    });
     for name in [SERVER, CLIENT] {
         match checked.as_ref().map(|binaries| binaries.of(name)) {
-            Some(Ok(info)) => row(ui, name, &info.build, Some(info.build == build)),
+            Some(Ok(info)) => row(
+                ui,
+                name,
+                &format!(
+                    "build {}, content version {}",
+                    info.build, info.content_version
+                ),
+                Some(builds_agree && info.content_version == content_version),
+            ),
             Some(Err(error)) => row(ui, name, error, Some(false)),
             None => row(ui, name, "checking…", None),
         }
     }
-    let folder_note = match &folder_version {
-        Some(folder) if *folder == content_version => " · the folder's too".to_owned(),
-        Some(folder) => format!(" · the folder has {folder}"),
-        None => String::new(),
-    };
-    row(
-        ui,
-        "content version",
-        &format!("{content_version}{folder_note}"),
-        Some(
-            folder_version
-                .as_deref()
-                .is_none_or(|folder| folder == content_version),
-        ),
-    );
+    if let Some(version) = &open_folder {
+        match version {
+            Some(version) => row(
+                ui,
+                "open folder",
+                &format!("content version {version}"),
+                Some(version == content_version),
+            ),
+            None => row(ui, "open folder", "does not load", None),
+        }
+    }
     ui.add_space(8.0);
-    if ok || checked.is_none() {
-        ui.label(
-            theme::muted(
-                "Builds come from each binary's --build-info and must match the editor's.",
-            )
-            .size(13.0),
-        );
-    } else if let Some(binaries) = &checked {
-        let culprit = [(SERVER, &binaries.server), (CLIENT, &binaries.client)]
-            .iter()
-            .find(|(_, info)| !info.as_ref().is_ok_and(|info| info.build == build))
-            .map(|(name, info)| match info {
-                Ok(_) => format!(
-                    "{name} is from another build. Rows this editor writes may not load in it."
-                ),
-                Err(error) => format!("{name} is {error} in this folder."),
-            })
-            .unwrap_or_default();
+    if let Some(binaries) = checked.as_ref().filter(|_| !ok) {
+        let culprit = culprit(binaries, content_version);
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new("⚠").color(theme::DANGER));
             ui.label(RichText::new(culprit).color(theme::DANGER).size(13.0));
@@ -846,6 +846,22 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         editor.play.binaries = None;
     }
     close
+}
+
+fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
+    let (server, client) = match (&binaries.server, &binaries.client) {
+        (Err(error), _) => return format!("{SERVER} is {error} in this folder."),
+        (_, Err(error)) => return format!("{CLIENT} is {error} in this folder."),
+        (Ok(server), Ok(client)) => (server, client),
+    };
+    if server.build != client.build {
+        return format!("{SERVER} and {CLIENT} are different builds.");
+    }
+    [(SERVER, server), (CLIENT, client)]
+        .into_iter()
+        .find(|(_, info)| info.content_version != content_version)
+        .map(|(name, _)| format!("{name} is of a different content version than the editor."))
+        .unwrap_or_default()
 }
 
 fn editor_folder(editor: &Editor) -> PathBuf {
@@ -891,7 +907,7 @@ fn spawn_client(
         game_server_url: format!("http://{LOCALHOST}:{}", ports.http),
         game_server_ws_url: format!("ws://{LOCALHOST}:{}", ports.ws),
         auth: launch::AuthMode::Fake,
-        access_token: Some(fake_token(character, &[])),
+        access_token: Some(fake_token(character)),
         profile_dir: profile,
         exit_on_stdin_eof: true,
         probe: None,
@@ -971,7 +987,7 @@ fn hand_over(
     }
     .map_err(|error| error.to_string())?;
     let response = ureq::post(format!("http://{LOCALHOST}:{http}{TEST_CHARACTER_ROUTE}"))
-        .header("Authorization", fake_token(character, &[]))
+        .header("Authorization", fake_token(character))
         .send(body.as_bytes());
     match response {
         Ok(_) => Ok(()),

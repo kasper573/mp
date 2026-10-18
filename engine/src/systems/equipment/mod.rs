@@ -9,18 +9,14 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
-use crate::systems::drain_requests;
-use crate::systems::effect::{self, Effect};
-use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
-use crate::systems::notification;
-use crate::systems::player::{may_command, sender_player};
-use crate::systems::script::{EventKind, condition};
+use crate::systems::item::{Inventory, ItemId, ItemKind, ItemStack};
+use crate::systems::player::player_requests;
+use crate::systems::script::condition;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Equipment>()
         .add_client_message::<UnequipRequest>(Channel::Ordered);
-    effect::source(app, equipped);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -85,6 +81,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     let ItemKind::Equipment {
         slot: into,
         requires,
+        ..
     } = &item.get(&content).kind
     else {
         return Err(format!("{} can't be worn", item.get(&content).name));
@@ -107,10 +104,6 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.insert(*into, item);
     }
-    if let Some(occupant) = occupant {
-        item::raise(world, occupant, EventKind::Unequipped, player);
-    }
-    item::raise(world, item, EventKind::Equipped, player);
     Ok(())
 }
 
@@ -129,34 +122,11 @@ pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> R
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.remove(&slot);
     }
-    item::raise(world, item, EventKind::Unequipped, player);
     Ok(())
 }
 
 pub fn unequip(world: &mut World) {
-    for request in drain_requests::<UnequipRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !may_command(world, player) {
-            continue;
-        }
-        if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
-            notification::error(world, player, refusal);
-        }
-    }
-}
-
-fn equipped(world: &World, entity: Entity) -> Vec<Effect> {
-    let content = world.resource::<Content>();
-    world
-        .get::<Equipment>(entity)
-        .map(|equipment| {
-            equipment
-                .slots
-                .values()
-                .flat_map(|item| item.get(content).effects())
-                .collect()
-        })
-        .unwrap_or_default()
+    player_requests::<UnequipRequest>(world, true, |world, player, request| {
+        unequip_slot(world, player, request.slot)
+    });
 }

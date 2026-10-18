@@ -21,7 +21,7 @@ use strum::{EnumString, IntoStaticStr, VariantArray};
 use crate::app::{BottomTab, Editor};
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::thumbs::Thumbnail;
-use crate::ui::{theme, widgets};
+use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::{import, thumbs, value};
 
@@ -33,7 +33,6 @@ pub const MAX_FRAME_MS: u32 = 60_000;
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
     pub bank: crate::audio::WaveformCache,
-    pub sfx_to_play: Vec<String>,
     pub drops: Vec<PathBuf>,
     pub reimports: HashMap<String, import::ModelReimport>,
 }
@@ -241,6 +240,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
     inspect::remove_face_dialog(editor, &ctx, key);
     let page = editor.views.model.view(key).page;
+    sidebar::right(ui, "model", |ui| sidebar(editor, ui, key));
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
@@ -291,6 +291,20 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
             }
         }
     });
+}
+
+/// The model window's inspector: the selected strip, frame, cue, hitbox or face, or else the
+/// model row itself.
+fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let selection = editor.selection.clone();
+    if selection.table == TABLE
+        && selection.keys.first().is_some_and(|k| k == key)
+        && !selection.parts.is_empty()
+    {
+        inspect_parts(editor, ui, &selection);
+    } else {
+        row_form::show_row(editor, ui, TABLE, key);
+    }
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {
