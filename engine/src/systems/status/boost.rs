@@ -20,19 +20,14 @@ pub fn hold(world: &mut World, actor: Entity, source: AspectSource, stat: Stat) 
         return;
     }
     let held = HeldBoost { source, stat };
-    match world.get_mut::<Boosts>(actor) {
-        Some(mut boosts) => {
-            match boosts
-                .0
-                .iter_mut()
-                .find(|boost| boost.source == source && boost.stat.kind == stat.kind)
-            {
-                Some(boost) => *boost = held,
-                None => boosts.0.push(held),
-            }
-        }
-        None => {
-            world.entity_mut(actor).insert(Boosts(vec![held]));
+    if let Some(mut boosts) = world.get_mut::<Boosts>(actor) {
+        match boosts
+            .0
+            .iter_mut()
+            .find(|boost| boost.source == source && boost.stat.kind == stat.kind)
+        {
+            Some(boost) => *boost = held,
+            None => boosts.0.push(held),
         }
     }
 }
@@ -45,9 +40,8 @@ pub fn drop(world: &mut World, actor: Entity, source: AspectSource) {
     }
 }
 
-pub fn modifiers(world: &World, entity: Entity) -> Vec<Stat> {
-    world
-        .get::<Boosts>(entity)
-        .map(|boosts| boosts.0.iter().map(|boost| boost.stat).collect())
-        .unwrap_or_default()
+pub fn modifiers(world: &World, entity: Entity, into: &mut Vec<Stat>) {
+    if let Some(boosts) = world.get::<Boosts>(entity) {
+        into.extend(boosts.0.iter().map(|boost| boost.stat));
+    }
 }

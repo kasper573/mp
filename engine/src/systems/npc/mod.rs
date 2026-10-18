@@ -7,7 +7,6 @@ use bevy_app::App;
 use bevy_ecs::message::{MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
-use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -315,36 +314,35 @@ fn spawn_wild(
     }
     .expect("validated at startup: populations have ground outside the safe zones");
     let entity = spawn(world, npc, at, area_id, pack);
-    world.entity_mut(entity).insert(Wild);
-    if let Some(bounds) = roams {
-        world.entity_mut(entity).insert(Roams(bounds));
-    }
+    match roams {
+        Some(bounds) => world.entity_mut(entity).insert((Wild, Roams(bounds))),
+        None => world.entity_mut(entity).insert(Wild),
+    };
 }
 
+/// A bare actor of the definition, as a test stands one up; `spawn` makes a whole NPC of it.
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
     let content = world.resource::<Content>().clone();
-    let entity = world.spawn(character(&content, def, at, area)).id();
-    world
-        .entity_mut(entity)
-        .insert(Stats(def.stats.listed().collect()));
-    entity
+    world.spawn(actor_bundle(&content, def, at, area)).id()
 }
 
 pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: Pack) -> Entity {
     let content = world.resource::<Content>().clone();
-    let entity = spawn_actor(world, def.get(&content), at, area);
-    world.entity_mut(entity).insert((
+    let row = def.get(&content);
+    let mut entity = world.spawn((
+        actor_bundle(&content, row, at, area),
         Npc { def },
         pack,
         Attitude::Friendly,
         body::Body::default(),
         actor::Name {
-            name: def.get(&content).name.to_owned(),
+            name: row.name.to_owned(),
         },
     ));
-    if let Some(babble) = def.get(&content).voice() {
-        world.entity_mut(entity).insert(Babbler(babble));
+    if let Some(babble) = row.voice() {
+        entity.insert(Babbler(babble));
     }
+    let entity = entity.id();
     start_scripts(world, entity, def);
     entity
 }
@@ -495,22 +493,22 @@ pub fn approach(world: &mut World) {
     }
 }
 
-fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Character {
-    Character {
-        replicated: Replicated,
-        position: Position::at(at),
-        actor: Actor {
+fn actor_bundle(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> impl Bundle {
+    let character = Character::new(
+        Position::at(at),
+        Actor {
             color: def.tint(),
             dir: Direction::S,
             action: Action::Idle,
             model: def.model,
             attack_rate: PlaybackRate::default(),
         },
-        hitbox: Hitbox {
+        Hitbox {
             size: ActorModel::get(content, def.model).hitbox(),
         },
-        area: AreaTag { area },
-    }
+        AreaTag { area },
+    );
+    (character, Stats(def.stats.listed().collect()))
 }
 
 fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {

@@ -1,6 +1,6 @@
 use driver::{
-    UiTarget, bare_spot, holding, id, learned, planned, reset_prompted, resident_home, slot_skill,
-    to_spend, tree_view,
+    Player, UiTarget, bare_spot, holding, id, learned, planned, reset_prompted, resident_home,
+    slot_skill, to_spend, tree_view,
 };
 use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
@@ -88,18 +88,7 @@ fn skills_are_learned_in_the_tree_pinned_on_the_bar_and_given_back_by_a_reset() 
             && view.panned.y <= view.canvas.height - view.viewport.size.height + 0.5,
         "panning stops at the canvas's edge: {view:?}"
     );
-    let grab = bare_spot(&panned, view.viewport).expect("a bare spot of the tree");
-    let screen = panned.screen.expect("the screen");
-    player.drag_from(
-        grab,
-        Offset::new(
-            (view.panned.x + 20.0).min(screen.width - grab.x - 10.0),
-            (view.panned.y + 20.0).min(screen.height - grab.y - 10.0),
-        ),
-    );
-    player.wait_until("the tree panned back to its origin", |snapshot| {
-        tree_view(snapshot).is_some_and(|view| view.panned.x == 0.0 && view.panned.y == 0.0)
-    });
+    pan_home(&mut player);
     player.drag_ui("Skills", Pos::new(20.0, 20.0) - view.window.origin);
     let moved = player.wait_until("the window moved", |snapshot| {
         tree_view(snapshot).is_some_and(|view| view.window.origin.x < 40.0)
@@ -146,4 +135,28 @@ fn skills_are_learned_in_the_tree_pinned_on_the_bar_and_given_back_by_a_reset() 
     });
     assert_eq!(slot_skill(&snapshot, 0), Some("cleave"));
     assert!(snapshot.hotbar[0].dimmed);
+}
+
+/// Drags the tree back toward its origin, past it so the clamp lands it there, in as many drags as
+/// the screen leaves room for from the bare spots it offers.
+fn pan_home(player: &mut Player) {
+    for _ in 0..4 {
+        let seen = player.settled();
+        let view = tree_view(&seen).expect("the skills window");
+        if view.panned.x == 0.0 && view.panned.y == 0.0 {
+            return;
+        }
+        let grab = bare_spot(&seen, view.viewport).expect("a bare spot of the tree");
+        let screen = seen.screen.expect("the screen");
+        player.drag_from(
+            grab,
+            Offset::new(
+                (view.panned.x + 20.0).min(screen.width - grab.x - 10.0),
+                (view.panned.y + 20.0).min(screen.height - grab.y - 10.0),
+            ),
+        );
+    }
+    player.wait_until("the tree panned back to its origin", |snapshot| {
+        tree_view(snapshot).is_some_and(|view| view.panned.x == 0.0 && view.panned.y == 0.0)
+    });
 }

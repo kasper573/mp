@@ -101,9 +101,9 @@ impl Stats {
     }
 }
 
-/// A system's say in an actor's effective stats, on top of its own `Stats`; registered with
-/// `source`.
-pub type Source = fn(&World, Entity) -> Vec<Stat>;
+/// A system's say in an actor's effective stats, on top of its own `Stats`, pushed onto the
+/// modifiers gathered so far; registered with `source`.
+pub type Source = fn(&World, Entity, &mut Vec<Stat>);
 
 #[derive(Resource, Default)]
 pub struct Sources(Vec<Source>);
@@ -118,12 +118,11 @@ pub fn source(app: &mut App, source: Source) {
 }
 
 pub fn modifiers(world: &World, entity: Entity) -> Vec<Stat> {
-    world
-        .resource::<Sources>()
-        .0
-        .iter()
-        .flat_map(|source| source(world, entity))
-        .collect()
+    let mut gathered = Vec::new();
+    for source in &world.resource::<Sources>().0 {
+        source(world, entity, &mut gathered);
+    }
+    gathered
 }
 
 pub fn snapshot(world: &World, entity: Entity) -> Stats {

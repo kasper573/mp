@@ -210,11 +210,8 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
         during: None,
         during_next: None,
     };
-    match world.get_mut::<ActiveAspects>(actor) {
-        Some(mut aspects) => aspects.0.push(aspect),
-        None => {
-            world.entity_mut(actor).insert(ActiveAspects(vec![aspect]));
-        }
+    if let Some(mut aspects) = world.get_mut::<ActiveAspects>(actor) {
+        aspects.0.push(aspect);
     }
     if let AspectSource::Status(effect) = source {
         let content = world.resource::<Content>().clone();

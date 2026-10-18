@@ -142,13 +142,10 @@ pub fn apply(
         since: now,
         until: lasts.map(|lasts| now.after(lasts)),
     };
-    match world.get_mut::<Statuses>(actor) {
-        Some(mut statuses) => match statuses.0.iter_mut().find(|held| held.effect == effect) {
+    if let Some(mut statuses) = world.get_mut::<Statuses>(actor) {
+        match statuses.0.iter_mut().find(|held| held.effect == effect) {
             Some(held) => *held = fresh,
             None => statuses.0.push(fresh),
-        },
-        None => {
-            world.entity_mut(actor).insert(Statuses(vec![fresh]));
         }
     }
 }

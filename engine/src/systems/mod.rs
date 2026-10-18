@@ -57,6 +57,8 @@ use crate::systems::player::PlayerDefId;
 use actor::{Actor, Hitbox};
 use area::AreaTag;
 use movement::Position;
+use skill::Cooldowns;
+use status::{ActiveAspects, Boosts, Statuses};
 use terminal::TerminalKind;
 
 pub const TICK_HZ: Hertz = Hertz(30.0);
@@ -105,6 +107,9 @@ pub struct GameSettings {
     pub player: PlayerDefId,
 }
 
+/// What every character in the world is made of, player and NPC alike, spawned whole so a character
+/// takes one archetype: its standing in the world, and the statuses, boosts, aspects and cooldowns it
+/// starts without.
 #[derive(Bundle)]
 pub struct Character {
     pub replicated: Replicated,
@@ -112,6 +117,26 @@ pub struct Character {
     pub actor: Actor,
     pub hitbox: Hitbox,
     pub area: AreaTag,
+    pub statuses: Statuses,
+    pub boosts: Boosts,
+    pub aspects: ActiveAspects,
+    pub cooldowns: Cooldowns,
+}
+
+impl Character {
+    pub fn new(position: Position, actor: Actor, hitbox: Hitbox, area: AreaTag) -> Character {
+        Character {
+            replicated: Replicated,
+            position,
+            actor,
+            hitbox,
+            area,
+            statuses: Statuses::default(),
+            boosts: Boosts::default(),
+            aspects: ActiveAspects::default(),
+            cooldowns: Cooldowns::default(),
+        }
+    }
 }
 
 pub fn server_app(

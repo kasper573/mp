@@ -276,10 +276,9 @@ impl EffectDef<RiftScripting> for GrantXp {
     }
 }
 
-fn level_stats(world: &World, entity: Entity) -> Vec<Stat> {
+fn level_stats(world: &World, entity: Entity, into: &mut Vec<Stat>) {
     let content = world.resource::<Content>();
-    let Some(class) = of(world, entity) else {
-        return Vec::new();
-    };
-    class.get(content).stats_at(xp_of(world, entity)).collect()
+    if let Some(class) = of(world, entity) {
+        into.extend(class.get(content).stats_at(xp_of(world, entity)));
+    }
 }

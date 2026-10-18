@@ -24,8 +24,7 @@ use crate::systems::script::Place;
 use crate::systems::shop::{Sale, ShopId, ShopLedger};
 use crate::systems::skill::learn::{PlanRefusal, plan};
 use crate::systems::skill::{
-    self, BasicAttack, Cooldowns, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, Rank,
-    SkillId,
+    self, BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, Rank, SkillId,
 };
 use crate::systems::stat::StatMap;
 
@@ -276,7 +275,6 @@ pub fn materialize(
             def: snapshot.class,
         },
         learned: learned(snapshot),
-        cooldowns: Cooldowns::default(),
         hotbar: hotbar(snapshot),
         basic_attack: BasicAttack(snapshot.basic_attack),
         memory,

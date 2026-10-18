@@ -24,6 +24,7 @@ use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
 use crate::systems::skill::{BasicAttack, Cooldowns, Hotbar, Learned, ResetPrompt};
+use crate::systems::status::Boosts;
 
 pub const VIEW_DISTANCE: Tiles = Tiles(24.0);
 // Compared against squared distance to avoid a per-pair `sqrt`. Exact: `VIEW_DISTANCE` is a perfect
@@ -34,9 +35,8 @@ pub fn register(app: &mut App) {
     app.add_visibility_filter::<OwnedBy>();
     app.init_resource::<ScopeBits>();
     app.init_resource::<Sights>();
-    app.init_resource::<Slots>();
     app.add_observer(grant_hidden_slots);
-    app.add_observer(release_slot);
+    app.add_observer(forget_subject);
     app.add_observer(reveal_to_all);
 }
 
@@ -62,19 +62,12 @@ pub fn coexist(world: &World, a: Entity, b: Entity) -> bool {
 
 type Clients = QueryState<(Entity, &'static ClientId)>;
 type Views = QueryState<(&'static mut ClientVisibility, &'static mut HiddenSlots)>;
-type Subjects = QueryState<
-    (
-        Entity,
-        &'static Position,
-        Option<&'static AreaTag>,
-        Option<&'static SubjectSlot>,
-    ),
-    With<Replicated>,
->;
+type Subjects = QueryState<(Entity, &'static Position, Option<&'static AreaTag>), With<Replicated>>;
 type Presences = QueryState<Entity, (With<Presence>, With<Replicated>)>;
 
 /// Replicon is told only about range transitions: a client remembers which subjects it hides in a
-/// bitset over the subjects' slots, so the steady state costs no hashing per subject and client.
+/// bitset over the subjects' entity indices, so the steady state costs no hashing per subject and
+/// client.
 pub fn update(
     world: &mut World,
     clients_query: &mut Clients,
@@ -91,29 +84,19 @@ pub fn update(
     }
     let bits = *world.resource::<ScopeBits>();
     let conditional: Vec<Entity> = presences.iter(world).collect();
-    let found: Vec<(Subject, Option<SubjectSlot>)> = subjects_query
+    let subjects: Vec<Subject> = subjects_query
         .iter(world)
-        .map(|(entity, position, tag, slot)| {
-            let subject = Subject {
-                entity,
-                pos: position.pos,
-                area: tag.map(|tag| tag.area),
-            };
-            (subject, slot.copied())
+        .map(|(entity, position, tag)| Subject {
+            entity,
+            pos: position.pos,
+            area: tag.map(|tag| tag.area),
         })
         .collect();
-    let subjects: Vec<(Subject, usize)> = found
-        .into_iter()
-        .map(|(subject, slot)| {
-            let slot = slot.unwrap_or_else(|| {
-                let slot = SubjectSlot(world.resource_mut::<Slots>().allocate());
-                world.entity_mut(subject.entity).insert(slot);
-                slot
-            });
-            (subject, slot.0)
-        })
-        .collect();
-    let slots = world.resource::<Slots>().len();
+    let slots = subjects
+        .iter()
+        .map(|subject| slot_of(subject.entity) + 1)
+        .max()
+        .unwrap_or(0);
     for (client, id) in clients {
         let sight = sight(world, id);
         let present: Vec<(Entity, bool)> = conditional
@@ -131,10 +114,11 @@ pub fn update(
         let visibility = visibility.as_mut();
         let hidden = hidden.as_mut();
         hidden.0.grow(slots);
-        for (subject, slot) in &subjects {
+        for subject in &subjects {
+            let slot = slot_of(subject.entity);
             let hide = !sight.as_ref().is_some_and(|sight| sight.sees(subject));
-            if hidden.0.contains(*slot) != hide {
-                hidden.0.set(*slot, hide);
+            if hidden.0.contains(slot) != hide {
+                hidden.0.set(slot, hide);
                 visibility.set(subject.entity, bits.range, !hide);
             }
         }
@@ -153,11 +137,14 @@ pub fn seen_by(world: &mut World, entity: Entity) -> Vec<Entity> {
         pos,
         area: world.get::<AreaTag>(entity).map(|tag| tag.area),
     };
-    let clients: Vec<(Entity, ClientId)> = world
-        .query::<(Entity, &ClientId)>()
-        .iter(world)
-        .map(|(entity, &id)| (entity, id))
-        .collect();
+    let clients: Vec<(Entity, ClientId)> =
+        world.resource_scope(|world, mut sights: Mut<Sights>| {
+            sights
+                .0
+                .iter(world)
+                .map(|(entity, &id)| (entity, id))
+                .collect()
+        });
     clients
         .into_iter()
         .filter(|&(_, id)| {
@@ -209,7 +196,8 @@ impl VisibilityFilter for OwnedBy {
 }
 
 /// What a character carries that only its own client is told of: its bag, its dealings, its
-/// skills and what holds it. Two tuples, as replicon scopes at most ten components at once.
+/// skills, its boosts and what holds it. Two tuples, as replicon scopes at most ten components at
+/// once.
 pub struct OwnersOnly;
 
 type Dealings = (
@@ -224,7 +212,7 @@ type Dealings = (
     HeardMove,
 );
 
-type Skills = (Learned, Cooldowns, Hotbar, BasicAttack, ResetPrompt);
+type Skills = (Learned, Cooldowns, Hotbar, BasicAttack, ResetPrompt, Boosts);
 
 impl FilterScope for OwnersOnly {
     fn visibility_scope(world: &mut World, registry: &mut ReplicationRegistry) -> VisibilityScope {
@@ -245,42 +233,17 @@ fn grant_hidden_slots(add: On<Add<ClientId>>, mut commands: Commands) {
     commands.entity(add.entity).insert(HiddenSlots::default());
 }
 
-#[derive(Component, Clone, Copy)]
-#[component(immutable)]
-pub struct SubjectSlot(usize);
-
+/// The subjects a client hides, by entity index; an index a despawned subject leaves behind is
+/// cleared, so whatever is spawned into it starts shown as replicon has it.
 #[derive(Component, Default)]
 pub struct HiddenSlots(FixedBitSet);
 
-#[derive(Resource, Default)]
-struct Slots {
-    free: Vec<usize>,
-    len: usize,
+fn slot_of(subject: Entity) -> usize {
+    subject.index_u32() as usize
 }
 
-impl Slots {
-    fn allocate(&mut self) -> usize {
-        self.free.pop().unwrap_or_else(|| {
-            self.len += 1;
-            self.len - 1
-        })
-    }
-
-    fn len(&self) -> usize {
-        self.len
-    }
-}
-
-fn release_slot(
-    remove: On<Remove<SubjectSlot>>,
-    subjects: Query<&SubjectSlot>,
-    mut slots: ResMut<Slots>,
-    mut clients: Query<&mut HiddenSlots>,
-) {
-    let Ok(&SubjectSlot(slot)) = subjects.get(remove.entity) else {
-        return;
-    };
-    slots.free.push(slot);
+fn forget_subject(remove: On<Remove<Replicated>>, mut clients: Query<&mut HiddenSlots>) {
+    let slot = slot_of(remove.entity);
     for mut hidden in &mut clients {
         if slot < hidden.0.len() {
             hidden.0.set(slot, false);

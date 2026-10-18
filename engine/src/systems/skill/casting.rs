@@ -197,12 +197,10 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
 }
 
 /// Everyone reaching for a cast gives chase, at twice their pace.
-pub fn chase(world: &World, entity: Entity) -> Vec<stat::Stat> {
+pub fn chase(world: &World, entity: Entity, into: &mut Vec<stat::Stat>) {
     if reach::current(world, entity).is_some_and(|intent| intent.cast().is_some()) {
         let base = stat::base(world, entity, stat::StatKind::MovementSpeed);
-        vec![stat::StatKind::MovementSpeed.of(base * (CHASE_SPEED_MULTIPLIER - 1.0))]
-    } else {
-        Vec::new()
+        into.push(stat::StatKind::MovementSpeed.of(base * (CHASE_SPEED_MULTIPLIER - 1.0)));
     }
 }
 
@@ -224,15 +222,8 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
     let cooldown = def.cooldown_at(rank);
     if cooldown.0 > 0.0 {
         let ready_at = now.after(cooldown);
-        match world.get_mut::<Cooldowns>(caster) {
-            Some(mut cooldowns) => {
-                cooldowns.0.insert(skill, ready_at);
-            }
-            None => {
-                world
-                    .entity_mut(caster)
-                    .insert(Cooldowns([(skill, ready_at)].into_iter().collect()));
-            }
+        if let Some(mut cooldowns) = world.get_mut::<Cooldowns>(caster) {
+            cooldowns.0.insert(skill, ready_at);
         }
     }
     world

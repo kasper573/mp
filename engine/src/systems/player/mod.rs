@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ClientId as Sender, Replicated};
+use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
-use crate::systems::skill::{BasicAttack, Cooldowns, Hotbar, Learned};
+use crate::systems::skill::{BasicAttack, Hotbar, Learned};
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
@@ -388,7 +388,6 @@ pub struct CharacterState {
     pub equipment: Equipment,
     pub class: Class,
     pub learned: Learned,
-    pub cooldowns: Cooldowns,
     pub hotbar: Hotbar,
     pub basic_attack: BasicAttack,
     pub memory: Memory,
@@ -410,7 +409,6 @@ impl CharacterState {
             equipment: world.get::<Equipment>(entity)?.clone(),
             class: *world.get::<Class>(entity)?,
             learned: world.get::<Learned>(entity).cloned().unwrap_or_default(),
-            cooldowns: world.get::<Cooldowns>(entity).cloned().unwrap_or_default(),
             hotbar: world.get::<Hotbar>(entity).cloned().unwrap_or_default(),
             basic_attack: world
                 .get::<BasicAttack>(entity)
@@ -450,21 +448,20 @@ pub(crate) fn place(
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let entity = world
         .spawn((
-            Character {
-                replicated: Replicated,
-                position: Position::at(at),
-                actor: Actor {
+            Character::new(
+                Position::at(at),
+                Actor {
                     color: def.tint(),
                     dir: Direction::S,
                     action: Action::Idle,
                     model,
                     attack_rate: PlaybackRate::default(),
                 },
-                hitbox: Hitbox {
+                Hitbox {
                     size: ActorModel::get(&content, model).hitbox(),
                 },
-                area: AreaTag { area: zone },
-            },
+                AreaTag { area: zone },
+            ),
             OwnedBy(client),
             Owner { client },
             HeardMove::default(),

@@ -42,7 +42,9 @@ fn statuses_come_from_items_skills_and_gear_and_go_by_category_or_time() {
             .any(|status| status.effect == "warded" && status.category == StatusCategory::Buff)
     );
     player.find_ui(UiTarget::starting("Status Warded"));
-    assert!(played(&warded, "ward_bubble").len() + played(&warded, "ward_up").len() >= 1);
+    player.wait_until("the ward shown", |snapshot| {
+        played(snapshot, "ward_bubble").len() + played(snapshot, "ward_up").len() >= 1
+    });
 
     player.act(InputAction::ToggleInventory);
     player.act_on_ui(InputAction::UseItem, UiTarget::image(ANTIDOTE));

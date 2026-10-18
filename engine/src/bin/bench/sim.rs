@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::ConnectedClient;
+use bevy_replicon::shared::backend::channels::{ClientChannel, ServerChannel};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use engine::core::content::Content;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
@@ -104,7 +107,7 @@ pub fn step(worlds: &mut [App], rosters: &[Roster], content: &Content) {
         play::act(app.world_mut(), content, roster, ticks);
     }
     step_areas(worlds, clock_after(ticks));
-    consume_sent(worlds);
+    acknowledge_sent(worlds);
 }
 
 static TICKS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -118,18 +121,33 @@ pub fn step_single_threaded(worlds: &mut [App]) {
         app.insert_resource(clock_after(ticks));
         app.update();
     }
-    consume_sent(worlds);
+    acknowledge_sent(worlds);
 }
 
-/// What the server's transport does with outgoing messages once they are on the wire.
-fn consume_sent(worlds: &mut [App]) {
+/// What the wire and the clients do with the server's outgoing messages: they go out, and every
+/// mutate message comes back acknowledged, as a client acknowledges each one it receives. Left
+/// unacknowledged, the server would resend every changed component each replication tick and keep
+/// the bookkeeping for all of them, a load no connected client puts on it.
+fn acknowledge_sent(worlds: &mut [App]) {
     for app in worlds.iter_mut() {
-        app.world_mut()
-            .resource_mut::<ServerMessages>()
-            .drain_sent()
-            .for_each(drop);
+        let mut messages = app.world_mut().resource_mut::<ServerMessages>();
+        let mut acks: HashMap<Entity, Vec<u8>> = HashMap::new();
+        for (client, channel, message) in messages.drain_sent() {
+            if channel == usize::from(ServerChannel::Mutations) {
+                acks.entry(client)
+                    .or_default()
+                    .extend_from_slice(&message[MUTATE_INDEX]);
+            }
+        }
+        for (client, ack) in acks {
+            messages.insert_received(client, ClientChannel::MutationAcks, ack);
+        }
     }
 }
+
+/// Where a mutate message carries its index, which is what an acknowledgement quotes: right after
+/// the flags byte.
+const MUTATE_INDEX: std::ops::Range<usize> = 1..3;
 
 fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster) {
     let mut app = server_app(
