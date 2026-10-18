@@ -177,7 +177,8 @@ up flags services="":
     {{compose}} {{flags}} up -d --build --wait {{services}}
 
 # Films COMMAND's window titled TITLE on a private virtual display to OUT, playing INPUT (an xdotool
-# command chain in window pixels) and running HOOK (a shell line) while it records.
+# command chain in window pixels) and running HOOK (a shell line) while it records. The app plays
+# into a sink of its own, whose monitor is the recording's sound track.
 [private]
 [positional-arguments]
 record out title seconds input hook +command:
@@ -186,16 +187,21 @@ record out title seconds input hook +command:
     export out=$1 title=$2 seconds=$3 input=$4 hook=$5
     shift 5
     mkdir -p "$(dirname "$out")"
+    export sink="rift-record-$$"
+    module=$(pactl load-module module-null-sink "sink_name=$sink")
+    trap 'pactl unload-module "$module"' EXIT
     xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
-      "$@" & app=$!
+      PULSE_SINK="$sink" "$@" & app=$!
       window=$(xdotool search --sync --name "$title" | head -1)
       xdotool windowmove --sync "$window" 0 0
       xdotool windowfocus --sync "$window"
       eval "$(xdotool getwindowgeometry --shell "$window")"
       # The window maps before bevy has rendered into it.
       sleep 2
-      ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
-        -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 "$out" & recording=$!
+      { parecord --raw --format=s16le --channels=2 --rate=48000 --latency-msec=10 "--device=$sink.monitor" || true; } \
+        | ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
+            -f s16le -ar 48000 -ac 2 -i pipe:0 \
+            -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 -c:a libopus -b:a 128k "$out" & recording=$!
       [ -z "$hook" ] || bash -c "$hook" &
       [ -z "$input" ] || xdotool $input
       wait $recording
