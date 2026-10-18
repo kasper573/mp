@@ -49,6 +49,10 @@ pub struct VfxDef {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub params: Vec<VfxParam>,
     pub layers: Vec<VfxLayer>,
+    /// Played on each actor standing inside this vfx's area, with the same parameters, when it
+    /// plays on an area: what a blast does to whoever it catches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_actors_inside: Option<VfxId>,
 }
 
 /// A parameter a vfx row leaves to whoever plays it.

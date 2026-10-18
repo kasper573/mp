@@ -76,6 +76,7 @@ pub fn preview(
     ui: &mut Ui,
     key: &str,
     layers: Vec<VfxLayer>,
+    inside: Option<Vec<VfxLayer>>,
     specs: &[ParamSpec],
     drafts: &[(String, String)],
 ) {
@@ -231,6 +232,7 @@ pub fn preview(
     posed.vfx = Some(PosedVfx {
         layers,
         on,
+        inside,
         params,
         elapsed: Seconds(elapsed),
         drafts: drafts.to_vec(),

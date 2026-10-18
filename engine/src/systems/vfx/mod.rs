@@ -24,6 +24,7 @@ use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
 use crate::systems::script::effect::{Arrow, Link};
+use crate::systems::script::query::TickRoster;
 use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
 use crate::systems::visibility::Presence;
 
@@ -42,7 +43,33 @@ pub fn spawn(world: &mut World, vfx: VfxId, site: VfxSite, params: VfxParams) ->
         VfxSite::Path(points) => *points.first()?,
         VfxSite::Screen | VfxSite::Widget(_) => return None,
     };
+    if let VfxSite::Area(footprint) = &site
+        && let Some(inner) = vfx.get(world.resource::<Content>()).on_actors_inside
+    {
+        for (actor, stood) in actors_inside(world, footprint) {
+            spawn_at(
+                world,
+                inner,
+                VfxSite::Actor(actor),
+                params.clone(),
+                stood,
+                None,
+            );
+        }
+    }
     Some(spawn_at(world, vfx, site, params, at, None))
+}
+
+/// The living actors of this world's area standing inside `footprint`, each where it stands.
+fn actors_inside(world: &World, footprint: &Footprint) -> Vec<(Entity, Pos<Tiles>)> {
+    let area = world.resource::<WorldArea>().0;
+    world
+        .get_resource::<TickRoster>()
+        .into_iter()
+        .flat_map(TickRoster::iter)
+        .filter(|listed| listed.area == area && !listed.dead && footprint.contains(listed.at))
+        .map(|listed| (listed.entity, listed.at))
+        .collect()
 }
 
 /// Plays a vfx on one player's screen or interface, shown to that player alone.

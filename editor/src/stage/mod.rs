@@ -77,6 +77,9 @@ pub struct PosedActor {
 pub struct PosedVfx {
     pub layers: Vec<VfxLayer>,
     pub on: PosedSite,
+    /// Layers each actor standing inside an area site also plays, as the game plays a vfx's
+    /// `on_actors_inside` on whoever an area catches.
+    pub inside: Option<Vec<VfxLayer>>,
     pub params: VfxParams,
     pub elapsed: Seconds,
     /// Shader text as it is being typed, by shader key, played in place of the file's.
@@ -425,23 +428,35 @@ fn posed_frame<'a>(
             plate: actor.plate.clone(),
         })
         .collect();
-    let vfx = posed
-        .vfx
-        .iter()
-        .map(|vfx| VfxPose {
+    let mut vfx = Vec::new();
+    if let Some(posed_vfx) = &posed.vfx {
+        vfx.push(VfxPose {
             owner: Source::Posed(0),
-            layers: vfx.layers.clone(),
-            site: match &vfx.on {
+            layers: posed_vfx.layers.clone(),
+            site: match &posed_vfx.on {
                 PosedSite::Actor(index) => Site::Actor(Source::Posed(*index)),
                 PosedSite::Area(footprint) => {
                     Site::World(engine::core::vfx::VfxSite::Area(*footprint))
                 }
                 PosedSite::Screen => Site::Screen,
             },
-            elapsed: vfx.elapsed,
-            params: vfx.params.clone(),
-        })
-        .collect();
+            elapsed: posed_vfx.elapsed,
+            params: posed_vfx.params.clone(),
+        });
+        if let (PosedSite::Area(footprint), Some(inside)) = (&posed_vfx.on, &posed_vfx.inside) {
+            for (index, actor) in posed.actors.iter().enumerate() {
+                if footprint.contains(actor.at) {
+                    vfx.push(VfxPose {
+                        owner: Source::Posed(1 + index),
+                        layers: inside.clone(),
+                        site: Site::Actor(Source::Posed(index)),
+                        elapsed: posed_vfx.elapsed,
+                        params: posed_vfx.params.clone(),
+                    });
+                }
+            }
+        }
+    }
     mirror::Frame {
         content,
         files,

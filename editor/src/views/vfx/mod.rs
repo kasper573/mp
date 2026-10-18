@@ -9,7 +9,7 @@ use std::sync::Arc;
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
 use engine::core::content::{Content, ContentScope, ErrorPlace, with_content};
 use engine::core::time::Seconds;
-use engine::core::vfx::{ParamFill, VfxLayer, VfxShaderDef, shader_file};
+use engine::core::vfx::{ParamFill, VfxDef, VfxLayer, VfxShaderDef, shader_file};
 use serde_json::Value;
 
 pub use params::{ParamSpec, param_fill, params_of, shader_params};
@@ -35,9 +35,19 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(theme::muted(format!("{} is gone", row_file(TABLE, key))));
         return;
     };
-    let layers = editor
-        .loaded()
-        .map_or_else(Vec::new, |content| layers_of(&content, &row));
+    let (layers, inside) = editor.loaded().map_or((Vec::new(), None), |content| {
+        let layers = layers_of(&content, &row);
+        let inside = row["on_actors_inside"].as_str().map(|inner| {
+            if inner == key {
+                layers.clone()
+            } else {
+                content
+                    .by_key::<VfxDef>(inner)
+                    .map_or_else(Vec::new, |id| id.get(&content).layers.clone())
+            }
+        });
+        (layers, inside)
+    });
     let specs = editor
         .project
         .as_ref()
@@ -54,7 +64,15 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.add_space(16.0);
         ui.vertical(|ui| {
             widgets::section(ui, "preview");
-            preview(editor, ui, &format!("{TABLE}/{key}"), layers, &specs, &[]);
+            preview(
+                editor,
+                ui,
+                &format!("{TABLE}/{key}"),
+                layers,
+                inside,
+                &specs,
+                &[],
+            );
         });
     });
 }
@@ -130,6 +148,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui,
                 &format!("{SHADER_TABLE}/{key}"),
                 vec![layer],
+                None,
                 &specs,
                 &drafts,
             );
