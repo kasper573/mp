@@ -1,8 +1,10 @@
-use egui::epaint::{Mesh, Shadow};
+use std::sync::OnceLock;
+
+use egui::epaint::{Mesh, Shadow, Vertex, WHITE_UV};
 use egui::layers::ShapeIdx;
 use egui::{
     Align2, Color32, ColorImage, CornerRadius, Id, InnerResponse, Margin, Painter, Pos2, Rect,
-    Response, Sense, Shape, Stroke, StrokeKind, TextureHandle, TextureOptions, Ui, Vec2,
+    Response, Sense, Shape, Stroke, StrokeKind, TextureHandle, TextureId, TextureOptions, Ui, Vec2,
     WidgetInfo, WidgetType,
 };
 
@@ -57,10 +59,9 @@ impl Sheet<'_> {
     ) -> SheetParts {
         let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
         painter.add(shadow.as_shape(rect, CornerRadius::ZERO));
-        let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
-        vellum(&painter, rect);
+        vellum(painter, rect);
         let inset = if small { SMALL_RULE_INSET } else { RULE_INSET };
-        rule(&painter, rect, inset);
+        rule(painter, rect, inset);
         let band = Rect::from_min_size(rect.min, Vec2::new(rect.width(), TITLE_BAND));
         let cross_size = if small { SMALL_CROSS } else { CROSS };
         let cross = self.closable.then(|| {
@@ -71,13 +72,13 @@ impl Sheet<'_> {
         });
         if let Some(title) = self.title {
             let room = band.shrink2(Vec2::new(cross_size + 14.0, 0.0));
-            title_band(&painter, room, title, !small);
+            title_band(painter, room, title, !small);
         }
         let curl = self
             .curl
             .then(|| Rect::from_min_max(rect.max - Vec2::splat(CURL), rect.max));
         if let Some(curl) = curl {
-            paint_curl(&painter, curl);
+            paint_curl(painter, curl);
         }
         let top = if self.title.is_some() {
             band.max.y
@@ -145,28 +146,23 @@ pub const CONTACT_SHADOW: Shadow = Shadow {
 };
 
 pub fn vellum(painter: &Painter, rect: Rect) {
-    painter.add(Shape::Vec(vellum_shapes(painter.ctx(), rect)));
+    painter.add(vellum_shape(painter.ctx(), rect));
 }
 
-pub fn vellum_shapes(ctx: &egui::Context, rect: Rect) -> Vec<Shape> {
-    let mut shapes = vec![Shape::mesh(vignette(rect))];
+pub fn vellum_shape(ctx: &egui::Context, rect: Rect) -> Shape {
     let grain = grain(ctx);
     let tile = grain.size_vec2();
-    let mut y = rect.min.y;
-    while y < rect.max.y {
-        let mut x = rect.min.x;
-        while x < rect.max.x {
-            let cell = Rect::from_min_size(Pos2::new(x, y), tile).intersect(rect);
-            let uv = Rect::from_min_max(
-                Pos2::ZERO,
-                Pos2::new(cell.width() / tile.x, cell.height() / tile.y),
-            );
-            shapes.push(Shape::image(grain.id(), cell, uv, Color32::WHITE));
-            x += tile.x;
-        }
-        y += tile.y;
-    }
-    shapes
+    Shape::mesh(vignette(rect, grain.id(), |offset| {
+        (offset / tile).to_pos2()
+    }))
+}
+
+/// Vellum without its grain, for a box too small to show it: the grain's texture would cost the box
+/// a draw call of its own.
+pub fn radial(painter: &Painter, rect: Rect) {
+    painter.add(Shape::mesh(vignette(rect, TextureId::default(), |_| {
+        WHITE_UV
+    })));
 }
 
 pub fn note<R>(ui: &mut Ui, padding: Margin, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
@@ -181,7 +177,7 @@ pub fn paint_note(painter: &Painter, under: ShapeIdx, rect: Rect) {
         Shape::Rect(shadow(Depth::Front).as_shape(rect, CornerRadius::ZERO)),
         Shape::Rect(CONTACT_SHADOW.as_shape(rect, CornerRadius::ZERO)),
     ];
-    shapes.extend(vellum_shapes(painter.ctx(), rect));
+    shapes.push(vellum_shape(painter.ctx(), rect));
     painter.set(under, Shape::Vec(shapes));
     rule(painter, rect, RULE_INSET);
 }
@@ -208,7 +204,12 @@ pub fn title_band(painter: &Painter, band: Rect, title: &str, fillers: bool) {
         band.center().x - width / 2.0,
         band.center().y - galley.size().y / 2.0,
     );
-    let painter = painter.with_clip_rect(band.intersect(painter.clip_rect()));
+    if galley.size().x > band.width() {
+        painter
+            .with_clip_rect(band.intersect(painter.clip_rect()))
+            .galley(at, galley, ink::RUBRIC);
+        return;
+    }
     painter.galley(at, galley, ink::RUBRIC);
     if !fillers {
         return;
@@ -217,17 +218,18 @@ pub fn title_band(painter: &Painter, band: Rect, title: &str, fillers: bool) {
     let gap = 10.0;
     let left = Pos2::new(at.x - gap, y);
     let right = Pos2::new(at.x + width + gap, y);
+    let reach = (left.x - band.min.x).clamp(0.0, FILLER);
     fading_line(
-        &painter,
+        painter,
         left,
-        left - Vec2::new(FILLER, 0.0),
+        left - Vec2::new(reach, 0.0),
         ink::RUBRIC,
         1.0,
     );
     fading_line(
-        &painter,
+        painter,
         right,
-        right + Vec2::new(FILLER, 0.0),
+        right + Vec2::new(reach, 0.0),
         ink::RUBRIC,
         1.0,
     );
@@ -393,6 +395,8 @@ pub fn sunk(painter: &Painter, rect: Rect, radius: f32) {
 
 const GRAIN: usize = 192;
 
+/// The grain multiplies the vignette's tones rather than lying over them, so vellum is one mesh on
+/// one texture, which egui draws in a single call.
 fn grain(ctx: &egui::Context) -> TextureHandle {
     let id = Id::new("vellum grain");
     if let Some(texture) = ctx.data(|data| data.get_temp::<TextureHandle>(id)) {
@@ -403,13 +407,19 @@ fn grain(ctx: &egui::Context) -> TextureHandle {
         for x in 0..GRAIN {
             let fibre = noise(x as u32, y as u32) % 24;
             let streak = noise(x as u32 / 3, y as u32 * 7) % 9;
-            pixels.push(ink::ink_wash((fibre + streak) as f32 / 255.0 * 0.6));
+            let inked = ink::on(ink::CREAM, ink::INK, (fibre + streak) as f32 / 255.0 * 0.6);
+            let over = |inked: u8, cream: u8| (u32::from(inked) * 255 / u32::from(cream)) as u8;
+            pixels.push(Color32::from_rgb(
+                over(inked.r(), ink::CREAM.r()),
+                over(inked.g(), ink::CREAM.g()),
+                over(inked.b(), ink::CREAM.b()),
+            ));
         }
     }
     let texture = ctx.load_texture(
         "vellum grain",
         ColorImage::new([GRAIN, GRAIN], pixels),
-        TextureOptions::NEAREST,
+        TextureOptions::NEAREST_REPEAT,
     );
     ctx.data_mut(|data| data.insert_temp(id, texture.clone()));
     texture
@@ -426,29 +436,54 @@ fn noise(x: u32, y: u32) -> u32 {
 
 const VIGNETTE_CELLS: usize = 12;
 
-fn vignette(rect: Rect) -> Mesh {
-    let mut mesh = Mesh::default();
-    let cells = VIGNETTE_CELLS;
-    for row in 0..=cells {
-        for column in 0..=cells {
-            let u = column as f32 / cells as f32;
-            let v = row as f32 / cells as f32;
-            let at = Pos2::new(
-                rect.min.x + rect.width() * u,
-                rect.min.y + rect.height() * v,
-            );
-            mesh.colored_vertex(at, tone(u * 2.0 - 1.0, v * 2.0 - 1.0));
-        }
+fn vignette(rect: Rect, texture: TextureId, uv: impl Fn(Vec2) -> Pos2) -> Mesh {
+    let grid = vignette_grid();
+    let vertices = grid
+        .points
+        .iter()
+        .map(|&(at, color)| {
+            let offset = rect.size() * at;
+            Vertex {
+                pos: rect.min + offset,
+                uv: uv(offset),
+                color,
+            }
+        })
+        .collect();
+    Mesh {
+        indices: grid.indices.clone(),
+        vertices,
+        texture_id: texture,
     }
-    let stride = (cells + 1) as u32;
-    for row in 0..cells as u32 {
-        for column in 0..cells as u32 {
-            let a = row * stride + column;
-            mesh.add_triangle(a, a + 1, a + stride);
-            mesh.add_triangle(a + 1, a + stride + 1, a + stride);
-        }
-    }
-    mesh
+}
+
+/// The vignette's grid of tones over a unit square, worked out once, since every vellum surface lays
+/// it over its rect each frame.
+struct VignetteGrid {
+    points: Vec<(Vec2, Color32)>,
+    indices: Vec<u32>,
+}
+
+fn vignette_grid() -> &'static VignetteGrid {
+    static GRID: OnceLock<VignetteGrid> = OnceLock::new();
+    GRID.get_or_init(|| {
+        let stride = VIGNETTE_CELLS + 1;
+        let points = (0..stride * stride)
+            .map(|index| {
+                let at = Vec2::new(
+                    (index % stride) as f32 / VIGNETTE_CELLS as f32,
+                    (index / stride) as f32 / VIGNETTE_CELLS as f32,
+                );
+                (at, tone(at.x * 2.0 - 1.0, at.y * 2.0 - 1.0))
+            })
+            .collect();
+        let stride = stride as u32;
+        let indices = (0..VIGNETTE_CELLS as u32)
+            .flat_map(|row| (0..VIGNETTE_CELLS as u32).map(move |column| row * stride + column))
+            .flat_map(|a| [a, a + 1, a + stride, a + 1, a + stride + 1, a + stride])
+            .collect();
+        VignetteGrid { points, indices }
+    })
 }
 
 fn tone(dx: f32, dy: f32) -> Color32 {

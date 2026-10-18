@@ -43,7 +43,8 @@ pub fn frame() -> egui::Frame {
 }
 
 fn shapes(ctx: &egui::Context, rect: Rect) -> Vec<Shape> {
-    let mut shapes = vec![Shape::Rect(SHADOW.as_shape(rect, CornerRadius::ZERO))];
-    shapes.extend(sheet::vellum_shapes(ctx, rect));
-    shapes
+    vec![
+        Shape::Rect(SHADOW.as_shape(rect, CornerRadius::ZERO)),
+        sheet::vellum_shape(ctx, rect),
+    ]
 }

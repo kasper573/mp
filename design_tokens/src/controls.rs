@@ -1,8 +1,9 @@
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
+use egui::emath::GuiRounding;
 use egui::emath::Rot2;
-use egui::epaint::{Shadow, TextShape};
+use egui::epaint::{Mesh, Shadow, TextShape};
 use egui::{
     Align, Align2, Color32, CornerRadius, InnerResponse, Key, Margin, Painter, Pos2, Rangef, Rect,
     Response, Sense, Shape, Stroke, StrokeKind, Ui, UiBuilder, Vec2, WidgetInfo, WidgetText,
@@ -306,20 +307,7 @@ pub fn slot_frame(painter: &Painter, rect: Rect, look: SlotLook) {
             Stroke::new(1.0, ink::ink_wash(0.12)),
         );
     } else {
-        let stroke = Stroke::new(1.0, ink::ink_wash(0.3));
-        let inset = rect.shrink(0.5);
-        painter.add(Shape::dashed_line(
-            &[
-                inset.left_top(),
-                inset.right_top(),
-                inset.right_bottom(),
-                inset.left_bottom(),
-                inset.left_top(),
-            ],
-            stroke,
-            3.0,
-            3.0,
-        ));
+        dashed_border(painter, rect, ink::ink_wash(0.3));
     }
     if look.refused {
         glyph::hatch(painter, rect.shrink(1.0), ink::ink_wash(0.35));
@@ -468,4 +456,34 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
         focus_ring(painter, drawn, RADIUS);
     }
     response
+}
+
+/// Dashes as plain pixel quads in one mesh: an empty bag is dozens of these, and egui would feather
+/// each dash of a dashed line as a stroke of its own.
+fn dashed_border(painter: &Painter, rect: Rect, color: Color32) {
+    const DASH: f32 = 3.0;
+    let rect = rect.round_to_pixels(painter.pixels_per_point());
+    let dashes =
+        2.0 * ((rect.width() / (2.0 * DASH)).ceil() + (rect.height() / (2.0 * DASH)).ceil());
+    let mut mesh = Mesh::default();
+    mesh.reserve_vertices(4 * dashes as usize);
+    mesh.reserve_triangles(2 * dashes as usize);
+    let mut along = |from: Pos2, direction: Vec2, length: f32, thickness: Vec2| {
+        let mut at = 0.0;
+        while at < length {
+            let dash = DASH.min(length - at);
+            let start = from + direction * at;
+            mesh.add_colored_rect(
+                Rect::from_two_pos(start, start + direction * dash + thickness),
+                color,
+            );
+            at += 2.0 * DASH;
+        }
+    };
+    let (width, height) = (rect.width(), rect.height());
+    along(rect.left_top(), Vec2::X, width, Vec2::Y);
+    along(rect.left_bottom() - Vec2::Y, Vec2::X, width, Vec2::Y);
+    along(rect.left_top(), Vec2::Y, height, Vec2::X);
+    along(rect.right_top() - Vec2::X, Vec2::Y, height, Vec2::X);
+    painter.add(Shape::mesh(mesh));
 }
