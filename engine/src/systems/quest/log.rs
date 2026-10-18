@@ -301,7 +301,6 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tone {
     Plain,
-    /// Something to act on: a choice to make, a quest to hand in.
     Notice,
     Done,
     Failed,

@@ -396,7 +396,6 @@ pub enum Objective {
 }
 
 impl Objective {
-    /// The item an objective is about, whose icon stands for it.
     pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a AssetRef> {
         match self {
             Objective::Hold(stack) => Some(&stack.item.get(content).icon),

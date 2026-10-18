@@ -812,7 +812,6 @@ const CURRENT: Color32 = ink::GOLD2;
 const RUN: Color32 = ink::RUBRIC;
 const EFFECT_FILL: Color32 = Color32::from_rgb(221, 219, 194);
 
-/// A node's head: the card's light tinted toward its kind's ink.
 fn kind_fill(node: &Value) -> Color32 {
     match FlowKind::of(node) {
         Some(FlowKind::On) => Color32::from_rgb(225, 211, 180),

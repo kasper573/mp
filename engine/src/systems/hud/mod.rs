@@ -185,7 +185,6 @@ pub(crate) fn confirm_layer() -> LayerId {
     LayerId::new(Band::Modal.order(), Id::new(CONFIRM))
 }
 
-/// How much of the screen's right edge the launchers keep for themselves.
 pub(crate) fn launchers_width() -> f32 {
     LAUNCHER_RIGHT + WIDGET.0
 }

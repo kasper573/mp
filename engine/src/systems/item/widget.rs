@@ -94,9 +94,7 @@ impl HudWindow for InventoryWindow {
 pub(crate) struct SlotLook<'a> {
     pub icon: Option<&'a AssetRef>,
     pub count: u32,
-    /// Ringed in ochre: wanted where the slot is shown.
     pub wanted: bool,
-    /// A ghost of itself: refused, or carried away.
     pub faded: bool,
     pub quest: bool,
 }
@@ -111,8 +109,6 @@ impl SlotLook<'_> {
     };
 }
 
-/// A slot sunk into the page; it washes gold while the pointer is on it when it senses more than
-/// a hover.
 pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
     if !ui.is_rect_visible(rect) {

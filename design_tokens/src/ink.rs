@@ -1,5 +1,3 @@
-//! The inks and the stock: every colour the interface is drawn in.
-
 use egui::Color32;
 
 pub const CREAM: Color32 = Color32::from_rgb(0xEF, 0xE3, 0xC4);
@@ -20,17 +18,14 @@ pub const GOLD2: Color32 = Color32::from_rgb(0xE2, 0xC2, 0x5A);
 pub const TYRIAN: Color32 = Color32::from_rgb(0x6B, 0x3A, 0x7A);
 pub const WAX: Color32 = Color32::from_rgb(0xA8, 0x26, 0x1F);
 
-/// The curtain drawn over the world while there is nothing to show behind a screen's sheet.
 pub const VEIL: Color32 = Color32::from_rgb(0x12, 0x12, 0x12);
 
-/// The inks prose marks words with: places, names, items, magic and danger.
 pub const PLACE: Color32 = AZURE;
 pub const NAME: Color32 = VERDIGRIS;
 pub const ITEM: Color32 = GOLD;
 pub const MAGIC: Color32 = TYRIAN;
 pub const DANGER: Color32 = RUBRIC;
 
-/// A colour at a fraction of its strength, to lay over what is beneath.
 pub fn wash(color: Color32, alpha: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(
         color.r(),
@@ -52,7 +47,6 @@ pub fn gold_wash(alpha: f32) -> Color32 {
     wash(GOLD, alpha)
 }
 
-/// The opaque colour of `over` laid on `base` at `amount`.
 pub fn on(base: Color32, over: Color32, amount: f32) -> Color32 {
     let amount = amount.clamp(0.0, 1.0);
     let mix = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * amount).round() as u8;

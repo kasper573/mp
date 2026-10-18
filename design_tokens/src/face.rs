@@ -1,5 +1,3 @@
-//! The five faces and the roles text plays in them.
-
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Color32, FontFamily, FontId, RichText, WidgetText};
 
@@ -61,35 +59,25 @@ impl Face {
     }
 }
 
-/// What a piece of text is for, which picks its face, size, tracking and line height.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TextRole {
-    /// A window's title: rubric small caps.
     Title,
-    /// A confirm note's title: the book face, bold, no small caps.
     NoteTitle,
     Section,
     Tab,
-    /// A card's kind band.
     Band,
-    /// A card's name band.
     Name,
     Body,
     CardBody,
-    /// A spoken line.
     Line,
     Button,
     Tooltip,
     Small,
-    /// A flavour line, in the quill italic.
     Flavour,
-    /// A Roman numeral on a card band.
     Numeral,
     KeyHint,
     Mono,
-    /// A count in a slot's corner.
     Count,
-    /// A launcher's key letter.
     Launcher,
 }
 
@@ -162,7 +150,6 @@ impl TextRole {
         }
     }
 
-    /// The text laid out with the role's tracking, in `color`.
     pub fn job(self, text: &str, color: Color32) -> LayoutJob {
         let mut job = LayoutJob::default();
         job.append(text, 0.0, self.format(color));

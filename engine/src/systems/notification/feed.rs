@@ -97,7 +97,6 @@ fn age(world: &mut World) {
     feed.toasts.retain(|toast| !clock.lapsed(toast.until));
 }
 
-/// The feed as notice slips down from `top`, oldest first; held under the pointer, it shows more.
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let step = hud::motion_step(gui);
     let expanded = rows::hovered(world, &world.resource::<Feed>().drawn);

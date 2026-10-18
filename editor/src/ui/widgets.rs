@@ -23,7 +23,6 @@ pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
     controls::combo(id_salt)
 }
 
-/// A checkbox without words of its own, for a row whose label stands beside it.
 pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
     controls::checkbox(ui, on, "")
 }
@@ -45,7 +44,6 @@ pub fn chip_colored(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Res
         .interact(Sense::click())
 }
 
-/// A 20 px pill bordered in `color` on a white wash.
 pub fn pill(ui: &mut Ui, text: &str, color: Color32) -> Response {
     egui::Frame::new()
         .fill(ink::white_wash(0.25))
@@ -62,7 +60,6 @@ pub fn pill(ui: &mut Ui, text: &str, color: Color32) -> Response {
         .response
 }
 
-/// Something laid on the page as a unit: ruled in ink, in rubric while it is the one chosen.
 pub fn card_frame(selected: bool) -> egui::Frame {
     egui::Frame::new()
         .fill(if selected {

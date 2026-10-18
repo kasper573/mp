@@ -27,7 +27,6 @@ pub struct TextLook {
     pub line_height: Option<f32>,
 }
 
-/// Which face a line is written in: the book face, or the quill italic of what was spoken.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hand {
     Book,
@@ -44,7 +43,6 @@ impl TextLook {
         }
     }
 
-    /// The role's size and line height, in `color`.
     pub fn role(role: TextRole, color: Color32) -> TextLook {
         TextLook {
             line_height: role.line_height(),

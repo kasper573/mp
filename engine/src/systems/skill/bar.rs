@@ -48,11 +48,8 @@ const GAP: f32 = 4.0;
 const PITCH: f32 = SLOT + GAP;
 const BASIC_ATTACK_GAP: f32 = 8.0;
 const BOTTOM: f32 = 8.0;
-/// How long a slot holds the mark of how its last press went.
 const PRESS_MARK_SECONDS: f32 = 0.6;
 
-/// The hotbar: the basic attack slot apart at the left, then the slots in the shape the player
-/// gave it, on one slip.
 pub struct HotbarWidget;
 
 impl HudWidget for HotbarWidget {
@@ -747,8 +744,6 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
     }
 }
 
-/// A slot holds a mark of how its last press went for a moment: gold when it fired, rubric when it
-/// could not.
 fn press_mark(ui: &Ui, world: &World, slot: HotbarSlot, rect: Rect) {
     let Some(press) = world.resource::<BarState>().presses.get(&slot) else {
         return;
@@ -764,7 +759,6 @@ fn press_mark(ui: &Ui, world: &World, slot: HotbarSlot, rect: Rect) {
         .rect_stroke(rect, 3.0, Stroke::new(2.0, color), StrokeKind::Outside);
 }
 
-/// What is carried may land here: the gold wash of a slot that takes it.
 fn drop_wash(ui: &Ui, rect: Rect) {
     ui.painter().rect(
         rect,
@@ -775,7 +769,6 @@ fn drop_wash(ui: &Ui, rect: Rect) {
     );
 }
 
-/// The key a slot answers to, in its top-left corner.
 fn slot_key_mark(ui: &Ui, rect: Rect, key: &str) {
     let at = rect.left_top() + Vec2::new(3.0, 1.0);
     for offset in [

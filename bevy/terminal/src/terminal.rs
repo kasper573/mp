@@ -44,7 +44,6 @@ pub struct TerminalLine<K> {
     pub tone: LineTone,
 }
 
-/// Whether a line reports something that went wrong.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LineTone {
     Said,
@@ -107,7 +106,6 @@ pub fn reply<K: TerminalKey>(
     send(world, Some(conn), terminal, &text.into(), LineTone::Said);
 }
 
-/// Tells one connection what went wrong with what it asked for.
 pub fn reply_failure<K: TerminalKey>(
     world: &mut World,
     conn: Entity,

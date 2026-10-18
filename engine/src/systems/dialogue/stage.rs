@@ -115,7 +115,6 @@ pub struct StageChoice {
 #[derive(Clone, Copy)]
 pub struct DockedPanel {
     pub head: fn(&World) -> Option<PanelHead>,
-    /// Draws the panel in a width, given the most height it may take.
     pub show: fn(&mut Ui, &mut World, f32, f32),
 }
 
@@ -124,7 +123,6 @@ pub struct PanelHead {
     pub chrome: PanelChrome,
 }
 
-/// How a docked panel is dressed: as a card that draws itself, or laid on a sheet the stage draws.
 pub enum PanelChrome {
     Card,
     Sheet { title: String, height: f32 },
@@ -678,7 +676,6 @@ fn docked_heads(world: &World) -> Vec<(PanelHead, DockedPanel)> {
         .unwrap_or_default()
 }
 
-/// The docked panels side by side above the conversation, standing on `bottom`.
 fn docked_panels(
     world: &mut World,
     gui: &egui::Context,
@@ -756,8 +753,6 @@ fn docked_sheet(
     rect
 }
 
-/// The conversation: a sheet at the bottom centre titled with the speaker's name, the line, and the
-/// choices once it has been said. It grows to fit what it holds.
 fn dialogue_sheet(
     world: &mut World,
     gui: &egui::Context,
@@ -837,7 +832,6 @@ fn dialogue_sheet(
     rect
 }
 
-/// The sheet's painted title, told to the accessibility tree as written.
 fn titled(ui: &Ui, band: Rect, title: &str) {
     ui.interact(band, ui.id().with(("title", title)), Sense::hover())
         .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, title));
@@ -926,8 +920,8 @@ fn choices(ui: &mut Ui, world: &mut World, before: &StageDrawn) {
     });
 }
 
-/// The row under the pointer, found where the rows stood the pass before as egui finds what is
-/// hovered, so the selection it moves lights its row on the pass the pointer reaches it.
+/// Found where the rows stood the pass before, as egui finds what is hovered, so the selection it
+/// moves lights its row on the pass the pointer reaches it.
 fn pointed_choice(ui: &Ui, before: &StageDrawn) -> Option<usize> {
     let pointer = ui.ctx().pointer_hover_pos()?;
     if ui.ctx().layer_id_at(pointer) != Some(layer()) {
@@ -960,8 +954,7 @@ fn point_at(world: &mut World, pointed: Option<usize>, moved: bool) {
     shown.pointed = pointed;
 }
 
-/// The choice's key chip, icon and words, with its pills at the row's end; hands back its words
-/// and the item of the pill under the pointer, since the row takes every click.
+/// Hands back the item of the pill under the pointer, since the row takes every click.
 fn choice_row(
     ui: &mut Ui,
     world: &mut World,
@@ -1044,8 +1037,6 @@ fn pills(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<(ItemId,
     pointed
 }
 
-/// The key hints in faint ink at the foot of the sheet, and a chevron while a said line waits to
-/// be moved on from.
 fn foot(ui: &mut Ui, world: &mut World, body: Rect) {
     let room = Rect::from_min_max(Pos2::new(body.left(), body.bottom() - HINT_ROOM), body.max);
     ui.scope_builder(

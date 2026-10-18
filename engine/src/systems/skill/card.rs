@@ -59,7 +59,6 @@ impl Plugin for SkillCardPlugin {
     }
 }
 
-/// Deals the skill's card from `from`, the widget it was asked for from.
 pub fn open(world: &mut World, skill: SkillId, from: Option<Rect>) {
     hud::pin(world, skill, from);
 }
@@ -144,7 +143,6 @@ pub fn kind(def: &SkillDef) -> Kind {
     }
 }
 
-/// The skill's card, with a cross when `closable`.
 pub fn show(
     ui: &mut Ui,
     world: &mut World,
@@ -212,7 +210,6 @@ pub fn show(
     })
 }
 
-/// The line under the name: the rank and how the skill is used, or what it waits on.
 fn overview(world: &World, content: &Content, def: &SkillDef, card: &SkillCard) -> String {
     if let Some(item) = card.granted_by {
         return format!("Known while your {} is worn", item.get(content).name);

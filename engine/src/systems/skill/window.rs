@@ -514,9 +514,6 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
     );
 }
 
-/// A dark medallion on the designer's canvas: ringed in gold while it can be picked, in cream once
-/// learned, filled gold when maxed, and ringed thick in pale gold while it is picked or its card is
-/// up. Its name sits beneath in cream, haloed in ink to read over any canvas.
 fn draw_node(
     ui: &mut Ui,
     world: &mut World,

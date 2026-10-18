@@ -1,6 +1,3 @@
-//! The look the editor and the game share: parchment sheets and slips, playing cards, the inks
-//! and faces they are drawn in, and the egui style that makes egui's own widgets match.
-
 pub mod card;
 pub mod controls;
 pub mod face;
@@ -16,7 +13,6 @@ use egui::{Context, FontDefinitions, Margin, Stroke, Style, TextStyle};
 
 pub use face::{Face, TextRole};
 
-/// Installs the faces and the parchment style on a context.
 pub fn apply(ctx: &Context) {
     ctx.set_fonts(fonts());
     ctx.set_theme(egui::Theme::Light);
@@ -27,7 +23,6 @@ pub fn fonts() -> FontDefinitions {
     fonts::definitions()
 }
 
-/// The parchment look on a style: text in the book face, ink on cream, gold where the keyboard is.
 pub fn style(style: &mut Style) {
     for (text, role) in [
         (TextStyle::Body, TextRole::Body),
@@ -113,7 +108,6 @@ pub fn style(style: &mut Style) {
     }
 }
 
-/// A popup's, menu's or combo list's rows answer a hover with their wash alone, as a slip's do.
 pub fn popup_style(style: &mut Style) {
     let widgets = &mut style.visuals.widgets;
     for widget in [
@@ -126,10 +120,8 @@ pub fn popup_style(style: &mut Style) {
     }
 }
 
-/// The frame egui's own popups, menus and tooltips are given: a flat slip.
 pub fn popup_frame() -> egui::Frame {
     slip::frame()
 }
 
-/// The shadow of what floats over the page without a rule.
 pub const SLIP_SHADOW: Shadow = slip::SHADOW;

@@ -1,5 +1,3 @@
-//! A slip: vellum without a rule, title, cross or curl, under a short shadow.
-
 use egui::epaint::Shadow;
 use egui::{Color32, CornerRadius, InnerResponse, Margin, Painter, Rect, Shape, Ui};
 
@@ -14,12 +12,10 @@ pub const SHADOW: Shadow = Shadow {
     color: Color32::from_black_alpha(115),
 };
 
-/// Content on a slip, which takes the size of its content.
 pub fn show<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     show_tinted(ui, Color32::WHITE, add)
 }
 
-/// A slip tinted over its whole face, for one in motion.
 pub fn show_tinted<R>(
     ui: &mut Ui,
     tint: Color32,
@@ -39,7 +35,6 @@ pub fn paint(painter: &Painter, rect: Rect) {
     painter.add(Shape::Vec(shapes(painter.ctx(), rect)));
 }
 
-/// A flat slip for what egui frames itself: popups, menus and tooltips.
 pub fn frame() -> egui::Frame {
     egui::Frame::new()
         .fill(crate::ink::CREAM)

@@ -1,5 +1,3 @@
-//! The editor's names for the parchment inks, so its panels speak of what a colour is for.
-
 use design_tokens::{Face, ink};
 use egui::{Color32, Context, FontFamily, RichText};
 

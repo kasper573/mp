@@ -39,15 +39,12 @@ impl Plugin for QuestCardPlugin {
     }
 }
 
-/// How a quest's card is laid where it is shown.
 pub(super) struct QuestCardLook {
     pub width: f32,
     pub max_height: f32,
-    /// The kind band's words before the quest's category, when the place adds any.
     pub moment: Option<&'static str>,
 }
 
-/// The quest's card: its category on the band, its name, and `plate` written under the overview.
 pub(super) fn show(
     ui: &mut Ui,
     world: &mut World,
@@ -79,7 +76,6 @@ pub(super) fn show(
     })
 }
 
-/// What kind of errand the quest is and what it pays: "Delivery · 40 xp".
 pub fn overview(def: &QuestDef) -> String {
     let kinds = def.kinds();
     let mut letters = kinds.chars();
@@ -233,10 +229,8 @@ fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
     });
 }
 
-/// Where an objective stands, which picks the mark before it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Standing {
-    /// Under way or not yet begun: a flag.
     Open,
     Done,
     Failed,

@@ -472,8 +472,6 @@ fn place(world: &mut World) {
     }
 }
 
-/// A slip over its speaker's head with a tail toward them: the speaker's name in small caps, then
-/// the lines, faded once read.
 fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, pose: SheetPose) {
     let area = gui::world_area(world, ("bubble", draw.key))
         .fade_in(false)

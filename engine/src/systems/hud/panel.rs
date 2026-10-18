@@ -52,8 +52,7 @@ pub(crate) fn widget<R>(
     shown.inner
 }
 
-/// How far a window's sheet has dropped onto the table, run up while it is open and down after
-/// it closes. `None` once a closed window has lifted off entirely.
+/// `None` once a closed window has lifted off entirely.
 pub(crate) fn sheet_pose(
     world: &mut World,
     gui: &egui::Context,
@@ -70,13 +69,10 @@ pub(crate) fn sheet_pose(
     (!clock.is_closed() || open).then(|| clock.pose())
 }
 
-/// How far the sheet and slip clocks move this pass.
 pub(crate) fn motion_step(gui: &egui::Context) -> f32 {
     gui.input(|input| input.unstable_dt).min(MAX_STEP)
 }
 
-/// A window drawn as a sheet in `pose`: dragged by its title band, resized by its curl, closed by
-/// its cross.
 pub(crate) fn window<R>(
     world: &mut World,
     gui: &egui::Context,
@@ -158,7 +154,6 @@ pub(crate) fn window<R>(
     egui::InnerResponse::new(inner, shown.response)
 }
 
-/// A thing drawn at a spot the player can move it from by `handle`, keyed like a widget.
 pub(crate) fn placed_spot(
     world: &World,
     gui: &egui::Context,
@@ -181,7 +176,6 @@ pub(crate) fn grab_spot(world: &mut World, key: &'static str, handle: &egui::Res
     );
 }
 
-/// Which sheet lies on top of the others, by the order egui stacks their layers.
 pub(crate) fn front_sheet(world: &World, gui: &egui::Context) -> Option<&'static str> {
     let drawn = &world.resource::<WindowsDrawn>().last;
     gui.memory(|memory| {
@@ -321,8 +315,7 @@ fn grab(world: &mut World, handle: &egui::Response, held: Held) {
     });
 }
 
-/// Where a piece stands this frame: where it rests, or where the pointer holds it. A window and the
-/// launcher that opens it share a key, so the hold names which of the two it has.
+/// A window and the launcher that opens it share a key, so the hold names which of the two it has.
 fn standing(
     world: &World,
     gui: &egui::Context,
@@ -344,7 +337,6 @@ fn within(rect: Rect, screen: Rect, max: Option<Vec2>) -> Rect {
     Rect::from_min_size(rect.min.clamp(screen.min, screen.max - size), size)
 }
 
-/// What a window adds around its body: its rule and title band.
 pub(super) fn chrome() -> Vec2 {
     sheet::chrome(true)
 }
@@ -400,8 +392,6 @@ fn corner_grip(ui: &mut Ui, id: Id, curl: Rect) -> egui::Response {
     response
 }
 
-/// A resize grip in a slip's corner: a small curl the player drags, which tells the accessibility
-/// tree it resizes.
 pub(crate) fn slip_grip(ui: &mut Ui, id: Id, slip: Rect, at: GripCorner) -> egui::Response {
     let size = GRIP;
     let (corner, cursor) = match at {

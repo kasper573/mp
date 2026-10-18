@@ -1,5 +1,3 @@
-//! The card: every thing the interface describes, as a playing card on pasteboard.
-
 use egui::epaint::{Mesh, Shadow};
 use egui::{
     Align2, Color32, CornerRadius, Margin, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
@@ -51,7 +49,6 @@ pub const CONTACT_SHADOW: Shadow = Shadow {
     color: Color32::from_black_alpha(80),
 };
 
-/// The art window: the row's own pixel icon on the kind's ground, or the kind's glyph without one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Art {
     pub icon: Option<TextureId>,
@@ -66,24 +63,18 @@ impl Art {
 
 pub struct Card<'a> {
     pub kind: Kind,
-    /// The kind band's words: the kind, a quest's category, or "quest offer · <category>".
     pub band: &'a str,
-    /// A Roman numeral at the band's right: a rank over the ranks there are, a stack count.
     pub numeral: Option<&'a str>,
     pub name: &'a str,
     pub art: Art,
     pub width: f32,
-    /// How tall the card may grow before its plate scrolls.
     pub max_height: f32,
     pub closable: bool,
-    /// Not learned: the whole card faded and a padlock over the art.
     pub faded: bool,
-    /// An askew ochre word over the plate's top right.
     pub stamp: Option<&'a str>,
     pub depth: Depth,
 }
 
-/// What the plate is told as it is written.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Plate {
     /// The name overran its band and was cut: the plate's first line writes it in full.
@@ -93,7 +84,6 @@ pub struct Plate {
 pub struct CardResponse {
     pub rect: Rect,
     pub frame: Rect,
-    /// The kind band, which drags the card.
     pub band: Response,
     pub close: Option<Response>,
 }
@@ -215,7 +205,6 @@ impl<'a> Card<'a> {
         }
     }
 
-    /// What lies under everything: the shadows, the pasteboard and the frame.
     fn board(&self, outer: Rect, frame: Rect) -> Vec<Shape> {
         let shadow = match self.depth {
             Depth::Front => SHADOW,
@@ -310,7 +299,6 @@ impl<'a> Card<'a> {
         }
     }
 
-    /// Paints the name band and tells whether the name had to be cut.
     fn paint_name_band(&self, painter: &Painter, band: Rect) -> bool {
         painter.rect_filled(band, CornerRadius::ZERO, ink::white_wash(0.25));
         for y in [band.min.y + 1.0, band.max.y - 1.0] {
@@ -328,7 +316,6 @@ impl<'a> Card<'a> {
         cut
     }
 
-    /// The pips on the margins, the padlock and the veil of a card not learned, and the stamp.
     fn paint_over(&self, painter: &Painter, outer: Rect, frame: Rect, art: Rect) {
         let top = Rect::from_min_size(outer.min + Vec2::new(9.0, 10.0), Vec2::splat(GLYPH));
         let bottom = Rect::from_min_size(
@@ -352,35 +339,29 @@ impl<'a> Card<'a> {
     }
 }
 
-/// The overview line under the name, in the secondary ink.
 pub fn overview(ui: &mut Ui, text: &str) {
     sheet::label(ui, TextRole::CardBody, text, ink::INK2);
 }
 
-/// The name written in full when its band had to cut it.
 pub fn full_name(ui: &mut Ui, name: &str) {
     ui.add(
         egui::Label::new(crate::face::bold(name).size(TextRole::CardBody.size())).selectable(false),
     );
 }
 
-/// The flavour line in the quill italic.
 pub fn flavour(ui: &mut Ui, text: &str) {
     ui.add(egui::Label::new(TextRole::Flavour.rich(text).color(ink::INK2)).wrap());
 }
 
-/// A fact in ink, one per line.
 pub fn fact(ui: &mut Ui, text: &str) {
     ui.add(egui::Label::new(TextRole::CardBody.rich(text).color(ink::INK)).wrap());
 }
 
-/// A section heading in rubric small caps.
 pub fn heading(ui: &mut Ui, text: &str) {
     ui.add_space(2.0);
     sheet::label(ui, TextRole::Section, text, ink::RUBRIC);
 }
 
-/// A requirement: verdigris with a tick when met, rubric with a cross and what you are when not.
 pub fn requirement(ui: &mut Ui, met: bool, text: &str) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 5.0;
@@ -394,13 +375,11 @@ pub fn requirement(ui: &mut Ui, met: bool, text: &str) {
     });
 }
 
-/// A line at the foot in faint ink: key hints, or what to do next.
 pub fn foot(ui: &mut Ui, text: &str) {
     ui.add_space(2.0);
     ui.add(egui::Label::new(TextRole::Small.rich(text).color(ink::INK3)).wrap());
 }
 
-/// A line in the faint ink inside a row of pills or hints.
 pub fn faint(text: &str) -> egui::RichText {
     TextRole::CardBody.rich(text).color(ink::INK3)
 }

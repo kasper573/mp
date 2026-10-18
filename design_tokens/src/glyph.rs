@@ -1,6 +1,3 @@
-//! The marks the interface draws instead of symbol glyphs: a card's kind pips, and the ticks,
-//! crosses, flags, padlocks and chevrons painted beside words.
-
 use egui::{
     Align2, Color32, ColorImage, FontId, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
     TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
@@ -8,7 +5,6 @@ use egui::{
 
 use crate::ink;
 
-/// What a card describes; its glyph, word and art ground follow from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     Equipment,
@@ -40,7 +36,6 @@ impl Kind {
         }
     }
 
-    /// The art window's ground, top to bottom.
     pub fn ground(self) -> [Color32; 2] {
         match self {
             Kind::Equipment => [Color32::from_rgb(0x3A, 0x5E, 0xA3), ink::AZURE],
@@ -67,7 +62,6 @@ impl Kind {
         texture.id()
     }
 
-    /// The glyph filling `rect` in `color`, turned upside down when asked.
     pub fn paint(self, painter: &Painter, rect: Rect, color: Color32, upside_down: bool) {
         let uv = if upside_down {
             Rect::from_min_max(Pos2::new(1.0, 1.0), Pos2::ZERO)
@@ -89,7 +83,6 @@ impl Kind {
     }
 }
 
-/// A mark painted as lines and polygons, sized to the rect it is given.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Mark {
     Tick,
@@ -134,7 +127,6 @@ pub enum Mark {
 }
 
 impl Mark {
-    /// The word the accessibility tree hears for the mark.
     pub fn word(self) -> &'static str {
         match self {
             Mark::Tick => "yes",
@@ -180,7 +172,6 @@ impl Mark {
     }
 }
 
-/// The mark drawn to fill `rect` in `color`.
 pub fn paint(painter: &Painter, mark: Mark, rect: Rect, color: Color32) {
     let size = rect.width().min(rect.height());
     let rect = Rect::from_center_size(rect.center(), Vec2::splat(size));
@@ -466,7 +457,6 @@ pub fn paint(painter: &Painter, mark: Mark, rect: Rect, color: Color32) {
     }
 }
 
-/// A mark as a widget, `size` square, that tells the accessibility tree its word.
 pub fn show(ui: &mut Ui, mark: Mark, size: f32, color: Color32) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, mark.word()));
@@ -476,7 +466,6 @@ pub fn show(ui: &mut Ui, mark: Mark, size: f32, color: Color32) -> Response {
     response
 }
 
-/// A mark that can be clicked, `size` square, telling the accessibility tree `label`.
 pub fn button(ui: &mut Ui, mark: Mark, size: f32, color: Color32, label: &str) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), label));
@@ -493,14 +482,12 @@ pub fn button(ui: &mut Ui, mark: Mark, size: f32, color: Color32, label: &str) -
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-/// The ring around text that reads over any picture.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Halo {
     pub color: Color32,
     pub width: f32,
 }
 
-/// `text` in `color` within its `halo`. Says where it landed.
 pub fn haloed(
     painter: &Painter,
     at: Pos2,
@@ -591,7 +578,6 @@ pub fn dashed_circle(painter: &Painter, center: Pos2, radius: f32, stroke: Strok
     painter.add(Shape::dashed_line(&points, stroke, 4.0, 3.0));
 }
 
-/// A small text tag on a sunk plate, with its `anchor` corner or centre at `at`.
 pub fn badge(painter: &Painter, at: Pos2, anchor: Align2, text: &str, color: Color32) {
     let galley = painter.layout_no_wrap(
         text.to_owned(),

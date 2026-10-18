@@ -434,7 +434,6 @@ fn empty_centre(ui: &mut egui::Ui) {
 const TOP_BAR_HEIGHT: f32 = 42.0;
 const STATUS_HEIGHT: f32 = 24.0;
 
-/// The side of a panel a rule divides it from its neighbour on.
 #[derive(Clone, Copy)]
 pub enum Edge {
     Top,
@@ -443,7 +442,6 @@ pub enum Edge {
     Right,
 }
 
-/// The single ink rule between two panels of the one vellum sheet.
 pub fn divide(ui: &egui::Ui, panel: egui::Rect, edge: Edge) {
     let stroke = egui::Stroke::new(1.0, ink::ink_wash(0.35));
     let painter = ui.painter();
@@ -455,7 +453,6 @@ pub fn divide(ui: &egui::Ui, panel: egui::Rect, edge: Edge) {
     };
 }
 
-/// egui_dock's tabs as the sheet's index tabs, on the vellum with no frame of their own.
 fn dock_style(egui_style: &egui::Style) -> egui_dock::Style {
     let mut style = egui_dock::Style::from_egui(egui_style);
     let top = egui::CornerRadius {

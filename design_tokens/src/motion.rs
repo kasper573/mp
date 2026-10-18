@@ -1,6 +1,3 @@
-//! The two motions: a sheet drops onto the table and lifts off it, a card is dealt from its slot
-//! and flicked away. Nothing else moves.
-
 use egui::emath::{Rot2, TSTransform};
 use egui::epaint::{ClippedShape, Mesh, Primitive, Shadow};
 use egui::{Color32, Context, LayerId, Pos2, Rect};
@@ -28,8 +25,6 @@ pub fn ease_in(t: f32) -> f32 {
     t.clamp(0.0, 1.0).powi(3)
 }
 
-/// One reversible clock per sheet: open runs it up over 180 ms, close runs it down over 120 ms,
-/// from wherever it stands.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Clock {
     progress: f32,
@@ -92,7 +87,6 @@ impl SheetPose {
         shadow: sheet::shadow(sheet::Depth::Front),
     };
 
-    /// The sheet's transform about its own centre.
     pub fn transform(self, rect: Rect) -> TSTransform {
         let centre = rect.center().to_vec2();
         TSTransform::from_translation(centre + egui::Vec2::new(0.0, self.dy))
@@ -101,7 +95,6 @@ impl SheetPose {
     }
 }
 
-/// Where a card in motion is: its centre, size against its rest, tilt and opacity.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CardPose {
     pub center: Pos2,
@@ -110,8 +103,6 @@ pub struct CardPose {
     pub opacity: f32,
 }
 
-/// The deal at `t` of its 220 ms: from the slot at 20%, turned −14°, to its place, straightening
-/// and landing with a 1% overshoot at 190 ms.
 pub fn deal(t: f32, from: Rect, to: Rect) -> CardPose {
     let e = ease_out(t);
     let overshoot = if t > LAND_AT * 0.85 && t < 1.0 {
@@ -128,7 +119,6 @@ pub fn deal(t: f32, from: Rect, to: Rect) -> CardPose {
     }
 }
 
-/// The flick at `t` of its 150 ms: the card lifts 20 px, tilts 4° and fades.
 pub fn flick(t: f32, at: Rect) -> CardPose {
     let e = ease_in(t);
     CardPose {
@@ -139,7 +129,6 @@ pub fn flick(t: f32, at: Rect) -> CardPose {
     }
 }
 
-/// The replaced card at `t` of the new one's deal: it drops 26 px and dims to 55%.
 pub fn replaced(t: f32, at: Rect) -> CardPose {
     let e = ease_out(t);
     CardPose {
@@ -150,8 +139,6 @@ pub fn replaced(t: f32, at: Rect) -> CardPose {
     }
 }
 
-/// Takes what was drawn on `layer` this pass, meant to stand at `rest`, and returns it as meshes
-/// scaled, turned and moved into `pose`, for the caller to draw on another layer.
 pub fn posed(ctx: &Context, layer: LayerId, rest: Rect, pose: CardPose) -> Vec<Mesh> {
     let shapes: Vec<ClippedShape> = ctx.graphics_mut(|graphics| {
         std::mem::take(graphics.entry(layer))
@@ -184,7 +171,6 @@ pub fn posed(ctx: &Context, layer: LayerId, rest: Rect, pose: CardPose) -> Vec<M
         .collect()
 }
 
-/// The loose shadow a sheet casts while it is still in the air.
 pub fn loose_shadow() -> Shadow {
     LOOSE_SHADOW
 }

@@ -1,6 +1,3 @@
-//! The sheet: a parchment window. Vellum, the double rule, the title band, the cross and the
-//! curl, with the index tabs and section headings cut into the page.
-
 use egui::epaint::{Mesh, Shadow};
 use egui::layers::ShapeIdx;
 use egui::{
@@ -19,10 +16,8 @@ pub const CROSS: f32 = 24.0;
 pub const SMALL_CROSS: f32 = 16.0;
 pub const CURL: f32 = 24.0;
 pub const FILLER: f32 = 34.0;
-/// A sheet narrower or shorter than this drops its fillers and shrinks its cross and rule.
 pub const SMALL_SHEET: f32 = 160.0;
 
-/// How far back in the stack a sheet lies, which shortens its shadow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Depth {
     Front,
@@ -36,7 +31,6 @@ pub struct Sheet<'a> {
     pub depth: Depth,
 }
 
-/// Where a sheet's parts landed, for the interaction laid over them.
 pub struct SheetParts {
     pub band: Rect,
     pub cross: Option<Rect>,
@@ -54,7 +48,6 @@ impl Sheet<'_> {
         )
     }
 
-    /// Painted with its own shadow and a tint over the whole sheet, for a sheet in motion.
     pub fn paint_at(
         &self,
         painter: &Painter,
@@ -107,7 +100,6 @@ impl Sheet<'_> {
     }
 }
 
-/// Where a sheet's content goes: inside the rule, under the title band when there is one.
 pub fn body(rect: Rect, titled: bool) -> Rect {
     let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
     let margin = if small { SMALL_RULE_INSET } else { RULE_INSET } + 4.0;
@@ -123,7 +115,6 @@ pub fn body(rect: Rect, titled: bool) -> Rect {
     .intersect(rect)
 }
 
-/// What a full-size sheet adds around its body.
 pub fn chrome(titled: bool) -> Vec2 {
     let rect = Rect::from_min_size(Pos2::ZERO, Vec2::splat(4.0 * SMALL_SHEET));
     rect.size() - body(rect, titled).size()
@@ -153,7 +144,6 @@ pub const CONTACT_SHADOW: Shadow = Shadow {
     color: Color32::from_black_alpha(90),
 };
 
-/// Cream, lighter at the centre and darker toward the edges, under a faint fibre grain.
 pub fn vellum(painter: &Painter, rect: Rect) {
     painter.add(Shape::Vec(vellum_shapes(painter.ctx(), rect)));
 }
@@ -179,8 +169,6 @@ pub fn vellum_shapes(ctx: &egui::Context, rect: Rect) -> Vec<Shape> {
     shapes
 }
 
-/// A note laid around `add`, as a confirm note is: vellum under a front shadow, and the rule, with
-/// no title band, cross or curl.
 pub fn note<R>(ui: &mut Ui, padding: Margin, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     let under = ui.painter().add(Shape::Noop);
     let framed = egui::Frame::new().inner_margin(padding).show(ui, add);
@@ -188,7 +176,6 @@ pub fn note<R>(ui: &mut Ui, padding: Margin, add: impl FnOnce(&mut Ui) -> R) -> 
     framed
 }
 
-/// The note's sheet over `rect`, set into the place `under` kept beneath what was laid on it.
 pub fn paint_note(painter: &Painter, under: ShapeIdx, rect: Rect) {
     let mut shapes = vec![
         Shape::Rect(shadow(Depth::Front).as_shape(rect, CornerRadius::ZERO)),
@@ -199,7 +186,6 @@ pub fn paint_note(painter: &Painter, under: ShapeIdx, rect: Rect) {
     rule(painter, rect, RULE_INSET);
 }
 
-/// The double hairline inside the edge: ink at 50% `inset` in, and at 16% two further.
 pub fn rule(painter: &Painter, rect: Rect, inset: f32) {
     painter.rect_stroke(
         rect.shrink(inset),
@@ -215,7 +201,6 @@ pub fn rule(painter: &Painter, rect: Rect, inset: f32) {
     );
 }
 
-/// The title centred in rubric small caps, with a line filler fading out on each side.
 pub fn title_band(painter: &Painter, band: Rect, title: &str, fillers: bool) {
     let galley = painter.layout_job(TextRole::Title.job(title, ink::RUBRIC));
     let width = galley.size().x.min(band.width());
@@ -248,7 +233,6 @@ pub fn title_band(painter: &Painter, band: Rect, title: &str, fillers: bool) {
     );
 }
 
-/// A line from `from`, where it is `color`, to `to`, where it has faded out.
 pub fn fading_line(painter: &Painter, from: Pos2, to: Pos2, color: Color32, width: f32) {
     let along = to - from;
     if along.length() <= f32::EPSILON {
@@ -266,7 +250,6 @@ pub fn fading_line(painter: &Painter, from: Pos2, to: Pos2, color: Color32, widt
     painter.add(Shape::mesh(mesh));
 }
 
-/// An ink cross of two bars at ±45°, with a faint wash behind it while hovered.
 pub fn cross(painter: &Painter, rect: Rect, hovered: bool) {
     if hovered {
         painter.rect_filled(rect, 3.0, ink::ink_wash(0.1));
@@ -286,8 +269,6 @@ pub fn cross(painter: &Painter, rect: Rect, hovered: bool) {
     );
 }
 
-/// Index tabs cut into the page, the active one lifted to `light` with a lip over the baseline.
-/// Each tab tells the accessibility tree its label as written.
 pub fn tabs<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
     let baseline = ui.painter().add(Shape::Noop);
     let mut lip = None;
@@ -354,8 +335,6 @@ pub fn tabs<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut
     ui.add_space(6.0);
 }
 
-/// A rubric small-caps heading followed by a rule fading to the right. The accessibility tree
-/// hears the label as written.
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(6.0);
     let galley = ui
@@ -379,7 +358,6 @@ pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
 }
 
-/// A scroll area whose thumb is rubric in a faint ink track, the content keeping its own look.
 pub fn scroll<R>(
     ui: &mut Ui,
     area: egui::ScrollArea,
@@ -403,7 +381,6 @@ pub fn scroll<R>(
     shown
 }
 
-/// A square ink-ruled box that lies on a sheet: a text field's or a slot's ground.
 pub fn sunk(painter: &Painter, rect: Rect, radius: f32) {
     painter.rect(
         rect,
@@ -486,8 +463,6 @@ fn smooth(from: f32, to: f32, at: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-/// The corner curls up: the darker underside shows where the page lifts, and the folded flap lies
-/// over it, lighter, creased along the fold.
 fn paint_curl(painter: &Painter, corner: Rect) {
     let a = Pos2::new(corner.min.x, corner.max.y);
     let b = Pos2::new(corner.max.x, corner.min.y);
@@ -511,17 +486,14 @@ fn paint_curl(painter: &Painter, corner: Rect) {
     ));
 }
 
-/// A faint wash behind something hovered, as the title band's cross takes.
 pub fn hover_wash(painter: &Painter, rect: Rect) {
     painter.rect_filled(rect, 3.0, ink::ink_wash(0.1));
 }
 
-/// A label that tells the accessibility tree its text, drawn in a role and colour.
 pub fn label(ui: &mut Ui, role: TextRole, text: &str, color: Color32) -> Response {
     ui.add(egui::Label::new(role.widget_text(text, color)).selectable(false))
 }
 
-/// Text anchored at a point in a role and colour, straight onto a painter.
 pub fn text(
     painter: &Painter,
     at: Pos2,

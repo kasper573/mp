@@ -11,7 +11,6 @@ use crate::systems::interface::InterfaceSound;
 
 const CARD_TOP: f32 = 96.0;
 const CARD_MARGIN: f32 = 72.0;
-/// Where a card dealt with no widget to come from starts: this far inside the screen's edge.
 const EDGE_ORIGIN: f32 = 18.0;
 
 /// One thing of a kind inspected at a time, in a card pinned beside the windows until it is
@@ -37,7 +36,6 @@ impl<T: Send + Sync + 'static> Default for Pinned<T> {
     }
 }
 
-/// Pins `card`, dealt from `from`, the widget it was asked for from.
 pub(crate) fn pin<T: PartialEq + Send + Sync + 'static>(
     world: &mut World,
     card: T,
@@ -91,8 +89,6 @@ pub(crate) fn pinned_rect<T: Send + Sync + 'static>(world: &World) -> Option<Rec
     world.resource::<Pinned<T>>().drawn
 }
 
-/// Draws the pinned card of the kind, if any, keyed by `key`, with the one it replaced or that was
-/// just closed on its way out. `draw` lays out one card in the depth it is given.
 pub(crate) fn draw_pinned<T: Clone + Send + Sync + 'static>(
     world: &mut World,
     key: &'static str,
@@ -204,7 +200,6 @@ enum Way {
     Replaced,
 }
 
-/// The pose of the card on its way out, and the card, while it is still in sight.
 fn leaving_pose<T: Clone + Send + Sync + 'static>(
     world: &mut World,
     now: f64,
@@ -228,8 +223,6 @@ fn leaving_pose<T: Clone + Send + Sync + 'static>(
     Some((leaving.card.clone(), leaving.at, pose, leaving.way))
 }
 
-/// The pose of the pinned card while it is being dealt, from the widget it was asked for from or,
-/// with none, from the screen's edge nearest its place.
 fn dealing<T: Send + Sync + 'static>(
     world: &mut World,
     now: f64,

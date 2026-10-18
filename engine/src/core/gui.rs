@@ -154,7 +154,6 @@ impl Afterimage {
         }))
     }
 
-    /// Drawn again through `painter`, which fades it by its opacity.
     pub fn paint(&self, painter: &egui::Painter) {
         for shape in &self.0 {
             painter

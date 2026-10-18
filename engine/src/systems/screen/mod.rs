@@ -171,8 +171,6 @@ pub(crate) fn system_screen<R>(
     shown
 }
 
-/// The note every screen between screens speaks in: a ruled sheet under a plain `title`, with no
-/// cross and no curl.
 pub(crate) fn panel<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
     sheet::note(ui, egui::Margin::same(NOTE_PADDING), |ui| {
         ui.set_width(NOTICE_WIDTH);

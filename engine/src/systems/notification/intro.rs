@@ -57,7 +57,6 @@ pub fn shown(world: &World) -> Option<(String, String)> {
     Some((title.to_string(), notification.text.plain_words()))
 }
 
-/// The intro as a larger slip centred under `top`: the area's emblem, its name and its line.
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let step = hud::motion_step(gui);
     let mut shown = world.resource_mut::<ShownIntro>();

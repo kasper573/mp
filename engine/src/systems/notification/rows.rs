@@ -98,17 +98,14 @@ pub(super) fn shown<P: RowPlace>(world: &World) -> NotificationRows {
     world.resource::<PlacedRows<P>>().rows.shown()
 }
 
-/// Alerts as notice slips down from `top`; a click on one puts it away.
 pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     draw_rows::<Alerts>(world, gui, top, Mark::Bell, true)
 }
 
-/// Narration as notice slips down from `top`.
 pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     draw_rows::<Captions>(world, gui, top, Mark::Page, false)
 }
 
-/// Milestones as larger slips down from `top`: the label in small caps over the words.
 pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let step = hud::motion_step(gui);
     let (lines, more) = lines_of::<Milestones>(world);
@@ -136,14 +133,11 @@ pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) 
     bottom
 }
 
-/// What a notice slip shows: its 20 px icon, the label of who it is from, and its line.
 pub(super) struct Notice<'a> {
     pub icon: NoticeIcon<'a>,
     pub label: Option<&'a str>,
     pub line: &'a StyledLine,
-    /// Rubric for an error or a failure, ink otherwise.
     pub ink: Color32,
-    /// A click puts it away.
     pub closable: bool,
 }
 
@@ -152,8 +146,6 @@ pub(super) enum NoticeIcon<'a> {
     Mark(Mark),
 }
 
-/// A notice slip hung at the top centre with its top edge at `top`, dropping in or lifting off in
-/// `pose`. Hands back where it lies at rest and whether it was clicked.
 pub(super) fn notice(
     world: &mut World,
     gui: &egui::Context,
@@ -193,14 +185,12 @@ pub(super) fn notice(
     (rect, shown.inner)
 }
 
-/// What a larger slip shows: an emblem over a small-caps title over a line in the book face.
 pub(super) struct BigNotice<'a> {
     pub emblem: Option<egui::Image<'static>>,
     pub title: &'a str,
     pub line: &'a StyledLine,
 }
 
-/// A larger slip centred under `top`, for milestones and the intro of an area.
 pub(super) fn big_notice(
     world: &mut World,
     gui: &egui::Context,
@@ -230,7 +220,6 @@ pub(super) fn big_notice(
     rect
 }
 
-/// "+N more · H history", on a slip of its own, for what a place had no room left to show.
 pub(super) fn more_slip(
     world: &mut World,
     gui: &egui::Context,
@@ -294,13 +283,11 @@ pub(super) fn look(size: f32, color: Color32) -> TextLook {
     TextLook::new(size, color)
 }
 
-/// The size of a label as a notice writes it, in small caps.
 pub(super) fn label_size(gui: &egui::Context, label: &str) -> Vec2 {
     gui.fonts_mut(|fonts| fonts.layout_job(TextRole::Band.job(label, ink::INK2)))
         .size()
 }
 
-/// An area hung from the top centre of the screen at `top`, which notices are drawn in.
 pub(super) fn column_area(gui: &egui::Context, id: Id, top: f32) -> egui::Area {
     egui::Area::new(id)
         .order(Band::Notices.order())
@@ -311,8 +298,7 @@ pub(super) fn column_area(gui: &egui::Context, id: Id, top: f32) -> egui::Area {
         .fixed_pos(Pos2::new(gui.content_rect().center().x, top))
 }
 
-/// Things that drop onto the table and lift off it like a slip, each on a reversible clock of its
-/// own; one that left keeps its place until it has lifted off.
+/// One that left keeps its place until it has lifted off.
 pub(super) struct Fades<T> {
     items: Vec<Fading<T>>,
 }
@@ -324,8 +310,6 @@ impl<T> Default for Fades<T> {
 }
 
 impl<T: Clone> Fades<T> {
-    /// Brings the place up to what it shows now, in the order given, each with its pose after
-    /// `seconds` more of its motion.
     pub(super) fn sync(
         &mut self,
         seconds: f32,

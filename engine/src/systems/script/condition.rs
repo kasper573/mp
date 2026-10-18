@@ -79,7 +79,6 @@ pub fn min_level(part: &Condition) -> Option<u32> {
     }
 }
 
-/// Where the subject stands against a requirement, where that can be said: "you are level 1".
 pub fn standing(world: &World, subject: Entity, condition: &Condition) -> Option<String> {
     match condition {
         Expr::AtLeast(a, _) | Expr::More(a, _) => match &**a {

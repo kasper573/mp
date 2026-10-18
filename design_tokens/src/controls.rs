@@ -1,6 +1,3 @@
-//! The control vocabulary every sheet uses: buttons, rows, slots, checkboxes, sliders, combos,
-//! fields, pills, key hints and stamps.
-
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
@@ -31,27 +28,22 @@ const LIFT: Shadow = Shadow {
     color: Color32::from_black_alpha(70),
 };
 
-/// An ink-outlined button that lifts a touch while hovered.
 pub fn button(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Outline)
 }
 
-/// The one ink-filled button a surface may have.
 pub fn primary(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Primary)
 }
 
-/// A rubric outline for the destructive answer; danger never fills.
 pub fn danger(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Danger)
 }
 
-/// A faint outline that still answers a click: something on offer the player can't take yet.
 pub fn faded(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Faded)
 }
 
-/// A button with a mark painted before its label.
 pub fn marked(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), Some(mark), Look::Outline)
 }
@@ -64,13 +56,10 @@ pub fn marked_danger(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Re
     button_look(ui, text.into(), Some(mark), Look::Danger)
 }
 
-/// A 14 px ink square with a pen tick, labelled.
 pub fn checkbox(ui: &mut Ui, on: &mut bool, text: impl Into<WidgetText>) -> Response {
     ui.checkbox(on, text)
 }
 
-/// A ruled line with a rubric fill up to a brass bead, dragged or clicked to the value under the
-/// pointer and nudged by the arrow keys while focused.
 pub fn slider(ui: &mut Ui, value: &mut f32, range: RangeInclusive<f32>) -> Response {
     let width = ui.spacing().slider_width;
     let (rect, mut response) =
@@ -124,7 +113,6 @@ pub fn slider(ui: &mut Ui, value: &mut f32, range: RangeInclusive<f32>) -> Respo
     response
 }
 
-/// An ink-outlined box with a chevron whose menu opens as a slip.
 pub fn combo(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
     egui::ComboBox::from_id_salt(id_salt)
         .popup_style(egui::style::StyleModifier::from(
@@ -140,7 +128,6 @@ pub fn combo(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
         })
 }
 
-/// A ruled field: a faint ink fill with a rule beneath, and an ink caret.
 pub fn text_field(ui: &mut Ui, edit: egui::TextEdit<'_>) -> Response {
     let under = ui.painter().add(Shape::Noop);
     let response = ui.add(
@@ -187,7 +174,6 @@ impl Pill {
     }
 }
 
-/// A 20 px pill bordered in its colour on a white wash.
 pub fn pill(ui: &mut Ui, text: &str, pill: Pill) -> Response {
     pill_with(ui, pill, |ui| {
         ui.add(egui::Label::new(text).selectable(false));
@@ -195,7 +181,6 @@ pub fn pill(ui: &mut Ui, text: &str, pill: Pill) -> Response {
     .response
 }
 
-/// A pill holding what `add` writes in it, such as an icon beside a count, in the pill's ink.
 pub fn pill_with<R>(ui: &mut Ui, pill: Pill, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     let color = pill.color();
     egui::Frame::new()
@@ -214,7 +199,6 @@ pub fn pill_with<R>(ui: &mut Ui, pill: Pill, add: impl FnOnce(&mut Ui) -> R) -> 
         })
 }
 
-/// A key's name in mono, faint, in an ink-outlined chip.
 pub fn key_hint(ui: &mut Ui, keys: &str) -> Response {
     egui::Frame::new()
         .stroke(Stroke::new(1.0, ink::ink_wash(0.35)))
@@ -228,7 +212,6 @@ pub fn key_hint(ui: &mut Ui, keys: &str) -> Response {
         .response
 }
 
-/// An askew small-caps word in an outlined box: ink for "done", ochre for "maxed".
 pub fn stamp(painter: &Painter, center: Pos2, word: &str, color: Color32) {
     let galley = painter.layout_job(TextRole::Section.job(word, color));
     let angle = -8.0_f32.to_radians();
@@ -249,13 +232,10 @@ pub fn stamp(painter: &Painter, center: Pos2, word: &str, color: Color32) {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RowLook {
     pub selected: bool,
-    /// Faint: done, disabled or locked.
     pub faint: bool,
     pub failed: bool,
 }
 
-/// A ruled row that takes a gold wash while hovered and a rubric bar while selected. The whole row
-/// answers a click; the caller names it to the accessibility tree through the response.
 pub fn row<R>(ui: &mut Ui, look: RowLook, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     let under = ui.painter().add(Shape::Noop);
     let width = ui.available_width();
@@ -280,8 +260,6 @@ pub fn row<R>(ui: &mut Ui, look: RowLook, add: impl FnOnce(&mut Ui) -> R) -> Inn
     shown
 }
 
-/// What a ruled row paints under its content in `rect`: the gold wash while hovered or selected,
-/// the rubric bar at its left while selected, and the rule beneath.
 pub fn row_marks(rect: Rect, hovered: bool, selected: bool) -> Shape {
     let mut shapes = Vec::new();
     if hovered || selected {
@@ -309,8 +287,6 @@ pub struct SlotLook {
     pub refused: bool,
 }
 
-/// A 36 px ink-ruled square sunk into the page; dashed and flat while empty, washed gold with an
-/// ochre border while hovered, hatched while it refuses what is held over it.
 pub fn slot_frame(painter: &Painter, rect: Rect, look: SlotLook) {
     if look.hovered {
         painter.rect(
@@ -350,7 +326,6 @@ pub fn slot_frame(painter: &Painter, rect: Rect, look: SlotLook) {
     }
 }
 
-/// A stack's count in the slot's bottom-right corner, haloed to read over the icon.
 pub fn slot_count(painter: &Painter, rect: Rect, count: u32) {
     glyph::haloed(
         painter,
@@ -366,7 +341,6 @@ pub fn slot_count(painter: &Painter, rect: Rect, count: u32) {
     );
 }
 
-/// A small gold pill in the slot's top-left corner, as the worn mark.
 pub fn slot_pill(painter: &Painter, rect: Rect, text: &str) {
     let galley = painter.layout_no_wrap(text.to_owned(), Face::BookBold.id(9.0), ink::GOLD);
     let size = galley.size() + Vec2::new(6.0, 1.0);
@@ -381,7 +355,6 @@ pub fn slot_pill(painter: &Painter, rect: Rect, text: &str) {
     painter.galley(pill.center() - galley.size() / 2.0, galley, ink::GOLD);
 }
 
-/// A small gold lozenge in the slot's top-right corner, as the quest-item mark.
 pub fn slot_lozenge(painter: &Painter, rect: Rect) {
     let centre = rect.right_top() + Vec2::new(-6.0, 6.0);
     painter.add(Shape::convex_polygon(
@@ -396,7 +369,6 @@ pub fn slot_lozenge(painter: &Painter, rect: Rect) {
     ));
 }
 
-/// The 2 px gold ring around whatever the keyboard has reached.
 pub fn focus_ring(painter: &Painter, rect: Rect, corner_radius: impl Into<CornerRadius>) {
     painter.rect_stroke(
         rect.expand(2.0),

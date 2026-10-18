@@ -47,7 +47,6 @@ pub(super) fn plugin(app: &mut App) {
         .add_systems(OnExit(ClientScreen::Area), rows::forget::<Errors>);
 }
 
-/// The error as a notice slip, its line and warning mark in rubric.
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let step = hud::motion_step(gui);
     let mut errors = world.resource_mut::<Errors>();
