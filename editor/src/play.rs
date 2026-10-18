@@ -106,10 +106,17 @@ impl GameBinaries {
         }
     }
 
-    pub fn matches(&self, build: &str) -> bool {
-        [&self.server, &self.client]
-            .iter()
-            .all(|info| info.as_ref().is_ok_and(|info| info.build == build))
+    /// Whether a play-test can run on them: the client joins only a server of its own build, and
+    /// both must read the rows this editor writes, which its content version tells.
+    pub fn matches(&self, content_version: &str) -> bool {
+        match (&self.server, &self.client) {
+            (Ok(server), Ok(client)) => {
+                server.build == client.build
+                    && server.content_version == content_version
+                    && client.content_version == content_version
+            }
+            _ => false,
+        }
     }
 }
 
@@ -278,8 +285,9 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         editor.toast("No test character: add a test_character row first");
         return;
     };
-    let build = version::build();
-    let Some(binaries) = check_binaries(editor).filter(|binaries| binaries.matches(build)) else {
+    let Some(binaries) =
+        check_binaries(editor).filter(|binaries| binaries.matches(content_version()))
+    else {
         editor.dialogs.push(ModalDialog::Binaries);
         return;
     };
@@ -698,7 +706,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         .map(|c| c.built::<GameSettings>().content_version.0.clone());
     let ok = checked
         .as_ref()
-        .is_some_and(|binaries| binaries.matches(build));
+        .is_some_and(|binaries| binaries.matches(content_version));
     if checked.is_none() {
         ui.ctx().request_repaint_after(Duration::from_millis(50));
     }
@@ -756,10 +764,26 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
             );
         });
     };
-    row(ui, "editor", build, None);
+    row(
+        ui,
+        "editor",
+        &format!("{build} · content {content_version}"),
+        None,
+    );
+    let builds_agree = checked.as_ref().is_some_and(|binaries| {
+        matches!(
+            (&binaries.server, &binaries.client),
+            (Ok(server), Ok(client)) if server.build == client.build
+        )
+    });
     for name in [SERVER, CLIENT] {
         match checked.as_ref().map(|binaries| binaries.of(name)) {
-            Some(Ok(info)) => row(ui, name, &info.build, Some(info.build == build)),
+            Some(Ok(info)) => row(
+                ui,
+                name,
+                &format!("{} · content {}", info.build, info.content_version),
+                Some(builds_agree && info.content_version == content_version),
+            ),
             Some(Err(error)) => row(ui, name, error, Some(false)),
             None => row(ui, name, "checking…", None),
         }
@@ -783,21 +807,13 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     if ok || checked.is_none() {
         ui.label(
             theme::muted(
-                "Builds come from each binary's --build-info and must match the editor's.",
+                "Each binary answers --build-info. The client joins only a server of its own build, \
+                 and both must read this editor's content version.",
             )
             .size(13.0),
         );
     } else if let Some(binaries) = &checked {
-        let culprit = [(SERVER, &binaries.server), (CLIENT, &binaries.client)]
-            .iter()
-            .find(|(_, info)| !info.as_ref().is_ok_and(|info| info.build == build))
-            .map(|(name, info)| match info {
-                Ok(_) => format!(
-                    "{name} is from another build. Rows this editor writes may not load in it."
-                ),
-                Err(error) => format!("{name} is {error} in this folder."),
-            })
-            .unwrap_or_default();
+        let culprit = culprit(binaries, content_version);
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new("⚠").color(theme::DANGER));
             ui.label(RichText::new(culprit).color(theme::DANGER).size(13.0));
@@ -838,6 +854,29 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         editor.play.binaries = None;
     }
     close
+}
+
+fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
+    let (server, client) = match (&binaries.server, &binaries.client) {
+        (Err(error), _) => return format!("{SERVER} is {error} in this folder."),
+        (_, Err(error)) => return format!("{CLIENT} is {error} in this folder."),
+        (Ok(server), Ok(client)) => (server, client),
+    };
+    if server.build != client.build {
+        return format!(
+            "{SERVER} and {CLIENT} are from different builds: the client joins only a server of its own."
+        );
+    }
+    [(SERVER, server), (CLIENT, client)]
+        .into_iter()
+        .find(|(_, info)| info.content_version != content_version)
+        .map(|(name, info)| {
+            format!(
+                "{name} reads content version {}, not this editor's: rows this editor writes may not load in it.",
+                info.content_version
+            )
+        })
+        .unwrap_or_default()
 }
 
 fn editor_folder(editor: &Editor) -> PathBuf {

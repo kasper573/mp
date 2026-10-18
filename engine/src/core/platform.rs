@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
@@ -92,12 +93,36 @@ pub trait Platform: Send + Sync + 'static {
 #[derive(Resource, Clone)]
 pub struct ClientPlatform(pub Arc<dyn Platform>);
 
-/// Ends the process once whoever started it closes its stdin, so a child that outlives a crashed
-/// parent stops instead of lingering.
-pub fn exit_when_stdin_closes() {
-    std::thread::spawn(|| {
-        let mut sink = Vec::new();
-        let _ = std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut sink);
-        std::process::exit(0);
+/// Raised once whoever started the process closes its stdin, so a child that outlives a crashed
+/// parent stops instead of lingering. The process ends from its own loop on seeing it, never from
+/// the watching thread: a thread exiting the process while the main thread is inside the GPU driver
+/// crashes in the driver's teardown.
+#[derive(Clone, Default)]
+pub struct StdinClosed(Arc<AtomicBool>);
+
+impl StdinClosed {
+    pub fn watch() -> StdinClosed {
+        let closed = StdinClosed::default();
+        let raise = closed.clone();
+        std::thread::spawn(move || {
+            let mut sink = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut sink);
+            raise.0.store(true, Ordering::Relaxed);
+        });
+        closed
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+/// Ends the app once the process's stdin closes.
+pub fn exit_when_stdin_closes(app: &mut App) {
+    let closed = StdinClosed::watch();
+    app.add_systems(Update, move |mut exit: MessageWriter<AppExit>| {
+        if closed.is_closed() {
+            exit.write(AppExit::Success);
+        }
     });
 }

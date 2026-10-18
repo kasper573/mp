@@ -20,7 +20,7 @@ use engine::core::content::{Content, ContentScope, FilesystemFolder, version, wi
 use engine::core::math::Rng;
 use engine::core::net::SessionRequest;
 use engine::core::net::auth::TokenClaims;
-use engine::core::platform::exit_when_stdin_closes;
+use engine::core::platform::StdinClosed;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::account::{AccountId, Identity};
 use engine::systems::area::{self, AreaDef, AreaId, transition};
@@ -56,14 +56,12 @@ fn main() {
         config.pyroscope_enabled,
         config.pyroscope_sample_hz,
     );
-    if config.exit_on_stdin_eof {
-        exit_when_stdin_closes();
-    }
+    let stdin = config.exit_on_stdin_eof.then(StdinClosed::watch);
     let http_bind = SocketAddr::new(config.bind, config.port);
     let ws_bind = SocketAddr::new(config.bind, config.ws_port);
 
     // One multi-threaded tokio runtime backs both the HTTP API and the WebSocket transport's
-    // accept/read/write tasks; it outlives `main` because `simulate` never returns.
+    // accept/read/write tasks, for as long as the simulation runs.
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
     let content = load_content(
@@ -162,7 +160,8 @@ fn main() {
         },
     };
     println!("{}", serde_json::to_string(&ready).expect("a ready line"));
-    simulate(worlds, transport, &lobby, reset);
+    simulate(worlds, transport, &lobby, reset, stdin);
+    runtime.shutdown_background();
 }
 
 struct Lobby {
@@ -173,7 +172,13 @@ struct Lobby {
     test_characters: Option<TestCharacters>,
 }
 
-fn simulate(mut worlds: Vec<App>, mut transport: WsTransport, lobby: &Lobby, reset: UtcHour) {
+fn simulate(
+    mut worlds: Vec<App>,
+    mut transport: WsTransport,
+    lobby: &Lobby,
+    reset: UtcHour,
+    stdin: Option<StdinClosed>,
+) {
     let (connection_config, client_channels) = {
         let channels = worlds[0].world().resource::<RepliconChannels>();
         let config =
@@ -189,6 +194,9 @@ fn simulate(mut worlds: Vec<App>, mut transport: WsTransport, lobby: &Lobby, res
     let frame = TICK_HZ.period();
     let mut last = Instant::now();
     loop {
+        if stdin.as_ref().is_some_and(StdinClosed::is_closed) {
+            return;
+        }
         let started = Instant::now();
         let dt = started - last;
         last = started;
