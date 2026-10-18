@@ -56,9 +56,9 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.click_ui(UiTarget::image(HISTORY));
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
-    me.caption_top("All of it, in order: conversations grouped, what you heard, what you gained");
+    me.caption("All of it, in order: conversations grouped, what you heard, what you gained");
     for (tab, says) in TABS {
-        me.caption_top(says);
+        me.caption(says);
         me.open_history_tab(tab);
     }
     me.hold();
@@ -80,7 +80,7 @@ fn play(shoot: &mut Shoot) {
                 .iter()
                 .any(|record| record.mark == Some(HistoryMark::Arrived))
     });
-    me.caption_top("Changing area adds a divider, so you can tell where things happened");
+    me.caption("Changing area adds a divider, so you can tell where things happened");
     me.hold();
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);

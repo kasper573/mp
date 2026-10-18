@@ -20,7 +20,7 @@ fn play(shoot: &mut Shoot) {
         Some(resident_home("glimmercap", "gnome_alchemist")),
     );
     let mut me = shoot.roll(player);
-    me.caption_top(
+    me.caption(
         "Buffs and debuffs are status effects. Bog water is a bad idea: Poisoned bites every two seconds",
     );
     me.act(InputAction::ToggleInventory);
@@ -31,12 +31,12 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the poison to bite", |snapshot| {
         snapshot.me.as_ref().is_some_and(|me| me.health < full)
     });
-    me.caption_top(
+    me.caption(
         "Whatever is on you lines up under your character info, ringed red for a debuff. Rest on one for its card",
     );
     me.hover_ui(UiTarget::starting("Status Poisoned"));
     me.hold();
-    me.caption_top(
+    me.caption(
         "Gear holds its boosts while it is worn, and lets go the moment it comes off: the wand's card lists them",
     );
     me.act(InputAction::ToggleEquipment);
@@ -48,14 +48,14 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.act(InputAction::Dismiss);
     me.act(InputAction::ToggleEquipment);
-    me.caption_top(
+    me.caption(
         "Skills apply them as well: Ward is a buff, ringed blue, and wraps your sprite in a shimmering outline for as long as it holds",
     );
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
     me.hover_ui(UiTarget::starting("Status Warded"));
     me.hold();
-    me.caption_top(
+    me.caption(
         "Buff or debuff is only a label, but content can filter by it: the antidote clears every debuff and spares the ward",
     );
     me.act(InputAction::ToggleInventory);
@@ -67,7 +67,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.act(InputAction::ToggleInventory);
     me.hold();
-    me.caption_top(
+    me.caption(
         "A status can act on a clock: Sanctuary's blessing heals whoever stands in it every two seconds",
     );
     me.act(InputAction::Hotbar5);
@@ -83,7 +83,7 @@ fn play(shoot: &mut Shoot) {
         snapshot.me.as_ref().is_some_and(|me| me.health > bitten)
     });
     me.hold();
-    me.caption_top("Time runs out on its own: the ward breaks, and its icon goes with it");
+    me.caption("Time runs out on its own: the ward breaks, and its icon goes with it");
     me.wait_until("the ward broken", |snapshot| {
         !status_on_me(snapshot, "warded")
     });

@@ -30,9 +30,9 @@ fn play(shoot: &mut Shoot) {
     let road = portal(&me.snapshot(), "forest-road").clone();
     me.walk_to(road.at);
     me.on_stage("halt");
-    me.caption_top("Without a pass the road is just ground. Standing on it, she stops you and your commands lock");
+    me.caption("Without a pass the road is just ground. Standing on it, she stops you and your commands lock");
     me.read_to_choices();
-    me.caption_top("Ilsa shows only what she means to: the road opens at level 3");
+    me.caption("Ilsa shows only what she means to: the road opens at level 3");
     me.hover_choice("I'm ready for the forest road.");
     me.hold();
     me.pick("I'll turn back.");
@@ -48,7 +48,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the pass in the feed", |snapshot| {
         noticed(snapshot, "+1 Road Pass")
     });
-    me.caption_top("The trade drops in as slips at the top: the fish goes, the pass arrives");
+    me.caption("The trade shows in the corner, over her bust: the fish goes, the pass arrives");
     me.read_to_choices();
     me.pick("Enjoy it.");
     me.conversation_over();
@@ -57,7 +57,7 @@ fn play(shoot: &mut Shoot) {
     });
 
     me.caption(
-        "Narration drops in as slips at the top, lifts off when read, and never blocks: gulls squabble at the pier",
+        "Narration plays as captions at the top and never blocks: gulls squabble at the pier",
     );
     // With the pass in the bag the road would take the player now, so the way to the pier keeps clear
     // of it.
@@ -72,29 +72,27 @@ fn play(shoot: &mut Shoot) {
     me.hover_ui(squabble());
     me.caption("Hovering holds the captions, so you can finish reading");
     me.hold();
-    me.caption_top("Every line is kept in history as well — H shows it");
+    me.caption("Every line is kept in history as well — H shows it");
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
     me.hold();
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);
 
-    me.caption(
-        "What you can't do is an error, a rubric slip at the top: the Tribal Helmet wants level 3",
-    );
+    me.caption("What you can't do is an error, in red at the top: the Tribal Helmet wants level 3");
     me.click_ui(UiTarget::image(BAG));
     me.act_on_ui(InputAction::UseItem, UiTarget::image(HELMET));
     me.wait_until("the helmet refused", |snapshot| {
         erred(snapshot, "Tribal Helmet")
     });
-    me.caption_top("Only the latest error shows: the Corsair's Cutlass wants level 3 too");
+    me.caption("Only the latest error shows: the Corsair's Cutlass wants level 3 too");
     me.act_on_ui(InputAction::UseItem, UiTarget::image(CUTLASS));
     me.wait_until("the cutlass refused over the helmet", |snapshot| {
         erred(snapshot, "Corsair's Cutlass")
     });
-    me.caption_top("Trying again keeps that one error up, with nothing piling on");
+    me.caption("Trying again keeps that one error up, with nothing piling on");
     me.act_on_ui(InputAction::UseItem, UiTarget::image(CUTLASS));
-    me.caption_top("Errors it replaced are kept in history");
+    me.caption("Errors it replaced are kept in history");
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
     me.open_history_tab("Errors");
@@ -123,11 +121,11 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the Gull to sail", |snapshot| {
         arrived_in(snapshot, "forest") && told_by(snapshot, "The Gull")
     });
-    me.caption_top("The crossing narrates itself while you walk on");
+    me.caption("The crossing narrates itself while you walk on");
     me.wait_until("the forest's intro", |snapshot| {
         told_by(snapshot, "The forest")
     });
-    me.caption_top("A first visit opens on the area's own title, to its own drums");
+    me.caption("A first visit opens on the area's own title, to its own drums");
     me.walk_by(Offset::new(3.0, 1.0));
     me.walk_by(Offset::new(-2.0, 2.0));
     me.hold();
@@ -138,7 +136,7 @@ fn play(shoot: &mut Shoot) {
     fight_until(&mut me, "orc", |snapshot| told_by(snapshot, "Level up"));
     me.hold();
 
-    me.caption_top(
+    me.caption(
         "You're on Mara's errand, and the forest's chiefs know it: come near one and he has words for you",
     );
     // A chief taunts once and then holds his tongue for a while, so one that wandered past earlier

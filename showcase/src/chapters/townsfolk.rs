@@ -22,7 +22,7 @@ fn play(shoot: &mut Shoot) {
     let mut me = shoot.roll(player);
     me.caption("Loot at a townsperson's feet? A click picks it up before it talks");
     let host = me.wait_for("Mara", |snapshot| townsperson(snapshot, "mara").cloned());
-    me.caption_top(&format!(
+    me.caption(&format!(
         "You arrived right where {} stands: drop a sword at her feet",
         host.name
     ));

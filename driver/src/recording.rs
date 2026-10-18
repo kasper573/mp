@@ -29,6 +29,8 @@ pub struct FootageOverlay {
     pub subtitles: PathBuf,
     pub blur_until: Seconds,
     pub insets: Vec<InsetCut>,
+    // Rows of plain ground added under the picture, for subtitles that must not cover it.
+    pub below: u32,
 }
 
 // Another screen's footage, scaled down into a framed corner of this one's.
@@ -41,6 +43,7 @@ pub struct InsetCut {
 }
 
 const INSET_BORDER: u32 = 3;
+const BELOW_GROUND: &str = "0x15151a";
 
 impl Recording {
     pub fn start(display: &str, size: (u32, u32), monitor: &str, folder: &Path) -> Recording {
@@ -173,8 +176,9 @@ impl Footage {
         }
         graph
             + &format!(
-                "[base{}]boxblur=10:2:enable='lt(t,{:.3})',subtitles=filename={}[video]",
+                "[base{}]pad=iw:ih+{}:0:0:color={BELOW_GROUND},boxblur=10:2:enable='lt(t,{:.3})',subtitles=filename={}[video]",
                 overlay.insets.len(),
+                overlay.below,
                 overlay.blur_until.0,
                 filter_path(&overlay.subtitles),
             )

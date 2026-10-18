@@ -21,7 +21,7 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Show me your wares.");
     me.wait_until("Mara's shop", |snapshot| shop_is(snapshot, "mara_wares"));
-    me.caption_top("It belongs to the conversation: fixed above it, with no close button");
+    me.caption("It belongs to the conversation: fixed above it, with no close button");
     let before = me.find_ui("Mara's Wares").rect;
     me.drag_ui("Mara's Wares", Offset::new(-300.0, 0.0));
     let after = me.settled();
@@ -33,11 +33,11 @@ fn play(shoot: &mut Shoot) {
         "the shop panel stays put"
     );
 
-    me.caption_top(
+    me.caption(
         "The chosen ware lies on the page as a card, its price beneath: a part you can't cover turns rubric",
     );
     me.click_ui("Greater Health Potion");
-    me.caption_top("The list stays as narrow as its wares, and browsing never shifts it");
+    me.caption("The list stays as narrow as its wares, and browsing never shifts it");
     let listed = row_x(&mut me, "Bone Shield");
     for ware in ["Bone Shield", "Health Potion", "Greater Health Potion"] {
         me.click_ui(UiTarget::button(ware));
@@ -48,18 +48,18 @@ fn play(shoot: &mut Shoot) {
             "the ware list holds still"
         );
     }
-    me.caption_top("Mara's shop opts into reactions — try buying anyway");
+    me.caption("Mara's shop opts into reactions — try buying anyway");
     me.click_ui("Can't afford");
     me.find_ui(UiTarget::containing("purse is heavier"));
 
-    me.caption_top("Buying trades the price for the goods");
+    me.caption("Buying trades the price for the goods");
     me.click_ui("Health Potion");
     me.click_ui("Buy");
     me.wait_until("the potion in the bag", |snapshot| {
         holding(snapshot, "health_potion") == 1
     });
 
-    me.caption_top("Limited stock is yours alone, and restocks on a timer");
+    me.caption("Limited stock is yours alone, and restocks on a timer");
     me.click_ui("Bone Shield");
     me.click_ui("Buy");
     me.wait_until("the shield to sell out", |snapshot| {
@@ -70,10 +70,10 @@ fn play(shoot: &mut Shoot) {
         })
     });
 
-    me.caption_top("With a shop open, your bag shows what sells and dims what doesn't");
+    me.caption("With a shop open, your bag shows what sells and dims what doesn't");
     me.act(InputAction::ToggleInventory);
     me.drag_ui("Inventory", Offset::new(384.0, -260.0));
-    me.caption_top("Right-click to sell…");
+    me.caption("Right-click to sell…");
     me.act_on_ui(
         InputAction::SellItem,
         UiTarget::image("icons/monster_part/skull.png"),
@@ -81,7 +81,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the tusks to sell", |snapshot| {
         holding(snapshot, "orc_tusk") == 0
     });
-    me.caption_top("…or drag onto the shop. Equipment asks first");
+    me.caption("…or drag onto the shop. Equipment asks first");
     me.carry_onto(
         UiTarget::image("icons/weapon_and_tool/iron_sword.png"),
         UiTarget::starting("Buys "),
@@ -92,7 +92,7 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "rusty_sword") == 0
     });
 
-    me.caption_top("Changed your mind? Buy it back for exactly what she paid");
+    me.caption("Changed your mind? Buy it back for exactly what she paid");
     me.click_ui(UiTarget::starting("Buy back ("));
     me.click_ui("Rusty Sword");
     me.click_ui("Buy back");
@@ -101,7 +101,7 @@ fn play(shoot: &mut Shoot) {
     });
 
     close_bag(&mut me);
-    me.caption_top("Leaving the conversation closes the shop with it");
+    me.caption("Leaving the conversation closes the shop with it");
     me.act(InputAction::Dismiss);
     me.conversation_over();
     me.wait_until("the shop to close", |snapshot| snapshot.shop.is_none());
@@ -113,7 +113,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("Wren's exchange", |snapshot| {
         shop_is(snapshot, "bone_exchange")
     });
-    me.caption_top(
+    me.caption(
         "Her shop has no reactions: trades pass in silence, and your bag lights up what she takes",
     );
     me.act(InputAction::ToggleInventory);

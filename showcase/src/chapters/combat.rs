@@ -44,9 +44,7 @@ fn play(shoot: &mut Shoot) {
             .iter()
             .any(|record| record.text.ends_with(" XP"))
     });
-    me.caption(
-        "Small news drops in as slips at the top: experience, loot, lifting off in a few seconds",
-    );
+    me.caption("Small news collects in the corner: experience, loot, gone in a few seconds");
     me.caption(
         "Monsters drop loot — click it to pick it up. The same thing again counts up on one row",
     );

@@ -42,7 +42,7 @@ fn at_the_stall(me: &mut Star, other: &mut Player, name: &str) {
     other.talk_to("mara");
     me.read_to_choices();
     other.read_to_choices();
-    me.caption_top("What she offers comes from each player's own quest log");
+    me.caption("What she offers comes from each player's own quest log");
     me.hold();
     for player in [&mut **me, other] {
         player.act(InputAction::Dismiss);
@@ -54,7 +54,7 @@ fn at_the_stall(me: &mut Star, other: &mut Player, name: &str) {
     me.talk_to("pell");
     me.read_to_choices();
     lose_at_dice(me);
-    me.caption_top("Losing again? Call him out — he won't take it quietly");
+    me.caption("Losing again? Call him out — he won't take it quietly");
     me.hover_choice("You're cheating.");
     me.hold();
     me.pick("You're cheating.");
@@ -111,7 +111,7 @@ fn lose_at_dice(me: &mut Star) {
                 .filter(|stage| holding(snapshot, "gold") != gold && !stage.typing)
         });
         if landed.node == "loses" {
-            me.caption_top("A win pays twenty. Again!");
+            me.caption("A win pays twenty. Again!");
         }
         me.read_to_choices();
     }

@@ -25,13 +25,13 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the tithe ready", |snapshot| {
         on_quest(snapshot, "bone_tithe").is_some_and(|quest| quest.ready)
     });
-    me.caption_top("Ten bones already in the bag: the tithe is ready at once");
+    me.caption("Ten bones already in the bag: the tithe is ready at once");
 
     me.talk_to("wren");
     me.read_to_choices();
     me.pick("Bone Tithe");
     me.read_to_choices();
-    me.caption_top("She named her price and her pay, so the hand-in shows both");
+    me.caption("She named her price and her pay, so the hand-in shows both");
     me.hold();
     me.pick("Here are today's bones.");
     me.on_stage("tithe_thanks");
@@ -41,7 +41,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the tokens in the feed", |snapshot| {
         noticed(snapshot, "+6 Bone Token")
     });
-    me.caption_top("Bones out, tokens in, and the day's tithe is done");
+    me.caption("Bones out, tokens in, and the day's tithe is done");
     me.read_to_choices();
     me.pick("Goodbye.");
     me.conversation_over();
@@ -60,12 +60,12 @@ fn play(shoot: &mut Shoot) {
                     .is_some_and(|text| text.contains("Come back in"))
         })
     });
-    me.caption_top("She works out the time left as she says it, in the words anyone would use");
+    me.caption("She works out the time left as she says it, in the words anyone would use");
     me.read_to_choices();
     me.pick("I'll be back.");
     me.conversation_over();
 
-    me.caption_top("History keeps what she said, exactly as she said it");
+    me.caption("History keeps what she said, exactly as she said it");
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
     me.open_history_tab("Talk");
