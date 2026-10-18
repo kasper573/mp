@@ -23,6 +23,7 @@ use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
+use crate::core::math::Rgba;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -33,7 +34,7 @@ use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
-use crate::systems::text::{self, LineText, Span};
+use crate::systems::text::{self, LineText, Motion, Span};
 use crate::systems::visibility;
 
 pub type NotificationId = ContentId<NotificationDef>;
@@ -310,6 +311,10 @@ pub enum NotificationDefKind {
     Intro {
         title: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        tint: Option<Rgba>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        motion: Option<Motion>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         emblem: Option<AssetRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sfx: Option<SfxId>,
@@ -347,9 +352,17 @@ impl From<&NotificationDefKind> for NotificationKind {
                 label: Cow::Owned(label.clone()),
                 sfx: *sfx,
             },
-            NotificationDefKind::Intro { title, emblem, sfx } => NotificationKind::Intro {
+            NotificationDefKind::Intro {
+                title,
+                tint,
+                motion,
+                emblem,
+                sfx,
+            } => NotificationKind::Intro {
                 title: Cow::Owned(title.clone()),
                 appearance: IntroAppearance {
+                    tint: *tint,
+                    motion: *motion,
                     emblem: emblem.clone(),
                 },
                 sfx: *sfx,
@@ -513,8 +526,7 @@ fn draw_column(world: &mut World) {
     let alerts = rows::draw_alerts(world, &gui, screen.top() + COLUMN_TOP);
     let captions = rows::draw_captions(world, &gui, alerts + GROUP_GAP);
     let error = error::draw(world, &gui, captions + GROUP_GAP);
-    let feed = feed::draw(world, &gui, error + GROUP_GAP);
-    let centre = feed + screen.height() * CENTRE_BELOW;
+    let centre = error + screen.height() * CENTRE_BELOW;
     let intro = intro::draw(world, &gui, centre);
     rows::draw_milestones(world, &gui, intro + CENTRE_GAP);
 }

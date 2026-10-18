@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use design_tokens::ink::Prose;
 use egui::Color32;
 
 pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
@@ -26,10 +27,16 @@ pub enum TextPiece {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyledSpan {
     pub text: Cow<'static, str>,
-    pub ink: Option<Color32>,
+    pub ink: Option<SpanInk>,
     pub voice: TextVoice,
     pub motion: Option<TextMotion>,
     pub slow: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpanInk {
+    Prose(Prose),
+    Fixed(Color32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -138,7 +145,12 @@ impl StyledSpan {
     }
 
     pub fn ink(mut self, ink: Color32) -> StyledSpan {
-        self.ink = Some(ink);
+        self.ink = Some(SpanInk::Fixed(ink));
+        self
+    }
+
+    pub fn prose(mut self, prose: Prose) -> StyledSpan {
+        self.ink = Some(SpanInk::Prose(prose));
         self
     }
 

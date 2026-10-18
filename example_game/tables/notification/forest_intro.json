@@ -2,6 +2,13 @@
   "kind": {
     "type": "intro",
     "title": "The forest",
+    "tint": [
+      143,
+      209,
+      139,
+      255
+    ],
+    "motion": "pulse",
     "sfx": "forest_drums"
   },
   "text": [

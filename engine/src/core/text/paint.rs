@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bevy::prelude::World;
+use design_tokens::ink::Ground;
 use design_tokens::{Face, TextRole};
 use egui::emath::TSTransform;
 use egui::epaint::TextShape;
@@ -11,7 +12,7 @@ use egui::{
     WidgetInfo, WidgetType,
 };
 
-use super::{KeyNames, StyledLine, TextMotion, TextPiece, TextVoice};
+use super::{KeyNames, SpanInk, StyledLine, TextMotion, TextPiece, TextVoice};
 
 const WHISPER_SCALE: f32 = 0.9;
 const WHISPER_ALPHA: f32 = 0.7;
@@ -25,6 +26,7 @@ pub struct TextLook {
     pub color: Color32,
     pub hand: Hand,
     pub line_height: Option<f32>,
+    pub ground: Ground,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +42,7 @@ impl TextLook {
             color,
             hand: Hand::Book,
             line_height: None,
+            ground: Ground::Paper,
         }
     }
 
@@ -48,6 +51,10 @@ impl TextLook {
             line_height: role.line_height(),
             ..TextLook::new(role.size(), color)
         }
+    }
+
+    pub const fn on(self, ground: Ground) -> TextLook {
+        TextLook { ground, ..self }
     }
 
     pub const fn quill(self) -> TextLook {
@@ -229,7 +236,7 @@ impl Plan {
                     letter += 1;
                 }
                 TextPiece::Span(span) => {
-                    let format = span_format(span.voice, span.ink.unwrap_or(look.color), look);
+                    let format = span_format(span.voice, ink_of(span.ink, look), look);
                     for ch in span.text.chars() {
                         let leading = std::mem::take(&mut owed);
                         plan.letters.push(Letter {
@@ -389,4 +396,12 @@ fn paint_word(
         }
     }
     ui.painter().add(Shape::Text(shape));
+}
+
+fn ink_of(ink: Option<SpanInk>, look: TextLook) -> Color32 {
+    match ink {
+        Some(SpanInk::Prose(prose)) => prose.on(look.ground),
+        Some(SpanInk::Fixed(color)) => color,
+        None => look.color,
+    }
 }

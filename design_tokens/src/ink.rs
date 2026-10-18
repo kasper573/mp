@@ -26,6 +26,42 @@ pub const ITEM: Color32 = GOLD;
 pub const MAGIC: Color32 = TYRIAN;
 pub const DANGER: Color32 = RUBRIC;
 
+/// What text is laid on: the paper of sheets, slips and cards, or the dusk of the notices that float
+/// over the world, where the paper's inks would sink into the dark.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Ground {
+    #[default]
+    Paper,
+    Dusk,
+}
+
+/// What prose marks a word as, inked to read on either ground.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Prose {
+    Place,
+    Name,
+    Item,
+    Magic,
+    Danger,
+}
+
+impl Prose {
+    pub const fn on(self, ground: Ground) -> Color32 {
+        match (ground, self) {
+            (Ground::Paper, Prose::Place) => PLACE,
+            (Ground::Paper, Prose::Name) => NAME,
+            (Ground::Paper, Prose::Item) => ITEM,
+            (Ground::Paper, Prose::Magic) => MAGIC,
+            (Ground::Paper, Prose::Danger) => DANGER,
+            (Ground::Dusk, Prose::Place) => Color32::from_rgb(104, 168, 235),
+            (Ground::Dusk, Prose::Name) => Color32::from_rgb(114, 180, 111),
+            (Ground::Dusk, Prose::Item) => Color32::from_rgb(246, 201, 96),
+            (Ground::Dusk, Prose::Magic) => Color32::from_rgb(190, 155, 240),
+            (Ground::Dusk, Prose::Danger) => Color32::from_rgb(233, 117, 120),
+        }
+    }
+}
+
 pub fn wash(color: Color32, alpha: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(
         color.r(),

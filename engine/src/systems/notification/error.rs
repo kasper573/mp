@@ -1,14 +1,21 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::glyph::Mark;
-use design_tokens::ink;
-use egui::{Id, Rect};
+use design_tokens::dusk;
+use egui::emath::TSTransform;
+use egui::{Rect, Vec2};
 
-use super::rows::{self, Clock, Fades, Notice, NoticeIcon};
+use super::rows::{self, Clock, Fades, Move, Presence, Swell};
 use super::{Notification, NotificationSent, window_visible};
-use crate::systems::hud;
+use crate::core::text;
 use crate::systems::screen::ClientScreen;
+
+const WIDEST: f32 = 356.0;
+const SIZE: f32 = 16.0;
+const PRESENCE: Presence = Presence {
+    enter: Move::new(Vec2::new(0.0, -100.0), 0.9, 0.25),
+    exit: Move::new(Vec2::new(0.0, -30.0), 0.94, 0.2),
+};
 
 pub fn toast(world: &mut World, notification_sent: NotificationSent) {
     let notification = notification_sent.notification;
@@ -18,6 +25,7 @@ pub fn toast(world: &mut World, notification_sent: NotificationSent) {
         && shown.notification == notification
     {
         shown.until = clock.ends_after(notification.stays());
+        errors.swell.bump();
         return;
     }
     errors.keys += 1;
@@ -48,25 +56,41 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let step = hud::motion_step(gui);
+    let now = rows::time(gui);
     let mut errors = world.resource_mut::<Errors>();
+    errors.swell.start_if_bumped(now);
+    let bump = errors.swell.scale(now);
     let current = errors
         .shown
         .as_ref()
         .map(|shown| (shown.key, (shown.key, shown.notification.clone())));
-    let toasts = errors.fades.sync(step, current);
+    let toasts = errors.fades.sync(now, PRESENCE, current);
+    let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
-    for ((key, notification), pose) in toasts {
-        let line = notification.text.styled();
-        let slip = Notice {
-            icon: NoticeIcon::Mark(Mark::Warning),
-            label: None,
-            line: &line,
-            ink: ink::RUBRIC,
-            closable: false,
-        };
-        let (rect, _) = rows::notice(world, gui, Id::new(("error", key)), top, slip, pose);
-        drawn.push(rect);
+    for ((key, notification), look) in toasts {
+        let shown = rows::column_area(gui, &format!("error-{key}"), top).show(gui, |ui| {
+            ui.set_width(width);
+            ui.vertical_centered(|ui| {
+                ui.multiply_opacity(look.opacity);
+                dusk::frame()
+                    .show(ui, |ui| {
+                        ui.set_max_width(WIDEST);
+                        text::show(
+                            ui,
+                            world,
+                            &notification.text.styled(),
+                            rows::look(SIZE, dusk::DANGER),
+                            None,
+                        );
+                    })
+                    .response
+                    .rect
+            })
+            .inner
+        });
+        let swell = TSTransform::new(shown.inner.center().to_vec2() * (1.0 - bump), bump);
+        gui.set_transform_layer(shown.response.layer_id, look.around(shown.inner) * swell);
+        drawn.push(shown.inner);
     }
     let bottom = drawn.iter().map(Rect::bottom).fold(top, f32::max);
     world.resource_mut::<Errors>().drawn = drawn;
@@ -78,6 +102,7 @@ struct Errors {
     shown: Option<ErrorToast>,
     fades: Fades<(u64, Notification)>,
     drawn: Vec<Rect>,
+    swell: Swell,
     clock: Clock,
     keys: u64,
 }

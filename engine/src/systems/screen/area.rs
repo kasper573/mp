@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{TextRole, ink, slip};
+use design_tokens::ink::Ground;
+use design_tokens::{TextRole, dusk};
 
 use super::ClientScreen;
 use crate::core::audio::soundscape::Soundscape;
@@ -454,7 +455,7 @@ impl TileSheets {
     }
 }
 
-/// The death notice reads over any ground, so its line sits on a slip. It takes no clicks:
+/// The death notice reads over any ground, so its line sits on the dusk of notices. It takes no clicks:
 /// respawning is a key the line names.
 fn death_notice(world: &mut World) {
     let Some(gui) = gui::context(world) else {
@@ -473,8 +474,8 @@ fn death_notice(world: &mut World) {
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .interactable(false);
     gui::show_anchored(&gui, area, |ui| {
-        slip::show(ui, |ui| {
-            let look = TextLook::new(TextRole::Body.size(), ink::INK);
+        dusk::frame().show(ui, |ui| {
+            let look = TextLook::new(TextRole::Body.size(), dusk::TEXT).on(Ground::Dusk);
             text::show(ui, world, &line, look, None);
         });
     });

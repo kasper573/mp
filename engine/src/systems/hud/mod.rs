@@ -27,9 +27,7 @@ use crate::systems::{equipment, history, item, player, quest, skill, stat, termi
 pub(crate) use card::{
     Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
 };
-pub(crate) use panel::{
-    GripCorner, WindowFrame, motion_step, sheet_pose, slip_grip, widget, window,
-};
+pub(crate) use panel::{GripCorner, WindowFrame, sheet_pose, slip_grip, widget, window};
 
 pub(crate) const WIDGET: WindowPx = WindowPx(46.0);
 pub(crate) const TOOLTIP_WIDTH: f32 = 260.0;
