@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::AudioSource;
 use bevy_replicon::prelude::AppRuleExt;
@@ -8,13 +9,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::mix::AudioCategory;
-use crate::core::audio::playback::{PlayClip, SfxPlace, SfxTune};
+use crate::core::audio::playback::{HushVoice, PlayClip, SfxPlace, SfxTune};
 use crate::core::content::{
     Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
 };
 use crate::core::math::Rng;
 use crate::core::text::{
-    StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal, TypewriterSpeed, reveal_times,
+    StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal, TypewriterSpeed,
+    advance_typewriters, reveal_times,
 };
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
@@ -122,7 +124,9 @@ impl Plugin for BabblePlugin {
             Update,
             (
                 load_clips.run_if(resource_exists_and_changed::<Content>),
-                babble.run_if(resource_exists::<Content>),
+                babble
+                    .run_if(resource_exists::<Content>)
+                    .after(advance_typewriters),
             )
                 .chain(),
         );
@@ -157,62 +161,79 @@ fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut
         .collect();
 }
 
-/// Which letters of a line sound is decided on the line's own clock, the moment the typewriter
-/// reveals each letter, never on the frames the reveals happen to arrive in, so a line babbles
-/// the same way every time it is spoken.
+/// A line is voiced whole the moment it starts: every letter that will sound is handed to the
+/// audio engine at once, each timed to its reveal moment on the line's own clock, so a line
+/// babbles the same way every time it is spoken, whatever the frame rate. A line cut short before
+/// its last letter is due is hushed.
 #[derive(Default)]
 struct Mouth {
     speaker: Option<Entity>,
-    busy_until: Duration,
+    ends_at: Duration,
+}
+
+#[derive(SystemParam)]
+struct Voice<'w> {
+    clips: Res<'w, BabbleClips>,
+    sounds: MessageWriter<'w, PlayClip>,
+    hushes: MessageWriter<'w, HushVoice>,
 }
 
 fn babble(
     content: Res<Content>,
     mut revealed: MessageReader<TypewriterReveal>,
     typing: Query<(Entity, &Babbling, &Typewriter, &StyledLine)>,
-    clips: Res<BabbleClips>,
     speed: Res<TypewriterSpeed>,
+    time: Res<Time>,
     mut mouth: Local<Mouth>,
-    mut sounds: MessageWriter<PlayClip>,
+    mut voice: Voice,
 ) {
-    let reveals: Vec<TypewriterReveal> = revealed.read().copied().collect();
     let heard = typing
         .iter()
-        .filter(|(entity, _, typewriter, _)| {
-            !typewriter.is_finished() || reveals.iter().any(|reveal| reveal.entity == *entity)
-        })
-        .max_by_key(|(_, babbling, ..)| babbling.rank);
-    let Some((speaker, babbling, _, text)) = heard else {
+        .filter(|(_, _, typewriter, _)| !typewriter.is_finished())
+        .max_by_key(|(entity, babbling, ..)| (babbling.rank, mouth.speaker == Some(*entity)));
+    if let Some(speaker) = mouth.speaker
+        && heard.is_none_or(|(entity, ..)| entity != speaker)
+    {
+        if time.elapsed() < mouth.ends_at {
+            voice.hushes.write(HushVoice);
+        }
+        mouth.speaker = None;
+    }
+    let Some((speaker, babbling, typewriter, text)) = heard else {
         return;
     };
-    if mouth.speaker != Some(speaker) {
-        *mouth = Mouth {
-            speaker: Some(speaker),
-            busy_until: Duration::ZERO,
-        };
+    if mouth.speaker == Some(speaker) {
+        return;
     }
+    let moments = reveal_times(&text.pieces, *speed);
+    let first_shown = revealed
+        .read()
+        .filter(|reveal| reveal.entity == speaker)
+        .map(|reveal| reveal.index)
+        .min()
+        .and_then(|index| moments.get(index).copied());
     let babble = babbling.babble.get(&content);
     let babble_bank = babble.babble_bank.get(&content);
-    let moments = reveal_times(&text.pieces, *speed);
-    for reveal in reveals.iter().filter(|reveal| reveal.entity == speaker) {
-        let Some(moment) = moments.get(reveal.index).copied() else {
-            continue;
-        };
-        if moment < mouth.busy_until {
+    let now = time.elapsed();
+    let mut ends_at = now;
+    let mut busy_until = first_shown.unwrap_or(typewriter.elapsed());
+    for (index, moment) in moments.iter().copied().enumerate() {
+        if moment < busy_until {
             continue;
         }
-        let Some(syllable) = Syllable::at(text, reveal.index) else {
+        let Some(syllable) = Syllable::at(text, index) else {
             continue;
         };
         let Some(letter) = syllable.letter else {
-            mouth.busy_until = moment + Duration::from_secs_f32(syllable.pause.0);
+            busy_until = moment + Duration::from_secs_f32(syllable.pause.0);
             continue;
         };
-        mouth.busy_until = moment + babble.pace.period();
-        let Some(clip) = clips.letter(babble.babble_bank, letter) else {
+        busy_until = moment + babble.pace.period();
+        let Some(clip) = voice.clips.letter(babble.babble_bank, letter) else {
             continue;
         };
-        sounds.write(PlayClip {
+        ends_at = now + moment.saturating_sub(typewriter.elapsed());
+        voice.sounds.write(PlayClip {
             clip,
             category: AudioCategory::Voice,
             place: babbling.place,
@@ -220,8 +241,13 @@ fn babble(
                 pitch: babble.pitch_for(&syllable),
                 volume: babble_bank.volume * syllable.loudness,
             },
+            due: ends_at,
         });
     }
+    *mouth = Mouth {
+        speaker: Some(speaker),
+        ends_at,
+    };
 }
 
 impl BabbleDef {

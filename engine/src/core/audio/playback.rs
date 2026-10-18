@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::{
-    Audio, AudioControl, AudioInstance, AudioSource, AudioTween, PlaybackState,
+    Audio, AudioApp, AudioChannel, AudioControl, AudioInstance, AudioSource, AudioTween,
+    PlaybackState,
 };
+use kira::StartTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -32,13 +35,16 @@ impl Plugin for SfxPlugin {
             .init_resource::<Catalog>()
             .init_resource::<Played>()
             .init_resource::<Sounding>()
+            .add_audio_channel::<VoiceTrack>()
             .add_message::<PlaySfx>()
             .add_message::<PlayClip>()
+            .add_message::<HushVoice>()
             .add_systems(
                 Update,
                 (
                     load.run_if(resource_exists_and_changed::<Content>),
                     mix,
+                    hush,
                     play_clips,
                 )
                     .chain(),
@@ -92,13 +98,20 @@ pub struct PlaySfx {
     pub place: SfxPlace,
 }
 
+/// A clip to sound at `due` on the app's clock (`Time::elapsed`): asked for ahead of its moment,
+/// it starts on that moment whatever the frame rate, since the audio engine holds it until then.
 #[derive(Message)]
 pub struct PlayClip {
     pub clip: Handle<AudioSource>,
     pub category: AudioCategory,
     pub place: SfxPlace,
     pub tune: SfxTune,
+    pub due: Duration,
 }
+
+/// Silences the voice, clips sounding and clips due alike, so a line cut short stops at once.
+#[derive(Message)]
+pub struct HushVoice;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SfxTune {
@@ -324,7 +337,13 @@ fn mix(
     }
 }
 
-fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, speakers: Speakers) {
+fn hush(mut hushes: MessageReader<HushVoice>, voice: Res<AudioChannel<VoiceTrack>>) {
+    if hushes.read().next().is_some() {
+        voice.stop();
+    }
+}
+
+fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, mut speakers: Speakers) {
     for clip in clips.read() {
         let Some(PositionalAudio { proximity, pan }) = heard_at(clip.place, listener.0) else {
             continue;
@@ -333,16 +352,23 @@ fn play_clips(mut clips: MessageReader<PlayClip>, listener: Res<Listener>, speak
             volume: clip.tune.volume * proximity,
             ..clip.tune
         };
-        speakers.play(clip.clip.clone(), clip.category, tune, pan);
+        let delay = clip.due.saturating_sub(speakers.time.elapsed());
+        speakers.play(clip.clip.clone(), clip.category, tune, pan, delay);
     }
 }
+
+/// The track every voice clip sounds on, so the voice can be hushed as one.
+#[derive(Resource)]
+struct VoiceTrack;
 
 #[derive(SystemParam)]
 struct Speakers<'w> {
     audio: Res<'w, Audio>,
+    voice: Res<'w, AudioChannel<VoiceTrack>>,
     audio_mix: Res<'w, AudioMix>,
     time: Res<'w, Time>,
     sounding: ResMut<'w, Sounding>,
+    sources: ResMut<'w, Assets<AudioSource>>,
 }
 
 impl Speakers<'_> {
@@ -351,31 +377,47 @@ impl Speakers<'_> {
     }
 
     fn play_sfx(&mut self, id: SfxId, clip: Handle<AudioSource>, tune: SfxTune, pan: f32) {
-        if let Some(instance) = self.play(clip, AudioCategory::Effects, tune, pan) {
+        if let Some(instance) = self.play(clip, AudioCategory::Effects, tune, pan, Duration::ZERO) {
             let now = self.now();
             self.sounding.begun(id, instance, now);
         }
     }
 
     fn play(
-        &self,
+        &mut self,
         clip: Handle<AudioSource>,
         category: AudioCategory,
         tune: SfxTune,
         pan: f32,
+        delay: Duration,
     ) -> Option<Handle<AudioInstance>> {
         let volume = tune.volume * self.audio_mix.gain(category);
         if volume <= 0.0 {
             return None;
         }
-        let instance = self
-            .audio
-            .play(clip)
+        let clip = self.delayed(clip, delay);
+        let mut command = match category {
+            AudioCategory::Voice => self.voice.play(clip),
+            _ => self.audio.play(clip),
+        };
+        command
             .with_volume(decibels(volume))
             .with_playback_rate(f64::from(tune.pitch.0))
-            .with_panning(pan)
-            .handle();
-        Some(instance)
+            .with_panning(pan);
+        Some(command.handle())
+    }
+
+    /// The clip as a sound the audio engine starts `delay` after it is handed over, or the clip
+    /// itself when it starts at once or is not loaded yet.
+    fn delayed(&mut self, clip: Handle<AudioSource>, delay: Duration) -> Handle<AudioSource> {
+        if delay.is_zero() {
+            return clip;
+        }
+        let Some(source) = self.sources.get(&clip) else {
+            return clip;
+        };
+        let sound = source.sound.clone().start_time(StartTime::Delayed(delay));
+        self.sources.add(AudioSource { sound })
     }
 }
 
