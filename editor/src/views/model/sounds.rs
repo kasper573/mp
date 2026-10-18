@@ -1,12 +1,6 @@
-use bevy::prelude::World;
-use bevy_kira_audio::prelude::{Audio, AudioControl, AudioSource};
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::audio;
-use engine::core::audio::loader::{self, DecodedAudio};
-use engine::core::audio::mix::{AudioCategory, AudioMix};
 use engine::core::audio::playback::{SfxRoleDef, SfxScalar};
 use engine::core::content::ContentRow;
-use engine::core::math::Rng;
 
 use crate::app::Editor;
 use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
@@ -249,7 +243,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         view.sound_role = new_filter;
     }
     if let Some(sfx) = play {
-        editor.views.model.sfx_to_play.push(sfx);
+        editor.views.sound.play.push(sfx);
     }
     if let Some(sfx) = choose {
         let view = editor.views.model.view_mut(key);
@@ -351,39 +345,5 @@ fn scalar_text(scalar: SfxScalar) -> (String, f32) {
     match scalar {
         SfxScalar::Fixed(fixed) => (format!("{fixed} · the row's"), fixed),
         SfxScalar::Random { min, max } => (format!("{min} to {max}, at random · the row's"), max),
-    }
-}
-
-pub fn sync(editor: &mut Editor, world: &mut World) {
-    let queued = std::mem::take(&mut editor.views.model.sfx_to_play);
-    if queued.is_empty() {
-        return;
-    }
-    let gain = AudioMix::default().gain(AudioCategory::Effects);
-    let mut rng = Rng::new(editor.frame);
-    for sfx in queued {
-        let Some(file) = sfx_file(editor, &sfx) else {
-            continue;
-        };
-        let Some(bytes) = editor
-            .project
-            .as_ref()
-            .and_then(|project| project.files.get(&format!("assets/{file}")).cloned())
-        else {
-            continue;
-        };
-        let Ok(sound) = loader::decode(bytes.to_vec()).and_then(DecodedAudio::into_sound) else {
-            continue;
-        };
-        let volume = scalar_of(editor, &sfx, "volume").resolve(&mut rng) * gain;
-        let pitch = scalar_of(editor, &sfx, "pitch").resolve(&mut rng);
-        let handle = world
-            .resource_mut::<bevy::asset::Assets<AudioSource>>()
-            .add(AudioSource { sound });
-        world
-            .resource::<Audio>()
-            .play(handle)
-            .with_volume(audio::decibels(volume))
-            .with_playback_rate(f64::from(pitch));
     }
 }

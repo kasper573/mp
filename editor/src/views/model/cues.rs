@@ -185,6 +185,6 @@ fn steps(
     if let Some((surface, footstep)) = play {
         let view = editor.views.model.view_mut(key);
         view.surface = Some(surface);
-        editor.views.model.sfx_to_play.push(footstep);
+        editor.views.sound.play.push(footstep);
     }
 }

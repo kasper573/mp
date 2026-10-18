@@ -70,7 +70,7 @@ impl EditorViews {
 
 pub fn sync(editor: &mut Editor, world: &mut World) {
     area::sync(editor, world);
-    model::sounds::sync(editor, world);
+    sound::sync(editor, world);
     crate::stage::sync(editor, world);
 }
 

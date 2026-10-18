@@ -127,12 +127,12 @@ pub fn fire(editor: &mut Editor, key: &str, frames: &[StripFrame], passed: &[usi
             continue;
         };
         if let Some(sound) = &frame.sound {
-            editor.views.model.sfx_to_play.push(sound.clone());
+            editor.views.sound.play.push(sound.clone());
         }
         if frame.step && !stepped {
             stepped = true;
             if let Some(footstep) = super::sounds::footstep_of(editor, surface.as_deref()) {
-                editor.views.model.sfx_to_play.push(footstep);
+                editor.views.sound.play.push(footstep);
             }
         }
     }

@@ -33,7 +33,6 @@ pub const MAX_FRAME_MS: u32 = 60_000;
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
     pub bank: crate::audio::WaveformCache,
-    pub sfx_to_play: Vec<String>,
     pub drops: Vec<PathBuf>,
     pub reimports: HashMap<String, import::ModelReimport>,
 }

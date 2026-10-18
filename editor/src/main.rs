@@ -1,8 +1,15 @@
 use std::path::PathBuf;
 
+use bevy::asset::AssetApp;
+use bevy::asset::io::AssetSourceId;
 use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
 use editor::app::{EditorLaunch, EditorPlugin};
+use engine::core::assets::SyncedFiles;
+use engine::core::audio::playback::SfxPlugin;
+use engine::core::babble::BabblePlugin;
+use engine::core::math::Rng;
+use engine::core::text::TextPlugin;
 
 const USAGE: &str = "usage: editor [folder] [--scene JSON] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
 
@@ -53,9 +60,17 @@ fn main() {
             folder => launch.folder = Some(PathBuf::from(folder)),
         }
     }
-    App::new()
+    let files = SyncedFiles::default();
+    let mut app = App::new();
+    app.insert_resource(files.clone())
+        .insert_resource(Rng::from_entropy());
+    AssetApp::register_asset_source(&mut app, AssetSourceId::Default, files.source())
         .add_plugins(
             DefaultPlugins
+                .set(bevy::log::LogPlugin {
+                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
+                    ..default()
+                })
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Rift editor".to_owned(),
@@ -67,7 +82,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugins(bevy_kira_audio::AudioPlugin)
+        .add_plugins((SfxPlugin, TextPlugin, BabblePlugin))
         .add_plugins(EditorPlugin { launch })
         .run();
 }

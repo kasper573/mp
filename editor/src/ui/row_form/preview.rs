@@ -21,7 +21,9 @@ use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::stage::{self, Posed, PosedActor, Scenario, Scene};
 use crate::views::character;
+use crate::views::model::sounds;
 use crate::views::script::panel;
+use crate::views::sound::BabbleRequest;
 use crate::{forms, value};
 
 pub struct RowPreviewState {
@@ -64,6 +66,8 @@ pub fn has_preview(table: &str) -> bool {
             | "test_character"
             | "status_effect"
             | "skill"
+            | "sfx"
+            | "babble"
     )
 }
 
@@ -76,6 +80,8 @@ pub fn show_beside(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
     match table {
         "status_effect" => return show_status(editor, ui, key),
         "skill" => return show_skill(editor, ui, key),
+        "sfx" => return show_sfx(editor, ui, key),
+        "babble" => return show_babble(editor, ui, key),
         _ => {}
     }
     let now = ui.input(|i| i.time);
@@ -190,6 +196,62 @@ fn show_skill(editor: &mut Editor, ui: &mut Ui, key: &str) {
         && let Some(report) = shown.report
     {
         ui.label(theme::muted(report).size(12.0));
+    }
+}
+
+/// An sfx played as the game plays it, with its waveform and how it sits in the mix.
+fn show_sfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    if widgets::primary(ui, "▶ play").clicked() {
+        editor.views.sound.play.push(key.to_owned());
+    }
+    let (volume_text, gain) = sounds::volume_of(editor, key);
+    widgets::kv_text(ui, "volume", volume_text);
+    widgets::kv_text(ui, "pitch", sounds::pitch_of(editor, key));
+    let wave = sounds::wave_of_sfx(editor, key);
+    ui.add_space(4.0);
+    let size = Vec2::new(ui.available_width() - 8.0, 44.0);
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    match &wave {
+        Some(wave) => {
+            sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::ACCENT);
+            widgets::kv_text(ui, "lasts", format!("{} ms", wave.ms));
+        }
+        None => {
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "no file to measure",
+                egui::FontId::proportional(12.0),
+                theme::MUTED,
+            );
+        }
+    }
+    widgets::section(ui, "Against the mix, at its loudest");
+    let role = sounds::role_of_sfx(editor, key);
+    match (wave.as_ref().and_then(|wave| wave.loudness), role) {
+        (Some(loudness), Some(role)) => {
+            let verdict = sounds::verdict(loudness, gain, &role.def);
+            widgets::verdict(ui, verdict.ok, &verdict.loudness);
+            widgets::verdict(ui, verdict.peak_ok, &verdict.peak);
+        }
+        (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
+        (_, None) => widgets::kv_text(ui, "loudness", "no role to measure against"),
+    }
+}
+
+/// A babble speaking a line of the designer's choosing, through the game's own typewriter.
+fn show_babble(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let sound = &mut editor.views.sound;
+    ui.add(
+        egui::TextEdit::multiline(&mut sound.babble_text)
+            .desired_rows(2)
+            .desired_width(f32::INFINITY),
+    );
+    if widgets::primary(ui, "▶ play").clicked() {
+        sound.babble = Some(BabbleRequest {
+            babble: key.to_owned(),
+            text: sound.babble_text.clone(),
+        });
     }
 }
 

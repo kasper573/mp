@@ -71,7 +71,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.views.tileset.view_mut(key).surface = Some(surface);
     }
     if let Some(footstep) = play {
-        editor.views.model.sfx_to_play.push(footstep);
+        editor.views.sound.play.push(footstep);
     }
     if new {
         let dialog = NewSurfaceDialog {
@@ -148,7 +148,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         editor.views.tileset.surface_use(surface).text(),
     );
     if play {
-        editor.views.model.sfx_to_play.push(footstep);
+        editor.views.sound.play.push(footstep);
     }
     if let Some(name) = renamed {
         let label = format!("Name surface {surface} {name}");

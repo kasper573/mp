@@ -3504,7 +3504,6 @@ dependencies = [
  "base64 0.23.1",
  "bevy",
  "bevy_egui",
- "bevy_kira_audio",
  "bevy_replicon",
  "bevy_tilemap",
  "blake3",

@@ -1,11 +1,22 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use bevy::asset::{AssetPath, AssetServer};
+use bevy::prelude::{Entity, World};
 use egui::Ui;
+use engine::core::assets::SyncedFiles;
+use engine::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
+use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
 use engine::core::content::Content;
 use engine::core::math::Pos;
+use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
 use engine::systems::area::{self, AreaId};
 
 use crate::app::Editor;
 use crate::ui::theme;
+
+pub const BABBLE_SAMPLE: &str = "The quick brown fox jumps over the lazy dog";
 
 #[derive(Clone, Debug, Default)]
 pub struct ListeningPoint {
@@ -50,9 +61,108 @@ pub fn listen(editor: &mut Editor, content: &Content, area_id: AreaId, at: Pos<T
     });
 }
 
-#[derive(Default)]
+/// What a babble preview says, for the engine to speak in a babble's voice.
+pub struct BabbleRequest {
+    pub babble: String,
+    pub text: String,
+}
+
 pub struct SoundViews {
     pub listening: Option<ListeningPoint>,
+    /// Sfx rows asked to play this frame.
+    pub play: Vec<String>,
+    pub babble: Option<BabbleRequest>,
+    pub babble_text: String,
+    babbler: Option<Entity>,
+    /// The content generation the engine's asset files and content were last taken from, with
+    /// the hash of each asset file then.
+    synced: Option<(u64, HashMap<String, String>)>,
+}
+
+impl Default for SoundViews {
+    fn default() -> SoundViews {
+        SoundViews {
+            listening: None,
+            play: Vec::new(),
+            babble: None,
+            babble_text: BABBLE_SAMPLE.to_owned(),
+            babbler: None,
+            synced: None,
+        }
+    }
+}
+
+/// Hands the project's assets and content to the engine's audio as they change, then plays what
+/// the windows asked for through it: sfx rows as the game plays them, and a babble speaking a
+/// line through the game's own typewriter.
+pub fn sync(editor: &mut Editor, world: &mut World) {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let views = &mut editor.views.sound;
+    if views.synced.as_ref().map(|(generation, _)| *generation) != Some(project.generation) {
+        let hashes: HashMap<String, String> = project
+            .files
+            .paths_under("assets/")
+            .filter_map(|path| Some((path.clone(), project.files.hash_of(path)?.to_owned())))
+            .collect();
+        let assets: HashMap<String, Arc<[u8]>> = hashes
+            .keys()
+            .filter_map(|path| Some((path.clone(), project.files.get(path)?.clone())))
+            .collect();
+        world.resource::<SyncedFiles>().replace(assets);
+        if let Some((_, before)) = &views.synced {
+            let server = world.resource::<AssetServer>();
+            for (path, hash) in &hashes {
+                let asset = AssetPath::from(path.clone());
+                if before.get(path) != Some(hash) && server.get_path_id(asset.clone()).is_some() {
+                    server.reload(asset);
+                }
+            }
+        }
+        views.synced = Some((project.generation, hashes));
+        if let Some(content) = &project.content {
+            world.insert_resource(content.clone());
+        }
+    }
+    let Some(content) = &project.content else {
+        return;
+    };
+    for key in std::mem::take(&mut views.play) {
+        if let Some(id) = content.by_key::<SfxDef>(&key) {
+            world.write_message(PlaySfx {
+                id,
+                place: SfxPlace::Interface,
+            });
+        }
+    }
+    if let Some(request) = views.babble.take()
+        && let Some(babble) = content.by_key::<BabbleDef>(&request.babble)
+    {
+        if let Some(previous) = views.babbler.take() {
+            world.despawn(previous);
+        }
+        let speaker = world
+            .spawn((
+                Typewriter::default(),
+                StyledLine::plain_text(request.text),
+                Babbling {
+                    babble,
+                    place: SfxPlace::Interface,
+                    rank: BabbleRank::Foremost,
+                },
+            ))
+            .id();
+        views.babbler = Some(speaker);
+    }
+    if let Some(speaker) = views.babbler
+        && world
+            .get::<Typewriter>(speaker)
+            .is_none_or(Typewriter::is_finished)
+    {
+        world.despawn(speaker);
+        views.babbler = None;
+    }
 }
 
 pub fn panel(editor: &Editor, ui: &mut Ui) {

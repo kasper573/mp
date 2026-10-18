@@ -543,7 +543,7 @@ fn cue_card(
         view.confirm = Some(super::strip::StripConfirm::Cues);
     }
     if let Some(sound) = play {
-        editor.views.model.sfx_to_play.push(sound);
+        editor.views.sound.play.push(sound);
     }
     if let Some(sound) = new_sound {
         let mut written = frames.to_vec();
