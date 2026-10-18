@@ -37,6 +37,8 @@ pub fn style(style: &mut Style) {
     spacing.item_spacing = egui::vec2(6.0, 5.0);
     spacing.button_padding = controls::BUTTON_PADDING;
     spacing.interact_size.y = controls::CONTROL_HEIGHT;
+    // egui's default menu height holds ten of its own rows; ten of these taller ones keep fitting.
+    spacing.combo_height = 10.0 * (controls::CONTROL_HEIGHT + spacing.item_spacing.y);
     spacing.icon_width = 14.0;
     spacing.icon_width_inner = 8.0;
     spacing.icon_spacing = 6.0;
