@@ -206,13 +206,13 @@ impl Plan {
         for piece in &line.pieces {
             match piece {
                 TextPiece::Pause(_) => {}
-                TextPiece::Key(input) => {
+                TextPiece::Key(cap) => {
                     let format = TextFormat {
                         line_height: look.line_height,
                         ..TextFormat::simple(Face::Mono.id(look.size * CAP_SCALE), look.color)
                     };
                     let start = plan.letters.len();
-                    for (at, ch) in keys.name(*input).chars().enumerate() {
+                    for (at, ch) in cap.name(keys).chars().enumerate() {
                         let leading = if at == 0 { owed + pad } else { 0.0 };
                         plan.letters.push(Letter {
                             ch,

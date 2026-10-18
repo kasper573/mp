@@ -1,0 +1,10 @@
+{
+  "label": "Pick one more rank of a skill in the tree",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

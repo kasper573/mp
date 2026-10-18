@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, ink, slip};
+use design_tokens::{TextRole, controls, ink, sheet, slip};
 use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
@@ -13,7 +13,8 @@ use super::{
     HotbarSlot, Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
 };
 use crate::core::content::{Content, Fixture};
-use crate::core::text::{StyledLine, TextPiece};
+use crate::core::gui;
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::Seconds;
 use crate::systems::equipment::Equipment;
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
@@ -46,7 +47,8 @@ pub const HOTBAR_KEYS: [InputAction; 9] = [
 pub const HOTBAR: &str = "hotbar";
 const GAP: f32 = 4.0;
 const PITCH: f32 = SLOT + GAP;
-const BASIC_ATTACK_GAP: f32 = 8.0;
+const BASIC_ATTACK_GAP: f32 = 10.0;
+const GROOVE_INSET: f32 = 4.0;
 const BOTTOM: f32 = 8.0;
 const PRESS_MARK_SECONDS: f32 = 0.6;
 
@@ -67,7 +69,14 @@ impl HudWidget for HotbarWidget {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::splat(GAP);
                 basic_attack_slot(ui, world);
-                ui.add_space(BASIC_ATTACK_GAP - GAP);
+                let (between, _) =
+                    ui.allocate_exact_size(Vec2::new(BASIC_ATTACK_GAP - GAP, SLOT), Sense::hover());
+                let inset = Vec2::new(0.0, GROOVE_INSET);
+                sheet::groove(
+                    ui.painter(),
+                    between.center_top() + inset,
+                    between.center_bottom() - inset,
+                );
                 egui::Grid::new("hotbar grid")
                     .spacing(Vec2::splat(GAP))
                     .show(ui, |ui| {
@@ -95,6 +104,7 @@ impl HudWidget for HotbarWidget {
 #[derive(Resource, Default)]
 pub struct BarState {
     rebinding: Option<HotbarSlot>,
+    primed: Option<HotbarSlot>,
     resizing: Option<Resizing>,
     presses: BTreeMap<HotbarSlot, Press>,
 }
@@ -119,6 +129,8 @@ pub struct SlotReport {
     pub rebinding: bool,
     /// How the last press on the slot went, if it was ever pressed.
     pub pressed: Option<HotbarPress>,
+    /// Its skill is armed and waits on a target.
+    pub primed: bool,
 }
 
 /// Puts something on the first free slot of the bar as it is shown, or says the bar is full.
@@ -258,6 +270,7 @@ pub fn report(world: &World) -> Vec<SlotReport> {
                 dimmed: view.dimmed,
                 rebinding: state.rebinding == Some(slot),
                 pressed: state.presses.get(&slot).map(|press| press.outcome),
+                primed: primed(world, slot, entry),
             }
         })
         .collect()
@@ -428,6 +441,9 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
     if carried.is_some() && response.contains_pointer() {
         drop_wash(ui, response.rect);
     }
+    if let Some(key) = key_name(world, index) {
+        slot_key_mark(ui, response.rect, &key);
+    }
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
@@ -437,6 +453,10 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
     });
     overlay(ui, response.rect, view.fill);
     press_mark(ui, world, index, response.rect);
+    if primed(world, index, entry) {
+        controls::primed_ring(ui.painter(), response.rect, ui.input(|input| input.time));
+        ui.ctx().request_repaint();
+    }
     if rebinding {
         ui.painter()
             .rect_filled(response.rect, 3.0, ink::wash(ink::CREAM, 0.85));
@@ -462,14 +482,15 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
                 entry: HotbarEntry::Empty,
             });
         }
-    } else if response.clicked() {
+    } else if map::clicked(world, InputAction::UseSlot, &response) {
         press(world, index, entry);
     } else if map::drag_started(world, InputAction::CarryItem, &response)
         && entry != HotbarEntry::Empty
     {
         hud::carry(ui.ctx(), Carried::HotbarEntry { from: index, entry });
     }
-    response.context_menu(|ui| {
+    let options = map::clicked(world, InputAction::SlotOptions, &response);
+    gui::pointer_menu(&response, options, |ui| {
         if ui.button("Rebind key").clicked() {
             world.resource_mut::<BarState>().rebinding = Some(index);
             ui.close();
@@ -485,14 +506,20 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
             ui.close();
         }
         ui.separator();
-        ui.label(
-            TextRole::Small
-                .rich(format!(
-                    "{} · {}",
-                    entry_name(&content, entry),
-                    key_name(world, index).unwrap_or_else(|| "no key".to_owned())
-                ))
-                .color(ink::INK3),
+        let mut said = vec![TextPiece::text(format!(
+            "{} · ",
+            entry_name(&content, entry)
+        ))];
+        said.extend(key_cap(world, index).map_or_else(
+            || vec![TextPiece::text("no key")],
+            |key| vec![TextPiece::text("key "), key],
+        ));
+        text::show(
+            ui,
+            world,
+            &StyledLine::new(said),
+            TextLook::new(TextRole::Small.size(), ink::INK3),
+            None,
         );
     });
     slot_tooltip(world, &response, index, entry);
@@ -552,7 +579,8 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
     {
         hud::carry(ui.ctx(), Carried::Skill(skill));
     }
-    response.context_menu(|ui| {
+    let options = map::clicked(world, InputAction::SlotOptions, &response);
+    gui::pointer_menu(&response, options, |ui| {
         if ui
             .add_enabled(held.is_some(), egui::Button::new("Clear"))
             .clicked()
@@ -564,19 +592,25 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
     match held {
         Some(skill) => {
             let hint = StyledLine::new(vec![
-                TextPiece::text("Click an enemy to use it · drag a basic-attack skill here · "),
+                input(InputAction::Interact),
+                TextPiece::text(" on an enemy uses it · "),
+                input(InputAction::CarryItem),
+                TextPiece::text(" another basic attack here to swap it · "),
                 input(InputAction::PinToHotbar),
-                TextPiece::text(" or right-click clears it"),
+                TextPiece::text(" or "),
+                input(InputAction::SlotOptions),
+                TextPiece::text(" clears it"),
             ]);
             card::tooltip(&response, world, &card::of(world, skill), Some(&hint));
         }
-        None => hud::tooltip(
-            &response,
-            world,
-            "Basic attack · empty",
-            &["Wear a weapon that has one, or drag one here".to_owned()],
-            None,
-        ),
+        None => {
+            let hint = StyledLine::new(vec![
+                TextPiece::text("Wear a weapon that has one, or "),
+                input(InputAction::CarryItem),
+                TextPiece::text(" one here"),
+            ]);
+            hud::tooltip(&response, world, "Basic attack · empty", &[], Some(&hint));
+        }
     }
 }
 
@@ -642,46 +676,60 @@ fn slot_tooltip(
     index: HotbarSlot,
     entry: HotbarEntry,
 ) {
-    let key = key_name(world, index);
-    let key_line = key.map_or_else(
-        || "No key · right-click to bind one".to_owned(),
-        |key| format!("Key {key} · right-click for options"),
-    );
+    let key = key_cap(world, index);
+    let options = match &key {
+        Some(_) => vec![
+            input(InputAction::SlotOptions),
+            TextPiece::text(" for options"),
+        ],
+        None => vec![
+            TextPiece::text("No key · "),
+            input(InputAction::SlotOptions),
+            TextPiece::text(" to bind one"),
+        ],
+    };
+    let uses = key.map_or_else(Vec::new, |key| {
+        vec![
+            key,
+            TextPiece::text(" or "),
+            input(InputAction::UseSlot),
+            TextPiece::text(" uses it · "),
+        ]
+    });
+    let take_off = [
+        TextPiece::text(" · "),
+        input(InputAction::PinToHotbar),
+        TextPiece::text(" takes it off the bar"),
+    ];
     match entry {
-        HotbarEntry::Empty => hud::tooltip(
-            response,
-            world,
-            &format!("Slot {}", index.number()),
-            &["Empty · drag a skill or an item here".to_owned(), key_line],
-            None,
-        ),
+        HotbarEntry::Empty => {
+            let hint = [
+                TextPiece::text("Empty · "),
+                input(InputAction::CarryItem),
+                TextPiece::text(" a skill or an item here · "),
+            ]
+            .into_iter()
+            .chain(options)
+            .collect();
+            hud::tooltip(
+                response,
+                world,
+                &format!("Slot {}", index.number()),
+                &[],
+                Some(&StyledLine::new(hint)),
+            );
+        }
         HotbarEntry::Skill(skill) => {
-            let hint = StyledLine::new(vec![
-                TextPiece::text(format!("{key_line} · ")),
-                input(InputAction::PinToHotbar),
-                TextPiece::text(" takes it off the bar"),
-            ]);
+            let hint = StyledLine::new(uses.into_iter().chain(options).chain(take_off).collect());
             card::tooltip(response, world, &card::of(world, skill), Some(&hint));
         }
         HotbarEntry::Item(item) => {
             let content = world.resource::<Content>().clone();
             let def = item.get(&content);
-            let hint = StyledLine::new(vec![
-                TextPiece::text(format!("{key_line} · ")),
-                input(InputAction::PinToHotbar),
-                TextPiece::text(" takes it off the bar"),
-            ]);
-            let lines = [item_card::overview(def), item_use_line(def)];
+            let hint = StyledLine::new(uses.into_iter().chain(options).chain(take_off).collect());
+            let lines = [item_card::overview(def)];
             hud::tooltip(response, world, &def.name, &lines, Some(&hint));
         }
-    }
-}
-
-fn item_use_line(def: &crate::systems::item::ItemDef) -> String {
-    match def.kind {
-        ItemKind::Usable => "The key uses one".to_owned(),
-        ItemKind::Equipment { .. } => "The key wears it".to_owned(),
-        ItemKind::Resource => "Counts what you carry".to_owned(),
     }
 }
 
@@ -766,6 +814,30 @@ fn drop_wash(ui: &Ui, rect: Rect) {
     );
 }
 
+fn slot_key_mark(ui: &Ui, rect: Rect, key: &str) {
+    let at = rect.left_top() + Vec2::new(3.0, 1.0);
+    for offset in [
+        Vec2::new(-1.0, 0.0),
+        Vec2::new(1.0, 0.0),
+        Vec2::new(0.0, 1.0),
+    ] {
+        ui.painter().text(
+            at + offset,
+            Align2::LEFT_TOP,
+            key,
+            TextRole::Launcher.font_id(),
+            ink::CREAM,
+        );
+    }
+    ui.painter().text(
+        at,
+        Align2::LEFT_TOP,
+        key,
+        TextRole::Launcher.font_id(),
+        ink::INK2,
+    );
+}
+
 fn uptime(world: &World) -> Seconds {
     Seconds(world.resource::<Time>().elapsed_secs())
 }
@@ -773,10 +845,18 @@ fn uptime(world: &World) -> Seconds {
 fn press(world: &mut World, slot: HotbarSlot, entry: HotbarEntry) {
     let outcome = fire(world, entry);
     let since = uptime(world);
-    world
-        .resource_mut::<BarState>()
-        .presses
-        .insert(slot, Press { outcome, since });
+    let arms = aim::aiming(world).is_some_and(|aimed| entry == HotbarEntry::Skill(aimed.skill));
+    let mut state = world.resource_mut::<BarState>();
+    state.presses.insert(slot, Press { outcome, since });
+    if arms {
+        state.primed = Some(slot);
+    }
+}
+
+/// The slot whose press armed the skill now waiting on its target.
+fn primed(world: &World, slot: HotbarSlot, entry: HotbarEntry) -> bool {
+    world.resource::<BarState>().primed == Some(slot)
+        && aim::aiming(world).is_some_and(|aimed| entry == HotbarEntry::Skill(aimed.skill))
 }
 
 fn cooldown_text(left: Seconds) -> String {
@@ -888,6 +968,13 @@ fn slot_key(settings: &UserSettings, slot: HotbarSlot) -> Option<SlotKey> {
     }
 }
 
+fn key_cap(world: &World, slot: HotbarSlot) -> Option<TextPiece> {
+    match slot_key(world.resource::<UserSettings>(), slot)? {
+        SlotKey::Action(action) => Some(input(action)),
+        SlotKey::Gesture(gesture) => Some(TextPiece::key(InputBinding::Key(gesture).name())),
+    }
+}
+
 fn key_name(world: &World, slot: HotbarSlot) -> Option<String> {
     match slot_key(world.resource::<UserSettings>(), slot)? {
         SlotKey::Action(action) => world.resource::<InputMap>().name(action),
@@ -914,12 +1001,15 @@ fn capture(world: &mut World, slot: HotbarSlot) {
     };
     let modifiers = KeyModifiers::held(keys);
     world.resource_mut::<BarState>().rebinding = None;
-    if key == KeyCode::Escape {
+    let gesture = KeyGesture { key, modifiers };
+    let map = world.resource::<InputMap>().clone();
+    if map
+        .bindings(InputAction::Dismiss)
+        .contains(&InputBinding::Key(gesture))
+    {
         return;
     }
-    let gesture = KeyGesture { key, modifiers };
     let content = world.resource::<Content>().clone();
-    let map = world.resource::<InputMap>().clone();
     let taken = InputAction::VARIANTS
         .iter()
         .copied()
@@ -988,22 +1078,22 @@ fn rebind_panel(ui: &mut Ui, world: &World, bar: Rect) {
     let Some(slot) = world.resource::<BarState>().rebinding else {
         return;
     };
-    let text = format!("Press a key for slot {} · Esc cancels", slot.number());
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text, TextRole::Small.font_id(), ink::INK);
-    let size = galley.size() + slip::PADDING.sum();
+    let line = StyledLine::new(vec![
+        TextPiece::text(format!("Press a key for slot {} · ", slot.number())),
+        input(InputAction::Dismiss),
+        TextPiece::text(" cancels"),
+    ]);
+    let look = TextLook::new(TextRole::Small.size(), ink::INK);
+    let size = text::measure(ui.ctx(), world, &line, look, f32::INFINITY) + slip::PADDING.sum();
     let rect = Rect::from_min_size(
         Pos2::new(bar.center().x - size.x / 2.0, bar.min.y - size.y - 6.0),
         size,
     );
-    let painter = ui.painter();
-    slip::paint(painter, rect);
-    painter.galley(
-        rect.min + Vec2::new(f32::from(slip::PADDING.left), f32::from(slip::PADDING.top)),
-        galley,
-        ink::INK,
-    );
+    slip::paint(ui.painter(), rect);
+    let inner = rect - slip::PADDING;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(inner), |ui| {
+        text::show(ui, world, &line, look, None);
+    });
 }
 
 /// The shape drawn now: the saved one, or the one the grip is being dragged toward, in whole slots.

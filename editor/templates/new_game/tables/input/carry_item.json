@@ -1,5 +1,5 @@
 {
-  "label": "Carry an item out of your bag",
+  "label": "Carry an item or a skill to where it goes",
   "bindings": [
     {
       "type": "drag",

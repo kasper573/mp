@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::{Content, ContentRow, Fixture, Loading, RowCheck};
-use crate::core::text::{InputRef, KeyNames, TextPiece};
+use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
     JsonSchema,
@@ -67,6 +67,11 @@ pub enum InputAction {
     Hotbar8,
     Hotbar9,
     PinToHotbar,
+    RaiseRank,
+    LowerRank,
+    InspectSkill,
+    UseSlot,
+    SlotOptions,
 }
 
 impl Fixture for InputAction {
@@ -84,7 +89,12 @@ impl InputAction {
             | InputAction::UseItem
             | InputAction::DropItem
             | InputAction::SellItem
-            | InputAction::PinToHotbar => &[GestureKind::Click],
+            | InputAction::PinToHotbar
+            | InputAction::RaiseRank
+            | InputAction::LowerRank
+            | InputAction::InspectSkill
+            | InputAction::UseSlot
+            | InputAction::SlotOptions => &[GestureKind::Click],
             InputAction::CarryItem => &[GestureKind::Drag],
             InputAction::SubmitText | InputAction::TakeDefault => &[GestureKind::Shortcut],
             _ => &[GestureKind::Press],
@@ -406,7 +416,7 @@ pub fn shortcut(world: &World, action: InputAction) -> Option<egui::KeyboardShor
 }
 
 pub fn input(action: InputAction) -> TextPiece {
-    TextPiece::Key(action.into())
+    TextPiece::Key(KeyCap::Input(action.into()))
 }
 
 impl From<InputAction> for InputRef {

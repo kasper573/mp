@@ -1,0 +1,11 @@
+{
+  "label": "Take back a rank picked in the tree",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1,
+      "ctrl": true
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 use driver::{
-    UiTarget, bare_spot, content, holding, learned, planned, reset_prompted, resident_home,
-    slot_skill, to_spend, tree_view,
+    UiTarget, bare_spot, content, holding, learned, planned, planned_rank, reset_prompted,
+    resident_home, slot_skill, to_spend, tree_view,
 };
 use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
@@ -39,11 +39,23 @@ fn play(shoot: &mut Shoot) {
     me.hover_ui(UiTarget::starting("War Cry node"));
     me.hold();
     me.caption(
-        "Click a node to pick a rank; the pill counts it. Confirm spends the points for good",
+        "Click a node to pick a rank, and again for the next one, as far as your points reach",
     );
     me.click_ui(UiTarget::starting("Cleave node"));
+    me.click_ui(UiTarget::starting("Cleave node"));
+    me.wait_until("Cleave picked twice", |snapshot| {
+        planned_rank(snapshot, "cleave") == 2
+    });
+    me.hold();
+    me.caption("Ctrl-click takes a rank back. Nothing is spent until you confirm");
+    me.act_on_ui(InputAction::LowerRank, UiTarget::starting("Cleave node"));
+    me.wait_until("one Cleave rank taken back", |snapshot| {
+        planned_rank(snapshot, "cleave") == 1
+    });
     me.click_ui(UiTarget::starting("Guard node"));
     me.wait_until("two picks", |snapshot| planned(snapshot) == 2);
+    me.hold();
+    me.caption("Confirm spends the points for good");
     me.hold();
     me.click_ui(UiTarget::starting("Confirm"));
     me.wait_until("the ranks learned", |snapshot| {
@@ -54,7 +66,7 @@ fn play(shoot: &mut Shoot) {
     me.caption(
         "Right-click a node and its card is dealt from it; the node stays ringed in gold while the card is up",
     );
-    me.act_on_ui(InputAction::InspectItem, UiTarget::starting("Cleave node"));
+    me.act_on_ui(InputAction::InspectSkill, UiTarget::starting("Cleave node"));
     me.wait_until("Cleave's card", |snapshot| {
         snapshot
             .skill_card

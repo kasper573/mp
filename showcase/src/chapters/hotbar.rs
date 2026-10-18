@@ -95,7 +95,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.caption("Right-click a slot to rebind its key, or to clear it");
     me.act_on_ui(
-        InputAction::InspectItem,
+        InputAction::SlotOptions,
         UiTarget::starting("Hotbar slot 2"),
     );
     me.click_ui(UiTarget::button("Rebind key"));
@@ -113,7 +113,7 @@ fn play(shoot: &mut Shoot) {
     me.hover_ui(UiTarget::starting("Hotbar slot 2"));
     me.hold();
     me.act_on_ui(
-        InputAction::InspectItem,
+        InputAction::SlotOptions,
         UiTarget::starting("Hotbar slot 5"),
     );
     me.click_ui(UiTarget::button("Clear slot"));

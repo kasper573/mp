@@ -182,7 +182,7 @@ fn announce(world: &mut World, player: Entity, learned: &[(NodeKey, Rank)]) {
         };
         let skill = node.skill.get(&content);
         let text = if rank.is_first() {
-            format!("Learned {} · drag it to the hotbar", skill.name)
+            format!("Learned {}", skill.name)
         } else {
             format!("{} rank {}", skill.name, rank.0)
         };

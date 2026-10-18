@@ -1,0 +1,10 @@
+{
+  "label": "Open a hotbar slot's options",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Right",
+      "times": 1
+    }
+  ]
+}

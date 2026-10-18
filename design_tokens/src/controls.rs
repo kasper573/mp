@@ -366,6 +366,50 @@ pub fn focus_ring(painter: &Painter, rect: Rect, corner_radius: impl Into<Corner
     );
 }
 
+const PRIMED_HUM_HZ: f64 = 1.6;
+const PRIMED_TURNS_PER_SEC: f64 = 0.7;
+const PRIMED_STEPS: usize = 96;
+const PRIMED_TAIL: f32 = 0.32;
+
+/// A slot armed and waiting on its target: a green outline humming in and out, with two glows
+/// running round it.
+pub fn primed_ring(painter: &Painter, rect: Rect, time: f64) {
+    let ring = rect.expand(1.5);
+    let hum = 0.5 + 0.5 * (time * PRIMED_HUM_HZ * std::f64::consts::TAU).sin() as f32;
+    painter.rect_stroke(
+        ring,
+        3.0,
+        Stroke::new(1.0, ink::wash(ink::SPRING, 0.3 + 0.3 * hum)),
+        StrokeKind::Middle,
+    );
+    let turn = (time * PRIMED_TURNS_PER_SEC).fract() as f32;
+    let points = perimeter(ring, PRIMED_STEPS);
+    for (step, pair) in points.windows(2).enumerate() {
+        let along = step as f32 / PRIMED_STEPS as f32;
+        let glow: f32 = [turn, (turn + 0.5).fract()]
+            .iter()
+            .map(|head| {
+                let behind = (head - along).rem_euclid(1.0);
+                (1.0 - behind / PRIMED_TAIL).max(0.0).powi(2)
+            })
+            .sum::<f32>()
+            .min(1.0);
+        if glow <= 0.0 {
+            continue;
+        }
+        let segment = [pair[0], pair[1]];
+        let lift = 0.75 + 0.25 * hum;
+        painter.line_segment(
+            segment,
+            Stroke::new(4.0, ink::wash(ink::SPRING, 0.3 * glow * lift)),
+        );
+        painter.line_segment(
+            segment,
+            Stroke::new(2.0, ink::wash(ink::SPRING, glow * lift)),
+        );
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Look {
     Outline,
@@ -486,4 +530,25 @@ fn dashed_border(painter: &Painter, rect: Rect, color: Color32) {
     along(rect.left_top(), Vec2::Y, height, Vec2::X);
     along(rect.right_top() - Vec2::X, Vec2::Y, height, Vec2::X);
     painter.add(Shape::mesh(mesh));
+}
+
+/// `steps + 1` points evenly spaced round the rectangle's edge, clockwise from its top left corner,
+/// the last one back on the first.
+fn perimeter(rect: Rect, steps: usize) -> Vec<Pos2> {
+    let (width, height) = (rect.width(), rect.height());
+    let length = 2.0 * (width + height);
+    (0..=steps)
+        .map(|step| {
+            let reach = (step as f32 / steps as f32 * length) % length;
+            if reach < width {
+                Pos2::new(rect.min.x + reach, rect.min.y)
+            } else if reach < width + height {
+                Pos2::new(rect.max.x, rect.min.y + reach - width)
+            } else if reach < 2.0 * width + height {
+                Pos2::new(rect.max.x - (reach - width - height), rect.max.y)
+            } else {
+                Pos2::new(rect.min.x, rect.max.y - (reach - 2.0 * width - height))
+            }
+        })
+        .collect()
 }

@@ -1,0 +1,10 @@
+{
+  "label": "Show a skill's card",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Right",
+      "times": 1
+    }
+  ]
+}

@@ -18,7 +18,7 @@ fn the_shipped_folder_carries_the_version_of_this_build() {
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(registry().version().0, "862ea303");
+    assert_eq!(registry().version().0, "1311b0f0");
 }
 
 #[test]

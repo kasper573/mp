@@ -1,6 +1,6 @@
 use driver::{
-    Player, UiTarget, bare_spot, holding, id, learned, planned, reset_prompted, resident_home,
-    slot_skill, to_spend, tree_view,
+    Player, UiTarget, bare_spot, holding, id, learned, planned, planned_rank, reset_prompted,
+    resident_home, slot_skill, to_spend, tree_view,
 };
 use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
@@ -21,6 +21,14 @@ fn skills_are_learned_in_the_tree_pinned_on_the_bar_and_given_back_by_a_reset() 
     player.act(InputAction::ToggleSkills);
     player.find_ui("Skills");
     player.click_ui(UiTarget::starting("Cleave node"));
+    player.click_ui(UiTarget::starting("Cleave node"));
+    player.wait_until("Cleave picked twice", |snapshot| {
+        planned_rank(snapshot, "cleave") == 2
+    });
+    player.act_on_ui(InputAction::LowerRank, UiTarget::starting("Cleave node"));
+    player.wait_until("one Cleave rank taken back", |snapshot| {
+        planned_rank(snapshot, "cleave") == 1
+    });
     player.click_ui(UiTarget::starting("Guard node"));
     player.wait_until("two picks", |snapshot| planned(snapshot) == 2);
     player.click_ui(UiTarget::starting("Confirm"));

@@ -192,7 +192,7 @@ impl Afterimage {
 pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
     let gui = &response.ctx;
     let key = response.id.with("tooltip");
-    if !response.contains_pointer() || gui.dragged_id().is_some() {
+    if !response.contains_pointer() || gui.dragged_id().is_some() || egui::Popup::is_any_open(gui) {
         gui.data_mut(|data| data.remove::<Pointed>(key));
         return;
     }
@@ -216,6 +216,26 @@ pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
     if follows_another || now - since >= f64::from(delay) {
         egui::Tooltip::for_widget(response).show(add);
     }
+}
+
+/// A menu at the pointer, laid out as a right-click menu is, but opened whenever `open` says.
+pub fn pointer_menu<R>(
+    response: &egui::Response,
+    open: bool,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> Option<R> {
+    let command = if open {
+        Some(egui::SetOpenCommand::Bool(true))
+    } else if response.clicked() {
+        Some(egui::SetOpenCommand::Bool(false))
+    } else {
+        None
+    };
+    egui::Popup::menu(response)
+        .open_memory(command)
+        .at_pointer_fixed()
+        .show(add)
+        .map(|shown| shown.inner)
 }
 
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.

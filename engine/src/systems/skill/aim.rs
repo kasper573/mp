@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, ink, slip};
-use egui::{Rect, Stroke, Vec2};
+use design_tokens::ink;
+use egui::Stroke;
 
 use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};
@@ -169,24 +169,13 @@ impl Gesture for AimGesture {
         });
     }
 
-    fn cursor(&self, world: &mut World, claim: ClickClaim) -> Option<Cursor> {
-        let aimed = aiming(world)?;
-        let hostile = aimed
-            .skill
-            .get(world.resource::<Content>())
-            .target
-            .hostile();
-        Some(Cursor::Shaped(match claim {
-            ClickClaim::Aim(_) if hostile => CursorShape::Attack,
-            ClickClaim::Aim(_) => CursorShape::Use,
-            _ => CursorShape::Default,
-        }))
+    fn cursor(&self, world: &mut World, _claim: ClickClaim) -> Option<Cursor> {
+        aiming(world).map(|_| Cursor::Shaped(CursorShape::Target))
     }
 }
 
-/// The armed skill's range around the character and, for a skill aimed at one target, a line
-/// saying what a click does. The area itself lies on the ground, kept by `surface`, and says on
-/// its own what it takes.
+/// The armed skill's range around the character. The area itself lies on the ground, kept by
+/// `surface`, and says on its own what it takes.
 pub fn draw_aim(world: &mut World) {
     let Some(aimed) = aiming(world) else {
         return;
@@ -197,43 +186,26 @@ pub fn draw_aim(world: &mut World) {
     let Some(me) = session::me(world) else {
         return;
     };
-    let content = world.resource::<Content>().clone();
-    let def = aimed.skill.get(&content);
     let Some(from) = movement::position(world, me) else {
         return;
     };
     let range = super::range_of(world, me, aimed.skill, aimed.rank);
     let reach = Footprint::cast(Shape::Circle { radius: range }, from, from);
-    let ring: Option<Vec<egui::Pos2>> = reach
+    let Some(ring) = reach
         .outline()
         .iter()
         .map(|point| render::tile_to_window(world, *point).map(|at| egui::Pos2::new(at.x, at.y)))
-        .collect();
-    let hint = def
-        .target
-        .aimed_at_actor()
-        .then(|| format!("{}: click a target · Esc cancels", def.name));
+        .collect::<Option<Vec<_>>>()
+    else {
+        return;
+    };
     let screen = gui.content_rect();
     let area = gui::world_area(world, "aim preview");
     area.fixed_pos(screen.min).show(&gui, |ui| {
-        let painter = ui.painter();
-        if let Some(ring) = ring {
-            painter.add(egui::Shape::closed_line(
-                ring,
-                Stroke::new(1.0, ink::wash(ink::GOLD2, 0.45)),
-            ));
-        }
-        let Some(hint) = hint else {
-            return;
-        };
-        let at = gui
-            .pointer_latest_pos()
-            .map_or(screen.center(), |at| at + Vec2::new(16.0, 18.0));
-        let galley = painter.layout_no_wrap(hint, TextRole::Tooltip.font_id(), ink::INK);
-        let padding = Vec2::new(slip::PADDING.left.into(), slip::PADDING.top.into());
-        let rect = Rect::from_min_size(at, galley.size() + 2.0 * padding);
-        slip::paint(painter, rect);
-        painter.galley(rect.min + padding, galley, ink::INK);
+        ui.painter().add(egui::Shape::closed_line(
+            ring,
+            Stroke::new(1.0, ink::wash(ink::GOLD2, 0.45)),
+        ));
     });
 }
 

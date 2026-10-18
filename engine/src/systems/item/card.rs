@@ -272,7 +272,8 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
             skill::bar::pin(world, skill::HotbarEntry::Skill(granted));
         }
         let hint = StyledLine::new(vec![
-            TextPiece::text("Drag it to a slot · "),
+            input(InputAction::CarryItem),
+            TextPiece::text(" carries it to a slot · "),
             input(InputAction::PinToHotbar),
             TextPiece::text(" puts it on the hotbar"),
         ]);
@@ -286,7 +287,7 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
     if granted.iter().any(|skill| skill.get(&content).basic_attack) {
         card::foot(
             ui,
-            "Dropping the item on the basic attack slot picks its first basic attack",
+            "On the basic attack slot, it lends its first basic attack",
         );
     }
 }

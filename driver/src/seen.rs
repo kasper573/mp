@@ -352,6 +352,15 @@ pub fn planned(snapshot: &ProbeSnapshot) -> usize {
         .map_or(0, |skills| skills.planned.len())
 }
 
+/// The rank a node is picked up to in the open tree, or 0 when it is not picked.
+pub fn planned_rank(snapshot: &ProbeSnapshot, key: &str) -> u8 {
+    snapshot
+        .skills
+        .as_ref()
+        .and_then(|skills| skills.planned.iter().find(|(node, _)| node == key))
+        .map_or(0, |(_, rank)| rank.0)
+}
+
 pub fn to_spend(snapshot: &ProbeSnapshot) -> u32 {
     snapshot.skills.as_ref().map_or(0, |skills| skills.to_spend)
 }

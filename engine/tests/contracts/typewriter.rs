@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use engine::core::text::{
-    InputRef, StyledSpan, TextPiece, TypewriterSpeed, reveal_duration, revealed,
+    InputRef, KeyCap, StyledSpan, TextPiece, TypewriterSpeed, reveal_duration, revealed,
 };
 
 const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
@@ -39,7 +39,7 @@ fn instant_speed_shows_everything_at_once() {
 
 #[test]
 fn a_key_reveals_as_one_letter() {
-    let line = [span("ab"), TextPiece::Key(InputRef(0))];
+    let line = [span("ab"), TextPiece::Key(KeyCap::Input(InputRef(0)))];
     assert_eq!(revealed(&line, TEN_PER_SECOND, ms(300)), 3);
 }
 

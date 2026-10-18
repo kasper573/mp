@@ -69,7 +69,7 @@ fn the_hotbar_fires_refuses_aims_quick_casts_and_takes_items() {
     });
 
     player.act_on_ui(
-        InputAction::InspectItem,
+        InputAction::SlotOptions,
         UiTarget::starting("Hotbar slot 2"),
     );
     player.click_ui(UiTarget::button("Rebind key"));
@@ -83,7 +83,7 @@ fn the_hotbar_fires_refuses_aims_quick_casts_and_takes_items() {
             .is_some_and(|slot| slot.key.as_deref() == Some("Q"))
     });
     player.act_on_ui(
-        InputAction::InspectItem,
+        InputAction::SlotOptions,
         UiTarget::starting("Hotbar slot 5"),
     );
     player.click_ui(UiTarget::button("Clear slot"));

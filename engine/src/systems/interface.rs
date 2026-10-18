@@ -40,6 +40,7 @@ pub enum CursorShape {
     Use,
     Open,
     Read,
+    Target,
 }
 
 impl Fixture for CursorShape {

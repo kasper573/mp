@@ -86,7 +86,7 @@ impl Default for TreeView {
     }
 }
 
-/// The ranks picked in the window and not yet confirmed, one rank per node.
+/// The rank each node is picked up to in the window, not yet confirmed.
 #[derive(Resource, Default, Clone, Debug, PartialEq)]
 pub struct Plan(pub BTreeMap<NodeKey, Rank>);
 
@@ -226,13 +226,17 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
         }
     } else if map::clicked(world, InputAction::PinToHotbar, &response) && !passive {
         bar::pin(world, super::HotbarEntry::Skill(skill));
-    } else if response.secondary_clicked() {
+    } else if map::clicked(world, InputAction::InspectSkill, &response) {
         card::open(world, skill, Some(response.rect));
     }
     let hint = StyledLine::new(vec![
         TextPiece::text("Known while the gear is worn · "),
+        input(InputAction::InspectSkill),
+        TextPiece::text(" shows its card · "),
         input(InputAction::PinToHotbar),
-        TextPiece::text(" puts it on the hotbar · drag it to a slot"),
+        TextPiece::text(" puts it on the hotbar · "),
+        input(InputAction::CarryItem),
+        TextPiece::text(" carries it to a slot"),
     ]);
     card::tooltip(&response, world, &card::of(world, skill), Some(&hint));
 }
@@ -411,68 +415,92 @@ fn node_input(
         } else {
             InterfaceSound::UiRefuse.play(world);
         }
-    } else if response.secondary_clicked() {
+    } else if map::clicked(world, InputAction::LowerRank, response) {
+        lower(world, sheet, key);
+    } else if map::clicked(world, InputAction::InspectSkill, response) {
         card::open(world, skill, Some(response.rect));
-    } else if response.clicked() {
-        pick(world, sheet, key, state);
+    } else if map::clicked(world, InputAction::RaiseRank, response) {
+        raise(world, sheet, key, state);
     }
     let hint = StyledLine::new(vec![
-        TextPiece::text("Click to pick a rank · right-click for the card · "),
+        input(InputAction::RaiseRank),
+        TextPiece::text(" picks a rank · "),
+        input(InputAction::LowerRank),
+        TextPiece::text(" takes one back · "),
+        input(InputAction::InspectSkill),
+        TextPiece::text(" shows its card · "),
         input(InputAction::PinToHotbar),
-        TextPiece::text(" puts it on the hotbar · drag it to a slot"),
+        TextPiece::text(" puts it on the hotbar · "),
+        input(InputAction::CarryItem),
+        TextPiece::text(" carries it to a slot"),
     ]);
     card::tooltip(response, world, &card::of(world, skill), Some(&hint));
 }
 
-fn pick(world: &mut World, sheet: &Sheet, key: &NodeKey, state: NodeState) {
+/// One more rank of the node joins the plan, while the skill has ranks left and the points
+/// picked so far leave room for it.
+fn raise(world: &mut World, sheet: &Sheet, key: &NodeKey, state: NodeState) {
+    if matches!(state, NodeState::Locked | NodeState::Maxed) {
+        InterfaceSound::UiRefuse.play(world);
+        return;
+    }
     let content = world.resource::<Content>().clone();
     let def = sheet.class.get(&content);
-    match state {
-        NodeState::Picked(_) => {
-            let mut plan = world.resource::<Plan>().clone();
-            plan.0.remove(key);
-            loop {
-                let planned = sheet.planned_ranks(&plan);
-                let orphan =
-                    plan.0
-                        .keys()
-                        .find(|picked| {
-                            def.tree.node(*picked).is_some_and(|node| {
-                                !node.requires.iter().all(|requirement| {
-                                    requirement.met(world, sheet.me, def, &planned)
-                                })
-                            })
-                        })
-                        .cloned();
-                match orphan {
-                    Some(orphan) => {
-                        plan.0.remove(&orphan);
-                    }
-                    None => break,
-                }
-            }
-            *world.resource_mut::<Plan>() = plan;
-            InterfaceSound::UiMove.play(world);
-        }
-        NodeState::Available | NodeState::Learned => {
-            let Some(node) = def.tree.node(key) else {
-                return;
-            };
-            let held = sheet.learned.rank(key);
-            let next = Rank(held.0 + 1);
-            let skill = node.skill.get(&content);
-            let cost = SkillPoints(skill.cost_to(next).0 - skill.cost_to(held).0);
-            let plan = world.resource::<Plan>().clone();
-            let picked = sheet.picked_cost(&content, def, &plan);
-            if picked.0 + cost.0 > sheet.to_spend.0 {
-                InterfaceSound::UiRefuse.play(world);
-                return;
-            }
-            world.resource_mut::<Plan>().0.insert(key.clone(), next);
-            InterfaceSound::UiPick.play(world);
-        }
-        NodeState::Locked | NodeState::Maxed => InterfaceSound::UiRefuse.play(world),
+    let Some(node) = def.tree.node(key) else {
+        return;
+    };
+    let skill = node.skill.get(&content);
+    let plan = world.resource::<Plan>().clone();
+    let current = plan.0.get(key).copied().unwrap_or(sheet.learned.rank(key));
+    let next = Rank(current.0 + 1);
+    let cost = SkillPoints(skill.cost_to(next).0 - skill.cost_to(current).0);
+    let picked = sheet.picked_cost(&content, def, &plan);
+    if current.0 >= skill.rank_count() || picked.0 + cost.0 > sheet.to_spend.0 {
+        InterfaceSound::UiRefuse.play(world);
+        return;
     }
+    world.resource_mut::<Plan>().0.insert(key.clone(), next);
+    InterfaceSound::UiPick.play(world);
+}
+
+/// The last rank picked on the node leaves the plan, and with it every pick that stood on it.
+fn lower(world: &mut World, sheet: &Sheet, key: &NodeKey) {
+    let mut plan = world.resource::<Plan>().clone();
+    let Some(current) = plan.0.get(key).copied() else {
+        InterfaceSound::UiRefuse.play(world);
+        return;
+    };
+    let back = Rank(current.0 - 1);
+    if back > sheet.learned.rank(key) {
+        plan.0.insert(key.clone(), back);
+    } else {
+        plan.0.remove(key);
+    }
+    let content = world.resource::<Content>().clone();
+    let def = sheet.class.get(&content);
+    loop {
+        let planned = sheet.planned_ranks(&plan);
+        let orphan = plan
+            .0
+            .keys()
+            .find(|picked| {
+                def.tree.node(*picked).is_some_and(|node| {
+                    !node
+                        .requires
+                        .iter()
+                        .all(|requirement| requirement.met(world, sheet.me, def, &planned))
+                })
+            })
+            .cloned();
+        match orphan {
+            Some(orphan) => {
+                plan.0.remove(&orphan);
+            }
+            None => break,
+        }
+    }
+    *world.resource_mut::<Plan>() = plan;
+    InterfaceSound::UiMove.play(world);
 }
 
 fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {

@@ -21,7 +21,23 @@ pub struct StyledLine {
 pub enum TextPiece {
     Span(StyledSpan),
     Pause(Duration),
-    Key(InputRef),
+    Key(KeyCap),
+}
+
+/// A key drawn as a cap: an input named by its current binding, or a key named outright.
+#[derive(Clone, Debug, PartialEq)]
+pub enum KeyCap {
+    Input(InputRef),
+    Named(Cow<'static, str>),
+}
+
+impl KeyCap {
+    pub fn name<'a>(&'a self, keys: &'a KeyNames) -> &'a str {
+        match self {
+            KeyCap::Input(input) => keys.name(*input),
+            KeyCap::Named(name) => name,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -121,7 +137,7 @@ impl StyledLine {
             .filter_map(|piece| match piece {
                 TextPiece::Span(span) => Some(span.text.as_ref()),
                 TextPiece::Pause(_) => None,
-                TextPiece::Key(input) => Some(keys.name(*input)),
+                TextPiece::Key(cap) => Some(cap.name(keys)),
             })
             .collect()
     }
@@ -130,6 +146,10 @@ impl StyledLine {
 impl TextPiece {
     pub fn text(text: impl Into<Cow<'static, str>>) -> TextPiece {
         TextPiece::Span(StyledSpan::plain(text))
+    }
+
+    pub fn key(name: impl Into<Cow<'static, str>>) -> TextPiece {
+        TextPiece::Key(KeyCap::Named(name.into()))
     }
 }
 
