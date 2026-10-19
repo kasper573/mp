@@ -3321,6 +3321,7 @@ dependencies = [
  "ab_glyph",
  "egui",
  "image",
+ "strum",
 ]
 
 [[package]]

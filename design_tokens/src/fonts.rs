@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use egui::{FontData, FontDefinitions, FontTweak};
+use strum::VariantArray;
 
 use crate::face::Face;
 
@@ -8,7 +9,7 @@ use crate::face::Face;
 /// is not drawn as text at all.
 pub(crate) fn definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::empty();
-    for face in Face::ALL {
+    for &face in Face::VARIANTS {
         let data = FontData::from_static(bytes(face)).tweak(tweak(face));
         fonts
             .font_data

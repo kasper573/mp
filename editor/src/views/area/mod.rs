@@ -39,6 +39,7 @@ use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
 use serde_json::Value;
+use strum::{AsRefStr, VariantArray};
 
 use self::overlays::{
     AreaLabels, overlay_blueprint_ghost, overlay_grid, overlay_modules, overlay_populations,
@@ -103,7 +104,7 @@ pub enum AreaAction {
     AdoptBlocks(usize),
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, VariantArray, AsRefStr)]
 pub enum AreaTool {
     #[default]
     Select,
@@ -117,17 +118,6 @@ pub enum AreaTool {
 }
 
 impl AreaTool {
-    pub const ALL: [AreaTool; 8] = [
-        AreaTool::Select,
-        AreaTool::Paint,
-        AreaTool::Terrain,
-        AreaTool::Fill,
-        AreaTool::Erase,
-        AreaTool::Eyedropper,
-        AreaTool::Stamp,
-        AreaTool::Module,
-    ];
-
     pub fn key(self) -> EditorKey {
         match self {
             AreaTool::Select => EditorKey::SelectTool,
@@ -148,19 +138,6 @@ impl AreaTool {
             }
             AreaTool::Stamp => Some(BottomTab::Blueprints),
             _ => None,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            AreaTool::Select => "Select",
-            AreaTool::Paint => "Paint",
-            AreaTool::Terrain => "Terrain",
-            AreaTool::Fill => "Fill",
-            AreaTool::Erase => "Erase",
-            AreaTool::Eyedropper => "Eyedropper",
-            AreaTool::Stamp => "Stamp",
-            AreaTool::Module => "Module",
         }
     }
 }

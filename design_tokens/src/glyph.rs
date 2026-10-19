@@ -2,11 +2,12 @@ use egui::{
     Align2, Color32, ColorImage, FontId, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
     TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
 };
+use strum::VariantArray;
 
 use crate::face::TextRole;
 use crate::ink;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray)]
 pub enum Kind {
     Equipment,
     Usable,
@@ -17,15 +18,6 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub const ALL: [Kind; 6] = [
-        Kind::Equipment,
-        Kind::Usable,
-        Kind::Resource,
-        Kind::Quest,
-        Kind::Active,
-        Kind::Passive,
-    ];
-
     pub fn word(self) -> &'static str {
         match self {
             Kind::Equipment => "equipment",

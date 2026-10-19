@@ -8,6 +8,7 @@ use bevy_egui::{
 };
 use egui::load::SizedTexture;
 use egui::{LayerId, Order};
+use strum::VariantArray;
 
 use crate::core::assets::ImageRef;
 use crate::core::content::asset_of;
@@ -42,7 +43,7 @@ impl Band {
 /// The background stacks in tiers over what floats over the world: whatever a tier holds lies over
 /// everything in the tiers before it, however recently either was drawn or clicked. egui would
 /// otherwise stack the background by whichever layer it saw first.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray)]
 pub enum Tier {
     Back,
     Mid,
@@ -51,8 +52,6 @@ pub enum Tier {
 }
 
 impl Tier {
-    const ALL: [Tier; 4] = [Tier::Back, Tier::Mid, Tier::Front, Tier::Top];
-
     fn anchor(self) -> LayerId {
         LayerId::new(Order::Background, egui::Id::new(("tier", self)))
     }
@@ -364,7 +363,7 @@ fn raise_tiers(gui: Option<Res<GuiContext>>) {
     let Some(gui) = gui else {
         return;
     };
-    for tier in Tier::ALL {
+    for &tier in Tier::VARIANTS {
         gui.0.move_to_top(tier.anchor());
     }
 }

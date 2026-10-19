@@ -5,6 +5,7 @@ use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::render::ACTOR_ANCHOR;
 use serde_json::Value;
+use strum::VariantArray;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
@@ -19,7 +20,7 @@ const INSET: Vec2 = Vec2::new(400.0, 300.0);
 const MIN: f32 = 0.1;
 const MAX: f32 = 8.0;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, VariantArray)]
 pub enum HitboxHandle {
     N,
     S,
@@ -32,17 +33,6 @@ pub enum HitboxHandle {
 }
 
 impl HitboxHandle {
-    const ALL: [HitboxHandle; 8] = [
-        HitboxHandle::N,
-        HitboxHandle::S,
-        HitboxHandle::E,
-        HitboxHandle::W,
-        HitboxHandle::Ne,
-        HitboxHandle::Nw,
-        HitboxHandle::Se,
-        HitboxHandle::Sw,
-    ];
-
     fn horizontal(self) -> bool {
         !matches!(self, HitboxHandle::N | HitboxHandle::S)
     }
@@ -142,7 +132,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             );
             let hover = response.hover_pos();
             let mut hovered_handle = None;
-            for handle in HitboxHandle::ALL {
+            for &handle in HitboxHandle::VARIANTS {
                 let at = handle.at(hitbox);
                 let near = hover.is_some_and(|pos| (pos - at).length() <= 8.0);
                 if near {

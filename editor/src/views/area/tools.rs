@@ -3,6 +3,7 @@ use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area::{AreaDef, AreaModuleKind};
+use strum::VariantArray;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
 use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
@@ -25,7 +26,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let view = editor.views.area.view_mut(view_key);
     let mut switched = None;
     ui.add_space(6.0);
-    for tool in AreaTool::ALL {
+    for &tool in AreaTool::VARIANTS {
         let selected = view.tool == tool;
         let (rect, response) = ui.allocate_exact_size(Vec2::new(32.0, 34.0), egui::Sense::click());
         let painter = ui.painter();
@@ -54,7 +55,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
             theme::MUTED,
         );
         if response
-            .on_hover_text(format!("{} ({})", tool.label(), tool.key().name()))
+            .on_hover_text(format!("{} ({})", tool.as_ref(), tool.key().name()))
             .clicked()
         {
             view.set_tool(tool);
@@ -396,7 +397,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     let mut switched = None;
     {
         let view = editor.views.area.view_mut(view_key);
-        for tool in AreaTool::ALL {
+        for &tool in AreaTool::VARIANTS {
             if pressed(tool.key()) {
                 view.set_tool(tool);
                 switched = tool.bottom_tab();
