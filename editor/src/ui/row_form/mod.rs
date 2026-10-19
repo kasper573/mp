@@ -628,12 +628,9 @@ pub(super) fn add_module_popup(
                 }
                 offered += 1;
                 let template = schema::variant_template(cx.root, variant);
-                let rule = registry.module_rule(table, &template);
-                let present = list
-                    .iter()
-                    .any(|module| module.kind() == variant.tag.as_str());
-                let at_most_one = rule == Some(ModuleRule::AtMostOne);
-                let blocked = present && at_most_one;
+                let at_most_one =
+                    registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne);
+                let blocked = !registry.takes_module(table, list, &template);
                 if blocked {
                     blocked_count += 1;
                 }

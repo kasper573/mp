@@ -125,6 +125,18 @@ impl ContentRegistry {
             .and_then(|(_, probe)| probe(json))
     }
 
+    /// Whether a row of `table` holding `modules` may take `module` as well: not when it holds
+    /// at most one of that kind and has one already.
+    pub fn takes_module(
+        &self,
+        table: &str,
+        modules: &[serde_json::Value],
+        module: &serde_json::Value,
+    ) -> bool {
+        let held = modules.iter().any(|known| known["type"] == module["type"]);
+        !held || self.module_rule(table, module) != Some(ModuleRule::AtMostOne)
+    }
+
     pub fn list_kind(
         &mut self,
         field: &'static str,

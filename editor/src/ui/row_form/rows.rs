@@ -241,12 +241,8 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
         let tag = template.kind_or("module").to_owned();
         let mut skipped: Vec<String> = Vec::new();
         for (key, value) in &values {
-            let present = value["modules"]
-                .as_array()
-                .is_some_and(|list| list.iter().any(|m| m["type"] == template["type"]));
-            let blocked =
-                present && registry.module_rule(&table, &template) == Some(ModuleRule::AtMostOne);
-            if blocked {
+            let modules = value["modules"].as_array().map_or(&[][..], Vec::as_slice);
+            if !registry.takes_module(&table, modules, &template) {
                 skipped.push(key.clone());
                 continue;
             }
@@ -393,9 +389,7 @@ pub(super) fn free_singles(
         .filter(|variant| {
             let template = schema::variant_template(cx.root, variant);
             registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne)
-                && !list
-                    .iter()
-                    .any(|module| module.kind() == variant.tag.as_str())
+                && registry.takes_module(table, &list, &template)
         })
         .map(|variant| variant.tag.replace('_', " "))
         .collect()
