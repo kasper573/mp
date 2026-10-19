@@ -5,7 +5,7 @@ use egui::{RichText, Ui};
 use engine::core::script::{NodeKind, OwnerKindDef, ScriptModuleKind, VariableType};
 use engine::systems::area::blueprint::holes;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::script::OwnerKind;
+use engine::systems::script::{OwnerKind, RiftEffectKind};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
@@ -227,7 +227,8 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
                 widgets::kv_text(ui, "locals", names_of(&script["locals"]));
                 let returns = doc.nodes().values().any(|node| {
-                    node.kind() == "return" && node.get("value").is_some_and(|v| !v.is_null())
+                    nodes::kind_of(node) == NodeKind::Return
+                        && node.get("value").is_some_and(|v| !v.is_null())
                 });
                 widgets::kv_text(ui, "returns", if returns { "a value" } else { "nothing" });
                 widgets::kv_text(ui, "nodes", nodes_line(doc));
@@ -994,8 +995,9 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
         ins,
         blurb,
     } = shown;
-    match kind {
-        "remember" | "forget" => {
+    match (nodes::kind_of(node), kind.parse()) {
+        (NodeKind::Repeat, _) => bounds_card(editor, ui, doc, name, node),
+        (NodeKind::Effect, Ok(RiftEffectKind::Remember | RiftEffectKind::Forget)) => {
             let memory = node["memory"]
                 .as_str()
                 .map(str::to_owned)
@@ -1005,7 +1007,6 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
             }
             keeps_cards(ui, doc);
         }
-        "repeat" => bounds_card(editor, ui, doc, name, node),
         _ => {
             if !blurb.is_empty() {
                 widgets::hint(ui, blurb);
@@ -1110,7 +1111,7 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, no
     let waits: Vec<f64> = body
         .iter()
         .filter_map(|n| doc.nodes().get(n))
-        .filter(|n| n.kind() == "wait")
+        .filter(|n| nodes::kind_of(n) == NodeKind::Wait)
         .map(|n| {
             n["at_most"]
                 .as_f64()
@@ -1187,7 +1188,7 @@ fn dialogue_form(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let Some(schema) = nodes::variant_schema(root, "dialogue") else {
+    let Some(schema) = nodes::variant_schema(root, NodeKind::Dialogue.name()) else {
         return changed;
     };
     let line_schema = schema
@@ -1534,7 +1535,7 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &st
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let choice_schema = nodes::variant_schema(root, "dialogue")
+    let choice_schema = nodes::variant_schema(root, NodeKind::Dialogue.name())
         .and_then(|schema| schema.pointer("/properties/choices/items").cloned())
         .unwrap_or(Value::Null);
     let mut draft = node.clone();

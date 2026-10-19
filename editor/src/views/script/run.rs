@@ -48,7 +48,7 @@ use crate::app::Editor;
 use crate::project::{ProjectFiles, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::value::{self, RowValue};
+use crate::value;
 use engine::core::content::{row_file, row_of};
 
 const CLIENT: u32 = 1;
@@ -69,7 +69,7 @@ pub struct RunSetup {
 impl Default for RunSetup {
     fn default() -> RunSetup {
         RunSetup {
-            event: "interacted".to_owned(),
+            event: EventKind::Interacted.name().to_owned(),
             owner: 0,
             character: None,
             hour: 12.0,
@@ -148,7 +148,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let randoms: Vec<(String, usize)> = doc
         .nodes()
         .iter()
-        .filter(|(_, node)| node.kind() == "random")
+        .filter(|(_, node)| nodes::kind_of(node) == NodeKind::Random)
         .map(|(name, node)| (name.clone(), node["weights"].as_array().map_or(0, Vec::len)))
         .collect();
     let characters: Vec<(String, String)> = editor

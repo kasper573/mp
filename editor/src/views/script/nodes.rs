@@ -534,7 +534,7 @@ pub fn template(root: &Value, kind: &str) -> Option<Value> {
 fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
     let kind: NodeKind = variant.tag.parse().unwrap_or(NodeKind::Effect);
     if kind == NodeKind::On {
-        return template_event(root, EventKind::Started.into());
+        return template_event(root, EventKind::Started.name());
     }
     let mut value = schema::variant_template(root, variant);
     match kind {

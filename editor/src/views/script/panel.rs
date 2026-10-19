@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
 use engine::core::content::Content;
-use engine::core::script::MayDo;
+use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::item::ItemDef;
@@ -21,7 +21,6 @@ use crate::condition;
 use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 use engine::core::content::{row_file, row_of};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
@@ -524,7 +523,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let seconds: Vec<String> = nodes
         .values()
-        .filter(|node| node.kind() == "wait")
+        .filter(|node| nodes::kind_of(node) == NodeKind::Wait)
         .filter_map(|node| node["seconds"].as_f64())
         .map(|s| format!("{} s", s))
         .collect();
