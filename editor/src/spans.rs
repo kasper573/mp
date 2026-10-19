@@ -396,7 +396,7 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
                     .unwrap_or("")
                     .to_owned();
                 let mut picked = current.clone();
-                widgets::combo_box(ui.id().with(path).with(field))
+                widgets::combo(ui.id().with(path).with(field))
                     .selected_text(if current.is_empty() {
                         field.to_owned()
                     } else {

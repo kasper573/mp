@@ -514,7 +514,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 }
                 let current = dialog.mapping.get(tag).cloned().flatten();
                 let mut picked: Option<Option<String>> = None;
-                widgets::combo_box(("import-strip", tag))
+                widgets::combo(("import-strip", tag))
                     .width(150.0)
                     .selected_text(
                         current
@@ -560,7 +560,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label(theme::muted("every model needs this strip"));
                     });
                     let mut picked = None;
-                    widgets::combo_box(("import-pick-tag", &name))
+                    widgets::combo(("import-pick-tag", &name))
                         .width(120.0)
                         .selected_text("pick a tag")
                         .show_ui(ui, |ui| {
@@ -1329,7 +1329,7 @@ fn place_cue(ui: &mut Ui, strip: &str, cue: &mut CueMove, count: usize, width: f
             Some(CuePlacement::Remove) => "remove the cue".to_owned(),
             None => format!("frame {}", cue.offered(count) + 1),
         };
-        widgets::combo_box(("import-place", strip, cue.from, cue.cue.label()))
+        widgets::combo(("import-place", strip, cue.from, cue.cue.label()))
             .width(ui.available_width().min(width))
             .selected_text(theme::mono(shown).color(if cue.choice.is_some() {
                 theme::TEXT
@@ -1366,7 +1366,7 @@ fn keep_lengths(ui: &mut Ui, strip: &str, retimed: &mut StripRetiming, width: f3
     ui.horizontal(|ui| {
         ui.label(theme::muted("keep"));
         let mut picked = None;
-        widgets::combo_box(("import-keep", strip))
+        widgets::combo(("import-keep", strip))
             .width(ui.available_width().min(width))
             .selected_text(theme::mono(if retimed.keep_here {
                 "the lengths set here"

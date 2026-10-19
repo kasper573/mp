@@ -227,7 +227,7 @@ fn backdrop_bar(
                 picker::asset_of(ui, cx, AssetKind::Image, &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
-                widgets::combo_box(ui.id().with("backdrop-fit"))
+                widgets::combo(ui.id().with("backdrop-fit"))
                     .selected_text(<&str>::from(fit))
                     .show_ui(ui, |ui| {
                         for &option in BackdropFit::VARIANTS {

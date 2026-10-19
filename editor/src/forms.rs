@@ -689,7 +689,7 @@ fn variant_picker(
         .map(|variant| variant.field.clone())
         .unwrap_or_else(|| "type".to_owned());
     let mut picked = current.clone();
-    widgets::combo_box(ui.id().with(path).with("variant"))
+    widgets::combo(ui.id().with(path).with("variant"))
         .selected_text(
             current
                 .as_deref()
@@ -870,7 +870,7 @@ fn choice(
         .position(|alternative| schema::fits(cx.root, alternative, value));
     let mut picked = current;
     if alternatives.len() > 1 {
-        widgets::combo_box(ui.id().with(path).with("choice"))
+        widgets::combo(ui.id().with(path).with("choice"))
             .selected_text(current.map(|at| names[at].as_str()).unwrap_or("pick…"))
             .show_ui(ui, |ui| {
                 for (at, name) in names.iter().enumerate() {
@@ -1418,7 +1418,7 @@ fn boolean(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) -> FormChange {
     let current = value.as_str().unwrap_or_default().to_owned();
     let mut picked = current.clone();
-    widgets::combo_box(ui.id().with(path).with("enum"))
+    widgets::combo(ui.id().with(path).with("enum"))
         .selected_text(schema::title(&current))
         .show_ui(ui, |ui| {
             for option in options {

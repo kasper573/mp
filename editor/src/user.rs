@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
+use engine::core::time::UnixMillis;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -98,7 +99,7 @@ impl UserFolder {
 #[serde(default)]
 pub struct EditorSettings {
     pub recent: Vec<PathBuf>,
-    pub recent_at: BTreeMap<String, u64>,
+    pub recent_at: BTreeMap<String, UnixMillis>,
     pub binaries: Option<PathBuf>,
     pub brush: BrushSettings,
     pub stamps: BTreeMap<String, StampSettings>,
@@ -168,8 +169,8 @@ impl EditorSettings {
         self.recent.retain(|known| known != folder);
         self.recent.insert(0, folder.to_path_buf());
         self.recent.truncate(12);
-        let now = unix_seconds();
-        self.recent_at.insert(folder.display().to_string(), now);
+        self.recent_at
+            .insert(folder.display().to_string(), SystemTime::now().into());
         self.recent_at.retain(|path, _| {
             self.recent
                 .iter()
@@ -186,13 +187,6 @@ impl EditorSettings {
         let Some(at) = self.recent_at.get(&folder.display().to_string()) else {
             return String::new();
         };
-        widgets::ago(unix_seconds().saturating_sub(*at))
+        widgets::ago(UnixMillis::from(SystemTime::now()).since(*at))
     }
-}
-
-pub fn unix_seconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
 }

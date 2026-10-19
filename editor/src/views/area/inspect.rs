@@ -250,7 +250,7 @@ fn terrain_card(
                 .set
                 .clone()
                 .unwrap_or_else(|| "pick a set".to_owned());
-            widgets::combo_box((view_key, "terrain-set"))
+            widgets::combo((view_key, "terrain-set"))
                 .selected_text(theme::mono(current))
                 .width(ui.available_width())
                 .show_ui(ui, |ui| {
@@ -522,7 +522,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 None => format!("footprint · {} × {}", footprint.0, footprint.1),
                 Some(n) => format!("{n} tiles"),
             };
-            widgets::combo_box((view_key, "spacing"))
+            widgets::combo((view_key, "spacing"))
                 .selected_text(theme::mono(label))
                 .width(ui.available_width())
                 .show_ui(ui, |ui| {
@@ -1215,7 +1215,7 @@ fn brush_size_field(ui: &mut Ui, brush: &mut BrushSettings, square: bool) -> boo
 
 fn layer_combo(ui: &mut Ui, view: &mut AreaViewState, layers: &[String], salt: (&str, &str)) {
     let current = layers.get(view.layer).cloned().unwrap_or_default();
-    widgets::combo_box(salt)
+    widgets::combo(salt)
         .selected_text(theme::mono(current))
         .width(ui.available_width())
         .show_ui(ui, |ui| {

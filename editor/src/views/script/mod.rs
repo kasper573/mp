@@ -1549,7 +1549,7 @@ pub fn link_node_dialog(
         widgets::default_focus(ui, &response);
         let needle = dialog.search.to_lowercase();
         if ports.len() > 1 {
-            widgets::combo_box("link-port")
+            widgets::combo("link-port")
                 .selected_text(
                     ports
                         .get(dialog.port)

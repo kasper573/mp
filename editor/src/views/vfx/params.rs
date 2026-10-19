@@ -179,7 +179,7 @@ pub fn param_fill(
                 Some(ParamFill::Param { param }) => format!("◇ {param}"),
                 _ => "value".to_owned(),
             };
-            widgets::combo_box(ui.id().with(path).with("source"))
+            widgets::combo(ui.id().with(path).with("source"))
                 .width(SOURCE_WIDTH)
                 .selected_text(theme::mono(source).size(12.5))
                 .show_ui(ui, |ui| {
@@ -241,7 +241,7 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
                     ui.set_width(120.0);
                     changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
                 });
-                widgets::combo_box(("param-kind", index))
+                widgets::combo(("param-kind", index))
                     .width(90.0)
                     .selected_text(theme::mono(&kind).size(13.0))
                     .show_ui(ui, |ui| {

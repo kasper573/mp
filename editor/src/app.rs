@@ -3,7 +3,7 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -31,7 +31,7 @@ use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
-use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
+use crate::user::{BrushSettings, EditorSettings, UserFolder};
 use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
 use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
@@ -813,7 +813,7 @@ impl Editor {
             build: version::build().to_owned(),
             content_version: content_version().to_owned(),
             folder: project.root.clone(),
-            written: unix_seconds(),
+            written: SystemTime::now().into(),
             files: unsaved
                 .iter()
                 .map(|path| {

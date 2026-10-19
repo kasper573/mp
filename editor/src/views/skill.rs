@@ -159,7 +159,7 @@ fn rank_card(
             .collect();
         if !missing.is_empty() {
             let mut picked: Option<SkillStat> = None;
-            widgets::combo_box(("add-skill-stat", index))
+            widgets::combo(("add-skill-stat", index))
                 .selected_text(theme::muted("+ stat"))
                 .width(INPUT)
                 .show_ui(ui, |ui| {

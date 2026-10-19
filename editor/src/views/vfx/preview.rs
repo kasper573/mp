@@ -107,7 +107,7 @@ pub fn preview(
     });
     ui.horizontal_wrapped(|ui| match &mut views.target {
         VfxTarget::Actor { model, action } => {
-            widgets::combo_box("preview-model")
+            widgets::combo("preview-model")
                 .width(160.0)
                 .selected_text(theme::mono(model.as_str()).size(13.0))
                 .show_ui(ui, |ui| {
@@ -282,7 +282,7 @@ impl VfxTarget {
 }
 
 fn action_combo(ui: &mut Ui, action: &mut Action) {
-    widgets::combo_box("preview-action")
+    widgets::combo("preview-action")
         .width(90.0)
         .selected_text(theme::mono(action.as_ref()).size(13.0))
         .show_ui(ui, |ui| {
@@ -309,7 +309,7 @@ fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
         Shape::Line { .. } => "line",
     };
     let mut picked = current;
-    widgets::combo_box("preview-shape")
+    widgets::combo("preview-shape")
         .width(80.0)
         .selected_text(theme::mono(current).size(13.0))
         .show_ui(ui, |ui| {

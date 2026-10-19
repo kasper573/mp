@@ -701,7 +701,7 @@ fn banners(
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Eye, 13.0, theme::MUTED);
             ui.label(theme::mono("preview ground:").size(13.0).color(theme::TEXT));
-            widgets::combo_box((view_key, "preview-ground"))
+            widgets::combo((view_key, "preview-ground"))
                 .selected_text(theme::mono(&picked).size(13.0))
                 .show_ui(ui, |ui| {
                     for area in &areas {

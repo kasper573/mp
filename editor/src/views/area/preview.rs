@@ -57,7 +57,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         .collect();
     areas.sort();
     widgets::section(ui, "Pick a place");
-    widgets::combo_box("pick-area")
+    widgets::combo("pick-area")
         .width(ui.available_width())
         .selected_text(theme::mono(
             area_key

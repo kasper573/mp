@@ -852,7 +852,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
                 "{} lines ask for it. They take another face instead:",
                 removing.uses
             ));
-            widgets::combo_box("face-replacement")
+            widgets::combo("face-replacement")
                 .selected_text(replacement.clone())
                 .show_ui(ui, |ui| {
                     for other in faces.iter().filter(|f| f.name != removing.face.name) {

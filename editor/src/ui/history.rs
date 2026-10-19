@@ -291,9 +291,5 @@ fn restores(step: &EditStep) -> String {
 }
 
 fn clock(at: SystemTime) -> String {
-    let unix = at
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    widgets::clock(unix, true)
+    widgets::clock(at.into(), true)
 }

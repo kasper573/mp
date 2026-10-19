@@ -5,6 +5,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
+use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef};
 use engine::systems::class::{ClassDef, SkillTree};
@@ -309,7 +310,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::kv(ui, "class", |ui| {
             let current = value.text("class").to_owned();
             let mut picked = current.clone();
-            widgets::combo_box("character-class")
+            widgets::combo("character-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current).size(13.0))
                 .show_ui(ui, |ui| {
@@ -456,7 +457,7 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             let current = value["equipment"][slot].as_str().map(str::to_owned);
             widgets::kv(ui, slot, |ui| {
                 let mut picked = current.clone();
-                widgets::combo_box(("equipment", slot))
+                widgets::combo(("equipment", slot))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
                         Some(item) => theme::mono(format!("item/ {item}")).size(13.0),
@@ -527,7 +528,7 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                     remove = Some(index);
                 }
                 let mut picked = node.clone();
-                widgets::combo_box(("learned-node", index))
+                widgets::combo(("learned-node", index))
                     .width(170.0)
                     .selected_text(if node.is_empty() {
                         theme::muted("pick a node…")
@@ -1104,7 +1105,7 @@ fn quests(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            widgets::combo_box(("quest-state", quest))
+                            widgets::combo(("quest-state", quest))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
                                     for &option in Standing::VARIANTS {
@@ -1474,7 +1475,7 @@ fn memories(
                 ui.label(
                     theme::muted(ago.map_or_else(
                         || "never".to_owned(),
-                        |seconds| widgets::ago(seconds as u64),
+                        |seconds| widgets::ago(Seconds(seconds as f32)),
                     ))
                     .size(12.5)
                     .monospace(),

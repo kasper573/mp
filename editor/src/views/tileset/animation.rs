@@ -246,7 +246,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             }
         });
         widgets::kv(ui, "offset by", |ui| {
-            widgets::combo_box(("offset-unit", key))
+            widgets::combo(("offset-unit", key))
                 .selected_text(unit.label())
                 .width(140.0)
                 .show_ui(ui, |ui| {

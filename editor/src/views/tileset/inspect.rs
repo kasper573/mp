@@ -108,7 +108,7 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
         ui.add_space(4.0);
         if mode == TilesetMode::Surface {
             widgets::kv(ui, "surface", |ui| {
-                widgets::combo_box(("tile-surface", key, tile))
+                widgets::combo(("tile-surface", key, tile))
                     .selected_text(theme::mono(surface.unwrap_or("none")))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -130,7 +130,7 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
             widgets::kv_text(ui, "walk", walk_label(walk));
         } else {
             widgets::kv(ui, "walk", |ui| {
-                widgets::combo_box(("tile-walk", key, tile))
+                widgets::combo(("tile-walk", key, tile))
                     .selected_text(theme::mono(walk_label(walk)))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -301,7 +301,7 @@ fn corners_grid(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     || terrains.first().cloned().unwrap_or_default(),
                     |corners| corners[corner.index()].clone(),
                 );
-                widgets::combo_box(("corner", key, tile, corner.index()))
+                widgets::combo(("corner", key, tile, corner.index()))
                     .selected_text(theme::mono(&current))
                     .width(90.0)
                     .show_ui(ui, |ui| {

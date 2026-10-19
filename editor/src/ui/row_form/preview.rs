@@ -119,7 +119,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
     if matches!(table, NpcDef::TABLE | PlayerDef::TABLE | ModelDef::TABLE) {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
-            widgets::combo_box("preview-action")
+            widgets::combo("preview-action")
                 .selected_text(state.action.as_ref())
                 .width(80.0)
                 .show_ui(ui, |ui| {
@@ -127,7 +127,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
                         ui.selectable_value(&mut state.action, action, action.as_ref());
                     }
                 });
-            widgets::combo_box("preview-direction")
+            widgets::combo("preview-direction")
                 .selected_text(state.direction.as_ref())
                 .width(56.0)
                 .show_ui(ui, |ui| {
@@ -174,7 +174,7 @@ fn show_status(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .to_owned()
     });
     ui.horizontal(|ui| {
-        widgets::combo_box("preview-status-model")
+        widgets::combo("preview-status-model")
             .selected_text(theme::mono(chosen.as_str()).size(13.0))
             .width(160.0)
             .show_ui(ui, |ui| {

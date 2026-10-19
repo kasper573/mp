@@ -1,12 +1,13 @@
-pub use design_tokens::controls::{danger, key_hint, primary};
+pub use design_tokens::controls::{combo, danger, key_hint, primary};
 pub use design_tokens::sheet::{section, section_with, tabs};
 
 use std::fmt::Display;
 
 use design_tokens::face::{Face, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{controls, ink};
+use design_tokens::ink;
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
+use engine::core::time::{Seconds, UnixMillis};
 
 use super::theme;
 use crate::keymap::EditorKey;
@@ -15,10 +16,6 @@ pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)
         .font(Face::SmallCapsBold.id(TextRole::Section.size()))
         .color(ink::RUBRIC)
-}
-
-pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
-    controls::combo(id_salt)
 }
 
 pub fn chip(ui: &mut Ui, text: &str) -> Response {
@@ -428,8 +425,8 @@ pub fn thousands(n: usize) -> String {
     out
 }
 
-pub fn clock(unix_seconds: u64, with_seconds: bool) -> String {
-    let seconds = unix_seconds % 86_400;
+pub fn clock(at: UnixMillis, with_seconds: bool) -> String {
+    let seconds = (at.0 / 1000) % 86_400;
     let (hours, minutes) = (seconds / 3600, (seconds % 3600) / 60);
     if with_seconds {
         format!("{hours:02}:{minutes:02}:{:02}", seconds % 60)
@@ -438,7 +435,8 @@ pub fn clock(unix_seconds: u64, with_seconds: bool) -> String {
     }
 }
 
-pub fn ago(seconds: u64) -> String {
+pub fn ago(elapsed: Seconds) -> String {
+    let seconds = elapsed.0.max(0.0) as u64;
     let minutes = seconds / 60;
     let hours = minutes / 60;
     let days = hours / 24;

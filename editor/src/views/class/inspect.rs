@@ -145,7 +145,7 @@ fn requirements(
                     let named = item.text("node").to_owned();
                     widgets::kv(ui, "node", |ui| {
                         let mut picked = named.clone();
-                        widgets::combo_box(("requirement-node", index))
+                        widgets::combo(("requirement-node", index))
                             .width(ui.available_width() - 8.0)
                             .selected_text(if named.is_empty() {
                                 theme::muted("pick a node…")

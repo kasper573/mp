@@ -262,7 +262,7 @@ fn level_card(
             .collect();
         if !missing.is_empty() {
             let mut picked: Option<StatKind> = None;
-            widgets::combo_box(("add-stat", index))
+            widgets::combo(("add-stat", index))
                 .selected_text(theme::muted("+ stat"))
                 .width(INPUT)
                 .show_ui(ui, |ui| {
