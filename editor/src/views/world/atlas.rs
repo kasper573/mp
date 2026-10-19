@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, ContentRow};
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::{Pos, Size};
 use engine::core::script::Expr;
 use engine::core::tiling::Tiles;
@@ -20,7 +20,6 @@ use strum::VariantArray;
 
 use crate::project::ProjectFiles;
 use crate::usages::ContentUsages;
-use engine::core::content::row_file;
 
 pub struct WorldAtlas {
     pub generation: u64,

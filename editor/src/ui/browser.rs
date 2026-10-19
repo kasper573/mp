@@ -1,22 +1,20 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, GAME_FILE, row_of};
 use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget};
 use crate::keymap::EditorKey;
-use crate::picker::Dragged;
-use crate::picker::{self, PictureFrame};
+use crate::picker::{self, Dragged, PictureFrame};
 use crate::project::{Project, RowSelection};
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
-use engine::core::content::{GAME_FILE, row_of};
 
 pub struct BrowserState {
     pub search: String,

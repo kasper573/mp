@@ -1,15 +1,13 @@
 use bevy::prelude::*;
-use design_tokens::face::TextRole;
-use design_tokens::{face, ink, slip};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{ink, slip};
 use egui::{Pos2, Rect, Sense, Stroke, Ui, Vec2};
 
 use crate::core::content::Content;
 use crate::systems::actor::Name;
-use crate::systems::class;
 use crate::systems::hud::HudWidget;
 use crate::systems::player::{Xp, session};
-use crate::systems::stat;
-use crate::systems::status;
+use crate::systems::{class, stat, status};
 
 const WIDTH: f32 = 178.0;
 const HEALTH_BAR: Vec2 = Vec2::new(70.0, 6.0);

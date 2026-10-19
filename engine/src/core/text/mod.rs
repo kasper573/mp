@@ -1,5 +1,7 @@
 mod paint;
 
+pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -10,8 +12,6 @@ use egui::Color32;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
-
-pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
 
 const SLOW_PACE: f32 = 2.5;
 

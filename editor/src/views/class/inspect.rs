@@ -1,9 +1,7 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
-use engine::core::content::Content;
-use engine::core::content::ContentRow;
-use engine::systems::class::ClassDef;
-use engine::systems::class::{NodeKey, SkillTree};
+use engine::core::content::{Content, ContentRow};
+use engine::systems::class::{ClassDef, NodeKey, SkillTree};
 use engine::systems::skill::SkillDef;
 use serde_json::{Map, Value};
 

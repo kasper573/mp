@@ -12,29 +12,27 @@ pub mod theme;
 pub mod tree;
 pub mod widgets;
 
-use engine::core::content::ContentRow;
-use engine::core::vfx::VfxDef;
-use engine::core::vfx::shader::VfxShaderDef;
-use engine::systems::class::ClassDef;
-use engine::systems::player::snapshot::CharacterSnapshot;
 use std::mem;
 use std::path::Path;
 use std::time::Duration;
 
 use design_tokens::controls::{self, Pill};
-use design_tokens::face::TextRole;
-use design_tokens::{face, ink, sheet, slip};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{ink, sheet, slip};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
+use engine::core::content::{ContentRow, LoadReport, row_file};
+use engine::core::vfx::{VfxDef, VfxShaderDef};
+use engine::systems::class::ClassDef;
+use engine::systems::player::snapshot::CharacterSnapshot;
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::{self, EditRefusal, RowSelection};
 use crate::tabs::{CloseTabs, EditorTab};
-use crate::views::script::ScriptKeys;
-use crate::views::{area, character, class, model, script, spreadsheet, tileset, vfx, world};
-use crate::{import, play, views};
-use engine::core::content::{LoadReport, row_file};
+use crate::views::script::{self, ScriptKeys};
+use crate::views::{self, area, character, class, model, spreadsheet, tileset, vfx, world};
+use crate::{import, play};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.status.right.clear();

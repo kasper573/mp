@@ -2,13 +2,10 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::script::Arrow;
-use crate::core::script::{Compiler, EffectDef, EffectStep, FlowCx, NEXT, ScriptFault};
-use crate::systems::combat;
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, FlowCx, NEXT, ScriptFault};
 use crate::systems::npc::Npc;
-use crate::systems::script::effect as effects;
-use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
-use crate::systems::stat;
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, effect as effects};
+use crate::systems::{combat, stat};
 
 /// Restores health up to the maximum.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]

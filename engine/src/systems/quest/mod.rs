@@ -33,10 +33,10 @@ use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::NpcId;
 use crate::systems::player::{Owner, player_requests};
 use crate::systems::rewards::KillCredited;
-use crate::systems::script::condition::CompiledCondition;
+use crate::systems::script::condition::{self, CompiledCondition};
 use crate::systems::script::{
     self, Condition, EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, Reach, RiftInstances,
-    RiftScripts, ScriptModule, ScriptedRow, condition,
+    RiftScripts, ScriptModule, ScriptedRow,
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;

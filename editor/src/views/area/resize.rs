@@ -1,9 +1,8 @@
 use egui::{RichText, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{GridSize, TileSize};
-use engine::systems::area::AreaDef;
-use engine::systems::area::{self, AreaModuleKind};
+use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::{pins, shapes};
@@ -12,7 +11,6 @@ use crate::forms;
 use crate::project::ContentEdit;
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
-use engine::core::content::row_file;
 
 pub struct ResizeDialog {
     pub area: String,

@@ -1,9 +1,8 @@
 use bevy::prelude::*;
-use design_tokens::card;
 use design_tokens::controls::{self, RowLook};
-use design_tokens::face::TextRole;
+use design_tokens::face::{self, TextRole};
 use design_tokens::sheet::{self, Depth};
-use design_tokens::{face, ink};
+use design_tokens::{card, ink};
 use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
 
 use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, WareRefusal};

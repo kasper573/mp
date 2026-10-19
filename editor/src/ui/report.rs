@@ -1,10 +1,10 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, RichText, Ui};
+use engine::core::content::GAME_FILE;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use engine::core::content::GAME_FILE;
 
 pub enum ReportAction {
     None,

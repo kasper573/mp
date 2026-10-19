@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
-use super::expr::Expr;
-use super::{Arrow, RevealDef, ScriptFault, Value, Vocabulary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use super::expr::Expr;
+use super::{Arrow, RevealDef, ScriptFault, Value, Vocabulary};
 
 pub const MAX_LINES: usize = 16;
 pub const MAX_CHOICES: usize = 12;

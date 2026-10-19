@@ -1,3 +1,5 @@
+mod auth;
+
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,8 +13,6 @@ use axum_extra::extract::cookie::CookieJar;
 use openidconnect::RedirectUrl;
 use serde::Deserialize;
 use tower_http::services::ServeDir;
-
-mod auth;
 
 service::heap_profiling!();
 

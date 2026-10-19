@@ -14,8 +14,9 @@ use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
-use crate::systems::script::effect as effects;
-use crate::systems::script::{Condition, EffectCall, Place, Reach, RiftScripting};
+use crate::systems::script::{
+    Condition, EffectCall, Place, Reach, RiftScripting, effect as effects,
+};
 use crate::systems::visibility::Presence;
 
 /// Takes and gives items in one exchange, all or nothing.

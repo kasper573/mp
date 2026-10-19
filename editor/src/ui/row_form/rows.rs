@@ -1,20 +1,18 @@
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
-use engine::core::content::ModuleRule;
+use engine::core::content::{ModuleRule, row_file};
 use engine::core::script::ScriptModuleKind;
 use engine::systems::registry;
 use serde_json::Value;
 
-use super::{LEFT_COLUMN, act, add_module_popup};
-use super::{theme, widgets};
+use super::{LEFT_COLUMN, act, add_module_popup, theme, widgets};
 use crate::app::Editor;
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::value::RowValue;
-use engine::core::content::row_file;
 
 pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection, wide: bool) {
     let table = selection.table.clone();

@@ -1,18 +1,17 @@
+pub use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
+pub use profiling::{CpuProfiler, ServiceAllocator, profiler};
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::Router;
-use axum::ServiceExt;
 use axum::extract::Request;
 use axum::routing::get;
+use axum::{Router, ServiceExt};
 use axum_prometheus::PrometheusMetricLayerBuilder;
 use axum_prometheus::metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 use tower_http::normalize_path::NormalizePath;
-
-pub use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
-pub use profiling::{CpuProfiler, ServiceAllocator, profiler};
 
 #[macro_export]
 macro_rules! heap_profiling {

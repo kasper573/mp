@@ -1,22 +1,19 @@
 use egui::{Pos2, RichText, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::{CellPos, TilePos, Tiles};
-use engine::systems::area::AreaDef;
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::{AreaDef, AreaModuleKind};
 use engine::systems::script::Place;
 use serde_json::Value;
 
 use super::select::start_paste;
-use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pins, shapes};
-use super::{pick, placement};
+use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pick, pins, placement, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{play, schema};
-use engine::core::content::row_file;
 
 #[derive(Clone, Copy)]
 pub struct AreaMenuAnchor {

@@ -1,38 +1,35 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::item::ItemDef;
-use engine::systems::player::snapshot::CharacterSnapshot;
-use engine::systems::skill::SkillDef;
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::class::{ClassDef, SkillTree};
+use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
 use engine::systems::npc::NpcId;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
-use engine::systems::skill::{HOTBAR_SLOTS, Rank};
+use engine::systems::skill::{HOTBAR_SLOTS, Rank, SkillDef};
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use crate::app::{Editor, PlacePick};
-use crate::forms::{FormAction, FormChange, FormCx};
+use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
-use crate::{condition, forms, picker, play, schema, stage};
-use engine::core::content::row_file;
+use crate::{condition, picker, play, schema, stage};
 
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;

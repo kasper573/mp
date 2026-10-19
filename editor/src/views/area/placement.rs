@@ -1,32 +1,28 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::math::{Pos, Rect};
 use engine::core::script::VariableType;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaId, AreaModuleKind, Flip};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::value_kind;
 use super::inspect::Followups;
-use super::modules;
 use super::stamp::placed_part;
-use super::{AreaFrame, AreaSnapshot, shapes};
+use super::{AreaFrame, AreaSnapshot, modules, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
-use crate::forms::FormCx;
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
+use crate::schema;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
-use crate::{forms, schema, value};
-use engine::core::content::{row_file, row_of};
+use crate::value::{self, RowValue};
 
 pub fn placement_bounds(content: &Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
     let mut out: HashMap<usize, Rect<Tiles>> = HashMap::new();

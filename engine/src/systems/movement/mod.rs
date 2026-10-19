@@ -1,3 +1,13 @@
+mod berth;
+mod claims;
+mod predict;
+
+pub use berth::{
+    Aim, Approach, approach, footing, place_beside, reachable, relocate_beside, settle, vacant_near,
+};
+pub use claims::{TileClaim, TileClaims, claim_of, others_on};
+pub use predict::request_walk;
+
 use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
@@ -13,19 +23,8 @@ use crate::core::tiling::{
 use crate::core::time::Seconds;
 use crate::systems::actor::{Action, Actor, ActorModel, set_facing};
 use crate::systems::player::{may_command, sender_player};
-use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
-use crate::systems::{area, drain_requests};
-
-mod berth;
-mod claims;
-mod predict;
-
-pub use berth::{
-    Aim, Approach, approach, footing, place_beside, reachable, relocate_beside, settle, vacant_near,
-};
-pub use claims::{TileClaim, TileClaims, claim_of, others_on};
-pub use predict::request_walk;
+use crate::systems::{area, drain_requests, reach};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;

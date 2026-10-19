@@ -1,6 +1,6 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
+use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::systems::skill::SkillStat;
 use serde_json::{Map, Value};

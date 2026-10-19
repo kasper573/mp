@@ -1,15 +1,12 @@
-use engine::core::content::ContentRow;
-use engine::core::vfx::shader::VfxShaderDef;
 use std::collections::HashMap;
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, Reference, asset_of};
-use engine::core::vfx::shader_file;
+use engine::core::content::{Content, ContentRow, GAME_FILE, Reference, asset_of, row_file};
+use engine::core::vfx::{VfxShaderDef, shader_file};
+use engine::systems::registry;
 use rayon::prelude::*;
 
 use crate::project::ProjectFiles;
-use engine::core::content::{GAME_FILE, row_file};
-use engine::systems::registry;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContentUsage {

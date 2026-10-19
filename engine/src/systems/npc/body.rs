@@ -5,23 +5,19 @@ use strum::IntoStaticStr;
 
 use crate::core::content::Content;
 use crate::core::math::{Pos, Rng};
-use crate::core::script::Arrow;
 use crate::core::script::{
-    Answer, Compiler, EffectDef, EffectStep, Eval, FlowCx, ScriptFault, Value, ValueType,
+    Answer, Arrow, Compiler, EffectDef, EffectStep, Eval, FlowCx, ScriptFault, Value, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
 use crate::systems::area::{self, AreaTag, object};
-use crate::systems::dialogue;
 use crate::systems::movement::{self, Approach};
 use crate::systems::npc::{Home, Npc, Roams};
-use crate::systems::reach;
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
     Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
 };
-use crate::systems::skill;
-use crate::systems::stat;
+use crate::systems::{dialogue, reach, skill, stat};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Priority(pub u8);

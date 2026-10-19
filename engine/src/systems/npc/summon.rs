@@ -12,10 +12,10 @@ use crate::systems::combat::Attitude;
 use crate::systems::movement::{self, position};
 use crate::systems::npc::NpcId;
 use crate::systems::player::{ClientId, Owner};
-use crate::systems::script::Condition;
-use crate::systems::script::effect as effects;
 use crate::systems::script::event::NPC;
-use crate::systems::script::{EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::script::{
+    Condition, EffectCall, OwnerKind, Reach, RiftScripting, effect as effects,
+};
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
 

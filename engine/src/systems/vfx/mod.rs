@@ -13,9 +13,8 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape, facing_from};
 use crate::core::math::Pos;
-use crate::core::script::Arrow;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, ScriptFault, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, ScriptFault, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, WallClock};

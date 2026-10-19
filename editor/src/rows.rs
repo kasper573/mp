@@ -1,27 +1,23 @@
-use engine::core::content::ContentRow;
-use engine::core::vfx::shader::VfxShaderDef;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use egui::{RichText, Ui};
-use engine::core::content::ModuleRule;
 use engine::core::content::id::LeafKind;
-use engine::core::vfx::shader_file;
+use engine::core::content::{ContentRow, ModuleRule, load, locate, row_file, row_folder, row_of};
+use engine::core::vfx::{VfxShaderDef, shader_file};
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::registry;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
 use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection};
-use crate::schema::SchemaShapes;
+use crate::schema::{self, SchemaShapes};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::usages::ContentUsage;
+use crate::usages::{self, ContentUsage};
 use crate::views::area::placement;
 use crate::views::world;
-use crate::{schema, usages};
-use engine::core::content::{load, locate, row_file, row_folder, row_of};
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {

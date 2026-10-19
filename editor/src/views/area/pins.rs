@@ -1,16 +1,13 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
-use engine::core::content::Content;
-use engine::core::content::ContentRow;
+use engine::core::content::{Content, ContentRow, GAME_FILE, row_of};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::AreaDef;
-use engine::systems::area::{self, AreaId, ObjectShape};
+use engine::systems::area::{self, AreaDef, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
 use crate::project::{ContentEdit, ProjectFiles, RowSelection};
 use crate::tabs::EditorTab;
-use engine::core::content::{GAME_FILE, row_of};
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
 

@@ -1,25 +1,23 @@
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::str::FromStr;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::script::VariableType;
 use engine::core::tiling::{CellPos, Tiles};
-use engine::systems::area::{self, AreaModuleKind};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::inspect::hidden_fields;
 use super::{holes, modules, placement};
 use crate::app::Editor;
-use crate::forms::FormCx;
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
+use crate::schema;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
-use crate::{forms, schema};
-use engine::core::content::row_file;
 
 /// The blueprint itself: its parts to pick from, where it is placed, its variables and modules.
 pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {

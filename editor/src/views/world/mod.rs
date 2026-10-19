@@ -11,16 +11,17 @@ pub use filters::{ColorBy, ColorField, MapLens};
 pub use inspect::inspect_parts;
 
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use atlas::WorldAtlas;
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, Fixture};
+use engine::core::content::{Content, ContentRow, Fixture, row_file};
 use engine::core::math::{Pos, Size};
 use engine::core::tiling::Tiles;
 use engine::systems::area::world_map::{Card, Note, Region, RegionColor, WorldMap, WorldMapDef};
 use engine::systems::area::{self, AreaDef, AreaId};
 use serde::Deserialize;
-use std::str::FromStr;
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection};
@@ -28,8 +29,6 @@ use crate::ui::{sidebar, theme};
 use crate::value;
 use crate::views::area::TILE_PX;
 use crate::views::navigation;
-use atlas::WorldAtlas;
-use engine::core::content::row_file;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
 const MIN_FOOTPRINT: Vec2 = Vec2::new(62.5, 38.75);

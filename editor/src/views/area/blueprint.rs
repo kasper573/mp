@@ -1,25 +1,21 @@
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::BTreeMap;
 
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaModuleKind, Flip};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaModuleKind, Flip};
 use serde_json::Value;
 
-use super::placement;
-use super::{AreaSnapshot, shapes};
+use super::{AreaSnapshot, placement, shapes};
 use crate::app::{Editor, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, theme, widgets};
-use crate::value::RowValue;
-use crate::{forms, rows, value};
-use engine::core::content::row_file;
+use crate::value::{self, RowValue};
+use crate::{forms, rows};
 
 pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
     let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {

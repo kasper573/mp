@@ -9,9 +9,9 @@ use crate::core::script::{
 };
 use crate::core::time::Seconds;
 use crate::systems::item::ItemId;
-use crate::systems::script::effect as effects;
 use crate::systems::script::{
     Condition, EffectCall, OwnerKind, OwnerRow, Reach, RiftScripting, RiftScripts,
+    effect as effects,
 };
 use crate::systems::skill::{SkillId, SkillKind};
 use crate::systems::stat::{Stat, StatKind};

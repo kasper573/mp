@@ -5,14 +5,12 @@ use serde::{Deserialize, Serialize};
 use super::AreaTag;
 use super::transition::Crossing;
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault};
-use crate::systems::dialogue;
-use crate::systems::movement;
 use crate::systems::npc::Npc;
 use crate::systems::player::SpawnPoint;
-use crate::systems::reach;
-use crate::systems::script::Condition;
-use crate::systems::script::effect as effects;
-use crate::systems::script::{EffectCall, Fill, Place, Reach, RiftScripting};
+use crate::systems::script::{
+    Condition, EffectCall, Fill, Place, Reach, RiftScripting, effect as effects,
+};
+use crate::systems::{dialogue, movement, reach};
 
 /// Moves an actor to a place, setting its spawn point.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]

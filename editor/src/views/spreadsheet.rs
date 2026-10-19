@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::script::ScriptModuleKind;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
@@ -16,10 +16,8 @@ use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;
 use crate::ui::assets::ICON_DECODES_PER_FRAME;
-use crate::ui::widgets;
-use crate::ui::{self, browser, sidebar, theme};
+use crate::ui::{self, browser, sidebar, theme, widgets};
 use crate::user::SpreadsheetView;
-use engine::core::content::row_file;
 
 const ROW_H: f32 = 29.0;
 const KEY_W: f32 = 110.0;

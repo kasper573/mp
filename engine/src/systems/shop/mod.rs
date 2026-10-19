@@ -10,22 +10,19 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
 };
-use crate::core::script::Arrow;
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, ScriptFault, Value};
+use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention::AttentionId;
-use crate::systems::dialogue;
-use crate::systems::drain_requests;
 use crate::systems::item::{
     ExchangeRefusal, Inventory, ItemCategory, ItemId, ItemModuleKind, ItemStack,
 };
-use crate::systems::notification;
 use crate::systems::player::sender_player;
-use crate::systems::script::effect as effects;
 use crate::systems::script::{
     self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
     RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
+    effect as effects,
 };
+use crate::systems::{dialogue, drain_requests, notification};
 
 pub type ShopId = ContentId<ShopDef>;
 

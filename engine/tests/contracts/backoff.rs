@@ -1,6 +1,5 @@
 use engine::core::math::Rng;
 use engine::core::time::{Backoff, Seconds};
-
 use testkit::drawn_seed;
 
 const BACKOFF: Backoff = Backoff {

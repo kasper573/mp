@@ -14,19 +14,17 @@ use crate::core::content::media::ImageSizes;
 use crate::core::gui::{self, Band};
 use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Direction, Pos};
-use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
 use crate::core::render::transition::{
     self, ActiveTransition, ScreenTransitionPhase, WorldViewSystems,
 };
-use crate::core::render::{GroundDepth, RowDepths, TILE};
+use crate::core::render::{GroundDepth, RowDepths, TILE, dynamic_z};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
-use crate::core::tiling::TileSize;
-use crate::core::tiling::Tiles;
+use crate::core::tiling::{TileSize, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
-use crate::systems::area::tileset::TilesetId;
-use crate::systems::area::{self, AreaId, AreaTag, tileset};
+use crate::systems::area::tileset::{self, TilesetId};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::session::{self, MyCharacter};

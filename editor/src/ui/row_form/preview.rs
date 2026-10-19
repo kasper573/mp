@@ -4,8 +4,9 @@ use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Kind, Mark};
 use design_tokens::ink;
 use egui::{Align, Layout, Sense, Ui, Vec2};
-use engine::core::content::Content;
-use engine::core::content::ContentRow;
+use engine::core::audio::playback::SfxDef;
+use engine::core::babble::BabbleDef;
+use engine::core::content::{Content, ContentRow};
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
@@ -15,6 +16,8 @@ use engine::systems::actor::plate::PlateLabel;
 use engine::systems::dialogue::ChoiceReveal;
 use engine::systems::item::card::CardLook;
 use engine::systems::item::{self, ItemDef};
+use engine::systems::npc::NpcDef;
+use engine::systems::player::PlayerDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::quest::{self, ActiveQuest, Parties, QuestDef};
 use engine::systems::script::{Reach, RiftScripts};
@@ -73,9 +76,15 @@ pub enum PreviewPlace {
 
 pub fn preview_place(table: &str) -> Option<PreviewPlace> {
     match table {
-        "npc" | "player" | "model" | "item" | "quest" | "test_character" | "status_effect"
-        | "skill" => Some(PreviewPlace::Beside),
-        "sfx" | "babble" => Some(PreviewPlace::Below),
+        NpcDef::TABLE
+        | PlayerDef::TABLE
+        | ModelDef::TABLE
+        | ItemDef::TABLE
+        | QuestDef::TABLE
+        | CharacterSnapshot::TABLE
+        | StatusEffectDef::TABLE
+        | SkillDef::TABLE => Some(PreviewPlace::Beside),
+        SfxDef::TABLE | BabbleDef::TABLE => Some(PreviewPlace::Below),
         _ => None,
     }
 }
@@ -87,10 +96,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
         return;
     };
     match table {
-        "status_effect" => return show_status(editor, ui, key),
-        "skill" => return show_skill(editor, ui, key),
-        "sfx" => return show_sfx(editor, ui, key),
-        "babble" => return show_babble(editor, ui, key),
+        StatusEffectDef::TABLE => return show_status(editor, ui, key),
+        SkillDef::TABLE => return show_skill(editor, ui, key),
+        SfxDef::TABLE => return show_sfx(editor, ui, key),
+        BabbleDef::TABLE => return show_babble(editor, ui, key),
         _ => {}
     }
     let now = ui.input(|i| i.time);
@@ -107,7 +116,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
     if table == CharacterSnapshot::TABLE {
         character::preview_extras(editor, ui, key);
     }
-    if matches!(table, "npc" | "player" | "model") {
+    if matches!(table, NpcDef::TABLE | PlayerDef::TABLE | ModelDef::TABLE) {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
             widgets::combo_box("preview-action")
@@ -277,8 +286,8 @@ pub(super) fn draw_preview(
         posed.items.extend(content.by_key::<ItemDef>(key));
     } else {
         let model_key = match table {
-            "model" => key.to_owned(),
-            "test_character" => content
+            ModelDef::TABLE => key.to_owned(),
+            CharacterSnapshot::TABLE => content
                 .built::<GameSettings>()
                 .player
                 .get(&content)
@@ -322,7 +331,7 @@ pub(super) fn draw_preview(
 /// test character's name as a player.
 fn plate_of(content: &Content, table: &str, key: &str, value: &Value) -> Option<PlateLabel> {
     match table {
-        "npc" => {
+        NpcDef::TABLE => {
             let role = value["modules"]
                 .as_array()
                 .into_iter()
@@ -333,7 +342,7 @@ fn plate_of(content: &Content, table: &str, key: &str, value: &Value) -> Option<
             let hostile = attitude(content, table, key, value) == Some(true);
             Some(PlateLabel::npc(name, role, hostile))
         }
-        "test_character" => Some(PlateLabel::player(value["name"].as_str().unwrap_or(key))),
+        CharacterSnapshot::TABLE => Some(PlateLabel::player(value["name"].as_str().unwrap_or(key))),
         _ => None,
     }
 }

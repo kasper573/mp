@@ -1,7 +1,7 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{controls, face};
 use std::collections::{BTreeMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{controls, face};
 use egui::{Align, Layout, Modifiers, Sense, Ui};
 
 use super::theme;

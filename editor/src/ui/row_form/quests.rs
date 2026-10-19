@@ -1,7 +1,6 @@
 use egui::{Sense, Ui};
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::AreaModuleKind;
+use engine::core::content::{ContentRow, row_file, row_of};
+use engine::systems::area::{AreaDef, AreaModuleKind};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
 use serde_json::Value;
@@ -11,7 +10,6 @@ use crate::app::Editor;
 use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
-use engine::core::content::{row_file, row_of};
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
     let (givers, turn_ins) = quest_parties(editor, quest);

@@ -1,17 +1,15 @@
+use std::collections::{HashMap, HashSet};
+
 use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
+use egui::Ui;
+use engine::core::content::fixture::FixtureLock;
+use engine::core::content::{Content, ContentRow, LoadReport, row_file};
+use engine::core::script::VariableType;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::npc::NpcDef;
-use std::collections::{HashMap, HashSet};
-
-use egui::Ui;
-use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{Content, LoadReport};
-use engine::core::script::VariableType;
 use serde_json::{Map, Value};
 
-use crate::drafts;
 use crate::keymap::EditorKey;
 use crate::project::{Project, ProjectFiles};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
@@ -21,8 +19,7 @@ use crate::usages::ContentUsages;
 use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
 use crate::views::vfx;
-use crate::{audio, condition, picker, spans, thumbs, value};
-use engine::core::content::row_file;
+use crate::{audio, condition, drafts, picker, spans, thumbs, value};
 
 pub const KEPT_TIP: &str = "Kept: the engine reads this from every game, so it stays as it is";
 

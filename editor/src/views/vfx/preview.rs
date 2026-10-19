@@ -4,7 +4,6 @@
 use std::collections::{BTreeMap, HashMap};
 
 use design_tokens::controls;
-
 use egui::{Pos2, Stroke, Ui};
 use engine::core::geometry::{Degrees, Footprint, Shape};
 use engine::core::math::Pos;
@@ -13,7 +12,7 @@ use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
 use engine::core::vfx::{ParamValue, VfxLayer, VfxParams};
 use engine::systems::actor::{Action, ModelDef};
-use strum::VariantArray;
+use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use super::params::{ParamSpec, param_control};
 use crate::app::Editor;
@@ -27,7 +26,7 @@ const FIRST_CROWD: u32 = 3;
 
 /// The vfx previews: what the open row asked to see, and the values tried for its parameters.
 pub struct VfxViews {
-    pub target: Target,
+    target: VfxTarget,
     pub background: bool,
     started: Option<(String, f64)>,
     pub fills: HashMap<String, BTreeMap<String, ParamValue>>,
@@ -36,7 +35,7 @@ pub struct VfxViews {
 impl Default for VfxViews {
     fn default() -> VfxViews {
         VfxViews {
-            target: Target::default(),
+            target: VfxTarget::default(),
             background: true,
             started: None,
             fills: HashMap::new(),
@@ -45,28 +44,27 @@ impl Default for VfxViews {
 }
 
 /// What the vfx plays on: one actor, an area, actors standing in an area, or the whole screen.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Target {
-    Actor {
-        model: String,
-        action: Action,
-    },
-    Area {
-        shape: Shape,
-        facing: Degrees,
-    },
+#[derive(Clone, Debug, PartialEq, EnumDiscriminants)]
+#[strum_discriminants(name(VfxTargetKind), derive(VariantArray, IntoStaticStr))]
+enum VfxTarget {
+    #[strum_discriminants(strum(serialize = "actor"))]
+    Actor { model: String, action: Action },
+    #[strum_discriminants(strum(serialize = "area"))]
+    Area { shape: Shape, facing: Degrees },
+    #[strum_discriminants(strum(serialize = "area + actors"))]
     Crowd {
         shape: Shape,
         facing: Degrees,
         count: u32,
         action: Action,
     },
+    #[strum_discriminants(strum(serialize = "screen"))]
     Screen,
 }
 
-impl Default for Target {
-    fn default() -> Target {
-        Target::Actor {
+impl Default for VfxTarget {
+    fn default() -> VfxTarget {
+        VfxTarget::Actor {
             model: String::new(),
             action: Action::Idle,
         }
@@ -93,45 +91,22 @@ pub fn preview(
         .fold(0.5_f32, f32::max);
     let now = ui.input(|input| input.time);
     let views = &mut editor.views.vfx;
-    if let Target::Actor { model, .. } = &mut views.target
+    if let VfxTarget::Actor { model, .. } = &mut views.target
         && model.is_empty()
         && let Some(first) = models.first()
     {
         *model = first.clone();
     }
     ui.horizontal_wrapped(|ui| {
-        for (label, on) in [
-            ("actor", matches!(views.target, Target::Actor { .. })),
-            ("area", matches!(views.target, Target::Area { .. })),
-            (
-                "area + actors",
-                matches!(views.target, Target::Crowd { .. }),
-            ),
-            ("screen", views.target == Target::Screen),
-        ] {
-            if widgets::mode_chip(ui, label, on).clicked() && !on {
-                views.target = match label {
-                    "actor" => Target::Actor {
-                        model: models.first().cloned().unwrap_or_default(),
-                        action: Action::Idle,
-                    },
-                    "area" => Target::Area {
-                        shape: Shape::Circle { radius: Tiles(1.5) },
-                        facing: Degrees(0.0),
-                    },
-                    "area + actors" => Target::Crowd {
-                        shape: Shape::Circle { radius: Tiles(2.5) },
-                        facing: Degrees(0.0),
-                        count: FIRST_CROWD,
-                        action: Action::Idle,
-                    },
-                    _ => Target::Screen,
-                };
+        for &kind in VfxTargetKind::VARIANTS {
+            let on = VfxTargetKind::from(&views.target) == kind;
+            if widgets::mode_chip(ui, kind.into(), on).clicked() && !on {
+                views.target = VfxTarget::fresh(kind, &models);
             }
         }
     });
     ui.horizontal_wrapped(|ui| match &mut views.target {
-        Target::Actor { model, action } => {
+        VfxTarget::Actor { model, action } => {
             widgets::combo_box("preview-model")
                 .width(160.0)
                 .selected_text(theme::mono(model.as_str()).size(13.0))
@@ -143,11 +118,11 @@ pub fn preview(
             ui.end_row();
             action_combo(ui, action);
         }
-        Target::Area { shape, facing } => {
+        VfxTarget::Area { shape, facing } => {
             shape_fields(ui, shape);
             facing_field(ui, facing);
         }
-        Target::Crowd {
+        VfxTarget::Crowd {
             shape,
             facing,
             count,
@@ -166,7 +141,7 @@ pub fn preview(
             ui.end_row();
             action_combo(ui, action);
         }
-        Target::Screen => {}
+        VfxTarget::Screen => {}
     });
     let started = match &views.started {
         Some((playing, started)) if playing == key => *started,
@@ -208,7 +183,7 @@ pub fn preview(
     let footprint = target.footprint(center);
     let mut posed = Posed::default();
     let on = match &target {
-        Target::Actor { model, action } => {
+        VfxTarget::Actor { model, action } => {
             let Some(model) = content.by_key::<ModelDef>(model) else {
                 ui.label(theme::warn("pick a model to play the vfx on"));
                 return;
@@ -219,8 +194,8 @@ pub fn preview(
             });
             PosedSite::Actor(0)
         }
-        Target::Area { .. } => PosedSite::Area(footprint.expect("an area has a footprint")),
-        Target::Crowd { count, action, .. } => {
+        VfxTarget::Area { .. } => PosedSite::Area(footprint.expect("an area has a footprint")),
+        VfxTarget::Crowd { count, action, .. } => {
             let footprint = footprint.expect("a crowd has a footprint");
             let models: Vec<_> = content.table::<ModelDef>().ids().collect();
             if !models.is_empty() {
@@ -233,7 +208,7 @@ pub fn preview(
             }
             PosedSite::Area(footprint)
         }
-        Target::Screen => PosedSite::Screen,
+        VfxTarget::Screen => PosedSite::Screen,
     };
     posed.vfx = Some(PosedVfx {
         layers,
@@ -271,17 +246,37 @@ pub fn preview(
     }
 }
 
-impl Target {
+impl VfxTarget {
+    fn fresh(kind: VfxTargetKind, models: &[String]) -> VfxTarget {
+        match kind {
+            VfxTargetKind::Actor => VfxTarget::Actor {
+                model: models.first().cloned().unwrap_or_default(),
+                action: Action::Idle,
+            },
+            VfxTargetKind::Area => VfxTarget::Area {
+                shape: Shape::Circle { radius: Tiles(1.5) },
+                facing: Degrees(0.0),
+            },
+            VfxTargetKind::Crowd => VfxTarget::Crowd {
+                shape: Shape::Circle { radius: Tiles(2.5) },
+                facing: Degrees(0.0),
+                count: FIRST_CROWD,
+                action: Action::Idle,
+            },
+            VfxTargetKind::Screen => VfxTarget::Screen,
+        }
+    }
+
     fn footprint(&self, at: Pos<Tiles>) -> Option<Footprint> {
         match self {
-            Target::Area { shape, facing } | Target::Crowd { shape, facing, .. } => {
+            VfxTarget::Area { shape, facing } | VfxTarget::Crowd { shape, facing, .. } => {
                 Some(Footprint {
                     at,
                     facing: facing.radians(),
                     shape: *shape,
                 })
             }
-            Target::Actor { .. } | Target::Screen => None,
+            VfxTarget::Actor { .. } | VfxTarget::Screen => None,
         }
     }
 }

@@ -10,8 +10,7 @@ use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::fill_holes;
-use super::{AreaFrame, shapes};
-use super::{modules, select};
+use super::{AreaFrame, modules, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};

@@ -1,3 +1,6 @@
+pub use design_tokens::controls::{danger, key_hint, primary};
+pub use design_tokens::sheet::{section, section_with};
+
 use std::fmt::Display;
 
 use design_tokens::face::{Face, TextRole};
@@ -7,9 +10,6 @@ use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stro
 
 use super::theme;
 use crate::keymap::EditorKey;
-
-pub use design_tokens::controls::{danger, key_hint, primary};
-pub use design_tokens::sheet::{section, section_with};
 
 pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)

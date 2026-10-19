@@ -1,13 +1,12 @@
+use std::path::{Path, PathBuf};
+
 use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
-use engine::core::content::ContentRow;
+use egui::{Context, RichText, Ui};
+use engine::core::content::{ContentRow, GAME_FILE, row_file, row_of, version};
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
-use std::path::{Path, PathBuf};
-
-use egui::{Context, RichText, Ui};
-use engine::core::content::version;
 use strum::VariantArray;
 
 use super::{theme, widgets};
@@ -17,14 +16,13 @@ use crate::app::{
 };
 use crate::keymap::{EditorKey, KeyScope};
 use crate::project::ContentEdit;
-use crate::rows::{UsageDecision, UsageSummary};
-use crate::templates::GameTemplate;
-use crate::ui::start;
-use crate::views::area::{layers, pick, resize};
-use crate::views::script::inspect;
-use crate::views::{area, script, world};
-use crate::{import, play, rows, templates, ui};
-use engine::core::content::{GAME_FILE, row_file, row_of};
+use crate::rows::{self, UsageDecision, UsageSummary};
+use crate::templates::{self, GameTemplate};
+use crate::ui::{self, start};
+use crate::views::area::{self, layers, pick, resize};
+use crate::views::script::{self, inspect};
+use crate::views::world;
+use crate::{import, play};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     import::show_readings(editor, ctx);

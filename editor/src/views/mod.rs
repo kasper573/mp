@@ -18,12 +18,12 @@ use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
 
 use crate::app::{BottomTab, Editor};
+use crate::play;
 use crate::project::AreaCameraState;
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserState;
 use crate::ui::row_form::usages;
-use crate::ui::theme;
-use crate::{play, ui};
+use crate::ui::{self, theme};
 
 #[derive(Component)]
 pub struct EditorCamera;

@@ -7,8 +7,7 @@ use engine::core::math::{Offset, Pos, Rect, WindowPx};
 use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area;
 use engine::systems::input::gestures::ClickClaim;
-use engine::systems::input::map::KeyModifiers;
-use engine::systems::input::map::{InputAction, InputBinding, InputMap};
+use engine::systems::input::map::{InputAction, InputBinding, InputMap, KeyModifiers};
 use engine::systems::movement::Grid;
 use engine::systems::probe::{ProbeBody, ProbeShop, ProbeSnapshot, ProbeStage, ProbeUiElement};
 

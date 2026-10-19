@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
-use design_tokens::face::TextRole;
-use design_tokens::sheet;
-use design_tokens::{controls, face, ink};
+use connection::{Announce, PendingSession};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{controls, ink, sheet};
 use egui::{TextStyle, Ui};
 use renet2::RenetClient;
 
@@ -18,7 +18,6 @@ use crate::core::math::Rng;
 use crate::core::net::auth::Credentials;
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
-use connection::{Announce, PendingSession};
 
 const NOTICE_WIDTH: f32 = 356.0;
 const NOTE_PADDING: i8 = 22;

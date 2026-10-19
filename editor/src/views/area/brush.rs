@@ -11,10 +11,10 @@ use super::{AreaFrame, AreaTool, grid, pins, select, terrain};
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
+use crate::thumbs;
 use crate::ui::{patterns, theme};
-use crate::user::BrushSettings;
+use crate::user::{self, BrushSettings};
 use crate::views::tileset::SheetCell;
-use crate::{thumbs, user};
 
 #[derive(Clone, Default, Debug)]
 pub struct TilePick {

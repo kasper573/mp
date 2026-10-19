@@ -10,16 +10,13 @@ use strum::IntoStaticStr;
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::systems::actor;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
-use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
 use crate::systems::player::{player_requests, session};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{self, EventKind, Procedure, RiftEvent, RiftInstances};
-use crate::systems::stat;
-use crate::systems::visibility;
+use crate::systems::{actor, dialogue, stat, visibility};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;

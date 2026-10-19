@@ -1,25 +1,22 @@
 use design_tokens::controls;
 use design_tokens::glyph::Mark;
 use egui::Ui;
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
-use engine::systems::area::AreaDef;
-use engine::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
+use engine::systems::area::{self, AreaDef, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
 use super::inspect::Followups;
-use super::modules;
 use super::placement::{self, warp_destinations};
 use super::stamp::object_names;
-use super::{AreaFrame, AreaSnapshot, shapes};
-use crate::forms::FormCx;
+use super::{AreaFrame, AreaSnapshot, modules, shapes};
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::widgets;
-use crate::value::RowValue;
-use crate::{app::Editor, forms, rows, value};
-use engine::core::content::row_file;
+use crate::value::{self, RowValue};
+use crate::{app::Editor, rows};
 
 pub struct PlacedTile {
     pub column: usize,

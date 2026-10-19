@@ -1,9 +1,8 @@
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
 use std::collections::{BTreeMap, HashSet};
 
-use engine::core::content::locate;
+use engine::core::content::{ContentRow, locate};
 use engine::core::script::VariableType;
+use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::{self, hole_name};
 use engine::systems::script::Variable;
 use serde_json::Value;

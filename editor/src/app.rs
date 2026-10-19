@@ -10,9 +10,10 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, version};
+use engine::core::content::{Content, row_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
+use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
 use engine::systems::script::Place;
 use serde::Deserialize;
@@ -30,17 +31,15 @@ use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
-use crate::ui::row_form;
+use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
 use crate::views::area::placement::ReplaceScope;
 use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
 use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
-use crate::views::{EditorCamera, EditorViews};
-use crate::{import, play, rows, ui, views};
-use engine::core::content::row_file;
-use engine::core::vfx::render::{VfxAssets, VfxMaterial};
+use crate::views::{self, EditorCamera, EditorViews};
+use crate::{import, play, rows};
 
 #[derive(Clone, Debug)]
 pub struct EditorLaunch {

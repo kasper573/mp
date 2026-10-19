@@ -2,8 +2,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use engine::core::content::ContentRegistry;
-use engine::core::content::{Content, FilesystemFolder, version, write};
+use engine::core::content::{Content, ContentRegistry, FilesystemFolder, version, write};
 use serde_json::json;
 use testkit::Game;
 use walkdir::WalkDir;

@@ -29,18 +29,16 @@ pub use blueprint::{
 };
 pub use resize::ResizeDialog;
 
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::World;
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
-use engine::systems::area::{self, AreaId, AreaModuleKind};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
 use serde_json::Value;
 
 use self::overlays::{
@@ -57,7 +55,6 @@ use crate::ui::{sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
-use engine::core::content::row_file;
 
 pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;

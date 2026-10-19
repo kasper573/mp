@@ -32,11 +32,11 @@ use engine::systems::launch::{
 };
 use engine::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use engine::systems::player::{ClientId, SpawnPolicy, SpawnRules};
-use engine::systems::{GameSettings, load_content, server_app, start_server, step_areas};
-use engine::systems::{REPLICATION_INTERVAL, TICK_HZ};
+use engine::systems::{
+    GameSettings, REPLICATION_INTERVAL, TICK_HZ, load_content, server_app, start_server, step_areas,
+};
 use metrics::{counter, gauge, histogram};
 use renet2::{ConnectionConfig, DisconnectReason, RenetServer, ServerEvent};
-
 use transport::WsTransport;
 
 service::heap_profiling!();

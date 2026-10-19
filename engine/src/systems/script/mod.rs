@@ -26,11 +26,12 @@ use crate::core::script::{
     TextDef, Vocabulary, compile::compile_row,
 };
 use crate::core::tiling::Tiles;
+use crate::systems::WorldArea;
 use crate::systems::actor::model::Face;
 use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaId, AreaObject};
 use crate::systems::class::{ClassDef, ClassId};
-use crate::systems::dialogue::ChoiceReveal;
+use crate::systems::dialogue::{self, ChoiceReveal};
 use crate::systems::item::{ItemDef, ItemId, ItemKind};
 use crate::systems::memory::{MemoryDef, MemoryId};
 use crate::systems::notification::{NotificationDef, NotificationId};
@@ -41,7 +42,6 @@ use crate::systems::skill::{SkillDef, SkillId};
 use crate::systems::stat::StatKind;
 use crate::systems::status::{StatusEffectDef, StatusEffectId};
 use crate::systems::text::{self, Span};
-use crate::systems::{WorldArea, dialogue};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RiftScripting;

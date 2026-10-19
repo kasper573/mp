@@ -12,14 +12,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
-use crate::core::script::Arrow;
-use crate::core::script::{Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::notification;
 use crate::systems::player::Xp;
-use crate::systems::script::effect as effects;
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
+    effect as effects,
 };
 use crate::systems::skill::{self, Learned, SkillDef};
 use crate::systems::stat::{Stat, Stats};

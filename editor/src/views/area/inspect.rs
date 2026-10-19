@@ -1,39 +1,34 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::HashSet;
 use std::str::FromStr;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, GAME_FILE, row_file};
 use engine::core::math::Rng;
 use engine::core::script::VariableType;
 use engine::core::tiling::{Cell, CellPos, TileSize};
-use engine::systems::area::{self, AreaId, AreaModuleKind};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
 use serde_json::Value;
 
-use super::pins::INITIAL_SPAWN;
-use super::placement::placement_extras;
+use super::pins::{self, INITIAL_SPAWN};
+use super::placement::{self, placement_extras};
 use super::population::from_npc;
 use super::preview::{clipboard_panel, pick_preview};
 use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
-use super::{AreaTool, pins};
-use super::{AreaViewState, grid, terrain};
-use super::{brush, placement, resize, stamp};
+use super::{AreaTool, AreaViewState, brush, grid, resize, stamp, terrain};
 use crate::app::{Editor, ModalDialog, PlacePick};
 use crate::drafts::{clear_draft, draft_or, set_draft};
-use crate::forms::FormCx;
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
-use crate::value::RowValue;
-use crate::{forms, picker, schema, value, views};
-use engine::core::content::{GAME_FILE, row_file};
+use crate::value::{self, RowValue};
+use crate::{picker, schema, views};
 
 /// The area itself: its card, modules, palette, the spawn and the ways in.
 pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {

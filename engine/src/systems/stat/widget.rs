@@ -3,12 +3,11 @@ use design_tokens::{face, sheet};
 use egui::{Ui, Vec2};
 
 use crate::core::content::Content;
-use crate::systems::class;
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::player::session;
-use crate::systems::stat;
+use crate::systems::{class, stat};
 
 const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 260.0);
 const LABEL_WIDTH: f32 = 140.0;

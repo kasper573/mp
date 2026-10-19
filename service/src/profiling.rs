@@ -1,9 +1,9 @@
+pub use tikv_jemallocator::Jemalloc as ServiceAllocator;
+
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pyroscope::backend::{BackendConfig, PprofConfig, pprof_backend};
 use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgentRunning};
-
-pub use tikv_jemallocator::Jemalloc as ServiceAllocator;
 
 pub struct CpuProfiler {
     _agent: PyroscopeAgent<PyroscopeAgentRunning>,

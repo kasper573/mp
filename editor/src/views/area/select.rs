@@ -1,12 +1,11 @@
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
-use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::HashSet;
 
 use egui::{Pos2, Ui};
+use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};

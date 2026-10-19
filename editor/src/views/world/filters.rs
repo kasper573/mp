@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::systems::area::{AreaDef, AreaId, AreaModuleKind};
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
@@ -14,7 +14,6 @@ use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::schema;
-use engine::core::content::row_file;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MapLens {

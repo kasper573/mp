@@ -1,18 +1,6 @@
 pub mod bindings;
 pub mod preview;
 
-use self::preview::PreviewPlace;
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::core::vfx::shader::VfxShaderDef;
-use engine::systems::actor::model::ModelDef;
-use engine::systems::area::AreaDef;
-use engine::systems::area::tileset::TilesetDef;
-use engine::systems::class::ClassDef;
-use engine::systems::input::map::InputDef;
-use engine::systems::quest::QuestDef;
-use engine::systems::skill::SkillDef;
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -21,13 +9,24 @@ pub mod usages;
 
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::ModuleRule;
+use engine::core::content::{ContentRow, ModuleRule, row_file};
 use engine::core::script::ScriptModuleKind;
+use engine::core::vfx::VfxShaderDef;
+use engine::systems::actor::model::ModelDef;
+use engine::systems::area::AreaDef;
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::class::ClassDef;
+use engine::systems::input::map::InputDef;
+use engine::systems::quest::QuestDef;
 use engine::systems::registry;
+use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
+use self::preview::PreviewPlace;
 use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{
     is_objective, module_lines, outline_block, script_extras, script_summary, script_values,
@@ -38,19 +37,16 @@ use crate::app::{
     Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
 };
 use crate::drafts::{clear_draft, draft_of, set_draft};
-use crate::forms;
-use crate::forms::{FormAction, FormChange, FormCx};
+use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
-use crate::schema;
-use crate::stage;
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
-use crate::views::script::{PendingScriptAction, ScriptOwner};
-use crate::views::{class, model, script, skill, tileset, vfx};
-use engine::core::content::row_file;
+use crate::views::script::{self, PendingScriptAction, ScriptOwner};
+use crate::views::{class, model, skill, tileset, vfx};
+use crate::{schema, stage};
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
@@ -312,7 +308,7 @@ fn row_card(
             return;
         }
         let hidden: &[&str] = match table {
-            "input" => &["modules", "bindings"],
+            InputDef::TABLE => &["modules", "bindings"],
             ClassDef::TABLE => &["modules", "levels", "tree", "backdrop"],
             SkillDef::TABLE => &["modules", "levels"],
             VfxShaderDef::TABLE => &["modules", "params"],

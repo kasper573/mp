@@ -1,13 +1,13 @@
+use std::path::PathBuf;
+
 use engine::core::content::ContentRow;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
-use engine::systems::class::ClassDef;
-use engine::systems::script::ScriptDef;
-use std::path::PathBuf;
-
 use engine::systems::area::world_map::{Note, Region};
 use engine::systems::area::{self, AreaDef};
+use engine::systems::class::ClassDef;
+use engine::systems::script::ScriptDef;
 use serde::Deserialize;
 use strum::VariantNames;
 
@@ -18,17 +18,17 @@ use crate::tabs::EditorTab;
 use crate::views::area::resize::ResizeDialog;
 use crate::views::area::{blueprint, shapes};
 use crate::views::character::CharacterSection;
+use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
-use crate::views::model::{FrameCueKind, ModelPage, ModelStrip, busts};
+use crate::views::model::{self, FrameCueKind, ModelPage, ModelStrip, busts};
 use crate::views::script::{PendingScriptAction, ScriptOwner};
 use crate::views::tileset::{
-    NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
+    self, NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
     TilesetMode, WalkBrush,
 };
 use crate::views::world::{
-    ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
+    self, ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
 
 #[derive(Clone, Debug, Deserialize, VariantNames)]

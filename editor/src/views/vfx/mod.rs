@@ -4,23 +4,23 @@ mod params;
 mod preview;
 mod shader_code;
 
-use engine::core::content::ContentRow;
+pub use params::{ParamSpec, param_fill, params_of, shader_params};
+pub use preview::VfxViews;
+
 use std::sync::Arc;
 
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
-use engine::core::content::{Content, ContentScope, ErrorPlace, with_content};
+use engine::core::content::{
+    Content, ContentRow, ContentScope, ErrorPlace, row_file, with_content,
+};
 use engine::core::time::Seconds;
 use engine::core::vfx::{ParamFill, VfxDef, VfxLayer, VfxShaderDef, shader_file};
 use serde_json::Value;
-
-pub use params::{ParamSpec, param_fill, params_of, shader_params};
-pub use preview::{Target, VfxViews};
 
 use self::preview::preview;
 use crate::app::Editor;
 use crate::project::ContentEdit;
 use crate::ui::{row_form, theme, widgets};
-use engine::core::content::row_file;
 
 const FORM_WIDTH: f32 = 440.0;
 const COLUMN_GAP: f32 = 16.0;

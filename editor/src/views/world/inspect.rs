@@ -1,6 +1,6 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, Fixture};
 use engine::systems::area::world_map::{
@@ -14,14 +14,13 @@ use super::canvas::{line_badge, viridis};
 use super::filters::{self, AreaRange, ColorField, ColorOf, ColorRanges, ColorShow, ColorTable};
 use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
 use crate::app::Editor;
-use crate::forms;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::ui::{sidebar, theme, widgets};
-use crate::value;
 use crate::views::area as area_view;
+use crate::{forms, value};
 
 fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     let Some(map) = OpenWorldMap::of(editor) else {

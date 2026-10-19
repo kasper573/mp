@@ -8,10 +8,9 @@ use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
-use super::card;
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
-    HotbarEntry, HotbarSlot, Rank, SkillId, Targeting, UseSkillRequest, casting,
+    HotbarEntry, HotbarSlot, Rank, SkillId, Targeting, UseSkillRequest, card, casting,
 };
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
@@ -26,13 +25,12 @@ use crate::systems::input::map::{
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::widget::{SLOT, SlotLook, slot};
 use crate::systems::item::{Inventory, ItemId, ItemKind, UseItemRequest, card as item_card};
-use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::reach::Engaged;
 use crate::systems::script::condition;
 use crate::systems::settings::{HotbarKey, HotbarShape, UserSettings};
 use crate::systems::skill::{CastAim, aim};
-use crate::systems::stat;
+use crate::systems::{notification, stat};
 
 pub const HOTBAR_KEYS: [InputAction; 9] = [
     InputAction::Hotbar1,

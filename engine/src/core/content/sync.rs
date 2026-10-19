@@ -7,8 +7,7 @@ use std::time::Duration;
 use bevy::tasks::futures_lite::future;
 use bevy_ecs::prelude::Resource;
 use futures_timer::Delay;
-use futures_util::StreamExt;
-use futures_util::stream;
+use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 
 use super::load::{ContentFolder, FileHashes, MemoryFolder};

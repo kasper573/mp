@@ -1,16 +1,13 @@
-use engine::core::content::ContentRow;
-use engine::systems::class::ClassDef;
-use engine::systems::skill::SkillDef;
 use std::collections::BTreeSet;
 
 use design_tokens::{glyph, ink};
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow};
 use engine::systems::class::{
-    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NodeKey, SkillNode, SkillTree,
-    TreeBackdrop,
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, NodeKey, SkillNode,
+    SkillTree, TreeBackdrop,
 };
-use engine::systems::skill::Rank;
+use engine::systems::skill::{Rank, SkillDef};
 use serde_json::{Map, Value, json};
 use strum::VariantArray;
 

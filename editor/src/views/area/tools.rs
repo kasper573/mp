@@ -2,8 +2,7 @@ use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::AreaDef;
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::{AreaDef, AreaModuleKind};
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
 use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
@@ -11,8 +10,10 @@ use super::select::{
     copy_selection, delete_selection, duplicate_selection, move_selection, paste_anchor,
     paste_in_place, select_input, selected_indices, snapped_delta, start_paste,
 };
-use super::{AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, shapes};
-use super::{placement, scenery, stamp};
+use super::{
+    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, placement, scenery, shapes,
+    stamp,
+};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;

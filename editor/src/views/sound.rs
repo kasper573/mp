@@ -1,5 +1,3 @@
-use engine::core::content::ContentRow;
-use engine::systems::area::AreaDef;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -9,11 +7,11 @@ use egui::Ui;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
 use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow};
 use engine::core::math::Pos;
 use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaId};
+use engine::systems::area::{self, AreaDef, AreaId};
 
 use crate::app::Editor;
 use crate::keymap::EditorKey;

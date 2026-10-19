@@ -1,7 +1,7 @@
-use design_tokens::face::Face;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use design_tokens::face::Face;
 use egui::emath::TSTransform;
 use egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,8 @@ use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
 use crate::core::math::Rgba;
-use crate::core::text::TextMotion;
-use crate::core::text::{self, TextShadow};
-use crate::systems::screen::ClientScreen;
-use crate::systems::screen::area;
+use crate::core::text::{self, TextMotion, TextShadow};
+use crate::systems::screen::{ClientScreen, area};
 
 const TITLE_SIZE: f32 = 44.0;
 const LINE_SIZE: f32 = 19.0;

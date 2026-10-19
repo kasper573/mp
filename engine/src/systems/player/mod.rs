@@ -10,19 +10,17 @@ use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use snapshot::{CharacterSnapshot, JoinAs};
 
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
-use crate::core::math::Rgba;
-use crate::core::math::{Direction, Pos, Rng};
+use crate::core::math::{Direction, Pos, Rgba, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
-use crate::systems::GameSettings;
 use crate::systems::account::Identity;
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Tint};
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
-use crate::systems::belongings;
 use crate::systems::class::{Class, ClassId};
 use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
@@ -31,15 +29,15 @@ use crate::systems::history::History;
 use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{self, HeardMove, Position};
-use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::skill::{BasicAttack, Hotbar, Learned};
 use crate::systems::stat::{self, Immortal, Stats};
 use crate::systems::visibility::{self, OwnedBy};
-use crate::systems::{Character, WorldArea, drain_requests};
-use snapshot::{CharacterSnapshot, JoinAs};
+use crate::systems::{
+    Character, GameSettings, WorldArea, belongings, drain_requests, notification,
+};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;

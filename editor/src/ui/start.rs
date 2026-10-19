@@ -1,16 +1,15 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Align, Context, Layout, RichText, Ui};
-use engine::core::content::version;
+use engine::core::content::{GAME_FILE, row_of, version};
 
 use super::report::{self, ReportAction};
 use super::{theme, widgets};
 use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, content_version};
 use crate::keymap::EditorKey;
 use crate::project::journal::RecoveryJournal;
-use crate::ui::dialogs;
-use crate::{templates, ui};
-use engine::core::content::{GAME_FILE, row_of};
+use crate::templates;
+use crate::ui::{self, dialogs};
 
 pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     let ctx = root.ctx().clone();

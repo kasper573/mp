@@ -12,10 +12,10 @@ use engine::systems::input::map::{InputAction, InputMap};
 use engine::systems::load_content;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::script::Place;
-
-use crate::seen::{area_key, clickable_point};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+
+use crate::seen::{area_key, clickable_point};
 
 /// The content the driver reads names and places from: the one the server it drives plays.
 pub fn content() -> &'static Content {

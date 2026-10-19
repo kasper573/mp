@@ -20,8 +20,7 @@ use crate::systems::attention;
 use crate::systems::combat::Attitude;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
-use crate::systems::player::Owner;
-use crate::systems::player::session;
+use crate::systems::player::{Owner, session};
 use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;

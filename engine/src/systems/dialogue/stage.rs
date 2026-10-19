@@ -32,8 +32,7 @@ use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemId, card};
 use crate::systems::npc::Npc;
-use crate::systems::player;
-use crate::systems::player::session;
+use crate::systems::player::{self, session};
 use crate::systems::screen::ClientScreen;
 
 const CHOICE_SHORTCUTS: [InputAction; 9] = [

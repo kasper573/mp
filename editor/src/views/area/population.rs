@@ -1,6 +1,5 @@
 use egui::{Ui, Vec2};
-use engine::core::content::Content;
-use engine::core::content::ContentRow;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
@@ -16,7 +15,6 @@ use crate::forms::{FormAction, FormCx};
 use crate::thumbs;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-use engine::core::content::row_file;
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {

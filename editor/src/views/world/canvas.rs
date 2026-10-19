@@ -1,7 +1,7 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink;
 use std::collections::{BTreeMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use egui::epaint::QuadraticBezierShape;
 use egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,

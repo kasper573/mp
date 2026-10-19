@@ -1,8 +1,3 @@
-use design_tokens::controls::{self, Pill};
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::core::content::table_folder;
-use engine::systems::player::snapshot::CharacterSnapshot;
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -10,8 +5,12 @@ use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentScope, version, with_content};
+use engine::core::content::{
+    Content, ContentRow, ContentScope, row_of, table_folder, version, with_content,
+};
 use engine::core::time::UtcHour;
 use engine::systems::GameSettings;
 use engine::systems::class::ClassDef;
@@ -21,6 +20,7 @@ use engine::systems::launch::{
     fake_token,
 };
 use engine::systems::player::SpawnPolicy;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
@@ -29,10 +29,9 @@ use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, conte
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;
 use crate::tabs::EditorTab;
-use crate::ui::{theme, widgets};
+use crate::ui::{self, theme, widgets};
 use crate::value::RowValue;
-use crate::{forms, play, ui};
-use engine::core::content::row_of;
+use crate::{forms, play};
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";

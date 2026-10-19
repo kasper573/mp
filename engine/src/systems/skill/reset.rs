@@ -5,15 +5,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{Cooldowns, Learned};
-use crate::core::script::Arrow;
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, ScriptFault};
+use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault};
 use crate::systems::class::{self, SkillPoints};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::notification::{self, Notification};
 use crate::systems::player::{self, player_requests};
-use crate::systems::script::Condition;
-use crate::systems::script::effect as effects;
-use crate::systems::script::{EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
+use crate::systems::script::{
+    Condition, EffectCall, FlowKey, Reach, RiftInstances, RiftScripting, effect as effects,
+};
 use crate::systems::stat;
 use crate::systems::text::counted;
 

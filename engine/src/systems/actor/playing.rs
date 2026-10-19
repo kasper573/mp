@@ -8,12 +8,10 @@ use crate::core::content::Content;
 use crate::core::math::Direction;
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault};
 use crate::core::time::{Millis, PlaybackRate, UnixMillis, WallClock};
-use crate::systems::movement;
-use crate::systems::notification;
-use crate::systems::script::Condition;
 use crate::systems::script::effect::{self as effects, Audience};
-use crate::systems::script::{EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
 use crate::systems::stat::{self, StatKind};
+use crate::systems::{movement, notification};
 
 /// An action an actor was told to play, with the moments its model lands and ends it. Replicated,
 /// so every client animates the same stroke from the same start.

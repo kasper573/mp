@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use design_tokens::card::{self, Art, Card, CardResponse};
 use design_tokens::controls::{self, Pill};
-use design_tokens::face::TextRole;
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::{self, Kind, Mark};
-use design_tokens::{face, ink};
+use design_tokens::ink;
 use egui::{Align, Label, Layout, Margin, Response, Sense, Stroke, Ui, Vec2};
 
 use super::{
@@ -14,9 +14,8 @@ use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::platform::ClientPlatform;
 use crate::core::time::UnixMillis;
-use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelChrome, PanelHead};
-use crate::systems::dialogue::{Conversation, ConversationPanel};
+use crate::systems::dialogue::{ChoiceReveal, Conversation, ConversationPanel};
 use crate::systems::hud;
 use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::item::{self, Inventory, ItemStack};

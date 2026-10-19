@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
+use engine::core::content::GAME_FILE;
 use include_dir::{Dir, include_dir};
 use walkdir::WalkDir;
 
 use crate::value::RowValue;
-use engine::core::content::GAME_FILE;
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
 

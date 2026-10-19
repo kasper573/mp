@@ -12,8 +12,8 @@ use engine::systems::movement::{
 };
 use engine::systems::npc::body::{self, Act, Priority};
 use engine::systems::npc::{self, Home, Npc, NpcDef, Pack};
-use engine::systems::script::Place;
-use engine::systems::{actor, script, skill, stat};
+use engine::systems::script::{self, Place};
+use engine::systems::{actor, skill, stat};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 

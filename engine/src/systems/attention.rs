@@ -12,8 +12,7 @@ use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::interact::{self, Interactive};
 use crate::systems::movement::Position;
 use crate::systems::player::Players;
-use crate::systems::stat;
-use crate::systems::visibility;
+use crate::systems::{stat, visibility};
 
 const REFRESH_ROUNDS: u32 = 3;
 const MARKED_RANGE: Tiles = Tiles(visibility::VIEW_DISTANCE.0 + 4.0);

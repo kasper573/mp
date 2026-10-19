@@ -2,14 +2,13 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 use design_tokens::controls::{self, Pill};
-use design_tokens::face::TextRole;
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{face, ink};
+use design_tokens::ink;
 use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
 
-use super::card;
-use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
+use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind, card};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};

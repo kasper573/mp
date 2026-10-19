@@ -1,7 +1,7 @@
+pub use std::alloc::System as ServiceAllocator;
+
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-
-pub use std::alloc::System as ServiceAllocator;
 
 pub enum CpuProfiler {}
 

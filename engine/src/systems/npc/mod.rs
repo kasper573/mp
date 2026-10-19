@@ -22,7 +22,6 @@ use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
-use crate::systems::dialogue;
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{self, Position, TileClaims, position};
@@ -36,7 +35,7 @@ use crate::systems::skill::{self, Rank, SkillId};
 use crate::systems::stat::Stats;
 use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
-use crate::systems::{Character, WorldArea};
+use crate::systems::{Character, WorldArea, dialogue};
 
 pub type NpcId = ContentId<NpcDef>;
 

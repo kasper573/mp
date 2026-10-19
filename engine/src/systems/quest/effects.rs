@@ -13,9 +13,9 @@ use crate::systems::dialogue::{
     self, CardOffer, ChoiceChip, ChoiceReveal, ChoiceTag, ConversationPanel,
 };
 use crate::systems::item::{Inventory, ItemStack};
-use crate::systems::script::Condition;
-use crate::systems::script::effect as effects;
-use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
+use crate::systems::script::{
+    Condition, EffectCall, Reach, RiftScripting, condition, effect as effects,
+};
 use crate::systems::text::LineText;
 
 /// Shows the offer card and pauses.

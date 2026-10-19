@@ -1,8 +1,7 @@
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
-use egui::emath::GuiRounding;
-use egui::emath::Rot2;
+use egui::emath::{GuiRounding, Rot2};
 use egui::epaint::{Mesh, TextShape};
 use egui::{
     Align, Align2, Color32, CornerRadius, InnerResponse, Key, Margin, Painter, Pos2, Rangef, Rect,

@@ -1,23 +1,19 @@
-use design_tokens::glyph;
-use engine::core::content::ContentRow;
-use engine::systems::npc::NpcDef;
-use engine::systems::script::ScriptDef;
 use std::str::FromStr;
 
+use design_tokens::glyph;
 use egui::{Align, Layout, Ui};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::script::{ScriptModuleKind, VariableType};
-use engine::systems::script::RiftScripts;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::{RiftScripts, ScriptDef};
 use serde_json::Value;
 
-use super::card_body;
-use super::{theme, widgets};
-use crate::forms::{FormAction, FormChange, FormCx};
-use crate::schema;
+use super::{card_body, theme, widgets};
+use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::value::RowValue;
 use crate::views::model::busts;
 use crate::views::script::{graph, nodes, panel};
-use crate::{condition, forms};
-use engine::core::content::row_file;
+use crate::{condition, schema};
 
 pub fn script_cards(
     ui: &mut Ui,

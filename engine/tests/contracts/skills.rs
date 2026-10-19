@@ -9,14 +9,13 @@ use engine::systems::equipment::{self, Equipment, EquipmentSlot, UnequipRequest}
 use engine::systems::item::{self, ItemDef, UseItemRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
-use engine::systems::reach;
 use engine::systems::skill::{
     self, AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, CastAim,
     Cooldowns, Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank,
     ResetAnswerRequest, ResetPrompt, SkillDef, SkillId, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
-use engine::systems::{actor, script, vfx};
+use engine::systems::{actor, reach, script, vfx};
 use serde_json::{Value, json};
 use testkit::{Game, Map, Sim};
 

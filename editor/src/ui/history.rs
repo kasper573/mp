@@ -1,7 +1,8 @@
-use design_tokens::glyph::{self, Mark};
 use std::time::SystemTime;
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align2, FontId, Sense, Ui};
+use engine::core::content::row_of;
 use serde_json::Value;
 
 use super::{theme, widgets};
@@ -9,7 +10,6 @@ use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::FileBytes;
 use crate::project::history::EditStep;
-use engine::core::content::row_of;
 
 const ROW: f32 = 28.0;
 

@@ -8,8 +8,6 @@ pub mod watch;
 pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_bytes};
 pub use history::{EditHistory, EditStep, RowSelection};
 
-use engine::core::content::ContentRow;
-use engine::systems::script::ScriptDef;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +15,13 @@ use std::sync::mpsc::{self, TryRecvError};
 use std::time::{Duration, Instant, SystemTime};
 
 use engine::core::content::ErrorPlace::WholeFile;
-use engine::core::content::{Content, ContentProblem, GAME_FILE, LoadError, LoadReport};
+use engine::core::content::{
+    Content, ContentProblem, ContentRow, GAME_FILE, LoadError, LoadReport,
+};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems;
+use engine::systems::script::ScriptDef;
 
 use crate::app::ChannelInbox;
 use crate::schema::SchemaShapes;

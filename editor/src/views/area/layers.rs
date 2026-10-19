@@ -1,8 +1,6 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
-use engine::core::content::{Content, load};
-use engine::systems::area::AreaDef;
-use engine::systems::area::{self, AreaId};
+use engine::core::content::{Content, ContentRow, load, row_file};
+use engine::systems::area::{self, AreaDef, AreaId};
 use serde_json::Value;
 
 use super::grid;
@@ -10,7 +8,6 @@ use crate::app::{ConfirmAction, ConfirmDialog, Editor, ModalDialog, RenameDialog
 use crate::project::ContentEdit;
 use crate::rows;
 use crate::ui::{theme, widgets};
-use engine::core::content::row_file;
 
 const WIDTH: f32 = 190.0;
 

@@ -8,8 +8,8 @@ use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
 use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
-use super::population::NpcSprite;
-use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
+use super::population::{self, NpcSprite};
+use super::{AreaFrame, AreaTool, TILE_PX, modules, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;

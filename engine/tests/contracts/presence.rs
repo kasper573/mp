@@ -10,11 +10,11 @@ use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::player::ClientId;
-use engine::systems::script::RiftQuery;
 use engine::systems::script::condition::{self, CompiledCondition};
+use engine::systems::script::{self, RiftQuery};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::{self, Presence};
-use engine::systems::{actor, reach, script, skill};
+use engine::systems::{actor, reach, skill};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 

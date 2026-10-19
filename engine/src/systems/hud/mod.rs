@@ -1,14 +1,18 @@
 mod card;
 mod panel;
 
+pub(crate) use card::{
+    Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
+};
+pub(crate) use panel::{GripCorner, WindowFrame, sheet_pose, slip_grip, widget, window};
+
 use std::collections::HashSet;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::face::TextRole;
-use design_tokens::sheet;
-use design_tokens::{controls, face, ink, slip};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{controls, ink, sheet, slip};
 use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::AssetRef;
@@ -18,17 +22,12 @@ use crate::core::math::WindowPx;
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::input::map::{ActionInput, InputAction, InputMap};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::item::Inventory;
-use crate::systems::player::session;
+use crate::systems::item::{self, Inventory};
+use crate::systems::player::{self, session};
 use crate::systems::screen::ClientScreen;
 use crate::systems::settings::{self, UserSettings};
-use crate::systems::skill::{HotbarEntry, HotbarSlot, SkillId};
-use crate::systems::{equipment, history, item, player, quest, skill, stat, terminal};
-
-pub(crate) use card::{
-    Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
-};
-pub(crate) use panel::{GripCorner, WindowFrame, sheet_pose, slip_grip, widget, window};
+use crate::systems::skill::{self, HotbarEntry, HotbarSlot, SkillId};
+use crate::systems::{equipment, history, quest, stat, terminal};
 
 pub(crate) const WIDGET: WindowPx = WindowPx(46.0);
 pub(crate) const TOOLTIP_WIDTH: f32 = 260.0;

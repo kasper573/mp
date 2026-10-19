@@ -4,17 +4,16 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Ui};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Rgba;
-use engine::core::vfx::VfxDef;
-use engine::core::vfx::shader::VfxShaderDef;
-use engine::core::vfx::{ParamFill, ParamKind, ParamValue, ShaderParam, VfxParam};
+use engine::core::vfx::{
+    ParamFill, ParamKind, ParamValue, ShaderParam, VfxDef, VfxParam, VfxShaderDef,
+};
 use serde_json::{Map, Value};
 
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::ProjectFiles;
 use crate::ui::{theme, widgets};
-use engine::core::content::row_file;
 
 const PARAM_INDENT: f32 = 22.0;
 const BOUND_WIDTH: f32 = 64.0;

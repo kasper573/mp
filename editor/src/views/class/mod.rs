@@ -1,12 +1,12 @@
 pub mod inspect;
 pub mod tree;
 
-use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::class::ClassDef;
 use std::collections::HashMap;
 
+use design_tokens::glyph::{self, Mark};
 use egui::Ui;
+use engine::core::content::{ContentRow, row_file};
+use engine::systems::class::ClassDef;
 use engine::systems::stat::StatKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
@@ -15,7 +15,6 @@ use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{self, row_form, sidebar, theme, widgets};
-use engine::core::content::row_file;
 
 pub const TREE_PART: &str = "/tree/";
 

@@ -1,7 +1,7 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
-use engine::core::content::ContentRow;
 use engine::core::content::fixture::FixtureLock;
+use engine::core::content::{ContentRow, row_file};
 use engine::systems::input::map::InputDef;
 use serde_json::Value;
 
@@ -9,7 +9,6 @@ use super::{theme, widgets};
 use crate::forms::FormChange;
 use crate::project::ProjectFiles;
 use crate::value::RowValue;
-use engine::core::content::row_file;
 
 pub(super) fn bindings_section(
     ui: &mut Ui,

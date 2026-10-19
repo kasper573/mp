@@ -1,14 +1,15 @@
 use std::time::Duration;
 
+use design_tokens::ink::Prose;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
+
 use crate::core::script::{Expr, Value};
 use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice};
 use crate::core::time::{Millis, Seconds};
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::script::RiftScripting;
-use design_tokens::ink::Prose;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use strum::{IntoStaticStr, VariantArray};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(try_from = "SpanRow", into = "SpanRow")]

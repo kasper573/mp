@@ -4,10 +4,9 @@ use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
 use engine::core::content::locate;
 use engine::core::script::VariableType;
-use serde_json::{Map, Value, json};
-
 use engine::systems::registry;
 use engine::systems::script::Place;
+use serde_json::{Map, Value, json};
 
 pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,

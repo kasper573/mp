@@ -9,8 +9,7 @@ use crate::core::script::{
     Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
 };
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::systems::script::effect as effects;
-use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, effect as effects};
 
 pub type MemoryId = ContentId<MemoryDef>;
 
