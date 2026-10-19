@@ -499,7 +499,7 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
     if editor.views.tileset.views.contains_key(key) {
         return;
     }
-    let surface = sounds::surfaces(editor)
+    let surface = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)))
         .into_iter()
         .next()
         .map(|surface| surface.key);
@@ -775,7 +775,8 @@ fn status(editor: &mut Editor, tileset: &OpenTileset) {
                 .map_or(0, |counts| counts.with_surface);
             left.push(format!(
                 "{} surfaces · {} tiles have one",
-                sounds::surfaces(editor).len(),
+                sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, &tileset.key)))
+                    .len(),
                 widgets::thousands(with_surface)
             ));
         }

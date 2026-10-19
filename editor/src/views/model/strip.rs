@@ -1,5 +1,6 @@
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
 use engine::core::content::ContentRow;
+use engine::core::content::RowName;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
 use engine::systems::actor::ModelDef;
@@ -720,13 +721,9 @@ pub fn set_cue(
             format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
         }
         FrameCueKind::Sound => {
-            let sound = editor
-                .views
-                .model
-                .view(key)
-                .last_sound
-                .clone()
-                .or_else(|| super::sounds::first_sfx(editor));
+            let sound = editor.views.model.view(key).last_sound.clone().or_else(|| {
+                super::sounds::first_sfx(editor, Some(&RowName::new(ModelDef::TABLE, key)))
+            });
             let Some(sound) = sound else {
                 editor.toast("No sound rows to pick from");
                 return;

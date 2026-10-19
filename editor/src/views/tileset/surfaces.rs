@@ -1,7 +1,9 @@
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
+use engine::core::content::RowName;
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::systems::area::tileset::SurfaceDef;
+use engine::systems::area::tileset::TilesetDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
@@ -15,7 +17,7 @@ use crate::{forms, picker, rows, value};
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let surfaces = sounds::surfaces(editor);
+    let surfaces = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)));
     let brush = editor.views.tileset.view(key).surface.clone();
     let mut pick = None;
     let mut play = None;
@@ -74,7 +76,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     if new {
         let dialog = NewSurfaceDialog {
-            footstep: sounds::first_sfx(editor).unwrap_or_default(),
+            footstep: sounds::first_sfx(editor, None).unwrap_or_default(),
             ..NewSurfaceDialog::default()
         };
         editor.views.tileset.view_mut(key).dialog = Some(TileSheetDialog::NewSurface(dialog));
@@ -175,7 +177,7 @@ pub fn new_surface_dialog(
     tileset: &str,
     mut dialog: NewSurfaceDialog,
 ) -> Option<NewSurfaceDialog> {
-    let footsteps = sounds::sfx_keys(editor);
+    let footsteps = sounds::sfx_keys(editor, None);
     let mut answer = None;
     dialogs::card(ctx, "new-surface", 400.0, |ui| {
         ui.label(RichText::new("New surface").size(16.0).strong());

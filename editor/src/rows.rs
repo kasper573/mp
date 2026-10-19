@@ -100,8 +100,13 @@ pub fn new_row_dialog(editor: &mut Editor, table: &str, owner: Option<RowName>) 
     new_row(editor, table, owner, None);
 }
 
-pub fn new_row_into(editor: &mut Editor, table: &str, into: Option<(String, String)>) {
-    new_row(editor, table, None, into);
+pub fn new_row_into(
+    editor: &mut Editor,
+    table: &str,
+    owner: Option<RowName>,
+    into: Option<(String, String)>,
+) {
+    new_row(editor, table, owner, into);
 }
 
 fn new_row(

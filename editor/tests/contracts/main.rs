@@ -9,6 +9,7 @@ mod opening;
 mod palette;
 mod project_edits;
 mod project_history;
+mod reach;
 mod scenes;
 mod spans;
 mod support;

@@ -1,5 +1,5 @@
 use egui::Ui;
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentOwners, ContentRow, row_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
@@ -87,7 +87,7 @@ impl PickSource for RowSource {
             let mut owners: Vec<String> = cx
                 .files
                 .keys_of(ScriptDef::TABLE)
-                .map(|key| script_owner(cx, key))
+                .map(|key| script_runner(cx, key))
                 .filter(|owner| !owner.is_empty())
                 .collect();
             owners.sort();
@@ -103,21 +103,42 @@ impl PickSource for RowSource {
         Vec::new()
     }
 
+    fn scopes(&self, cx: &FormCx) -> Vec<String> {
+        cx.scopes()
+            .iter()
+            .map(|scope| match scope {
+                Some(owner) => format!("local to {owner}"),
+                None => "global".to_owned(),
+            })
+            .collect()
+    }
+
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate> {
+        let owners = cx.files.owners();
+        let scopes = cx.scopes();
         let mut listed = Vec::new();
         for table in &self.tables {
             for key in cx.files.keys_of(table) {
+                if !cx.reaches(table, key) {
+                    continue;
+                }
                 let category = if self.only_scripts() {
-                    script_owner(cx, key)
+                    script_runner(cx, key)
                 } else {
                     table.clone()
                 };
+                let owner = owners.owner(table, key).cloned();
+                let mut hint = pick_hint(cx, table, key);
+                if scopes.is_empty() && owner.is_some() {
+                    hint = format!("{} · {hint}", owner_path(&owners, table, key));
+                }
                 listed.push(Candidate {
                     pick: Pick::new(table.as_str(), key),
                     category,
                     name: display_name(cx, table, key),
-                    hint: pick_hint(cx, table, key),
+                    hint,
                     blocked: blocked(cx, table, &self.path, key),
+                    scope: scopes.iter().position(|scope| *scope == owner).unwrap_or(0),
                 });
             }
         }
@@ -131,6 +152,11 @@ impl PickSource for RowSource {
         if !self.tables.iter().any(|listed| listed == table) {
             return Err(format!("this field takes {}, not {table}", self.spoken()));
         }
+        if !cx.reaches(table, key)
+            && let Some(owner) = cx.files.owners().owner(table, key)
+        {
+            return Err(format!("{table}/{key} is local to {owner}"));
+        }
         if let Some(reason) = blocked(cx, table, &self.path, key) {
             return Err(format!("{table}/{key}: {reason}"));
         }
@@ -139,6 +165,12 @@ impl PickSource for RowSource {
 
     fn shown(&self, pick: &Pick) -> (String, String) {
         (format!("{}/", pick.category), pick.key.clone())
+    }
+
+    fn tag(&self, cx: &FormCx, pick: &Pick) -> Option<(String, String)> {
+        let owners = cx.files.owners();
+        let owner = owners.owner(&pick.category, &pick.key)?;
+        Some(("local".to_owned(), format!("local to {owner}")))
     }
 
     fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32) {
@@ -166,18 +198,31 @@ impl PickSource for RowSource {
         })
     }
 
-    fn creates(&self, cx: &FormCx) -> Option<(String, FormAction)> {
+    fn creates(&self, cx: &FormCx) -> Vec<(String, FormAction)> {
         if self.several() || cx.shapes.is_closed(&self.tables[0]) {
-            return None;
+            return Vec::new();
         }
         let table = &self.tables[0];
-        Some((
-            format!("New {}…", table.replace('_', " ")),
+        let spoken = table.replace('_', " ");
+        let mut lines = vec![(
+            format!("New {spoken}…"),
             FormAction::NewRow {
                 table: table.clone(),
                 path: self.path.clone(),
+                owner: None,
             },
-        ))
+        )];
+        if let Some(reader) = cx.reader().filter(|_| !cx.sees_all_rows()) {
+            lines.push((
+                format!("New {spoken} local to {reader}…"),
+                FormAction::NewRow {
+                    table: table.clone(),
+                    path: self.path.clone(),
+                    owner: Some(reader),
+                },
+            ));
+        }
+        lines
     }
 }
 
@@ -219,8 +264,8 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     match table {
         ScriptDef::TABLE => {
             let kind = runner_kind(cx.row_table.as_deref()?);
-            let owner = script_owner(cx, key);
-            (runner_kind(&owner) != kind).then(|| format!("owner {owner}"))
+            let owner = script_runner(cx, key);
+            (runner_kind(&owner) != kind).then(|| format!("runs on {owner}"))
         }
         SkillDef::TABLE if path.ends_with("/basic_attack") => {
             let row = cx.files.json(&row_file(SkillDef::TABLE, key))?;
@@ -251,11 +296,21 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     }
 }
 
+/// Where a local row sits, from the top owner down: `island › wren`.
+fn owner_path(owners: &ContentOwners, table: &str, key: &str) -> String {
+    let mut keys: Vec<&str> = owners
+        .chain(table, key)
+        .map(|owner| owner.key.as_str())
+        .collect();
+    keys.reverse();
+    keys.join(" › ")
+}
+
 fn runner_kind(owner: &str) -> RunnerKind {
     owner.parse().unwrap_or(RunnerKind::Any)
 }
 
-fn script_owner(cx: &FormCx, key: &str) -> String {
+fn script_runner(cx: &FormCx, key: &str) -> String {
     cx.files
         .json(&row_file(ScriptDef::TABLE, key))
         .map(|row| row.text("runs_on").to_owned())
@@ -295,7 +350,7 @@ fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
         }
         ScriptDef::TABLE => {
             let uses = cx.usages.of_row(ScriptDef::TABLE, key).len();
-            format!("{} · used by {uses}", script_owner(cx, key))
+            format!("{} · used by {uses}", script_runner(cx, key))
         }
         _ => {
             let uses = cx.usages.of_row(table, key).len();

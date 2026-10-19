@@ -467,6 +467,7 @@ fn overlays_legend(ui: &mut Ui) {
 
 fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content) {
     let stamp = editor.views.area.view(view_key).stamp.clone();
+    let viewed = super::viewed_row(view_key).expect("an area or blueprint view");
     let mut save = false;
     tool_card(ui, "Stamp", |ui| {
         let mut picked = stamp.clone().unwrap_or_default();
@@ -481,7 +482,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             let project = project.as_ref().expect("project");
             let root = Value::Null;
             let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                .editing(AreaDef::TABLE, None);
+                .editing(&viewed.table, Some(&viewed.key));
             widgets::kv(ui, "blueprint", |ui| {
                 if picker::row(
                     ui,
@@ -581,7 +582,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 let mut actions = Vec::new();
                 let root = Value::Null;
                 let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                    .editing(AreaDef::TABLE, None);
+                    .editing(&viewed.table, Some(&viewed.key));
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {

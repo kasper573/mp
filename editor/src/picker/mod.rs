@@ -97,6 +97,8 @@ pub struct Candidate {
     pub hint: String,
     /// Why this candidate can't be picked here, when it can't.
     pub blocked: Option<String>,
+    /// Which of the source's scopes the candidate lives in.
+    pub scope: usize,
 }
 
 /// What a picker field lists, how it shows a pick, and what it takes by drop.
@@ -104,6 +106,14 @@ pub trait PickSource {
     fn placeholder(&self) -> String;
     /// The chips offered for quick filtering; none hides the chip row.
     fn categories(&self, cx: &FormCx) -> Vec<Category>;
+    /// The headings candidates are grouped under, nearest first; none lists them ungrouped.
+    fn scopes(&self, _cx: &FormCx) -> Vec<String> {
+        Vec::new()
+    }
+    /// A word shown after a held pick, and what hovering it says.
+    fn tag(&self, _cx: &FormCx, _pick: &Pick) -> Option<(String, String)> {
+        None
+    }
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate>;
     /// The pick a dragged thing becomes on this field, or why the field refuses it.
     fn accepts(&self, cx: &FormCx, dragged: &Dragged) -> Result<Pick, String>;
@@ -119,9 +129,9 @@ pub trait PickSource {
     fn opens(&self, _pick: &Pick) -> Option<FormAction> {
         None
     }
-    /// A "New …" line at the popover's foot that creates and picks in one step.
-    fn creates(&self, _cx: &FormCx) -> Option<(String, FormAction)> {
-        None
+    /// "New …" lines at the popover's foot that create and pick in one step.
+    fn creates(&self, _cx: &FormCx) -> Vec<(String, FormAction)> {
+        Vec::new()
     }
 }
 
@@ -260,6 +270,10 @@ fn chip(ui: &mut Ui, cx: &mut FormCx, source: &dyn PickSource, pick: &Pick) -> e
                 ui.add(
                     egui::Label::new(theme::mono(text).size(13.0).color(theme::CODE)).truncate(),
                 );
+                if let Some((tag, about)) = source.tag(cx, pick) {
+                    ui.label(theme::faint(format!("· {tag}")).size(12.0))
+                        .on_hover_text(about);
+                }
             });
         })
         .response
@@ -301,6 +315,7 @@ fn popover(
     let mut category = draft_of(ui, category_id);
     let needle = search.to_lowercase();
     let categories = source.categories(cx);
+    let scopes = source.scopes(cx);
     let all = source.candidates(cx);
     let total = all.len();
     let mut blocked_rule: Option<String> = None;
@@ -319,9 +334,9 @@ fn popover(
         })
         .collect();
     candidates.sort_by(|a, b| {
-        a.blocked
-            .is_some()
-            .cmp(&b.blocked.is_some())
+        a.scope
+            .cmp(&b.scope)
+            .then(a.blocked.is_some().cmp(&b.blocked.is_some()))
             .then((a.pick != *pick).cmp(&(b.pick != *pick)))
             .then(a.pick.category.cmp(&b.pick.category))
             .then(a.pick.key.cmp(&b.pick.key))
@@ -420,24 +435,55 @@ fn popover(
         .max_height(300.0)
         .id_salt(id.with("list"))
         .show(ui, |ui| {
-            if grid {
-                egui::Grid::new(id.with("grid"))
-                    .num_columns(columns)
-                    .spacing([4.0, 4.0])
-                    .show(ui, |ui| {
-                        for (index, candidate) in candidates.iter().enumerate() {
-                            if tile(ui, cx, source, candidate, index == highlight, pick) {
-                                picked = Some(candidate.pick.clone());
-                            }
-                            if (index + 1) % columns == 0 {
-                                ui.end_row();
-                            }
-                        }
-                    });
+            let groups: Vec<CandidateGroup> = if scopes.is_empty() {
+                vec![CandidateGroup {
+                    heading: None,
+                    members: candidates.iter().copied().enumerate().collect(),
+                }]
+            } else if candidates.is_empty() {
+                Vec::new()
             } else {
-                for (index, candidate) in candidates.iter().enumerate() {
-                    if line(ui, cx, source, candidate, index == highlight, pick) {
-                        picked = Some(candidate.pick.clone());
+                scopes
+                    .iter()
+                    .enumerate()
+                    .map(|(scope, label)| CandidateGroup {
+                        heading: Some(label.as_str()),
+                        members: candidates
+                            .iter()
+                            .copied()
+                            .enumerate()
+                            .filter(|(_, candidate)| candidate.scope == scope)
+                            .collect(),
+                    })
+                    .collect()
+            };
+            for (group, CandidateGroup { heading, members }) in groups.iter().enumerate() {
+                if let Some(heading) = heading {
+                    ui.label(widgets::section_heading(heading));
+                    if members.is_empty() {
+                        ui.label(theme::faint("none").size(12.0));
+                        continue;
+                    }
+                }
+                if grid {
+                    egui::Grid::new(id.with(("grid", group)))
+                        .num_columns(columns)
+                        .spacing([4.0, 4.0])
+                        .show(ui, |ui| {
+                            for (count, (index, candidate)) in members.iter().enumerate() {
+                                if tile(ui, cx, source, candidate, *index == highlight, pick) {
+                                    picked = Some(candidate.pick.clone());
+                                }
+                                if (count + 1) % columns == 0 {
+                                    ui.end_row();
+                                }
+                            }
+                        });
+                } else {
+                    for (index, candidate) in members {
+                        if line(ui, cx, source, candidate, *index == highlight, pick) {
+                            picked = Some(candidate.pick.clone());
+                        }
                     }
                 }
             }
@@ -455,7 +501,7 @@ fn popover(
     if !pick.is_empty() {
         ui.label(theme::muted(source.footer(cx, pick)).monospace().size(11.5));
     }
-    if let Some((label, action)) = source.creates(cx) {
+    for (label, action) in source.creates(cx) {
         let response = ui
             .horizontal(|ui| {
                 ui.label(theme::code("+"));
@@ -485,6 +531,12 @@ fn popover(
         close(ui, id);
     }
     changed
+}
+
+/// The candidates listed under one scope's heading, each with its place in the whole list.
+struct CandidateGroup<'c> {
+    heading: Option<&'c str>,
+    members: Vec<(usize, &'c Candidate)>,
 }
 
 fn line(

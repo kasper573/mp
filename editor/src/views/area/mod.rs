@@ -70,6 +70,16 @@ pub fn blueprint_view_key(blueprint: &str) -> String {
     format!("blueprint:{blueprint}")
 }
 
+/// The row a view key's view shows: an area, or a blueprint.
+pub fn viewed_row(view_key: &str) -> Option<RowName> {
+    let (kind, key) = view_key.split_once(':')?;
+    match kind {
+        "area" => Some(RowName::new(AreaDef::TABLE, key)),
+        "blueprint" => Some(RowName::new(BlueprintDef::TABLE, key)),
+        _ => None,
+    }
+}
+
 fn camera_key(project: &Project, view_key: &str) -> String {
     format!("{}:{view_key}", project.root.display())
 }

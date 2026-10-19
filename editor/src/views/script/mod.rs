@@ -180,8 +180,8 @@ impl ScriptDoc {
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx =
-            FormCx::new(project, root, shapes, form, actions).editing(ScriptDef::TABLE, None);
+        let mut cx = FormCx::new(project, root, shapes, form, actions)
+            .editing(ScriptDef::TABLE, Some(&self.at.key));
         cx.speaker = self.default_speaker().npc().map(str::to_owned);
         cx
     }
@@ -1238,7 +1238,8 @@ pub fn add_node(
         node["lines"] = serde_json::json!([doc.default_speaker().blank_line()]);
     }
     if let (Some(schema), Some(project)) = (nodes::node_schema(root), editor.project.as_ref()) {
-        nodes::fill_references(root, schema, &mut node, &project.files);
+        let reader = RowName::new(ScriptDef::TABLE, &doc.at.key);
+        nodes::fill_references(root, schema, &mut node, &project.files, &reader);
     }
     if nodes::is_event(&node) {
         let catalogue = catalogue_of(editor.project.as_ref());

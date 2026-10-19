@@ -1,6 +1,6 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::audio::playback::{SfxDef, SfxRoleDef, SfxScalar};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentRow, RowName, row_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::SurfaceDef;
 
@@ -52,11 +52,14 @@ pub struct SfxRole {
     pub def: SfxRoleDef,
 }
 
-pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
+pub fn sfx_roles(editor: &Editor, reader: Option<&RowName>) -> Vec<SfxRole> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let mut keys: Vec<&str> = project.files.keys_of(SfxRoleDef::TABLE).collect();
+    let mut keys: Vec<&str> = project
+        .files
+        .keys_in_reach(SfxRoleDef::TABLE, reader)
+        .collect();
     keys.sort_unstable();
     keys.into_iter()
         .filter_map(|key| sfx_role(editor, key))
@@ -118,17 +121,18 @@ pub fn verdict(loudness: Loudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerd
     }
 }
 
-pub fn first_sfx(editor: &Editor) -> Option<String> {
-    sfx_keys(editor).into_iter().next()
+pub fn first_sfx(editor: &Editor, reader: Option<&RowName>) -> Option<String> {
+    sfx_keys(editor, reader).into_iter().next()
 }
 
-pub fn sfx_keys(editor: &Editor) -> Vec<String> {
+/// The sounds `reader` may name.
+pub fn sfx_keys(editor: &Editor, reader: Option<&RowName>) -> Vec<String> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
     let mut keys: Vec<String> = project
         .files
-        .keys_of(SfxDef::TABLE)
+        .keys_in_reach(SfxDef::TABLE, reader)
         .map(str::to_owned)
         .collect();
     keys.sort();
@@ -141,11 +145,15 @@ pub struct FootstepSurface {
     pub footstep: String,
 }
 
-pub fn surfaces(editor: &Editor) -> Vec<FootstepSurface> {
+/// The surfaces `reader` may name.
+pub fn surfaces(editor: &Editor, reader: Option<&RowName>) -> Vec<FootstepSurface> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let mut keys: Vec<&str> = project.files.keys_of(SurfaceDef::TABLE).collect();
+    let mut keys: Vec<&str> = project
+        .files
+        .keys_in_reach(SurfaceDef::TABLE, reader)
+        .collect();
     keys.sort_unstable();
     keys.into_iter()
         .filter_map(|key| {
@@ -159,8 +167,12 @@ pub fn surfaces(editor: &Editor) -> Vec<FootstepSurface> {
         .collect()
 }
 
-pub fn footstep_of(editor: &Editor, surface: Option<&str>) -> Option<String> {
-    let surfaces = surfaces(editor);
+pub fn footstep_of(
+    editor: &Editor,
+    reader: Option<&RowName>,
+    surface: Option<&str>,
+) -> Option<String> {
+    let surfaces = surfaces(editor, reader);
     let chosen = match surface {
         Some(key) => surfaces.iter().find(|s| s.key == key),
         None => surfaces.first(),
@@ -169,8 +181,9 @@ pub fn footstep_of(editor: &Editor, surface: Option<&str>) -> Option<String> {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let keys = sfx_keys(editor);
-    let roles = sfx_roles(editor);
+    let reader = RowName::new(ModelDef::TABLE, key);
+    let keys = sfx_keys(editor, Some(&reader));
+    let roles = sfx_roles(editor, Some(&reader));
     let (search, filter) = {
         let view = &editor.views.model.view(key);
         (view.sound_search.clone(), view.sound_role.clone())

@@ -701,8 +701,14 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         FormAction::NewRow {
             table: into_table,
             path,
+            owner,
         } => {
-            new_row_into(editor, &into_table, Some((row_file(table, key), path)));
+            new_row_into(
+                editor,
+                &into_table,
+                owner,
+                Some((row_file(table, key), path)),
+            );
         }
         FormAction::RowAction(action) => browser::act(editor, table, key, action),
     }

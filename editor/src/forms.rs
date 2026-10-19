@@ -5,11 +5,12 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{Content, ContentRow, LoadReport, row_file};
+use engine::core::content::{Content, ContentRow, LoadReport, RowName, row_file};
 use engine::core::script::VariableType;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::npc::NpcDef;
+use engine::systems::registry;
 use serde_json::{Map, Value};
 
 use crate::keymap::EditorKey;
@@ -85,6 +86,43 @@ impl<'a> FormCx<'a> {
         };
         self
     }
+
+    /// The row this form edits, from which what it may name is reckoned.
+    pub fn reader(&self) -> Option<RowName> {
+        Some(RowName::new(
+            self.row_table.as_deref()?,
+            self.row_key.as_deref()?,
+        ))
+    }
+
+    /// Whether the row this form edits may name any row of a table, local or not.
+    pub fn sees_all_rows(&self) -> bool {
+        self.row_table
+            .as_deref()
+            .is_some_and(|table| registry().sees_all_rows(table))
+    }
+
+    /// Whether the row this form edits may name `table/key`: a global row, or one local to it or
+    /// to an owner above it.
+    pub fn reaches(&self, table: &str, key: &str) -> bool {
+        self.files.reaches(self.reader().as_ref(), table, key)
+    }
+
+    /// Where rows in reach of this form's row live, nearest first: the row itself, each owner
+    /// above it, and then global (`None`). Empty for a row that sees every row.
+    pub fn scopes(&self) -> Vec<Option<RowName>> {
+        if self.sees_all_rows() {
+            return Vec::new();
+        }
+        let owners = self.files.owners();
+        let mut scopes = Vec::new();
+        if let Some(reader) = self.reader() {
+            scopes.extend(owners.chain(&reader.table, &reader.key).cloned().map(Some));
+            scopes.insert(0, Some(reader));
+        }
+        scopes.push(None);
+        scopes
+    }
 }
 
 #[derive(Default)]
@@ -117,10 +155,21 @@ pub struct FormState {
 }
 
 pub enum FormAction {
-    OpenRow { table: String, key: String },
-    OpenNode { name: String },
-    PickPlace { path: String },
-    NewRow { table: String, path: String },
+    OpenRow {
+        table: String,
+        key: String,
+    },
+    OpenNode {
+        name: String,
+    },
+    PickPlace {
+        path: String,
+    },
+    NewRow {
+        table: String,
+        path: String,
+        owner: Option<RowName>,
+    },
     RowAction(browser::BrowserAction),
 }
 

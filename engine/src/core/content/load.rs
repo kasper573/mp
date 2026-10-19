@@ -203,6 +203,14 @@ impl ContentRegistry {
         self.rows.iter().map(|row| row.name()).collect()
     }
 
+    /// Whether the table's rows may name any row, local or not, as `ContentRow::SEES_ALL_ROWS`
+    /// declares.
+    pub fn sees_all_rows(&self, table: &str) -> bool {
+        self.rows
+            .iter()
+            .any(|row| row.name() == table && row.sees_all_rows())
+    }
+
     pub fn version(&self) -> ContentVersion {
         self.version
             .get_or_init(|| super::version::compute(self))

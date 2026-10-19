@@ -1,6 +1,7 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, RichText, Sense, Ui, Vec2};
 use engine::core::content::ContentRow;
+use engine::core::content::RowName;
 use engine::systems::actor::ModelDef;
 use serde_json::Value;
 
@@ -101,7 +102,7 @@ fn steps(
         };
         found
     };
-    let surfaces = super::sounds::surfaces(editor);
+    let surfaces = super::sounds::surfaces(editor, Some(&RowName::new(ModelDef::TABLE, key)));
     let chosen = editor.views.model.view(key).surface.clone();
     let mut play = None;
     ui.horizontal_top(|ui| {

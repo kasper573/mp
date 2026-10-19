@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
-use engine::core::content::{Content, ContentScope, with_content};
+use engine::core::content::{Content, ContentScope, RowName, with_content};
 use engine::core::script::node::MAX_CALL_DEPTH;
 use engine::core::script::{EffectDef, EventDef, NodeKind, REFUSED, RunnerKindDef};
 use engine::systems::actor::model::Expression;
@@ -561,11 +561,18 @@ fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
     Some(value)
 }
 
-pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &ProjectFiles) {
+/// Fills each empty reference in a new node with the first row the script may name.
+pub fn fill_references(
+    root: &Value,
+    schema: &Value,
+    value: &mut Value,
+    files: &ProjectFiles,
+    reader: &RowName,
+) {
     let schema = schema::resolve(root, schema);
     if let Some(table) = schema::table_of(schema) {
         if value.as_str().is_some_and(str::is_empty)
-            && let Some(key) = files.keys_of(table).min()
+            && let Some(key) = files.keys_in_reach(table, Some(reader)).min()
         {
             *value = Value::from(key);
         }
@@ -575,7 +582,7 @@ pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &
         schema::SchemaKind::Object => {
             for (name, field) in schema::properties(schema) {
                 if let Some(inner) = value.get_mut(name) {
-                    fill_references(root, field, inner, files);
+                    fill_references(root, field, inner, files, reader);
                 }
             }
         }
@@ -584,12 +591,12 @@ pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &
                 .iter()
                 .find(|alternative| schema::fits(root, alternative, value))
             {
-                fill_references(root, alternative, value, files);
+                fill_references(root, alternative, value, files, reader);
             }
         }
         schema::SchemaKind::Union(variants) => {
             if let Some(variant) = schema::variant_of(&variants, value) {
-                fill_references(root, variant.schema, value, files);
+                fill_references(root, variant.schema, value, files, reader);
             }
         }
         _ => {}

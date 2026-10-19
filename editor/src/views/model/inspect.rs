@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::assets::AssetKind;
 use engine::core::audio::playback::SfxDef;
+use engine::core::content::RowName;
 use engine::core::content::{ContentRow, row_of};
 use engine::systems::actor::model::MAX_FRAME_MS;
 use engine::systems::actor::{Action, ModelDef};
@@ -511,7 +512,7 @@ fn cue_card(
                 ui.add_space(4.0);
                 ui.label(theme::muted("hear it on").size(12.0));
                 let chosen = editor.views.model.view(key).surface.clone();
-                let surfaces = super::sounds::surfaces(editor);
+                let surfaces = super::sounds::surfaces(editor, Some(&RowName::new(ModelDef::TABLE, key)));
                 let mut pick_surface = None;
                 for surface in &surfaces {
                     ui.horizontal(|ui| {

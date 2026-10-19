@@ -11,11 +11,12 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, RowName, row_file, version};
+use engine::core::content::{Content, ContentRow, RowName, row_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
+use engine::systems::area::AreaDef;
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
@@ -271,6 +272,17 @@ pub enum PickRowThen {
         area: String,
         index: usize,
     },
+}
+
+impl PickRowThen {
+    /// The row the picked key is written into.
+    pub fn reader(&self) -> RowName {
+        match self {
+            PickRowThen::AddModule { area, .. } | PickRowThen::ReplaceBlueprint { area, .. } => {
+                RowName::new(AreaDef::TABLE, area)
+            }
+        }
+    }
 }
 
 #[derive(Clone)]

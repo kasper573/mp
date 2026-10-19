@@ -7,6 +7,7 @@ use std::sync::{Arc, OnceLock};
 use engine::core::content::{
     ContentOwners, MemoryFolder, OWNER_FIELD, RowName, TABLES_DIR, row_of, table_folder,
 };
+use engine::systems::registry;
 use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;
@@ -140,6 +141,24 @@ impl ProjectFiles {
             .map(|(path, _)| path.as_str())
             .take_while(move |path| path.starts_with(&prefix))
             .filter_map(|path| row_of(path).map(|(_, key)| key))
+    }
+
+    /// Whether `reader` may name `table/key`: a global row, or one local to the reader or to an
+    /// owner above it; any row when the reader's table sees every row. `None` reads from above
+    /// every row, as the game's settings do.
+    pub fn reaches(&self, reader: Option<&RowName>, table: &str, key: &str) -> bool {
+        reader.is_some_and(|reader| registry().sees_all_rows(&reader.table))
+            || self.owners().in_reach(reader, table, key)
+    }
+
+    /// The keys of a table that `reader` may name.
+    pub fn keys_in_reach<'a>(
+        &'a self,
+        table: &'a str,
+        reader: Option<&'a RowName>,
+    ) -> impl Iterator<Item = &'a str> {
+        self.keys_of(table)
+            .filter(move |key| self.reaches(reader, table, key))
     }
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {

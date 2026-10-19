@@ -2,7 +2,10 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::assets::AssetKind;
+use engine::core::content::ContentRow;
+use engine::core::content::RowName;
 use engine::systems::area::tileset::TileData;
+use engine::systems::area::tileset::TilesetDef;
 use serde_json::Value;
 use strum::VariantArray;
 
@@ -100,7 +103,7 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
     let walk = tileset.def.walk(tile);
     let surface = tileset.surface(tile);
     let mode = editor.views.tileset.view(key).mode;
-    let surfaces = sounds::surfaces(editor);
+    let surfaces = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)));
     let mut picked = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());

@@ -46,6 +46,7 @@ impl PickSource for AssetSource {
                     .unwrap_or("")
                     .to_owned(),
                 blocked: None,
+                scope: 0,
             })
             .collect()
     }

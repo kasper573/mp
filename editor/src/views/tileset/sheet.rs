@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
+use engine::core::content::RowName;
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -84,10 +85,11 @@ impl TileBrush {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mode = editor.views.tileset.view(&tileset.key).mode;
-    let surfaces: Vec<String> = sounds::surfaces(editor)
-        .into_iter()
-        .map(|surface| surface.key)
-        .collect();
+    let surfaces: Vec<String> =
+        sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, &tileset.key)))
+            .into_iter()
+            .map(|surface| surface.key)
+            .collect();
     let canvas = canvas(editor, ui, tileset, |painter, tile, cell| match mode {
         TilesetMode::Walk => walk_mark(painter, cell, tileset.def.walk(tile)),
         TilesetMode::Surface => {
@@ -227,7 +229,7 @@ pub fn walk_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn surface_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let surfaces = sounds::surfaces(editor);
+    let surfaces = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)));
     let view = editor.views.tileset.view_mut(key);
     for (index, surface) in surfaces.iter().enumerate() {
         let on = view.surface.as_deref() == Some(surface.key.as_str());

@@ -915,10 +915,16 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             let mut outcome = None;
             window(ctx, &dialog.title, |ui| {
                 let keys: Vec<String> = if dialog.options.is_empty() {
+                    let reader = dialog.then.reader();
                     editor
                         .project
                         .as_ref()
-                        .map(|p| p.files.keys_of(&dialog.table).map(str::to_owned).collect())
+                        .map(|p| {
+                            p.files
+                                .keys_in_reach(&dialog.table, Some(&reader))
+                                .map(str::to_owned)
+                                .collect()
+                        })
                         .unwrap_or_default()
                 } else {
                     dialog.options.clone()
