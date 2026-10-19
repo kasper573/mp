@@ -7,7 +7,7 @@ use bevy_state::prelude::{OnEnter, OnExit};
 
 use super::{ClientId, Owner, Welcome};
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::time::{Seconds, ServerClock, UnixMillis};
+use crate::core::time::{Seconds, ServerClock};
 use crate::systems::stat;
 use bevy_time::Time;
 
@@ -45,11 +45,6 @@ pub struct MyClient(pub Option<ClientId>);
 /// The character this client plays and sees the world through, once it stands in the world.
 #[derive(Resource, Default)]
 pub struct MyCharacter(pub Option<Entity>);
-
-pub fn server_now(world: &World) -> Option<UnixMillis> {
-    let uptime = Seconds(world.resource::<Time>().elapsed_secs());
-    world.resource::<ServerClock>().now(uptime)
-}
 
 pub fn my_id(world: &World) -> Option<ClientId> {
     world.resource::<MyClient>().0

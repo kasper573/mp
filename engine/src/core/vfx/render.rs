@@ -35,7 +35,7 @@ use crate::core::render::{
     self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, atlas_rect,
 };
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, ServerClock, UnixMillis};
+use crate::core::time::{Seconds, server_now};
 
 pub struct VfxRenderPlugin;
 
@@ -829,7 +829,7 @@ fn sync(world: &mut World) {
         .map(|(entity, instance)| (entity, instance.clone()))
         .collect();
     let mut overdrawn = HashSet::new();
-    let screen_layer = RenderLayers::layer(PRESENT_LAYER);
+    let screen_layer = screen_layer();
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let pieces = match world.get::<VfxView>(entity) {
@@ -981,11 +981,6 @@ fn bounds(points: &[Pos<Tiles>]) -> (Vec2, Vec2) {
         return (Vec2::ZERO, Vec2::ZERO);
     }
     ((min + max) / 2.0, max - min)
-}
-
-fn server_now(world: &World) -> Option<UnixMillis> {
-    let uptime = Seconds(world.get_resource::<Time>()?.elapsed_secs());
-    world.get_resource::<ServerClock>()?.now(uptime)
 }
 
 /// Every layer of a widget or screen site draws through the interface rather than the world.

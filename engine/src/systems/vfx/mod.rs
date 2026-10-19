@@ -192,13 +192,16 @@ impl EffectDef<RiftScripting> for PlayVfx {
                     ValueType::Point | ValueType::Area => {
                         return Err(ScriptFault::new(
                             "wrong type",
-                            format!("on is {ty:?}; a path runs through actors"),
+                            format!("on is {}; a path runs through actors", ty.name()),
                         ));
                     }
                     other => {
                         return Err(ScriptFault::new(
                             "wrong type",
-                            format!("on is {other:?}, not an actor, a set, a point or an area"),
+                            format!(
+                                "on is {}, not an actor, a set, a point or an area",
+                                other.name()
+                            ),
                         ));
                     }
                 }

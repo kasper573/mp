@@ -1,7 +1,8 @@
 use std::hash::{Hash, Hasher};
 use std::time::SystemTime;
 
-use bevy_ecs::prelude::Resource;
+use bevy_ecs::prelude::{Resource, World};
+use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -333,4 +334,10 @@ impl ServerClock {
         let (then, at) = self.0?;
         Some(then.after(uptime - at))
     }
+}
+
+/// The server's wall clock as this client reckons it, once the server has told it the time.
+pub fn server_now(world: &World) -> Option<UnixMillis> {
+    let uptime = Seconds(world.get_resource::<Time>()?.elapsed_secs());
+    world.get_resource::<ServerClock>()?.now(uptime)
 }

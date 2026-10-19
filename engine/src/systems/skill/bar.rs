@@ -16,7 +16,7 @@ use super::{
 use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
-use crate::core::time::Seconds;
+use crate::core::time::{self, Seconds};
 use crate::systems::equipment::{self, Equipment, EquipmentSlot};
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
 use crate::systems::input::map::{
@@ -389,7 +389,7 @@ fn skill_fill(world: &World, me: Entity, skill: SkillId, rank: Rank) -> Fill {
     if stat::is_dead(world, me) {
         return Fill::Blocked(Glyph::Cross);
     }
-    if let Some(now) = session::server_now(world)
+    if let Some(now) = time::server_now(world)
         && let Some(ready) = world
             .get::<Cooldowns>(me)
             .and_then(|cooldowns| cooldowns.ready_at(skill))

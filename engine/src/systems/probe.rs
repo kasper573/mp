@@ -19,7 +19,7 @@ use crate::core::platform::ClientPlatform;
 use crate::core::render::tile_to_window;
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::tiling::{CellPos, TilePos, Tiles};
-use crate::core::time::Seconds;
+use crate::core::time::{self, Seconds};
 use crate::core::vfx::{VfxId, VfxInstance, VfxSite};
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
@@ -616,7 +616,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         statuses: me
             .and_then(|seen| world.get::<status::Statuses>(seen).cloned())
             .map(|statuses| {
-                let now = session::server_now(world);
+                let now = time::server_now(world);
                 statuses
                     .0
                     .iter()
@@ -1114,7 +1114,7 @@ fn remember_vfx(
 }
 
 fn vfx_seen(world: &mut World) -> Vec<ProbeVfx> {
-    let now = session::server_now(world);
+    let now = time::server_now(world);
     let mut seen = world.resource_mut::<VfxSeen>();
     if let Some(now) = now {
         seen.0

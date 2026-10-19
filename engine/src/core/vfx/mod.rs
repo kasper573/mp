@@ -226,15 +226,12 @@ impl VfxLayer {
 impl VfxDef {
     /// How long the whole stack plays: when its last layer ends.
     pub fn lasts(&self) -> Seconds {
-        self.layers
-            .iter()
-            .map(VfxLayer::ends)
-            .fold(
-                Seconds(0.0),
-                |longest, ends| {
-                    if ends > longest { ends } else { longest }
-                },
-            )
+        Seconds(
+            self.layers
+                .iter()
+                .map(|layer| layer.ends().0)
+                .fold(0.0, f32::max),
+        )
     }
 
     pub fn declares(&self, name: &str) -> Option<ParamKind> {
