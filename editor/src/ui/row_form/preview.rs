@@ -1,27 +1,25 @@
-use design_tokens::card::{self, Art, Card};
-use design_tokens::controls::{self, Pill};
-use design_tokens::face::TextRole;
-use design_tokens::glyph::{self, Kind, Mark};
-use design_tokens::ink;
-use egui::{Align, Layout, Sense, Ui, Vec2};
+use design_tokens::card::{self};
+use design_tokens::glyph::{self, Mark};
+use egui::Ui;
 use engine::core::audio::playback::SfxDef;
 use engine::core::babble::BabbleDef;
 use engine::core::content::{Content, ContentRow};
+use engine::core::gui::ImageSource;
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::actor::Action;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::actor::plate::PlateLabel;
-use engine::systems::dialogue::ChoiceReveal;
 use engine::systems::item::card::CardLook;
 use engine::systems::item::{self, ItemDef};
 use engine::systems::npc::NpcDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
-use engine::systems::quest::{self, ActiveQuest, Parties, QuestDef};
+use engine::systems::quest::card::{Moment, QuestCardLook};
+use engine::systems::quest::{self, Parties, QuestDef};
 use engine::systems::script::{Reach, RiftScripts};
-use engine::systems::skill::{self, SkillDef};
+use engine::systems::skill::SkillDef;
 use engine::systems::status::StatusEffectDef;
 use serde_json::Value;
 use strum::VariantArray;
@@ -29,9 +27,8 @@ use strum::VariantArray;
 use super::quests::quest_parties_sections;
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::forms;
-use crate::project::ProjectFiles;
 use crate::stage::{self, Posed, PosedActor, Scenario, Scene};
+use crate::thumbs::ProjectImages;
 use crate::value::{self, RowValue};
 use crate::views::character;
 use crate::views::script::panel;
@@ -266,18 +263,18 @@ pub(super) fn draw_preview(
     let Some(content) = editor.loaded() else {
         return;
     };
-    if table == QuestDef::TABLE {
-        let width = ui.available_width();
-        let Editor { project, form, .. } = editor;
-        let project = project.as_ref().expect("a project");
-        ui.vertical(|ui| {
-            ui.set_width(width);
-            quest_card(ui, &ctx, form, &project.files, &content, key, width);
-        });
-        return;
-    }
-    if table == ItemDef::TABLE {
-        item_card(editor, ui, &content, key);
+    if table == QuestDef::TABLE || table == ItemDef::TABLE {
+        let Editor { project, form, .. } = &mut *editor;
+        let mut images = ProjectImages {
+            ctx: &ctx,
+            files: &project.as_ref().expect("a project").files,
+            thumbnails: &mut form.thumbnails,
+        };
+        if table == QuestDef::TABLE {
+            quest_card(ui, &mut images, &content, key);
+            return;
+        }
+        item_card(ui, &mut images, &content, key);
         ui.add_space(12.0);
     }
     let center = stage::center(&content);
@@ -347,115 +344,34 @@ fn plate_of(content: &Content, table: &str, key: &str, value: &Value) -> Option<
     }
 }
 
-pub(super) fn quest_card(
-    ui: &mut Ui,
-    ctx: &egui::Context,
-    form: &mut forms::FormState,
-    files: &ProjectFiles,
-    content: &Content,
-    key: &str,
-    width: f32,
-) {
-    let Some(id) = content.by_key::<QuestDef>(key) else {
+fn quest_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &str) {
+    let Some(quest) = content.by_key::<QuestDef>(key) else {
         return;
     };
     if !content.has_built::<RiftScripts>() {
         return;
     }
-    let def = id.get(content);
     let parties = Parties::of(content, content.built::<RiftScripts>());
-    let progress = def.progress(content, &parties, &ActiveQuest::fresh(content, id), None);
-    let art = form
-        .thumbnails
-        .image(ctx, files, def.icon(content).as_str())
-        .map(|thumb| thumb.texture.id());
-    let mut icon = |ui: &mut Ui, path: &str, size: f32| {
-        if let Some(thumb) = form.thumbnails.image(ctx, files, path) {
-            ui.add(egui::Image::from_texture((
-                thumb.texture.id(),
-                Vec2::splat(size),
-            )));
-        } else {
-            ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
-        }
+    let width = ui.available_width();
+    let look = QuestCardLook {
+        width: width.min(card::DOCKED_WIDTH),
+        max_height: card::MAX_HEIGHT,
+        moment: Some(Moment::Offer),
     };
-    let band = format!("quest offer · {}", def.category.to_lowercase());
-    let mut shown = Card::new(Kind::Quest, &def.title);
-    shown.band = &band;
-    shown.art = Art {
-        icon: art,
-        height: card::ART_QUEST,
-    };
-    shown.width = width.min(card::DOCKED_WIDTH);
-    shown.show(ui, |ui, plate| {
-        if plate.name_cut {
-            card::full_name(ui, &def.title);
-        }
-        card::overview(ui, &quest::card::overview(def));
-        card::overview(ui, &def.meta(&parties, id));
-        card::heading(ui, "objectives");
-        for (objective, progress) in def.objectives().zip(&progress) {
-            ui.horizontal(|ui| {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if progress.counted {
-                        ui.label(
-                            TextRole::CardBody
-                                .rich(format!("{} / {}", progress.have, progress.need)),
-                        );
-                    }
-                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        ui.spacing_mut().item_spacing.x = 5.0;
-                        glyph::show(ui, Mark::Flag, 13.0, ink::INK);
-                        if let Some(asset) = objective.icon(content) {
-                            icon(ui, asset.as_str(), 20.0);
-                        }
-                        ui.add(
-                            egui::Label::new(TextRole::CardBody.rich(progress.label.as_str()))
-                                .wrap(),
-                        );
-                    });
-                });
-            });
-        }
-        if def.reveals(ChoiceReveal::Gains) {
-            card::heading(ui, "rewards");
-            ui.horizontal_wrapped(|ui| {
-                if def.xp > 0 {
-                    controls::pill(ui, &format!("{} XP", def.xp), Pill::Gold);
-                }
-                for stack in def.rewards() {
-                    let item = stack.item.get(content);
-                    controls::pill_with(ui, Pill::Gold, |ui| {
-                        icon(ui, item.icon.as_str(), 16.0);
-                        ui.label(quest::card::counted(content, *stack));
-                    });
-                }
-            });
-            if !def.pick_one().is_empty() {
-                card::heading(ui, "pick one when you return");
-                ui.horizontal(|ui| {
-                    for stack in def.pick_one() {
-                        icon(ui, stack.item.get(content).icon.as_str(), 28.0);
-                    }
-                });
-            }
-        }
-        card::foot(ui, "Accept or decline in the conversation");
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        quest::card::show(ui, images, content, quest, look, |ui, images| {
+            quest::card::offer(ui, images, content, &parties, quest, None);
+        });
     });
 }
 
-fn item_card(editor: &mut Editor, ui: &mut Ui, content: &Content, key: &str) {
+fn item_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &str) {
     let Some(item) = content.by_key::<ItemDef>(key) else {
         return;
     };
-    let ctx = ui.ctx().clone();
-    let Editor { project, form, .. } = editor;
-    let files = &project.as_ref().expect("a project").files;
     let def = item.get(content);
-    let art = form
-        .thumbnails
-        .image(&ctx, files, def.icon.as_str())
-        .map(|thumb| thumb.texture.id());
+    let art = images.image(&def.icon).map(|image| image.texture);
     let look = CardLook {
         width: ui.available_width().min(card::WIDTH),
         closable: false,
@@ -464,26 +380,7 @@ fn item_card(editor: &mut Editor, ui: &mut Ui, content: &Content, key: &str) {
     item::card::face_of(def, art, look).show(ui, |ui, plate| {
         item::card::summary(ui, content, item, plate);
         item::card::details(ui, content, item, |_| None);
-        let granted = skill::grants_of(content, item);
-        if !granted.is_empty() {
-            card::heading(ui, "grants while worn");
-        }
-        for granted in granted {
-            let skill = granted.get(content);
-            item::card::grant_line(ui, skill, |ui| {
-                match form.thumbnails.image(&ctx, files, skill.icon.as_str()) {
-                    Some(thumb) => {
-                        ui.add(egui::Image::from_texture((
-                            thumb.texture.id(),
-                            Vec2::splat(card::GRANT_ICON),
-                        )));
-                    }
-                    None => {
-                        ui.allocate_exact_size(Vec2::splat(card::GRANT_ICON), Sense::hover());
-                    }
-                }
-            });
-        }
+        item::card::grant_lines(ui, images, content, item);
     });
 }
 

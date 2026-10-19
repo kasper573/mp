@@ -91,6 +91,17 @@ impl GuiImage {
     }
 }
 
+/// Where a gui's pictures come from: the game's own asset loading, or a tool's.
+pub trait ImageSource {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage>;
+}
+
+impl ImageSource for World {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage> {
+        image(self, asset)
+    }
+}
+
 pub struct GuiPlugin;
 
 impl Plugin for GuiPlugin {

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
+use engine::core::assets::ImageRef;
 use engine::core::content::asset_file;
+use engine::core::gui::{GuiImage, ImageSource};
 use image::RgbaImage;
 use image::imageops::FilterType;
 
@@ -22,6 +24,26 @@ pub struct Thumbnail {
     pub texture: TextureHandle,
     pub size: [usize; 2],
     pub hash: String,
+}
+
+/// A project's pictures, for drawing the engine's own gui in the editor.
+pub struct ProjectImages<'a> {
+    pub ctx: &'a egui::Context,
+    pub files: &'a ProjectFiles,
+    pub thumbnails: &'a mut Thumbnails,
+}
+
+impl ImageSource for ProjectImages<'_> {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage> {
+        let thumb = self
+            .thumbnails
+            .image(self.ctx, self.files, asset.as_str())?;
+        Some(GuiImage {
+            texture: thumb.texture.id(),
+            size: thumb.texture.size_vec2(),
+            path: asset.as_str().to_owned(),
+        })
+    }
 }
 
 pub const ICON: u32 = 32;

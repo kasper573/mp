@@ -11,14 +11,14 @@ use super::{
     resets_label,
 };
 use crate::core::content::Content;
-use crate::core::gui;
+use crate::core::gui::ImageSource;
 use crate::core::platform::ClientPlatform;
 use crate::core::time::UnixMillis;
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelChrome, PanelHead};
 use crate::systems::dialogue::{ChoiceReveal, Conversation, ConversationPanel};
 use crate::systems::hud;
 use crate::systems::item::widget::{SlotLook, slot};
-use crate::systems::item::{self, Inventory, ItemStack};
+use crate::systems::item::{self, Inventory, ItemId, ItemStack};
 use crate::systems::player::session;
 
 const ICON: f32 = 20.0;
@@ -39,26 +39,27 @@ impl Plugin for QuestCardPlugin {
     }
 }
 
-pub(super) struct QuestCardLook {
+pub struct QuestCardLook {
     pub width: f32,
     pub max_height: f32,
-    pub moment: Option<&'static str>,
+    pub moment: Option<Moment>,
 }
 
-pub(super) fn show(
+/// A quest's card: its face, and whatever `plate` writes under the overview.
+pub fn show<I: ImageSource + ?Sized>(
     ui: &mut Ui,
-    world: &mut World,
+    images: &mut I,
+    content: &Content,
     quest: QuestId,
     look: QuestCardLook,
-    plate: impl FnOnce(&mut Ui, &mut World),
+    plate: impl FnOnce(&mut Ui, &mut I),
 ) -> CardResponse {
-    let content = world.resource::<Content>().clone();
-    let def = quest.get(&content);
+    let def = quest.get(content);
     let band = match look.moment {
-        Some(moment) => format!("{moment} · {}", def.category.to_lowercase()),
+        Some(moment) => format!("{} · {}", moment.band(), def.category.to_lowercase()),
         None => def.category.to_lowercase(),
     };
-    let icon = gui::image(world, def.icon(&content)).map(|image| image.texture);
+    let icon = images.image(def.icon(content)).map(|image| image.texture);
     let mut shown = Card::new(Kind::Quest, &def.title);
     shown.band = &band;
     shown.art = Art {
@@ -72,33 +73,56 @@ pub(super) fn show(
             card::full_name(ui, &def.title);
         }
         card::overview(ui, &overview(def));
-        plate(ui, world);
+        plate(ui, images);
     })
 }
 
-pub fn overview(def: &QuestDef) -> String {
-    let kinds = def.kinds();
-    let mut letters = kinds.chars();
-    let kinds = letters
-        .next()
-        .map(|first| first.to_uppercase().chain(letters).collect::<String>())
-        .unwrap_or_default();
-    match def.xp {
-        0 => kinds,
-        xp if kinds.is_empty() => format!("{xp} xp"),
-        xp => format!("{kinds} · {xp} xp"),
+/// The body of a quest's offer: what it asks, and what it gives when the quest lets on. Answers
+/// the rewards shown, for a reader who may inspect them.
+pub fn offer<I: ImageSource + ?Sized>(
+    ui: &mut Ui,
+    images: &mut I,
+    content: &Content,
+    parties: &Parties,
+    quest: QuestId,
+    inventory: Option<&Inventory>,
+) -> Vec<(Response, ItemId)> {
+    let def = quest.get(content);
+    let progress = def.progress(
+        content,
+        parties,
+        &ActiveQuest::fresh(content, quest),
+        inventory,
+    );
+    card::overview(ui, &def.meta(parties, quest));
+    card::heading(ui, "objectives");
+    for (index, (objective, progress)) in def.objectives().zip(&progress).enumerate() {
+        ui.push_id(("objective", index), |ui| {
+            objective_row(ui, images, content, objective, progress, Standing::Open);
+        });
     }
+    let mut shown = Vec::new();
+    if def.reveals(ChoiceReveal::Gains) {
+        card::heading(ui, "rewards");
+        shown.extend(reward_chips(ui, images, content, def));
+        if !def.pick_one().is_empty() {
+            card::heading(ui, "pick one when you return");
+            shown.extend(picks(ui, images, content, def));
+        }
+    }
+    card::foot(ui, "Accept or decline in the conversation");
+    shown
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Moment {
+pub enum Moment {
     Offer,
     TurnIn,
     Decision,
 }
 
 impl Moment {
-    fn band(self) -> &'static str {
+    pub fn band(self) -> &'static str {
         match self {
             Moment::Offer => "quest offer",
             Moment::TurnIn => "quest complete",
@@ -136,66 +160,59 @@ fn show_docked(ui: &mut Ui, world: &mut World, width: f32, most: f32) {
     let look = QuestCardLook {
         width,
         max_height: most.min(card::MAX_HEIGHT),
-        moment: Some(moment.band()),
+        moment: Some(moment),
     };
-    show(ui, world, quest, look, |ui, world| match moment {
-        Moment::Offer => offer(ui, world, quest, &inventory),
-        Moment::TurnIn => turn_in(ui, world, quest, &inventory),
-        Moment::Decision => decision(ui, world, quest),
+    let content = world.resource::<Content>().clone();
+    let parties = world.resource::<Parties>().clone();
+    show(ui, world, &content, quest, look, |ui, world| {
+        let shown = match moment {
+            Moment::Offer => offer(ui, world, &content, &parties, quest, Some(&inventory)),
+            Moment::TurnIn => turn_in(ui, world, &content, quest, &inventory),
+            Moment::Decision => {
+                decision(ui, &content, quest);
+                Vec::new()
+            }
+        };
+        inspectable(world, shown);
     });
 }
 
-fn offer(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {
-    let content = world.resource::<Content>().clone();
-    let parties = world.resource::<Parties>().clone();
-    let def = quest.get(&content);
-    let progress = def.progress(
-        &content,
-        &parties,
-        &ActiveQuest::fresh(&content, quest),
-        Some(inventory),
-    );
-    card::overview(ui, &def.meta(&parties, quest));
-    card::heading(ui, "objectives");
-    for (index, (objective, progress)) in def.objectives().zip(&progress).enumerate() {
-        ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, progress, Standing::Open);
-        });
+/// Lets the reader inspect each item a card shows.
+pub(super) fn inspectable(world: &mut World, shown: Vec<(Response, ItemId)>) {
+    for (response, item) in shown {
+        item::card::inspect(world, response, item);
     }
-    if def.reveals(ChoiceReveal::Gains) {
-        card::heading(ui, "rewards");
-        reward_chips(ui, world, def);
-        if !def.pick_one().is_empty() {
-            card::heading(ui, "pick one when you return");
-            picks(ui, world, def);
-        }
-    }
-    card::foot(ui, "Accept or decline in the conversation");
 }
 
-fn turn_in(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {
-    let content = world.resource::<Content>().clone();
-    let def = quest.get(&content);
+fn turn_in(
+    ui: &mut Ui,
+    images: &mut World,
+    content: &Content,
+    quest: QuestId,
+    inventory: &Inventory,
+) -> Vec<(Response, ItemId)> {
+    let def = quest.get(content);
     if def.reveals(ChoiceReveal::Costs) {
         card::heading(ui, "hand in");
         for (index, &stack) in def.hand_in().iter().enumerate() {
             ui.push_id(("hand in", index), |ui| {
-                hand_in_row(ui, world, stack, inventory.count(stack.item));
+                hand_in_row(ui, images, content, stack, inventory.count(stack.item));
             });
         }
     }
     if !def.reveals(ChoiceReveal::Gains) {
-        return;
+        return Vec::new();
     }
     card::heading(ui, "rewards");
-    reward_chips(ui, world, def);
+    let shown = reward_chips(ui, images, content, def);
     if !def.pick_one().is_empty() {
         card::foot(ui, "Your pick is offered in the conversation");
     }
+    shown
 }
 
-fn decision(ui: &mut Ui, world: &World, quest: QuestId) {
-    let def = quest.get(world.resource::<Content>());
+fn decision(ui: &mut Ui, content: &Content, quest: QuestId) {
+    let def = quest.get(content);
     let paths = def.decision().unwrap_or_default();
     ui.columns(paths.len().max(1), |columns| {
         for (column, path) in columns.iter_mut().zip(paths) {
@@ -210,8 +227,7 @@ fn decision(ui: &mut Ui, world: &World, quest: QuestId) {
     });
 }
 
-fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
-    let content = world.resource::<Content>().clone();
+fn hand_in_row(ui: &mut Ui, images: &mut World, content: &Content, stack: ItemStack, held: u32) {
     let short = held < stack.count;
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -222,8 +238,8 @@ fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
                     .color(color),
             );
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                hud::icon(ui, world, &stack.item.get(&content).icon, ICON);
-                ui.add(Label::new(TextRole::CardBody.rich(counted(&content, stack))).wrap());
+                hud::icon(ui, images, &stack.item.get(content).icon, ICON);
+                ui.add(Label::new(TextRole::CardBody.rich(counted(content, stack))).wrap());
             });
         });
     });
@@ -238,12 +254,12 @@ pub(super) enum Standing {
 
 pub(super) fn objective_row(
     ui: &mut Ui,
-    world: &mut World,
+    images: &mut (impl ImageSource + ?Sized),
+    content: &Content,
     objective: &Objective,
     progress: &Progress,
     standing: Standing,
 ) {
-    let content = world.resource::<Content>().clone();
     let standing = match standing {
         Standing::Open if progress.done() => Standing::Done,
         other => other,
@@ -265,8 +281,8 @@ pub(super) fn objective_row(
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 5.0;
                 glyph::show(ui, mark, MARK, color);
-                if let Some(icon) = objective.icon(&content) {
-                    hud::icon(ui, world, icon, ICON);
+                if let Some(icon) = objective.icon(content) {
+                    hud::icon(ui, images, icon, ICON);
                 }
                 ui.add(
                     Label::new(
@@ -281,41 +297,69 @@ pub(super) fn objective_row(
     });
 }
 
-pub(super) fn reward_chips(ui: &mut Ui, world: &mut World, def: &QuestDef) {
-    let content = world.resource::<Content>().clone();
+pub(super) fn reward_chips(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    content: &Content,
+    def: &QuestDef,
+) -> Vec<(Response, ItemId)> {
     ui.horizontal_wrapped(|ui| {
         if def.xp > 0 {
             controls::pill(ui, &format!("{} XP", def.xp), Pill::Gold);
         }
-        for &stack in def.rewards() {
-            let chip = item_chip(ui, world, &content, stack);
-            item::card::inspect(world, chip, stack.item);
-        }
-    });
+        def.rewards()
+            .iter()
+            .map(|&stack| (item_chip(ui, images, content, stack), stack.item))
+            .collect()
+    })
+    .inner
 }
 
-pub(super) fn picks(ui: &mut Ui, world: &mut World, def: &QuestDef) {
-    let content = world.resource::<Content>().clone();
+pub(super) fn picks(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    content: &Content,
+    def: &QuestDef,
+) -> Vec<(Response, ItemId)> {
     ui.horizontal(|ui| {
-        for (index, stack) in def.pick_one().iter().enumerate() {
-            ui.push_id(("pick", index), |ui| {
+        def.pick_one()
+            .iter()
+            .enumerate()
+            .map(|(index, stack)| {
                 let look = SlotLook {
-                    icon: Some(&stack.item.get(&content).icon),
+                    icon: Some(&stack.item.get(content).icon),
                     count: stack.count,
                     ..SlotLook::EMPTY
                 };
-                let response = slot(ui, world, look, Sense::click());
-                item::card::inspect(world, response, stack.item);
-            });
-        }
-    });
+                let response = ui
+                    .push_id(("pick", index), |ui| slot(ui, images, look, Sense::click()))
+                    .inner;
+                (response, stack.item)
+            })
+            .collect()
+    })
+    .inner
 }
 
 pub(super) fn caption(ui: &mut Ui, text: impl Into<String>) {
     ui.add(Label::new(face::small_faint(text.into())).wrap());
 }
 
-pub fn counted(content: &Content, stack: ItemStack) -> String {
+fn overview(def: &QuestDef) -> String {
+    let kinds = def.kinds();
+    let mut letters = kinds.chars();
+    let kinds = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect::<String>())
+        .unwrap_or_default();
+    match def.xp {
+        0 => kinds,
+        xp if kinds.is_empty() => format!("{xp} xp"),
+        xp => format!("{kinds} · {xp} xp"),
+    }
+}
+
+fn counted(content: &Content, stack: ItemStack) -> String {
     let name = &stack.item.get(content).name;
     match stack.count {
         1 => name.to_owned(),
@@ -362,7 +406,12 @@ pub(super) fn time_left(content: &Content, log: &QuestLog, quest: QuestId, now: 
     (left / limit).clamp(0.0, 1.0)
 }
 
-fn item_chip(ui: &mut Ui, world: &mut World, content: &Content, stack: ItemStack) -> Response {
+fn item_chip(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    content: &Content,
+    stack: ItemStack,
+) -> Response {
     egui::Frame::new()
         .fill(ink::white_wash(0.25))
         .stroke(Stroke::new(1.0, ink::ink_wash(0.35)))
@@ -371,7 +420,7 @@ fn item_chip(ui: &mut Ui, world: &mut World, content: &Content, stack: ItemStack
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-                hud::icon(ui, world, &stack.item.get(content).icon, CHIP_ICON);
+                hud::icon(ui, images, &stack.item.get(content).icon, CHIP_ICON);
                 ui.label(
                     face::bold(counted(content, stack))
                         .size(12.0)

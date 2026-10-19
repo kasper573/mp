@@ -17,7 +17,7 @@ use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, Strok
 
 use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
-use crate::core::gui::{self, Band, WidgetRects};
+use crate::core::gui::{self, Band, ImageSource, WidgetRects};
 use crate::core::math::WindowPx;
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::input::map::{ActionInput, InputAction, InputMap};
@@ -134,8 +134,13 @@ pub(crate) fn dropped(response: &egui::Response) -> Option<Carried> {
     Some(carried)
 }
 
-pub(crate) fn icon(ui: &mut Ui, world: &mut World, asset: &ImageRef, size: f32) -> egui::Response {
-    sized(ui, gui::image(world, asset), size)
+pub fn icon(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    asset: &ImageRef,
+    size: f32,
+) -> egui::Response {
+    sized(ui, images.image(asset), size)
 }
 
 pub(crate) fn confirm(world: &mut World, confirm: Confirm) {

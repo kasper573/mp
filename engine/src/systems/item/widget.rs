@@ -5,7 +5,7 @@ use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::ImageRef;
 use crate::core::content::Content;
-use crate::core::gui;
+use crate::core::gui::ImageSource;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
@@ -110,7 +110,12 @@ impl SlotLook<'_> {
     };
 }
 
-pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
+pub(crate) fn slot(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    look: SlotLook,
+    sense: Sense,
+) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
     if !ui.is_rect_visible(rect) {
         return response;
@@ -129,7 +134,7 @@ pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense)
         ui.painter()
             .rect_stroke(rect, 3.0, Stroke::new(1.5, ink::OCHRE), StrokeKind::Inside);
     }
-    if let Some(image) = look.icon.and_then(|icon| gui::image(world, icon)) {
+    if let Some(image) = look.icon.and_then(|icon| images.image(icon)) {
         let tint = if look.faded {
             Color32::from_white_alpha((GHOST * 255.0) as u8)
         } else {

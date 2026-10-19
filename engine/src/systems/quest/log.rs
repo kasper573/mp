@@ -7,7 +7,8 @@ use egui::{Align, Label, Layout, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use strum::IntoStaticStr;
 
 use super::card::{
-    Countdown, QuestCardLook, Standing, caption, objective_row, picks, reward_chips, time_left,
+    Countdown, QuestCardLook, Standing, caption, inspectable, objective_row, picks, reward_chips,
+    time_left,
 };
 use super::{
     ActiveQuest, FinishedQuest, Parties, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest,
@@ -360,7 +361,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     };
     ui.vertical_centered(|ui| {
         ui.set_width(look.width);
-        super::card::show(ui, world, quest, look, |ui, world| {
+        super::card::show(ui, world, &content, quest, look, |ui, world| {
             plate(ui, world, page, quest)
         });
         if trackable {
@@ -397,7 +398,7 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
         };
         progress.counted &= finished.is_none();
         ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, &progress, standing);
+            objective_row(ui, world, &content, objective, &progress, standing);
         });
     }
     if let Some(paths) = def.decision() {
@@ -409,11 +410,13 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     let handed_in = finished.is_some_and(|finished| finished.result == QuestResult::Completed);
     if def.reveals(ChoiceReveal::Gains) || handed_in {
         card::heading(ui, "rewards");
-        reward_chips(ui, world, def);
+        let shown = reward_chips(ui, world, &content, def);
+        inspectable(world, shown);
     }
     if def.reveals(ChoiceReveal::Gains) && !def.pick_one().is_empty() && finished.is_none() {
         card::heading(ui, "pick one when you return");
-        picks(ui, world, def);
+        let shown = picks(ui, world, &content, def);
+        inspectable(world, shown);
     }
     if def.time_limit().is_some() {
         card::heading(ui, "if time runs out");
