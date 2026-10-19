@@ -7,7 +7,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::math::Direction;
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault};
-use crate::core::time::{PlaybackRate, UnixMillis, WallClock};
+use crate::core::time::{Millis, PlaybackRate, UnixMillis, WallClock};
 use crate::systems::movement;
 use crate::systems::notification;
 use crate::systems::script::Condition;
@@ -187,7 +187,7 @@ pub fn ready(world: &World, actor: Entity) -> bool {
         return false;
     }
     let now = world.resource::<WallClock>().now;
-    let delay = crate::core::time::Millis(stat::effective(world, actor, StatKind::AttackDelay));
+    let delay = Millis(stat::effective(world, actor, StatKind::AttackDelay));
     world
         .get::<LastAction>(actor)
         .is_none_or(|last| now.since(last.at) >= delay.seconds())

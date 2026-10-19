@@ -9,6 +9,7 @@ use super::ParamValue;
 use crate::core::content::{
     ContentId, ContentProblem, ContentRow, ErrorPlace, Loading, RowCheck, asset_file,
 };
+use crate::core::math::Rgba;
 
 pub type VfxShaderId = ContentId<VfxShaderDef>;
 
@@ -58,7 +59,7 @@ impl ParamKind {
         match self {
             ParamKind::Number => ParamValue::Number(1.0),
             ParamKind::Bool => ParamValue::Bool(false),
-            ParamKind::Color => ParamValue::Color(crate::core::math::Rgba::WHITE),
+            ParamKind::Color => ParamValue::Color(Rgba::WHITE),
         }
     }
 }

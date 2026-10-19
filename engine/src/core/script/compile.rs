@@ -16,6 +16,7 @@ use super::{
     Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, OwnerKindDef, QueryDef, ScriptError,
     ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
+use crate::core::content::id::nearest;
 use crate::core::content::{Content, ContentId, ContentRow};
 use crate::core::time::Seconds;
 
@@ -492,7 +493,7 @@ fn compile_source<'c, V: Vocabulary>(
                 format!(
                     "{name} is not a variable of {}{}",
                     source.label,
-                    nearest(
+                    nearest_note(
                         name,
                         declared
                             .into_iter()
@@ -532,7 +533,7 @@ fn compile_source<'c, V: Vocabulary>(
                 fail(
                     "unknown node",
                     Some(at),
-                    format!("{name:?}{}", nearest(name, names.iter().copied())),
+                    format!("{name:?}{}", nearest_note(name, names.iter().copied())),
                 )
             }),
         }
@@ -877,7 +878,7 @@ fn compile_source<'c, V: Vocabulary>(
                         Some(to) => index_of(to).map(|to| (output, Some(to))).ok_or_else(|| {
                             node_fail(
                                 "unknown node",
-                                format!("{to:?}{}", nearest(to, names.iter().copied())),
+                                format!("{to:?}{}", nearest_note(to, names.iter().copied())),
                             )
                         }),
                     })
@@ -1177,13 +1178,6 @@ impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Wa
     }
 }
 
-pub fn nearest<'a>(wanted: &str, known: impl Iterator<Item = &'a str>) -> String {
-    let known: Vec<String> = known.map(str::to_owned).collect();
-    crate::core::content::id::nearest(&known, wanted)
-        .map(|near| format!(" · nearest {near:?}"))
-        .unwrap_or_default()
-}
-
 pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
     owner: V::OwnerKind,
@@ -1353,7 +1347,10 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         let Some((name, _)) = self.variables.get_key_value(name) else {
             return Err(ScriptFault::new(
                 "unknown variable",
-                format!("{name}{}", nearest(name, self.variables.keys().copied())),
+                format!(
+                    "{name}{}",
+                    nearest_note(name, self.variables.keys().copied())
+                ),
             ));
         };
         let name: &'c str = name;
@@ -1645,4 +1642,11 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
 fn constant(value: Value) -> Eval {
     Box::new(move |_, _| value.clone())
+}
+
+fn nearest_note<'a>(wanted: &str, known: impl Iterator<Item = &'a str>) -> String {
+    let known: Vec<String> = known.map(str::to_owned).collect();
+    nearest(&known, wanted)
+        .map(|near| format!(" · nearest {near:?}"))
+        .unwrap_or_default()
 }

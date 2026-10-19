@@ -13,6 +13,7 @@ use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
     HotbarEntry, HotbarSlot, Rank, SkillId, Targeting, UseSkillRequest, casting,
 };
+use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
@@ -312,7 +313,7 @@ enum Glyph {
 }
 
 struct SlotView {
-    icon: Option<crate::core::assets::AssetRef>,
+    icon: Option<AssetRef>,
     count: u32,
     dimmed: bool,
     fill: Fill,

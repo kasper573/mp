@@ -3,6 +3,7 @@ use design_tokens::face::TextRole;
 use design_tokens::{face, ink, slip};
 use egui::{Pos2, Rect, Sense, Stroke, Ui, Vec2};
 
+use crate::core::content::Content;
 use crate::systems::actor::Name;
 use crate::systems::class;
 use crate::systems::hud::HudWidget;
@@ -88,7 +89,7 @@ fn health(ui: &mut Ui, current: f32, max: f32) {
 fn character_sheet(world: &World) -> Option<CharacterSheet> {
     let me = session::my_character(world)?;
     let entity = me.id();
-    let content = world.resource::<crate::core::content::Content>();
+    let content = world.resource::<Content>();
     Some(CharacterSheet {
         name: me
             .get::<Name>()

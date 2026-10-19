@@ -8,7 +8,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
 use crate::core::content::{ContentId, ContentProblem, ContentRow, RowCheck};
-use crate::core::math::{Pos, Rect, WorldPx};
+use crate::core::math::{Pos, Rect, Size, WorldPx};
 
 pub type TilesetId = ContentId<TilesetDef>;
 pub type SurfaceId = ContentId<SurfaceDef>;
@@ -223,7 +223,7 @@ impl TilesetGrid {
                 (tile % self.columns) as f32 * tile_px,
                 (tile / self.columns) as f32 * tile_px,
             ),
-            crate::core::math::Size::splat(tile_px),
+            Size::splat(tile_px),
         )
     }
 }

@@ -35,7 +35,7 @@ use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRegistry, ContentRow, ErrorPlace, FileWriter,
     LoadError, LoadStep, Loading, ModuleRule, ModuleSet, RowCheck, serial, valid_key,
 };
-use crate::core::math::{Pos, Rect, Size};
+use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
@@ -1019,9 +1019,7 @@ fn check_bounds(
         match &placed.module {
             AreaModule::Object(object) => {
                 let b = object.shape.bounds();
-                if outside(b.min())
-                    || outside(b.max() - crate::core::math::Offset::new(0.001, 0.001))
-                {
+                if outside(b.min()) || outside(b.max() - Offset::new(0.001, 0.001)) {
                     out(check, object.shape.origin());
                 }
             }

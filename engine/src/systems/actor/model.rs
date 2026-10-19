@@ -489,7 +489,7 @@ impl ActorModel {
         self.def.hitbox.tiles()
     }
 
-    pub fn sheet(&self) -> &crate::core::assets::AssetRef {
+    pub fn sheet(&self) -> &AssetRef {
         &self.def.sprites.image
     }
 
