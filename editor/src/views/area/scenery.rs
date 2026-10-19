@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use super::inspect::Followups;
 use super::modules;
-use super::placement::warp_destinations;
+use super::placement::{self, warp_destinations};
 use super::stamp::object_names;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
@@ -270,11 +270,16 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
+    let mut scripts = module["scripts"].clone();
+    placement::redirect_places(
+        &mut scripts,
+        &serde_json::json!({ "area": area_key, "x": back_to.x, "y": back_to.y }),
+    );
     let door = serde_json::json!({
         "type": "object",
         "name": name,
         "shape": { "type": "point", "x": cell.x as f32, "y": cell.y as f32 },
-        "scripts": [{ "type": "shared_script", "script": "warp", "values": { "to": { "area": area_key, "x": back_to.x, "y": back_to.y } } }]
+        "scripts": scripts,
     });
     let Some(mut there_row) = editor.row_value("area", &target_area) else {
         return;

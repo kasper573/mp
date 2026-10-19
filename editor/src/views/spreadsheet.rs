@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
 use engine::core::content::ContentRow;
+use engine::core::script::ScriptModuleKind;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
@@ -247,10 +248,10 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
 }
 
 fn short_tag(tag: &str) -> String {
-    match tag {
-        "shared_script" => "shared".to_owned(),
-        "inline_script" => "inline".to_owned(),
-        other => other.to_owned(),
+    match ScriptModuleKind::of(tag) {
+        Some(ScriptModuleKind::Shared) => "shared".to_owned(),
+        Some(ScriptModuleKind::Inline) => "inline".to_owned(),
+        None => tag.to_owned(),
     }
 }
 

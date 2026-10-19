@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use engine::core::content::{self, Content, ContentScope};
+use engine::core::script::ScriptModuleKind;
 use engine::systems::area::AreaModuleKind;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -41,6 +42,10 @@ pub trait RowValue {
     fn text(&self, field: &str) -> &str;
     fn text_or<'a>(&'a self, field: &str, default: &'a str) -> &'a str;
     fn remove_field(&mut self, field: &str);
+
+    fn script_kind(&self) -> Option<ScriptModuleKind> {
+        ScriptModuleKind::of(self.kind())
+    }
 
     fn module_kind(&self) -> Option<AreaModuleKind> {
         AreaModuleKind::from_str(self.kind()).ok()

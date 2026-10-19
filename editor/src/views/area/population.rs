@@ -15,6 +15,7 @@ use crate::forms::{FormAction, FormCx};
 use crate::project::row_file;
 use crate::thumbs;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
@@ -36,7 +37,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     );
     let scripts: Vec<String> = modules
         .iter()
-        .filter(|m| m["type"].as_str().is_some_and(|t| t.ends_with("_script")))
+        .filter(|module| module.script_kind().is_some())
         .map(|m| match m["script"].as_str() {
             Some(script) => {
                 let values: Vec<String> = m["values"]

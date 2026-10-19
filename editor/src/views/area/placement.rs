@@ -208,34 +208,28 @@ pub(super) fn short_value(value: &Value) -> String {
 }
 
 pub fn warp_destinations(module: &Value) -> Vec<(String, Pos<Tiles>)> {
-    let mut out = Vec::new();
-    let mut walk = |value: &Value| {
-        if let Some(area) = value["area"].as_str()
-            && let (Some(x), Some(y)) = (value["x"].as_f64(), value["y"].as_f64())
-        {
-            out.push((area.to_owned(), Pos::new(x as f32, y as f32)));
-        }
-    };
-    fn visit(value: &Value, walk: &mut dyn FnMut(&Value)) {
-        match value {
-            Value::Object(map) => {
-                if map.contains_key("area") && map.contains_key("x") && map.contains_key("y") {
-                    walk(value);
-                }
-                for v in map.values() {
-                    visit(v, walk);
-                }
-            }
-            Value::Array(items) => {
-                for item in items {
-                    visit(item, walk);
-                }
-            }
-            _ => {}
-        }
+    let mut places = Vec::new();
+    collect_places(&module["scripts"], &mut places);
+    places
+        .into_iter()
+        .filter_map(|place| {
+            let area = place["area"].as_str()?;
+            let (x, y) = (place["x"].as_f64()?, place["y"].as_f64()?);
+            Some((area.to_owned(), Pos::new(x as f32, y as f32)))
+        })
+        .collect()
+}
+
+/// Points every place the scripts name at `to`, so a copy of a warp's scripts leads there instead.
+pub fn redirect_places(value: &mut Value, to: &Value) {
+    match value {
+        Value::Object(map) if is_place(map) => *value = to.clone(),
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|field| redirect_places(field, to)),
+        Value::Array(items) => items.iter_mut().for_each(|item| redirect_places(item, to)),
+        _ => {}
     }
-    visit(&module["scripts"], &mut walk);
-    out
 }
 
 pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[usize]) -> bool {
@@ -750,4 +744,19 @@ pub(super) fn placement_extras(
         }
     });
     widgets::key_hint_text(ui, EditorKey::Confirm, "edits the blueprint in place");
+}
+
+fn collect_places<'a>(value: &'a Value, places: &mut Vec<&'a Value>) {
+    match value {
+        Value::Object(map) if is_place(map) => places.push(value),
+        Value::Object(map) => map.values().for_each(|field| collect_places(field, places)),
+        Value::Array(items) => items.iter().for_each(|item| collect_places(item, places)),
+        _ => {}
+    }
+}
+
+fn is_place(map: &serde_json::Map<String, Value>) -> bool {
+    ["area", "x", "y"]
+        .iter()
+        .all(|field| map.contains_key(*field))
 }

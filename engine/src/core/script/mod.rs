@@ -13,7 +13,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
@@ -213,18 +213,35 @@ pub struct InlineScript<V: Vocabulary> {
     pub nodes: BTreeMap<String, Node<V>>,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case", bound = "")]
 #[schemars(bound = "")]
+#[strum_discriminants(
+    name(ScriptModuleKind),
+    derive(EnumString, IntoStaticStr, VariantArray)
+)]
 pub enum ScriptModule<V: Vocabulary> {
     #[serde(rename = "shared_script")]
+    #[strum_discriminants(strum(serialize = "shared_script"))]
     Shared {
         script: ScriptId<V>,
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         values: BTreeMap<String, VarValue<V>>,
     },
     #[serde(rename = "inline_script")]
+    #[strum_discriminants(strum(serialize = "inline_script"))]
     Inline(InlineScript<V>),
+}
+
+impl ScriptModuleKind {
+    /// The kind of script module a `type` tag names, when it names one.
+    pub fn of(tag: &str) -> Option<ScriptModuleKind> {
+        tag.parse().ok()
+    }
+
+    pub fn tag(self) -> &'static str {
+        self.into()
+    }
 }
 
 #[derive(

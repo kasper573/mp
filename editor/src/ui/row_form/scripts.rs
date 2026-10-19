@@ -2,7 +2,7 @@ use design_tokens::glyph;
 use std::str::FromStr;
 
 use egui::{Align, Layout, Ui};
-use engine::core::script::VariableType;
+use engine::core::script::{ScriptModuleKind, VariableType};
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
 
@@ -28,7 +28,7 @@ pub fn script_cards(
         .shapes
         .module_variants(table)
         .into_iter()
-        .filter(|v| v.tag.ends_with("_script"))
+        .filter(|variant| ScriptModuleKind::of(&variant.tag).is_some())
         .collect();
     if !owner[field].is_array() {
         owner[field] = Value::Array(Vec::new());
@@ -60,7 +60,7 @@ pub fn script_cards(
             });
             changed |= card_body(ui, cx, table, &variants, module, &module_path);
         });
-        if tag == "inline_script" {
+        if module.script_kind() == Some(ScriptModuleKind::Inline) {
             outline_block(ui, cx, &owner[field][index]);
         }
         ui.add_space(2.0);
@@ -72,8 +72,8 @@ pub fn script_cards(
             .width(300.0)
             .show(|ui| {
                 for variant in &variants {
-                    let description = match variant.tag.as_str() {
-                        "inline_script" => "its nodes on this object",
+                    let description = match ScriptModuleKind::of(&variant.tag) {
+                        Some(ScriptModuleKind::Inline) => "its nodes on this object",
                         _ => "names a script row",
                     };
                     if ui
@@ -108,15 +108,14 @@ pub fn script_cards(
 }
 
 pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path: &str) {
-    let tag = module.kind();
-    if tag != "inline_script" && tag != "shared_script" {
+    let Some(script_kind) = module.script_kind() else {
         return;
-    }
+    };
     let Some(pointer) = path.find("/modules/").map(|at| path[at..].to_owned()) else {
         return;
     };
     let key = cx.speaker.clone();
-    let inline = tag == "inline_script";
+    let inline = script_kind == ScriptModuleKind::Inline;
     if inline {
         let count = module["nodes"].as_object().map_or(0, |nodes| nodes.len());
         let dialogue = module["nodes"].as_object().map_or(0, |nodes| {
@@ -273,7 +272,7 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
 }
 
 pub(super) fn script_summary(module: &Value) -> String {
-    if module["type"] == "shared_script" {
+    if module.script_kind() == Some(ScriptModuleKind::Shared) {
         let mut parts = vec!["shared".to_owned()];
         if let Some(values) = module["values"]
             .as_object()

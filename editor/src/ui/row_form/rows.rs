@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
 use engine::core::content::ModuleRule;
+use engine::core::script::ScriptModuleKind;
 use engine::systems::registry;
 use serde_json::Value;
 
@@ -154,7 +155,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                                 }
                             }
                         }
-                    } else if tag == "shared_script" {
+                    } else if ScriptModuleKind::of(tag) == Some(ScriptModuleKind::Shared) {
                         let mut by_script: BTreeMap<String, Vec<String>> = BTreeMap::new();
                         for (key, _, module) in &firsts {
                             by_script

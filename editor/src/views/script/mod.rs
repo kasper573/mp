@@ -12,7 +12,7 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use engine::core::script::OwnerKindDef;
+use engine::core::script::{OwnerKindDef, ScriptModuleKind};
 use engine::systems::script::OwnerKind;
 use serde_json::{Map, Value};
 
@@ -1654,7 +1654,7 @@ pub fn open_inline_or_row(editor: &mut Editor, table: &str, key: &str, pointer: 
     let inline = editor
         .row_value(table, key)
         .and_then(|row| row.pointer(pointer).cloned())
-        .is_some_and(|module| module["type"] == "inline_script");
+        .is_some_and(|module| module.script_kind() == Some(ScriptModuleKind::Inline));
     if inline {
         open_inline(editor, table, key, pointer);
     } else {

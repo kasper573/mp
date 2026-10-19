@@ -24,12 +24,13 @@ use strum::VariantArray;
 use super::quests::quest_parties_sections;
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::forms;
 use crate::project::ProjectFiles;
 use crate::stage::{self, Posed, PosedActor, Scenario, Scene};
+use crate::value::{self, RowValue};
 use crate::views::character;
 use crate::views::script::panel;
 use crate::views::sound::BabbleRequest;
-use crate::{forms, value};
 
 pub struct RowPreviewState {
     pub action: Action,
@@ -487,10 +488,7 @@ fn attitude(content: &Content, table: &str, key: &str, value: &Value) -> Option<
         .flatten()
         .enumerate()
     {
-        if !module["type"]
-            .as_str()
-            .is_some_and(|tag| tag.ends_with("_script"))
-        {
+        if module.script_kind().is_none() {
             continue;
         }
         let Some(bound) = panel::owner_row(content, table, key, &format!("/modules/{index}"))

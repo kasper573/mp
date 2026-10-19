@@ -2,7 +2,7 @@ use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
-use engine::core::script::{OwnerKindDef, VariableType};
+use engine::core::script::{OwnerKindDef, ScriptModuleKind, VariableType};
 use engine::systems::area::blueprint::holes;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::script::OwnerKind;
@@ -327,10 +327,9 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .flatten()
         .enumerate()
     {
-        let tag = sibling.kind();
-        if !tag.ends_with("_script") {
+        let Some(script_kind) = sibling.script_kind() else {
             continue;
-        }
+        };
         let sibling_module = match module.object() {
             Some(object) => ScriptPath::ObjectScript {
                 object,
@@ -342,7 +341,7 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             continue;
         }
         any = true;
-        let (word, name, detail) = if tag == "shared_script" {
+        let (word, name, detail) = if script_kind == ScriptModuleKind::Shared {
             let script = sibling.text_or("script", "?").to_owned();
             let values = sibling["values"]
                 .as_object()
@@ -373,7 +372,7 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .clicked()
         {
-            open = Some(if tag == "shared_script" {
+            open = Some(if script_kind == ScriptModuleKind::Shared {
                 ScriptOwner::Shared {
                     key: sibling.text("script").to_owned(),
                 }
@@ -1979,7 +1978,8 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         script["variables"] = Value::Object(variables);
     }
     script["nodes"] = Value::Object(nodes_map);
-    let mut module = serde_json::json!({ "type": "shared_script", "script": dialog.key });
+    let mut module =
+        serde_json::json!({ "type": ScriptModuleKind::Shared.tag(), "script": dialog.key });
     if !values.is_empty() {
         module["values"] = Value::Object(values);
     }
@@ -2184,7 +2184,8 @@ fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
     }
     let mut nodes_value = script["nodes"].clone();
     fill_holes(&mut nodes_value, &Value::Object(values), &BTreeMap::new());
-    let mut inline = serde_json::json!({ "type": "inline_script", "nodes": nodes_value });
+    let mut inline =
+        serde_json::json!({ "type": ScriptModuleKind::Inline.tag(), "nodes": nodes_value });
     for field in ["state", "locals"] {
         if let Some(value) = script.get(field)
             && !value.is_null()

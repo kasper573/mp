@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::ModuleRule;
+use engine::core::script::ScriptModuleKind;
 use engine::systems::registry;
 use serde_json::Value;
 
@@ -345,7 +346,7 @@ fn modules_column(
     let shown = if scripts_only {
         value["modules"].as_array().map_or(0, |list| {
             list.iter()
-                .filter(|m| m["type"].as_str().is_some_and(|t| t.ends_with("_script")))
+                .filter(|module| module.script_kind().is_some())
                 .count()
         })
     } else {
@@ -406,10 +407,11 @@ fn modules_column(
         let path = format!("/modules/{index}");
         let module = &mut value["modules"][index];
         let tag = module.kind_or("module").to_owned();
-        if scripts_only && !tag.ends_with("_script") {
+        let script_kind = module.script_kind();
+        let is_script = script_kind.is_some();
+        if scripts_only && !is_script {
             continue;
         }
-        let is_script = tag.ends_with("_script");
         let summary = if is_script {
             script_summary(module)
         } else if table == "quest" && is_objective(&tag) {
@@ -513,7 +515,7 @@ fn modules_column(
                 changed |= card_body(ui, cx, table, &variants, module, &path);
             }
         });
-        if !folded && tag == "inline_script" {
+        if !folded && script_kind == Some(ScriptModuleKind::Inline) {
             outline_block(ui, cx, &value["modules"][index]);
         }
         ui.add_space(2.0);
@@ -546,10 +548,11 @@ pub(super) fn card_body(
     ui.add_space(4.0);
     let mut changed = FormChange::default();
     if let Some(variant) = schema::variant_of(variants, module) {
-        let hidden: &[&str] = match variant.tag.as_str() {
-            "inline_script" => &["nodes"],
-            "shared_script" => &["values"],
-            _ => &[],
+        let script_kind = ScriptModuleKind::of(&variant.tag);
+        let hidden: &[&str] = match script_kind {
+            Some(ScriptModuleKind::Inline) => &["nodes"],
+            Some(ScriptModuleKind::Shared) => &["values"],
+            None => &[],
         };
         let fieldless = variant.schema["properties"]
             .as_object()
@@ -563,7 +566,7 @@ pub(super) fn card_body(
         } else {
             changed |= forms::object_without(ui, cx, variant.schema, module, path, hidden);
         }
-        if variant.tag == "shared_script" {
+        if script_kind == Some(ScriptModuleKind::Shared) {
             changed |= script_values(ui, cx, module, path);
         }
     } else {
@@ -576,10 +579,10 @@ pub(super) fn card_body(
 fn module_counts(ui: &mut Ui, value: &Value) {
     let mut counts: BTreeMap<String, usize> = Default::default();
     for module in value["modules"].as_array().into_iter().flatten() {
-        let kind = module.kind_or("module");
-        if kind.ends_with("_script") {
+        if module.script_kind().is_some() {
             continue;
         }
+        let kind = module.kind_or("module");
         *counts.entry(kind.to_owned()).or_default() += 1;
     }
     let text: Vec<String> = counts
@@ -624,7 +627,8 @@ pub(super) fn add_module_popup(
         .max_height(360.0)
         .show(ui, |ui| {
             for variant in variants {
-                if scripts_only && !variant.tag.ends_with("_script") {
+                let script_kind = ScriptModuleKind::of(&variant.tag);
+                if scripts_only && script_kind.is_none() {
                     continue;
                 }
                 offered += 1;
@@ -646,11 +650,15 @@ pub(super) fn add_module_popup(
                 let description = variant.schema["description"]
                     .as_str()
                     .map(str::to_owned)
-                    .unwrap_or_else(|| match variant.tag.as_str() {
-                        "inline_script" => "any number · nodes in this row".to_owned(),
-                        "shared_script" => "any number · names a script row".to_owned(),
-                        _ if at_most_one => "at most one".to_owned(),
-                        _ => "any number".to_owned(),
+                    .unwrap_or_else(|| match script_kind {
+                        Some(ScriptModuleKind::Inline) => {
+                            "any number · nodes in this row".to_owned()
+                        }
+                        Some(ScriptModuleKind::Shared) => {
+                            "any number · names a script row".to_owned()
+                        }
+                        None if at_most_one => "at most one".to_owned(),
+                        None => "any number".to_owned(),
                     });
                 let line = if blocked {
                     "at most one · already added".to_owned()
