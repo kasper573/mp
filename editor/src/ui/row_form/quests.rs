@@ -2,7 +2,7 @@ use egui::{Sense, Ui};
 use engine::core::content::{ContentRow, row_file, row_of};
 use engine::systems::area::{AreaDef, AreaModuleKind};
 use engine::systems::player::snapshot::CharacterSnapshot;
-use engine::systems::script::{Fill, ScriptDef};
+use engine::systems::script::{Fill, RiftEffectKind, ScriptDef};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -109,9 +109,9 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
                 script: script_label.clone(),
                 node: name.clone(),
             };
-            match node["type"].as_str() {
-                Some("offer_quest") | Some("accept_quest") => givers.push(entry),
-                Some("turn_in") => turn_ins.push(entry),
+            match node.kind().parse() {
+                Ok(RiftEffectKind::OfferQuest | RiftEffectKind::AcceptQuest) => givers.push(entry),
+                Ok(RiftEffectKind::TurnIn) => turn_ins.push(entry),
                 _ => {}
             }
         }

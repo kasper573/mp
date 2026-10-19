@@ -11,7 +11,7 @@ pub mod project;
 mod rows;
 pub mod scenes;
 pub mod schema;
-mod spans;
+pub mod spans;
 mod stage;
 mod tabs;
 pub mod templates;
