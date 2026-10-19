@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -380,7 +380,7 @@ impl BodyShape {
 }
 
 impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.place {
             ErrorPlace::Text { line, column } => write!(f, "{line}:{column}: {}", self.message),
             _ => write!(f, "{}", self.message),

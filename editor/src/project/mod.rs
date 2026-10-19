@@ -8,7 +8,7 @@ pub mod watch;
 pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_bytes};
 pub use history::{EditHistory, EditStep, RowSelection};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{self, TryRecvError};
@@ -467,7 +467,7 @@ impl Project {
             .chain(self.disk.keys())
             .filter(|path| self.is_unsaved(path))
             .cloned()
-            .collect::<std::collections::BTreeSet<String>>()
+            .collect::<BTreeSet<String>>()
             .into_iter()
             .collect()
     }

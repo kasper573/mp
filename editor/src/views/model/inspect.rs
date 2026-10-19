@@ -9,6 +9,8 @@ use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
 use serde_json::Value;
 
+use super::busts::{BustFace, FaceLine};
+use super::strip::StripConfirm;
 use super::{FrameCueKind, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
 use crate::app::Editor;
 use crate::forms::{self, FormChange};
@@ -535,7 +537,7 @@ fn cue_card(
     ui.add_space(8.0);
     if ui.button("Copy cues to the other 7 directions…").clicked() {
         let view = editor.views.model.view_mut(key);
-        view.confirm = Some(super::strip::StripConfirm::Cues);
+        view.confirm = Some(StripConfirm::Cues);
     }
     if let Some(sound) = play {
         editor.views.sound.play.push(sound);
@@ -663,8 +665,8 @@ fn face_card(
     ui: &mut Ui,
     key: &str,
     row: &Value,
-    face: &super::busts::BustFace,
-    faces: &[super::busts::BustFace],
+    face: &BustFace,
+    faces: &[BustFace],
 ) {
     ui.label(
         theme::mono(format!("model/{key} › bust › {}", face.name))
@@ -732,7 +734,7 @@ fn face_card(
         });
         widgets::kv_text(ui, "size", size_text(&face.name, own_size, &sizes));
     });
-    let own_lines: Vec<&super::busts::FaceLine> = lines
+    let own_lines: Vec<&FaceLine> = lines
         .iter()
         .filter(|line| faces.iter().any(|f| f.own.is_some() && f.name == line.face))
         .collect();
@@ -805,13 +807,7 @@ fn face_card(
     }
 }
 
-fn remove_dialog(
-    editor: &mut Editor,
-    key: &str,
-    face: &super::busts::BustFace,
-    faces: &[super::busts::BustFace],
-    uses: usize,
-) {
+fn remove_dialog(editor: &mut Editor, key: &str, face: &BustFace, faces: &[BustFace], uses: usize) {
     let view = editor.views.model.view_mut(key);
     view.removing = Some(super::FaceRemoval {
         face: face.clone(),

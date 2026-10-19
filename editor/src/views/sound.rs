@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::sync::Arc;
 
 use bevy::asset::{AssetPath, AssetServer};
@@ -279,7 +280,7 @@ fn soundscape_name(editor: &Editor, area: &str, module: usize) -> String {
         .as_array()
         .and_then(|channels| channels.first())
         .and_then(|channel| channel["file"].as_str())
-        .and_then(|file| std::path::Path::new(file).file_stem())
+        .and_then(|file| Path::new(file).file_stem())
         .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_default();
     format!("soundscape {index} · {stem}")

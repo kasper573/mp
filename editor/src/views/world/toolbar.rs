@@ -6,6 +6,7 @@ use engine::systems::npc::NpcDef;
 use engine::systems::quest::QuestDef;
 use engine::systems::shop::ShopDef;
 
+use super::atlas::AtlasArea;
 use super::filters::{ColorBy, ColorField, MapLens};
 use super::{MapPart, OpenWorldMap, select};
 use crate::app::Editor;
@@ -69,7 +70,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
 
 pub fn layer_rows(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
     let atlas = &map.atlas;
-    let count = |of: fn(&super::atlas::AtlasArea) -> usize| atlas.areas.values().map(of).sum();
+    let count = |of: fn(&AtlasArea) -> usize| atlas.areas.values().map(of).sum();
     let givers: usize = atlas
         .areas
         .keys()

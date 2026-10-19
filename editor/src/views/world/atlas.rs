@@ -1,3 +1,4 @@
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use engine::core::content::id::LeafKind;
@@ -323,7 +324,7 @@ impl WorldAtlas {
         while let Some(current) = queue.pop_front() {
             let here = distances[&current];
             for &next in self.exits(current) {
-                if let std::collections::btree_map::Entry::Vacant(slot) = distances.entry(next) {
+                if let Entry::Vacant(slot) = distances.entry(next) {
                     slot.insert(here + 1);
                     queue.push_back(next);
                 }

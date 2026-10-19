@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -61,13 +62,13 @@ impl<Row> PartialEq for ContentId<Row> {
 impl<Row> Eq for ContentId<Row> {}
 
 impl<Row> PartialOrd for ContentId<Row> {
-    fn partial_cmp(&self, other: &ContentId<Row>) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &ContentId<Row>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<Row> Ord for ContentId<Row> {
-    fn cmp(&self, other: &ContentId<Row>) -> std::cmp::Ordering {
+    fn cmp(&self, other: &ContentId<Row>) -> Ordering {
         self.0.cmp(&other.0)
     }
 }

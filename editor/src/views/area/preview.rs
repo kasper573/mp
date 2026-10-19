@@ -4,6 +4,7 @@ use engine::systems::area;
 use engine::systems::script::Place;
 use serde_json::Value;
 
+use super::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use super::{pins, select};
 use crate::app::Editor;
 use crate::forms;
@@ -97,26 +98,22 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     );
     let center = Pos::new(area.size.width / 2.0 - 0.5, area.size.height / 2.0 - 0.5);
     let view_key = format!("pick:{area_key}");
-    editor
-        .views
-        .area
-        .requests
-        .push(super::scene::AreaSceneRequest {
-            key: view_key.clone(),
-            spec: super::scene::AreaSceneSpec {
-                ground: area_key.clone(),
-                scenery: super::scene::SceneryOf::Area,
-                hidden_ground: Vec::new(),
-                show_blueprints: true,
-                show_scenery: true,
-            },
-            width: (rect.width() * ppp).round().max(1.0) as u32,
-            height: (rect.height() * ppp).round().max(1.0) as u32,
-            center,
-            zoom: zoom * ppp,
-            generation,
-            live: true,
-        });
+    editor.views.area.requests.push(AreaSceneRequest {
+        key: view_key.clone(),
+        spec: AreaSceneSpec {
+            ground: area_key.clone(),
+            scenery: SceneryOf::Area,
+            hidden_ground: Vec::new(),
+            show_blueprints: true,
+            show_scenery: true,
+        },
+        width: (rect.width() * ppp).round().max(1.0) as u32,
+        height: (rect.height() * ppp).round().max(1.0) as u32,
+        center,
+        zoom: zoom * ppp,
+        generation,
+        live: true,
+    });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, theme::INPUT);
     if let Some(scene) = editor.views.area.scenes.by_key.get(&view_key) {

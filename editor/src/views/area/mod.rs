@@ -28,6 +28,7 @@ pub use blueprint::{MakeBlueprintDialog, make_blueprint_dialog};
 pub use resize::ResizeDialog;
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 
 use bevy::prelude::World;
 use design_tokens::glyph::{self, Mark};
@@ -874,7 +875,7 @@ pub struct AreaFrame<'a> {
     pub labels: AreaLabels,
 }
 
-impl std::ops::Deref for AreaFrame<'_> {
+impl Deref for AreaFrame<'_> {
     type Target = AreaSnapshot;
 
     fn deref(&self) -> &AreaSnapshot {

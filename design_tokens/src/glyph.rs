@@ -3,6 +3,7 @@ use egui::{
     TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
 };
 
+use crate::face::TextRole;
 use crate::ink;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -579,11 +580,7 @@ pub fn dashed_circle(painter: &Painter, center: Pos2, radius: f32, stroke: Strok
 }
 
 pub fn badge(painter: &Painter, at: Pos2, anchor: Align2, text: &str, color: Color32) {
-    let galley = painter.layout_no_wrap(
-        text.to_owned(),
-        crate::face::TextRole::Count.font_id(),
-        color,
-    );
+    let galley = painter.layout_no_wrap(text.to_owned(), TextRole::Count.font_id(), color);
     let size = galley.size() + Vec2::new(6.0, 2.0);
     let rect = anchor.anchor_size(at, size);
     painter.rect(

@@ -5,6 +5,7 @@ use engine::core::tiling::{GridSize, TileSize};
 use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
+use super::grid::GridDraft;
 use super::{pins, shapes};
 use crate::app::Editor;
 use crate::forms;
@@ -221,7 +222,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = super::grid::GridDraft::of(&dialog.area, &area.grids);
+    let draft = GridDraft::of(&dialog.area, &area.grids);
     let (resized, clipped) = draft.resized(new, shift);
     let mut row = editor
         .row_value(AreaDef::TABLE, &dialog.area)

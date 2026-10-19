@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::ops::BitOrAssign;
 
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
@@ -139,7 +140,7 @@ impl FormChange {
     }
 }
 
-impl std::ops::BitOrAssign for FormChange {
+impl BitOrAssign for FormChange {
     fn bitor_assign(&mut self, other: FormChange) {
         if self.0.is_none() {
             self.0 = other.0;

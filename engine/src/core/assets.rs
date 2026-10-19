@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
@@ -104,8 +105,8 @@ impl FileBytes {
     }
 }
 
-impl std::fmt::Display for FileBytes {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for FileBytes {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{} KiB", self.0.div_ceil(1024))
     }
 }

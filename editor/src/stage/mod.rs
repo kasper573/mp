@@ -29,8 +29,9 @@ use engine::systems::status::StatusEffectId;
 use self::live::LiveWorld;
 use self::mirror::{ActorPose, Site, Source, Stage, VfxPose};
 use crate::app::Editor;
+use crate::project::ProjectFiles;
 use crate::ui::theme;
-use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes, SceneryOf};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
@@ -383,10 +384,7 @@ fn ground_key(key: &str) -> String {
     format!("{key}/ground")
 }
 
-fn behind(
-    scenes: &crate::views::area::scene::AreaScenes,
-    request: &Request,
-) -> Option<SiteTexture> {
+fn behind(scenes: &AreaScenes, request: &Request) -> Option<SiteTexture> {
     if !request.ground {
         return None;
     }
@@ -402,7 +400,7 @@ fn behind(
 fn posed_frame<'a>(
     posed: &Posed,
     content: &'a Content,
-    files: &'a crate::project::ProjectFiles,
+    files: &'a ProjectFiles,
     request: &Request,
 ) -> mirror::Frame<'a> {
     let spawn = content.built::<GameSettings>().initial_spawn;
@@ -474,7 +472,7 @@ fn posed_frame<'a>(
 fn live_frame<'a>(
     live: &mut LiveWorld,
     content: &'a Content,
-    files: &'a crate::project::ProjectFiles,
+    files: &'a ProjectFiles,
     request: &Request,
 ) -> mirror::Frame<'a> {
     let spawn = content.built::<GameSettings>().initial_spawn;

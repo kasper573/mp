@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::io;
+use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
@@ -114,10 +115,7 @@ impl ProjectFiles {
     pub fn keys_of(&self, table: &str) -> impl Iterator<Item = &str> {
         let prefix = format!("{}/", table_folder(table));
         self.map
-            .range::<str, _>((
-                std::ops::Bound::Included(prefix.as_str()),
-                std::ops::Bound::Unbounded,
-            ))
+            .range::<str, _>((Bound::Included(prefix.as_str()), Bound::Unbounded))
             .map(|(path, _)| path.as_str())
             .take_while(move |path| path.starts_with(&prefix))
             .filter_map(|path| row_of(path).map(|(_, key)| key))
@@ -125,10 +123,7 @@ impl ProjectFiles {
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {
         self.map
-            .range::<str, _>((
-                std::ops::Bound::Included(prefix),
-                std::ops::Bound::Unbounded,
-            ))
+            .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
             .map(|(path, _)| path)
             .take_while(move |path| path.starts_with(prefix))
     }

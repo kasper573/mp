@@ -7,6 +7,7 @@ use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
 use engine::systems::area::{self, AreaDef, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
+use super::grid::GridDraft;
 use super::inspect::Followups;
 use super::placement::{self, warp_destinations};
 use super::stamp::object_names;
@@ -171,7 +172,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     };
     let tileset = module.text("tileset").to_owned();
     let grids = frame.area().grids.clone();
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
+    let mut draft = GridDraft::of(&frame.area_key, &grids);
     let layer = editor
         .views
         .area
@@ -413,7 +414,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         return;
     };
     let grids = frame.area().grids.clone();
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
+    let mut draft = GridDraft::of(&frame.area_key, &grids);
     let mut adopted: Vec<Value> = module["blocks"].as_array().cloned().unwrap_or_default();
     let mut count = 0;
     for cell in rect.tiles() {

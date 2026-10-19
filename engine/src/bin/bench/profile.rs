@@ -8,6 +8,7 @@ mod play;
 mod sim;
 
 use std::alloc::{GlobalAlloc, Layout};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -315,7 +316,7 @@ fn report_changes(worlds: &mut [App]) {
         }
     }
     let mut rows: Vec<_> = counts.into_iter().collect();
-    rows.sort_by_key(|row| std::cmp::Reverse(row.1));
+    rows.sort_by_key(|row| Reverse(row.1));
     println!("[changes] replicated entities: {entities}, changed this tick: {changed_entities}");
     for (name, count) in rows.iter().take(20) {
         println!("[changes] {count:>8}  {name}");

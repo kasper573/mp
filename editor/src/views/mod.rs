@@ -20,8 +20,11 @@ use engine::systems::script::Place;
 use crate::app::{BottomTab, Editor};
 use crate::play;
 use crate::project::AreaCameraState;
+use crate::stage::Stages;
 use crate::tabs::EditorTab;
+use crate::ui::assets::AssetsState;
 use crate::ui::browser::BrowserState;
+use crate::ui::row_form::preview::RowPreviewState;
 use crate::ui::row_form::usages;
 use crate::ui::{self, theme};
 
@@ -41,9 +44,9 @@ pub struct EditorViews {
     pub character: character::CharacterView,
     pub class: class::ClassViews,
     pub vfx: vfx::VfxViews,
-    pub assets: crate::ui::assets::AssetsState,
-    pub preview: crate::ui::row_form::preview::RowPreviewState,
-    pub stage: crate::stage::Stages,
+    pub assets: AssetsState,
+    pub preview: RowPreviewState,
+    pub stage: Stages,
 }
 
 impl EditorViews {

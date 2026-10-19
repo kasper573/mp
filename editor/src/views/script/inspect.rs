@@ -12,6 +12,7 @@ use engine::systems::script::{OwnerKind, RiftEffectKind, ScriptDef};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
+use super::graph::ScriptGraphAction;
 use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
@@ -934,11 +935,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             }));
     }
     if duplicate {
-        super::act(
-            editor,
-            doc,
-            super::graph::ScriptGraphAction::Duplicate(name.to_owned()),
-        );
+        super::act(editor, doc, ScriptGraphAction::Duplicate(name.to_owned()));
     }
     if delete {
         super::delete_nodes(editor, doc, vec![name.to_owned()]);

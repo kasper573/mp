@@ -1,4 +1,5 @@
 use std::f32::consts::FRAC_1_SQRT_2;
+use std::ops::Range;
 
 use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
@@ -125,7 +126,7 @@ impl Rng {
         (!items.is_empty()).then(|| &items[self.rand_range(0..items.len() as u32) as usize])
     }
 
-    pub fn rand_range(&mut self, range: std::ops::Range<u32>) -> u32 {
+    pub fn rand_range(&mut self, range: Range<u32>) -> u32 {
         self.0.rand_range(range)
     }
 }

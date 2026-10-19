@@ -13,6 +13,7 @@ use engine::systems::script::{
 };
 use engine::systems::shop::ShopDef;
 use engine::systems::skill::SkillDef;
+use engine::systems::stat::StatKind;
 use engine::systems::status::StatusEffectDef;
 use serde_json::Value;
 
@@ -835,7 +836,7 @@ fn summarise_values(values: &Value) -> String {
         .unwrap_or_default()
 }
 
-fn stat_name(stat: engine::systems::stat::StatKind) -> String {
+fn stat_name(stat: StatKind) -> String {
     let name: &'static str = stat.into();
     name.to_lowercase()
 }

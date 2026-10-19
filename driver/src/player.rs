@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use bevy_ecs::entity::Entity;
@@ -746,7 +747,7 @@ impl Player {
         self.desktop.stop()
     }
 
-    pub fn folder(&self) -> &std::path::Path {
+    pub fn folder(&self) -> &Path {
         self.desktop.folder()
     }
 

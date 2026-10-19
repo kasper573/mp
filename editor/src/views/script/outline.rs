@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
 use design_tokens::glyph::{self, Mark};
@@ -227,7 +228,7 @@ fn draw(
     }
     let mono = FontId::monospace(13.0);
     let small = FontId::monospace(12.0);
-    let x = std::cell::Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
+    let x = Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
     let y = rect.center().y;
     let put = |ui: &Ui, text: &str, font: &FontId, ink: Color32| {
         let drawn = ui.painter().text(

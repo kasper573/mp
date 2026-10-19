@@ -5,8 +5,8 @@ use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2}
 use engine::core::assets::AssetKind;
 use engine::core::content::{Content, ContentRow};
 use engine::systems::class::{
-    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, NodeKey, SkillNode,
-    SkillTree, TreeBackdrop,
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, ClassLevel, NodeKey,
+    SkillNode, SkillTree, TreeBackdrop,
 };
 use engine::systems::skill::{Rank, SkillDef};
 use serde_json::{Map, Value, json};
@@ -144,12 +144,11 @@ fn toolbar(
     let shapes = editor.shapes.clone();
     let mut snap = editor.views.class.snap;
     let mut picked = String::new();
-    let granted: u32 =
-        value::typed::<Vec<engine::systems::class::ClassLevel>>(content, row["levels"].clone())
-            .unwrap_or_default()
-            .iter()
-            .map(|level| level.skill_points.0)
-            .sum();
+    let granted: u32 = value::typed::<Vec<ClassLevel>>(content, row["levels"].clone())
+        .unwrap_or_default()
+        .iter()
+        .map(|level| level.skill_points.0)
+        .sum();
     let cost: u32 = tree
         .0
         .values()

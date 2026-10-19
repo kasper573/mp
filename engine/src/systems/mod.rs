@@ -50,13 +50,24 @@ use skill::Cooldowns;
 use status::{ActiveAspects, Boosts, Statuses};
 
 use crate::core::assets::SyncedFiles;
+use crate::core::audio::playback::{SfxDef, SfxPlugin, SfxRoleDef};
+use crate::core::audio::soundscape::SoundscapePlugin;
+use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
     Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
     Loading, Settings,
 };
+use crate::core::gui::GuiPlugin;
+use crate::core::interpolate::SnapshotPlugin;
+use crate::core::math::Rng;
+use crate::core::net::auth::Credentials;
+use crate::core::net::transport::SocketClientPlugin;
 use crate::core::platform::{ClientPlatform, Platform, SignIn, StartParams};
+use crate::core::render::WorldRenderPlugin;
+use crate::core::text::StyledTextPlugin;
 use crate::core::time::{Hertz, Seconds, WallClock};
+use crate::core::vfx::render::VfxRenderPlugin;
 use crate::systems::area::AreaId;
 use crate::systems::player::PlayerDefId;
 
@@ -208,7 +219,7 @@ pub fn server_app(
     app.insert_resource(bevy_time::TimeUpdateStrategy::ManualDuration(
         TICK_HZ.period(),
     ));
-    app.insert_resource(crate::core::math::Rng::for_world(rng_seed, ordinal));
+    app.insert_resource(Rng::for_world(rng_seed, ordinal));
     app.add_plugins(
         bevy_app::PluginGroup::build(bevy_replicon::prelude::RepliconPlugins)
             .set(RepliconSharedPlugin {
@@ -351,16 +362,14 @@ pub fn client_app(
     use bevy::prelude::*;
 
     let credentials = match &params.sign_in {
-        SignIn::Token(token) => Some(crate::core::net::auth::Credentials::from_access_token(
-            token,
-        )),
+        SignIn::Token(token) => Some(Credentials::from_access_token(token)),
         SignIn::AnyAccount | SignIn::Provider(_) => None,
     };
 
     let mut app = App::new();
     let files = SyncedFiles::default();
     app.insert_resource(files.clone());
-    app.insert_resource(crate::core::math::Rng::from_entropy());
+    app.insert_resource(Rng::from_entropy());
     bevy::asset::AssetApp::register_asset_source(
         &mut app,
         bevy::asset::io::AssetSourceId::Default,
@@ -389,17 +398,17 @@ pub fn client_app(
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
-            crate::core::gui::GuiPlugin,
-            crate::core::text::StyledTextPlugin,
-            crate::core::net::transport::SocketClientPlugin,
-            crate::core::interpolate::SnapshotPlugin {
+            GuiPlugin,
+            StyledTextPlugin,
+            SocketClientPlugin,
+            SnapshotPlugin {
                 period: REPLICATION_PERIOD,
             },
-            crate::core::render::WorldRenderPlugin,
-            crate::core::vfx::render::VfxRenderPlugin,
-            crate::core::audio::playback::SfxPlugin,
-            crate::core::audio::soundscape::SoundscapePlugin,
-            crate::core::babble::BabblePlugin,
+            WorldRenderPlugin,
+            VfxRenderPlugin,
+            SfxPlugin,
+            SoundscapePlugin,
+            BabblePlugin,
         ))
         .add_plugins((
             screen::ClientScreenPlugin { credentials },
@@ -529,8 +538,8 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
-        .row::<crate::core::audio::playback::SfxDef>()
-        .row::<crate::core::audio::playback::SfxRoleDef>()
+        .row::<SfxDef>()
+        .row::<SfxRoleDef>()
         .row::<attention::AttentionDef>()
         .row::<input::map::InputDef>()
         .row::<interface::CursorDef>()

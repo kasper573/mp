@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -47,14 +49,14 @@ impl Tiles {
     }
 }
 
-impl std::ops::Mul<f32> for TilesPerSec {
+impl Mul<f32> for TilesPerSec {
     type Output = TilesPerSec;
     fn mul(self, factor: f32) -> TilesPerSec {
         TilesPerSec(Tiles(self.0.0 * factor))
     }
 }
 
-impl std::ops::Mul<Seconds> for TilesPerSec {
+impl Mul<Seconds> for TilesPerSec {
     type Output = Tiles;
     fn mul(self, time: Seconds) -> Tiles {
         Tiles(self.0.0 * time.0)

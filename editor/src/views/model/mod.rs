@@ -9,6 +9,7 @@ pub mod sounds;
 pub mod strip;
 
 use std::collections::HashMap;
+use std::ops::Not;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
@@ -22,6 +23,7 @@ use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
+use crate::audio::WaveformCache;
 use crate::import;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
@@ -32,7 +34,7 @@ use crate::value::{self, RowValue};
 #[derive(Default)]
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
-    pub bank: crate::audio::WaveformCache,
+    pub bank: WaveformCache,
     pub drops: Vec<PathBuf>,
     pub reimports: HashMap<String, import::ModelReimport>,
 }
@@ -147,9 +149,9 @@ pub struct FaceRemoval {
 pub struct StripFrame {
     pub frame: u32,
     pub ms: u32,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "Not::not")]
     pub step: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "Not::not")]
     pub apex: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sound: Option<String>,

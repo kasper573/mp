@@ -1,3 +1,4 @@
+use std::ops::Not;
 use std::time::Duration;
 
 use design_tokens::ink::Prose;
@@ -48,7 +49,7 @@ struct StyledRow {
     voice: Option<TextVoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     motion: Option<TextMotion>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "Not::not")]
     slow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pause_after: Option<Millis>,

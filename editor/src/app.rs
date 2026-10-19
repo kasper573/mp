@@ -20,12 +20,15 @@ use serde_json::Value;
 use strum::IntoStaticStr;
 
 use crate::forms::{FormCx, FormState};
+use crate::import::{self, ImportJobs, ImportRecords};
+use crate::play::{self, PlayTest};
 use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
 use crate::project::{
     AppliedStep, ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
 };
+use crate::rows;
 use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
@@ -37,7 +40,6 @@ use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{self, EditorCamera, EditorViews};
-use crate::{import, play, rows};
 
 #[derive(Clone, Debug)]
 pub struct EditorLaunch {
@@ -396,9 +398,9 @@ impl Editor {
             scene: None,
             clipboard: None,
             views: EditorViews::default(),
-            play: crate::play::PlayTest::default(),
-            imports: crate::import::ImportRecords::default(),
-            jobs: crate::import::ImportJobs::default(),
+            play: PlayTest::default(),
+            imports: ImportRecords::default(),
+            jobs: ImportJobs::default(),
             pick: None,
             quit: false,
             frame: 0,
@@ -515,7 +517,7 @@ impl Editor {
                 self.selection = RowSelection::default();
                 self.form = FormState::default();
                 self.views = EditorViews::default();
-                self.imports = crate::import::ImportRecords::load(&self.user, folder);
+                self.imports = ImportRecords::load(&self.user, folder);
                 if let Some(problem) = self.imports.unreadable.clone() {
                     self.toast(format!(
                         "Import records are unreadable and will not be saved: {problem}"

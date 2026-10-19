@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
@@ -341,7 +342,7 @@ fn header_of(file: &Path) -> Header {
 }
 
 fn is_apng(file: &Path) -> bool {
-    std::fs::File::open(file)
+    File::open(file)
         .ok()
         .and_then(|file| PngDecoder::new(BufReader::new(file)).ok())
         .and_then(|decoder| decoder.is_apng().ok())
@@ -562,7 +563,7 @@ fn decode_sequence(files: &[PathBuf]) -> Result<AnimationExport, String> {
 }
 
 fn decode_gif(file: &Path) -> Result<AnimationExport, String> {
-    let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
+    let handle = File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = GifDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
     decoder
@@ -579,7 +580,7 @@ fn decode_gif(file: &Path) -> Result<AnimationExport, String> {
 }
 
 fn decode_apng(file: &Path) -> Result<AnimationExport, String> {
-    let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
+    let handle = File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = PngDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
     decoder

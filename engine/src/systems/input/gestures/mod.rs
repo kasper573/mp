@@ -25,6 +25,7 @@ use crate::core::tiling::Tiles;
 use crate::systems::interface::CursorShape;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
+use crate::systems::skill::aim::AimGesture;
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum ClickClaim {
@@ -77,7 +78,7 @@ pub trait Gesture: Send + Sync {
 static GESTURES: &[&dyn Gesture] = &[
     &interface::InterfaceGesture,
     &locked::LockedGesture,
-    &crate::systems::skill::aim::AimGesture,
+    &AimGesture,
     &attack::AttackGesture,
     &pickup::PickupGesture,
     &interact::InteractGesture,
