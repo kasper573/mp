@@ -1,21 +1,20 @@
-not loaded · 8 errors in 6 files · cargo test failed
+not loaded · 7 errors in 5 files · the test game did not load
 
 ## Errors by rule
-not walkable  2    missing file  1    missing fixture  1
-palette out of range  1    start not known  1    unknown row  1
-wrong type  1
+not walkable  2    missing file  1    palette out of range  1
+start not known  1    unknown row  1    wrong type  1
 
 ## Errors, by file and line
-game.json:4:20  /initial_spawn
+game.json:3:20  /initial_spawn
   rule      not walkable
   found     start 40, 40
   expected  a place on a walkable cell of start, outside every warp object
-  nearest   15, 11
-game.json:9:13  /player
+  nearest   9, 7
+game.json:8:13  /player
   rule      unknown row
-  found     "adventurr"
+  found     "heroo"
   expected  the key of a player row
-  nearest   "adventurer"
+  nearest   "hero"
 tables/area/cove/ground.csv:2:3  row 2, column 3
   rule      palette out of range
   found     "7"
@@ -24,15 +23,11 @@ tables/class/apprentice.json:1:11  /name
   rule      wrong type
   found     integer `3`
   expected  a string
-tables/input/interact.json  whole file
-  rule      missing fixture
-  found     no such file
-  expected  one row for every input fixture the engine requires
-tables/sfx/splash.json:1:9  /file
+tables/sfx/splash.json:2:11  /file
   rule      missing file
-  found     "audio/combat/splash.wav"
+  found     "audio/splash.wav"
   expected  a file under assets/
-  nearest   "audio/combat/slash03.wav"
+  nearest   "audio/slash.wav"
 tables/test_character/lost.json:4:18  /known_areas
   rule      start not known
   found     start
@@ -41,6 +36,6 @@ tables/test_character/lost.json:7:12  /start
   rule      not walkable
   found     start 40, 40
   expected  a place on a walkable cell of start, outside every warp object
-  nearest   15, 11
+  nearest   9, 7
 
-## End · 8 errors
+## End · 7 errors

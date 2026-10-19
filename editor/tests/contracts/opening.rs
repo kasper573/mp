@@ -1,14 +1,14 @@
 use std::path::{Component, Path, PathBuf};
 
 use editor::app::Editor;
-use editor::templates;
 use editor::user::{EditorSettings, UserFolder};
+
+use crate::support::game_folder;
 
 #[test]
 fn a_folder_opened_by_a_relative_path_is_known_by_its_absolute_one() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
-    let folder = scratch.path().join("game");
-    templates::new_game("new_game", "Saltmarsh", &folder).expect("writes");
+    let folder = game_folder(scratch.path().join("game"));
     let mut editor = Editor::new(
         UserFolder::at(scratch.path().join("user")),
         EditorSettings::default(),

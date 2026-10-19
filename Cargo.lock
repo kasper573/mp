@@ -3547,6 +3547,7 @@ dependencies = [
  "strip-ansi-escapes",
  "strum",
  "tempfile",
+ "testkit",
  "ureq",
  "walkdir",
 ]
@@ -8850,10 +8851,13 @@ dependencies = [
 name = "testkit"
 version = "0.1.0"
 dependencies = [
- "bevy_app",
  "bevy_ecs",
  "bevy_replicon",
+ "bevy_time",
  "engine",
+ "png",
+ "serde_json",
+ "strum",
 ]
 
 [[package]]

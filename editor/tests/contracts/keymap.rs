@@ -55,12 +55,13 @@ fn pressed_by(key: Key, modifiers: Modifiers) -> Vec<EditorKey> {
         ..RawInput::default()
     };
     let mut pressed = Vec::new();
-    let _ = ctx.run_ui(input, |ui| {
+    let mut output = ctx.run_ui(input, |ui| {
         pressed = EditorKey::VARIANTS
             .iter()
             .copied()
             .filter(|editor_key| ui.input(|i| editor_key.pressed(i)))
             .collect();
     });
+    output.textures_delta.clear();
     pressed
 }

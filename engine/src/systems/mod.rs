@@ -93,6 +93,45 @@ pub fn protocol(app: &mut App) {
     reach::register(app);
     terminal::register(app);
     vfx::register(app);
+    plug_ins(app.world_mut());
+}
+
+/// Wires each system's say into the registries other systems read, so neither names the other: what
+/// an actor's effective stats are made of, and what draws a player's attention.
+pub fn plug_ins(world: &mut World) {
+    world.init_resource::<stat::Sources>();
+    world.init_resource::<attention::MarkSources>();
+    world.init_resource::<attention::BadgeSources>();
+    stat::source(world, status::boost::modifiers);
+    stat::source(world, class::level_stats);
+    stat::source(world, skill::casting::chase);
+    attention::badge_source(world, dialogue::talking);
+    attention::mark_source(world, interact::marks);
+    attention::mark_source(world, shop::marks);
+    attention::mark_source(world, quest::marks);
+}
+
+/// What an area's server keeps besides its entities: the game's content and the scripts and parties
+/// built from it, who plays, where everyone stands and who sees them, who is on their way out, the
+/// clocks of regeneration, resets and conversations, and the messages its systems pass one another.
+pub fn area_state(world: &mut World, content: &Content) {
+    use bevy_ecs::message::MessageRegistry;
+
+    world.insert_resource(content.clone());
+    world.insert_resource(content.built::<quest::Parties>().clone());
+    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    world.init_resource::<script::RiftInstances>();
+    world.init_resource::<player::Players>();
+    world.init_resource::<movement::TileClaims>();
+    world.init_resource::<area::transition::Departures>();
+    world.init_resource::<combat::RegenAt>();
+    world.init_resource::<skill::reset::PendingResets>();
+    world.init_resource::<dialogue::StepCounter>();
+    world.init_resource::<visibility::Sights>();
+    MessageRegistry::register_message::<combat::Died>(world);
+    MessageRegistry::register_message::<rewards::KillCredited>(world);
+    world.add_observer(player::greet);
+    world.add_observer(player::client_left);
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -158,11 +197,7 @@ pub fn server_app(
     app.insert_resource(WorldArea(area));
     app.insert_resource(assets.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(assets.clone());
-    app.insert_resource(assets.built::<quest::Parties>().clone());
-    app.insert_resource(assets.built::<script::RiftScripts>().clone());
     app.insert_resource(input::map::InputMap::new(assets));
-    app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     // Every tick steps the same span of game time however long it took, so a seeded world plays out
     // alike tick for tick.
@@ -184,18 +219,10 @@ pub fn server_app(
     );
     protocol(&mut app);
     visibility::register(&mut app);
-    app.init_resource::<player::Players>()
-        .init_resource::<movement::TileClaims>()
-        .init_resource::<area::transition::Departures>()
-        .init_resource::<combat::RegenAt>()
-        .init_resource::<skill::reset::PendingResets>()
-        // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
-        // serialization load across ticks instead of spiking every Nth tick in lockstep.
-        .insert_resource(ReplicationClock(ordinal))
-        .add_message::<combat::Died>()
-        .add_message::<rewards::KillCredited>()
-        .add_observer(player::greet)
-        .add_observer(player::client_left)
+    area_state(app.world_mut(), assets);
+    // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
+    // serialization load across ticks instead of spiking every Nth tick in lockstep.
+    app.insert_resource(ReplicationClock(ordinal))
         .add_systems(
             Startup,
             (
@@ -423,7 +450,7 @@ pub fn load_content(
     outcome: &str,
 ) -> Result<Content, LoadReport> {
     crate::core::content::load(
-        &registry(),
+        registry(),
         folder,
         crate::core::content::version::build(),
         outcome,
@@ -461,7 +488,42 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     Ok(())
 }
 
-pub fn registry() -> ContentRegistry {
+/// A whole game: the tables it's made of, its settings, every row the engine itself requires, and
+/// every quest and shop within a player's reach.
+pub fn registry() -> &'static ContentRegistry {
+    use crate::core::content::LoadStep;
+    // Built once a process, as its content version hashes every shape it reads.
+    static REGISTRY: std::sync::LazyLock<ContentRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = settled_tables();
+        registry
+            .fixture::<input::map::InputAction>()
+            .fixture::<attention::AttentionMark>()
+            .fixture::<interface::InterfaceSound>()
+            .fixture::<interface::CursorShape>()
+            .fixture::<interface::InterfaceIcon>()
+            .fixture::<vfx::VfxFixture>()
+            .fixture::<vfx::VfxShaderFixture>()
+            .fixture::<area::world_map::WorldMap>()
+            .hook(LoadStep::Across, script::check_reached);
+        registry
+    });
+    &REGISTRY
+}
+
+/// Every table a game is made of, and the settings its `game.json` holds: a folder of only some of
+/// a game's rows, set up to be played, loads through this.
+pub fn settled_tables() -> ContentRegistry {
+    use crate::core::content::LoadStep;
+    let mut registry = tables();
+    registry
+        .settings::<GameSettings>()
+        .hook(LoadStep::Settings, check_settings);
+    registry
+}
+
+/// Every table a game is made of and what the engine builds from them, without what a whole game
+/// must also provide: a folder of only some of a game's rows loads through this.
+pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
@@ -491,14 +553,6 @@ pub fn registry() -> ContentRegistry {
         .row::<status::StatusEffectDef>()
         .modules::<status::StatusEffectDef>()
         .list_kind("modules", "unknown module type", "a module type")
-        .fixture::<input::map::InputAction>()
-        .fixture::<attention::AttentionMark>()
-        .fixture::<interface::InterfaceSound>()
-        .fixture::<interface::CursorShape>()
-        .fixture::<interface::InterfaceIcon>()
-        .fixture::<vfx::VfxFixture>()
-        .fixture::<vfx::VfxShaderFixture>()
-        .settings::<GameSettings>()
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);
     actor::content(&mut registry);
@@ -513,8 +567,7 @@ pub fn registry() -> ContentRegistry {
         .hook(LoadStep::Across, class::check_all)
         .hook(LoadStep::Across, npc::check_all)
         .hook(LoadStep::Across, skill::check_all)
-        .hook(LoadStep::Across, player::snapshot::check_all)
-        .hook(LoadStep::Settings, check_settings);
+        .hook(LoadStep::Across, player::snapshot::check_all);
     registry
 }
 

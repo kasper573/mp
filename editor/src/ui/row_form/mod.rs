@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::ModuleRule;
+use engine::systems::registry;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
@@ -25,7 +26,6 @@ use self::scripts::{
 use super::{theme, widgets};
 use crate::app::{
     Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
-    registry,
 };
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms;

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use editor::app::Editor;
 use editor::project::{ContentEdit, Project, RowSelection, row_file};
 use editor::schema::SchemaShapes;
-use editor::templates;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
@@ -13,7 +12,7 @@ use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
 use serde_json::{Value, json};
 
-const AREA: &str = "start";
+use crate::support::{AREA, game_folder};
 
 fn barn_door() -> Value {
     json!({
@@ -24,8 +23,7 @@ fn barn_door() -> Value {
 }
 
 fn editor_with_a_door(scratch: &tempfile::TempDir) -> Editor {
-    let folder = scratch.path().join("game");
-    templates::new_game("new_game", "Saltmarsh", &folder).expect("writes");
+    let folder = game_folder(scratch.path().join("game"));
     let project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
     let mut editor = Editor::new(
         UserFolder::at(scratch.path().join("user")),

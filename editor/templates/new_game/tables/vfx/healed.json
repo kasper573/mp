@@ -4,16 +4,16 @@
     {
       "type": "shader",
       "shader": "tint",
-      "duration": 0.35,
       "params": {
+        "amount": 0.5,
         "color": [
           120,
           232,
           128,
           255
-        ],
-        "amount": 0.5
-      }
+        ]
+      },
+      "duration": 0.35
     }
   ]
 }

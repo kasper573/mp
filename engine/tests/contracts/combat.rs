@@ -1,40 +1,85 @@
+use bevy_ecs::prelude::*;
+use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
-use engine::systems::combat::AttackRequest;
-use engine::systems::movement::position;
-use engine::systems::npc::{self, Pack};
+use engine::systems::area::AreaDef;
+use engine::systems::combat::{self, AttackRequest, Attitude};
+use engine::systems::movement::{self, position};
+use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::stat::{self, StatKind};
-
-use testkit::{Sim, row, spawn_area};
+use engine::systems::{actor, script, skill};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn an_attack_walks_into_range_and_strikes() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(3.0), Tiles(5.0));
-    let orc = npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX));
-    sim.tick();
-    let full = stat::effective(sim.world(), orc, StatKind::Health);
+    let (mut sim, player) = fight();
+    let brute = brute(&mut sim, player, Offset::new(4.0, 0.0));
+    let full = stat::effective(&sim.world, brute, StatKind::Health);
 
-    sim.send(1, AttackRequest { target: orc });
+    let conn = sim.conn(1);
+    sim.send(conn, AttackRequest { target: brute });
 
-    assert!(
-        sim.run_until(10.0, |world| stat::effective(world, orc, StatKind::Health)
-            < full)
-    );
+    assert!(sim.run_until(10.0, |world| stat::effective(
+        world,
+        brute,
+        StatKind::Health
+    ) < full));
 }
 
-// Right beside the player, so the fight stays where it starts: a chase could run into anything.
+// Right beside the player, so the fight stays where it starts.
 #[test]
 fn an_attacked_monster_is_fought_until_it_falls() {
-    let mut sim = Sim::area(spawn_area());
+    let (mut sim, player) = fight();
+    let brute = brute(&mut sim, player, Offset::new(1.0, 0.0));
+
+    let conn = sim.conn(1);
+    sim.send(conn, AttackRequest { target: brute });
+
+    assert!(sim.run_until(60.0, |world| stat::is_dead(world, brute)));
+}
+
+fn fight() -> (Sim, Entity) {
+    let content = Game::new()
+        .area("field", &Map::open(11, 11), json!([]))
+        .hero("field", 5.0, 5.0)
+        .sword()
+        .wearing(&["sword"])
+        .npc("brute", 25.0, json!([]))
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("defeated")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("field")
+        .accept::<AttackRequest>()
+        .add((
+            combat::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            movement::advance,
+        ))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            skill::hotbar::settle_basic_attack,
+            actor::settle,
+        ));
+    script::spawn_stateless(&mut sim.world);
     let player = sim.join(1);
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(1.0), Tiles(1.0));
-    let orc = npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX));
     sim.tick();
+    (sim, player)
+}
 
-    sim.send(1, AttackRequest { target: orc });
-
-    assert!(sim.run_until(60.0, |world| stat::is_dead(world, orc)));
+/// A monster turned hostile that stands where it's put and never strikes back.
+fn brute(sim: &mut Sim, player: Entity, offset: Offset<Tiles>) -> Entity {
+    let at: Pos<Tiles> = position(&sim.world, player).expect("the player") + offset;
+    let area = sim.id::<AreaDef>("field");
+    let brute = sim.id::<NpcDef>("brute");
+    let brute = npc::spawn(&mut sim.world, brute, at, area, Pack(u32::MAX));
+    sim.world.entity_mut(brute).insert(Attitude::Hostile);
+    brute
 }

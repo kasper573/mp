@@ -1,41 +1,42 @@
 use bevy_ecs::prelude::*;
-use engine::core::math::Pos;
+use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
-use engine::systems::area::AreaTag;
-use engine::systems::item::{DroppedItem, Inventory, PickupRequest, Reservation};
-use engine::systems::movement::{MoveRequest, MoveSeq, Position, position};
-use engine::systems::npc::{self, Pack};
+use engine::systems::area::{AreaDef, AreaTag};
+use engine::systems::item::{self, DroppedItem, Inventory, ItemDef, PickupRequest, Reservation};
+use engine::systems::movement::{self, MoveRequest, MoveSeq, Position, position};
+use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::reach::{self, ReachAct, ReachTarget, Tether};
-
-use testkit::{Sim, row, spawn_area};
+use engine::systems::skill::SkillDef;
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = yard();
     let player = sim.join(1);
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(3.0), Tiles(5.0));
-    let item = drop_bone(&mut sim, spot);
+    let start = position(&sim.world, player).expect("position");
+    let bone = drop_bone(&mut sim, start + Offset::new(4.0, 0.0));
 
-    sim.send(1, PickupRequest { target: item });
+    let conn = sim.conn(1);
+    sim.send(conn, PickupRequest { target: bone });
 
     assert!(sim.run_until(10.0, |world| bones(world, player) == 2));
-    assert!(sim.world().get_entity(item).is_err());
+    assert!(sim.world.get_entity(bone).is_err());
 }
 
 #[test]
 fn walking_away_cancels_the_intent() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = yard();
     let player = sim.join(1);
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(4.0), Tiles(6.0));
-    let item = drop_bone(&mut sim, spot);
+    let start = position(&sim.world, player).expect("position");
+    let bone = drop_bone(&mut sim, start + Offset::new(5.0, 0.0));
 
-    sim.send(1, PickupRequest { target: item });
+    let conn = sim.conn(1);
+    sim.send(conn, PickupRequest { target: bone });
     sim.tick();
     sim.send(
-        1,
+        conn,
         MoveRequest {
             pos: start,
             seq: MoveSeq(1),
@@ -43,42 +44,43 @@ fn walking_away_cancels_the_intent() {
     );
 
     assert!(!sim.run_until(10.0, |world| bones(world, player) > 0));
-    assert!(sim.world().get_entity(item).is_ok());
+    assert!(sim.world.get_entity(bone).is_ok());
 }
 
 #[test]
 fn an_actor_holds_one_intent_at_a_time() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = yard();
     let player = sim.join(1);
-    let at = position(sim.world(), player).expect("position");
-    let orc = npc::spawn(sim.world(), row("Orc"), at, spawn_area(), Pack(u32::MAX));
-    let item = drop_bone(&mut sim, at);
-    let world = sim.world();
+    let at = position(&sim.world, player).expect("position");
+    let brute = brute(&mut sim, at);
+    let bone = drop_bone(&mut sim, at);
+    let strike = sim.id::<SkillDef>("strike");
+    let world = &mut sim.world;
 
     reach::intend(
         world,
         player,
-        ReachTarget::Actor(orc),
+        ReachTarget::Actor(brute),
         ReachAct::Cast {
-            skill: row("Slash"),
+            skill: strike,
             repeat: true,
         },
     );
-    reach::intend(world, player, ReachTarget::Actor(item), ReachAct::Pickup);
+    reach::intend(world, player, ReachTarget::Actor(bone), ReachAct::Pickup);
 
     assert_eq!(reach::attacking(world, player), None);
-    assert_eq!(reach::intent(world, player, ReachAct::Pickup), Some(item));
+    assert_eq!(reach::intent(world, player, ReachAct::Pickup), Some(bone));
 }
 
 #[test]
 fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = yard();
     let player = sim.join(1);
-    let anchor = position(sim.world(), player).expect("position");
-    let far = sim.walkable_near(anchor, Tiles(5.0), Tiles(8.0));
-    let orc = npc::spawn(sim.world(), row("Orc"), far, spawn_area(), Pack(u32::MAX));
-    let world = sim.world();
-    let tether = Tether::around(world, player, Tiles(2.0), Some(orc)).expect("tether");
+    let anchor = position(&sim.world, player).expect("position");
+    let far = anchor + Offset::new(6.0, 0.0);
+    let brute = brute(&mut sim, far);
+    let world = &mut sim.world;
+    let tether = Tether::around(world, player, Tiles(2.0), Some(brute)).expect("tether");
 
     assert!(tether.holds(world, player));
 
@@ -88,17 +90,45 @@ fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
     world.get_mut::<Position>(player).expect("position").pos = anchor;
     assert!(tether.holds(world, player));
 
-    world.despawn(orc);
+    world.despawn(brute);
     assert!(!tether.holds(world, player));
 }
 
+fn yard() -> Sim {
+    let content = Game::new()
+        .area("yard", &Map::open(13, 5), json!([]))
+        .hero("yard", 2.0, 2.0)
+        .sword()
+        .npc("brute", 25.0, json!([]))
+        .item(
+            "bone",
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 10 }] }),
+        )
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("yard")
+        .accept::<MoveRequest>()
+        .accept::<PickupRequest>()
+        .add((movement::move_request, item::pickup_request))
+        .add((movement::advance, item::pickups));
+    sim
+}
+
+fn brute(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
+    let area = sim.id::<AreaDef>("yard");
+    let brute = sim.id::<NpcDef>("brute");
+    npc::spawn(&mut sim.world, brute, at, area, Pack(u32::MAX))
+}
+
 fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
-    sim.world()
+    let area = sim.id::<AreaDef>("yard");
+    let bone = sim.id::<ItemDef>("bone");
+    sim.world
         .spawn((
             Position::at(at),
-            AreaTag { area: spawn_area() },
+            AreaTag { area },
             DroppedItem {
-                item: row("Bone"),
+                item: bone,
                 count: 2,
             },
             Reservation {
@@ -110,7 +140,9 @@ fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
 }
 
 fn bones(world: &World, player: Entity) -> u32 {
+    let content = world.resource::<engine::core::content::Content>();
+    let bone = content.by_key::<ItemDef>("bone").expect("bones");
     world
         .get::<Inventory>(player)
-        .map_or(0, |inventory| inventory.count(row("Bone")))
+        .map_or(0, |inventory| inventory.count(bone))
 }

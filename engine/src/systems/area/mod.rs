@@ -64,7 +64,6 @@ pub fn content(registry: &mut ContentRegistry) {
         .row::<tileset::SurfaceDef>()
         .row::<blueprint::BlueprintDef>()
         .row::<world_map::WorldMapDef>()
-        .fixture::<world_map::WorldMap>()
         .folder::<AreaDef>()
         .modules::<AreaDef>()
         .hook(LoadStep::Files, read_grids)

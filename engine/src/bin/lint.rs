@@ -1,8 +1,11 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use cargo_metadata::MetadataCommand;
+use engine::core::content::{FilesystemFolder, write};
+use engine::systems::{load_content, registry};
 use serde::Deserialize;
 use syn::UseTree;
 use syn::visit::{self, Visit};
@@ -27,9 +30,14 @@ fn main() {
             .join("src");
         check_crate(&pkg.name, &src, &mut violations);
     }
+    let root = metadata.workspace_root.as_std_path();
+    let scratch = metadata.target_directory.as_std_path().join("lint");
+    for game in SHIPPED_GAMES {
+        check_shipped_game(game, &root.join(game), &scratch.join(game), &mut violations);
+    }
 
     if violations.is_empty() {
-        println!("lint: layering and content keys OK");
+        println!("lint: layering, content keys and shipped games OK");
         return;
     }
     for violation in &violations {
@@ -83,6 +91,58 @@ fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
             }
         }
     }
+}
+
+/// The game folders the repo ships: the example game, and the template the editor starts new games
+/// from.
+const SHIPPED_GAMES: &[&str] = &["example_game", "editor/templates/new_game"];
+
+/// A shipped game loads as a whole game, and every row and grid in it reads exactly as the editor
+/// writes it, so saving it in the editor changes only what was edited.
+fn check_shipped_game(name: &str, folder: &Path, scratch: &Path, out: &mut Vec<String>) {
+    let content = match load_content(Arc::new(FilesystemFolder(folder.to_path_buf())), "lint") {
+        Ok(content) => content,
+        Err(report) => {
+            out.push(format!("[{name}] does not load:\n{report}"));
+            return;
+        }
+    };
+    if scratch.exists() {
+        fs::remove_dir_all(scratch).expect("clear the lint's scratch folder");
+    }
+    let writer = write(registry(), content, scratch).expect("write the game to the scratch folder");
+    let written: BTreeSet<String> = writer.written().iter().cloned().collect();
+    let shipped = rows_and_grids(folder);
+    for file in shipped.difference(&written) {
+        out.push(format!(
+            "[{name}] {file}: a file no row or grid is written to"
+        ));
+    }
+    for file in written.intersection(&shipped) {
+        let ours = fs::read(folder.join(file)).expect("a shipped file");
+        let editors = fs::read(scratch.join(file)).expect("a written file");
+        if ours != editors {
+            out.push(format!(
+                "[{name}] {file}: not as the editor writes it; see {}",
+                scratch.join(file).display()
+            ));
+        }
+    }
+}
+
+fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
+    let tables = WalkDir::new(folder.join("tables"))
+        .follow_links(true)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| {
+            let relative = entry.path().strip_prefix(folder).unwrap_or(entry.path());
+            relative.to_string_lossy().replace('\\', "/")
+        });
+    std::iter::once("game.json".to_owned())
+        .chain(tables)
+        .collect()
 }
 
 fn core_to_systems(file: &Path) -> BTreeSet<String> {

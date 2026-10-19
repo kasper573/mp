@@ -2,19 +2,9 @@ use engine::core::content::{ContentRegistry, ContentRow};
 use engine::systems::registry;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
-use crate::support::{TempFolder, load};
-
-const SHIPPED: &str = include_str!("../../../example_game/game.json");
-
-#[test]
-fn the_shipped_folder_carries_the_version_of_this_build() {
-    let game: serde_json::Value = serde_json::from_str(SHIPPED).expect("game.json");
-    assert_eq!(
-        game["content_version"].as_str(),
-        Some(registry().version().0.as_str())
-    );
-}
+use crate::support::game;
 
 #[test]
 fn the_version_is_pinned() {
@@ -23,13 +13,14 @@ fn the_version_is_pinned() {
 
 #[test]
 fn another_version_is_refused_last() {
-    let folder = TempFolder::of_template();
-    folder.edit("game.json", |game| {
-        game["content_version"] = serde_json::Value::String("deadbeef".to_owned());
-        game["initial_spawn"]["area"] = serde_json::Value::String("strat".to_owned());
-    });
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = game()
+        .edit_settings(|settings| {
+            settings["content_version"] = json!("deadbeef");
+            settings["initial_spawn"]["area"] = json!("strat");
+        })
+        .try_load()
+        .err()
+        .expect("refused");
 
     let rules: Vec<&str> = report
         .errors

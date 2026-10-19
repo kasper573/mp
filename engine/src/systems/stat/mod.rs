@@ -110,11 +110,11 @@ pub struct Sources(Vec<Source>);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<Stats>().init_resource::<Sources>();
+    app.replicate::<Stats>();
 }
 
-pub fn source(app: &mut App, source: Source) {
-    app.world_mut().resource_mut::<Sources>().0.push(source);
+pub fn source(world: &mut World, source: Source) {
+    world.resource_mut::<Sources>().0.push(source);
 }
 
 pub fn modifiers(world: &World, entity: Entity) -> Vec<Stat> {

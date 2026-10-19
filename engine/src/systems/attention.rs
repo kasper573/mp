@@ -20,10 +20,7 @@ const MARKED_RANGE: Tiles = Tiles(visibility::VIEW_DISTANCE.0 + 4.0);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<Attention>()
-        .replicate::<StatusBadges>()
-        .init_resource::<MarkSources>()
-        .init_resource::<BadgeSources>();
+    app.replicate::<Attention>().replicate::<StatusBadges>();
 }
 
 pub type AttentionId = ContentId<AttentionDef>;
@@ -105,15 +102,12 @@ pub struct MarkSources(Vec<MarkSource>);
 #[derive(Resource, Default)]
 pub struct BadgeSources(Vec<BadgeSource>);
 
-pub fn mark_source(app: &mut App, source: MarkSource) {
-    app.world_mut().resource_mut::<MarkSources>().0.push(source);
+pub fn mark_source(world: &mut World, source: MarkSource) {
+    world.resource_mut::<MarkSources>().0.push(source);
 }
 
-pub fn badge_source(app: &mut App, source: BadgeSource) {
-    app.world_mut()
-        .resource_mut::<BadgeSources>()
-        .0
-        .push(source);
+pub fn badge_source(world: &mut World, source: BadgeSource) {
+    world.resource_mut::<BadgeSources>().0.push(source);
 }
 
 pub fn update(

@@ -4,7 +4,7 @@ use engine::core::content::fixture::FixtureLock;
 use engine::core::script::VariableType;
 use serde_json::{Map, Value, json};
 
-use crate::app::registry;
+use engine::systems::registry;
 
 pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,

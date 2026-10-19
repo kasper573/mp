@@ -164,7 +164,7 @@ cargo_metadata = "0.23"
 syn = { workspace = true, features = ["visit"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 
-# The gameplay tests play through the same driver as the showcase.
+# The client bench plays through the same driver as the showcase.
 [dev-dependencies]
 driver = { path = "../driver" }
 testkit = { path = "../testkit" }

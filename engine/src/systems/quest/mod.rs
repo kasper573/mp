@@ -21,7 +21,6 @@ use crate::core::content::{
 use crate::core::math::{Percent, Rng};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::{self, AreaDef, AreaId};
-use crate::systems::attention;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::class;
 use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
@@ -50,7 +49,6 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<QuestLog>()
         .add_client_message::<QuestRequest>(Channel::Ordered);
-    attention::mark_source(app, marks);
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -1313,7 +1311,7 @@ pub fn pick_label(content: &Content, pick: ItemStack) -> String {
     }
 }
 
-fn marks(
+pub(crate) fn marks(
     world: &World,
     target: Entity,
     viewers: &[Entity],

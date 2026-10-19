@@ -1,23 +1,32 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::Pos;
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::{self, Area, Wild};
+use engine::systems::area::{self, AreaDef, Wild};
+use engine::systems::combat::{self, AttackRequest};
 use engine::systems::movement::{self, MoveRequest, MoveSeq, position};
-use engine::systems::npc::{self, NpcId, Pack};
-use engine::systems::reach;
+use engine::systems::npc::{self, NpcDef};
+use engine::systems::{actor, reach, script, skill, stat};
+use serde_json::{Value, json};
+use testkit::{Game, Map, Sim};
 
-use testkit::{Sim, content, place, row, spawn_area};
+const LAIR: Pos<Tiles> = Pos::new(1.0, 4.0);
+const DOORSTEP: Pos<Tiles> = Pos::new(4.0, 4.0);
+const REFUGE: Pos<Tiles> = Pos::new(8.0, 4.0);
 
 #[test]
 fn wild_monsters_never_set_foot_in_a_safe_zone() {
-    let mut sim = Sim::area(spawn_area());
-    sim.join(1);
-    let world = sim.world();
-    let monsters: Vec<Entity> = world
+    let mut sim = border(json!([{ "type": "population", "npc": "wanderer", "count": 6 }]));
+    npc::spawn_all(&mut sim.world);
+    let monsters: Vec<Entity> = sim
+        .world
         .query_filtered::<Entity, With<Wild>>()
-        .iter(world)
+        .iter(&sim.world)
         .collect();
-    assert!(!monsters.is_empty(), "the island has wild monsters");
+    assert_eq!(monsters.len(), 6);
+    let spawns: Vec<_> = monsters
+        .iter()
+        .map(|&monster| position(&sim.world, monster))
+        .collect();
 
     let mut trespassed = false;
     sim.run_until(30.0, |world| {
@@ -27,71 +36,82 @@ fn wild_monsters_never_set_foot_in_a_safe_zone() {
         false
     });
 
+    let roamed = monsters
+        .iter()
+        .zip(&spawns)
+        .filter(|&(&monster, &spawn)| position(&sim.world, monster) != spawn)
+        .count();
+    assert!(roamed > 0, "no monster roamed");
     assert!(!trespassed);
 }
 
 #[test]
 fn a_wild_monster_gives_up_a_player_who_reaches_a_safe_zone() {
-    let mut sim = Sim::area(spawn_area());
-    let edge = edge(sim.map());
+    let mut sim = border(json!([]));
     let player = sim.join(1);
-    place(&mut sim, player, edge.doorstep);
-    let skeleton = wild(&mut sim, row("Skeleton"), edge.lair);
-    assert!(hunted_by(&mut sim, skeleton, player));
+    movement::relocate(&mut sim.world, player, DOORSTEP);
+    let hunter = spawn(&mut sim, "hunter", LAIR);
+    sim.world.entity_mut(hunter).insert(Wild);
+    assert!(hunted_by(&mut sim, hunter, player));
 
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         MoveRequest {
-            pos: edge.refuge,
+            pos: REFUGE,
             seq: MoveSeq(1),
         },
     );
     let mut trespassed = false;
     sim.run_until(10.0, |world| {
-        trespassed |= on_safe_ground(world, skeleton);
+        trespassed |= on_safe_ground(world, hunter);
         false
     });
 
-    assert!(on_safe_ground(sim.world(), player));
+    assert!(on_safe_ground(&sim.world, player));
     assert!(!trespassed);
-    assert_eq!(reach::attacking(sim.world(), skeleton), None);
+    assert_eq!(reach::attacking(&sim.world, hunter), None);
 }
 
 #[test]
 fn a_summoned_monster_follows_its_target_into_a_safe_zone() {
-    let mut sim = Sim::area(spawn_area());
-    let edge = edge(sim.map());
+    let mut sim = border(json!([]));
     let player = sim.join(1);
-    place(&mut sim, player, edge.doorstep);
-    let guard = summon(&mut sim, player, row("Skeleton"));
+    movement::relocate(&mut sim.world, player, DOORSTEP);
+    let hunter = sim.id::<NpcDef>("hunter");
+    let guard = npc::summon(&mut sim.world, hunter, 1, player, None, Some(player))
+        .first()
+        .copied()
+        .expect("summoned");
     assert!(hunted_by(&mut sim, guard, player));
 
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         MoveRequest {
-            pos: edge.refuge,
+            pos: REFUGE,
             seq: MoveSeq(1),
         },
     );
 
     assert!(sim.run_until(10.0, |world| on_safe_ground(world, guard)));
-    assert_eq!(reach::attacking(sim.world(), guard), Some(player));
+    assert_eq!(reach::attacking(&sim.world, guard), Some(player));
 }
 
 #[test]
 fn a_wild_flyer_flies_around_a_safe_zone_instead_of_over_it() {
-    let mut sim = Sim::area(spawn_area());
-    let map = sim.map();
-    let ground = map.wild_grid.nodes();
-    let (from, to) = ground
-        .iter()
-        .flat_map(|&a| ground.iter().map(move |&b| (a, b)))
-        .filter(|&(a, b)| map.safe(a.lerp(b, 0.5)))
-        .min_by(|(a, b), (c, d)| a.distance(*b).0.total_cmp(&c.distance(*d).0))
-        .expect("two points whose straight line crosses a safe zone");
-    let bat = unscripted_wild(&mut sim, row("Bat"), from);
+    let mut sim = border(json!([]));
+    let (from, to) = (DOORSTEP, Pos::new(15.0, 4.0));
+    let content = sim
+        .world
+        .resource::<engine::core::content::Content>()
+        .clone();
+    let bat = sim.id::<NpcDef>("bat");
+    let area = sim.id::<AreaDef>("border");
+    let bat = npc::spawn_actor(&mut sim.world, bat.get(&content), from, area);
+    sim.world.entity_mut(bat).insert(Wild);
 
-    movement::goto(sim.world(), bat, to);
+    movement::goto(&mut sim.world, bat, to);
     let mut trespassed = false;
     let arrived = sim.run_until(60.0, |world| {
         trespassed |= on_safe_ground(world, bat);
@@ -102,36 +122,106 @@ fn a_wild_flyer_flies_around_a_safe_zone_instead_of_over_it() {
     assert!(!trespassed);
 }
 
-struct Edge {
-    lair: Pos<Tiles>,
-    doorstep: Pos<Tiles>,
-    refuge: Pos<Tiles>,
+fn border(modules: Value) -> Sim {
+    let mut modules = modules;
+    modules.as_array_mut().expect("modules").push(json!({
+        "type": "safe_zone",
+        "rect": { "x": 6.5, "y": 1.5, "w": 6.0, "h": 5.0 },
+    }));
+    let content = Game::new()
+        .area("border", &Map::open(20, 9), modules)
+        .hero("border", 15.0, 4.0)
+        .sword()
+        .wearing(&["sword"])
+        .npc(
+            "wanderer",
+            25.0,
+            json!([{
+                "type": "inline_script",
+                "nodes": {
+                    "spawned": { "type": "on", "event": "started", "next": "roam" },
+                    "roam": { "type": "wander", "priority": 1, "next": "rest" },
+                    "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "roam" },
+                },
+            }]),
+        )
+        .npc("hunter", 1_000.0, hunting())
+        .edit("npc", "hunter", |hunter| {
+            hunter["basic_attack"] = json!("strike")
+        })
+        .npc("bat", 8.0, json!([]))
+        .edit("model", "bat", |bat| {
+            bat["modules"] = json!([{ "type": "airborne" }])
+        })
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("defeated")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("border")
+        .accept::<MoveRequest>()
+        .accept::<AttackRequest>()
+        .add((
+            movement::move_request,
+            combat::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            npc::body::drive,
+            movement::advance,
+        ))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            skill::hotbar::settle_basic_attack,
+            actor::settle,
+        ));
+    script::spawn_stateless(&mut sim.world);
+    sim
 }
 
-fn edge(map: &Area) -> Edge {
-    let ground = &map.grid;
-    let outside = &map.wild_grid;
-    outside
-        .nodes()
-        .iter()
-        .find_map(|&doorstep| {
-            let refuge = ground.nodes().iter().copied().find(|&inside| {
-                map.safe(inside)
-                    && (3.0..=4.5).contains(&doorstep.distance(inside).0)
-                    && ground.component(inside) == ground.component(doorstep)
-            })?;
-            let lair = outside.nodes().iter().copied().find(|&out| {
-                (2.5..=3.5).contains(&out.distance(doorstep).0)
-                    && out.distance(refuge).0 > doorstep.distance(refuge).0 + 2.0
-                    && outside.component(out) == outside.component(doorstep)
-            })?;
-            Some(Edge {
-                lair,
-                doorstep,
-                refuge,
-            })
-        })
-        .expect("a safe zone with open ground beside it")
+fn hunting() -> Value {
+    json!([{
+        "type": "inline_script",
+        "locals": { "target": "actor" },
+        "nodes": {
+            "spawned": { "type": "on", "event": "started", "next": "hostile" },
+            "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
+            "look": {
+                "type": "set",
+                "values": [{
+                    "local": "target",
+                    "to": { "type": "nearest", "among": "characters", "within": 8.0 },
+                }],
+                "next": "found",
+            },
+            "found": {
+                "type": "if",
+                "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
+                "yes": "fight",
+                "no": "tick",
+            },
+            "fight": {
+                "type": "attack",
+                "target": { "type": "local", "local": "target" },
+                "within": 8.0,
+                "priority": 5,
+                "defeated": "look",
+                "lost": "look",
+                "interrupted": "look",
+            },
+            "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
+        },
+    }])
+}
+
+fn spawn(sim: &mut Sim, key: &str, at: Pos<Tiles>) -> Entity {
+    let area = sim.id::<AreaDef>("border");
+    let def = sim.id::<NpcDef>(key);
+    npc::spawn(&mut sim.world, def, at, area, npc::Pack(u32::MAX))
 }
 
 fn on_safe_ground(world: &World, entity: Entity) -> bool {
@@ -139,25 +229,6 @@ fn on_safe_ground(world: &World, entity: Entity) -> bool {
         (Some(area), Some(at)) => area.safe(at),
         _ => false,
     }
-}
-
-fn wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
-    let monster = npc::spawn(sim.world(), what, at, spawn_area(), Pack(u32::MAX));
-    sim.world().entity_mut(monster).insert(Wild);
-    monster
-}
-
-fn unscripted_wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
-    let monster = npc::spawn_actor(sim.world(), what.get(content()), at, spawn_area());
-    sim.world().entity_mut(monster).insert(Wild);
-    monster
-}
-
-fn summon(sim: &mut Sim, player: Entity, what: NpcId) -> Entity {
-    npc::summon(sim.world(), what, 1, player, None, Some(player))
-        .first()
-        .copied()
-        .expect("summoned")
 }
 
 fn hunted_by(sim: &mut Sim, hunter: Entity, player: Entity) -> bool {

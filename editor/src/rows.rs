@@ -5,9 +5,10 @@ use egui::{RichText, Ui};
 use engine::core::content::ModuleRule;
 use engine::core::content::id::LeafKind;
 use engine::core::vfx::shader_file;
+use engine::systems::registry;
 use serde_json::Value;
 
-use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog, registry};
+use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
 use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection, row_file, row_of};
 use crate::schema::SchemaShapes;
 use crate::tabs::EditorTab;

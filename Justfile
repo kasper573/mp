@@ -11,7 +11,7 @@ lint:
 
 # Every test lives in a tests/ folder; the libs' and bins' own test harnesses would build for nothing.
 test:
-    cargo test --release -p engine -p editor --test '*'
+    cargo test --release --workspace --test '*'
 
 # The website and game server binaries, and the roles the auth stack syncs from.
 build:

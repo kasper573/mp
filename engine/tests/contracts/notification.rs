@@ -1,122 +1,116 @@
 use bevy_ecs::prelude::*;
+use engine::core::content::Content;
 use engine::core::math::{Offset, Pos};
-use engine::core::vfx::{VfxParams, VfxShaderId};
-use engine::systems::area::AreaId;
+use engine::core::tiling::Tiles;
+use engine::core::vfx::{VfxParams, VfxShaderDef, VfxShaderId};
 use engine::systems::area::transition::{self, Crossing};
-use engine::systems::class;
-use engine::systems::combat;
-use engine::systems::dialogue::Conversation;
+use engine::systems::area::{self, AreaDef};
+use engine::systems::combat::{self, Attitude};
+use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::history::{History, HistoryTopic};
-use engine::systems::input::map::InputMap;
-use engine::systems::movement::position;
+use engine::systems::interact::{self, InteractRequest};
+use engine::systems::memory::{self, MemoryDef};
+use engine::systems::movement::{self, position};
 use engine::systems::notification::{self, Notification, NotificationKind, NotificationSent};
-use engine::systems::npc::{self, Pack};
-use engine::systems::player::{AreaDrawn, Xp, commands_locked};
-use engine::systems::quest::{self, QuestId};
-use engine::systems::stat;
-use engine::systems::status;
+use engine::systems::npc::{self, NpcDef, Pack};
+use engine::systems::player::{AreaDrawn, commands_locked};
+use engine::systems::quest::{self, QuestDef};
+use engine::systems::status::{self, StatusEffectDef};
 use engine::systems::text::LineText;
+use engine::systems::{actor, belongings, class, script, stat, vfx};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
-use testkit::{
-    Sim, content, conversation, later, object_center, open_with, place, remembered, row, settle,
-    spawn_area, spoken, target_dummy, told, townsperson,
-};
+const BESIDE_PIER: Pos<Tiles> = Pos::new(8.0, 6.0);
+const ON_PIER: Pos<Tiles> = Pos::new(10.0, 6.0);
 
 #[test]
 fn stepping_onto_the_pier_narrates_the_gulls_once() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    let start = position(sim.world(), player).expect("position");
-    let pier = object_center(&mut sim, "ferry-pier");
+    let start = position(&sim.world, player).expect("position");
 
-    place(&mut sim, player, pier);
-    settle(&mut sim);
-    assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
-    assert!(!commands_locked(sim.world(), player));
+    movement::relocate(&mut sim.world, player, ON_PIER);
+    sim.run(0.5);
+    assert_eq!(sim.told(1), vec![sim.spoken("gulls")]);
+    assert!(!commands_locked(&sim.world, player));
 
-    later(&mut sim, 30.0);
+    sim.later(30.0);
     sim.forget_notified();
-    place(&mut sim, player, start);
-    settle(&mut sim);
-    place(&mut sim, player, pier);
-    settle(&mut sim);
-    assert_eq!(told(&sim, 1), Vec::new());
-    assert!(remembered(&mut sim, player, row("HeardGulls")));
+    movement::relocate(&mut sim.world, player, start);
+    sim.run(0.5);
+    movement::relocate(&mut sim.world, player, ON_PIER);
+    sim.run(0.5);
+    assert_eq!(sim.told(1), Vec::new());
+    assert!(remembered(&sim, player, "heard_gulls"));
 }
 
 #[test]
 fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    let beside_pier = Pos::new(44.8, 26.0);
-    let on_pier = Pos::new(46.0, 26.0);
-    let npc = townsperson(&mut sim, row("Tobb"));
-    place(&mut sim, npc, beside_pier);
-    place(&mut sim, player, beside_pier);
-    settle(&mut sim);
-    open_with(&mut sim, 1, player, npc);
-    assert!(conversation(&mut sim, player).is_some());
+    let talker = sim.npc("talker");
+    movement::relocate(&mut sim.world, talker, BESIDE_PIER);
+    movement::relocate(&mut sim.world, player, BESIDE_PIER);
+    sim.run(0.5);
+    sim.open_with(1, talker);
 
-    place(&mut sim, player, on_pier);
-    settle(&mut sim);
-    assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
+    movement::relocate(&mut sim.world, player, ON_PIER);
+    sim.run(0.5);
+    assert_eq!(sim.told(1), vec![sim.spoken("gulls")]);
 
-    later(&mut sim, 30.0);
+    sim.later(30.0);
     sim.forget_notified();
-    place(&mut sim, player, beside_pier);
-    settle(&mut sim);
-    place(&mut sim, player, on_pier);
-    settle(&mut sim);
-    assert_eq!(told(&sim, 1), Vec::new());
-    assert!(remembered(&mut sim, player, row("HeardGulls")));
-    assert!(conversation(&mut sim, player).is_some());
+    movement::relocate(&mut sim.world, player, BESIDE_PIER);
+    sim.run(0.5);
+    movement::relocate(&mut sim.world, player, ON_PIER);
+    sim.run(0.5);
+    assert_eq!(sim.told(1), Vec::new());
+    assert!(remembered(&sim, player, "heard_gulls"));
+    assert!(sim.conversation(1).is_some());
 }
 
 #[test]
 fn every_notification_is_recorded_when_it_is_raised() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    notification::notify(sim.world(), player, spoken(row("Gulls")));
-    notification::record(
-        sim.world(),
-        player,
-        &Notification::new(
-            NotificationKind::error(content()),
-            LineText::plain("Needs 10 Gold"),
-        ),
-    );
+    let gulls = sim.spoken("gulls");
+    notification::notify(&mut sim.world, player, gulls.clone());
+    let refused = refusal(&sim);
+    notification::record(&mut sim.world, player, &refused);
 
-    let records = recorded(&mut sim, player);
+    let records = recorded(&sim, player);
     assert!(records.contains(&(
         HistoryTopic::Notification,
         Some("Gulls".to_owned()),
-        "Gulls squabble over a fish head at the end of the pier.".to_owned(),
+        "Gulls squabble over a fish head.".to_owned(),
         1
     )));
     assert!(records.contains(&(HistoryTopic::Error, None, "Needs 10 Gold".to_owned(), 1)));
-    assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
+    assert_eq!(sim.told(1), vec![gulls]);
 }
 
 #[test]
-fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
-    let mut sim = Sim::area(spawn_area());
+fn a_character_speaks_to_players_on_its_errand_from_its_own_body() {
+    let mut sim = island(&game());
     let player = sim.join(1);
     let bystander = sim.join(2);
-    sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
-    settle(&mut sim);
-    quest::accept(sim.world(), player, row("TusksForTheChief")).expect("accepted");
-    let at = position(sim.world(), player).expect("position");
-    place(&mut sim, bystander, at);
+    let quest = sim.id::<QuestDef>("tusks");
+    quest::accept(&mut sim.world, player, quest).expect("accepted");
+    let at = position(&sim.world, player).expect("position");
+    movement::relocate(&mut sim.world, bystander, at);
     sim.forget_notified();
 
+    let area = sim.id::<AreaDef>("island");
+    let def = sim.id::<NpcDef>("chief");
     let chief = npc::spawn(
-        sim.world(),
-        row("OrcChief"),
+        &mut sim.world,
+        def,
         at + Offset::new(2.0, 0.0),
-        spawn_area(),
+        area,
         Pack(u32::MAX),
     );
-    settle(&mut sim);
+    sim.run(0.5);
 
     let said: Vec<NotificationSent> = sim
         .notified(1)
@@ -127,13 +121,13 @@ fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
         said.iter()
             .map(|sent| sent.notification.clone())
             .collect::<Vec<_>>(),
-        vec![spoken(row("ChiefChallenge")), spoken(row("ChiefThreat"))]
+        vec![sim.spoken("challenge"), sim.spoken("threat")]
     );
     assert!(said.iter().all(|sent| sent.actor == Some(chief)));
-    assert!(sim.world().get::<Conversation>(player).is_none());
-    assert!(!commands_locked(sim.world(), player));
+    assert!(sim.world.get::<Conversation>(player).is_none());
+    assert!(!commands_locked(&sim.world, player));
     assert!(
-        !told(&sim, 2)
+        !sim.told(2)
             .iter()
             .any(|notification| matches!(notification.kind, NotificationKind::Speech { .. }))
     );
@@ -141,16 +135,12 @@ fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
 
 #[test]
 fn speech_names_no_body_when_the_speaker_is_someone_else() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    let tobb = townsperson(&mut sim, row("Tobb"));
+    let talker = sim.npc("talker");
 
-    notification::notify_from(
-        sim.world(),
-        player,
-        Some(tobb),
-        spoken(row("ChiefChallenge")),
-    );
+    let challenge = sim.spoken("challenge");
+    notification::notify_from(&mut sim.world, player, Some(talker), challenge);
 
     assert_eq!(
         sim.notified(1)
@@ -163,46 +153,48 @@ fn speech_names_no_body_when_the_speaker_is_someone_else() {
 
 #[test]
 fn an_area_intro_plays_on_the_first_arrival_only_and_never_for_the_start_zone() {
-    let mut island = Sim::area(spawn_area());
+    let game = game();
+    let mut island = island(&game);
     let player = island.join(1);
-    settle(&mut island);
-    assert_eq!(intros(&island, 1), 0);
+    island.run(0.5);
+    assert_eq!(intros(&mut island, 1), 0);
 
-    let (mut forest, player) = travel(&mut island, player, row("Forest"));
-    assert_eq!(
-        told(&forest, 1)
-            .into_iter()
-            .filter(|notification| matches!(notification.kind, NotificationKind::Intro { .. }))
-            .collect::<Vec<_>>(),
-        vec![spoken(row("ForestIntro"))]
-    );
+    let mut forest = area(&game, "forest");
+    let player = travel(&mut island, player, &mut forest);
+    let intros_told: Vec<Notification> = forest
+        .told(1)
+        .into_iter()
+        .filter(|notification| matches!(notification.kind, NotificationKind::Intro { .. }))
+        .collect();
+    assert_eq!(intros_told, vec![forest.spoken("forest_intro")]);
 
-    let (mut island, player) = travel(&mut forest, player, spawn_area());
-    assert_eq!(intros(&island, 1), 0);
+    let mut island = area(&game, "island");
+    let player = travel(&mut forest, player, &mut island);
+    assert_eq!(intros(&mut island, 1), 0);
 
-    let (forest, _) = travel(&mut island, player, row("Forest"));
-    assert_eq!(intros(&forest, 1), 0);
+    let mut forest = area(&game, "forest");
+    travel(&mut island, player, &mut forest);
+    assert_eq!(intros(&mut forest, 1), 0);
 }
 
 #[test]
 fn completing_a_quest_and_reaching_a_level_are_milestones() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
-    settle(&mut sim);
-    quest::accept(sim.world(), player, row("TusksForTheChief")).expect("accepted");
+    let quest = sim.id::<QuestDef>("tusks");
+    quest::accept(&mut sim.world, player, quest).expect("accepted");
 
-    quest::complete(sim.world(), player, row("TusksForTheChief"));
-    settle(&mut sim);
+    quest::complete(&mut sim.world, player, quest);
+    class::grant_xp(&mut sim.world, player, 30);
+    sim.run(0.5);
 
-    let milestones: Vec<(String, String, HistoryTopic)> = told(&sim, 1)
+    let milestones: Vec<(String, String, HistoryTopic)> = sim
+        .told(1)
         .into_iter()
         .filter_map(|notification| match notification.kind {
-            NotificationKind::Milestone { label, topic, .. } => Some((
-                label.into_owned(),
-                notification.text.words(&InputMap::new(content())),
-                topic,
-            )),
+            NotificationKind::Milestone { label, topic, .. } => {
+                Some((label.into_owned(), notification.text.plain_words(), topic))
+            }
             _ => None,
         })
         .collect();
@@ -211,157 +203,370 @@ fn completing_a_quest_and_reaching_a_level_are_milestones() {
             .iter()
             .any(|(label, _, topic)| label == "Level up" && *topic == HistoryTopic::Notification)
     );
-    assert!(
-        milestones.contains(&(
-            "Quest complete".to_owned(),
-            row::<QuestId>("TusksForTheChief")
-                .get(content())
-                .title
-                .to_owned(),
-            HistoryTopic::Quest
-        ))
-    );
+    assert!(milestones.contains(&(
+        "Quest complete".to_owned(),
+        "Tusks".to_owned(),
+        HistoryTopic::Quest
+    )));
 }
 
 #[test]
 fn the_same_line_from_the_same_speaker_goes_out_once_per_window_and_merges_in_history() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
+    let gulls = sim.spoken("gulls");
     for _ in 0..25 {
-        notification::notify(sim.world(), player, spoken(row("Gulls")));
+        notification::notify(&mut sim.world, player, gulls.clone());
     }
-    assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
-    let gulls = |records: Vec<(HistoryTopic, Option<String>, String, u32)>| {
-        records
+    assert_eq!(sim.told(1), vec![gulls.clone()]);
+    let repeats = |sim: &Sim| {
+        recorded(sim, player)
             .into_iter()
             .filter(|(_, by, ..)| by.as_deref() == Some("Gulls"))
             .map(|(.., repeats)| repeats)
             .collect::<Vec<_>>()
     };
-    assert_eq!(gulls(recorded(&mut sim, player)), vec![25]);
+    assert_eq!(repeats(&sim), vec![25]);
 
-    later(&mut sim, 11.0);
-    notification::notify(sim.world(), player, spoken(row("Gulls")));
-    assert_eq!(
-        told(&sim, 1),
-        vec![spoken(row("Gulls")), spoken(row("Gulls"))]
-    );
+    sim.later(11.0);
+    notification::notify(&mut sim.world, player, gulls.clone());
+    assert_eq!(sim.told(1), vec![gulls.clone(), gulls]);
 }
 
 #[test]
 fn a_flood_goes_out_in_a_burst_and_then_at_the_refill_rate() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
     for line in 0..15 {
-        notification::notify(
-            sim.world(),
-            player,
-            narration("Drums", format!("Beat {line}")),
-        );
+        notification::notify(&mut sim.world, player, narration(format!("Beat {line}")));
     }
-    assert_eq!(told(&sim, 1).len(), 10);
+    assert_eq!(sim.told(1).len(), 10);
     assert_eq!(
-        recorded(&mut sim, player)
+        recorded(&sim, player)
             .iter()
             .filter(|(_, by, ..)| by.as_deref() == Some("Drums"))
             .count(),
         15
     );
 
-    later(&mut sim, 1.0);
+    sim.later(1.0);
     for line in 15..20 {
-        notification::notify(
-            sim.world(),
-            player,
-            narration("Drums", format!("Beat {line}")),
-        );
+        notification::notify(&mut sim.world, player, narration(format!("Beat {line}")));
     }
-    assert_eq!(told(&sim, 1).len(), 12);
+    assert_eq!(sim.told(1).len(), 12);
 }
 
 #[test]
 fn errors_and_feed_lines_answer_every_action() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    let refused = Notification::new(
-        NotificationKind::error(content()),
-        LineText::plain("Needs 10 Gold"),
-    );
+    let refused = refusal(&sim);
     for _ in 0..20 {
-        notification::notify(sim.world(), player, refused.clone());
+        notification::notify(&mut sim.world, player, refused.clone());
     }
-    assert_eq!(told(&sim, 1), vec![refused; 20]);
+    assert_eq!(sim.told(1), vec![refused; 20]);
 }
 
 #[test]
 fn a_hit_pops_its_amount_out_of_the_one_struck_for_everyone_who_sees_it() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
     sim.join(2);
-    settle(&mut sim);
-    let at = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_toward(at, Offset::new(1.0, 0.0));
-    let orc = target_dummy(&mut sim, row("Orc"), spot);
-    settle(&mut sim);
+    let at = position(&sim.world, player).expect("position");
+    let area = sim.id::<AreaDef>("island");
+    let def = sim.id::<NpcDef>("dummy");
+    let dummy = npc::spawn(
+        &mut sim.world,
+        def,
+        at + Offset::new(1.0, 0.0),
+        area,
+        Pack(u32::MAX),
+    );
+    sim.world.entity_mut(dummy).insert(Attitude::Hostile);
+    sim.run(0.5);
     sim.forget_notified();
 
-    combat::inflict(sim.world(), orc, Some(player), 4.0);
+    combat::inflict(&mut sim.world, dummy, Some(player), 4.0);
     sim.tick();
 
-    let damage_pop = Some(row::<VfxShaderId>("DamagePop"));
+    let damage_pop = Some(sim.id::<VfxShaderDef>("damage_pop"));
     for client in [1, 2] {
         assert_eq!(
-            pops(&sim, client),
-            vec![(Some(orc), "4".to_owned(), damage_pop)]
+            pops(&mut sim, client),
+            vec![(Some(dummy), "4".to_owned(), damage_pop)]
         );
     }
 }
 
 #[test]
 fn healing_a_level_and_a_status_each_pop_with_their_own_look() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    settle(&mut sim);
-    stat::apply_damage(sim.world(), player, 6.0);
+    stat::apply_damage(&mut sim.world, player, 6.0);
     sim.tick();
     sim.forget_notified();
 
-    stat::heal(sim.world(), player, 3.0);
-    class::grant_xp(sim.world(), player, 30);
-    status::apply(sim.world(), player, row("Guarded"), 10.0, None);
-    settle(&mut sim);
+    stat::heal(&mut sim.world, player, 3.0);
+    class::grant_xp(&mut sim.world, player, 30);
+    let guarded = sim.id::<StatusEffectDef>("guarded");
+    status::apply(&mut sim.world, player, guarded, 10.0, None);
+    sim.run(0.5);
 
-    let guarded = content()
-        .table::<status::StatusEffectDef>()
-        .get(row("Guarded"))
-        .expect("guarded")
-        .name
-        .clone();
-    assert_eq!(
-        pops(&sim, 1),
-        vec![
-            (Some(player), "+3".to_owned(), Some(row("HealPop"))),
-            (Some(player), "Level 2".to_owned(), Some(row("LevelPop"))),
-            (Some(player), guarded, Some(row("StatusPop"))),
-        ]
-    );
+    let shader = |key: &str| Some(sim.id::<VfxShaderDef>(key));
+    let looks = vec![
+        (Some(player), "+3".to_owned(), shader("heal_pop")),
+        (Some(player), "Level 2".to_owned(), shader("level_pop")),
+        (Some(player), "Guarded".to_owned(), shader("status_pop")),
+    ];
+    assert_eq!(pops(&mut sim, 1), looks);
 }
 
 #[test]
 fn a_pop_is_never_kept_in_history() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = island(&game());
     let player = sim.join(1);
-    settle(&mut sim);
-    let before = recorded(&mut sim, player);
+    sim.run(0.5);
+    let before = recorded(&sim, player);
 
-    notification::pop(sim.world(), player, "Ouch", None, VfxParams::default());
+    notification::pop(&mut sim.world, player, "Ouch", None, VfxParams::default());
     sim.tick();
 
-    assert_eq!(pops(&sim, 1).len(), 1);
-    assert_eq!(recorded(&mut sim, player), before);
+    assert_eq!(pops(&mut sim, 1).len(), 1);
+    assert_eq!(recorded(&sim, player), before);
 }
 
-fn pops(sim: &Sim, client: u32) -> Vec<(Option<Entity>, String, Option<VfxShaderId>)> {
+/// An island with a pier the gulls haunt, a forest across the water that greets newcomers, and a
+/// chief who taunts whoever is after his tusks.
+fn game() -> Content {
+    let intro = |key: &str| {
+        json!([{
+            "type": "inline_script",
+            "nodes": {
+                "discovered": { "type": "on", "event": "discovered", "next": "intro" },
+                "intro": { "type": "notify", "notification": key },
+            },
+        }])
+    };
+    let mut island_modules = intro("island_intro");
+    island_modules.as_array_mut().expect("modules").extend([
+        json!({ "type": "resident", "npc": "talker", "at": { "x": 2.0, "y": 2.0 } }),
+        json!({
+            "type": "object",
+            "name": "pier",
+            "shape": { "type": "rect", "x": 9.5, "y": 5.5, "w": 2.0, "h": 2.0 },
+            "scripts": [{
+                "type": "inline_script",
+                "nodes": {
+                    "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
+                    "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls", "seconds": 600 }, "no": "remember" },
+                    "remember": { "type": "remember", "memory": "heard_gulls", "next": "gulls" },
+                    "gulls": { "type": "notify", "notification": "gulls" },
+                },
+            }],
+        }),
+    ]);
+    Game::new()
+        .area("island", &Map::open(12, 12), island_modules)
+        .area("forest", &Map::open(8, 8), intro("forest_intro"))
+        .hero("island", 3.0, 8.0)
+        .edit("class", "hero", |hero| {
+            hero["levels"] = json!([{ "xp": 0, "skill_points": 1 }, { "xp": 20 }])
+        })
+        .npc(
+            "talker",
+            40.0,
+            json!([{
+                "type": "inline_script",
+                "nodes": {
+                    "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
+                    "hello": {
+                        "type": "dialogue",
+                        "lines": [{ "by": { "type": "narrator" }, "text": ["Fine weather."] }],
+                        "choices": [{ "label": ["Goodbye."] }],
+                    },
+                },
+            }]),
+        )
+        .babble("chief")
+        .npc(
+            "chief",
+            40.0,
+            json!([{ "type": "voice", "babble": "chief" }, {
+                "type": "inline_script",
+                "nodes": {
+                    "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
+                    "hunting_me": {
+                        "type": "if",
+                        "test": { "type": "all", "of": [
+                            { "type": "on_quest", "quest": "tusks" },
+                            { "type": "not", "of": { "type": "set_within", "memory": "taunted", "seconds": 120 } },
+                        ] },
+                        "yes": "taunted",
+                    },
+                    "taunted": { "type": "remember", "memory": "taunted", "next": "challenge" },
+                    "challenge": { "type": "notify", "notification": "challenge", "next": "threat" },
+                    "threat": { "type": "notify", "notification": "threat" },
+                },
+            }]),
+        )
+        .npc("dummy", 40.0, json!([]))
+        .item("tusk", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 50 }] }))
+        .row(
+            "quest",
+            "tusks",
+            json!({
+                "title": "Tusks",
+                "category": "Errands",
+                "blurb": "Bring tusks.",
+                "xp": 10,
+                "modules": [
+                    { "type": "hold", "item": "tusk", "count": 5 },
+                    { "type": "hand_in", "items": [{ "item": "tusk", "count": 5 }] },
+                    { "type": "hand_over", "text": ["Here are your tusks."] },
+                ],
+            }),
+        )
+        .row(
+            "status_effect",
+            "guarded",
+            json!({
+                "name": "Guarded",
+                "icon": "icons/status.png",
+                "category": "buff",
+                "description": "Guarded.",
+                "vfx": {},
+                "modules": [],
+            }),
+        )
+        .asset("icons/status.png", testkit::png(1, 1))
+        .row(
+            "notification",
+            "gulls",
+            json!({
+                "kind": { "type": "narration", "label": "Gulls", "sfx": "gull_cries" },
+                "text": ["Gulls squabble over a fish head."],
+            }),
+        )
+        .row(
+            "notification",
+            "challenge",
+            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["WHO DARES?!"] }),
+        )
+        .row(
+            "notification",
+            "threat",
+            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["I'll grind your bones!"] }),
+        )
+        .row("notification", "island_intro", intro_row("The island"))
+        .row("notification", "forest_intro", intro_row("The forest"))
+        .row("memory", "heard_gulls", json!({ "label": "heard", "type": "boolean", "resets": "never" }))
+        .row("memory", "taunted", json!({ "label": "taunted", "type": "boolean", "resets": "never" }))
+        .sfx("gull_cries")
+        .sfx("drums")
+        .sfx("ui_refuse")
+        .sfx("ui_close")
+        .sfx("ui_chime")
+        .sfx("rising_chime")
+        .sfx("tally_tick")
+        .sfx("quest_accepted")
+        .sfx("quest_completed")
+        .vfx("damage_taken")
+        .vfx("healed")
+        .vfx("level_up")
+        .vfx("defeated")
+        .shader("pop")
+        .shader("damage_pop")
+        .shader("heal_pop")
+        .shader("level_pop")
+        .shader("status_pop")
+        .mark("quest_ready")
+        .mark("quest_offered")
+        .mark("repeatable_ready")
+        .mark("repeatable_offered")
+        .mark("quest_in_progress")
+        .mark("quest_locked")
+        .load()
+}
+
+fn intro_row(title: &str) -> serde_json::Value {
+    json!({
+        "kind": { "type": "intro", "title": title, "tint": [143, 209, 139, 255], "motion": "pulse", "sfx": "drums" },
+        "text": ["Pines close in around you."],
+        "lasts": 5.0,
+    })
+}
+
+fn island(game: &Content) -> Sim {
+    let mut sim = area(game, "island");
+    npc::spawn_all(&mut sim.world);
+    area::object::spawn_all(&mut sim.world);
+    sim
+}
+
+/// The server of the area under `key`, running what raises and carries notifications.
+fn area(game: &Content, key: &str) -> Sim {
+    let mut sim = Sim::new(game.clone());
+    sim.serve(key)
+        .accept::<AreaDrawn>()
+        .accept::<InteractRequest>()
+        .accept::<ConversationRequest>()
+        .add((
+            (status::expire, status::aspect::settle, status::aspect::tick).chain(),
+            vfx::expire,
+            engine::systems::player::arrival_holds,
+            interact::interact_request,
+            dialogue::requests,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            area::object::track,
+            npc::approach,
+            script::run_tick,
+            movement::advance,
+            interact::interactions,
+            dialogue::hold,
+            dialogue::refresh,
+        ))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            actor::settle,
+            belongings::notify_changes,
+        ));
+    script::spawn_stateless(&mut sim.world);
+    sim
+}
+
+/// Hands `player` over from one area's server to the other's, the way a crossing does.
+fn travel(from: &mut Sim, player: Entity, to: &mut Sim) -> Entity {
+    let dest_area = *to.world.resource::<engine::systems::WorldArea>();
+    to.connect(1);
+    from.world.entity_mut(player).insert(Crossing {
+        dest_area: dest_area.0,
+        dest: Pos::new(3.0, 3.0),
+    });
+    let traveler = transition::departing(&mut from.world)
+        .pop()
+        .expect("a traveler");
+    let arrived = transition::arrive(&mut to.world, traveler);
+    let conn = to.conn(1);
+    to.send(conn, AreaDrawn);
+    to.run(0.5);
+    arrived
+}
+
+fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
+    memory::get(&sim.world, player, sim.id::<MemoryDef>(key)).truthy()
+}
+
+fn refusal(sim: &Sim) -> Notification {
+    Notification::new(
+        NotificationKind::error(sim.world.resource::<Content>()),
+        LineText::plain("Needs 10 Gold"),
+    )
+}
+
+fn pops(sim: &mut Sim, client: u32) -> Vec<(Option<Entity>, String, Option<VfxShaderId>)> {
     sim.notified(client)
         .into_iter()
         .filter_map(|sent| match sent.notification.kind {
@@ -373,50 +578,38 @@ fn pops(sim: &Sim, client: u32) -> Vec<(Option<Entity>, String, Option<VfxShader
         .collect()
 }
 
-fn recorded(sim: &mut Sim, player: Entity) -> Vec<(HistoryTopic, Option<String>, String, u32)> {
-    sim.world()
+fn recorded(sim: &Sim, player: Entity) -> Vec<(HistoryTopic, Option<String>, String, u32)> {
+    sim.world
         .get::<History>(player)
         .map(|history| {
             history
                 .records()
                 .map(|record| {
                     let entry = &record.entry;
-                    let text = entry.text.words(&InputMap::new(content()));
-                    (entry.topic, entry.by.clone(), text, entry.repeats)
+                    (
+                        entry.topic,
+                        entry.by.clone(),
+                        entry.text.plain_words(),
+                        entry.repeats,
+                    )
                 })
                 .collect()
         })
         .unwrap_or_default()
 }
 
-fn narration(label: &'static str, text: String) -> Notification {
+fn narration(text: String) -> Notification {
     Notification::new(
         NotificationKind::Narration {
-            label: label.into(),
+            label: "Drums".into(),
             sfx: None,
         },
         LineText::plain(text),
     )
 }
 
-fn travel(from: &mut Sim, player: Entity, to: AreaId) -> (Sim, Entity) {
-    let mut there = Sim::area(to);
-    there.connect(1);
-    from.world().entity_mut(player).insert(Crossing {
-        dest_area: to,
-        dest: there.map().fallback_spawn(),
-    });
-    let traveler = transition::departing(from.world())
-        .pop()
-        .expect("a traveler");
-    let arrived = transition::arrive(there.world(), traveler);
-    there.send(1, AreaDrawn);
-    settle(&mut there);
-    (there, arrived)
-}
-
-fn intros(sim: &Sim, client: u32) -> usize {
-    told(sim, client)
+fn intros(sim: &mut Sim, client: u32) -> usize {
+    sim.told(client)
         .iter()
         .filter(|notification| matches!(notification.kind, NotificationKind::Intro { .. }))
         .count()

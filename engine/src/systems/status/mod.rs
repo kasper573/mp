@@ -19,14 +19,12 @@ use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
 use crate::systems::script::{OwnerKind, ScriptModule, ScriptedRow};
-use crate::systems::stat;
 
 pub type StatusEffectId = ContentId<StatusEffectDef>;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Statuses>().replicate::<Boosts>();
-    stat::source(app, boost::modifiers);
 }
 
 /// A buff or debuff an actor carries for a while: the row says how it looks and sounds coming,

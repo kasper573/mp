@@ -17,7 +17,6 @@ use crate::core::script::{
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
 use crate::systems::actor::model::Face;
-use crate::systems::attention;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
@@ -37,9 +36,7 @@ use crate::systems::text::LineText;
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Conversation>()
-        .add_client_message::<ConversationRequest>(Channel::Ordered)
-        .init_resource::<StepCounter>();
-    attention::badge_source(app, talking);
+        .add_client_message::<ConversationRequest>(Channel::Ordered);
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -459,7 +456,7 @@ enum Pick {
 }
 
 #[derive(Resource, Default)]
-struct StepCounter(u32);
+pub(crate) struct StepCounter(u32);
 
 fn heard_key(script: &str, node: &str) -> String {
     format!("{script}#{node}")
@@ -724,7 +721,7 @@ fn refuse(world: &mut World, player: Entity, choice: u32, reason: String) {
     refresh_view(world, player);
 }
 
-fn talking(world: &World, player: Entity) -> Option<AttentionId> {
+pub(crate) fn talking(world: &World, player: Entity) -> Option<AttentionId> {
     in_conversation(world, player).then_some(AttentionMark::Talking.id(world.resource::<Content>()))
 }
 

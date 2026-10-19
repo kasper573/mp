@@ -1,25 +1,27 @@
 use bevy_ecs::prelude::*;
 use engine::core::content::Fixture;
+use engine::core::math::Offset;
+use engine::core::script::Value as Recalled;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
-use engine::systems::attention::{Attention, AttentionId, AttentionMark};
-use engine::systems::dialogue::{Conversation, ConversationRequest};
-use engine::systems::movement::{MoveRequest, MoveSeq, moving, position};
+use engine::systems::attention::{self, Attention, AttentionId, AttentionMark};
+use engine::systems::dialogue::{self, Conversation, ConversationRequest};
+use engine::systems::interact::{self, InteractRequest};
+use engine::systems::memory::{self, MemoryDef};
+use engine::systems::movement::{self, MoveRequest, MoveSeq, moving, position};
 use engine::systems::player::commands_locked;
 use engine::systems::script::{self, EventKind, RiftInstances};
 use engine::systems::stat::{self, StatKind};
-
-use testkit::{
-    Sim, choice, content, conversation, count, counted, errors, give, place, row, spawn_area, talk,
-    townsperson,
-};
+use engine::systems::{combat, npc};
+use serde_json::{Value, json};
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn a_conversation_reaches_the_client_as_the_world_holds_it() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let mut sim = inn();
+    sim.join(1);
 
-    let opened = talk(&mut sim, 1, player, row("Grisha"));
+    let opened = sim.talk(1, "keeper");
     let wire = postcard::to_allocvec(&opened).expect("a conversation serializes");
     let received: Conversation = postcard::from_bytes(&wire).expect("a conversation deserializes");
 
@@ -29,74 +31,76 @@ fn a_conversation_reaches_the_client_as_the_world_holds_it() {
 
 #[test]
 fn talking_walks_into_reach_opens_the_greeting_and_locks_commands() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    let grisha = townsperson(&mut sim, row("Grisha"));
+    let keeper = sim.npc("keeper");
 
-    let opened = talk(&mut sim, 1, player, row("Grisha"));
+    let opened = sim.talk(1, "keeper");
 
     assert_eq!(opened.node, "hello");
-    assert_eq!(opened.with, Some(grisha));
+    assert_eq!(opened.with, Some(keeper));
     // A step under way when the greeting opens still ends on its tile.
     assert!(sim.run_until(1.0, |world| !moving(world, player)));
-    let at = position(sim.world(), player).expect("position");
-    let grisha_at = position(sim.world(), grisha).expect("position");
-    assert!(at.distance(grisha_at) <= Tiles(2.0 + std::f32::consts::SQRT_2));
-    assert!(commands_locked(sim.world(), player));
+    let at = position(&sim.world, player).expect("position");
+    let keeper_at = position(&sim.world, keeper).expect("position");
+    assert!(at.distance(keeper_at) <= Tiles(2.0 + std::f32::consts::SQRT_2));
+    assert!(commands_locked(&sim.world, player));
 
-    let elsewhere = sim.walkable_near(at, Tiles(4.0), Tiles(6.0));
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         MoveRequest {
-            pos: elsewhere,
+            pos: at + Offset::new(0.0, 4.0),
             seq: MoveSeq(1),
         },
     );
-    sim.run_until(2.0, |_| false);
-    let still = position(sim.world(), player).expect("position");
+    sim.run(2.0);
+    let still = position(&sim.world, player).expect("position");
     assert!(still.distance(at) < Tiles(0.5));
 
-    sim.send(1, ConversationRequest::Leave { step: opened.step });
+    sim.send(conn, ConversationRequest::Leave { step: opened.step });
     sim.tick();
-    assert!(conversation(&mut sim, player).is_none());
-    assert!(!commands_locked(sim.world(), player));
+    assert!(sim.conversation(1).is_none());
+    assert!(!commands_locked(&sim.world, player));
 }
 
 #[test]
 fn a_pick_answers_its_step_once() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    give(&mut sim, player, row("Gold"), 30);
-    let opened = talk(&mut sim, 1, player, row("Grisha"));
+    sim.give(player, "gold", 30);
+    let opened = sim.talk(1, "keeper");
     let round = ConversationRequest::Pick {
         step: opened.step,
         choice: choice(&opened, "Buy a round for the room."),
     };
 
-    sim.send(1, round);
-    sim.send(1, round);
+    let conn = sim.conn(1);
+    sim.send(conn, round);
+    sim.send(conn, round);
     sim.tick();
 
-    assert_eq!(count(&mut sim, player, row("Gold")), 20);
-    let now = conversation(&mut sim, player).expect("still talking");
+    assert_eq!(sim.count(player, "gold"), 20);
+    let now = sim.conversation(1).expect("still talking");
     assert_eq!(now.node, "round");
-    assert_eq!(counted(&mut sim, player, row("InnFavour")), 1);
+    assert_eq!(favour(&sim, player), Recalled::Int(1));
 
-    sim.send(1, round);
+    sim.send(conn, round);
     sim.tick();
-    assert_eq!(count(&mut sim, player, row("Gold")), 20);
+    assert_eq!(sim.count(player, "gold"), 20);
 }
 
 #[test]
 fn a_choice_that_costs_too_much_changes_nothing() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    let opened = talk(&mut sim, 1, player, row("Grisha"));
+    let opened = sim.talk(1, "keeper");
     let index = choice(&opened, "Buy a round for the room.");
     assert!(!opened.choices[index as usize].locked);
 
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         ConversationRequest::Pick {
             step: opened.step,
             choice: index,
@@ -104,54 +108,53 @@ fn a_choice_that_costs_too_much_changes_nothing() {
     );
     sim.tick();
 
-    let now = conversation(&mut sim, player).expect("still talking");
+    let now = sim.conversation(1).expect("still talking");
     assert_eq!(now.node, "hello");
     assert_eq!(now.refused.map(|refused| refused.choice), Some(index));
-    assert_eq!(errors(&sim, 1), vec!["Needs 10 more Gold".to_owned()]);
-    assert_eq!(counted(&mut sim, player, row("InnFavour")), 0);
+    assert_eq!(sim.errors(1), vec!["Needs 10 more Gold".to_owned()]);
+    assert_eq!(favour(&sim, player), Recalled::Int(0));
 }
 
 #[test]
 fn walking_out_of_reach_ends_the_conversation() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    talk(&mut sim, 1, player, row("Grisha"));
-    let at = position(sim.world(), player).expect("position");
-    let away = sim.walkable_near(at, Tiles(6.0), Tiles(9.0));
+    sim.talk(1, "keeper");
+    let at = position(&sim.world, player).expect("position");
 
-    place(&mut sim, player, away);
+    movement::relocate(&mut sim.world, player, at + Offset::new(0.0, 7.0));
     sim.tick();
 
-    assert!(conversation(&mut sim, player).is_none());
-    assert!(!commands_locked(sim.world(), player));
+    assert!(sim.conversation(1).is_none());
+    assert!(!commands_locked(&sim.world, player));
 }
 
 #[test]
 fn damage_keeps_a_conversation_but_death_ends_it() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    talk(&mut sim, 1, player, row("Grisha"));
+    sim.talk(1, "keeper");
 
-    stat::apply_damage(sim.world(), player, 1.0);
+    stat::apply_damage(&mut sim.world, player, 1.0);
     sim.tick();
-    assert!(conversation(&mut sim, player).is_some());
+    assert!(sim.conversation(1).is_some());
 
-    let health = stat::effective(sim.world(), player, StatKind::Health);
-    stat::apply_damage(sim.world(), player, health);
+    let health = stat::effective(&sim.world, player, StatKind::Health);
+    stat::apply_damage(&mut sim.world, player, health);
     sim.tick();
-    assert!(conversation(&mut sim, player).is_none());
+    assert!(sim.conversation(1).is_none());
 }
 
 #[test]
 fn a_conversation_an_npc_starts_replaces_the_one_in_progress() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let player = sim.join(1);
-    let grisha = townsperson(&mut sim, row("Grisha"));
-    talk(&mut sim, 1, player, row("Grisha"));
+    let keeper = sim.npc("keeper");
+    sim.talk(1, "keeper");
 
-    let ilsa = townsperson(&mut sim, row("Ilsa"));
-    let owner = script::owner_of(sim.world(), ilsa).expect("Ilsa runs scripts");
-    sim.world().resource_mut::<RiftInstances>().raise(
+    let crier = sim.npc("crier");
+    let owner = script::owner_of(&sim.world, crier).expect("the crier runs scripts");
+    sim.world.resource_mut::<RiftInstances>().raise(
         owner,
         EventKind::Interacted,
         Some(player),
@@ -160,67 +163,233 @@ fn a_conversation_an_npc_starts_replaces_the_one_in_progress() {
     );
     sim.tick();
 
-    let opened = conversation(&mut sim, player).expect("talking");
-    assert_eq!(opened.with, Some(ilsa));
-    assert_ne!(opened.with, Some(grisha));
+    let opened = sim.conversation(1).expect("talking");
+    assert_eq!(opened.with, Some(crier));
+    assert_ne!(opened.with, Some(keeper));
     assert_eq!(opened.node, "hello");
 }
 
 #[test]
-fn tobb_holds_his_news_until_you_are_free() {
-    let mut sim = Sim::area(spawn_area());
+fn news_called_out_waits_until_you_are_free() {
+    let mut sim = inn();
     let player = sim.join(1);
-    let opened = talk(&mut sim, 1, player, row("Tobb"));
+    let opened = sim.talk(1, "crier");
     assert_eq!(opened.node, "hello");
 
-    sim.run_until(1.0, |_| false);
-    assert_eq!(
-        conversation(&mut sim, player).map(|now| now.step),
-        Some(opened.step)
-    );
-    sim.send(1, ConversationRequest::Leave { step: opened.step });
+    sim.run(1.0);
+    assert_eq!(sim.conversation(1).map(|now| now.step), Some(opened.step));
+    let conn = sim.conn(1);
+    sim.send(conn, ConversationRequest::Leave { step: opened.step });
     assert!(sim.run_until(1.0, |world| {
         world
             .get::<Conversation>(player)
             .is_some_and(|now| now.step != opened.step)
     }));
-    let news = conversation(&mut sim, player).expect("Tobb's news");
+    let news = sim.conversation(1).expect("the crier's news");
     assert_eq!(news.node, "news");
 
-    sim.send(1, ConversationRequest::Leave { step: news.step });
-    sim.run_until(2.0, |_| false);
-    assert!(conversation(&mut sim, player).is_none());
+    sim.send(conn, ConversationRequest::Leave { step: news.step });
+    sim.run(2.0);
+    assert!(sim.conversation(1).is_none());
 }
 
 #[test]
 fn an_npc_shows_news_only_to_those_who_have_not_heard_him_out() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = inn();
     let regular = sim.join(1);
     let stranger = sim.join(2);
-    let tobb = townsperson(&mut sim, row("Tobb"));
-    for visit in 0..4 {
-        sim.world().insert_resource(WallClock {
-            now: UnixMillis(visit * 3_600_000),
-            reset: UtcHour::MIDNIGHT,
-        });
-        let step = talk(&mut sim, 1, regular, row("Tobb")).step;
-        sim.send(1, ConversationRequest::Leave { step });
-        sim.tick();
-    }
-    sim.world().insert_resource(WallClock {
-        now: UnixMillis(4 * 3_600_000),
+    let crier = sim.npc("crier");
+    let step = sim.talk(1, "crier").step;
+    let conn = sim.conn(1);
+    sim.send(conn, ConversationRequest::Leave { step });
+    sim.tick();
+    sim.world.insert_resource(WallClock {
+        now: UnixMillis(3_600_000),
         reset: UtcHour::MIDNIGHT,
     });
 
-    let marks = |sim: &mut Sim, player: Entity| -> Vec<AttentionId> {
-        sim.world()
+    sim.run(0.5);
+
+    let marks = |sim: &Sim, player: Entity| -> Vec<AttentionId> {
+        sim.world
             .get::<Attention>(player)
             .expect("attention")
-            .of(tobb)
+            .of(crier)
             .to_vec()
     };
-    sim.run_until(0.5, |_| false);
+    let news = AttentionMark::News.id(sim.world.resource());
+    assert!(!marks(&sim, regular).contains(&news));
+    assert!(marks(&sim, stranger).contains(&news));
+}
 
-    assert!(!marks(&mut sim, regular).contains(&AttentionMark::News.id(content())));
-    assert!(marks(&mut sim, stranger).contains(&AttentionMark::News.id(content())));
+fn inn() -> Sim {
+    let content = Game::new()
+        .area(
+            "inn",
+            &Map::open(15, 15),
+            json!([
+                { "type": "resident", "npc": "keeper", "at": { "x": 7.0, "y": 4.0 } },
+                { "type": "resident", "npc": "crier", "at": { "x": 7.0, "y": 13.0 } },
+            ]),
+        )
+        .hero("inn", 7.0, 7.0)
+        .item(
+            "gold",
+            json!({
+                "name": "Gold",
+                "kind": { "type": "resource" },
+                "modules": [{ "type": "stack", "max": 100_000 }],
+            }),
+        )
+        .npc("keeper", 40.0, json!([keeping()]))
+        .busts("keeper")
+        .npc("crier", 40.0, json!([crying()]))
+        .row(
+            "memory",
+            "favour",
+            json!({ "label": "Rounds bought", "type": "integer", "resets": "never" }),
+        )
+        .row(
+            "memory",
+            "met",
+            json!({ "label": "Met the crier", "type": "boolean", "resets": "never" }),
+        )
+        .row(
+            "memory",
+            "news_today",
+            json!({ "label": "Heard the news today", "type": "boolean", "resets": "daily" }),
+        )
+        .mark("news")
+        .mark("talking")
+        .sfx("ui_refuse")
+        .sfx("ui_close")
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("defeated")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("inn")
+        .accept::<MoveRequest>()
+        .accept::<InteractRequest>()
+        .accept::<ConversationRequest>()
+        .add((
+            movement::move_request,
+            interact::interact_request,
+            dialogue::requests,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            npc::approach,
+            script::run_tick,
+            npc::body::drive,
+            movement::advance,
+            interact::interactions,
+            dialogue::hold,
+            dialogue::refresh,
+        ))
+        .add((stat::settle_health, combat::defeats, attention::update));
+    script::spawn_stateless(&mut sim.world);
+    npc::spawn_all(&mut sim.world);
+    sim
+}
+
+fn keeping() -> Value {
+    json!({
+        "type": "inline_script",
+        "nodes": {
+            "interacted": {
+                "type": "on",
+                "event": "interacted",
+                "verb": "talk",
+                "reach": 2.0,
+                "next": "hello",
+            },
+            "hello": {
+                "type": "dialogue",
+                "lines": [{
+                    "by": { "type": "npc", "npc": "keeper", "face": "neutral" },
+                    "text": ["Welcome in."],
+                }],
+                "choices": [
+                    { "label": ["Buy a round for the room."], "reveal": ["costs"], "to": "pay_round" },
+                    { "label": ["Goodbye."] },
+                ],
+            },
+            "pay_round": {
+                "type": "items",
+                "take": [{ "item": "gold", "count": 10 }],
+                "done": "count_round",
+            },
+            "count_round": {
+                "type": "remember",
+                "memory": "favour",
+                "to": { "type": "add", "a": { "type": "memory", "memory": "favour" }, "b": 1 },
+                "next": "round",
+            },
+            "round": {
+                "type": "dialogue",
+                "lines": [{ "by": { "type": "npc", "npc": "keeper", "face": "happy" }, "text": ["Cheers!"] }],
+                "choices": [{ "label": ["Goodbye."] }],
+            },
+        },
+    })
+}
+
+fn crying() -> Value {
+    json!({
+        "type": "inline_script",
+        "nodes": {
+            "interacted": {
+                "type": "on",
+                "event": "interacted",
+                "verb": "talk",
+                "reach": 2.0,
+                "news": true,
+                "next": "meet",
+            },
+            "meet": { "type": "remember", "memory": "met", "next": "hello" },
+            "hello": {
+                "type": "dialogue",
+                "lines": [{ "by": { "type": "narrator" }, "text": ["The crier tips his hat."] }],
+                "choices": [{ "label": ["Goodbye."] }],
+            },
+            "came_near": {
+                "type": "on",
+                "event": "came_near",
+                "within": 3.0,
+                "by": "characters",
+                "next": "news_due",
+            },
+            "news_due": {
+                "type": "if",
+                "test": {
+                    "type": "all",
+                    "of": [
+                        { "type": "memory", "memory": "met" },
+                        { "type": "not", "of": { "type": "memory", "memory": "news_today" } },
+                    ],
+                },
+                "yes": "remember_news",
+            },
+            "remember_news": { "type": "remember", "memory": "news_today", "next": "news" },
+            "news": {
+                "type": "dialogue",
+                "lines": [{ "by": { "type": "narrator" }, "text": ["Hear ye!"] }],
+                "choices": [{ "label": ["Thanks."] }],
+            },
+        },
+    })
+}
+
+fn favour(sim: &Sim, player: Entity) -> Recalled {
+    let favour = sim.id::<MemoryDef>("favour");
+    memory::get(&sim.world, player, favour)
+}
+
+fn choice(conversation: &Conversation, label: &str) -> u32 {
+    conversation
+        .choices
+        .iter()
+        .position(|choice| choice.label.plain_words() == label)
+        .expect("the choice") as u32
 }

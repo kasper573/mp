@@ -1,0 +1,13 @@
+mod area_actions;
+mod drafts;
+mod fixtures;
+mod import;
+mod keymap;
+mod new_game;
+mod opening;
+mod palette;
+mod project_edits;
+mod project_history;
+mod scenes;
+mod support;
+mod thumbnails;

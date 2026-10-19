@@ -15,6 +15,22 @@ use serde::{Deserialize, Serialize};
 #[serde(transparent)]
 pub struct AssetRef(String);
 
+/// How much a file weighs to download.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FileBytes(pub usize);
+
+impl FileBytes {
+    pub const fn kib(kib: usize) -> FileBytes {
+        FileBytes(kib * 1024)
+    }
+}
+
+impl std::fmt::Display for FileBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} KiB", self.0.div_ceil(1024))
+    }
+}
+
 impl AssetRef {
     pub fn new(path: impl Into<String>) -> AssetRef {
         AssetRef(path.into())

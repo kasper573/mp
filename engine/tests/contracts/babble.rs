@@ -8,8 +8,9 @@ use bevy_kira_audio::AudioSource;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{HushVoice, PlayClip, SfxPlace};
 use engine::core::babble::{BabbleId, BabblePlugin, BabbleRank, Babbling};
+use engine::core::content::Content;
 use engine::core::text::{StyledLine, TextPlugin, Typewriter, TypewriterSpeed};
-use testkit::{content, row};
+use testkit::Game;
 
 const FRAME: Duration = Duration::from_millis(50);
 const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
@@ -17,7 +18,7 @@ const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
 #[test]
 fn a_babbling_line_speaks_a_clip_per_letter_as_it_types() {
     let mut app = voice_app();
-    let babble: BabbleId = row("bram");
+    let babble = bram(&app);
     app.world_mut().spawn((
         Typewriter::default(),
         StyledLine::plain_text("The quick brown fox"),
@@ -58,7 +59,7 @@ fn a_line_babbles_the_same_letters_at_the_same_moments_whatever_the_frame_rate()
 #[test]
 fn a_line_cut_short_is_hushed_and_a_line_spoken_out_is_not() {
     let mut app = voice_app();
-    let babble: BabbleId = row("bram");
+    let babble = bram(&app);
     let line = app
         .world_mut()
         .spawn((
@@ -109,7 +110,7 @@ fn spoken_at(frame: Duration, line: &str) -> Vec<(String, u32, u32)> {
         .insert_resource(TypewriterSpeed(Some(45.0)))
         .init_resource::<Spoken>()
         .add_systems(Last, note_clips);
-    let babble: BabbleId = row("bram");
+    let babble = bram(&app);
     app.world_mut().spawn((
         Typewriter::default(),
         StyledLine::plain_text(line.to_owned()),
@@ -166,7 +167,7 @@ fn voice_app() -> App {
     .add_message::<HushVoice>()
     .insert_resource(TimeUpdateStrategy::ManualDuration(FRAME))
     .insert_resource(TEN_PER_SECOND)
-    .insert_resource(content().clone())
+    .insert_resource(voices())
     .init_resource::<Heard>()
     .init_resource::<Hushed>()
     .add_systems(Last, (count_clips, count_hushes));
@@ -179,4 +180,15 @@ fn count_clips(mut clips: MessageReader<PlayClip>, mut heard: ResMut<Heard>) {
 
 fn count_hushes(mut hushes: MessageReader<HushVoice>, mut hushed: ResMut<Hushed>) {
     hushed.0 += hushes.read().count();
+}
+
+fn voices() -> Content {
+    Game::new().babble("bram").load()
+}
+
+fn bram(app: &App) -> BabbleId {
+    app.world()
+        .resource::<Content>()
+        .by_key("bram")
+        .expect("bram babbles")
 }

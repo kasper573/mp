@@ -10,7 +10,7 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, ContentRegistry, version};
+use engine::core::content::{Content, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems;
@@ -916,14 +916,9 @@ fn background(world: &mut World) {
     });
 }
 
-pub fn registry() -> &'static ContentRegistry {
-    static REGISTRY: OnceLock<ContentRegistry> = OnceLock::new();
-    REGISTRY.get_or_init(systems::registry)
-}
-
 pub fn content_version() -> &'static str {
     static VERSION: OnceLock<String> = OnceLock::new();
-    VERSION.get_or_init(|| registry().version().0)
+    VERSION.get_or_init(|| systems::registry().version().0)
 }
 
 // A `Receiver` is `!Sync`, and everything the editor holds lives in one bevy resource, so each

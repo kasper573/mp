@@ -4,7 +4,6 @@
     {
       "type": "shader",
       "shader": "flash",
-      "duration": 0.5,
       "params": {
         "color": [
           255,
@@ -13,7 +12,8 @@
           255
         ],
         "strength": 0.5
-      }
+      },
+      "duration": 0.5
     }
   ]
 }

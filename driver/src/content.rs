@@ -125,19 +125,6 @@ pub fn east_of(area: &str, spot: Pos<Tiles>, by: f32) -> Place {
     }
 }
 
-pub fn beside_resident(area: &str, npc: &str) -> Place {
-    beside(area, resident_home(area, npc).at)
-}
-
-pub fn beside_object(area: &str, object: &str) -> Place {
-    beside(area, object_at(area, object))
-}
-
-pub fn object_at(area: &str, object: &str) -> Pos<Tiles> {
-    placed_object(area, object)
-        .unwrap_or_else(|| panic!("no object named {object} is placed in {area}"))
-}
-
 // A marked spot: a named object, or where a townsperson lives.
 pub fn marker_at(area: &str, name: &str) -> Pos<Tiles> {
     placed_object(area, name).unwrap_or_else(|| resident_home(area, name).at)
@@ -177,18 +164,6 @@ pub fn ground_near(area: &str, at: Pos<Tiles>, within: RangeInclusive<Tiles>) ->
         .collect();
     ground.sort_by(|a, b| a.distance_to(at).total_cmp(&b.distance_to(at)));
     ground
-}
-
-const BESIDE: Tiles = Tiles(2.0);
-
-fn beside(area: &str, at: Pos<Tiles>) -> Place {
-    let tile = *ground_near(area, at, BESIDE..=Tiles(f32::INFINITY))
-        .first()
-        .expect("walkable ground beside");
-    Place {
-        area: id(area),
-        at: tile,
-    }
 }
 
 fn placed_object(area: &str, object: &str) -> Option<Pos<Tiles>> {

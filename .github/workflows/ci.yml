@@ -47,21 +47,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
-          deps: test
           cache: test
           recipes: test
       - name: Test
-        # The gameplay tests record each client from a sound server sink.
-        run: |
-          pulseaudio --start --exit-idle-time=-1
-          just test
-      - name: Save gameplay test artifacts
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: gameplay-artifacts
-          path: target/tmp/gameplay/
-          if-no-files-found: ignore
+        run: just test
 
   e2e:
     # Not the newest image: ubuntu-26.04 ships GStreamer 1.28, whose device monitor starts its

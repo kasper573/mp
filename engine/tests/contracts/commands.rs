@@ -1,72 +1,102 @@
 use bevy_ecs::prelude::*;
 use engine::core::time::Seconds;
 use engine::systems::equipment::{self, Equipment, EquipmentSlot, UnequipRequest};
-use engine::systems::item::{DropItemRequest, UseItemRequest};
+use engine::systems::item::{self, DropItemRequest, ItemDef, UseItemRequest};
 use engine::systems::player::{ArrivalHold, CommandLock};
-use engine::systems::stat;
-
-use testkit::{Sim, count, give, row, slot_of, spawn_area};
+use engine::systems::{script, stat};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn a_command_lock_refuses_use_drop_and_unequip_until_it_lifts() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    free(&mut sim, player);
+    let (mut sim, player) = camp();
     prepare(&mut sim, player);
 
-    sim.world().entity_mut(player).insert(CommandLock);
-    attempt_each(&mut sim, player);
-    assert_eq!(belongings(&mut sim, player), PREPARED);
+    sim.world.entity_mut(player).insert(CommandLock);
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), PREPARED);
 
-    sim.world().entity_mut(player).remove::<CommandLock>();
-    attempt_each(&mut sim, player);
-    assert_eq!(belongings(&mut sim, player), EACH_DONE);
+    sim.world.entity_mut(player).remove::<CommandLock>();
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), EACH_DONE);
 }
 
 #[test]
 fn an_arrival_hold_refuses_use_drop_and_unequip_until_it_lifts() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    free(&mut sim, player);
+    let (mut sim, player) = camp();
     prepare(&mut sim, player);
 
-    sim.world().entity_mut(player).insert(ArrivalHold {
+    sim.world.entity_mut(player).insert(ArrivalHold {
         until: Seconds(1000.0),
     });
-    attempt_each(&mut sim, player);
-    assert_eq!(belongings(&mut sim, player), PREPARED);
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), PREPARED);
 
-    sim.world().entity_mut(player).remove::<ArrivalHold>();
-    attempt_each(&mut sim, player);
-    assert_eq!(belongings(&mut sim, player), EACH_DONE);
+    sim.world.entity_mut(player).remove::<ArrivalHold>();
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), EACH_DONE);
 }
 
-fn free(sim: &mut Sim, player: Entity) {
-    sim.tick();
-    sim.world()
-        .entity_mut(player)
-        .remove::<(ArrivalHold, CommandLock)>();
+fn camp() -> (Sim, Entity) {
+    let content = Game::new()
+        .area("camp", &Map::open(5, 5), json!([]))
+        .hero("camp", 2.0, 2.0)
+        .item(
+            "potion",
+            json!({
+                "kind": { "type": "usable" },
+                "modules": [{
+                    "type": "inline_script",
+                    "nodes": {
+                        "used": { "type": "on", "event": "used", "next": "drink" },
+                        "drink": { "type": "items", "take": [{ "item": "potion" }], "done": "mend" },
+                        "mend": { "type": "heal", "by": 25.0 },
+                    },
+                }],
+            }),
+        )
+        .item("tusk", json!({ "kind": { "type": "resource" } }))
+        .item("helmet", json!({ "kind": { "type": "equipment", "slot": "head" } }))
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("healed")
+        .shader("heal_pop")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("camp")
+        .accept::<UseItemRequest>()
+        .accept::<DropItemRequest>()
+        .accept::<UnequipRequest>()
+        .add((item::use_item, item::drop_item, equipment::unequip))
+        .add(script::run_tick)
+        .add(stat::settle_health);
+    script::spawn_stateless(&mut sim.world);
+    let player = sim.join(1);
+    (sim, player)
 }
 
 fn prepare(sim: &mut Sim, player: Entity) {
-    give(sim, player, row("GreaterHealthPotion"), 1);
-    give(sim, player, row("OrcTusk"), 1);
-    give(sim, player, row("FruloosRock"), 1);
-    equipment::equip_held(sim.world(), player, row("FruloosRock")).expect("the rock is worn");
-    stat::apply_damage(sim.world(), player, 10.0);
+    sim.give(player, "potion", 1);
+    sim.give(player, "tusk", 1);
+    sim.give(player, "helmet", 1);
+    let helmet = sim.id::<ItemDef>("helmet");
+    equipment::equip_held(&mut sim.world, player, helmet).expect("the helmet is worn");
+    stat::apply_damage(&mut sim.world, player, 10.0);
 }
 
-fn attempt_each(sim: &mut Sim, player: Entity) {
-    let potion = slot_of(sim, player, row("GreaterHealthPotion"));
-    sim.send(1, UseItemRequest { slot: potion });
+fn attempt_each(sim: &mut Sim) {
+    let player = sim.player(1);
+    let conn = sim.conn(1);
+    let potion = sim.slot_of(player, "potion");
+    sim.send(conn, UseItemRequest { slot: potion });
     sim.tick();
 
-    let tusk = slot_of(sim, player, row("OrcTusk"));
-    sim.send(1, DropItemRequest { slot: tusk });
+    let tusk = sim.slot_of(player, "tusk");
+    sim.send(conn, DropItemRequest { slot: tusk });
     sim.tick();
 
     sim.send(
-        1,
+        conn,
         UnequipRequest {
             slot: EquipmentSlot::Head,
         },
@@ -93,12 +123,12 @@ const EACH_DONE: Belongings = Belongings {
     helmet_worn: false,
 };
 
-fn belongings(sim: &mut Sim, player: Entity) -> Belongings {
+fn belongings(sim: &Sim, player: Entity) -> Belongings {
     Belongings {
-        potions: count(sim, player, row("GreaterHealthPotion")),
-        tusks: count(sim, player, row("OrcTusk")),
+        potions: sim.count(player, "potion"),
+        tusks: sim.count(player, "tusk"),
         helmet_worn: sim
-            .world()
+            .world
             .get::<Equipment>(player)
             .is_some_and(|equipment| equipment.slots.contains_key(&EquipmentSlot::Head)),
     }
