@@ -17,8 +17,14 @@ use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
 use crate::systems::{area, drain_requests};
 
+mod berth;
+mod claims;
 mod predict;
 
+pub use berth::{
+    Aim, Approach, approach, footing, place_beside, reachable, relocate_beside, settle, vacant_near,
+};
+pub use claims::{TileClaim, TileClaims, claim_of, others_on};
 pub use predict::request_walk;
 
 pub fn register(app: &mut App) {
@@ -144,6 +150,7 @@ pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
     if let Some(mut position) = world.get_mut::<Position>(entity) {
         position.pos = pos;
         position.jumps = position.jumps.next();
+        claims::claim(world, entity, pos);
     }
 }
 
@@ -166,6 +173,7 @@ pub fn halt(world: &mut World, entity: Entity) {
         }
         None => {
             world.entity_mut(entity).remove::<MoveTarget>();
+            claims::claim(world, entity, at);
         }
     }
 }
@@ -178,63 +186,16 @@ pub fn on_tile(world: &World, entity: Entity) -> bool {
     position(world, entity).is_some_and(|p| p.on_center())
 }
 
-/// Sends the actor walking to `pos`. A walk already headed there carries on untouched, and one heading
-/// elsewhere turns toward it without dropping the step it's on.
+/// Sends the actor walking to `pos`, exactly there, and claims its tile. A walk already headed there
+/// carries on untouched, and one heading elsewhere turns toward it without dropping the step it's on.
 pub fn goto(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
     if world
         .get::<MoveTarget>(entity)
         .is_none_or(|target| target.pos != pos)
     {
         world.entity_mut(entity).insert(MoveTarget { pos });
+        claims::claim(world, entity, pos);
     }
-}
-
-pub fn approach(world: &mut World, entity: Entity, target: Pos<Tiles>, range: Tiles) -> bool {
-    let Some(at) = position(world, entity) else {
-        return false;
-    };
-    if at.distance(target) <= range {
-        return true;
-    }
-    let heading = world
-        .get::<MoveTarget>(entity)
-        .is_some_and(|goal| goal.pos.distance(target) <= range);
-    if !heading {
-        let dest = approach_tile(world, entity, at, target, range).unwrap_or(target);
-        goto(world, entity, dest);
-    }
-    false
-}
-
-fn approach_tile(
-    world: &World,
-    entity: Entity,
-    from: Pos<Tiles>,
-    target: Pos<Tiles>,
-    range: Tiles,
-) -> Option<Pos<Tiles>> {
-    let navigator = Navigator::of(world, entity)?;
-    let start = from.cell();
-    let goal = target.cell();
-    let reach = range.0.ceil() as i32;
-    let mut best: Option<(Pos<Tiles>, Tiles)> = None;
-    for dy in -reach..=reach {
-        for dx in -reach..=reach {
-            let cell = goal.step((dx, dy));
-            if cell == goal {
-                continue;
-            }
-            let center = cell.center();
-            if center.distance(target) > range || !navigator.grid.connects(start, cell) {
-                continue;
-            }
-            let distance = from.distance(center);
-            if best.is_none_or(|(_, best)| distance < best) {
-                best = Some((center, distance));
-            }
-        }
-    }
-    best.map(|(center, _)| center)
 }
 
 type Movers = QueryState<Entity, With<MoveTarget>>;
@@ -250,6 +211,9 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     for id in movers {
         if stat::is_dead(world, id) {
             world.entity_mut(id).remove::<(MoveTarget, Path)>();
+            if let Some(at) = position(world, id) {
+                claims::claim(world, id, at);
+            }
             continue;
         }
         let Some(goal) = world.get::<MoveTarget>(id).map(|target| target.pos) else {
@@ -291,7 +255,7 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     }
 }
 
-fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
+pub fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
     TilesPerSec(Tiles(stat::effective(
         world,
         entity,
@@ -397,17 +361,34 @@ impl Grid {
         &self.nodes
     }
 
-    pub fn random_node(&self, rng: &mut Rng) -> Option<Pos<Tiles>> {
-        pick(rng, &self.nodes)
+    /// The random pickers draw only among the tiles that `fits`, so a caller can pass over tiles
+    /// someone has claimed.
+    pub fn random_node(&self, rng: &mut Rng, fits: impl Fn(CellPos) -> bool) -> Option<Pos<Tiles>> {
+        pick(rng, self.nodes.iter().copied(), fits)
     }
 
-    pub fn random_reachable(&self, rng: &mut Rng, from: Pos<Tiles>) -> Option<Pos<Tiles>> {
+    pub fn random_reachable(
+        &self,
+        rng: &mut Rng,
+        from: Pos<Tiles>,
+        fits: impl Fn(CellPos) -> bool,
+    ) -> Option<Pos<Tiles>> {
         let component = self.component(from)? as usize;
-        pick(rng, self.nodes_by_component.get(component)?)
+        pick(
+            rng,
+            self.nodes_by_component.get(component)?.iter().copied(),
+            fits,
+        )
     }
 
-    pub fn random_node_within(&self, rng: &mut Rng, bounds: Rect<Tiles>) -> Option<Pos<Tiles>> {
-        pick(rng, &within(&self.nodes, bounds))
+    pub fn random_node_within(
+        &self,
+        rng: &mut Rng,
+        bounds: Rect<Tiles>,
+        fits: impl Fn(CellPos) -> bool,
+    ) -> Option<Pos<Tiles>> {
+        let nodes = self.nodes.iter().copied();
+        pick(rng, nodes.filter(|&node| bounds.contains(node)), fits)
     }
 
     pub fn random_reachable_within(
@@ -415,9 +396,10 @@ impl Grid {
         rng: &mut Rng,
         from: Pos<Tiles>,
         bounds: Rect<Tiles>,
+        fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
         let nodes = bounds.tiles().map(Cell::center);
-        self.random_reachable_among(rng, from, nodes.filter(|&node| bounds.contains(node)))
+        self.random_reachable_among(rng, from, nodes.filter(|&node| bounds.contains(node)), fits)
     }
 
     pub fn random_reachable_near(
@@ -426,6 +408,7 @@ impl Grid {
         from: Pos<Tiles>,
         center: Pos<Tiles>,
         radius: Tiles,
+        fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
         let square = Rect::new(
             center - Offset::new(radius.0, radius.0),
@@ -436,6 +419,7 @@ impl Grid {
             rng,
             from,
             nodes.filter(|&node| node.distance(center) <= radius),
+            fits,
         )
     }
 
@@ -444,12 +428,14 @@ impl Grid {
         rng: &mut Rng,
         from: Pos<Tiles>,
         nodes: impl Iterator<Item = Pos<Tiles>>,
+        fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
         let component = self.component(from)?;
-        let reachable: Vec<Pos<Tiles>> = nodes
-            .filter(|&node| self.component(node) == Some(component))
-            .collect();
-        pick(rng, &reachable)
+        pick(
+            rng,
+            nodes.filter(|&node| self.component(node) == Some(component)),
+            fits,
+        )
     }
 
     fn component_at_cell(&self, c: CellPos) -> Option<u32> {
@@ -684,15 +670,12 @@ fn airborne(world: &World, entity: Entity) -> bool {
         .is_some_and(|actor| ActorModel::get(content, actor.model).airborne())
 }
 
-fn within(nodes: &[Pos<Tiles>], bounds: Rect<Tiles>) -> Vec<Pos<Tiles>> {
-    nodes
-        .iter()
-        .copied()
-        .filter(|&node| bounds.contains(node))
-        .collect()
-}
-
-fn pick(rng: &mut Rng, nodes: &[Pos<Tiles>]) -> Option<Pos<Tiles>> {
+fn pick(
+    rng: &mut Rng,
+    nodes: impl Iterator<Item = Pos<Tiles>>,
+    fits: impl Fn(CellPos) -> bool,
+) -> Option<Pos<Tiles>> {
+    let nodes: Vec<Pos<Tiles>> = nodes.filter(|node| fits(node.cell())).collect();
     if nodes.is_empty() {
         return None;
     }

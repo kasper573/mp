@@ -24,6 +24,6 @@ pub use seen::{
     carried, clickable_point, cooling, erred, finished, fixture, holding, in_warp, in_world,
     learned, marked, me_at_rest, nearest_npc, noticed, npc_is, on_quest, open, other_player,
     other_player_within, planned, planned_rank, played, played_on, playing, portal, pressed,
-    reset_prompted, slot_item, slot_skill, status_on_me, taken, to_spend, told_by, townsperson,
-    tree_view,
+    reset_prompted, slot_item, slot_skill, status_on_me, surrounded_by, taken, to_spend, told_by,
+    townsperson, tree_view,
 };

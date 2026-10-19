@@ -5,7 +5,7 @@ use std::time::Duration;
 use bevy_ecs::entity::Entity;
 use driver::{
     Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding,
-    input_name, npc_is, resident_home,
+    input_name, nearest_npc, npc_is, resident_home, surrounded_by,
 };
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::{TilePos, Tiles};
@@ -19,7 +19,7 @@ use crate::shoot::Shoot;
 pub const CHAPTER: Chapter = Chapter {
     name: "combat",
     title: "Combat",
-    summary: "Fight monsters, loot what they drop, grow stronger and run for town",
+    summary: "Fight monsters, loot what they drop, grow stronger, run for town and face a pack",
     play,
 };
 
@@ -84,9 +84,21 @@ fn play(shoot: &mut Shoot) {
     run_to_town(&mut me);
     me.caption("It gives up the chase at the edge: monsters never set foot in a safe zone");
     chase_ends(&mut me, &chaser);
+
+    me.caption("Out in the wilds a whole pack comes for you");
+    me.look_out(PACK, |snapshot| nearest_npc(snapshot, PACK).is_some());
+    me.fight(
+        |_, actor| npc_is(actor, PACK),
+        |snapshot| surrounded_by(snapshot, PACK, 3),
+    );
+    me.caption("They surround you, each on a tile of its own");
+    me.hold();
 }
 
 const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
+
+// They fight whoever comes near, so a few at once close in.
+const PACK: &str = "glow_moth";
 
 // Loot lying under a monster can't be clicked until it moves or falls, so it's given a while.
 const LOOTING: WaitBudget = WaitBudget {

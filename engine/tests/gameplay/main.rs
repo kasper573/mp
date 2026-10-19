@@ -3,6 +3,7 @@ mod conversation;
 mod effects;
 mod hotbar;
 mod skills;
+mod spacing;
 mod travel;
 
 use std::path::Path;
