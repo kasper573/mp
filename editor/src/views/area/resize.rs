@@ -5,7 +5,7 @@ use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::{pins, shapes};
-use crate::app::{Editor, REFUSED};
+use crate::app::Editor;
 use crate::forms;
 use crate::project::ContentEdit;
 use crate::ui::{dialogs, theme, widgets};
@@ -276,9 +276,5 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             });
         }
     }
-    if editor.apply(edit) {
-        Ok(())
-    } else {
-        Err(REFUSED.to_owned())
-    }
+    editor.try_apply(edit)
 }

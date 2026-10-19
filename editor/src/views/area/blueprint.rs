@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::placement;
 use super::{AreaSnapshot, shapes};
-use crate::app::{Editor, ModalDialog, REFUSED};
+use crate::app::{Editor, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, theme, widgets};
@@ -439,9 +439,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         row["modules"] = Value::Array(list);
         edit.write_json(row_file("area", &area), &row);
     }
-    if !editor.apply(edit) {
-        return Err(REFUSED.to_owned());
-    }
+    editor.try_apply(edit)?;
     editor.selection = RowSelection {
         table: "area".to_owned(),
         keys: vec![dialog.area.clone()],
@@ -624,9 +622,7 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
         edit.write_json(file, &json);
     }
     edit.remove(row_file("blueprint", &dialog.blueprint));
-    if !editor.apply(edit) {
-        return Err(REFUSED.to_owned());
-    }
+    editor.try_apply(edit)?;
     rows::close_tabs(editor, "blueprint", &dialog.blueprint);
     Ok(())
 }

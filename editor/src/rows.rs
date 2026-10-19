@@ -17,7 +17,7 @@ use crate::usages::ContentUsage;
 use crate::views::area::placement;
 use crate::views::{vfx, world};
 use crate::{schema, usages};
-use engine::core::content::{load, locate, row_file, row_of};
+use engine::core::content::{load, locate, row_file, row_folder, row_of};
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
@@ -174,21 +174,9 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
     let copy = free_key(&project.files, table, &format!("{key}_2"));
     let mut edit = ContentEdit::new(format!("Duplicate {table}/{key} as {copy}"));
     edit.write_json(row_file(table, &copy), &value);
-    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, &copy))
-        && let Some(bytes) = project.files.get(&from)
-    {
-        edit.write(to, bytes.clone());
-    }
-    for file in folder_files(project, table, key) {
-        if let Some(bytes) = project.files.get(&file) {
-            edit.write(
-                file.replacen(
-                    &format!("tables/{table}/{key}/"),
-                    &format!("tables/{table}/{copy}/"),
-                    1,
-                ),
-                bytes.clone(),
-            );
+    for (from, to) in beside_row(project, table, key, &copy) {
+        if let Some(bytes) = project.files.get(&from) {
+            edit.write(to, bytes.clone());
         }
     }
     if table == "area" {
@@ -240,29 +228,14 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         edit.write_json(row_file(table, new_key), &value);
     }
     edit.remove(own);
-    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, new_key))
-        && let Some(bytes) = project.files.get(&from)
-    {
-        edit.write(to, bytes.clone());
-        edit.remove(from);
-    }
-    for file in folder_files(project, table, key) {
-        if let Some(bytes) = project.files.get(&file) {
-            edit.write(
-                file.replacen(
-                    &format!("tables/{table}/{key}/"),
-                    &format!("tables/{table}/{new_key}/"),
-                    1,
-                ),
-                bytes.clone(),
-            );
-            edit.remove(file);
+    for (from, to) in beside_row(project, table, key, new_key) {
+        if let Some(bytes) = project.files.get(&from) {
+            edit.write(to, bytes.clone());
+            edit.remove(from);
         }
     }
     let count = edit.changes.len();
-    if !editor.apply(edit) {
-        return Err("the rename was refused; see the output".to_owned());
-    }
+    editor.try_apply(edit)?;
     editor.toast(format!(
         "Renamed {table}/{key} to {new_key}: {count} files rewritten"
     ));
@@ -331,8 +304,21 @@ const NEW_SHADER: &str =
 pub fn folder_files(project: &Project, table: &str, key: &str) -> Vec<String> {
     project
         .files
-        .paths_under(&format!("tables/{table}/{key}/"))
+        .paths_under(&format!("{}/", row_folder(table, key)))
         .cloned()
+        .collect()
+}
+
+/// The files a row keeps beside its own, each with where it lands when the row is keyed `to`.
+fn beside_row(project: &Project, table: &str, key: &str, to: &str) -> Vec<(String, String)> {
+    let (from_folder, to_folder) = (row_folder(table, key), row_folder(table, to));
+    let companion = companion_file(table, key).zip(companion_file(table, to));
+    companion
+        .into_iter()
+        .chain(folder_files(project, table, key).into_iter().map(|file| {
+            let moved = file.replacen(&from_folder, &to_folder, 1);
+            (file, moved)
+        }))
         .collect()
 }
 
@@ -573,9 +559,9 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     }
     let candidates: Vec<String> = project
         .files
-        .paths_under(&format!("tables/{}/", dialog.table))
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .filter(|key| !dialog.keys.contains(key))
+        .keys_of(&dialog.table)
+        .filter(|key| !dialog.keys.iter().any(|deleted| deleted == key))
+        .map(str::to_owned)
         .collect();
     let details: Vec<Vec<(String, String)>> = dialog
         .groups
@@ -887,9 +873,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
             edit.remove(file);
         }
     }
-    if !editor.apply(edit) {
-        return Err("the deletion was refused; see the output".to_owned());
-    }
+    editor.try_apply(edit)?;
     for key in &dialog.keys {
         close_tabs(editor, &dialog.table, key);
     }

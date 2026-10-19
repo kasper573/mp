@@ -104,8 +104,6 @@ fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>
     }
 }
 
-pub const REFUSED: &str = "refused; see the output";
-
 #[derive(Resource)]
 pub struct Editor {
     pub user: UserFolder,
