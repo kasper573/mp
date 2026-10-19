@@ -1,6 +1,7 @@
 use engine::core::content::{ContentOwners, LoadReport, RowName, write};
 use engine::systems::actor::model::ModelDef;
 use serde_json::json;
+use testkit::Map;
 
 use crate::support::game;
 
@@ -170,6 +171,46 @@ fn an_owner_set_after_loading_moves_the_row_and_what_it_holds() {
     owners.set(&wren, None);
     assert_eq!(owners.owner("npc", "wren"), None);
     assert_eq!(owners.len(), 1);
+}
+
+#[test]
+fn a_palette_reaches_only_the_tilesets_its_area_reaches() {
+    let report = game()
+        .area("other", &Map::of(&[".."]), json!([]))
+        .own("tileset", "start_ground", "area/other")
+        .try_load()
+        .err()
+        .expect("refused");
+
+    let error = only_error_in(&report, "tables/area/start/palette.csv");
+    assert_eq!(error.0, "out of reach");
+    assert_eq!(error.1, "\"start_ground\", local to area/other");
+}
+
+#[test]
+fn a_blueprint_part_reaches_only_what_its_blueprint_reaches() {
+    let rock = || {
+        game()
+            .row(
+                "blueprint",
+                "rock",
+                json!({ "parts": [
+                    { "type": "scenery", "at": { "x": 0.0, "y": 0.0 }, "tileset": "start_ground", "tiles": [[0]] }
+                ] }),
+            )
+            .own("tileset", "start_ground", "area/start")
+    };
+    let local = rock().own("blueprint", "rock", "area/start");
+
+    let report = rock().try_load().err().expect("refused");
+
+    let error = only_error_in(&report, "tables/blueprint/rock.json");
+    assert_eq!(error.0, "out of reach");
+    assert_eq!(
+        error.2,
+        "a global tileset row or one local to blueprint/rock"
+    );
+    local.load();
 }
 
 fn only_error_in<'a>(report: &'a LoadReport, file: &str) -> (&'a str, &'a str, &'a str) {

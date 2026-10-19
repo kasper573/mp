@@ -60,6 +60,7 @@ pub struct ContentRegistry {
     writers: Vec<FolderWriter>,
     module_rules: Vec<(&'static str, ModuleProbe)>,
     list_kinds: Vec<ListKind>,
+    beside: Vec<BesideFile>,
     // Hashing every shape takes a while, and a registry is read far more often than it changes.
     version: OnceLock<ContentVersion>,
 }
@@ -94,6 +95,25 @@ struct ListKind {
 }
 
 type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
+
+/// A file in the folders of a table's rows that names rows of its own, as an area's palette names
+/// tilesets.
+pub struct BesideFile {
+    pub table: &'static str,
+    pub name: &'static str,
+    /// Every row the file names, where it is written.
+    pub names: fn(&str) -> Vec<BesideName>,
+    /// The file with every name of the `table` row `from` written as `to`.
+    pub rename: fn(text: &str, table: &str, from: &str, to: &str) -> String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BesideName {
+    pub table: &'static str,
+    pub key: String,
+    pub line: usize,
+    pub column: usize,
+}
 
 impl ContentRegistry {
     pub fn row<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
@@ -150,6 +170,11 @@ impl ContentRegistry {
             rule,
             expected,
         });
+        self
+    }
+
+    pub fn beside(&mut self, file: BesideFile) -> &mut ContentRegistry {
+        self.beside.push(file);
         self
     }
 
@@ -211,6 +236,14 @@ impl ContentRegistry {
             .any(|row| row.name() == table && row.sees_all_rows())
     }
 
+    /// Whether every row of the table is in use by being in it, as
+    /// `ContentRow::PICKED_FROM_TABLE` declares.
+    pub fn picked_from_table(&self, table: &str) -> bool {
+        self.rows
+            .iter()
+            .any(|row| row.name() == table && row.picked_from_table())
+    }
+
     /// Whether code names the row through a fixture, which keeps it global.
     pub fn is_fixture(&self, row: &RowName) -> bool {
         self.fixtures.iter().any(|fixture| {
@@ -258,7 +291,50 @@ impl ContentRegistry {
         }
     }
 
+    /// Whether `file` is one the registry reads references from: the game's settings, a row, or a
+    /// file beside a row that names rows.
+    pub fn names_rows(&self, file: &str) -> bool {
+        file == GAME_FILE || super::row_of(file).is_some() || self.beside_of(file).is_some()
+    }
+
+    /// `text`, the file beside a row at `file`, with every name of the `table` row `from` written
+    /// as `to`; `None` when no such file names rows.
+    pub fn rename_beside(
+        &self,
+        file: &str,
+        text: &str,
+        table: &str,
+        from: &str,
+        to: &str,
+    ) -> Option<String> {
+        self.beside_of(file)
+            .map(|beside| (beside.rename)(text, table, from, to))
+    }
+
+    fn beside_of(&self, file: &str) -> Option<&BesideFile> {
+        let (table, _, name) = super::beside_parts(file)?;
+        self.beside
+            .iter()
+            .find(|beside| beside.table == table && beside.name == name)
+    }
+
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
+        if let Some(beside) = self.beside_of(file) {
+            return (beside.names)(text)
+                .into_iter()
+                .map(|named| Reference {
+                    known: content
+                        .table_named(named.table)
+                        .is_some_and(|rows| rows.keys().binary_search(&named.key).is_ok()),
+                    kind: LeafKind::Row(named.table),
+                    value: named.key,
+                    pointer: String::new(),
+                    key: false,
+                    line: named.line,
+                    column: named.column,
+                })
+                .collect();
+        }
         let parse: &dyn Fn(&serde_json::Value) -> ParseResult = if file == GAME_FILE {
             let Some(loader) = self.settings.as_deref() else {
                 return Vec::new();
@@ -1295,6 +1371,7 @@ pub(super) trait TableLoader: Send + Sync {
     fn folders(&self) -> bool;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn sees_all_rows(&self) -> bool;
+    fn picked_from_table(&self) -> bool;
     fn parse_value(&self, value: &serde_json::Value) -> ParseResult;
     fn finish(
         &self,
@@ -1340,8 +1417,15 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         Row::SEES_ALL_ROWS
     }
 
+    fn picked_from_table(&self) -> bool {
+        Row::PICKED_FROM_TABLE
+    }
+
     fn parse_value(&self, value: &serde_json::Value) -> ParseResult {
-        parse_value::<Row>(value).map(|row| Box::new(row) as Box<dyn Any + Send + Sync>)
+        parse_value::<Row>(value).map(|row| {
+            row.read_held();
+            Box::new(row) as Box<dyn Any + Send + Sync>
+        })
     }
 
     fn finish(

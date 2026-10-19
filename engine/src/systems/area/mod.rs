@@ -11,7 +11,7 @@ pub use blueprint::{Flattened, PlacedBlueprint, Placement};
 pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::sync::Arc;
 
@@ -64,6 +64,7 @@ pub fn content(registry: &mut ContentRegistry) {
         .row::<blueprint::BlueprintDef>()
         .row::<world_map::WorldMapDef>()
         .folder::<AreaDef>()
+        .beside(grid::palette_beside())
         .modules::<AreaDef>()
         .hook(LoadStep::Files, read_grids)
         .hook(LoadStep::Expand, flatten_all)
@@ -695,10 +696,19 @@ fn flatten_all(loading: &mut Loading) {
     let mut placed: Vec<Vec<Flattened>> = content.ids::<AreaDef>().map(|_| Vec::new()).collect();
     let mut placements: Vec<Vec<PlacedBlueprint>> =
         content.ids::<AreaDef>().map(|_| Vec::new()).collect();
+    let loaded: BTreeSet<blueprint::BlueprintId> = loading
+        .rows::<blueprint::BlueprintDef>(&content)
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
     for (id, def) in loading.rows::<AreaDef>(&content) {
         let mut errors = Vec::new();
         let flattening = blueprint::flatten(&content, &def.modules, &mut errors);
-        if !errors.is_empty() {
+        let places_a_failed_blueprint = flattening
+            .placements
+            .iter()
+            .any(|placed| !loaded.contains(&placed.blueprint));
+        if !errors.is_empty() || places_a_failed_blueprint {
             loading.fail(id);
         }
         for error in errors {

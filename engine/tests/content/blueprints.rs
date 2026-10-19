@@ -102,6 +102,27 @@ fn a_scenerys_bounds_cover_exactly_its_tiles_however_it_is_flipped() {
     }
 }
 
+#[test]
+fn a_placed_blueprint_naming_an_unknown_row_is_reported_once_at_the_blueprint() {
+    let mut bad = scenery(json!([[0]]));
+    bad["tileset"] = json!("nowhere");
+    let report = placing(
+        game().row("blueprint", "bad", json!({ "parts": [bad] })),
+        json!([{ "type": "blueprint", "blueprint": "bad", "at": { "x": 2.0, "y": 2.0 } }]),
+    )
+    .try_load()
+    .err()
+    .expect("refused");
+
+    let unknown: Vec<&str> = report
+        .errors
+        .iter()
+        .filter(|error| error.problem.rule == "unknown row")
+        .map(|error| error.file.as_str())
+        .collect();
+    assert_eq!(unknown, ["tables/blueprint/bad.json"], "{report}");
+}
+
 fn tree() -> Value {
     let mut trunk = scenery(json!([[0]]));
     trunk["sort"] = json!(0.5);

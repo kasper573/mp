@@ -17,8 +17,15 @@ pub trait ContentRow: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 
     /// Whether this row records or lays out the whole game rather than building one part of it, so
     /// it may name any row of a table, local or not.
     const SEES_ALL_ROWS: bool = false;
+    /// Whether every row is in use by being in the table, offered to pick from rather than named
+    /// by another row.
+    const PICKED_FROM_TABLE: bool = false;
 
     fn check(&self, _cx: &mut RowCheck) {}
+
+    /// Reads, in the scope the row was just parsed in, what it holds as plain JSON for another row
+    /// to read later, so the rows named there count as this row's references.
+    fn read_held(&self) {}
 }
 
 pub trait ModuleSet: ContentRow {

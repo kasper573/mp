@@ -378,6 +378,24 @@ pub fn with_content<T>(scope: ContentScope, f: impl FnOnce() -> T) -> (T, Conten
     (result, scope.expect("the scope installed above"))
 }
 
+/// Runs `f` in a copy of the scope being read in, and keeps the references it met that `keep`
+/// lets through, as if the scope had met them itself.
+pub fn read_aside<T>(f: impl FnOnce() -> T, keep: impl Fn(&Leaf) -> bool) -> T {
+    let Some(mut aside) = SCOPE.with(|slot| slot.borrow().clone()) else {
+        return f();
+    };
+    aside.leaves.clear();
+    let (result, aside) = with_content(aside, f);
+    SCOPE.with(|slot| {
+        if let Some(scope) = slot.borrow_mut().as_mut() {
+            scope
+                .leaves
+                .extend(aside.leaves.into_iter().filter(|leaf| keep(leaf)));
+        }
+    });
+    result
+}
+
 pub fn nearest<'a>(candidates: impl IntoIterator<Item = &'a String>, key: &str) -> Option<String> {
     let allowed = if key.len() > 12 { 3 } else { 2 };
     let mut best: Option<(usize, &String)> = None;

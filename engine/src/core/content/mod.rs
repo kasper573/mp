@@ -18,8 +18,9 @@ pub use fixture::Fixture;
 pub use id::{ContentId, ContentScope, ScopeReader, with_content};
 pub use key::key_of;
 pub use load::{
-    ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
-    LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
+    BesideFile, BesideName, ContentFolder, ContentRegistry, FileHashes, FileWriter,
+    FilesystemFolder, FolderEntry, LoadStep, Loading, MemoryFolder, Reference, Settings, load,
+    pointer_of, valid_key, write,
 };
 pub use owner::{ContentOwners, OWNER_FIELD, RowName};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
@@ -52,6 +53,21 @@ pub fn row_of(file: &str) -> Option<(&str, &str)> {
         .strip_suffix(".json")
         .filter(|key| !key.contains('/'))?;
     Some((table, key))
+}
+
+/// The row whose folder holds `file`, or whose file it is.
+pub fn row_holding(file: &str) -> Option<(&str, &str)> {
+    row_of(file).or_else(|| beside_parts(file).map(|(table, key, _)| (table, key)))
+}
+
+/// The table, key and name of a file directly in a row's folder.
+pub(crate) fn beside_parts(file: &str) -> Option<(&str, &str, &str)> {
+    let (table, rest) = file
+        .strip_prefix(TABLES_DIR)?
+        .strip_prefix('/')?
+        .split_once('/')?;
+    let (key, name) = rest.split_once('/')?;
+    (!name.contains('/')).then_some((table, key, name))
 }
 
 pub fn asset_file(path: &str) -> String {

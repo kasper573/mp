@@ -67,6 +67,7 @@ pub struct CharacterSnapshot {
 impl ContentRow for CharacterSnapshot {
     const TABLE: &'static str = "test_character";
     const SEES_ALL_ROWS: bool = true;
+    const PICKED_FROM_TABLE: bool = true;
 }
 
 impl CharacterSnapshot {

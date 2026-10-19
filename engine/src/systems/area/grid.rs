@@ -1,15 +1,18 @@
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use strum::{AsRefStr, EnumString};
 
 use super::tileset::TilesetDef;
 use super::{AreaDef, AreaId, Tilemap};
-use crate::core::content::id::nearest;
+use crate::core::content::id::Leaf;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    Content, ContentProblem, ContentRow, ErrorPlace, LoadError, Loading, row_folder,
+    BesideFile, BesideName, Content, ContentProblem, ContentRow, ContentScope, ErrorPlace,
+    LoadError, Loading, RowName, ScopeReader, row_folder, with_content,
 };
 use crate::core::math::{Pos, Rect};
 use crate::core::tiling::{GridSize, Tiles};
@@ -104,6 +107,44 @@ pub fn palette_file(area_key: &str) -> String {
 pub fn area_of_palette_file(path: &str) -> Option<&str> {
     path.strip_prefix(&format!("{}/", row_folder(AreaDef::TABLE, "")))?
         .strip_suffix(&format!("/{PALETTE_FILE}"))
+}
+
+/// The palette as a file beside each area that names tilesets.
+pub fn palette_beside() -> BesideFile {
+    BesideFile {
+        table: AreaDef::TABLE,
+        name: PALETTE_FILE,
+        names: palette_names,
+        rename: rename_in_palette,
+    }
+}
+
+fn palette_names(text: &str) -> Vec<BesideName> {
+    let file = GridFile { path: "", text };
+    read_palette(file, &mut Vec::new())
+        .unwrap_or_default()
+        .into_iter()
+        .enumerate()
+        .map(|(index, row)| BesideName {
+            table: TilesetDef::TABLE,
+            key: row.tileset,
+            line: index + 2,
+            column: 1,
+        })
+        .collect()
+}
+
+fn rename_in_palette(text: &str, table: &str, from: &str, to: &str) -> String {
+    let file = GridFile { path: "", text };
+    match read_palette(file, &mut Vec::new()) {
+        Some(mut rows) if table == TilesetDef::TABLE => {
+            for row in rows.iter_mut().filter(|row| row.tileset == from) {
+                row.tileset = to.to_owned();
+            }
+            write_palette(&rows)
+        }
+        _ => text.to_owned(),
+    }
 }
 
 pub fn write_palette(rows: &[PaletteRow]) -> String {
@@ -246,7 +287,8 @@ pub fn read_area(
         layers: layers.into_iter().collect::<Option<_>>()?,
     };
     let mut errors = Vec::new();
-    let grids = parse_area(content, sizes, map, &folder, &texts, &mut errors);
+    let area = RowName::new(AreaDef::TABLE, id.key(content));
+    let grids = parse_area(content, sizes, map, &area, &texts, &mut errors);
     loading.extend_errors(errors);
     grids
 }
@@ -444,10 +486,11 @@ fn parse_area(
     content: &Content,
     sizes: &ImageSizes,
     map: &Tilemap,
-    folder: &str,
+    area: &RowName,
     texts: &AreaTexts,
     errors: &mut Vec<LoadError>,
 ) -> Option<AreaGrids> {
+    let folder = folder(&area.key);
     let size = map.size.grid();
     let palette_file = format!("{folder}/{PALETTE_FILE}");
     let palette_keys = read_palette(
@@ -457,7 +500,15 @@ fn parse_area(
         },
         errors,
     )?;
-    let palette = resolve_palette(content, sizes, map, &palette_file, &palette_keys, errors);
+    let palette = resolve_palette(
+        content,
+        sizes,
+        map,
+        area,
+        &palette_file,
+        &palette_keys,
+        errors,
+    );
     let entries = palette_keys.len();
     let ground: Vec<Option<GroundLayer>> = map
         .ground
@@ -502,11 +553,21 @@ fn resolve_palette(
     content: &Content,
     sizes: &ImageSizes,
     map: &Tilemap,
+    area: &RowName,
     file: &str,
     rows: &[PaletteRow],
     errors: &mut Vec<LoadError>,
 ) -> Option<Vec<PaletteEntry>> {
     let tilesets = content.table::<TilesetDef>();
+    let reader = ScopeReader {
+        row: Some(area.clone()),
+        owners: Arc::new(content.owners().clone()),
+    };
+    let (ids, scope) = with_content(ContentScope::of(content).reading(reader), || {
+        rows.iter()
+            .map(|row| serde_json::from_value::<TilesetId>(Value::String(row.tileset.clone())).ok())
+            .collect::<Vec<_>>()
+    });
     let mut fault = |row: usize, column: usize, problem: ContentProblem| {
         errors.push(LoadError {
             file: file.to_owned(),
@@ -522,17 +583,10 @@ fn resolve_palette(
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            let Some(tileset) = tilesets.id_of(&row.tileset) else {
-                return fault(
-                    index,
-                    1,
-                    ContentProblem::unknown_row(
-                        TilesetDef::TABLE,
-                        &row.tileset,
-                        nearest(tilesets.keys(), &row.tileset).as_deref(),
-                    ),
-                );
-            };
+            if let Some(problem) = scope.leaves().get(index).and_then(Leaf::reported) {
+                return fault(index, 1, problem);
+            }
+            let tileset = ids[index]?;
             let def = tilesets.get(tileset)?;
             if def.tile != map.tile {
                 return fault(

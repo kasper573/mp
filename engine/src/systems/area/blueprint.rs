@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::grid::Flip;
 use super::{AreaDef, AreaModule, ObjectShape};
 use crate::core::audio::soundscape::SoundscapeShape;
-use crate::core::content::id::{Leaf, nearest};
+use crate::core::content::id::{Leaf, nearest, read_aside};
 use crate::core::content::locate::escape;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, ContentScope, RowCheck, pointer_of, row_file,
@@ -76,6 +76,50 @@ impl ContentRow for BlueprintDef {
                 );
             }
         }
+    }
+
+    fn read_held(&self) {
+        for part in &self.parts {
+            let mut json = part.clone();
+            stand_in_holes(&mut json, &self.variables);
+            read_aside(
+                || serde_json::from_value::<AreaModule>(json).ok(),
+                |leaf| leaf.value != HOLE,
+            );
+        }
+    }
+}
+
+/// What a hole without a value reads as while its part is read for references: a key no row has,
+/// whose reference is left out.
+const HOLE: &str = "\u{1}hole";
+
+/// Fills each hole with its variable's default, or with a stand-in of the variable's type, so the
+/// rest of the part reads as a module would.
+fn stand_in_holes(json: &mut Value, variables: &BTreeMap<String, Variable<RiftScripting>>) {
+    if let Some(name) = hole_name(json) {
+        let variable = variables.get(name);
+        let default = variable
+            .and_then(|variable| variable.default.as_ref())
+            .and_then(|default| serde_json::to_value(default).ok());
+        *json = default.unwrap_or_else(|| match variable.map(|variable| variable.ty) {
+            Some(VariableType::Integer | VariableType::Number) => Value::from(0),
+            Some(VariableType::Boolean) => Value::Bool(false),
+            Some(VariableType::Condition) => Value::Bool(true),
+            Some(VariableType::Text | VariableType::Name) => Value::String(String::new()),
+            Some(VariableType::Place) => serde_json::json!({ "area": HOLE, "x": 0, "y": 0 }),
+            Some(VariableType::Row | VariableType::Audio) | None => Value::String(HOLE.to_owned()),
+        });
+        return;
+    }
+    match json {
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|value| stand_in_holes(value, variables)),
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(|item| stand_in_holes(item, variables)),
+        _ => {}
     }
 }
 
@@ -262,6 +306,7 @@ impl Expansion<'_> {
             self.pointer.clone()
         };
         let mut filled: BTreeMap<String, Value> = BTreeMap::new();
+        let mut supplied: Vec<String> = Vec::new();
         let mut missing = false;
         for name in values.keys() {
             if !def.variables.contains_key(name) {
@@ -292,6 +337,9 @@ impl Expansion<'_> {
             };
             match typed_value(&content, variable, value) {
                 Ok(json) => {
+                    if own {
+                        strings(&json, &mut supplied);
+                    }
                     filled.insert(name.clone(), json);
                 }
                 Err(problem) => {
@@ -340,7 +388,11 @@ impl Expansion<'_> {
                 let (result, scope) = with_content(ContentScope::of(&content), || {
                     serde_path_to_error::deserialize::<_, AreaModule>(json)
                 });
-                for problem in scope.leaves().iter().filter_map(Leaf::reported) {
+                let from_placement = scope
+                    .leaves()
+                    .iter()
+                    .filter(|leaf| supplied.contains(&leaf.value));
+                for problem in from_placement.filter_map(Leaf::reported) {
                     self.errors.push(FlattenError {
                         at: FlattenAt::Blueprint(placement.blueprint, part_pointer.clone()),
                         problem,
@@ -561,6 +613,15 @@ pub fn hole_name(json: &Value) -> Option<&str> {
         return None;
     }
     map.get("var")?.as_str()
+}
+
+fn strings(json: &Value, into: &mut Vec<String>) {
+    match json {
+        Value::String(text) => into.push(text.clone()),
+        Value::Object(map) => map.values().for_each(|value| strings(value, into)),
+        Value::Array(items) => items.iter().for_each(|item| strings(item, into)),
+        _ => {}
+    }
 }
 
 pub fn holes(json: &Value, into: &mut Vec<String>) {
