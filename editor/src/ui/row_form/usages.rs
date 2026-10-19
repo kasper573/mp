@@ -1,6 +1,6 @@
 use egui::{Align, Layout, Sense, Ui};
 use engine::core::assets::FileSize;
-use engine::core::content::{RowName, asset_file, row_of};
+use engine::core::content::{RowName, asset_file, row_holding};
 
 use super::{theme, widgets};
 use crate::app::Editor;
@@ -50,7 +50,7 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &
     }
     let mut open = None;
     for group in &groups {
-        let row = row_of(&group.file);
+        let row = row_holding(&group.file);
         let name = row.map_or_else(
             || group.file.clone(),
             |(table, key)| format!("{table}/{key}"),
@@ -217,7 +217,7 @@ pub fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
         });
     }
     if let Some(file) = open
-        && let Some((table, key)) = row_of(&file)
+        && let Some((table, key)) = row_holding(&file)
     {
         editor.open_row(table, key);
     }

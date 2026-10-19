@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{ContentOwners, ContentRow, OWNER_FIELD, RowName, row_file, row_of};
+use engine::core::content::{
+    ContentOwners, ContentRow, OWNER_FIELD, RowName, row_file, row_holding,
+};
 use engine::systems::area::AreaDef;
 use engine::systems::registry;
 
@@ -98,7 +100,7 @@ impl<'a> ScopeMoves<'a> {
             if usage.is_owner_line() {
                 continue;
             }
-            let Some((table, key)) = row_of(&usage.file) else {
+            let Some((table, key)) = row_holding(&usage.file) else {
                 users.settings = true;
                 continue;
             };
@@ -156,7 +158,7 @@ impl<'a> ScopeMoves<'a> {
                 if usage.is_owner_line() {
                     continue;
                 }
-                let reader = row_of(&usage.file).map(|(table, key)| RowName::new(table, key));
+                let reader = row_holding(&usage.file).map(|(table, key)| RowName::new(table, key));
                 if !self.reaches(reader.as_ref(), &row.table, &row.key) {
                     broken.insert(BrokenUse {
                         file: usage.file.clone(),

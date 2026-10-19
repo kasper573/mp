@@ -247,6 +247,7 @@ pub enum ModalDialog {
     MakeGlobal(MakeGlobalDialog),
     MoveTo(MoveToDialog),
     Gather(GatherDialog),
+    FindUnused(FindUnusedDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
@@ -415,6 +416,13 @@ pub struct GatherDialog {
     pub table: Option<String>,
     /// The rows gathering would make local, worked out again whenever a tick changes.
     pub plan: Option<Vec<crate::moves::Gathered>>,
+    pub error: Option<String>,
+}
+
+pub struct FindUnusedDialog {
+    /// What is left out of the deletion; everything else found is in it.
+    pub unticked: BTreeSet<crate::unused::UnusedItem>,
+    pub open: BTreeSet<String>,
     pub error: Option<String>,
 }
 

@@ -15,6 +15,7 @@ pub mod sidebar;
 pub mod start;
 pub mod theme;
 pub mod tree;
+pub mod unused_dialog;
 pub mod widgets;
 
 use std::mem;
@@ -250,6 +251,13 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         .clicked()
                     {
                         move_dialogs::gather(editor);
+                        ui.close();
+                    }
+                    if ui
+                        .add_enabled(has_project, egui::Button::new("Find unused content…"))
+                        .clicked()
+                    {
+                        unused_dialog::find_unused(editor);
                         ui.close();
                     }
                     if ui.button("Game binaries…").clicked() {

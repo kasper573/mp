@@ -16,3 +16,4 @@ mod spans;
 mod support;
 mod tabs;
 mod thumbnails;
+mod unused;

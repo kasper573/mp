@@ -26,6 +26,7 @@ use engine::systems::script::ScriptDef;
 use self::watch::FolderChange;
 use crate::app::ChannelInbox;
 use crate::schema::SchemaShapes;
+use crate::unused::UnusedContent;
 use crate::usages::ContentUsages;
 use crate::value;
 use crate::views::script::nodes::NodeCatalogue;
@@ -90,6 +91,30 @@ impl ContentEdit {
             Some(FileChange { bytes: None, .. }) => None,
             None => files.json_owned(file),
         }
+    }
+
+    /// The file's bytes once this edit is applied, or `None` when it has none by then.
+    pub fn pending_bytes(&self, files: &ProjectFiles, file: &str) -> Option<FileBytes> {
+        match self.changes.iter().find(|change| change.file == file) {
+            Some(change) => change.bytes.clone(),
+            None => files.get(file).cloned(),
+        }
+    }
+
+    /// Writes every name of the `table` row `from` as `to` in a file beside a row that names rows.
+    pub fn rename_beside(
+        &mut self,
+        files: &ProjectFiles,
+        file: &str,
+        table: &str,
+        from: &str,
+        to: &str,
+    ) -> Option<()> {
+        let bytes = self.pending_bytes(files, file)?;
+        let text = std::str::from_utf8(&bytes).ok()?;
+        let renamed = systems::registry().rename_beside(file, text, table, from, to)?;
+        self.write(file.to_owned(), text_bytes(renamed));
+        Some(())
     }
 
     pub fn write_row<T: serde::Serialize>(
@@ -192,6 +217,7 @@ pub struct Project {
     pub report: Option<LoadReport>,
     pub history: EditHistory,
     pub usages: ContentUsages,
+    pub unused: UnusedContent,
     pub shapes: Arc<SchemaShapes>,
     pub read_only: Option<String>,
     pub last_load: Option<Duration>,
@@ -213,6 +239,7 @@ struct Loading {
 struct Loaded {
     content: Content,
     usages: ContentUsages,
+    unused: UnusedContent,
     took: Duration,
     usages_took: Duration,
 }
@@ -247,6 +274,7 @@ impl Project {
             report: None,
             history: EditHistory::default(),
             usages: ContentUsages::default(),
+            unused: UnusedContent::default(),
             shapes,
             read_only: None,
             last_load: None,
@@ -460,6 +488,7 @@ impl Project {
         self.last_load = Some(loaded.took);
         self.last_usages = Some(loaded.usages_took);
         self.usages = loaded.usages;
+        self.unused = loaded.unused;
         self.content = Some(loaded.content);
         self.generation += 1;
     }
@@ -555,9 +584,11 @@ impl Loaded {
     fn build(content: Content, files: &ProjectFiles, took: Duration) -> Loaded {
         let started = Instant::now();
         let usages = ContentUsages::build(&content, files);
+        let unused = UnusedContent::find(files, &usages);
         Loaded {
             content,
             usages,
+            unused,
             took,
             usages_took: started.elapsed(),
         }

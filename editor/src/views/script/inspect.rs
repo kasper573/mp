@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
-use engine::core::content::{ContentRow, RowName, row_file, row_of};
+use engine::core::content::{ContentRow, RowName, row_file, row_holding};
 use engine::core::script::{NodeKind, RunnerKindDef};
 use engine::systems::area::blueprint::holes;
 use engine::systems::memory::MemoryDef;
@@ -402,7 +402,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .of_row(ScriptDef::TABLE, &key)
         .iter()
         .filter_map(|usage| {
-            let (table, row_key) = row_of(&usage.file)?;
+            let (table, row_key) = row_holding(&usage.file)?;
             let at = ScriptRef::parse(&usage.pointer);
             Some(Caller {
                 row: format!("{table}/{row_key}"),

@@ -828,7 +828,7 @@ fn rows_phrase(verb: &str, count: usize, after: &str) -> String {
     }
 }
 
-fn title(ui: &mut Ui, text: &str) {
+pub(super) fn title(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).strong().size(18.0));
     ui.add_space(8.0);
 }
@@ -842,7 +842,7 @@ fn listed(ui: &mut Ui, lines: &[String], shown: usize) {
     }
 }
 
-fn error_line(ui: &mut Ui, error: &Option<String>) {
+pub(super) fn error_line(ui: &mut Ui, error: &Option<String>) {
     if let Some(error) = error {
         ui.colored_label(theme::DANGER, error);
     }
@@ -864,7 +864,7 @@ fn buttons(ui: &mut Ui, confirm: &str, ready: bool) -> Option<bool> {
     outcome
 }
 
-fn answer(outcome: Option<bool>, pressed: &DialogKeys) -> Option<bool> {
+pub(super) fn answer(outcome: Option<bool>, pressed: &DialogKeys) -> Option<bool> {
     if pressed.escape {
         Some(false)
     } else if pressed.enter {

@@ -18,6 +18,7 @@ pub mod tabs;
 pub mod templates;
 pub mod thumbs;
 pub mod ui;
+pub mod unused;
 mod usages;
 pub mod user;
 mod value;

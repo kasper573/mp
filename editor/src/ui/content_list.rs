@@ -58,6 +58,7 @@ pub struct ContentList {
     pub search: String,
     pub only_unsaved: bool,
     pub only_fixtures: bool,
+    pub only_unused: bool,
     pub hide_empty: bool,
     pub focus_search: bool,
     tree: TreeState,
@@ -69,6 +70,7 @@ impl ContentList {
             search: String::new(),
             only_unsaved: false,
             only_fixtures: false,
+            only_unused: false,
             hide_empty: matches!(source, ContentSource::LocalTo(_)),
             focus_search: false,
             tree: TreeState::default(),
@@ -76,7 +78,7 @@ impl ContentList {
     }
 
     fn filtering(&self) -> bool {
-        self.only_unsaved || self.only_fixtures
+        self.only_unsaved || self.only_fixtures || self.only_unused
     }
 }
 
@@ -167,6 +169,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, source: &ContentSource) {
         if widgets::toggle_chip(ui, "fixtures", list.only_fixtures).clicked() {
             list.only_fixtures = !list.only_fixtures;
         }
+        if widgets::toggle_chip(ui, "unused", list.only_unused).clicked() {
+            list.only_unused = !list.only_unused;
+        }
         if widgets::toggle_chip(ui, "hide empty", list.hide_empty).clicked() {
             list.hide_empty = !list.hide_empty;
         }
@@ -206,7 +211,7 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
     let hide_empty = list.hide_empty || filtering;
     let mut open: BTreeSet<String> = folds.tables.clone();
     let mut nodes: Vec<TreeNode<TableAction>> = Vec::new();
-    if *source == ContentSource::Global && !list.only_fixtures {
+    if *source == ContentSource::Global && !list.only_fixtures && !list.only_unused {
         let unsaved = project.is_unsaved(GAME_FILE);
         if !list.only_unsaved || unsaved {
             let mut game = TreeNode::leaf(GAME_LINE, "game");
@@ -235,6 +240,7 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
                 .filter(|key| {
                     (!list.only_unsaved || project.is_unsaved(&row_file(table, key)))
                         && (!list.only_fixtures || editor.shapes.is_fixture(table, key))
+                        && (!list.only_unused || project.unused.row(table, key).is_some())
                 })
                 .map(|key| row_node(project, &selection, table, key))
                 .collect();
@@ -603,6 +609,7 @@ fn results(
                 let file = row_file(&table, key);
                 if (list.only_unsaved && !project.is_unsaved(&file))
                     || (list.only_fixtures && !editor.shapes.is_fixture(&table, key))
+                    || (list.only_unused && project.unused.row(&table, key).is_none())
                 {
                     continue;
                 }
@@ -660,7 +667,11 @@ fn results(
             let mut folders: BTreeSet<String> = BTreeSet::new();
             for path in project.files.paths_under(&format!("{ASSETS_DIR}/")) {
                 let relative = asset_of(path);
-                if AssetKind::of(relative).is_none() {
+                if AssetKind::of(relative).is_none()
+                    || list.only_fixtures
+                    || (list.only_unused && !project.unused.has_asset(relative))
+                    || (list.only_unsaved && !project.is_unsaved(path))
+                {
                     continue;
                 }
                 if let Some((folder, _)) = relative.rsplit_once('/')
@@ -868,12 +879,18 @@ fn results(
         }
     }
     if let Some(path) = open_file {
-        editor.panels.left = LeftTab::Assets;
-        editor.views.assets.search = path.trim_end_matches('/').to_owned();
-        if !path.ends_with('/') {
-            editor.select(RowSelection::row("asset", &path));
-            editor.preview_tab(EditorTab::Asset { path });
-        }
+        open_asset(editor, path);
+    }
+}
+
+/// Shows an asset file, or a folder when `path` ends in a slash, in the assets panel, and opens
+/// a file's tab.
+pub fn open_asset(editor: &mut Editor, path: String) {
+    editor.panels.left = LeftTab::Assets;
+    editor.views.assets.search = path.trim_end_matches('/').to_owned();
+    if !path.ends_with('/') {
+        editor.select(RowSelection::row("asset", &path));
+        editor.preview_tab(EditorTab::Asset { path });
     }
 }
 

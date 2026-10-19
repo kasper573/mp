@@ -4,7 +4,8 @@ use std::sync::Arc;
 use egui::{RichText, Ui};
 use engine::core::content::id::LeafKind;
 use engine::core::content::{
-    ContentRow, ModuleRule, OWNER_FIELD, RowName, load, locate, row_file, row_folder, row_of,
+    ContentRow, GAME_FILE, ModuleRule, OWNER_FIELD, RowName, load, locate, row_file, row_folder,
+    row_holding, row_of,
 };
 use engine::core::vfx::{VfxShaderDef, shader_file};
 use engine::systems::area::AreaDef;
@@ -398,19 +399,26 @@ fn rename_edit(
     label: String,
 ) -> Result<ContentEdit, String> {
     let mut edit = ContentEdit::new(label);
-    let mut by_file: BTreeMap<String, Vec<(ContentUsage, RowName)>> = Default::default();
+    let mut by_file: BTreeMap<String, Vec<(ContentUsage, &RowName, RowName)>> = Default::default();
     for (row, to) in renames {
         for usage in project.usages.of_row(&row.table, &row.key) {
-            by_file
-                .entry(usage.file.clone())
-                .or_default()
-                .push((usage.clone(), RowName::new(&row.table, to)));
+            by_file.entry(usage.file.clone()).or_default().push((
+                usage.clone(),
+                row,
+                RowName::new(&row.table, to),
+            ));
         }
     }
     for (file, mut uses) in by_file {
+        if is_beside(&file) {
+            for (_, from, to) in &uses {
+                edit.rename_beside(&project.files, &file, &from.table, &from.key, &to.key);
+            }
+            continue;
+        }
         uses.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
         edit.update_json(&project.files, &file, |value| {
-            for (usage, to) in &uses {
+            for (usage, _, to) in &uses {
                 rewrite(value, usage, &project.usages, &file, to);
             }
             Some(())
@@ -424,8 +432,8 @@ fn rename_edit(
         edit.write_json(row_file(&row.table, to), &value);
         edit.remove(own);
         for (from, moved) in beside_row(project, &row.table, &row.key, to) {
-            if let Some(bytes) = project.files.get(&from) {
-                edit.write(moved, bytes.clone());
+            if let Some(bytes) = edit.pending_bytes(&project.files, &from) {
+                edit.write(moved, bytes);
                 edit.remove(from);
             }
         }
@@ -459,6 +467,11 @@ fn rewrite(
     } else if let Some(slot) = value.pointer_mut(pointer) {
         *slot = Value::String(to.key.clone());
     }
+}
+
+/// Whether `file` is one beside a row, which names rows in its own format rather than JSON.
+fn is_beside(file: &str) -> bool {
+    file != GAME_FILE && row_of(file).is_none()
 }
 
 fn split_pointer(pointer: &str) -> (&str, String) {
@@ -599,7 +612,7 @@ pub struct UsageSummary {
 pub fn usage_groups(project: &Project, table: &str, key: &str) -> Vec<UsageSummary> {
     let mut groups: Vec<UsageSummary> = Vec::new();
     for usage in project.usages.of_row(table, key) {
-        let Some((other_table, other_key)) = row_of(&usage.file) else {
+        let Some((other_table, other_key)) = row_holding(&usage.file) else {
             continue;
         };
         let field = field_of(project, &usage.file, &usage.pointer);
@@ -623,6 +636,13 @@ pub fn usage_groups(project: &Project, table: &str, key: &str) -> Vec<UsageSumma
 }
 
 pub fn field_of(project: &Project, file: &str, pointer: &str) -> String {
+    if is_beside(file) {
+        let name = file.rsplit('/').next().unwrap_or(file);
+        return name
+            .split_once('.')
+            .map_or(name, |(stem, _)| stem)
+            .to_owned();
+    }
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
     if segments.first() == Some(&"modules")
         && let Some(index) = segments.get(1)
@@ -651,13 +671,13 @@ struct UsageKind {
 }
 
 fn kind_of(project: &Project, file: &str, pointer: &str) -> UsageKind {
-    let table = row_of(file)
+    let table = row_holding(file)
         .map(|(table, _)| table)
         .unwrap_or("game")
         .to_owned();
     let kind = field_of(project, file, pointer);
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
-    let slot = (!segments.contains(&"nodes"))
+    let slot = (!is_beside(file) && !segments.contains(&"nodes"))
         .then(|| list_slot(pointer))
         .flatten();
     let entry = match slot {
@@ -779,7 +799,7 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         .map(|group| {
             let mut lines: Vec<(String, String, usize)> = Vec::new();
             for usage in &group.usages {
-                let row = row_of(&usage.file)
+                let row = row_holding(&usage.file)
                     .map(|(t, k)| format!("{t}/{k}"))
                     .unwrap_or_else(|| usage.file.clone());
                 let mut detail = usage_detail(project, &usage.file, &usage.pointer);
@@ -897,7 +917,7 @@ fn group_title(project: &Project, group: &UsageGroup) -> String {
             group.table
         );
     }
-    let row = row_of(files[0])
+    let row = row_holding(files[0])
         .map(|(t, k)| format!("{t}/{k}"))
         .unwrap_or_else(|| files[0].clone());
     match kinds.as_slice() {
@@ -1054,6 +1074,23 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         }
     }
     for (file, mut entries) in by_file {
+        if is_beside(&file) {
+            for (_, group) in &entries {
+                if let UsageDecision::Repoint(key) = &group.decision {
+                    let deleted = dialog
+                        .keys
+                        .iter()
+                        .map(|key| RowName::new(&dialog.table, key))
+                        .chain(dialog.along.iter().cloned());
+                    for row in deleted {
+                        if row.table == group.target {
+                            edit.rename_beside(&project.files, &file, &row.table, &row.key, key);
+                        }
+                    }
+                }
+            }
+            continue;
+        }
         let Some(mut value) = project.files.json_owned(&file) else {
             continue;
         };

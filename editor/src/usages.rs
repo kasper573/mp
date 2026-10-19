@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use engine::core::babble::{BabbleBankDef, letter_files};
 use engine::core::content::id::LeafKind;
 use engine::core::content::{
-    Content, ContentRow, GAME_FILE, OWNER_FIELD, Reference, asset_of, row_file,
+    Content, ContentRow, OWNER_FIELD, Reference, RowName, asset_file, asset_of, row_file,
 };
 use engine::core::vfx::{VfxShaderDef, shader_file};
 use engine::systems::registry;
@@ -36,7 +37,7 @@ impl ContentUsages {
         let registry = registry();
         let texts: Vec<(&String, String)> = files
             .iter()
-            .filter(|(path, _)| path.as_str() == GAME_FILE || path.ends_with(".json"))
+            .filter(|(path, _)| registry.names_rows(path))
             .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes.to_vec()).ok()?)))
             .collect();
         let parsed: Vec<(String, Vec<Reference>)> = texts
@@ -77,6 +78,19 @@ impl ContentUsages {
                     known: files.contains(&row_file(&owner.table, &owner.key)),
                 });
         }
+        for (id, bank) in content.table::<BabbleBankDef>().iter() {
+            for letter in letter_files(bank) {
+                usages
+                    .assets
+                    .entry(letter.as_str().to_owned())
+                    .or_default()
+                    .push(ContentUsage {
+                        file: row_file(BabbleBankDef::TABLE, id.key(content)),
+                        pointer: "/letters".to_owned(),
+                        known: files.contains(&asset_file(letter.as_str())),
+                    });
+            }
+        }
         for key in files.keys_of(VfxShaderDef::TABLE) {
             usages
                 .assets
@@ -89,6 +103,20 @@ impl ContentUsages {
                 });
         }
         usages
+    }
+
+    /// Every row named anywhere, with where it is named.
+    pub fn rows(&self) -> impl Iterator<Item = (RowName, &[ContentUsage])> {
+        self.rows
+            .iter()
+            .map(|((table, key), usages)| (RowName::new(table, key), usages.as_slice()))
+    }
+
+    /// Every asset path named anywhere, a file's or a folder's, with where it is named.
+    pub fn assets(&self) -> impl Iterator<Item = (&str, &[ContentUsage])> {
+        self.assets
+            .iter()
+            .map(|(path, usages)| (path.as_str(), usages.as_slice()))
     }
 
     pub fn of_row(&self, table: &str, key: &str) -> &[ContentUsage] {

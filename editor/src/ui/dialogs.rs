@@ -13,7 +13,7 @@ use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
-use super::{move_dialogs, theme, widgets};
+use super::{move_dialogs, theme, unused_dialog, widgets};
 use crate::app::{
     CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, RenameDialog,
     RenameTarget,
@@ -845,6 +845,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::MakeGlobal(dialog) => move_dialogs::make_global_dialog(editor, ctx, dialog),
         ModalDialog::MoveTo(dialog) => move_dialogs::move_to_dialog(editor, ctx, dialog),
         ModalDialog::Gather(dialog) => move_dialogs::gather_dialog(editor, ctx, dialog),
+        ModalDialog::FindUnused(dialog) => unused_dialog::find_unused_dialog(editor, ctx, dialog),
         ModalDialog::NewRow(mut dialog) => {
             let mut outcome = None;
             let title = match &dialog.owner {

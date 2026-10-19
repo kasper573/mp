@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, TABLES_DIR, asset_file, row_file, row_of};
+use engine::core::content::{ContentRow, TABLES_DIR, asset_file, row_file, row_holding, row_of};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::GenericExpression;
 use engine::systems::npc::NpcDef;
@@ -345,7 +345,7 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
                 .usages
                 .of_row(ScriptDef::TABLE, row_key)
                 .iter()
-                .filter_map(|usage| row_of(&usage.file))
+                .filter_map(|usage| row_holding(&usage.file))
                 .filter(|(table, _)| *table == NpcDef::TABLE)
                 .map(|(_, key)| key.to_owned())
                 .collect(),

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file, row_of};
+use engine::core::content::{Content, ContentRow, row_file, row_holding};
 use engine::core::math::{Pos, Rect};
 use engine::core::script::VariableType;
 use engine::core::tiling::Tiles;
@@ -50,7 +50,7 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
         .of_row(BlueprintDef::TABLE, blueprint)
         .iter()
         .find_map(|usage| {
-            row_of(&usage.file)
+            row_holding(&usage.file)
                 .filter(|(table, _)| *table == AreaDef::TABLE)
                 .map(|(_, key)| key.to_owned())
         })

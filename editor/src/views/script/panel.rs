@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentRow, row_file, row_of};
+use engine::core::content::{Content, ContentRow, row_file, row_holding, row_of};
 use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
@@ -42,7 +42,7 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
     };
     let mut found: Vec<ScriptBinding> = Vec::new();
     for usage in project.usages.of_row(ScriptDef::TABLE, &doc.at.key) {
-        let Some((table, row_key)) = row_of(&usage.file) else {
+        let Some((table, row_key)) = row_holding(&usage.file) else {
             continue;
         };
         let Some(module) = ScriptRef::parse(&usage.pointer).module else {

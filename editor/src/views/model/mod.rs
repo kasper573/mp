@@ -13,7 +13,7 @@ use std::ops::Not;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use engine::core::content::{ContentRow, RowName, row_file, row_of};
+use engine::core::content::{ContentRow, RowName, row_file, row_holding};
 use engine::core::math::{Direction, FrameSize};
 use engine::systems::actor::{Action, ModelDef};
 use engine::systems::npc::NpcDef;
@@ -590,7 +590,7 @@ pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
         .usages
         .of_row(ModelDef::TABLE, key)
         .iter()
-        .filter_map(|usage| row_of(&usage.file))
+        .filter_map(|usage| row_holding(&usage.file))
         .filter(|(table, _)| matches!(*table, NpcDef::TABLE | PlayerDef::TABLE))
         .map(|(table, key)| (table.to_owned(), key.to_owned()))
         .collect()
