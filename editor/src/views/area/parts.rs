@@ -374,29 +374,23 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let innermost = chain.last()?;
         (innermost.blueprint == key).then(|| (view.area.clone(), innermost.module))
     });
-    let mut placed: Vec<PlacedAt> = Vec::new();
-    let mut nested = 0;
-    for area_id in content.ids::<AreaDef>() {
-        let area_key = area_id.key(&content).to_owned();
-        for placement in area::placements(&content, area_id) {
-            if placement.blueprint != id {
-                continue;
-            }
-            if placement.chain.len() > 1 {
-                nested += 1;
-                continue;
-            }
-            let this = editing
-                .as_ref()
-                .is_some_and(|(a, m)| *a == area_key && *m == placement.origin);
-            placed.push(PlacedAt {
-                area: area_key.clone(),
+    let placements = placement::placements_of(&content, id);
+    let nested = placements.nested;
+    let placed: Vec<PlacedAt> = placements
+        .direct
+        .iter()
+        .map(|(area_id, placement)| {
+            let area = area_id.key(&content).to_owned();
+            PlacedAt {
+                this: editing
+                    .as_ref()
+                    .is_some_and(|(a, m)| *a == area && *m == placement.origin),
+                area,
                 at: placement.at,
-                this,
                 origin: placement.origin,
-            });
-        }
-    }
+            }
+        })
+        .collect();
     let mut areas: Vec<&String> = placed.iter().map(|placed| &placed.area).collect();
     areas.sort();
     areas.dedup();

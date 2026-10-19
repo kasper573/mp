@@ -635,17 +635,7 @@ fn banners(
     if let Some(place) = in_place.last() {
         let count = content
             .by_key::<BlueprintDef>(&place.blueprint)
-            .map(|id| {
-                content
-                    .ids::<AreaDef>()
-                    .flat_map(|a| {
-                        area::placements(content, a)
-                            .iter()
-                            .filter(|p| p.blueprint == id && p.chain.len() <= 1)
-                    })
-                    .count()
-            })
-            .unwrap_or(0);
+            .map_or(0, |id| placement::placements_of(content, id).direct.len());
         let name = place.blueprint.clone();
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Grid, 14.0, theme::WARN);

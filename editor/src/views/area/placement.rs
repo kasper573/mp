@@ -7,7 +7,7 @@ use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::math::{Pos, Rect};
 use engine::core::script::VariableType;
 use engine::core::tiling::Tiles;
-use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::blueprint::{BlueprintDef, BlueprintId, PlacedBlueprint};
 use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
@@ -56,28 +56,41 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
         })
 }
 
+/// Where a blueprint is placed: straight into areas, and how many more times inside other
+/// blueprints.
+pub struct BlueprintPlacements<'a> {
+    pub direct: Vec<(AreaId, &'a PlacedBlueprint)>,
+    pub nested: usize,
+}
+
+pub fn placements_of(content: &Content, blueprint: BlueprintId) -> BlueprintPlacements<'_> {
+    let mut placements = BlueprintPlacements {
+        direct: Vec::new(),
+        nested: 0,
+    };
+    for area_id in content.ids::<AreaDef>() {
+        for placement in area::placements(content, area_id) {
+            if placement.blueprint != blueprint {
+                continue;
+            }
+            if placement.chain.len() <= 1 {
+                placements.direct.push((area_id, placement));
+            } else {
+                placements.nested += 1;
+            }
+        }
+    }
+    placements
+}
+
 pub fn placement_count(content: &Content, blueprint: &str) -> String {
     let Some(id) = content.by_key::<BlueprintDef>(blueprint) else {
         return String::new();
     };
-    let mut direct = 0;
-    let mut areas: Vec<AreaId> = Vec::new();
-    let mut nested = 0;
-    for area_id in content.ids::<AreaDef>() {
-        for placement in area::placements(content, area_id) {
-            if placement.blueprint != id {
-                continue;
-            }
-            if placement.chain.len() <= 1 {
-                direct += 1;
-                if !areas.contains(&area_id) {
-                    areas.push(area_id);
-                }
-            } else {
-                nested += 1;
-            }
-        }
-    }
+    let BlueprintPlacements { direct, nested } = placements_of(content, id);
+    let mut areas: Vec<AreaId> = direct.iter().map(|(area, _)| *area).collect();
+    areas.dedup();
+    let direct = direct.len();
     let mut text = match areas.as_slice() {
         [] => "Placed nowhere yet.".to_owned(),
         [only] => {
