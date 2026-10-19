@@ -10,6 +10,7 @@ use crate::core::assets::AssetRef;
 use crate::core::audio::decibels;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::playback::{Listener, PositionalAudio};
+use crate::core::content::serial;
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
@@ -43,10 +44,18 @@ pub struct SoundscapeZone {
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(from = "ShapeRow", into = "ShapeRow")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum SoundscapeShape {
-    Rect(Rect<Tiles>),
-    Ellipse(Rect<Tiles>),
+    Rect(
+        #[schemars(with = "serial::RectRow")]
+        #[serde(serialize_with = "serial::rect", deserialize_with = "serial::rect_from")]
+        Rect<Tiles>,
+    ),
+    Ellipse(
+        #[schemars(with = "serial::RectRow")]
+        #[serde(serialize_with = "serial::rect", deserialize_with = "serial::rect_from")]
+        Rect<Tiles>,
+    ),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -299,45 +308,4 @@ fn unit_circle(bounds: Rect<Tiles>, at: Pos<Tiles>) -> euclid::Vector2D<f32, Til
 
 fn toward(from: f32, to: f32, step: f32) -> f32 {
     from + (to - from).clamp(-step, step)
-}
-
-#[derive(JsonSchema, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum ShapeRow {
-    #[schemars(extend("x-rect" = true))]
-    Rect { x: f32, y: f32, w: f32, h: f32 },
-    #[schemars(extend("x-rect" = true))]
-    Ellipse { x: f32, y: f32, w: f32, h: f32 },
-}
-
-impl From<ShapeRow> for SoundscapeShape {
-    fn from(row: ShapeRow) -> SoundscapeShape {
-        match row {
-            ShapeRow::Rect { x, y, w, h } => {
-                SoundscapeShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-            ShapeRow::Ellipse { x, y, w, h } => {
-                SoundscapeShape::Ellipse(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-        }
-    }
-}
-
-impl From<SoundscapeShape> for ShapeRow {
-    fn from(shape: SoundscapeShape) -> ShapeRow {
-        match shape {
-            SoundscapeShape::Rect(r) => ShapeRow::Rect {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-            SoundscapeShape::Ellipse(r) => ShapeRow::Ellipse {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-        }
-    }
 }
