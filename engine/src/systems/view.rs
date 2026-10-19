@@ -20,9 +20,9 @@ use crate::systems::screen::ClientScreen;
 /// floatier; this is what makes the camera glide after the actor rather than rigidly lock to it.
 const CAMERA_HALF_LIFE: Seconds = Seconds(0.09);
 
-pub struct ViewPlugin;
+pub struct CameraFollowPlugin;
 
-impl Plugin for ViewPlugin {
+impl Plugin for CameraFollowPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FollowCenter>().add_systems(
             Update,

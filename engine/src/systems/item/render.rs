@@ -17,9 +17,9 @@ const DROP_STAGGER: Seconds = Seconds(0.06);
 const DROP_DURATION: Seconds = Seconds(0.5);
 const DROP_HOP: WorldPx = WorldPx(24.0);
 
-pub struct ItemsPlugin;
+pub struct ItemRenderPlugin;
 
-impl Plugin for ItemsPlugin {
+impl Plugin for ItemRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(attach_drop_sprite).add_systems(
             Update,

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use driver::{
     Pace, Player, Playtest, PlaytestSetup, aiming, area_key, area_named, arrived_in,
-    clickable_point, ground_near, hunting_ground, open, portal,
+    clickable_point, ground_near, hunting_ground, open, warp_named,
 };
 use engine::core::render::transition::ScreenTransitionPhase;
 use engine::core::tiling::TilePos;
@@ -156,7 +156,7 @@ fn toggle(me: &mut Player, windows: [InputAction; 6]) {
 }
 
 fn step_into(me: &mut Player, warp: &str) {
-    let gate = portal(&me.in_world(), warp).clone();
+    let gate = warp_named(&me.in_world(), warp).clone();
     me.travel_to(
         |_| Some(gate.at),
         |snapshot| snapshot.transition != ScreenTransitionPhase::Idle,

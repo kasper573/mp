@@ -85,9 +85,9 @@ pub fn atlas_rect(region: WorldRect<WorldPx>) -> Rect {
     )
 }
 
-pub struct RenderPlugin;
+pub struct WorldRenderPlugin;
 
-impl Plugin for RenderPlugin {
+impl Plugin for WorldRenderPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "present.wesl");
         app.add_plugins(Material2dPlugin::<present::Present>::default())

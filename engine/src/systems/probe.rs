@@ -77,9 +77,9 @@ pub struct ProbeSnapshot {
     pub area: Option<AreaId>,
     pub me: Option<ProbeBody>,
     pub actors: Vec<ProbeBody>,
-    pub props: Vec<ProbeFixture>,
+    pub objects: Vec<ProbeObject>,
     pub items: Vec<ProbeGroundItem>,
-    pub portals: Vec<ProbeExit>,
+    pub warps: Vec<ProbeWarp>,
     /// What the interface shows: text, icons, fields and sliders, less what is scrolled or clipped
     /// out of sight.
     pub ui: Vec<ProbeUiElement>,
@@ -167,7 +167,7 @@ pub struct ProbeBody {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeFixture {
+pub struct ProbeObject {
     pub id: Entity,
     pub name: Option<String>,
     pub label: Option<String>,
@@ -186,7 +186,7 @@ pub struct ProbeGroundItem {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeExit {
+pub struct ProbeWarp {
     pub name: String,
     pub to: AreaId,
     pub at: Pos<Tiles>,
@@ -636,9 +636,9 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         skills: me.and_then(|me| skills(world, me)),
         me: me.and_then(|me| body(world, me)),
         actors: actors(world, me, area),
-        props: props(world, area),
+        objects: objects(world, area),
         items: items(world, area),
-        portals: portals(world, area),
+        warps: warps(world, area),
         ui: ui(world),
         covered: covered(world),
         soundscape: soundscape(world),
@@ -845,19 +845,19 @@ fn actors(world: &mut World, me: Option<Entity>, area: Option<AreaId>) -> Vec<Pr
         .collect()
 }
 
-fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
+fn objects(world: &mut World, area: Option<AreaId>) -> Vec<ProbeObject> {
     let viewer = session::me(world);
     let attention = viewer
         .and_then(|viewer| world.get::<Attention>(viewer))
         .cloned();
-    let fixtures: Vec<(Entity, ProbeFixture)> = world
+    let objects: Vec<(Entity, ProbeObject)> = world
         .query::<(Entity, &AreaObject, &Position, &Hitbox, &AreaTag)>()
         .iter(world)
         .filter(|(.., tag)| area.is_none_or(|area| tag.area == area))
         .filter(|(_, object, ..)| object.look.is_some())
         .map(|(entity, object, at, hitbox, _)| {
             let hitbox = at.pos.hitbox(hitbox.size);
-            let fixture = ProbeFixture {
+            let seen = ProbeObject {
                 id: entity,
                 name: object.name.clone(),
                 label: object.label.clone(),
@@ -869,14 +869,14 @@ fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
                     .map(|attention| attention.of(entity).to_vec())
                     .unwrap_or_default(),
             };
-            (entity, fixture)
+            (entity, seen)
         })
         .collect();
-    fixtures
+    objects
         .into_iter()
-        .map(|(entity, fixture)| ProbeFixture {
-            aim: aim(world, entity, fixture.hitbox),
-            ..fixture
+        .map(|(entity, seen)| ProbeObject {
+            aim: aim(world, entity, seen.hitbox),
+            ..seen
         })
         .collect()
 }
@@ -922,13 +922,13 @@ fn items(world: &mut World, area: Option<AreaId>) -> Vec<ProbeGroundItem> {
         .collect()
 }
 
-fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
+fn warps(world: &World, area: Option<AreaId>) -> Vec<ProbeWarp> {
     let Some(area) = area else {
         return Vec::new();
     };
     let content = world.resource::<Content>();
     let scripts = world.resource::<RiftScripts>();
-    let mut exits: Vec<ProbeExit> = area::objects(area::placed(content, area))
+    let mut warps: Vec<ProbeWarp> = area::objects(area::placed(content, area))
         .filter_map(|(index, object)| {
             let owner = OwnerRow::of_object(area, index);
             let warp = scripts
@@ -939,7 +939,7 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
                     Reach::Warp(place) => Some(*place),
                     _ => None,
                 })?;
-            Some(ProbeExit {
+            Some(ProbeWarp {
                 name: object.name.clone().unwrap_or_default(),
                 to: warp.area,
                 at: object.shape.center(),
@@ -947,8 +947,8 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
             })
         })
         .collect();
-    exits.sort_by(|a, b| a.name.cmp(&b.name));
-    exits
+    warps.sort_by(|a, b| a.name.cmp(&b.name));
+    warps
 }
 
 fn ui(world: &mut World) -> Vec<ProbeUiElement> {

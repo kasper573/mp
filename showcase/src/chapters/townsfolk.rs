@@ -1,4 +1,6 @@
-use driver::{Player, UiTarget, content, fixture, holding, input_name, resident_home, townsperson};
+use driver::{
+    Player, UiTarget, content, holding, input_name, object_named, resident_home, townsperson,
+};
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::systems::input::gestures::ClickClaim;
@@ -64,15 +66,15 @@ fn play(shoot: &mut Shoot) {
     me.caption("An icon over a head is the most important thing they have for you");
     me.caption("Things on the map can be used too: a notice board, a chest by the tide");
     walk_below(&mut me, |snapshot| {
-        fixture(snapshot, "tide-chest").map(|chest| chest.at)
+        object_named(snapshot, "tide-chest").map(|chest| chest.at)
     });
     let chest = me.wait_for("the tide chest", |snapshot| {
-        fixture(snapshot, "tide-chest").cloned()
+        object_named(snapshot, "tide-chest").cloned()
     });
     me.point_at_tile(chest.aim);
     me.hold();
     let board = me.wait_for("the notice board", |snapshot| {
-        fixture(snapshot, "notice-board").cloned()
+        object_named(snapshot, "notice-board").cloned()
     });
     walk_below(&mut me, |_| Some(board.at));
     me.point_at_tile(board.aim);

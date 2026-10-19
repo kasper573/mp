@@ -72,9 +72,9 @@ pub fn position(world: &World, entity: Entity) -> Option<Pos<Tiles>> {
     world.get::<Position>(entity).map(|p| p.pos)
 }
 
-pub struct MovementPlugin;
+pub struct MovementRenderPlugin;
 
-impl Plugin for MovementPlugin {
+impl Plugin for MovementRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InterpolatePlugin::<RenderPosition>::default())
             .add_systems(Update, predict::walk_ahead.in_set(RenderValueSystems));

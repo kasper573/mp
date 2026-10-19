@@ -269,9 +269,9 @@ pub fn reveal_duration(pieces: &[TextPiece], speed: LettersPerSecond) -> Duratio
         .unwrap_or(Duration::ZERO)
 }
 
-pub struct TextPlugin;
+pub struct StyledTextPlugin;
 
-impl Plugin for TextPlugin {
+impl Plugin for StyledTextPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyNames>()
             .init_resource::<LettersPerSecond>()

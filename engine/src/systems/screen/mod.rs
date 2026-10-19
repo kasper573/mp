@@ -78,7 +78,7 @@ impl Plugin for ClientScreenPlugin {
             sign_in::SignInPlugin,
             loading::LoadingPlugin,
             connection::ConnectionPlugin,
-            area::AreaPlugin,
+            area::AreaScreenPlugin,
         ))
         .add_systems(Update, (connection::poll_session, drive, announce).chain());
     }

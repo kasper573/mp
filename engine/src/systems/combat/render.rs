@@ -4,9 +4,9 @@ use crate::core::render::present::ScreenGrade;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 
-pub struct CombatPlugin;
+pub struct CombatRenderPlugin;
 
-impl Plugin for CombatPlugin {
+impl Plugin for CombatRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, death_wash.run_if(in_state(ClientScreen::Area)));
     }

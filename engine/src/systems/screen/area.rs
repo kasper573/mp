@@ -32,9 +32,9 @@ use crate::systems::movement::RenderPosition;
 use crate::systems::player::session::{self, MyCharacter};
 use crate::systems::player::{ARRIVAL_PATIENCE, AreaDrawn};
 
-pub struct AreaPlugin;
+pub struct AreaScreenPlugin;
 
-impl Plugin for AreaPlugin {
+impl Plugin for AreaScreenPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SpawnedArea>()
             .init_resource::<Crossing>()

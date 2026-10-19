@@ -11,8 +11,8 @@ use engine::systems::history::HistoryTopic;
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::probe::{
-    ProbeBody, ProbeExit, ProbeFixture, ProbeQuest, ProbeSnapshot, ProbeTreeView, ProbeUiElement,
-    ProbeVfx,
+    ProbeBody, ProbeObject, ProbeQuest, ProbeSnapshot, ProbeTreeView, ProbeUiElement, ProbeVfx,
+    ProbeWarp,
 };
 use engine::systems::quest::{QuestDef, QuestResult};
 use engine::systems::skill::{HotbarEntry, bar::HotbarPress};
@@ -91,18 +91,18 @@ pub fn marked(snapshot: &ProbeSnapshot, npc: &str, mark: AttentionMark) -> bool 
     townsperson(snapshot, npc).is_some_and(|body| body.marks.contains(&mark))
 }
 
-pub fn fixture<'a>(snapshot: &'a ProbeSnapshot, name: &str) -> Option<&'a ProbeFixture> {
+pub fn object_named<'a>(snapshot: &'a ProbeSnapshot, name: &str) -> Option<&'a ProbeObject> {
     snapshot
-        .props
+        .objects
         .iter()
-        .find(|prop| prop.name.as_deref() == Some(name))
+        .find(|object| object.name.as_deref() == Some(name))
 }
 
-pub fn portal<'a>(snapshot: &'a ProbeSnapshot, name: &str) -> &'a ProbeExit {
+pub fn warp_named<'a>(snapshot: &'a ProbeSnapshot, name: &str) -> &'a ProbeWarp {
     snapshot
-        .portals
+        .warps
         .iter()
-        .find(|portal| portal.name == name)
+        .find(|warp| warp.name == name)
         .unwrap_or_else(|| panic!("no warp named {name} here"))
 }
 
@@ -212,7 +212,10 @@ pub fn taken(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
         .actors
         .iter()
         .any(|actor| actor.hitbox.contains(tile))
-        || snapshot.props.iter().any(|prop| prop.hitbox.contains(tile))
+        || snapshot
+            .objects
+            .iter()
+            .any(|object| object.hitbox.contains(tile))
         || snapshot
             .items
             .iter()
@@ -234,10 +237,7 @@ const PASSING: Tiles = Tiles(1.0);
 
 /// Stepping into a warp takes it.
 pub fn in_warp(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
-    snapshot
-        .portals
-        .iter()
-        .any(|portal| portal.rect.contains(tile))
+    snapshot.warps.iter().any(|warp| warp.rect.contains(tile))
 }
 
 /// A piece of the interface, picked out by what it says or shows, or by where it sits.

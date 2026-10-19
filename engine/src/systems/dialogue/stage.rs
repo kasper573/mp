@@ -70,9 +70,9 @@ const SLIDE: f32 = 70.0;
 const BUST_EASE: f32 = 0.3;
 const UNLIT: Color32 = Color32::from_rgb(128, 128, 143);
 
-pub struct StagePlugin;
+pub struct DialogueStagePlugin;
 
-impl Plugin for StagePlugin {
+impl Plugin for DialogueStagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Stage>()
             .init_resource::<StageDrawn>()

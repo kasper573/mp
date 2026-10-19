@@ -385,12 +385,12 @@ pub fn client_app(
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
             crate::core::gui::GuiPlugin,
-            crate::core::text::TextPlugin,
+            crate::core::text::StyledTextPlugin,
             crate::core::net::transport::SocketClientPlugin,
             crate::core::interpolate::SnapshotPlugin {
                 period: REPLICATION_PERIOD,
             },
-            crate::core::render::RenderPlugin,
+            crate::core::render::WorldRenderPlugin,
             crate::core::vfx::render::VfxRenderPlugin,
             crate::core::audio::playback::SfxPlugin,
             crate::core::audio::soundscape::SoundscapePlugin,
@@ -398,19 +398,19 @@ pub fn client_app(
         ))
         .add_plugins((
             screen::ClientScreenPlugin { credentials },
-            actor::render::ActorPlugin,
+            actor::render::ActorRenderPlugin,
             actor::plate::PlatePlugin,
-            movement::MovementPlugin,
-            combat::render::CombatPlugin,
-            item::render::ItemsPlugin,
-            area::object::render::ObjectPlugin,
-            view::ViewPlugin,
+            movement::MovementRenderPlugin,
+            combat::render::CombatRenderPlugin,
+            item::render::ItemRenderPlugin,
+            area::object::render::ObjectRenderPlugin,
+            view::CameraFollowPlugin,
             player::session::ClientSessionPlugin,
-            input::InputPlugin,
+            input::PlayerInputPlugin,
         ))
         .add_plugins((
             hud::HudPlugin,
-            dialogue::stage::StagePlugin,
+            dialogue::stage::DialogueStagePlugin,
             notification::NotificationPlugin,
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,

@@ -16,8 +16,8 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, aiming, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest,
-    open, passed_by, portal, taken, townsperson,
+    UiTarget, aiming, area_key, at_rest, clickable_point, in_warp, in_world, me_at_rest,
+    object_named, open, passed_by, taken, townsperson, warp_named,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -337,7 +337,7 @@ impl Player {
     /// standing in one steps off before stepping on.
     pub fn cross(&mut self, warp: &str) -> ProbeSnapshot {
         let seen = self.in_world();
-        let gate = portal(&seen, warp).clone();
+        let gate = warp_named(&seen, warp).clone();
         if gate.rect.contains(seen.me.as_ref().expect("the player").at) {
             let grid = grid_of(&seen);
             let off = grid
@@ -498,9 +498,9 @@ impl Player {
     pub fn interact_with(&mut self, object: &str) -> ProbeStage {
         self.engage(
             &format!("using {object}"),
-            |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
+            |snapshot| object_named(snapshot, object).map(|seen| (seen.id, seen.at, seen.aim)),
             |snapshot| {
-                let with = fixture(snapshot, object)?.id;
+                let with = object_named(snapshot, object)?.id;
                 stage_with(snapshot, with)
             },
         )
@@ -509,7 +509,7 @@ impl Player {
     pub fn shop_at(&mut self, object: &str) -> ProbeShop {
         self.engage(
             &format!("the shop at {object}"),
-            |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
+            |snapshot| object_named(snapshot, object).map(|seen| (seen.id, seen.at, seen.aim)),
             |snapshot| snapshot.shop.clone(),
         )
     }

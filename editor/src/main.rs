@@ -9,7 +9,7 @@ use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::SfxPlugin;
 use engine::core::babble::BabblePlugin;
 use engine::core::math::Rng;
-use engine::core::text::TextPlugin;
+use engine::core::text::StyledTextPlugin;
 
 const USAGE: &str = "usage: editor [folder] [--scene JSON] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
 
@@ -82,7 +82,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugins((SfxPlugin, TextPlugin, BabblePlugin))
+        .add_plugins((SfxPlugin, StyledTextPlugin, BabblePlugin))
         .add_plugins(EditorPlugin { launch })
         .run();
 }

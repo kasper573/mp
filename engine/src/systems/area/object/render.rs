@@ -10,9 +10,9 @@ use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::Position;
 use crate::systems::screen::ClientScreen;
 
-pub struct ObjectPlugin;
+pub struct ObjectRenderPlugin;
 
-impl Plugin for ObjectPlugin {
+impl Plugin for ObjectRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(attach_look).add_systems(
             Update,

@@ -9,7 +9,7 @@ use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{HushVoice, PlayClip, SfxPlace};
 use engine::core::babble::{BabbleId, BabblePlugin, BabbleRank, Babbling};
 use engine::core::content::Content;
-use engine::core::text::{LettersPerSecond, StyledLine, TextPlugin, Typewriter};
+use engine::core::text::{LettersPerSecond, StyledLine, StyledTextPlugin, Typewriter};
 use testkit::Game;
 
 const FRAME: Duration = Duration::from_millis(50);
@@ -159,7 +159,7 @@ fn voice_app() -> App {
     app.add_plugins((
         MinimalPlugins,
         AssetPlugin::default(),
-        TextPlugin,
+        StyledTextPlugin,
         BabblePlugin,
     ))
     .init_asset::<AudioSource>()
