@@ -4,7 +4,6 @@ members = [
     "design_tokens",
     "bevy/tilemap",
     "bevy/terminal",
-    "bevy/terminal/macros",
     "engine",
     "driver",
     "testkit",
@@ -24,7 +23,6 @@ match_bool = "warn"
 [workspace.dependencies]
 askama = "0.16"
 axum-prometheus = "0.10"
-inventory = "0.3"
 typetag = "0.2"
 ctrlc = { version = "3", features = ["termination"] }
 pyroscope = { version = "2", features = ["backend-pprof-rs"] }
@@ -45,7 +43,6 @@ bevy_time = { version = "0.20.0", default-features = false }
 bevy_camera = "0.20.0"
 bevy = { version = "0.20.0", default-features = false }
 syn = { version = "3", features = ["full"] }
-quote = "1"
 proc-macro2 = "1"
 bevy_replicon = { version = "0.45", default-features = false }
 renet2 = { version = "0.19", default-features = false }

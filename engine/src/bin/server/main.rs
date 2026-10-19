@@ -424,8 +424,7 @@ fn build_world(
 }
 
 /// The whole connection bundle is spawned in one call so `Add` observers on any of its
-/// components (e.g. greeting, terminal tab issuance) observe the complete connection,
-/// `Identity` included.
+/// components (e.g. greeting) observe the complete connection, `Identity` included.
 fn spawn_conn(
     app: &mut App,
     client: ClientId,

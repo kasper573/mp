@@ -1,5 +1,6 @@
+use bevy_ecs::message::Messages;
 use bevy_ecs::prelude::*;
-use bevy_terminal::TerminalInbox;
+use bevy_terminal::TerminalSaid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,25 +15,27 @@ use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Players};
 use crate::systems::script::effect::{Arrow, Link};
 use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
-use crate::systems::terminal::TerminalKind;
 use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility::{self, VIEW_DISTANCE};
 
 const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
 
 pub fn rebroadcast(world: &mut World) {
-    let entries = world.resource::<TerminalInbox<TerminalKind>>().0.clone();
-    for entry in entries.iter().filter(|entry| !entry.consumed()) {
-        let name = player::conn_player(world, entry.conn)
+    let saids: Vec<TerminalSaid> = world
+        .resource_mut::<Messages<TerminalSaid>>()
+        .drain()
+        .collect();
+    for said in saids {
+        let name = player::conn_player(world, said.conn)
             .and_then(|player| world.get::<ActorName>(player))
             .map(|name| name.name.clone())
             .or_else(|| {
                 world
-                    .get::<ClientId>(entry.conn)
+                    .get::<ClientId>(said.conn)
                     .map(|client| format!("player {}", client.0))
             })
             .unwrap_or_else(|| "player".to_owned());
-        bevy_terminal::broadcast(world, entry.terminal, format!("{name}: {}", entry.text));
+        bevy_terminal::broadcast(world, format!("{name}: {}", said.text));
     }
 }
 
@@ -91,7 +94,7 @@ pub fn say(world: &mut World, speaker: Entity, text: LineText, within: Tiles) {
         .map(|name| name.name.clone())
         .unwrap_or_default();
     let words = text.words(world.resource::<InputMap>());
-    bevy_terminal::broadcast(world, TerminalKind::Global, format!("{name}: {words}"));
+    bevy_terminal::broadcast(world, format!("{name}: {words}"));
     let kind = match world.get::<Npc>(speaker) {
         Some(npc) => NotificationKind::Speech { speaker: npc.def },
         None => NotificationKind::Narration {
