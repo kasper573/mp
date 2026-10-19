@@ -4,7 +4,9 @@ use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
-use engine::core::content::{ContentRow, GAME_FILE, is_asset_file, row_file, row_of, version};
+use engine::core::content::{
+    ASSETS_DIR, ContentRow, GAME_FILE, TABLES_DIR, is_asset_file, row_file, row_of, version,
+};
 use engine::systems::area::AreaDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
@@ -184,8 +186,8 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                         let rows = files.iter().filter(|file| row_of(file).is_some()).count();
                         let assets = files.iter().filter(|file| is_asset_file(file)).count();
                         ui.label(theme::mono(format!("{GAME_FILE}   name → {}", dialog.name)));
-                        ui.label(theme::mono(format!("tables/     {rows} rows")));
-                        ui.label(theme::mono(format!("assets/     {assets} files")));
+                        ui.label(theme::mono(format!("{TABLES_DIR}/     {rows} rows")));
+                        ui.label(theme::mono(format!("{ASSETS_DIR}/     {assets} files")));
                     });
                     ui.vertical(|ui| {
                         widgets::section(ui, "Stays behind");
@@ -918,12 +920,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     editor
                         .project
                         .as_ref()
-                        .map(|p| {
-                            p.files
-                                .paths_under(&format!("tables/{}/", dialog.table))
-                                .filter_map(|f| row_of(f).map(|(_, k)| k.to_owned()))
-                                .collect()
-                        })
+                        .map(|p| p.files.keys_of(&dialog.table).map(str::to_owned).collect())
                         .unwrap_or_default()
                 } else {
                     dialog.options.clone()

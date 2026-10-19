@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use engine::core::content::TABLES_DIR;
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
 use engine::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteRow};
@@ -259,7 +260,7 @@ impl GridDraft {
 
 pub fn palettes(files: &ProjectFiles) -> Vec<(String, Vec<PaletteRow>)> {
     files
-        .paths_under("tables/")
+        .paths_under(&format!("{TABLES_DIR}/"))
         .filter_map(|path| {
             let area = grid::area_of_palette_file(path)?;
             let text = files.text(path)?;

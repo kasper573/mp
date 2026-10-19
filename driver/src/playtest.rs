@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use engine::core::content::{GAME_FILE, row_file};
 use engine::systems::launch;
 use engine::systems::script::Place;
 use serde_json::Value;
@@ -26,7 +27,26 @@ pub struct PlaytestSetup {
 }
 
 /// A content file, and how a deploy changes it.
-pub type ContentEdit<'a> = (&'a str, &'a dyn Fn(&mut Value));
+pub struct DeployEdit<'a> {
+    file: String,
+    change: &'a dyn Fn(&mut Value),
+}
+
+impl<'a> DeployEdit<'a> {
+    pub fn game(change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
+        DeployEdit {
+            file: GAME_FILE.to_owned(),
+            change,
+        }
+    }
+
+    pub fn row(table: &str, key: &str, change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
+        DeployEdit {
+            file: row_file(table, key),
+            change,
+        }
+    }
+}
 
 /// One game server and the players who join it. What they leave behind is kept should anything
 /// fail, and cleared otherwise.
@@ -89,16 +109,16 @@ impl Playtest {
     /// A content deploy: rows of the content change and the server restarts on them, as a deploy
     /// does, running `while_down` in between. Clients reconnect, sync the changed files and rejoin.
     /// Returns how many files changed.
-    pub fn deploy(&mut self, edits: &[ContentEdit], while_down: impl FnOnce()) -> usize {
+    pub fn deploy(&mut self, edits: &[DeployEdit], while_down: impl FnOnce()) -> usize {
         let deployed = self.folder.join("deployed");
         if !deployed.exists() {
             copy_folder(&self.content, &deployed);
         }
-        for (file, edit) in edits {
-            let path = deployed.join(file);
+        for edit in edits {
+            let path = deployed.join(&edit.file);
             let text = std::fs::read_to_string(&path).expect("a content file to deploy");
             let mut row: Value = serde_json::from_str(&text).expect("a content row");
-            edit(&mut row);
+            (edit.change)(&mut row);
             let text = serde_json::to_string_pretty(&row).expect("a content row");
             std::fs::write(&path, text + "\n").expect("a deployed content file");
         }

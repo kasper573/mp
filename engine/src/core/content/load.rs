@@ -19,7 +19,7 @@ use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
-use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_folder, table_folder};
+use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_file, row_folder, table_folder};
 
 // The steps a load runs its hooks at, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -1370,7 +1370,7 @@ impl Listing {
                         &row_folder(table, &folder),
                         "unknown entry",
                         format!("a folder with no {table} row {folder}.json beside it"),
-                        format!("tables/{table}/{folder}.json for its files"),
+                        format!("{} for its files", row_file(table, &folder)),
                     ));
                 }
             }

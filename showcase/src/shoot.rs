@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::SystemTime;
 
-use driver::{ContentEdit, Pace, Player, Playtest, PlaytestSetup};
+use driver::{DeployEdit, Pace, Player, Playtest, PlaytestSetup};
 use engine::systems::script::Place;
 
 use crate::chapters::Chapter;
@@ -62,7 +62,7 @@ impl Shoot {
         self.playtest.start_signed_out()
     }
 
-    pub fn deploy(&mut self, edits: &[ContentEdit], while_down: impl FnOnce()) -> usize {
+    pub fn deploy(&mut self, edits: &[DeployEdit], while_down: impl FnOnce()) -> usize {
         self.playtest.deploy(edits, while_down)
     }
 

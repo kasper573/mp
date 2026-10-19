@@ -16,7 +16,7 @@ pub use content::{
 };
 pub use desktop::{BUDGET, WaitBudget};
 pub use player::{LONG, Pace, Player, reading};
-pub use playtest::{ContentEdit, Playtest, PlaytestSetup};
+pub use playtest::{DeployEdit, Playtest, PlaytestSetup};
 pub use recording::{Footage, FootageOverlay, InsetCut, seconds};
 pub use seen::{
     UiTarget, aiming, area_key, arrived_in, bare_spot, beside_other_player, blocked, carried,

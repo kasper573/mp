@@ -9,7 +9,7 @@ use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
 use engine::core::audio::soundscape::{SoundscapeChannel, SoundscapeLayer, SoundscapeZone};
 use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
-use engine::core::content::Content;
+use engine::core::content::{ASSETS_DIR, Content};
 use engine::core::math::Pos;
 use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
@@ -120,7 +120,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     if views.synced.as_ref().map(|(generation, _)| *generation) != Some(project.generation) {
         let hashes: HashMap<String, String> = project
             .files
-            .paths_under("assets/")
+            .paths_under(&format!("{ASSETS_DIR}/"))
             .filter_map(|path| Some((path.clone(), project.files.hash_of(path)?.to_owned())))
             .collect();
         let assets: HashMap<String, Arc<[u8]>> = hashes
