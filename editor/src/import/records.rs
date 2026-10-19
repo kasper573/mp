@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::tileset::{TileBlock, TileGridSettings};
 use crate::app::Editor;
-use crate::project::watch::FolderWatcher;
+use crate::project::watch::{FolderChange, FolderWatcher};
 use crate::user::UserFolder;
 use crate::views::model::ModelStrip;
 
@@ -199,10 +199,10 @@ impl ImportRecords {
         let mut touched: Vec<PathBuf> = Vec::new();
         for (dir, watcher) in &mut self.watchers {
             match watcher.poll() {
-                Some(Some(paths)) => {
+                Some(FolderChange::Files(paths)) => {
                     touched.extend(paths.into_iter().map(|path| dir.join(path)));
                 }
-                Some(None) => touched.push(dir.clone()),
+                Some(FolderChange::Unknown) => touched.push(dir.clone()),
                 None => {}
             }
         }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use editor::project::watch::FolderChange;
 use editor::project::{
     ContentEdit, EditHistory, EditStep, EditViewpoint, FileChange, Project, RowSelection,
     json_bytes,
@@ -25,7 +26,7 @@ fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     let mut outside = project.files.json_owned(GAME_FILE).expect("game.json");
     outside["name"] = "Outside".into();
     std::fs::write(folder.join(GAME_FILE), &*json_bytes(&outside)).expect("writes outside");
-    let changes = project.outside_changes(None);
+    let changes = project.outside_changes(FolderChange::Unknown);
     assert!(changes.taken.iter().any(|file| file == GAME_FILE));
     assert_eq!(project.history.saved(), Some(0));
 

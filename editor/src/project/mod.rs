@@ -23,6 +23,7 @@ use engine::core::tiling::Tiles;
 use engine::systems;
 use engine::systems::script::ScriptDef;
 
+use self::watch::FolderChange;
 use crate::app::ChannelInbox;
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;
@@ -481,12 +482,12 @@ impl Project {
         outcome
     }
 
-    pub fn outside_changes(&mut self, paths: Option<Vec<String>>) -> OutsideChanges {
+    pub fn outside_changes(&mut self, change: FolderChange) -> OutsideChanges {
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
-        let candidates: Vec<String> = match paths {
-            Some(paths) => paths,
-            None => ProjectFiles::read_dir(&self.root)
+        let candidates: Vec<String> = match change {
+            FolderChange::Files(paths) => paths,
+            FolderChange::Unknown => ProjectFiles::read_dir(&self.root)
                 .map(|files| {
                     let mut all: Vec<String> = files.paths().cloned().collect();
                     all.extend(self.disk.keys().cloned());
