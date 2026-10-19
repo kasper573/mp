@@ -59,6 +59,17 @@ impl EquipmentSlot {
     }
 }
 
+pub fn wears(world: &World, actor: Entity, item: ItemId) -> bool {
+    worn(world, actor).any(|worn| worn == item)
+}
+
+pub fn worn(world: &World, actor: Entity) -> impl Iterator<Item = ItemId> + '_ {
+    world
+        .get::<Equipment>(actor)
+        .into_iter()
+        .flat_map(|equipment| equipment.slots.values().copied())
+}
+
 pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(), String> {
     let slot = world
         .get::<Inventory>(player)

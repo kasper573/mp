@@ -17,7 +17,7 @@ use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::Seconds;
-use crate::systems::equipment::{Equipment, EquipmentSlot};
+use crate::systems::equipment::{self, Equipment, EquipmentSlot};
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
 use crate::systems::input::map::{
     self, InputAction, InputBinding, InputMap, KeyGesture, KeyModifiers, input,
@@ -356,7 +356,7 @@ impl SlotView {
                 let held = world
                     .get::<Inventory>(me)
                     .map_or(0, |inventory| inventory.count(item));
-                let worn = wears(world, me, item);
+                let worn = equipment::wears(world, me, item);
                 SlotView {
                     icon: Some(def.icon.clone()),
                     count: held,
@@ -371,12 +371,6 @@ impl SlotView {
             }
         }
     }
-}
-
-fn wears(world: &World, me: Entity, item: ItemId) -> bool {
-    world
-        .get::<Equipment>(me)
-        .is_some_and(|equipment| equipment.slots.values().any(|worn| *worn == item))
 }
 
 fn bag_item(world: &World, slot: u32) -> Option<ItemId> {
@@ -964,7 +958,7 @@ fn use_item(world: &mut World, item: ItemId) -> bool {
             world.write_message(UseItemRequest { slot: slot as u32 });
             true
         }
-        None if wears(world, me, item) => {
+        None if equipment::wears(world, me, item) => {
             notification::local_error(world, format!("{} is worn already", def.name));
             false
         }

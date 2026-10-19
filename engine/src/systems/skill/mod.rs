@@ -37,7 +37,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::area::AreaTag;
 use crate::systems::class::{self, NodeKey, SkillPoints, SkillTree};
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment::{self, Equipment};
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
 use crate::systems::npc::{Npc, NpcDef};
@@ -570,10 +570,7 @@ pub fn check_rank(
 pub fn known(world: &World, actor: Entity) -> BTreeMap<SkillId, Rank> {
     let content = world.resource::<Content>();
     let tree = class::of(world, actor).map(|class| &class.get(content).tree);
-    let worn = world
-        .get::<Equipment>(actor)
-        .into_iter()
-        .flat_map(|equipment| equipment.slots.values().copied());
+    let worn = equipment::worn(world, actor);
     known_from(
         content,
         tree,

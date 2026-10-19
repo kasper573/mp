@@ -13,7 +13,7 @@ use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, Area, AreaId, AreaTag, object};
 use crate::systems::class::{self, ClassId};
 use crate::systems::combat::{Attackers, Attitude};
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment;
 use crate::systems::item::{DroppedItem, Inventory, ItemId};
 use crate::systems::memory::{self, MemoryId};
 use crate::systems::movement::{self, Position};
@@ -479,11 +479,10 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 let item = *item;
                 let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
-                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
-                        world
-                            .get::<Equipment>(who)
-                            .is_some_and(|worn| worn.slots.values().any(|worn| *worn == item))
-                    }))
+                    Value::Bool(
+                        character(world, cx, &of)
+                            .is_some_and(|who| equipment::wears(world, who, item)),
+                    )
                 })
             }
             RiftQuery::Memory { of, memory } => {
@@ -772,15 +771,16 @@ fn skill_of(cx: &Compiler<RiftScripting>) -> Result<SkillId, ScriptFault> {
 }
 
 pub fn actor(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
-    let who = eval(world, cx).as_actor()?;
-    (world.get_entity(who).is_ok() && !stat::is_dead(world, who)).then_some(who)
+    eval(world, cx)
+        .as_actor()
+        .filter(|&who| stat::stands(world, who))
 }
 
 pub fn actors(world: &World, cx: &FlowCx, eval: &Eval) -> Vec<Entity> {
     eval(world, cx)
         .as_actors()
         .into_iter()
-        .filter(|who| world.get_entity(*who).is_ok() && !stat::is_dead(world, *who))
+        .filter(|&who| stat::stands(world, who))
         .collect()
 }
 
