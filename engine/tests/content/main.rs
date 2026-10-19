@@ -1,6 +1,7 @@
 mod blueprints;
 mod load_errors;
 mod owners;
+mod references;
 mod round_trip;
 mod shaders;
 mod store;

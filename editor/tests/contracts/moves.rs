@@ -22,9 +22,7 @@ fn resident(npc: &str) -> Value {
 fn islands() -> Game {
     support::game()
         .npc("wren", 10.0, json!([]))
-        .edit("npc", "wren", |npc| npc["name"] = json!("Wren"))
         .npc("bat", 10.0, json!([]))
-        .edit("npc", "bat", |npc| npc["name"] = json!("Bat"))
         .area(
             "island",
             &Map::open(8, 8),

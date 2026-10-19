@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
@@ -259,22 +259,28 @@ impl ContentRegistry {
     }
 
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
-        let parse: &dyn Fn(&str) -> ParseResult = if file == GAME_FILE {
+        let parse: &dyn Fn(&serde_json::Value) -> ParseResult = if file == GAME_FILE {
             let Some(loader) = self.settings.as_deref() else {
                 return Vec::new();
             };
-            &|text| loader.parse(text)
+            &|value| loader.parse_value(value)
         } else {
             let loader = super::row_of(file)
                 .and_then(|(table, _)| self.rows.iter().find(|row| row.name() == table));
             let Some(loader) = loader else {
                 return Vec::new();
             };
-            &|text| loader.parse(text)
+            &|value| loader.parse_value(value)
         };
-        let (_, scope) = with_content(ContentScope::of(content), || parse(text));
+        let Ok((value, _)) = split_owner(text) else {
+            return Vec::new();
+        };
+        let unread = ContentScope::of(content);
+        let (_, scope) = with_content(unread.clone(), || parse(&value));
         let index = JsonIndex::of(text);
-        placed(scope.leaves(), &index)
+        let probe = |pointer: &str| reads_reference(&unread, &value, pointer, parse);
+        placed(scope.leaves(), &index, |_| true, probe)
+            .into_iter()
             .filter_map(|(leaf, found)| {
                 let found = found?;
                 Some(Reference {
@@ -644,7 +650,7 @@ impl Loading {
                     Some(reader) => scope.clone().reading(reader),
                     None => scope.clone(),
                 };
-                let parsed = parse_read(file, &scope, &registry.list_kinds, |value| {
+                let parsed = parse_read(file, &scope, &registry.list_kinds, &|value| {
                     loader.parse_value(value)
                 });
                 (index, key, parsed)
@@ -673,7 +679,7 @@ impl Loading {
             read_file(root.as_ref(), GAME_FILE, false),
             &scope.clone().reading(ScopeReader { row: None, owners }),
             &registry.list_kinds,
-            |value| {
+            &|value| {
                 registry
                     .settings_loader()
                     .map(|loader| loader.parse_value(value))
@@ -1004,7 +1010,7 @@ fn parse_read(
     read: ReadFile,
     scope: &ContentScope,
     list_kinds: &[ListKind],
-    parse: impl FnOnce(serde_json::Value) -> ParseResult,
+    parse: &dyn Fn(&serde_json::Value) -> ParseResult,
 ) -> ParsedFile {
     let mut parsed = ParsedFile {
         row: None,
@@ -1014,13 +1020,17 @@ fn parse_read(
     let (Some(value), Some(index)) = (read.value, parsed.index.clone()) else {
         return parsed;
     };
-    let (result, scope) = with_content(scope.clone(), || parse(value));
+    let (result, read_scope) = with_content(scope.clone(), || parse(&value));
     match result {
         Ok(row) => {
             parsed.row = Some(row);
-            parsed
-                .errors
-                .extend(reference_errors(&read.file, scope.leaves(), &index));
+            let probe = |pointer: &str| reads_reference(scope, &value, pointer, parse);
+            parsed.errors.extend(reference_errors(
+                &read.file,
+                read_scope.leaves(),
+                &index,
+                probe,
+            ));
         }
         Err(error) => parsed
             .errors
@@ -1042,8 +1052,14 @@ fn whole_file(
     }
 }
 
-pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<LoadError> {
-    placed(leaves, index)
+pub fn reference_errors(
+    file: &str,
+    leaves: &[Leaf],
+    index: &JsonIndex,
+    probe: impl Fn(&str) -> bool,
+) -> Vec<LoadError> {
+    placed(leaves, index, |leaf| leaf.problem.is_some(), probe)
+        .into_iter()
         .filter_map(|(leaf, found)| {
             Some(LoadError {
                 file: file.to_owned(),
@@ -1058,25 +1074,70 @@ pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<L
         .collect()
 }
 
-// A leaf is written where its value is. The parse may meet the leaves in another order than the
-// file has them (flattened fields are read in declaration order), so each leaf takes the next
-// unclaimed occurrence of its value.
+/// Where each leaf is written: an occurrence of its value. The parse may meet the leaves in another
+/// order than the file has them (flattened fields are read in declaration order), so leaves are
+/// matched to occurrences per value. When a value is written in more places than it is read as a
+/// reference (a script node named like a quest), `probe` tells which places are references. Only
+/// the leaves `needed` picks are placed.
 fn placed<'a>(
     leaves: &'a [Leaf],
     index: &'a JsonIndex,
-) -> impl Iterator<Item = (&'a Leaf, Option<&'a IndexedValue>)> {
-    let mut occurrences: HashMap<&'a str, VecDeque<&'a IndexedValue>> = HashMap::new();
+    needed: impl Fn(&Leaf) -> bool,
+    probe: impl Fn(&str) -> bool,
+) -> Vec<(&'a Leaf, Option<&'a IndexedValue>)> {
+    let mut occurrences: HashMap<&'a str, Vec<&'a IndexedValue>> = HashMap::new();
     for value in index.strings() {
         if let Some(string) = value.string.as_deref() {
-            occurrences.entry(string).or_default().push_back(value);
+            occurrences.entry(string).or_default().push(value);
         }
     }
-    leaves.iter().map(move |leaf| {
-        let found = occurrences
-            .get_mut(leaf.value.as_str())
-            .and_then(VecDeque::pop_front);
-        (leaf, found)
-    })
+    let mut by_value: HashMap<&'a str, Vec<usize>> = HashMap::new();
+    for (at, leaf) in leaves.iter().enumerate() {
+        by_value.entry(leaf.value.as_str()).or_default().push(at);
+    }
+    let mut found: Vec<Option<&'a IndexedValue>> = vec![None; leaves.len()];
+    for (value, read) in by_value {
+        if !read.iter().any(|&at| needed(&leaves[at])) {
+            continue;
+        }
+        let written = occurrences.remove(value).unwrap_or_default();
+        let places = if written.len() > read.len() {
+            let references: Vec<&IndexedValue> = written
+                .iter()
+                .copied()
+                .filter(|place| probe(&place.pointer))
+                .collect();
+            if references.is_empty() {
+                written
+            } else {
+                references
+            }
+        } else {
+            written
+        };
+        for (at, place) in read.into_iter().zip(places) {
+            found[at] = Some(place);
+        }
+    }
+    leaves.iter().zip(found).collect()
+}
+
+/// Whether `value`, parsed by `parse`, reads the string at `pointer` as a reference: a stand-in
+/// written there comes back as a leaf.
+fn reads_reference(
+    scope: &ContentScope,
+    value: &serde_json::Value,
+    pointer: &str,
+    parse: &dyn Fn(&serde_json::Value) -> ParseResult,
+) -> bool {
+    const PROBE: &str = "\u{1}probe";
+    let mut probed = value.clone();
+    let Some(slot) = probed.pointer_mut(pointer) else {
+        return false;
+    };
+    *slot = serde_json::Value::String(PROBE.to_owned());
+    let (_, scope) = with_content(scope.clone(), || parse(&probed));
+    scope.leaves().iter().any(|leaf| leaf.value == PROBE)
 }
 
 pub fn pointer_of(path: &serde_path_to_error::Path) -> String {
@@ -1234,11 +1295,7 @@ pub(super) trait TableLoader: Send + Sync {
     fn folders(&self) -> bool;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn sees_all_rows(&self) -> bool;
-    fn parse(&self, text: &str) -> ParseResult {
-        let (value, _) = split_owner(text)?;
-        self.parse_value(value)
-    }
-    fn parse_value(&self, value: serde_json::Value) -> ParseResult;
+    fn parse_value(&self, value: &serde_json::Value) -> ParseResult;
     fn finish(
         &self,
         keys: Vec<String>,
@@ -1283,7 +1340,7 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         Row::SEES_ALL_ROWS
     }
 
-    fn parse_value(&self, value: serde_json::Value) -> ParseResult {
+    fn parse_value(&self, value: &serde_json::Value) -> ParseResult {
         parse_value::<Row>(value).map(|row| Box::new(row) as Box<dyn Any + Send + Sync>)
     }
 
@@ -1333,7 +1390,7 @@ struct Owned<'a, Row> {
     row: &'a Row,
 }
 
-pub fn parse_value<T: DeserializeOwned>(value: serde_json::Value) -> Result<T, ParseError> {
+pub fn parse_value<T: DeserializeOwned>(value: &serde_json::Value) -> Result<T, ParseError> {
     Ok(serde_path_to_error::deserialize(value)?)
 }
 
@@ -1348,8 +1405,7 @@ pub fn parse_json<T: DeserializeOwned>(text: &str) -> Result<T, ParseError> {
 }
 
 pub(super) trait SettingsLoader: Send + Sync {
-    fn parse(&self, text: &str) -> ParseResult;
-    fn parse_value(&self, value: serde_json::Value) -> ParseResult;
+    fn parse_value(&self, value: &serde_json::Value) -> ParseResult;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn store(&self, settings: Box<dyn Any + Send + Sync>, builder: &mut ContentBuilder);
     fn built(&self, content: &Content) -> bool;
@@ -1364,11 +1420,7 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
         shape_of::<G>(settings)
     }
 
-    fn parse(&self, text: &str) -> ParseResult {
-        parse_json::<G>(text).map(|settings| Box::new(settings) as Box<dyn Any + Send + Sync>)
-    }
-
-    fn parse_value(&self, value: serde_json::Value) -> ParseResult {
+    fn parse_value(&self, value: &serde_json::Value) -> ParseResult {
         parse_value::<G>(value).map(|settings| Box::new(settings) as Box<dyn Any + Send + Sync>)
     }
 

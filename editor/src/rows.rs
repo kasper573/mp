@@ -138,7 +138,8 @@ fn new_row(
 pub fn new_row_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut NewRowDialog) {
     ui.horizontal(|ui| {
         ui.label("Key");
-        ui.text_edit_singleline(&mut dialog.key);
+        let response = ui.text_edit_singleline(&mut dialog.key);
+        widgets::default_focus(ui, &response);
     });
     if let Some(project) = &editor.project
         && let Some(problem) = key_problem(&project.files, &dialog.table, dialog.key.trim())
