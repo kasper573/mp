@@ -117,6 +117,9 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     if ctx.text_edit_focused() {
         return;
     }
+    if ctx.input_mut(|i| EditorKey::OpenOwner.consume(i)) {
+        open_owner(editor);
+    }
     let script_tab = matches!(active_tab(editor), Some(EditorTab::Script(_)));
     let script_hovered = editor
         .views
@@ -126,9 +129,6 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         .is_some_and(|(rect, pos)| rect.contains(pos));
     if (script_tab || script_hovered) && editor.dialogs.is_empty() {
         editor.views.script.keys = ScriptKeys::take(ctx);
-    }
-    if ctx.input_mut(|i| EditorKey::OpenOwner.consume(i)) {
-        open_owner(editor);
     }
     let (save, undo, redo, search, quit, close) = ctx.input_mut(|i| {
         (
