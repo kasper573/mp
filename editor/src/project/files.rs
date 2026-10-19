@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -28,21 +27,14 @@ impl ProjectFiles {
             .min_depth(1)
             .follow_links(true)
             .into_iter()
-            .filter_entry(|entry| !hidden(entry.file_name()));
+            .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
         for entry in entries {
             let entry = entry?;
             if !entry.file_type().is_file() {
                 continue;
             }
-            let relative = entry
-                .path()
-                .strip_prefix(root)
-                .expect("a walked file lies under its root")
-                .components()
-                .map(|part| part.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/");
-            files.insert(relative, FileBytes::from(std::fs::read(entry.path())?));
+            let file = folder_file(root, entry.path()).expect("a walked file lies under its root");
+            files.insert(file, FileBytes::from(std::fs::read(entry.path())?));
         }
         Ok(files)
     }
@@ -182,7 +174,19 @@ impl PartialEq for FileChange {
     }
 }
 
-fn hidden(name: &OsStr) -> bool {
-    name.to_str()
-        .is_some_and(|name| name.starts_with('.') || name.ends_with(".tmp"))
+/// Whether a file or folder of that name is kept out of the game folder's content: dotfiles, and
+/// the temporary files saving writes.
+pub fn hidden(name: &str) -> bool {
+    name.starts_with('.') || name.ends_with(".tmp")
+}
+
+/// The folder-relative, slash-separated name of a file under `root`.
+pub fn folder_file(root: &Path, path: &Path) -> Option<String> {
+    let parts: Vec<_> = path
+        .strip_prefix(root)
+        .ok()?
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect();
+    Some(parts.join("/"))
 }

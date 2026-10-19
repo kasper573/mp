@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 
+use super::files;
 use crate::app::ChannelInbox;
 
 pub struct FolderWatcher {
@@ -73,15 +74,6 @@ impl FolderWatcher {
 }
 
 fn relative(root: &Path, path: &Path) -> Option<String> {
-    let rest = path.strip_prefix(root).ok()?;
-    let name = rest.file_name()?.to_str()?;
-    if name.starts_with('.') || name.ends_with(".tmp") {
-        return None;
-    }
-    Some(
-        rest.components()
-            .map(|part| part.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/"),
-    )
+    let name = path.file_name()?.to_str()?;
+    (!files::hidden(name)).then(|| files::folder_file(root, path))?
 }
