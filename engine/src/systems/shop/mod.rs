@@ -678,14 +678,15 @@ fn held(inventory: &Inventory, price: &[ItemStack]) -> Vec<u32> {
         .collect()
 }
 
-fn price_refusal(
+fn trade_refusal(
     content: &Content,
     inventory: &Inventory,
     price: &[ItemStack],
+    bought: &[ItemStack],
 ) -> Option<WareRefusal> {
-    let mut trial = inventory.clone();
-    trial
-        .exchange(content, price, &[])
+    inventory
+        .clone()
+        .exchange(content, price, bought)
         .err()
         .map(|refusal| WareRefusal::of(refusal, content))
 }
@@ -705,15 +706,12 @@ fn offer_refusal(
     if stock(world, player, shop, index, now).is_some_and(|(left, _)| left == 0) {
         return Some(WareRefusal::Unavailable("Sold out for now".to_owned()));
     }
-    let mut inventory = world.get::<Inventory>(player)?.clone();
-    inventory
-        .exchange(
-            content,
-            &offer.price,
-            &[ItemStack::new(offer.item, offer.count)],
-        )
-        .err()
-        .map(|refusal| WareRefusal::of(refusal, content))
+    trade_refusal(
+        content,
+        world.get::<Inventory>(player)?,
+        &offer.price,
+        &[ItemStack::new(offer.item, offer.count)],
+    )
 }
 
 fn stock(
@@ -773,7 +771,7 @@ fn refresh_view(world: &mut World, player: Entity) {
                 .iter()
                 .map(|sale| BuybackView {
                     sale: sale.clone(),
-                    refusal: price_refusal(&content, &inventory, &sale.paid),
+                    refusal: trade_refusal(&content, &inventory, &sale.paid, &[]),
                     held: held(&inventory, &sale.paid),
                 })
                 .collect()
