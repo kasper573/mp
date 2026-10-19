@@ -239,7 +239,7 @@ pub(crate) fn window_rect(world: &World, window: &dyn HudWindow) -> Option<Rect>
 /// The most a window may be given, when its content bounds it.
 pub(crate) fn window_limit(world: &World, window: &dyn HudWindow) -> Option<Vec2> {
     let body = window.body_limit(world)?;
-    Some(body + panel::chrome())
+    Some(body + sheet::chrome(true))
 }
 
 static WIDGETS: &[(&str, &dyn HudWidget)] = &[

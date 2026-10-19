@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{StatusEffectId, Statuses, boost};
+use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxSite;
@@ -326,6 +327,6 @@ fn advance(
     }
 }
 
-fn sound(world: &mut World, actor: Entity, sfx: crate::core::audio::playback::SfxId) {
+fn sound(world: &mut World, actor: Entity, sfx: SfxId) {
     notification::play_sound(world, Some(actor), Some(actor), sfx, Audience::Everyone);
 }

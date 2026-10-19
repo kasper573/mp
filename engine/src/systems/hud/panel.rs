@@ -89,7 +89,7 @@ pub(crate) fn window<R>(
         body_limit,
     } = frame;
     let id = panel_id(key);
-    let max = body_limit.map(|body| body + chrome());
+    let max = body_limit.map(|body| body + sheet::chrome(true));
     let rest = world
         .resource::<UserSettings>()
         .window_placement(key)
@@ -339,10 +339,6 @@ fn within(rect: Rect, screen: Rect, max: Option<Vec2>) -> Rect {
     Rect::from_min_size(rect.min.clamp(screen.min, screen.max - size), size)
 }
 
-pub(super) fn chrome() -> Vec2 {
-    sheet::chrome(true)
-}
-
 fn snapped(world: &World, rect: Rect, grip: Grip) -> Rect {
     let Some(grid) = world.resource::<UserSettings>().snap() else {
         return rect;
@@ -452,11 +448,7 @@ fn placed_rect(placement: Placement) -> Rect {
     )
 }
 
-pub(crate) fn area_id(key: &str) -> Id {
-    panel_id(key)
-}
-
-fn panel_id(key: &str) -> Id {
+pub(crate) fn panel_id(key: &str) -> Id {
     Id::new(("hud", key))
 }
 

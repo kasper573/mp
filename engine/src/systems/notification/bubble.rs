@@ -46,8 +46,8 @@ const LINE_GAP: f32 = 4.0;
 const TAIL: f32 = 12.0;
 const TAIL_OUT: f32 = TAIL / 2.0;
 const READ_OPACITY: f32 = 0.5;
-const INK: Color32 = Color32::from_rgb(228, 234, 239);
-const FILL: Color32 = Color32::from_rgb(41, 46, 45);
+const INK: Color32 = rows::SLATE_90;
+const FILL: Color32 = rows::SLATE_40;
 const OUTLINE: Color32 = Color32::from_rgb(73, 74, 80);
 // The offsets are those of a bubble whose tail points down; `Tail::turn` turns them to its tail.
 const PRESENCE: Presence = Presence {

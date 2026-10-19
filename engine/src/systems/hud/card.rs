@@ -123,7 +123,7 @@ pub(crate) fn draw_pinned<T: Clone + Send + Sync + 'static>(
     let deal = dealing::<T>(world, now, rest, screen);
     let front = panel::front_sheet(world, &gui) == Some(key);
     let depth = if front { Depth::Front } else { Depth::Behind };
-    let shown = egui::Area::new(panel::area_id(key))
+    let shown = egui::Area::new(panel::panel_id(key))
         .order(Band::Hud.order())
         .fixed_pos(rest.min)
         .constrain(false)

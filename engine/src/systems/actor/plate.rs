@@ -1,7 +1,8 @@
-use design_tokens::face::Face;
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use design_tokens::face::Face;
+use design_tokens::ink::{Ground, Prose};
 use bevy_egui::EguiPrimaryContextPass;
 use egui::emath::{GuiRounding, TSTransform};
 use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
@@ -27,7 +28,7 @@ const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
 const ICON_GAP: f32 = 2.0;
 const TEXT_SIZE: f32 = 12.0;
-const HOSTILE: Color32 = Color32::from_rgb(233, 117, 120);
+const HOSTILE: Color32 = Prose::Danger.on(Ground::Dusk);
 const PLAYER: Color32 = Color32::from_rgb(104, 168, 235);
 const SHADOW: TextShadow = TextShadow {
     offset: egui::vec2(1.0, 1.0),

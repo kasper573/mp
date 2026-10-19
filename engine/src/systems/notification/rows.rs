@@ -5,6 +5,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use design_tokens::dusk;
 use design_tokens::face::Face;
+use design_tokens::glyph::{self, Mark};
 use design_tokens::ink::Ground;
 use egui::emath::{TSTransform, easing};
 use egui::{
@@ -23,8 +24,8 @@ use crate::systems::screen::ClientScreen;
 const COUNT_LINGERS: Seconds = Seconds(5.0);
 
 const WHITE: Color32 = Color32::WHITE;
-const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
-const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
+pub(super) const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
+pub(super) const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
 const AMBER_80: Color32 = Color32::from_rgb(246, 201, 96);
 const LABEL: f32 = 12.0;
 const CLOSE: f32 = 20.0;
@@ -146,10 +147,8 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
                 closed
             })
         });
-        let open = !shown.inner.inner;
-        let shown = Some(shown);
-        drawn.extend(shown.map(|shown| shown.response.rect));
-        if !open {
+        drawn.push(shown.response.rect);
+        if shown.inner.inner {
             world
                 .resource_mut::<PlacedRows<Alerts>>()
                 .rows
@@ -834,18 +833,7 @@ fn alert_title(ui: &mut Ui, label: &str) -> bool {
                 if response.hovered() {
                     ui.painter().rect_filled(rect, 4.0, dusk::HOVER);
                 }
-                let arm = Vec2::splat(CLOSE * 0.2);
-                let stroke = egui::Stroke::new(1.5, dusk::TEXT);
-                let centre = rect.center();
-                ui.painter()
-                    .line_segment([centre - arm, centre + arm], stroke);
-                ui.painter().line_segment(
-                    [
-                        centre + Vec2::new(-arm.x, arm.y),
-                        centre + Vec2::new(arm.x, -arm.y),
-                    ],
-                    stroke,
-                );
+                glyph::paint(ui.painter(), Mark::Cross, rect.shrink(CLOSE * 0.2), dusk::TEXT);
                 response.clicked()
             })
             .inner
