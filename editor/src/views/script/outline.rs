@@ -344,7 +344,6 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
 fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
-            editor.views.script.focus_on(&doc.owner);
             editor.select(RowSelection::parts(
                 doc.owner.table(),
                 doc.owner.key(),

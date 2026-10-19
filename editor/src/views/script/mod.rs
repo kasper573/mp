@@ -388,7 +388,6 @@ pub struct ScriptViews {
     pub shown_rect: Option<Rect>,
     pub run: Option<run::ScriptRun>,
     setups: HashMap<ScriptSessionId, run::RunSetup>,
-    focus: Option<ScriptSessionId>,
     fire: Option<ScriptSessionId>,
     pending: Option<(ScriptSessionId, PendingScriptAction)>,
     pub callout: Option<ScriptCallout>,
@@ -412,13 +411,6 @@ impl ScriptViews {
             .iter()
             .find(|session| session.owner == *owner)
             .map(|session| session.id)
-    }
-
-    pub fn owner(&self, id: ScriptSessionId) -> Option<&ScriptOwner> {
-        self.sessions
-            .iter()
-            .find(|session| session.id == id)
-            .map(|session| &session.owner)
     }
 
     pub fn relocate(&mut self, from: &ScriptOwner, to: ScriptOwner) {
@@ -484,14 +476,6 @@ impl ScriptViews {
         self.setups.insert(id, setup);
     }
 
-    pub fn focus_on(&mut self, owner: &ScriptOwner) {
-        self.focus = Some(self.session(owner));
-    }
-
-    pub fn focused(&self) -> Option<ScriptOwner> {
-        self.owner(self.focus?).cloned()
-    }
-
     pub fn fire(&mut self, owner: &ScriptOwner) {
         self.fire = Some(self.session(owner));
     }
@@ -518,7 +502,6 @@ impl ScriptViews {
         self.views.clear();
         self.setups.clear();
         self.run = None;
-        self.focus = None;
         self.fire = None;
         self.pending = None;
     }
@@ -601,7 +584,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
         ui.label(RichText::new(format!("{} is gone", owner.title())).weak());
         return;
     };
-    editor.views.script.focus_on(owner);
     editor.views.script.shown_rect = Some(ui.max_rect());
     if let Some(pending) = editor.views.script.take_pending(owner) {
         match pending {
@@ -1075,7 +1057,6 @@ fn callout_card(ui: &Ui, painter: &egui::Painter, anchor: Rect, callout: &Script
 }
 
 pub fn select_nodes(editor: &mut Editor, doc: &ScriptDoc, names: &[String]) {
-    editor.views.script.focus_on(&doc.owner);
     editor.select(RowSelection::parts(
         doc.owner.table(),
         doc.owner.key(),
