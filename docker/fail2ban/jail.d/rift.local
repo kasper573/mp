@@ -10,7 +10,7 @@ enabled = true
 logpath = /var/log/caddy/access.log
 maxretry = 10
 # Published container ports bypass the INPUT chain; bans must land in DOCKER-USER to take effect
-# (this also cuts the game server's UDP port for the banned ip).
+# (this also drops the banned ip's HTTP/3 traffic to the reverse proxy's udp 443).
 banaction = iptables-allports[chain="DOCKER-USER"]
 
 [sshd]
