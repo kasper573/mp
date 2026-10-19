@@ -6,7 +6,7 @@ pub mod query;
 pub use crate::core::script::Fill;
 pub use effect::RiftEffect;
 pub use event::{EventKind, RiftEvent, Who};
-pub use query::RiftQuery;
+pub use query::{RiftQuery, RiftQueryKind};
 
 use std::collections::HashMap;
 use std::sync::Arc;

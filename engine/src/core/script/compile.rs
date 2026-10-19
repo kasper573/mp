@@ -177,16 +177,6 @@ impl<V: Vocabulary> Procedure<V> {
     }
 }
 
-impl<V: Vocabulary> Step<V> {
-    pub fn pauses(&self) -> bool {
-        match self {
-            Step::Wait { .. } | Step::Dialogue { .. } => true,
-            Step::Effect { pauses, .. } => *pauses,
-            _ => false,
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub enum Call<'c, V: Vocabulary> {
     Shared {
@@ -952,7 +942,8 @@ fn compile_source<'c, V: Vocabulary>(
             ));
         }
     }
-    bound_steps(&steps, &names, &successors, &entries, &fail)?;
+    let pauses: Vec<bool> = source.nodes.values().map(Node::pauses).collect();
+    bound_steps(&steps, &pauses, &names, &successors, &entries, &fail)?;
     let any_needs_subject = needs_subject.iter().any(|needs| *needs);
     Ok(Arc::new(Procedure {
         id: ProcedureId(NEXT_PROCEDURE.fetch_add(1, Ordering::Relaxed)),
@@ -1071,6 +1062,7 @@ fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
 
 fn bound_steps<V: Vocabulary>(
     steps: &[Step<V>],
+    pauses: &[bool],
     names: &[&str],
     successors: &[Vec<StepIndex>],
     entries: &[(StepIndex, V::Event)],
@@ -1078,6 +1070,7 @@ fn bound_steps<V: Vocabulary>(
 ) -> Result<(), ScriptError> {
     let mut walk = Walk {
         steps,
+        pauses,
         names,
         successors,
         path: Vec::new(),
@@ -1085,13 +1078,9 @@ fn bound_steps<V: Vocabulary>(
         fail,
     };
     let mut sources: Vec<StepIndex> = entries.iter().map(|(entry, _)| *entry).collect();
-    sources.extend(
-        (0..steps.len())
-            .filter(|node| steps[*node].pauses())
-            .map(StepIndex),
-    );
+    sources.extend((0..steps.len()).filter(|node| pauses[*node]).map(StepIndex));
     for source in sources {
-        let starts: Vec<StepIndex> = if steps[source.0].pauses() {
+        let starts: Vec<StepIndex> = if pauses[source.0] {
             successors[source.0].clone()
         } else {
             vec![source]
@@ -1105,6 +1094,7 @@ fn bound_steps<V: Vocabulary>(
 
 struct Walk<'a, V: Vocabulary, F> {
     steps: &'a [Step<V>],
+    pauses: &'a [bool],
     names: &'a [&'a str],
     successors: &'a [Vec<StepIndex>],
     path: Vec<StepIndex>,
@@ -1114,7 +1104,7 @@ struct Walk<'a, V: Vocabulary, F> {
 
 impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Walk<'_, V, F> {
     fn longest(&mut self, node: StepIndex) -> Result<usize, ScriptError> {
-        if self.steps[node.0].pauses() {
+        if self.pauses[node.0] {
             return Ok(1);
         }
         if let Some(known) = self.memo.get(&node) {
@@ -1232,7 +1222,12 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         if !want.accepts(ty) {
             return Err(ScriptFault::new(
                 "wrong type",
-                format!("{} is {}, expected {}", expr.kind(), ty.name(), want.name()),
+                format!(
+                    "{} is {}, expected {}",
+                    expr.kind().name(),
+                    ty.name(),
+                    want.name()
+                ),
             ));
         }
         Ok(if ty == want {

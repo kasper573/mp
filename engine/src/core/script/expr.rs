@@ -1,11 +1,17 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use super::Vocabulary;
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case", bound = "")]
 #[schemars(rename = "Expr", bound = "", extend("x-condition" = true))]
+#[strum_discriminants(
+    name(ExprKind),
+    derive(EnumString, IntoStaticStr, VariantArray),
+    strum(serialize_all = "snake_case")
+)]
 pub enum Expr<V: Vocabulary> {
     Local {
         local: String,
@@ -80,10 +86,13 @@ pub enum Expr<V: Vocabulary> {
         b: Box<Expr<V>>,
     },
     #[serde(untagged)]
+    #[strum_discriminants(strum(serialize = "boolean"))]
     Bool(bool),
     #[serde(untagged)]
+    #[strum_discriminants(strum(serialize = "integer"))]
     Int(i64),
     #[serde(untagged)]
+    #[strum_discriminants(strum(serialize = "number"))]
     Num(f64),
     #[serde(untagged)]
     Text(String),
@@ -95,40 +104,19 @@ pub enum Expr<V: Vocabulary> {
     Query(V::Query),
 }
 
+impl ExprKind {
+    pub fn name(self) -> &'static str {
+        self.into()
+    }
+}
+
 pub const MAX_DEPTH: usize = 16;
 pub const MAX_NODES: usize = 64;
 pub const MAX_LIST: usize = 32;
 
 impl<V: Vocabulary> Expr<V> {
-    pub fn kind(&self) -> &'static str {
-        match self {
-            Expr::Bool(_) => "boolean",
-            Expr::Int(_) => "integer",
-            Expr::Num(_) => "number",
-            Expr::Text(_) => "text",
-            Expr::Var { .. } => "var",
-            Expr::Local { .. } => "local",
-            Expr::State { .. } => "state",
-            Expr::Event { .. } => "event",
-            Expr::Query(_) => "query",
-            Expr::All { .. } => "all",
-            Expr::Any { .. } => "any",
-            Expr::Not { .. } => "not",
-            Expr::Equal { .. } => "equal",
-            Expr::NotEqual { .. } => "not_equal",
-            Expr::Less { .. } => "less",
-            Expr::AtMost { .. } => "at_most",
-            Expr::More { .. } => "more",
-            Expr::AtLeast { .. } => "at_least",
-            Expr::Add { .. } => "add",
-            Expr::Subtract { .. } => "subtract",
-            Expr::Multiply { .. } => "multiply",
-            Expr::Divide { .. } => "divide",
-            Expr::Min { .. } => "min",
-            Expr::Max { .. } => "max",
-            Expr::Round { .. } => "round",
-            Expr::Join { .. } => "join",
-        }
+    pub fn kind(&self) -> ExprKind {
+        self.into()
     }
 
     pub fn children(&self) -> Vec<&Expr<V>> {

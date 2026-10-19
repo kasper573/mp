@@ -17,9 +17,9 @@ use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
-pub use expr::Expr;
+pub use expr::{Expr, ExprKind};
 pub use may_do::MayDo;
-pub use node::{Assignment, Node, Target};
+pub use node::{Assignment, Node, NodeKind, Target};
 pub use run::{
     Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
     Owner, Pause, TraceStep,
