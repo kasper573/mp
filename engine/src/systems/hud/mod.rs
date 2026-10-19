@@ -47,7 +47,6 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        settings::plugin(app);
         app.init_resource::<Open>()
             .init_resource::<panel::Arranging>()
             .init_resource::<panel::SheetClocks>()

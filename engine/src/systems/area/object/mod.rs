@@ -221,16 +221,7 @@ pub fn spawn_all(world: &mut World) {
         let owner_row = OwnerRow::of_object(zone, index as u32);
         let procedures = scripts.of(owner_row).to_vec();
         let may_do = scripts.may_do(owner_row);
-        let interactive = procedures
-            .iter()
-            .flat_map(|procedure| procedure.entry(EventKind::Interacted))
-            .find_map(|(_, event)| match event {
-                RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
-                    verb: *verb,
-                    reach: *reach,
-                }),
-                _ => None,
-            });
+        let interactive = Interactive::of(&procedures);
         let warp = may_do.reaches.iter().find_map(|reach| match reach {
             script::Reach::Warp(place) => Some(*place),
             _ => None,

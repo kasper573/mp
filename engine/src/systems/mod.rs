@@ -116,9 +116,7 @@ pub fn plug_ins(world: &mut World) {
 pub fn area_state(world: &mut World, content: &Content) {
     use bevy_ecs::message::MessageRegistry;
 
-    world.insert_resource(content.clone());
-    world.insert_resource(content.built::<quest::Parties>().clone());
-    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    insert_content(world, content);
     world.init_resource::<script::RiftInstances>();
     world.init_resource::<player::Players>();
     world.init_resource::<movement::TileClaims>();
@@ -131,6 +129,13 @@ pub fn area_state(world: &mut World, content: &Content) {
     MessageRegistry::register_message::<rewards::KillCredited>(world);
     world.add_observer(player::greet);
     world.add_observer(player::client_left);
+}
+
+/// The content and the scripts and parties built from it, as every world playing it reads them.
+fn insert_content(world: &mut World, content: &Content) {
+    world.insert_resource(content.built::<quest::Parties>().clone());
+    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    world.insert_resource(content.clone());
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -184,7 +189,7 @@ pub fn server_app(
     ordinal: u64,
     rng_seed: u64,
     clock: WallClock,
-    assets: &Content,
+    content: &Content,
 ) -> App {
     use bevy_app::{First, PostUpdate, Startup, Update};
     use bevy_ecs::schedule::{IntoScheduleConfigs, Schedules, SingleThreadedExecutor};
@@ -194,9 +199,9 @@ pub fn server_app(
 
     let mut app = App::new();
     app.insert_resource(WorldArea(area));
-    app.insert_resource(assets.built::<GameSettings>().clone());
+    app.insert_resource(content.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(input::map::InputMap::new(assets));
+    app.insert_resource(input::map::InputMap::new(content));
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     // Every tick steps the same span of game time however long it took, so a seeded world plays out
     // alike tick for tick.
@@ -218,7 +223,7 @@ pub fn server_app(
     );
     protocol(&mut app);
     visibility::register(&mut app);
-    area_state(app.world_mut(), assets);
+    area_state(app.world_mut(), content);
     // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
     // serialization load across ticks instead of spiking every Nth tick in lockstep.
     app.insert_resource(ReplicationClock(ordinal))
@@ -409,6 +414,7 @@ pub fn client_app(
             input::PlayerInputPlugin,
         ))
         .add_plugins((
+            settings::plugin,
             hud::HudPlugin,
             dialogue::stage::DialogueStagePlugin,
             notification::NotificationPlugin,
@@ -477,11 +483,9 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
             }
         }
     }
-    world.insert_resource(content.built::<quest::Parties>().clone());
-    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    insert_content(world, &content);
     world.insert_resource(content.built::<GameSettings>().clone());
     world.insert_resource(input::map::InputMap::new(&content));
-    world.insert_resource(content);
     world.insert_resource(synced);
     Ok(())
 }

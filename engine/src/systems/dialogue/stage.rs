@@ -1137,7 +1137,9 @@ fn busts(ui: &mut Ui, world: &mut World, dialogue: Rect, screen: Rect) {
                 Side::Right => 1.0,
             };
             let rect = rect.translate(Vec2::new(away * SLIDE * (1.0 - shown), 0.0));
-            let tint = lerp_color(UNLIT, Color32::WHITE, lit).gamma_multiply(shown);
+            let tint = UNLIT
+                .lerp_to_gamma(Color32::WHITE, lit)
+                .gamma_multiply(shown);
             ui.put(rect, image.widget(size).tint(tint));
         }
     }
@@ -1168,15 +1170,6 @@ fn bust_rect(
     };
     let bottom = screen.bottom() - screen.height() * lift;
     Rect::from_min_size(Pos2::new(left, bottom - size.y), size)
-}
-
-fn lerp_color(from: Color32, to: Color32, t: f32) -> Color32 {
-    let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
-    Color32::from_rgb(
-        mix(from.r(), to.r()),
-        mix(from.g(), to.g()),
-        mix(from.b(), to.b()),
-    )
 }
 
 fn cast_members(world: &World, now: Duration, before: &[CastMember]) -> Vec<CastMember> {

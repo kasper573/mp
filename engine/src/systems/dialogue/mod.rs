@@ -303,14 +303,10 @@ pub fn close(world: &mut World, flow: FlowKey, subject: Entity, ending: BoxEndin
     if session.flow != flow {
         return;
     }
-    drop_session(world, subject);
+    close_for(world, subject);
     if ending == BoxEnding::Gone {
         tell_ended(world, subject, "they're gone");
     }
-}
-
-pub fn close_for(world: &mut World, player: Entity) {
-    drop_session(world, player);
 }
 
 pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
@@ -468,7 +464,7 @@ fn begin(world: &mut World, flow: FlowKey, subject: Entity) -> bool {
             return true;
         }
         let old = session.flow;
-        drop_session(world, subject);
+        close_for(world, subject);
         world
             .resource_mut::<RiftInstances>()
             .answer(old, Answer::Left);
@@ -484,9 +480,7 @@ fn begin(world: &mut World, flow: FlowKey, subject: Entity) -> bool {
             RiftEvent::Interacted { reach, .. } => Some(reach.0),
             _ => None,
         })
-        .fold(None, |most: Option<f32>, reach| {
-            Some(most.map_or(reach, |most| most.max(reach)))
-        })
+        .reduce(f32::max)
         .map_or(DEFAULT_REACH, Tiles);
     let tether = with.and_then(|with| Tether::around(world, subject, reach, Some(with)));
     reach::forget(world, subject);
@@ -522,7 +516,7 @@ fn begin(world: &mut World, flow: FlowKey, subject: Entity) -> bool {
     true
 }
 
-fn drop_session(world: &mut World, player: Entity) {
+pub fn close_for(world: &mut World, player: Entity) {
     if let Some(session) = world.entity_mut(player).take::<ConversationSession>() {
         world
             .resource_mut::<RiftInstances>()
@@ -538,7 +532,7 @@ fn leave(world: &mut World, player: Entity) {
         return;
     };
     let (flow, answer) = (session.flow, session.on_leave.clone());
-    drop_session(world, player);
+    close_for(world, player);
     world.resource_mut::<RiftInstances>().answer(flow, answer);
 }
 

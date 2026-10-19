@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, ContentRow, Fixture};
+use crate::core::content::{Content, ContentRow, Fixture, serial};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -486,13 +486,13 @@ impl DragGesture {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct KeyModifiers {
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub ctrl: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub shift: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub alt: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub super_key: bool,
 }
 
@@ -543,10 +543,6 @@ pub fn mouse_button_schema(_: &mut SchemaGenerator) -> Schema {
 
 fn publish(map: Res<InputMap>, mut names: ResMut<KeyNames>) {
     *names = map.key_names();
-}
-
-fn is_false(flag: &bool) -> bool {
-    !*flag
 }
 
 fn pointer_button(button: MouseButton) -> Option<egui::PointerButton> {
