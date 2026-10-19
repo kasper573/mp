@@ -7,7 +7,7 @@ use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
-use crate::systems::hud::{self, HudWindow};
+use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::{SlotLook, slot};
@@ -78,9 +78,10 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
     let def = item.get(&content);
     let look = SlotLook {
         icon: Some(&def.icon),
+        faded: hud::carried(ui.ctx()) == Some(Carried::Worn(kind)),
         ..SlotLook::EMPTY
     };
-    let response = slot(ui, world, look, Sense::click());
+    let response = slot(ui, world, look, Sense::click_and_drag());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
@@ -92,6 +93,8 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
         world.write_message(UnequipRequest { slot: kind });
     } else if map::clicked(world, InputAction::InspectItem, &response) {
         card::open(world, item, Some(response.rect));
+    } else if map::drag_started(world, InputAction::CarryItem, &response) {
+        hud::carry(ui.ctx(), Carried::Worn(kind));
     }
     let hint = StyledLine::new(
         card::inspect_hint()
@@ -99,7 +102,9 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
             .chain([
                 TextPiece::text(" · "),
                 input(InputAction::UseItem),
-                TextPiece::text(" to take it off"),
+                TextPiece::text(" to take it off · "),
+                input(InputAction::CarryItem),
+                TextPiece::text(" onto the hotbar"),
             ])
             .collect(),
     );

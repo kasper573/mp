@@ -112,6 +112,7 @@ pub(crate) type Answer = Box<dyn FnOnce(&mut World, bool) + Send + Sync>;
 pub(crate) enum Carried {
     Skill(SkillId),
     BagSlot(u32),
+    Worn(equipment::EquipmentSlot),
     HotbarEntry {
         from: HotbarSlot,
         entry: HotbarEntry,
@@ -525,6 +526,15 @@ fn draw_carried(world: &mut World) {
                 return;
             };
             stack.item.get(&content).icon.clone()
+        }
+        Carried::Worn(slot) => {
+            let Some(item) = session::my_character(world)
+                .and_then(|me| me.get::<equipment::Equipment>())
+                .and_then(|equipment| equipment.slots.get(&slot).copied())
+            else {
+                return;
+            };
+            item.get(&content).icon.clone()
         }
         Carried::HotbarEntry { entry, .. } => match entry {
             HotbarEntry::Skill(skill) => skill.get(&content).icon.clone(),

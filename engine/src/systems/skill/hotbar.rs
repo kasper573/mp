@@ -2,10 +2,10 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, SkillId, SkillKind,
+    BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, ItemId, Learned, SkillId, SkillKind,
 };
 use crate::core::content::Content;
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment::{self, Equipment};
 use crate::systems::history::HistoryTopic;
 use crate::systems::item::Inventory;
 use crate::systems::notification::{self, Notification};
@@ -19,7 +19,16 @@ pub struct AssignHotbarRequest {
 
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct AssignBasicAttackRequest {
-    pub skill: Option<SkillId>,
+    pub pick: BasicAttackPick,
+}
+
+/// What the player puts in the basic attack slot: a skill they know, a weapon whose attack they
+/// want (worn first if it is still in the bag), or nothing.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BasicAttackPick {
+    Empty,
+    Skill(SkillId),
+    Weapon(ItemId),
 }
 
 pub fn requests(world: &mut World) {
@@ -27,7 +36,7 @@ pub fn requests(world: &mut World) {
         assign(world, player, request.slot, request.entry)
     });
     player_requests::<AssignBasicAttackRequest>(world, false, |world, player, request| {
-        assign_basic_attack(world, player, request.skill)
+        assign_basic_attack(world, player, request.pick)
     });
 }
 
@@ -64,22 +73,35 @@ pub fn assign(
     Ok(())
 }
 
-/// Puts a known, flagged skill in the basic attack slot, or empties it.
+/// Puts a known, flagged skill in the basic attack slot, or a weapon's attack once it is worn, or
+/// empties the slot.
 pub fn assign_basic_attack(
     world: &mut World,
     player: Entity,
-    skill: Option<SkillId>,
+    pick: BasicAttackPick,
 ) -> Result<(), String> {
     let content = world.resource::<Content>().clone();
-    if let Some(skill) = skill {
-        let def = skill.get(&content);
-        if !super::known(world, player).contains_key(&skill) {
-            return Err(format!("You don't know {}", def.name));
+    let skill = match pick {
+        BasicAttackPick::Empty => None,
+        BasicAttackPick::Skill(skill) => {
+            let def = skill.get(&content);
+            if !super::known(world, player).contains_key(&skill) {
+                return Err(format!("You don't know {}", def.name));
+            }
+            if !def.basic_attack {
+                return Err(format!("{} can't be a basic attack", def.name));
+            }
+            Some(skill)
         }
-        if !def.basic_attack {
-            return Err(format!("{} can't be a basic attack", def.name));
+        BasicAttackPick::Weapon(item) => {
+            let skill = super::first_flagged_grant(&content, std::iter::once(item))
+                .ok_or_else(|| format!("{} has no basic attack", item.get(&content).name))?;
+            if !wears(world, player, item) {
+                equipment::equip_held(world, player, item)?;
+            }
+            Some(skill)
         }
-    }
+    };
     let mut slot = world
         .get_mut::<BasicAttack>(player)
         .ok_or("No basic attack slot")?;
@@ -88,13 +110,17 @@ pub fn assign_basic_attack(
 }
 
 /// Whether an item is in the actor's bag or worn.
-pub fn holds_item(world: &World, actor: Entity, item: super::ItemId) -> bool {
+pub fn holds_item(world: &World, actor: Entity, item: ItemId) -> bool {
     world
         .get::<Inventory>(actor)
         .is_some_and(|inventory| inventory.count(item) > 0)
-        || world
-            .get::<Equipment>(actor)
-            .is_some_and(|equipment| equipment.slots.values().any(|worn| *worn == item))
+        || wears(world, actor, item)
+}
+
+fn wears(world: &World, actor: Entity, item: ItemId) -> bool {
+    world
+        .get::<Equipment>(actor)
+        .is_some_and(|equipment| equipment.slots.values().any(|worn| *worn == item))
 }
 
 type Stirred = Or<(Changed<Equipment>, Changed<Learned>, Added<BasicAttack>)>;

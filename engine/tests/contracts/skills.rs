@@ -4,15 +4,15 @@ use engine::core::tiling::Tiles;
 use engine::core::time::WallClock;
 use engine::systems::class::{self, NodeKey, SkillPoints};
 use engine::systems::combat::AttackRequest;
-use engine::systems::equipment::{EquipmentSlot, UnequipRequest};
+use engine::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
 use engine::systems::item::{ItemId, UseItemRequest};
 use engine::systems::movement::position;
 use engine::systems::npc::{self, Pack};
 use engine::systems::reach;
 use engine::systems::skill::{
-    AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, CastAim, Cooldowns, Hotbar,
-    HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest, ResetPrompt,
-    SkillId, UseSkillRequest,
+    AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, CastAim,
+    Cooldowns, Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank,
+    ResetAnswerRequest, ResetPrompt, SkillId, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 
@@ -154,7 +154,7 @@ fn the_basic_attack_slot_accepts_only_known_flagged_skills() {
     sim.send(
         1,
         AssignBasicAttackRequest {
-            skill: Some(row("Cleave")),
+            pick: BasicAttackPick::Skill(row("Cleave")),
         },
     );
     settle(&mut sim);
@@ -164,7 +164,7 @@ fn the_basic_attack_slot_accepts_only_known_flagged_skills() {
     sim.send(
         1,
         AssignBasicAttackRequest {
-            skill: Some(row("Cleave")),
+            pick: BasicAttackPick::Skill(row("Cleave")),
         },
     );
     settle(&mut sim);
@@ -175,9 +175,128 @@ fn the_basic_attack_slot_accepts_only_known_flagged_skills() {
             .any(|text| text.contains("basic attack"))
     );
 
-    sim.send(1, AssignBasicAttackRequest { skill: None });
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Empty,
+        },
+    );
     settle(&mut sim);
     assert_eq!(basic_attack(&mut sim, player), None);
+}
+
+#[test]
+fn a_weapon_put_in_the_basic_attack_slot_is_worn_and_lends_its_attack() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    let sword: ItemId = row("IronSword");
+
+    sim.send(
+        1,
+        UnequipRequest {
+            slot: EquipmentSlot::Weapon,
+        },
+    );
+    settle(&mut sim);
+    assert_eq!(basic_attack(&mut sim, player), None);
+
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Weapon(sword),
+        },
+    );
+    settle(&mut sim);
+    assert_eq!(basic_attack(&mut sim, player), Some(row("Slash")));
+    assert_eq!(
+        sim.world()
+            .get::<Equipment>(player)
+            .and_then(|equipment| equipment.slots.get(&EquipmentSlot::Weapon).copied()),
+        Some(sword)
+    );
+    assert!(errors(&sim, 1).is_empty());
+
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Empty,
+        },
+    );
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Weapon(sword),
+        },
+    );
+    settle(&mut sim);
+    assert_eq!(basic_attack(&mut sim, player), Some(row("Slash")));
+    assert!(errors(&sim, 1).is_empty());
+
+    let potion: ItemId = row("HealthPotion");
+    give(&mut sim, player, potion, 1);
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Weapon(potion),
+        },
+    );
+    settle(&mut sim);
+    assert_eq!(basic_attack(&mut sim, player), Some(row("Slash")));
+    assert!(
+        errors(&sim, 1)
+            .iter()
+            .any(|text| text.contains("no basic attack"))
+    );
+}
+
+#[test]
+fn slotting_what_the_bar_already_holds_moves_it() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    let potion = HotbarEntry::Item(row("HealthPotion"));
+    give(&mut sim, player, row("HealthPotion"), 2);
+
+    for slot in [HotbarSlot(0), HotbarSlot(3)] {
+        sim.send(
+            1,
+            AssignHotbarRequest {
+                slot,
+                entry: potion,
+            },
+        );
+    }
+    sim.send(
+        1,
+        AssignHotbarRequest {
+            slot: HotbarSlot(1),
+            entry: skill_entry("Slash"),
+        },
+    );
+    settle(&mut sim);
+    let bar = sim.world().get::<Hotbar>(player).expect("hotbar").clone();
+    assert_eq!(bar.entry(HotbarSlot(0)), HotbarEntry::Empty);
+    assert_eq!(bar.entry(HotbarSlot(3)), potion);
+
+    sim.send(
+        1,
+        AssignHotbarRequest {
+            slot: HotbarSlot(1),
+            entry: potion,
+        },
+    );
+    sim.send(
+        1,
+        AssignHotbarRequest {
+            slot: HotbarSlot(3),
+            entry: skill_entry("Slash"),
+        },
+    );
+    settle(&mut sim);
+    let bar = sim.world().get::<Hotbar>(player).expect("hotbar");
+    assert_eq!(bar.entry(HotbarSlot(1)), potion);
+    assert_eq!(bar.entry(HotbarSlot(3)), skill_entry("Slash"));
 }
 
 #[test]
@@ -188,7 +307,12 @@ fn an_empty_basic_attack_slot_says_so_on_a_click() {
     let orc = orc_near(&mut sim, player, 1.0, 1.0);
     let full = stat::effective(sim.world(), orc, StatKind::Health);
 
-    sim.send(1, AssignBasicAttackRequest { skill: None });
+    sim.send(
+        1,
+        AssignBasicAttackRequest {
+            pick: BasicAttackPick::Empty,
+        },
+    );
     settle(&mut sim);
     sim.send(1, AttackRequest { target: orc });
     settle(&mut sim);

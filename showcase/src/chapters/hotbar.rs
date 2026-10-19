@@ -1,8 +1,10 @@
 use driver::{
-    UiTarget, aiming, blocked, cooling, holding, input_name, pressed, resident_home, slot_item,
+    UiTarget, aiming, blocked, content, cooling, holding, input_name, pressed, resident_home,
+    slot_item,
 };
 use engine::core::math::Offset;
 use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
 use engine::systems::skill::bar::HotbarPress;
 
 use crate::chapters::Chapter;
@@ -16,6 +18,7 @@ pub const CHAPTER: Chapter = Chapter {
 };
 
 const POTION: &str = "icons/potion/red_potion.png";
+const SWORD: &str = "icons/weapon_and_tool/silver_sword.png";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as(
@@ -103,6 +106,13 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("a potion drunk", |snapshot| {
         holding(snapshot, "health_potion") == 1
     });
+    me.caption("Each skill or item holds one slot: carry it onto another, and it moves there");
+    me.act(InputAction::ToggleInventory);
+    me.carry_onto(in_bag(POTION), UiTarget::starting("Hotbar slot 7"));
+    me.wait_until("the potion moved to slot 7", |snapshot| {
+        slot_item(snapshot, 6) == Some("health_potion") && slot_item(snapshot, 4).is_none()
+    });
+    me.act(InputAction::ToggleInventory);
     me.caption(&format!(
         "{} a slot to rebind its key, or to clear it",
         input_name(InputAction::SlotOptions)
@@ -127,11 +137,11 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.act_on_ui(
         InputAction::SlotOptions,
-        UiTarget::starting("Hotbar slot 5"),
+        UiTarget::starting("Hotbar slot 7"),
     );
     me.click_ui(UiTarget::button("Clear slot"));
-    me.wait_until("slot 5 cleared", |snapshot| {
-        slot_item(snapshot, 4).is_none()
+    me.wait_until("slot 7 cleared", |snapshot| {
+        slot_item(snapshot, 6).is_none()
     });
     me.caption("The bar is a grid of any shape: pull its corner, and it snaps to whole slots");
     me.drag_ui("Resize", Offset::new(-200.0, -44.0));
@@ -145,4 +155,49 @@ fn play(shoot: &mut Shoot) {
     ));
     me.hover_ui(UiTarget::starting("Basic attack slot"));
     me.hold();
+    me.caption(&format!(
+        "{} empties it; carry the weapon you wear onto it, from Equipment, and its attack is back",
+        input_name(InputAction::PinToHotbar)
+    ));
+    me.act_on_ui(
+        InputAction::PinToHotbar,
+        UiTarget::starting("Basic attack slot"),
+    );
+    me.wait_until("the basic attack slot empty", |snapshot| {
+        snapshot.basic_attack.is_none()
+    });
+    me.act(InputAction::ToggleEquipment);
+    me.carry_onto(
+        UiTarget::starting("Worn as"),
+        UiTarget::starting("Basic attack slot"),
+    );
+    me.wait_until("Slash back in the slot", slashing);
+    me.hold();
+    me.caption("Carry a weapon onto it from the bag, and you put it on to attack with it");
+    me.act_on_ui(InputAction::UseItem, UiTarget::starting("Worn as"));
+    me.wait_until("the sword taken off", |snapshot| {
+        holding(snapshot, "iron_sword") == 1 && snapshot.basic_attack.is_none()
+    });
+    me.act(InputAction::ToggleInventory);
+    me.carry_onto(in_bag(SWORD), UiTarget::starting("Basic attack slot"));
+    me.wait_until("the sword worn, swinging Slash", |snapshot| {
+        holding(snapshot, "iron_sword") == 0 && slashing(snapshot)
+    });
+    me.hold();
+}
+
+fn slashing(snapshot: &ProbeSnapshot) -> bool {
+    snapshot
+        .basic_attack
+        .is_some_and(|skill| skill.key(content()) == "slash")
+}
+
+fn in_bag(image: &str) -> UiTarget {
+    UiTarget::image(image).and("in the bag", |element, snapshot| {
+        !snapshot.ui.iter().any(|slot| {
+            slot.text.as_deref().is_some_and(|text| {
+                text.starts_with("Hotbar slot") || text.starts_with("Basic attack slot")
+            }) && slot.rect.contains(element.rect.center())
+        })
+    })
 }
