@@ -144,6 +144,20 @@ impl ContentRow for SkillDef {
                 );
             }
         }
+        if self.basic_attack {
+            let answers = "nothing: a click on an enemy must always answer";
+            if !self.cost.is_empty() {
+                check.error("/cost", "basic attack with a cost", "a cost", answers);
+            }
+            if self.cooldown.0 > 0.0 {
+                check.error(
+                    "/cooldown",
+                    "basic attack with a cooldown",
+                    self.cooldown.0,
+                    answers,
+                );
+            }
+        }
         match (self.target.aimed_at_point(), self.area.is_some()) {
             (true, false) => check.error(
                 "/area",

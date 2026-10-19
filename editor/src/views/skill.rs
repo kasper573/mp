@@ -19,7 +19,6 @@ pub fn ranks(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     if !value["levels"].is_array() {
         value["levels"] = Value::Array(Vec::new());
     }
-    warnings(ui, value);
     let levels = value["levels"].as_array_mut().expect("array");
     widgets::section_count(ui, "ranks", levels.len());
     let mut remove = None;
@@ -44,26 +43,6 @@ pub fn ranks(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         changed = FormChange::at("/levels");
     }
     changed
-}
-
-fn warnings(ui: &mut Ui, value: &Value) {
-    if value["basic_attack"] != true {
-        return;
-    }
-    let costs = value["cost"]
-        .as_array()
-        .is_some_and(|cost| !cost.is_empty());
-    let cools = value["cooldown"].as_f64().unwrap_or(0.0) > 0.0;
-    if costs {
-        ui.label(theme::warn(
-            "A basic attack spends nothing: a click on an enemy must always answer.",
-        ));
-    }
-    if cools {
-        ui.label(theme::warn(
-            "A basic attack with a cooldown leaves clicks unanswered while it cools.",
-        ));
-    }
 }
 
 fn rank_card(

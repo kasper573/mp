@@ -65,6 +65,7 @@ enum Hit {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrowserAction {
     Open,
     OpenTab,
@@ -72,6 +73,40 @@ pub enum BrowserAction {
     Rename,
     Usages,
     Delete,
+}
+
+/// The menu of what can be done to one row, each with its shortcut; `opening` adds the ways to
+/// open it. Answers the one picked.
+pub fn row_menu(ui: &mut Ui, fixture: bool, opening: bool) -> Option<BrowserAction> {
+    use BrowserAction::*;
+    let opens: &[BrowserAction] = if opening { &[Open, OpenTab] } else { &[] };
+    let groups = [opens, &[Duplicate, Rename, Usages], &[Delete]];
+    let mut picked = None;
+    let mut drawn = false;
+    for group in groups {
+        let allowed: Vec<BrowserAction> = group
+            .iter()
+            .copied()
+            .filter(|action| !fixture || action.suits_fixtures())
+            .collect();
+        if allowed.is_empty() {
+            continue;
+        }
+        if drawn {
+            ui.separator();
+        }
+        drawn = true;
+        for action in allowed {
+            if ui
+                .add(widgets::shortcut_button(action.label(), action.key()))
+                .clicked()
+            {
+                picked = Some(action);
+                ui.close();
+            }
+        }
+    }
+    picked
 }
 
 pub fn focus_search(editor: &mut Editor) {
@@ -215,7 +250,9 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                     menu: Some(&mut |ui, id| {
                         if let Some((table, key)) = row_of(id) {
                             let fixture = shapes.is_fixture(table, key);
-                            row_menu(ui, &mut action, table, key, fixture);
+                            if let Some(picked) = row_menu(ui, fixture, true) {
+                                action = Some((table.to_owned(), key.to_owned(), picked));
+                            }
                         }
                     }),
                     thumbs: Some(&mut |ctx, file| {
@@ -309,75 +346,46 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     }
     let pressed = ui.input_mut(|i| {
         [
-            (BrowserAction::Rename, EditorKey::Rename.consume(i)),
-            (BrowserAction::Usages, EditorKey::Usages.consume(i)),
-            (BrowserAction::Duplicate, EditorKey::Duplicate.consume(i)),
-            (BrowserAction::Delete, EditorKey::Delete.consume(i)),
-            (BrowserAction::OpenTab, EditorKey::OpenInNewTab.consume(i)),
+            BrowserAction::Rename,
+            BrowserAction::Usages,
+            BrowserAction::Duplicate,
+            BrowserAction::Delete,
+            BrowserAction::OpenTab,
         ]
         .into_iter()
-        .find(|(_, hit)| *hit)
-        .map(|(action, _)| action)
+        .find(|action| action.key().consume(i))
     });
     if let Some(action) = pressed {
         act(editor, &selection.table, &selection.keys[0], action);
     }
 }
 
-fn row_menu(
-    ui: &mut Ui,
-    action: &mut Option<(String, String, BrowserAction)>,
-    table: &str,
-    key: &str,
-    fixture: bool,
-) {
-    let mut pick = |what: BrowserAction, ui: &mut Ui| {
-        *action = Some((table.to_owned(), key.to_owned(), what));
-        ui.close();
-    };
-    if ui
-        .add(widgets::shortcut_button("Open", EditorKey::Confirm))
-        .clicked()
-    {
-        pick(BrowserAction::Open, ui);
-    }
-    if ui
-        .add(widgets::shortcut_button(
-            "Open in new tab",
-            EditorKey::OpenInNewTab,
-        ))
-        .clicked()
-    {
-        pick(BrowserAction::OpenTab, ui);
-    }
-    ui.separator();
-    if ui
-        .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
-        .clicked()
-    {
-        pick(BrowserAction::Duplicate, ui);
-    }
-    if !fixture
-        && ui
-            .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
-            .clicked()
-    {
-        pick(BrowserAction::Rename, ui);
-    }
-    if ui
-        .add(widgets::shortcut_button("Show usages", EditorKey::Usages))
-        .clicked()
-    {
-        pick(BrowserAction::Usages, ui);
-    }
-    if !fixture {
-        ui.separator();
-        if ui
-            .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
-            .clicked()
-        {
-            pick(BrowserAction::Delete, ui);
+impl BrowserAction {
+    fn label(self) -> &'static str {
+        match self {
+            BrowserAction::Open => "Open",
+            BrowserAction::OpenTab => "Open in new tab",
+            BrowserAction::Duplicate => "Duplicate",
+            BrowserAction::Rename => "Rename key…",
+            BrowserAction::Usages => "Show usages",
+            BrowserAction::Delete => "Delete…",
         }
+    }
+
+    fn key(self) -> EditorKey {
+        match self {
+            BrowserAction::Open => EditorKey::Confirm,
+            BrowserAction::OpenTab => EditorKey::OpenInNewTab,
+            BrowserAction::Duplicate => EditorKey::Duplicate,
+            BrowserAction::Rename => EditorKey::Rename,
+            BrowserAction::Usages => EditorKey::Usages,
+            BrowserAction::Delete => EditorKey::Delete,
+        }
+    }
+
+    /// A fixture's key is one every game provides, so it is neither renamed nor deleted.
+    fn suits_fixtures(self) -> bool {
+        !matches!(self, BrowserAction::Rename | BrowserAction::Delete)
     }
 }
 
@@ -585,7 +593,11 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             action = Some((table.clone(), key.clone(), BrowserAction::Open));
                         }
                         let fixture = editor.shapes.is_fixture(table, key);
-                        response.context_menu(|ui| row_menu(ui, &mut action, table, key, fixture));
+                        response.context_menu(|ui| {
+                            if let Some(picked) = row_menu(ui, fixture, true) {
+                                action = Some((table.clone(), key.clone(), picked));
+                            }
+                        });
                     }
                     Hit::Module {
                         table,

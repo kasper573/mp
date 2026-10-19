@@ -1,6 +1,5 @@
 pub mod bindings;
 pub mod preview;
-
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -42,7 +41,7 @@ use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
 use crate::tabs::EditorTab;
-use crate::ui::browser::{self, BrowserAction};
+use crate::ui::browser::{self};
 use crate::value::RowValue;
 use crate::views::script::{self, PendingScriptAction, ScriptOwner};
 use crate::views::{class, model, skill, tileset, vfx};
@@ -264,35 +263,8 @@ fn row_card(
                         .copy_text(serde_json::to_string_pretty(&*value).unwrap_or_default());
                     ui.close();
                 }
-                if ui.button("Duplicate").clicked() {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Duplicate));
-                    ui.close();
-                }
-                if !fixture
-                    && ui
-                        .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
-                        .clicked()
-                {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Rename));
-                    ui.close();
-                }
-                if ui.button("Show usages").clicked() {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Usages));
-                    ui.close();
-                }
-                if !fixture {
-                    ui.separator();
-                    if ui
-                        .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
-                        .clicked()
-                    {
-                        cx.actions
-                            .push(FormAction::RowAction(BrowserAction::Delete));
-                        ui.close();
-                    }
+                if let Some(action) = browser::row_menu(ui, fixture, false) {
+                    cx.actions.push(FormAction::RowAction(action));
                 }
             },
         );

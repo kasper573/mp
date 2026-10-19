@@ -1,14 +1,15 @@
+use bevy::input::keyboard::KeyCode;
+use bevy::input::mouse::MouseButton;
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::{ContentRow, row_file};
-use engine::systems::input::map::InputDef;
+use engine::systems::input::map::{InputBinding, InputBindingKind, InputDef, KeyModifiers};
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::forms::FormChange;
 use crate::project::ProjectFiles;
-use crate::value::RowValue;
 
 pub(super) fn bindings_section(
     ui: &mut Ui,
@@ -20,11 +21,14 @@ pub(super) fn bindings_section(
     let mut changed = FormChange::default();
     widgets::section(ui, "Bindings");
     let read = locks.iter().find_map(|lock| lock.variants("/bindings"));
-    let reads = |kind: &str| read.is_none_or(|read| read.iter().any(|known| known == kind));
+    let reads = |kind: InputBindingKind| {
+        read.is_none_or(|read| read.iter().any(|known| known == <&str>::from(kind)))
+    };
     if !value["bindings"].is_array() {
         value["bindings"] = Value::Array(Vec::new());
     }
     let mut remove = None;
+    let mut conflicts = Vec::new();
     ui.horizontal_wrapped(|ui| {
         for (index, binding) in value["bindings"]
             .as_array()
@@ -32,7 +36,7 @@ pub(super) fn bindings_section(
             .flatten()
             .enumerate()
         {
-            let (keys, kind) = binding_label(binding);
+            let (name, kind) = label(binding);
             let shared_with = also_bound(files, key, binding);
             egui::Frame::new()
                 .fill(theme::RAISED)
@@ -48,7 +52,7 @@ pub(super) fn bindings_section(
                 .inner_margin(egui::Margin::symmetric(6, 3))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        widgets::key_hint(ui, &keys);
+                        widgets::key_hint(ui, &name);
                         ui.label(theme::mono(kind).size(12.5));
                         if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove").clicked() {
                             remove = Some(index);
@@ -57,27 +61,18 @@ pub(super) fn bindings_section(
                 })
                 .response
                 .on_hover_text(if shared_with.is_empty() {
-                    format!("Only this input uses {keys}.")
+                    format!("Only this input uses {name}.")
                 } else {
                     format!("Also bound to {}.", shared_with.join(", "))
                 });
+            if !shared_with.is_empty() {
+                conflicts.push(format!(
+                    "{name} is also bound to {}",
+                    shared_with.join(", ")
+                ));
+            }
         }
     });
-    let conflicts: Vec<String> = value["bindings"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|binding| {
-            let others = also_bound(files, key, binding);
-            (!others.is_empty()).then(|| {
-                format!(
-                    "{} is also bound to {}",
-                    binding_label(binding).0,
-                    others.join(", ")
-                )
-            })
-        })
-        .collect();
     for conflict in conflicts {
         ui.label(theme::warn(conflict).size(12.5));
     }
@@ -129,158 +124,112 @@ pub(super) fn bindings_section(
             theme::faint(format!("The game reads this as: {}", kinds.join(" or "))).size(12.0),
         );
     }
-    if capturing {
-        let captured = ui.input(|i| {
-            if i.key_pressed(Key::Escape) {
-                return Some(None);
+    if !capturing {
+        return changed;
+    }
+    match ui.input(|input| capture(input, reads)) {
+        Some(Capture::Bound(binding)) => {
+            let binding = serde_json::to_value(binding).expect("a binding serializes");
+            let list = value["bindings"].as_array_mut().expect("bindings");
+            if !list.contains(&binding) {
+                list.push(binding);
+                changed = FormChange::at("/bindings");
             }
-            for event in &i.events {
-                match event {
-                    egui::Event::Key {
-                        key,
-                        pressed: true,
-                        modifiers,
-                        ..
-                    } if reads("key") => {
-                        let name = key_code_name(*key);
-                        return Some(Some(binding_json(
-                            "key",
-                            modifiers,
-                            serde_json::json!({ "key": name }),
-                        )));
-                    }
-                    egui::Event::PointerButton {
-                        button,
-                        pressed: true,
-                        modifiers,
-                        ..
-                    } => {
-                        let name = match button {
-                            egui::PointerButton::Primary => "Left",
-                            egui::PointerButton::Secondary => "Right",
-                            egui::PointerButton::Middle => "Middle",
-                            _ => "Left",
-                        };
-                        let pointer = ["click", "drag", "mouse"]
-                            .into_iter()
-                            .find(|kind| reads(kind));
-                        let Some(kind) = pointer else {
-                            continue;
-                        };
-                        let fields = match kind {
-                            "click" => serde_json::json!({ "button": name, "times": 1 }),
-                            _ => serde_json::json!({ "button": name }),
-                        };
-                        return Some(Some(binding_json(kind, modifiers, fields)));
-                    }
-                    _ => {}
-                }
-            }
-            None
-        });
-        match captured {
-            Some(Some(binding)) => {
-                let list = value["bindings"].as_array_mut().expect("bindings");
-                if !list.contains(&binding) {
-                    list.push(binding);
-                    changed = FormChange::at("/bindings");
-                }
-                ui.ctx().data_mut(|d| d.insert_temp(id, false));
-            }
-            Some(None) => {
-                ui.ctx().data_mut(|d| d.insert_temp(id, false));
-            }
-            None => {}
+            ui.ctx().data_mut(|d| d.insert_temp(id, false));
         }
+        Some(Capture::Cancelled) => {
+            ui.ctx().data_mut(|d| d.insert_temp(id, false));
+        }
+        None => {}
     }
     changed
 }
 
-pub(super) fn binding_json(kind: &str, modifiers: &egui::Modifiers, mut fields: Value) -> Value {
-    fields["type"] = Value::String(kind.to_owned());
-    if modifiers.ctrl || modifiers.command {
-        fields["ctrl"] = Value::Bool(true);
+/// A binding as the game names it, and the kind of input it is.
+fn label(binding: &Value) -> (String, String) {
+    match serde_json::from_value::<InputBinding>(binding.clone()) {
+        Ok(binding) => {
+            let kind: &str = InputBindingKind::from(binding).into();
+            (binding.name(), kind.replace('_', " "))
+        }
+        Err(_) => ("?".to_owned(), "unreadable".to_owned()),
     }
-    if modifiers.shift {
-        fields["shift"] = Value::Bool(true);
-    }
-    if modifiers.alt {
-        fields["alt"] = Value::Bool(true);
-    }
-    fields
 }
 
-pub fn binding_label(binding: &Value) -> (String, String) {
-    let mut parts: Vec<String> = Vec::new();
-    if binding["ctrl"].as_bool().unwrap_or(false) {
-        parts.push("Ctrl".to_owned());
-    }
-    if binding["shift"].as_bool().unwrap_or(false) {
-        parts.push("Shift".to_owned());
-    }
-    if binding["alt"].as_bool().unwrap_or(false) {
-        parts.push("Alt".to_owned());
-    }
-    let kind = binding.kind_or("key").to_owned();
-    let main = match kind.as_str() {
-        "key" => binding["key"]
-            .as_str()
-            .unwrap_or("?")
-            .trim_start_matches("Key")
-            .trim_start_matches("Digit")
-            .to_owned(),
-        "any_key" => "any key".to_owned(),
-        "mouse" | "click" | "drag" => binding.text_or("button", "?").to_owned(),
-        _ => "?".to_owned(),
-    };
-    parts.push(main);
-    let kind = if kind == "click" && binding["times"].as_u64().unwrap_or(1) > 1 {
-        "double click".to_owned()
-    } else {
-        kind.replace('_', " ")
-    };
-    (parts.join(" "), kind)
+enum Capture {
+    Bound(InputBinding),
+    Cancelled,
 }
 
-pub(super) fn key_code_name(key: Key) -> String {
-    let name = key.name();
-    match key {
+fn capture(input: &egui::InputState, reads: impl Fn(InputBindingKind) -> bool) -> Option<Capture> {
+    if input.key_pressed(Key::Escape) {
+        return Some(Capture::Cancelled);
+    }
+    input.events.iter().find_map(|event| match event {
+        egui::Event::Key {
+            key,
+            physical_key,
+            pressed: true,
+            modifiers,
+            ..
+        } if reads(InputBindingKind::Key) => key_code(physical_key.unwrap_or(*key))
+            .map(|code| Capture::Bound(InputBinding::key(code).with(held(modifiers)))),
+        egui::Event::PointerButton {
+            button,
+            pressed: true,
+            modifiers,
+            ..
+        } => {
+            let button = match button {
+                egui::PointerButton::Secondary => MouseButton::Right,
+                egui::PointerButton::Middle => MouseButton::Middle,
+                _ => MouseButton::Left,
+            };
+            let binding = [
+                (InputBindingKind::Click, InputBinding::click(button)),
+                (InputBindingKind::Drag, InputBinding::drag(button)),
+                (InputBindingKind::Mouse, InputBinding::mouse(button)),
+            ]
+            .into_iter()
+            .find_map(|(kind, binding)| reads(kind).then_some(binding))?;
+            Some(Capture::Bound(binding.with(held(modifiers))))
+        }
+        _ => None,
+    })
+}
+
+fn held(modifiers: &egui::Modifiers) -> KeyModifiers {
+    KeyModifiers {
+        ctrl: modifiers.ctrl || modifiers.command,
+        shift: modifiers.shift,
+        alt: modifiers.alt,
+        super_key: false,
+    }
+}
+
+/// egui and bevy name a few keys apart; content stores bevy's names.
+fn key_code(key: Key) -> Option<KeyCode> {
+    let name = match key {
         Key::ArrowDown => "ArrowDown".to_owned(),
         Key::ArrowLeft => "ArrowLeft".to_owned(),
         Key::ArrowRight => "ArrowRight".to_owned(),
         Key::ArrowUp => "ArrowUp".to_owned(),
-        Key::Escape => "Escape".to_owned(),
-        Key::Tab => "Tab".to_owned(),
-        Key::Backspace => "Backspace".to_owned(),
-        Key::Enter => "Enter".to_owned(),
-        Key::Space => "Space".to_owned(),
-        Key::Insert => "Insert".to_owned(),
-        Key::Delete => "Delete".to_owned(),
-        Key::Home => "Home".to_owned(),
-        Key::End => "End".to_owned(),
-        Key::PageUp => "PageUp".to_owned(),
-        Key::PageDown => "PageDown".to_owned(),
-        Key::Comma => "Comma".to_owned(),
-        Key::Period => "Period".to_owned(),
-        Key::Minus => "Minus".to_owned(),
         Key::Equals => "Equal".to_owned(),
-        Key::Semicolon => "Semicolon".to_owned(),
-        Key::Quote => "Quote".to_owned(),
-        Key::Slash => "Slash".to_owned(),
-        Key::Backslash => "Backslash".to_owned(),
         Key::Backtick => "Backquote".to_owned(),
         Key::OpenBracket => "BracketLeft".to_owned(),
         Key::CloseBracket => "BracketRight".to_owned(),
         _ => {
-            if name.len() == 1 && name.chars().all(|c| c.is_ascii_alphabetic()) {
-                format!("Key{}", name.to_uppercase())
-            } else if name.len() == 1 && name.chars().all(|c| c.is_ascii_digit()) {
-                format!("Digit{name}")
-            } else {
-                name.to_owned()
+            let name = key.name();
+            match name.chars().next() {
+                Some(first) if name.len() == 1 && first.is_ascii_alphabetic() => {
+                    format!("Key{name}")
+                }
+                Some(first) if name.len() == 1 && first.is_ascii_digit() => format!("Digit{name}"),
+                _ => name.to_owned(),
             }
         }
-    }
+    };
+    serde_json::from_value(Value::String(name)).ok()
 }
 
 /// The other inputs that carry this same binding.

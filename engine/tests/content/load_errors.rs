@@ -164,6 +164,34 @@ fn a_binding_the_game_never_reads_for_its_action_is_refused() {
 }
 
 #[test]
+fn a_basic_attack_that_costs_or_cools_down_is_refused() {
+    let report = game()
+        .sword()
+        .item("ore", json!({ "kind": { "type": "resource" } }))
+        .edit("skill", "strike", |strike| {
+            strike["cost"] = json!([{ "item": "ore", "count": 1 }]);
+            strike["cooldown"] = json!(2.0);
+        })
+        .try_load()
+        .err()
+        .expect("refused");
+
+    assert_eq!(
+        rules_in(&report, "tables/skill/strike.json"),
+        vec![
+            (
+                "basic attack with a cost",
+                "nothing: a click on an enemy must always answer"
+            ),
+            (
+                "basic attack with a cooldown",
+                "nothing: a click on an enemy must always answer"
+            ),
+        ]
+    );
+}
+
+#[test]
 fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
     let report = Game::new()
         .shader("skill_area")
