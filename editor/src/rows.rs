@@ -17,7 +17,7 @@ use crate::usages::ContentUsage;
 use crate::views::area::placement;
 use crate::views::{vfx, world};
 use crate::{schema, usages};
-use engine::core::content::{load, row_file, row_of};
+use engine::core::content::{load, locate, row_file, row_of};
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
@@ -302,7 +302,7 @@ fn rewrite(
 
 fn split_pointer(pointer: &str) -> (&str, String) {
     let cut = pointer.rfind('/').unwrap_or(0);
-    let name = pointer[cut + 1..].replace("~1", "/").replace("~0", "~");
+    let name = locate::unescape(&pointer[cut + 1..]);
     (&pointer[..cut], name)
 }
 

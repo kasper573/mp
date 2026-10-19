@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
+use engine::core::content::locate;
 use engine::core::script::VariableType;
 use serde_json::{Map, Value, json};
 
@@ -128,7 +129,7 @@ pub fn at_pointer<'a>(
     let mut schema = settle(root, schema, value);
     let mut value = value;
     for segment in pointer.split('/').skip(1) {
-        let segment = segment.replace("~1", "/").replace("~0", "~");
+        let segment = locate::unescape(segment);
         let field = match kind(root, schema) {
             SchemaKind::Object => schema.get("properties")?.get(&segment)?,
             SchemaKind::Map(values) => values,

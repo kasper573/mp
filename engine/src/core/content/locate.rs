@@ -91,6 +91,10 @@ pub fn escape(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
+pub fn unescape(segment: &str) -> String {
+    segment.replace("~1", "/").replace("~0", "~")
+}
+
 fn strict_json() -> ParseOptions {
     ParseOptions {
         allow_comments: false,
