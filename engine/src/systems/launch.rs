@@ -18,6 +18,8 @@ pub const CLIENT_ENV_PREFIX: &str = "RIFT_CLIENT_";
 pub const OIDC_ENV_PREFIX: &str = "RIFT_AUTH_";
 pub const SETTINGS_FILE: &str = "rift.env";
 pub const TEST_CHARACTER_ROUTE: &str = "/test/character";
+/// The histogram of how long the server takes to step every world one tick.
+pub const TICK_METRIC: &str = "rift_tick_duration_seconds";
 
 /// What a server on fake auth takes as an account's sign-in.
 pub fn fake_token(account: &str) -> String {

@@ -27,8 +27,8 @@ use engine::systems::account::{AccountId, Identity};
 use engine::systems::area::{self, AreaDef, AreaId, transition};
 use engine::systems::launch::{
     AuthMode, BUILD_INFO_FLAG, BuildInfo, LaunchSettings, OIDC_ENV_PREFIX, OidcConfig, ReadyLine,
-    SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE, TestCharacterRequest,
-    build_info_line,
+    SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE, TICK_METRIC,
+    TestCharacterRequest, build_info_line,
 };
 use engine::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use engine::systems::player::{ClientId, SpawnPolicy, SpawnRules};
@@ -312,7 +312,7 @@ fn simulate(
         transport.send(&mut server);
 
         counter!("rift_ticks_total").increment(1);
-        histogram!("rift_tick_duration_seconds").record(started.elapsed().as_secs_f64());
+        histogram!(TICK_METRIC).record(started.elapsed().as_secs_f64());
         histogram!("rift_tick_interval_seconds").record(dt.as_secs_f64());
         gauge!("rift_clients_connected").set(conns.len() as f64);
         record_ecs_metrics(&worlds);

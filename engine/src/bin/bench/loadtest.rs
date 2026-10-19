@@ -22,7 +22,7 @@ use engine::core::net::SessionRequest;
 use engine::core::net::transport::{ClientSocket, SocketClientPlugin};
 use engine::core::platform::{ServerSocket, SocketState};
 use engine::systems::TICK_HZ;
-use engine::systems::launch::fake_token;
+use engine::systems::launch::{TICK_METRIC, fake_token};
 use engine::systems::player::JoinRequest;
 use engine::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
@@ -189,17 +189,18 @@ fn scrape_tick(http_url: &str) -> Option<(f64, f64)> {
         .body_mut()
         .read_to_string()
         .ok()?;
-    let mut sum = None;
-    let mut count = None;
-    for line in body.lines() {
-        let value = || line.rsplit(' ').next().and_then(|v| v.parse::<f64>().ok());
-        if line.starts_with("rift_tick_duration_seconds_sum") {
-            sum = value();
-        } else if line.starts_with("rift_tick_duration_seconds_count") {
-            count = value();
-        }
-    }
-    Some((sum?, count?))
+    let reading = |name: String| {
+        body.lines()
+            .find(|line| line.starts_with(&name))?
+            .rsplit(' ')
+            .next()?
+            .parse::<f64>()
+            .ok()
+    };
+    Some((
+        reading(format!("{TICK_METRIC}_sum"))?,
+        reading(format!("{TICK_METRIC}_count"))?,
+    ))
 }
 
 fn connected_count(clients: &[App]) -> usize {
