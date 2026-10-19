@@ -60,13 +60,7 @@ impl Fixture for VfxShaderFixture {
 
 pub fn play(world: &mut World, fixture: VfxFixture, site: VfxSite) {
     let content = world.resource::<Content>().clone();
-    super::spawn(
-        world,
-        fixture.id(&content),
-        site,
-        VfxParams::default(),
-        super::Delivery::default(),
-    );
+    super::show(world, fixture.id(&content), site);
 }
 
 pub fn play_for(world: &mut World, player: Entity, fixture: VfxFixture, site: VfxSite) {

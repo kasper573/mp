@@ -89,7 +89,7 @@ pub struct SkillDef {
     pub range: Option<Tiles>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area: Option<Shape>,
-    #[serde(default, skip_serializing_if = "is_no_time")]
+    #[serde(default, skip_serializing_if = "Seconds::is_zero")]
     pub cooldown: Seconds,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
@@ -761,8 +761,4 @@ pub fn check_all(loading: &mut Loading) {
             ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
         );
     }
-}
-
-fn is_no_time(seconds: &Seconds) -> bool {
-    seconds.0 == 0.0
 }

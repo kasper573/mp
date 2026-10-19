@@ -731,11 +731,7 @@ pub fn form_fields<'a>(root: &'a Value, node: &Value) -> Option<(&'a Value, Vec<
 }
 
 fn is_arrow(field: &Value) -> bool {
-    let types = schema::type_names(field);
-    types.len() == 2
-        && types.contains(&"string")
-        && types.contains(&"null")
-        && schema::marker(field).is_none()
+    schema::marker(field) == Some("x-arrow")
 }
 
 pub fn summary(node: &Value, catalogue: &NodeCatalogue) -> String {

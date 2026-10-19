@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::{StatusEffectId, Statuses, boost};
 use crate::core::content::Content;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::core::vfx::{VfxParams, VfxSite};
+use crate::core::vfx::VfxSite;
 use crate::systems::actor::Actor;
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{Inventory, ItemId, ItemKind};
@@ -212,13 +212,7 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_activate {
-            vfx::spawn(
-                world,
-                shown,
-                VfxSite::Actor(actor),
-                VfxParams::default(),
-                vfx::Delivery::default(),
-            );
+            vfx::show(world, shown, VfxSite::Actor(actor));
         }
         if let Some(heard) = def.sfx.on_activate {
             sound(world, actor, heard);
@@ -259,13 +253,7 @@ fn deactivate(world: &mut World, actor: Entity, source: AspectSource) {
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_expire {
-            vfx::spawn(
-                world,
-                shown,
-                VfxSite::Actor(actor),
-                VfxParams::default(),
-                vfx::Delivery::default(),
-            );
+            vfx::show(world, shown, VfxSite::Actor(actor));
         }
         if let Some(heard) = def.sfx.on_expire {
             sound(world, actor, heard);
@@ -297,13 +285,7 @@ fn play_during(world: &mut World, actor: Entity, source: AspectSource, now: Unix
     }
     let shown = def.vfx.during.and_then(|shown| {
         let lasts = shown.get(&content).lasts();
-        let entity = vfx::spawn(
-            world,
-            shown,
-            VfxSite::Actor(actor),
-            VfxParams::default(),
-            vfx::Delivery::default(),
-        )?;
+        let entity = vfx::show(world, shown, VfxSite::Actor(actor))?;
         Some((entity, lasts))
     });
     if let Some(heard) = def.sfx.during {

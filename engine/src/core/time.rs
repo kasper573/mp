@@ -1,4 +1,5 @@
 use std::hash::{Hash, Hasher};
+use std::time::SystemTime;
 
 use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
@@ -92,6 +93,10 @@ impl Hash for Seconds {
 }
 
 impl Seconds {
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+
     pub fn millis(self) -> Millis {
         Millis(self.0 * 1000.0)
     }
@@ -190,6 +195,15 @@ impl UnixMillis {
 
     pub fn since(self, earlier: UnixMillis) -> Seconds {
         Millis(self.0.saturating_sub(earlier.0) as f32).seconds()
+    }
+}
+
+impl From<SystemTime> for UnixMillis {
+    fn from(time: SystemTime) -> UnixMillis {
+        let since_epoch = time
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("the clock is set after 1970");
+        UnixMillis(since_epoch.as_millis() as u64)
     }
 }
 

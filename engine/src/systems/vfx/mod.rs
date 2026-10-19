@@ -45,6 +45,10 @@ pub struct Delivery {
     pub struck: Option<Vec<Entity>>,
 }
 
+pub fn show(world: &mut World, vfx: VfxId, site: VfxSite) -> Option<Entity> {
+    spawn(world, vfx, site, VfxParams::default(), Delivery::default())
+}
+
 /// Plays a vfx on a site everyone nearby sees.
 pub fn spawn(
     world: &mut World,

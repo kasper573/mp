@@ -21,7 +21,7 @@ use engine::core::math::Rng;
 use engine::core::net::SessionRequest;
 use engine::core::net::auth::TokenClaims;
 use engine::core::platform::StdinClosed;
-use engine::core::time::{UnixMillis, UtcHour, WallClock};
+use engine::core::time::{UtcHour, WallClock};
 use engine::systems::account::{AccountId, Identity};
 use engine::systems::area::{self, AreaDef, AreaId, transition};
 use engine::systems::launch::{
@@ -333,11 +333,8 @@ fn simulate(
 }
 
 fn wall_clock(reset: UtcHour) -> WallClock {
-    let since_epoch = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("system clock is set after 1970");
     WallClock {
-        now: UnixMillis(u64::try_from(since_epoch.as_millis()).expect("millis since 1970 fit u64")),
+        now: SystemTime::now().into(),
         reset,
     }
 }

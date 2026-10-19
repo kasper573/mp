@@ -4,7 +4,7 @@
 //! holds.
 
 use std::collections::BTreeMap;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use bevy::prelude::*;
 use engine::core::content::Content;
@@ -91,7 +91,7 @@ impl LiveWorld {
         let settings = content.built::<GameSettings>();
         let spawn = settings.initial_spawn;
         let clock = WallClock {
-            now: UnixMillis(epoch_millis()),
+            now: SystemTime::now().into(),
             reset: UtcHour::MIDNIGHT,
         };
         let mut app = server_app(spawn.area, 0, SEED, clock, content);
@@ -483,10 +483,4 @@ fn enemy_model(content: &Content, zone: AreaId) -> ModelId {
                 .map(|npc| npc.get(content).model)
         })
         .unwrap_or_else(|| content.built::<GameSettings>().player.get(content).model)
-}
-
-fn epoch_millis() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as u64)
 }
