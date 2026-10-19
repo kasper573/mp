@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use engine::systems::area::world_map::{Note, Region};
 use engine::systems::area::{self, AreaDef};
 use serde::Deserialize;
+use strum::VariantNames;
 
 use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
 use crate::import::ImportStep;
@@ -24,8 +25,9 @@ use crate::views::world::{
 use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, VariantNames)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Step {
     Area(String),
     Blueprint(String),

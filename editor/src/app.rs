@@ -40,7 +40,7 @@ use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, ui, views};
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
     pub scene: Option<Vec<Step>>,
