@@ -191,24 +191,30 @@ fn harbour() -> Sim {
             "gold",
             json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 100_000 }] }),
         )
-        .npc("gambler", 40.0, json!([gambling()]))
+        .npc("gambler", 40.0, json!([{ "type": "script", "script": "gambler_roll" }]))
+        .script("gambler_roll", "npc/gambler", "npc", gambling())
         .npc(
             "gambler_hostile",
             40.0,
             json!([
-                hunting(),
-                {
-                    "type": "inline_script",
-                    "nodes": {
-                        "defeated": { "type": "on", "event": "defeated", "next": "over" },
-                        "over": { "type": "forget", "memories": ["fighting"], "next": "dead" },
-                        "dead": { "type": "remember", "memory": "dead" },
-                    },
-                },
+                { "type": "script", "script": "gambler_hostile_hunt" },
+                { "type": "script", "script": "gambler_hostile_defeat" },
             ]),
         )
+        .owned("script", "gambler_hostile_hunt", "npc/gambler_hostile", hunting())
+        .script(
+            "gambler_hostile_defeat",
+            "npc/gambler_hostile",
+            "npc",
+            json!({
+                "defeated": { "type": "on", "event": "defeated", "next": "over" },
+                "over": { "type": "forget", "memories": ["fighting"], "next": "dead" },
+                "dead": { "type": "remember", "memory": "dead" },
+            }),
+        )
         .edit("npc", "gambler_hostile", |copy| copy["basic_attack"] = json!("strike"))
-        .npc("guard", 30.0, json!([hunting()]))
+        .npc("guard", 30.0, json!([{ "type": "script", "script": "guard_hunt" }]))
+        .owned("script", "guard_hunt", "npc/guard", hunting())
         .edit("npc", "guard", |guard| guard["basic_attack"] = json!("strike"))
         .npc("baker", 20.0, json!([{ "type": "respawn", "after": 5.0 }]))
         .row("memory", "grudge", memory_row("never"))
@@ -260,8 +266,6 @@ fn gambling() -> Value {
         })
     };
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": {
                 "type": "on",
                 "event": "interacted",
@@ -311,13 +315,12 @@ fn gambling() -> Value {
                 "near": "owner",
                 "shown": "subject",
             },
-        },
     })
 }
 
 fn hunting() -> Value {
     json!({
-        "type": "inline_script",
+        "runs_on": "npc",
         "locals": { "target": "actor" },
         "nodes": {
             "spawned": { "type": "on", "event": "started", "next": "hostile" },

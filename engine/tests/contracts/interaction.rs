@@ -74,28 +74,40 @@ fn beach() -> Sim {
             "beach",
             &Map::open(9, 9),
             json!([
-                object("board", 2.0, 4.0, json!({
-                    "interacted": { "type": "on", "event": "interacted", "verb": "read", "reach": 1.5, "next": "read" },
-                    "read": said("Notices flap on the post."),
-                })),
-                object("chest", 6.0, 4.0, json!({
-                    "interacted": { "type": "on", "event": "interacted", "verb": "open", "reach": 1.5, "next": "looted" },
-                    "looted": {
-                        "type": "if",
-                        "test": { "type": "memory", "memory": "chest_looted" },
-                        "yes": "empty",
-                        "no": "loot",
-                    },
-                    "loot": {
-                        "type": "items",
-                        "give": [{ "item": "gold", "count": 5 }],
-                        "done": "remember",
-                    },
-                    "remember": { "type": "remember", "memory": "chest_looted", "next": "found" },
-                    "found": said("Five coins glint in the sand."),
-                    "empty": said("Only sand."),
-                })),
+                object("board", 2.0, 4.0, "board_read"),
+                object("chest", 6.0, 4.0, "chest_open"),
             ]),
+        )
+        .script(
+            "board_read",
+            "area/beach",
+            "object",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "read", "reach": 1.5, "next": "read" },
+                "read": said("Notices flap on the post."),
+            }),
+        )
+        .script(
+            "chest_open",
+            "area/beach",
+            "object",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "open", "reach": 1.5, "next": "looted" },
+                "looted": {
+                    "type": "if",
+                    "test": { "type": "memory", "memory": "chest_looted" },
+                    "yes": "empty",
+                    "no": "loot",
+                },
+                "loot": {
+                    "type": "items",
+                    "give": [{ "item": "gold", "count": 5 }],
+                    "done": "remember",
+                },
+                "remember": { "type": "remember", "memory": "chest_looted", "next": "found" },
+                "found": said("Five coins glint in the sand."),
+                "empty": said("Only sand."),
+            }),
         )
         .hero("beach", 4.0, 4.0)
         .item(
@@ -126,14 +138,14 @@ fn beach() -> Sim {
     sim
 }
 
-fn object(name: &str, x: f32, y: f32, nodes: Value) -> Value {
+fn object(name: &str, x: f32, y: f32, script: &str) -> Value {
     json!({
         "type": "object",
         "name": name,
         "label": name,
         "shape": { "type": "point", "x": x, "y": y },
         "look": "objects/look.png",
-        "scripts": [{ "type": "inline_script", "nodes": nodes }],
+        "scripts": [{ "script": script }],
     })
 }
 

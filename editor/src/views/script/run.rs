@@ -130,8 +130,8 @@ struct Watched {
 
 pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let bound = bindings(editor, doc);
-    let owner_key = doc.owner.clone();
-    let mut setup: RunSetup = editor.views.script.setup_of(&owner_key);
+    let row_key = doc.at.clone();
+    let mut setup: RunSetup = editor.views.script.setup_of(&row_key);
     let events: Vec<String> = doc
         .nodes()
         .values()
@@ -160,8 +160,8 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .collect()
         })
         .unwrap_or_default();
-    let running = editor.views.script.run_of(&doc.owner).is_some();
-    let mut start = editor.views.script.take_fire(&doc.owner);
+    let running = editor.views.script.run_of(&doc.at).is_some();
+    let mut start = editor.views.script.take_fire(&doc.at);
     let mut stop = false;
     let mut open_owner: Option<String> = None;
     let mut step = false;
@@ -175,7 +175,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         {
             start = true;
         }
-        widgets::combo(("run-event", doc.owner.slug()))
+        widgets::combo(("run-event", doc.at.slug()))
             .selected_text(theme::mono(&setup.event).size(13.0))
             .show_ui(ui, |ui| {
                 for event in &events {
@@ -212,7 +212,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             }
             _ => {
-                widgets::combo(("run-owner", doc.owner.slug()))
+                widgets::combo(("run-owner", doc.at.slug()))
                     .selected_text(
                         theme::mono(
                             bound
@@ -230,7 +230,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         ui.label(theme::muted("by").size(13.0));
-        widgets::combo(("run-character", doc.owner.slug()))
+        widgets::combo(("run-character", doc.at.slug()))
             .selected_text(
                 theme::mono(
                     setup
@@ -287,7 +287,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted(format!("{name} takes")));
                     let pick = setup.random.get(name).copied();
-                    widgets::combo(("run-random", doc.owner.slug(), name))
+                    widgets::combo(("run-random", doc.at.slug(), name))
                         .selected_text(pick.map_or("its weights".to_owned(), |index| {
                             format!("output {}", index + 1)
                         }))
@@ -314,7 +314,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         });
     });
-    editor.views.script.set_setup(&owner_key, setup.clone());
+    editor.views.script.set_setup(&row_key, setup.clone());
     if let Some(file) = open_owner
         && let Some((table, key)) = row_of(&file)
     {
@@ -354,7 +354,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .or(bound.first())
         .map(|b| b.label.clone())
         .unwrap_or_default();
-    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
+    let Some(run) = editor.views.script.run_of_mut(&row_key) else {
         if bound.is_empty() {
             widgets::hint(
                 ui,
@@ -380,7 +380,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut skip = false;
     let mut resume = false;
     egui::ScrollArea::vertical()
-        .id_salt(("run-trace", doc.owner.slug()))
+        .id_salt(("run-trace", doc.at.slug()))
         .stick_to_bottom(true)
         .show(ui, |ui| {
             let mut row_number = 0;
@@ -473,7 +473,7 @@ struct NodeCard {
 }
 
 pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let owner = doc.owner.clone();
+    let owner = doc.at.clone();
     let Some(run) = editor.views.script.run_of_mut(&owner) else {
         return;
     };
@@ -578,15 +578,15 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 }
 
 pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
-    let owner_key = doc.owner.clone();
-    if editor.views.script.run_of(&owner_key).is_none() {
+    let row_key = doc.at.clone();
+    if editor.views.script.run_of(&row_key).is_none() {
         return false;
     }
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return false;
     };
     let bound = bindings(editor, doc);
-    let setup = editor.views.script.setup_of(&owner_key);
+    let setup = editor.views.script.setup_of(&row_key);
     let reaches: Vec<Reach> = bound
         .get(setup.owner)
         .or(bound.first())
@@ -595,7 +595,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
     let read_memories = NodeReads::of(&content, doc.nodes()).memories;
     let state_names = inspect::names_of(&doc.script["state"]);
     let mut open: Option<EditorTab> = None;
-    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
+    let Some(run) = editor.views.script.run_of_mut(&row_key) else {
         return false;
     };
     let label = run.label.split(" · ").next().unwrap_or("").to_owned();
@@ -1044,7 +1044,7 @@ fn start_run(
     owner: &ScriptBinding,
     setup: &RunSetup,
 ) -> Result<ScriptRun, String> {
-    let doc_session = editor.views.script.session(&doc.owner);
+    let doc_session = editor.views.script.session(&doc.at);
     let project = editor.project.as_ref().ok_or("no project")?;
     let content = project.content.clone().ok_or("the folder does not load")?;
     let generation = project.generation;

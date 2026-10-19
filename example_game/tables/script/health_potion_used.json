@@ -1,0 +1,24 @@
+{
+  "owner": "item/health_potion",
+  "runs_on": "item",
+  "nodes": {
+    "drink": {
+      "type": "items",
+      "take": [
+        {
+          "item": "health_potion"
+        }
+      ],
+      "done": "mend"
+    },
+    "mend": {
+      "type": "heal",
+      "by": 10.0
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "drink"
+    }
+  }
+}

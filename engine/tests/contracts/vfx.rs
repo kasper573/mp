@@ -227,7 +227,13 @@ fn arena() -> (Sim, Entity) {
         .row(
             "skill",
             "cleave",
-            area_skill(json!({ "type": "cone", "angle": 90.0, "length": 2.0 }), json!({
+            area_skill(json!({ "type": "cone", "angle": 90.0, "length": 2.0 }), "cleave_sweep"),
+        )
+        .script(
+            "cleave_sweep",
+            "skill/cleave",
+            "skill",
+            area_nodes(json!({
                 "sweep": { "type": "vfx", "vfx": "swoosh", "on": { "type": "skill_area" }, "next": "hit" },
                 "hit": damage("show"),
                 "show": { "type": "vfx", "vfx": "slash_hit", "on": { "type": "skill_targets" } },
@@ -236,7 +242,13 @@ fn arena() -> (Sim, Entity) {
         .row(
             "skill",
             "fireball",
-            area_skill(json!({ "type": "circle", "radius": 2.0 }), json!({
+            area_skill(json!({ "type": "circle", "radius": 2.0 }), "fireball_blast"),
+        )
+        .script(
+            "fireball_blast",
+            "skill/fireball",
+            "skill",
+            area_nodes(json!({
                 "blast": { "type": "vfx", "vfx": "blast", "on": { "type": "skill_area" }, "next": "hit" },
                 "hit": damage_last(),
             }), "blast"),
@@ -244,7 +256,13 @@ fn arena() -> (Sim, Entity) {
         .row(
             "skill",
             "chain",
-            area_skill(json!({ "type": "circle", "radius": 3.0 }), json!({
+            area_skill(json!({ "type": "circle", "radius": 3.0 }), "chain_arc"),
+        )
+        .script(
+            "chain_arc",
+            "skill/chain",
+            "skill",
+            area_nodes(json!({
                 "arc": {
                     "type": "vfx",
                     "vfx": "arc",
@@ -292,10 +310,7 @@ fn arena() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn area_skill(area: Value, mut nodes: Value, first: &str) -> Value {
-    nodes["used"] = json!({ "type": "on", "event": "used", "next": "swing" });
-    nodes["swing"] =
-        json!({ "type": "animate", "action": "attack", "wait": "apex", "next": first });
+fn area_skill(area: Value, script: &str) -> Value {
     json!({
         "name": "Area skill",
         "icon": "icons/skill.png",
@@ -304,8 +319,15 @@ fn area_skill(area: Value, mut nodes: Value, first: &str) -> Value {
         "area": area,
         "cooldown": 6.0,
         "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": script }],
     })
+}
+
+fn area_nodes(mut nodes: Value, first: &str) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "swing" });
+    nodes["swing"] =
+        json!({ "type": "animate", "action": "attack", "wait": "apex", "next": first });
+    nodes
 }
 
 fn damage(next: &str) -> Value {

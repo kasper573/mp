@@ -474,7 +474,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             let project = project.as_ref().expect("project");
             let root = Value::Null;
             let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                .owned_by(AreaDef::TABLE, None);
+                .editing(AreaDef::TABLE, None);
             widgets::kv(ui, "blueprint", |ui| {
                 if picker::row(
                     ui,
@@ -574,7 +574,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 let mut actions = Vec::new();
                 let root = Value::Null;
                 let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                    .owned_by(AreaDef::TABLE, None);
+                    .editing(AreaDef::TABLE, None);
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
@@ -947,7 +947,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by(AreaDef::TABLE, Some(&area_key));
+            .editing(AreaDef::TABLE, Some(&area_key));
         if indices.len() == 1 {
             let index = indices[0];
             let view = views.area.views.get_mut(&super::area_view_key(&area_key));

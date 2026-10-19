@@ -398,19 +398,22 @@ fn harbour() -> Sim {
                     "label": "Standing stone",
                     "shape": { "type": "point", "x": 12.0, "y": 12.0 },
                     "look": "objects/stone.png",
-                    "scripts": [{
-                        "type": "inline_script",
-                        "nodes": {
-                            "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "on_quest" },
-                            "on_quest": { "type": "if", "test": on_quest("x_marks"), "yes": "found", "no": "look" },
-                            "found": { "type": "complete_task", "quest": "x_marks", "task": "find_stone", "next": "matches" },
-                            "matches": said("The stone matches the drawing.", "turn_in"),
-                            "turn_in": { "type": "turn_in", "quest": "x_marks" },
-                            "look": dialogue("Moss covers the runes.", json!([{ "label": ["Step away."] }])),
-                        },
-                    }],
+                    "scripts": [{ "script": "stone_look" }],
                 },
             ]),
+        )
+        .script(
+            "stone_look",
+            "area/harbour",
+            "object",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "on_quest" },
+                "on_quest": { "type": "if", "test": on_quest("x_marks"), "yes": "found", "no": "look" },
+                "found": { "type": "complete_task", "quest": "x_marks", "task": "find_stone", "next": "matches" },
+                "matches": said("The stone matches the drawing.", "turn_in"),
+                "turn_in": { "type": "turn_in", "quest": "x_marks" },
+                "look": dialogue("Moss covers the runes.", json!([{ "label": ["Step away."] }])),
+            }),
         )
         .asset("objects/stone.png", testkit::png(1, 1))
         .hero("harbour", 7.0, 7.0)
@@ -434,36 +437,42 @@ fn harbour() -> Sim {
         .item("key", quest_item("resource"))
         .item("map", {
             let mut map = quest_item("usable");
-            map["modules"].as_array_mut().expect("modules").push(json!({
-                "type": "inline_script",
-                "nodes": {
-                    "used": { "type": "on", "event": "used", "next": "read" },
-                    "read": { "type": "if", "test": on_quest("x_marks"), "yes": "waiting", "no": "offer" },
-                    "offer": said("A cross is scrawled beside a standing stone.", "card"),
-                    "card": { "type": "offer_quest", "quest": "x_marks" },
-                    "waiting": dialogue("The cross sits beside a standing stone.", json!([{ "label": ["Fold it away."] }])),
-                },
-            }));
+            map["modules"].as_array_mut().expect("modules").push(json!({ "type": "script", "script": "map_read" }));
             map
         })
+        .script(
+            "map_read",
+            "item/map",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "read" },
+                "read": { "type": "if", "test": on_quest("x_marks"), "yes": "waiting", "no": "offer" },
+                "offer": said("A cross is scrawled beside a standing stone.", "card"),
+                "card": { "type": "offer_quest", "quest": "x_marks" },
+                "waiting": dialogue("The cross sits beside a standing stone.", json!([{ "label": ["Fold it away."] }])),
+            }),
+        )
         .npc("bat", 10.0, json!([]))
         .npc("rat", 10.0, json!([]))
-        .npc(
-            "giver",
-            40.0,
-            json!([talker(
+        .script(
+            "giver_talk",
+            "npc/giver",
+            "npc",
+            talker(
                 json!([
                     { "label": ["A Letter"], "requires": not(quest_done("letter")), "to": "letter" },
                     { "label": ["Low Tide"], "requires": not(quest_done("low_tide")), "to": "low_tide" },
                     { "label": ["Goodbye."] },
                 ]),
                 [offered("letter", "I'll take it."), offered("low_tide", "I'll hurry.")],
-            )]),
+            ),
         )
-        .npc(
-            "captain",
-            40.0,
-            json!([talker(
+        .npc("giver", 40.0, json!([{ "type": "script", "script": "giver_talk" }]))
+        .script(
+            "captain_talk",
+            "npc/captain",
+            "npc",
+            talker(
                 json!([
                     { "label": ["A Letter"], "requires": on_quest("letter"), "to": "letter_turn_in" },
                     {
@@ -483,23 +492,27 @@ fn harbour() -> Sim {
                     }),
                     offered("bats", "I'll clear them."),
                 ],
-            )]),
+            ),
         )
-        .npc(
-            "keeper",
-            40.0,
-            json!([talker(
+        .npc("captain", 40.0, json!([{ "type": "script", "script": "captain_talk" }]))
+        .script(
+            "keeper_talk",
+            "npc/keeper",
+            "npc",
+            talker(
                 json!([
                     { "label": ["Tithe"], "requires": not(json!({ "type": "quest_cooling", "quest": "tithe" })), "to": "tithe" },
                     { "label": ["Goodbye."] },
                 ]),
                 [offered("tithe", "I'll bring today's bones.")],
-            )]),
+            ),
         )
-        .npc(
-            "trader",
-            40.0,
-            json!([talker(
+        .npc("keeper", 40.0, json!([{ "type": "script", "script": "keeper_talk" }]))
+        .script(
+            "trader_talk",
+            "npc/trader",
+            "npc",
+            talker(
                 json!([
                     { "label": ["Show me your wares."], "to": "wares" },
                     { "label": ["Tusks"], "requires": not(quest_done("tusks")), "to": "tusks" },
@@ -512,9 +525,11 @@ fn harbour() -> Sim {
                     }),
                     offered("tusks", "I'll bring them."),
                 ],
-            )]),
+            ),
         )
-        .npc("shaman", 40.0, json!([shaman()]))
+        .npc("trader", 40.0, json!([{ "type": "script", "script": "trader_talk" }]))
+        .npc("shaman", 40.0, json!([{ "type": "script", "script": "shaman_talk" }]))
+        .script("shaman_talk", "npc/shaman", "npc", shaman())
         .row(
             "shop",
             "wares",
@@ -697,7 +712,7 @@ fn talker<const N: usize>(choices: Value, topics: [Value; N]) -> Value {
             nodes[key] = node.clone();
         }
     }
-    json!({ "type": "inline_script", "nodes": nodes })
+    nodes
 }
 
 /// The nodes of a quest offered on its title's choice, accepted with `accept`, and handed in on
@@ -738,8 +753,6 @@ fn offered(quest: &str, accept: &str) -> Value {
 /// A shaman who asks for the tusks the trader wants, and befriends whoever hands them over.
 fn shaman() -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "befriended" },
             "befriended": { "type": "if", "test": { "type": "memory", "memory": "sided" }, "yes": "friend", "no": "spurned_before" },
             "spurned_before": { "type": "if", "test": { "type": "memory", "memory": "spurned" }, "yes": "silent", "no": "hello" },
@@ -773,7 +786,6 @@ fn shaman() -> Value {
             "plea_kept": { "type": "turn_in", "quest": "plea", "done": "remember_spurned" },
             "remember_spurned": { "type": "remember", "memory": "spurned", "next": "silent" },
             "friend": dialogue("Friend of the clan.", json!([{ "label": ["Farewell."] }])),
-        },
     })
 }
 

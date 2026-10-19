@@ -69,6 +69,17 @@ impl Game {
         self.owned(table, key, owner, row)
     }
 
+    /// A script row of `nodes`, local to `owner` and run by a `runs_on`, that a script module names
+    /// by `key`.
+    pub fn script(self, key: &str, owner: &str, runs_on: &str, nodes: Value) -> Game {
+        self.owned(
+            "script",
+            key,
+            owner,
+            json!({ "runs_on": runs_on, "nodes": nodes }),
+        )
+    }
+
     /// A file under the folder's `assets/`.
     pub fn asset(mut self, path: &str, bytes: Vec<u8>) -> Game {
         self.put(&asset_file(path), bytes);
@@ -143,18 +154,21 @@ impl Game {
                 "target": "single_enemy",
                 "basic_attack": true,
                 "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "swing" },
-                        "swing": { "type": "animate", "action": "attack", "wait": "apex", "next": "hit" },
-                        "hit": {
-                            "type": "damage",
-                            "who": { "type": "skill_targets" },
-                            "by": { "type": "stat", "stat": "damage" },
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "strike" }],
+            }),
+        )
+        .script(
+            "strike",
+            "skill/strike",
+            "skill",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "swing" },
+                "swing": { "type": "animate", "action": "attack", "wait": "apex", "next": "hit" },
+                "hit": {
+                    "type": "damage",
+                    "who": { "type": "skill_targets" },
+                    "by": { "type": "stat", "stat": "damage" },
+                },
             }),
         )
         .asset("icons/strike.png", png(1, 1))

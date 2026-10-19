@@ -21,7 +21,7 @@
       "xp": 10
     },
     {
-      "type": "shared_script",
+      "type": "script",
       "script": "combat_aggressive",
       "values": {
         "aggro": 10.0

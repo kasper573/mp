@@ -1,0 +1,18 @@
+{
+  "owner": "status_effect/poisoned",
+  "runs_on": "status_effect",
+  "nodes": {
+    "bite": {
+      "type": "damage",
+      "by": {
+        "type": "status_power"
+      }
+    },
+    "every": {
+      "type": "on",
+      "event": "interval",
+      "seconds": 2.0,
+      "next": "bite"
+    }
+  }
+}

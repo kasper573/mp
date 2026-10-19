@@ -1,0 +1,20 @@
+{
+  "owner": "skill/toughness",
+  "runs_on": "skill",
+  "nodes": {
+    "activated": {
+      "type": "on",
+      "event": "activated",
+      "next": "harden"
+    },
+    "harden": {
+      "type": "boost",
+      "stat": "max_health",
+      "by": {
+        "type": "skill_stat",
+        "skill": "toughness",
+        "stat": "power"
+      }
+    }
+  }
+}

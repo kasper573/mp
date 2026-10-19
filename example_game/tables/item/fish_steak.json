@@ -20,34 +20,8 @@
       "max": 10
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "eat": {
-          "type": "items",
-          "take": [
-            {
-              "item": "fish_steak"
-            }
-          ],
-          "done": "mend"
-        },
-        "fill": {
-          "type": "apply_status",
-          "effect": "well_fed",
-          "power": 5.0,
-          "seconds": 60.0
-        },
-        "mend": {
-          "type": "heal",
-          "by": 15.0,
-          "next": "fill"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "eat"
-        }
-      }
+      "type": "script",
+      "script": "fish_steak_used"
     }
   ]
 }

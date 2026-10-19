@@ -10,25 +10,12 @@ use engine::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
 use testkit::{Sim, labels};
 
-use crate::game::{field, health, inline, inline_with, scripted_npc, spawn};
+use crate::game::{field, health, module, scripted_npc, spawn};
 
 #[test]
 fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "interacted": interacted("wait"),
-        "wait": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "hello" },
-        "hello": say("Pay up.", vec![("Pay.", Some("pay"))]),
-        "pay": {
-            "type": "items",
-            "take": [{ "item": "gold", "count": 5 }],
-            "done": "paid",
-            "refused": "broke"
-        },
-        "paid": say("Thanks.", vec![("Bye.", None)]),
-        "broke": say("No coin?", vec![("Bye.", None)]),
-    }));
-    let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, owner) = scripted_npc(&mut sim, player, &[&module("flow_pay_later")]);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
     assert!(!sim.run_until(0.5, |world| world.get::<Conversation>(player).is_some()));
@@ -54,15 +41,7 @@ fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
 fn flows_run_in_the_order_their_events_were_raised() {
     let (mut sim, player) = field();
     let (gulls, sails) = (sim.spoken("gulls"), sim.spoken("sails"));
-    let script = inline(json!({
-        "interacted": interacted("first"),
-        "first": { "type": "notify", "notification": "gulls" },
-        "came_near": {
-            "type": "on", "event": "came_near", "within": 3.0, "by": "characters", "next": "second"
-        },
-        "second": { "type": "notify", "notification": "sails" },
-    }));
-    let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, owner) = scripted_npc(&mut sim, player, &[&module("flow_notices")]);
     sim.forget_notified();
 
     raise(&mut sim, owner, EventKind::Interacted, player);
@@ -81,21 +60,7 @@ fn flows_run_in_the_order_their_events_were_raised() {
 #[test]
 fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "interacted": interacted("hostile"),
-        "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
-        "attack": {
-            "type": "attack",
-            "target": { "type": "subject" },
-            "within": 10.0,
-            "priority": 5,
-            "lost": "lost",
-            "interrupted": "stopped"
-        },
-        "stopped": remember("bribed", None),
-        "lost": remember("sided", None),
-    }));
-    let (npc, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (npc, owner) = scripted_npc(&mut sim, player, &[&module("flow_interruptible")]);
     let full = health(&sim, player);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
@@ -128,19 +93,7 @@ fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
 #[test]
 fn an_attack_loses_a_target_that_leaves_its_range() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "interacted": interacted("hostile"),
-        "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
-        "attack": {
-            "type": "attack",
-            "target": { "type": "subject" },
-            "within": 10.0,
-            "priority": 5,
-            "lost": "lost"
-        },
-        "lost": remember("sided", None),
-    }));
-    let (npc, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (npc, owner) = scripted_npc(&mut sim, player, &[&module("flow_leash")]);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
     assert!(sim.run_until(5.0, |world| body::target(world, npc) == Some(player)));
@@ -154,26 +107,7 @@ fn an_attack_loses_a_target_that_leaves_its_range() {
 #[test]
 fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
     let (mut sim, player) = field();
-    let nobody = json!({ "type": "local", "local": "nobody" });
-    let script = inline_with(
-        json!({ "nobody": "actor" }),
-        json!({
-            "interacted": interacted("give"),
-            "give": {
-                "type": "items",
-                "who": nobody,
-                "give": [{ "item": "gold" }],
-                "done": "gave",
-                "refused": "refused"
-            },
-            "gave": remember("sided", None),
-            "refused": remember("bribed", Some("heal")),
-            "heal": { "type": "heal", "who": nobody, "by": "full", "next": "despawn" },
-            "despawn": { "type": "despawn", "who": nobody, "done": "gone" },
-            "gone": remember("looted", None),
-        }),
-    );
-    let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, owner) = scripted_npc(&mut sim, player, &[&module("flow_nobody")]);
     stat::apply_damage(&mut sim.world, player, 1.0);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
@@ -191,11 +125,7 @@ fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
 #[test]
 fn an_npc_can_be_the_subject_of_a_flow() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "came_near": { "type": "on", "event": "came_near", "within": 3.0, "by": "npcs", "next": "heal" },
-        "heal": { "type": "heal", "by": "full" },
-    }));
-    let (_, healer) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, healer) = scripted_npc(&mut sim, player, &[&module("flow_healer")]);
     let patient = spawn(&mut sim, "fighter", player, Offset::new(0.0, 2.0), u32::MAX);
     sim.tick();
     let full = health(&sim, patient);
@@ -211,15 +141,7 @@ fn an_npc_can_be_the_subject_of_a_flow() {
 #[test]
 fn a_choice_label_fills_its_values_like_a_line_does() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "talk": interacted("hello"),
-        "hello": {
-            "type": "dialogue",
-            "lines": [{ "by": { "type": "narrator" }, "text": ["Pay ", { "value": "Gold" }, " or go."] }],
-            "choices": [{ "label": ["Pay ", { "value": "Gold" }] }]
-        },
-    }));
-    let (_, healer) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, healer) = scripted_npc(&mut sim, player, &[&module("flow_label")]);
 
     raise(&mut sim, healer, EventKind::Interacted, player);
     sim.tick();
@@ -275,13 +197,7 @@ fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
 #[test]
 fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
     let (mut sim, player) = field();
-    let script = inline(json!({
-        "interacted": interacted("roll"),
-        "roll": { "type": "random", "weights": [1, 1], "outputs": ["hello", "bye"] },
-        "hello": say("Hi.", vec![("Bye.", None)]),
-        "bye": { "type": "wait", "seconds": 1, "at_most": 5.0 },
-    }));
-    let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
+    let (_, owner) = scripted_npc(&mut sim, player, &[&module("flow_random")]);
 
     let world: &World = &sim.world;
     let found = world.resource::<RiftInstances>().next_dialogue(
@@ -291,5 +207,122 @@ fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
         player,
     );
 
-    assert_eq!(found, vec![("test/npc".to_owned(), "hello".to_owned())]);
+    assert_eq!(
+        found,
+        vec![("script/flow_random".to_owned(), "hello".to_owned())]
+    );
+}
+
+pub fn scripts() -> Vec<(&'static str, Value)> {
+    let npc = |nodes: Value| json!({ "runs_on": "npc", "nodes": nodes });
+    vec![
+        (
+            "flow_pay_later",
+            npc(json!({
+                "interacted": interacted("wait"),
+                "wait": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "hello" },
+                "hello": say("Pay up.", vec![("Pay.", Some("pay"))]),
+                "pay": {
+                    "type": "items",
+                    "take": [{ "item": "gold", "count": 5 }],
+                    "done": "paid",
+                    "refused": "broke"
+                },
+                "paid": say("Thanks.", vec![("Bye.", None)]),
+                "broke": say("No coin?", vec![("Bye.", None)]),
+            })),
+        ),
+        (
+            "flow_notices",
+            npc(json!({
+                "interacted": interacted("first"),
+                "first": { "type": "notify", "notification": "gulls" },
+                "came_near": {
+                    "type": "on", "event": "came_near", "within": 3.0, "by": "characters", "next": "second"
+                },
+                "second": { "type": "notify", "notification": "sails" },
+            })),
+        ),
+        (
+            "flow_interruptible",
+            npc(json!({
+                "interacted": interacted("hostile"),
+                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
+                "attack": {
+                    "type": "attack",
+                    "target": { "type": "subject" },
+                    "within": 10.0,
+                    "priority": 5,
+                    "lost": "lost",
+                    "interrupted": "stopped"
+                },
+                "stopped": remember("bribed", None),
+                "lost": remember("sided", None),
+            })),
+        ),
+        (
+            "flow_leash",
+            npc(json!({
+                "interacted": interacted("hostile"),
+                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
+                "attack": {
+                    "type": "attack",
+                    "target": { "type": "subject" },
+                    "within": 10.0,
+                    "priority": 5,
+                    "lost": "lost"
+                },
+                "lost": remember("sided", None),
+            })),
+        ),
+        (
+            "flow_nobody",
+            json!({
+                "runs_on": "npc",
+                "locals": { "nobody": "actor" },
+                "nodes": {
+                    "interacted": interacted("give"),
+                    "give": {
+                        "type": "items",
+                        "who": { "type": "local", "local": "nobody" },
+                        "give": [{ "item": "gold" }],
+                        "done": "gave",
+                        "refused": "refused"
+                    },
+                    "gave": remember("sided", None),
+                    "refused": remember("bribed", Some("heal")),
+                    "heal": { "type": "heal", "who": { "type": "local", "local": "nobody" }, "by": "full", "next": "despawn" },
+                    "despawn": { "type": "despawn", "who": { "type": "local", "local": "nobody" }, "done": "gone" },
+                    "gone": remember("looted", None),
+                },
+            }),
+        ),
+        (
+            "flow_healer",
+            npc(json!({
+                "came_near": { "type": "on", "event": "came_near", "within": 3.0, "by": "npcs", "next": "heal" },
+                "heal": { "type": "heal", "by": "full" },
+            })),
+        ),
+        (
+            "flow_label",
+            npc(json!({
+                "talk": interacted("hello"),
+                "hello": {
+                    "type": "dialogue",
+                    "lines": [{ "by": { "type": "narrator" }, "text": ["Pay ", { "value": "Gold" }, " or go."] }],
+                    "choices": [{ "label": ["Pay ", { "value": "Gold" }] }]
+                },
+            })),
+        ),
+        (
+            "flow_random",
+            npc(json!({
+                "interacted": interacted("roll"),
+                "roll": { "type": "random", "weights": [1, 1], "outputs": ["hello", "bye"] },
+                "hello": say("Hi.", vec![("Bye.", None)]),
+                "bye": { "type": "wait", "seconds": 1, "at_most": 5.0 },
+            })),
+        ),
+    ]
 }

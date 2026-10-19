@@ -79,7 +79,6 @@ pub enum ShopModule {
     Sells(ShopOffer),
     Buys(ShopBuys),
     Reactions(ShopReactions),
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 

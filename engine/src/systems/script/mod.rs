@@ -96,7 +96,6 @@ impl RunnerKindDef for RunnerKind {
 
 pub type ScriptDef = script::ScriptDef<RiftScripting>;
 pub type ScriptId = script::ScriptId<RiftScripting>;
-pub type InlineScript = script::InlineScript<RiftScripting>;
 pub type ScriptModule = script::ScriptModule<RiftScripting>;
 pub type Condition = Expr<RiftScripting>;
 pub type VarValue = script::VarValue<RiftScripting>;

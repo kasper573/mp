@@ -23,19 +23,8 @@
       "text": "Ash cut in a storm. It remembers the lightning."
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "boost_damage"
-        },
-        "boost_damage": {
-          "type": "boost",
-          "stat": "damage",
-          "by": 2.0
-        }
-      }
+      "type": "script",
+      "script": "ash_wand_activated"
     }
   ]
 }

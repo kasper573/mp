@@ -23,12 +23,9 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
     };
     let modules = selected_modules(&row, &indices);
     if modules.is_empty()
-        || modules.iter().any(|m| {
-            matches!(
-                m.module_kind(),
-                Some(AreaModuleKind::SharedScript | AreaModuleKind::InlineScript)
-            )
-        })
+        || modules
+            .iter()
+            .any(|m| m.module_kind() == Some(AreaModuleKind::Script))
     {
         editor.toast("A blueprint takes any selection but area scripts");
         return;

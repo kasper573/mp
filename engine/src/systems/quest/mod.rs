@@ -125,10 +125,9 @@ pub enum QuestModule {
         seconds: Seconds,
     },
     Drop(QuestDrop),
+    Script(ScriptModule),
     #[serde(untagged)]
     Objective(Objective),
-    #[serde(untagged)]
-    Script(ScriptModule),
 }
 
 impl QuestDef {

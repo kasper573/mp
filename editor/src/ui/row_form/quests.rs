@@ -78,10 +78,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
     let files = &project.files;
     let mut scan = |table: &str, key: &str, object: Option<&str>, module: &Value| {
         let (script_label, nodes) = match module.module_kind() {
-            Some(AreaModuleKind::InlineScript) => {
-                ("inline script".to_owned(), module["nodes"].clone())
-            }
-            Some(AreaModuleKind::SharedScript) => {
+            Some(AreaModuleKind::Script) => {
                 let name = module.text("script").to_owned();
                 (
                     format!("script/{name}"),

@@ -1,0 +1,20 @@
+{
+  "owner": "skill/keen_eye",
+  "runs_on": "skill",
+  "nodes": {
+    "activated": {
+      "type": "on",
+      "event": "activated",
+      "next": "sharpen"
+    },
+    "sharpen": {
+      "type": "boost",
+      "stat": "range",
+      "by": {
+        "type": "skill_stat",
+        "skill": "keen_eye",
+        "stat": "power"
+      }
+    }
+  }
+}

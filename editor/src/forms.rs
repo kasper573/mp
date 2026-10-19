@@ -34,8 +34,8 @@ pub struct FormCx<'a> {
     pub state: &'a mut FormState,
     pub actions: &'a mut Vec<FormAction>,
     pub speaker: Option<String>,
-    pub owner_table: Option<String>,
-    pub owner_key: Option<String>,
+    pub row_table: Option<String>,
+    pub row_key: Option<String>,
     pub holes: Option<FormHoles>,
     pub autofocus: bool,
     /// What the row being edited keeps as the engine reads it, when it is a fixture.
@@ -62,8 +62,8 @@ impl<'a> FormCx<'a> {
             state,
             actions,
             speaker: None,
-            owner_table: None,
-            owner_key: None,
+            row_table: None,
+            row_key: None,
             holes: None,
             autofocus: false,
             locks: Vec::new(),
@@ -73,9 +73,9 @@ impl<'a> FormCx<'a> {
     }
 
     /// The row this form edits, whose load errors it then shows beside their fields.
-    pub fn owned_by(mut self, table: &str, key: Option<&str>) -> FormCx<'a> {
-        self.owner_table = Some(table.to_owned());
-        self.owner_key = key.map(str::to_owned);
+    pub fn editing(mut self, table: &str, key: Option<&str>) -> FormCx<'a> {
+        self.row_table = Some(table.to_owned());
+        self.row_key = key.map(str::to_owned);
         self.locks = key.map_or_else(Vec::new, |key| self.shapes.locks(table, key).to_vec());
         self.load_errors = match (self.report, key) {
             (Some(report), Some(key)) => crate::project::errors_in(report, &row_file(table, key))
@@ -119,9 +119,6 @@ pub struct FormState {
 pub enum FormAction {
     OpenRow { table: String, key: String },
     OpenNode { name: String },
-    OpenScript { pointer: String },
-    MakeShared { pointer: String },
-    MakeInline { script: String },
     PickPlace { path: String },
     NewRow { table: String, path: String },
     RowAction(browser::BrowserAction),

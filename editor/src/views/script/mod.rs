@@ -12,8 +12,9 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use engine::core::content::{ContentRow, row_file};
-use engine::core::script::{RunnerKindDef, ScriptModuleKind};
+use engine::core::content::{ContentRow, OWNER_FIELD, RowName, row_file};
+use engine::core::script::RunnerKindDef;
+use engine::systems::npc::NpcDef;
 use engine::systems::script::{RunnerKind, ScriptDef};
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{LineSpeaker, NodeCatalogue};
@@ -91,142 +92,59 @@ impl ScriptRef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ScriptOwner {
-    Shared {
-        key: String,
-    },
-    Inline {
-        table: String,
-        key: String,
-        module: ScriptPath,
-    },
+pub struct ScriptRow {
+    pub key: String,
 }
 
-impl ScriptOwner {
-    pub fn inline(table: &str, key: &str, pointer: &str) -> Option<ScriptOwner> {
-        Some(ScriptOwner::Inline {
-            table: table.to_owned(),
-            key: key.to_owned(),
-            module: ScriptPath::parse(pointer)?,
-        })
+impl ScriptRow {
+    pub fn new(key: impl Into<String>) -> ScriptRow {
+        ScriptRow { key: key.into() }
     }
 
     pub fn title(&self) -> String {
-        match self {
-            ScriptOwner::Shared { .. } => self.row_label(),
-            ScriptOwner::Inline { module, .. } => match module.object() {
-                Some(object) => format!("{} › object {object} › script", self.row_label()),
-                None => format!("{} › script", self.row_label()),
-            },
-        }
-    }
-
-    pub fn row_label(&self) -> String {
-        format!("{}/{}", self.table(), self.key())
+        format!("{}/{}", ScriptDef::TABLE, self.key)
     }
 
     pub fn row(&self) -> (String, String) {
-        (self.table().to_owned(), self.key().to_owned())
-    }
-
-    pub fn table(&self) -> &str {
-        match self {
-            ScriptOwner::Shared { .. } => "script",
-            ScriptOwner::Inline { table, .. } => table,
-        }
-    }
-
-    pub fn key(&self) -> &str {
-        match self {
-            ScriptOwner::Shared { key } | ScriptOwner::Inline { key, .. } => key,
-        }
+        (ScriptDef::TABLE.to_owned(), self.key.clone())
     }
 
     pub fn file(&self) -> String {
-        row_file(self.table(), self.key())
-    }
-
-    pub fn pointer(&self) -> String {
-        match self {
-            ScriptOwner::Shared { .. } => String::new(),
-            ScriptOwner::Inline { module, .. } => module.pointer(),
-        }
-    }
-
-    pub fn object_index(&self) -> Option<usize> {
-        match self {
-            ScriptOwner::Shared { .. } => None,
-            ScriptOwner::Inline { module, .. } => module.object(),
-        }
-    }
-
-    pub fn kind(&self) -> RunnerKind {
-        match self {
-            ScriptOwner::Shared { .. } => RunnerKind::Any,
-            ScriptOwner::Inline { table, module, .. } => match table.parse() {
-                Ok(RunnerKind::Area) if module.object().is_some() => RunnerKind::Object,
-                Ok(kind) => kind,
-                Err(_) => RunnerKind::Any,
-            },
-        }
+        row_file(ScriptDef::TABLE, &self.key)
     }
 
     pub fn slug(&self) -> String {
-        match self {
-            ScriptOwner::Shared { key } => format!("script-{key}"),
-            ScriptOwner::Inline { table, key, module } => {
-                format!("{table}-{key}{}", module.pointer().replace('/', "-"))
-            }
-        }
+        format!("script-{}", self.key)
     }
 
-    pub fn renamed(&self, table: &str, key: &str, new_key: &str) -> Option<ScriptOwner> {
-        if !self.is_row(table, key) {
-            return None;
-        }
-        let mut renamed = self.clone();
-        match &mut renamed {
-            ScriptOwner::Shared { key } | ScriptOwner::Inline { key, .. } => {
-                *key = new_key.to_owned();
-            }
-        }
-        Some(renamed)
+    pub fn renamed(&self, table: &str, key: &str, new_key: &str) -> Option<ScriptRow> {
+        self.is_row(table, key).then(|| ScriptRow::new(new_key))
     }
 
     pub fn is_row(&self, table: &str, key: &str) -> bool {
-        self.table() == table && self.key() == key
+        table == ScriptDef::TABLE && self.key == key
     }
 }
 
 #[derive(Clone)]
 pub struct ScriptDoc {
-    pub owner: ScriptOwner,
+    pub at: ScriptRow,
     pub file: String,
-    pub row: Value,
     pub script: Value,
     pub kind: RunnerKind,
 }
 
 impl ScriptDoc {
-    pub fn load(editor: &Editor, owner: &ScriptOwner) -> Option<ScriptDoc> {
-        let row = editor.row_value(owner.table(), owner.key())?;
-        let script = match owner {
-            ScriptOwner::Shared { .. } => row.clone(),
-            ScriptOwner::Inline { module, .. } => row.pointer(&module.pointer())?.clone(),
-        };
+    pub fn load(editor: &Editor, at: &ScriptRow) -> Option<ScriptDoc> {
+        let script = editor.row_value(ScriptDef::TABLE, &at.key)?;
         if !script.is_object() || !script["nodes"].is_object() {
             return None;
         }
-        let kind = match owner {
-            ScriptOwner::Shared { .. } => script.text("runs_on").parse().unwrap_or(RunnerKind::Any),
-            ScriptOwner::Inline { .. } => owner.kind(),
-        };
         Some(ScriptDoc {
-            owner: owner.clone(),
-            file: owner.file(),
-            row,
+            at: at.clone(),
+            file: at.file(),
+            kind: script.text("runs_on").parse().unwrap_or(RunnerKind::Any),
             script,
-            kind,
         })
     }
 
@@ -234,27 +152,14 @@ impl ScriptDoc {
         self.script["nodes"].as_object().expect("a nodes map")
     }
 
-    pub fn is_shared(&self) -> bool {
-        matches!(self.owner, ScriptOwner::Shared { .. })
-    }
-
-    pub fn row_with(&self, script: Value) -> Value {
-        match &self.owner {
-            ScriptOwner::Shared { .. } => script,
-            ScriptOwner::Inline { module, .. } => {
-                let mut row = self.row.clone();
-                if let Some(slot) = row.pointer_mut(&module.pointer()) {
-                    *slot = script;
-                }
-                row
-            }
-        }
+    pub fn owner(&self) -> Option<RowName> {
+        serde_json::from_value(self.script[OWNER_FIELD].clone()).ok()
     }
 
     pub fn default_speaker(&self) -> LineSpeaker {
-        match (self.kind, &self.owner) {
-            (RunnerKind::Npc, ScriptOwner::Inline { key, .. }) => LineSpeaker::Npc {
-                npc: key.clone(),
+        match (self.kind, self.owner()) {
+            (RunnerKind::Npc, Some(owner)) if owner.table == NpcDef::TABLE => LineSpeaker::Npc {
+                npc: owner.key,
                 face: None,
             },
             (RunnerKind::Object, _) => LineSpeaker::Object,
@@ -276,7 +181,7 @@ impl ScriptDoc {
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx =
-            FormCx::new(project, root, shapes, form, actions).owned_by(self.owner.table(), None);
+            FormCx::new(project, root, shapes, form, actions).editing(ScriptDef::TABLE, None);
         cx.speaker = self.default_speaker().npc().map(str::to_owned);
         cx
     }
@@ -328,8 +233,8 @@ impl ScriptViewState {
     }
 }
 
-fn snarl_id(owner: &ScriptOwner) -> egui::Id {
-    egui::Id::new(("script-graph", owner.slug()))
+fn snarl_id(at: &ScriptRow) -> egui::Id {
+    egui::Id::new(("script-graph", at.slug()))
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -377,7 +282,7 @@ pub struct ScriptSessionId(u64);
 
 struct ScriptSession {
     id: ScriptSessionId,
-    owner: ScriptOwner,
+    at: ScriptRow,
 }
 
 #[derive(Default)]
@@ -394,104 +299,93 @@ pub struct ScriptViews {
 }
 
 impl ScriptViews {
-    pub fn session(&mut self, owner: &ScriptOwner) -> ScriptSessionId {
-        if let Some(id) = self.find(owner) {
+    pub fn session(&mut self, at: &ScriptRow) -> ScriptSessionId {
+        if let Some(id) = self.find(at) {
             return id;
         }
         let id = ScriptSessionId(self.sessions.len() as u64);
-        self.sessions.push(ScriptSession {
-            id,
-            owner: owner.clone(),
-        });
+        self.sessions.push(ScriptSession { id, at: at.clone() });
         id
     }
 
-    pub fn find(&self, owner: &ScriptOwner) -> Option<ScriptSessionId> {
+    pub fn find(&self, at: &ScriptRow) -> Option<ScriptSessionId> {
         self.sessions
             .iter()
-            .find(|session| session.owner == *owner)
+            .find(|session| session.at == *at)
             .map(|session| session.id)
     }
 
-    pub fn relocate(&mut self, from: &ScriptOwner, to: ScriptOwner) {
-        if let Some(session) = self
-            .sessions
-            .iter_mut()
-            .find(|session| session.owner == *from)
-        {
-            session.owner = to.clone();
+    pub fn relocate(&mut self, from: &ScriptRow, to: ScriptRow) {
+        if let Some(session) = self.sessions.iter_mut().find(|session| session.at == *from) {
+            session.at = to.clone();
         }
-        if let Some(callout) = self
-            .callout
-            .as_mut()
-            .filter(|callout| callout.owner == *from)
-        {
-            callout.owner = to;
+        if let Some(callout) = self.callout.as_mut().filter(|callout| callout.at == *from) {
+            callout.at = to;
         }
     }
 
-    pub fn view(&self, owner: &ScriptOwner) -> Option<&ScriptViewState> {
-        self.views.get(&self.find(owner)?)
+    pub fn view(&self, at: &ScriptRow) -> Option<&ScriptViewState> {
+        self.views.get(&self.find(at)?)
     }
 
     pub fn view_mut(
         &mut self,
-        owner: &ScriptOwner,
+        at: &ScriptRow,
         user: &UserFolder,
         project: Option<&Project>,
     ) -> &mut ScriptViewState {
-        let id = self.session(owner);
+        let id = self.session(at);
         self.views.entry(id).or_insert_with(|| {
             let layout = project
-                .map(|project| user.load_layout(&project.root, &owner.slug()))
+                .map(|project| user.load_layout(&project.root, &at.slug()))
                 .unwrap_or_default();
             ScriptViewState::opened(layout)
         })
     }
 
-    pub fn run_of(&self, owner: &ScriptOwner) -> Option<&run::ScriptRun> {
-        let id = self.find(owner)?;
+    pub fn run_of(&self, at: &ScriptRow) -> Option<&run::ScriptRun> {
+        let id = self.find(at)?;
         self.run.as_ref().filter(|run| run.doc == id)
     }
 
-    pub fn run_of_mut(&mut self, owner: &ScriptOwner) -> Option<&mut run::ScriptRun> {
-        let id = self.find(owner)?;
+    pub fn run_of_mut(&mut self, at: &ScriptRow) -> Option<&mut run::ScriptRun> {
+        let id = self.find(at)?;
         self.run.as_mut().filter(|run| run.doc == id)
     }
 
-    pub fn existing_view_mut(&mut self, owner: &ScriptOwner) -> Option<&mut ScriptViewState> {
-        let id = self.find(owner)?;
+    pub fn existing_view_mut(&mut self, at: &ScriptRow) -> Option<&mut ScriptViewState> {
+        let id = self.find(at)?;
         self.views.get_mut(&id)
     }
 
-    pub fn setup_of(&self, owner: &ScriptOwner) -> run::RunSetup {
-        self.find(owner)
+    pub fn setup_of(&self, at: &ScriptRow) -> run::RunSetup {
+        self.find(at)
             .and_then(|id| self.setups.get(&id))
             .cloned()
             .unwrap_or_default()
     }
 
-    pub fn set_setup(&mut self, owner: &ScriptOwner, setup: run::RunSetup) {
-        let id = self.session(owner);
+    pub fn set_setup(&mut self, at: &ScriptRow, setup: run::RunSetup) {
+        let id = self.session(at);
         self.setups.insert(id, setup);
     }
 
-    pub fn fire(&mut self, owner: &ScriptOwner) {
-        self.fire = Some(self.session(owner));
+    pub fn fire(&mut self, at: &ScriptRow) {
+        self.fire = Some(self.session(at));
     }
 
-    pub fn take_fire(&mut self, owner: &ScriptOwner) -> bool {
+    pub fn take_fire(&mut self, at: &ScriptRow) -> bool {
         let fired = self.fire.take();
-        fired.is_some() && fired == self.find(owner)
+        fired.is_some() && fired == self.find(at)
     }
 
-    pub fn set_pending(&mut self, owner: &ScriptOwner, action: PendingScriptAction) {
-        let id = self.session(owner);
+    pub fn set_pending(&mut self, at: &ScriptRow, action: PendingScriptAction) {
+        let id = self.session(at);
         self.pending = Some((id, action));
     }
 
-    pub fn take_pending(&mut self, owner: &ScriptOwner) -> Option<PendingScriptAction> {
-        let id = self.find(owner)?;
+    pub fn take_pending(&mut self, at: &ScriptRow) -> Option<PendingScriptAction> {
+        let id = self.find(at)?;
         self.pending
             .take_if(|(pending, _)| *pending == id)
             .map(|(_, action)| action)
@@ -508,8 +402,6 @@ impl ScriptViews {
 }
 
 pub enum PendingScriptAction {
-    MakeShared,
-    MakeInline,
     Connect {
         from: String,
         field: String,
@@ -518,7 +410,7 @@ pub enum PendingScriptAction {
 }
 
 pub struct ScriptCallout {
-    pub owner: ScriptOwner,
+    pub at: ScriptRow,
     pub node: String,
     pub to: Option<String>,
     pub rule: String,
@@ -527,19 +419,19 @@ pub struct ScriptCallout {
 }
 
 impl ScriptCallout {
-    pub fn live(&self, owner: &ScriptOwner) -> bool {
-        self.owner == *owner && self.since.elapsed().as_secs_f32() < 12.0
+    pub fn live(&self, at: &ScriptRow) -> bool {
+        self.at == *at && self.since.elapsed().as_secs_f32() < 12.0
     }
 }
 
 pub struct RenameNodeDialog {
-    pub owner: ScriptOwner,
+    pub at: ScriptRow,
     pub old: String,
     pub draft: String,
 }
 
 pub struct LinkNodeDialog {
-    pub owner: ScriptOwner,
+    pub at: ScriptRow,
     pub from: String,
     pub search: String,
     pub port: usize,
@@ -562,7 +454,7 @@ fn sync_graph(editor: &mut Editor, doc: &ScriptDoc) {
     } = editor;
     views
         .script
-        .view_mut(&doc.owner, user, project.as_ref())
+        .view_mut(&doc.at, user, project.as_ref())
         .graph
         .sync(doc, catalogue_of(project.as_ref()), generation);
 }
@@ -579,16 +471,14 @@ pub fn sync_with_content(editor: &mut Editor) {
     }
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
-    let Some(doc) = ScriptDoc::load(editor, owner) else {
-        ui.label(RichText::new(format!("{} is gone", owner.title())).weak());
+pub fn show(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
+    let Some(doc) = ScriptDoc::load(editor, at) else {
+        ui.label(RichText::new(format!("{} is gone", at.title())).weak());
         return;
     };
     editor.views.script.shown_rect = Some(ui.max_rect());
-    if let Some(pending) = editor.views.script.take_pending(owner) {
+    if let Some(pending) = editor.views.script.take_pending(at) {
         match pending {
-            PendingScriptAction::MakeShared => inspect::make_shared_dialog(editor, &doc),
-            PendingScriptAction::MakeInline => inspect::make_inline_dialog(editor, &doc),
             PendingScriptAction::Connect { from, field, to } => {
                 act(editor, &doc, ScriptGraphAction::Connect { from, field, to })
             }
@@ -597,7 +487,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     if ui.input(|i| i.pointer.any_pressed()) && ui.rect_contains_pointer(ui.max_rect()) {
         editor
             .dock_requests
-            .push(DockRequest::Focus(EditorTab::Script(owner.clone())));
+            .push(DockRequest::Focus(EditorTab::Script(at.clone())));
     }
     sync_with_content(editor);
     sync_graph(editor, &doc);
@@ -605,7 +495,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     keys(editor, ui, &doc, &mut actions);
     status(editor, &doc);
     sidebar::row(ui, "script", |ui| inspect::script_row(editor, ui, &doc));
-    let (table, key) = owner.row();
+    let (table, key) = at.row();
     let selection = if editor.selection.table == table
         && editor.selection.keys.first().is_some_and(|k| *k == key)
     {
@@ -622,7 +512,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
             if editor
                 .views
                 .script
-                .view_mut(owner, &editor.user, editor.project.as_ref())
+                .view_mut(at, &editor.user, editor.project.as_ref())
                 .outline
             {
                 outline::show(editor, ui, &doc, &mut actions);
@@ -635,11 +525,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
         act(editor, &doc, action);
     }
     editor.views.script.keys = ScriptKeys::default();
-    save_layout(editor, ui, owner);
+    save_layout(editor, ui, at);
 }
 
-pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: BottomTab) {
-    let Some(doc) = ScriptDoc::load(editor, owner) else {
+pub fn bottom(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow, tab: BottomTab) {
+    let Some(doc) = ScriptDoc::load(editor, at) else {
         return;
     };
     sync_with_content(editor);
@@ -652,11 +542,11 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: Bottom
 }
 
 fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
-    let owner = doc.owner.clone();
+    let at = doc.at.clone();
     let (lit, current): (HashSet<String>, Option<String>) = editor
         .views
         .script
-        .run_of(&owner)
+        .run_of(&at)
         .map(|run| {
             (
                 run.visited.iter().cloned().collect(),
@@ -666,10 +556,10 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         .unwrap_or_default();
     let selected_before = {
         let views = &mut editor.views.script;
-        let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
+        let view = views.view_mut(&at, &editor.user, editor.project.as_ref());
         let selection = &editor.selection;
-        if selection.table == owner.table()
-            && selection.keys == [owner.key()]
+        if selection.table == ScriptDef::TABLE
+            && selection.keys == [at.key.as_str()]
             && is_node_selection(selection)
         {
             let mut names: Vec<String> = selection
@@ -684,11 +574,11 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         view.selected.clone()
     };
     let faces = faces(editor, ui.ctx(), doc);
-    let id = snarl_id(&owner);
+    let id = snarl_id(&at);
     let (dragged, to_global, mut taken, clicked, rects) = {
         let views = &mut editor.views.script;
         let catalogue = catalogue_of(editor.project.as_ref());
-        let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
+        let view = views.view_mut(&at, &editor.user, editor.project.as_ref());
         let chosen: HashSet<String> = selected_before.iter().cloned().collect();
         let mut viewer = graph::ScriptGraphViewer {
             doc,
@@ -729,7 +619,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
     editor
         .views
         .script
-        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .view_mut(&at, &editor.user, editor.project.as_ref())
         .rects = rects;
     run::conversation_box(editor, ui, doc);
     actions.append(&mut taken);
@@ -737,7 +627,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         let view = editor
             .views
             .script
-            .view_mut(&owner, &editor.user, editor.project.as_ref());
+            .view_mut(&at, &editor.user, editor.project.as_ref());
         let graph = &view.graph;
         let mut marked: Vec<String> = get_selected_nodes(id, ui.ctx())
             .iter()
@@ -765,12 +655,12 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         }
         names
     };
-    callout(editor, ui, &owner);
+    callout(editor, ui, &at);
     if selected != selected_before {
         editor
             .views
             .script
-            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .view_mut(&at, &editor.user, editor.project.as_ref())
             .selected = selected.clone();
         if !selected.is_empty() {
             select_nodes(editor, doc, &selected);
@@ -811,11 +701,8 @@ fn faces(editor: &mut Editor, ctx: &egui::Context, doc: &ScriptDoc) -> graph::Sp
 }
 
 fn header_chip(editor: &Editor, ui: &Ui, doc: &ScriptDoc) {
-    let text = match editor.views.script.run_of(&doc.owner) {
-        Some(_) => format!(
-            "{} · running with a pretend subject",
-            owner_label(editor, doc)
-        ),
+    let text = match editor.views.script.run_of(&doc.at) {
+        Some(_) => format!("{} · running with a pretend subject", doc.at.title()),
         None => chip_title(editor, doc),
     };
     widgets::floating_chip(
@@ -829,49 +716,31 @@ fn header_chip(editor: &Editor, ui: &Ui, doc: &ScriptDoc) {
     );
 }
 
-pub fn owner_label(editor: &Editor, doc: &ScriptDoc) -> String {
-    match doc.owner.object_index() {
-        Some(index) => {
-            let name = editor
-                .row_value(doc.owner.table(), doc.owner.key())
-                .and_then(|row| row["modules"][index]["name"].as_str().map(str::to_owned))
-                .unwrap_or_else(|| format!("object {index}"));
-            format!("{} · object {name}", doc.owner.row_label())
-        }
-        None => doc.owner.row_label(),
-    }
-}
-
 pub fn chip_title(editor: &Editor, doc: &ScriptDoc) -> String {
     let count = doc.nodes().len();
-    let nodes = format!("{count} node{}", widgets::plural(count));
-    match &doc.owner {
-        ScriptOwner::Shared { key } => {
-            let mut text = format!("script/{key} · owner {} · {nodes}", doc.kind.name());
-            if editor.shapes.is_fixture(ScriptDef::TABLE, key) {
-                text.push_str(" · from New Game");
-            }
-            text
-        }
-        ScriptOwner::Inline { .. } => {
-            format!("{} · inline script · {nodes}", owner_label(editor, doc))
-        }
+    let mut text = format!(
+        "{} · runs on {} · {count} node{}",
+        doc.at.title(),
+        doc.kind.name(),
+        widgets::plural(count)
+    );
+    if let Some(owner) = doc.owner() {
+        text.push_str(&format!(" · local to {owner}"));
     }
+    if editor.shapes.is_fixture(ScriptDef::TABLE, &doc.at.key) {
+        text.push_str(" · from New Game");
+    }
+    text
 }
 
 fn status(editor: &mut Editor, doc: &ScriptDoc) {
-    let owner = doc.owner.clone();
-    let view = editor.views.script.view(&owner);
+    let at = doc.at.clone();
+    let view = editor.views.script.view(&at);
     let outline = view.is_some_and(|view| view.outline);
     let palette = view.is_some_and(|view| view.palette.is_some());
     let selected = view.map(|view| view.selected.clone()).unwrap_or_default();
-    let what = if doc.is_shared() {
-        "shared script"
-    } else {
-        "inline script"
-    };
     let head = match selected.as_slice() {
-        [one] if !outline && !palette => format!("{} › {one}", owner.row_label()),
+        [one] if !outline && !palette => format!("{} › {one}", at.title()),
         _ => {
             let mode = if outline {
                 " · outline"
@@ -880,7 +749,7 @@ fn status(editor: &mut Editor, doc: &ScriptDoc) {
             } else {
                 ""
             };
-            format!("{} › {what}{mode}", owner.row_label())
+            format!("{} › script{mode}", at.title())
         }
     };
     let refused = editor
@@ -888,11 +757,11 @@ fn status(editor: &mut Editor, doc: &ScriptDoc) {
         .script
         .callout
         .as_ref()
-        .filter(|callout| callout.live(&owner))
+        .filter(|callout| callout.live(&at))
         .map(|callout| callout.rule.clone());
     let hint = if let Some(rule) = refused {
         format!("refused · {rule}  nothing changed")
-    } else if let Some(run) = editor.views.script.run_of(&owner) {
+    } else if let Some(run) = editor.views.script.run_of(&at) {
         let waiting = run
             .visited
             .last()
@@ -949,17 +818,17 @@ fn beside(graph: &ScriptGraph, from: &str) -> Pos2 {
     pos
 }
 
-fn callout(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
+fn callout(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
     let Some(callout) = editor
         .views
         .script
         .callout
         .as_ref()
-        .filter(|callout| callout.live(owner))
+        .filter(|callout| callout.live(at))
     else {
         return;
     };
-    let Some(view) = editor.views.script.view(owner) else {
+    let Some(view) = editor.views.script.view(at) else {
         return;
     };
     let Some(to_global) = view.to_global else {
@@ -1057,14 +926,14 @@ fn callout_card(ui: &Ui, painter: &egui::Painter, anchor: Rect, callout: &Script
 
 pub fn select_nodes(editor: &mut Editor, doc: &ScriptDoc, names: &[String]) {
     editor.select(RowSelection::parts(
-        doc.owner.table(),
-        doc.owner.key(),
+        ScriptDef::TABLE,
+        &doc.at.key,
         names.iter().map(|name| format!("node:{name}")).collect(),
     ));
     editor
         .views
         .script
-        .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+        .view_mut(&doc.at, &editor.user, editor.project.as_ref())
         .selected = names.to_vec();
 }
 
@@ -1077,12 +946,12 @@ pub fn is_node_selection(selection: &RowSelection) -> bool {
 }
 
 fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
-    let owner = doc.owner.clone();
+    let at = doc.at.clone();
     let keys = editor.views.script.keys;
     if editor
         .views
         .script
-        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .view_mut(&at, &editor.user, editor.project.as_ref())
         .palette
         .is_some()
     {
@@ -1090,12 +959,12 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
     }
     if keys.fire {
         editor.panels.bottom = BottomTab::Run;
-        editor.views.script.fire(&owner);
+        editor.views.script.fire(&at);
         return;
     }
     let views = &mut editor.views.script;
     let catalogue = catalogue_of(editor.project.as_ref());
-    let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
+    let view = views.view_mut(&at, &editor.user, editor.project.as_ref());
     let in_outline = view.outline;
     if keys.outline {
         view.toggle_outline();
@@ -1149,7 +1018,7 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
     if keys.link
         && let Some(name) = first
     {
-        link_by_name(editor, &owner, name);
+        link_by_name(editor, &at, name);
     }
 }
 
@@ -1165,9 +1034,9 @@ pub fn free_port_link(
         .map(|port| (name.to_owned(), port.field))
 }
 
-pub fn link_by_name(editor: &mut Editor, owner: &ScriptOwner, from: String) {
+pub fn link_by_name(editor: &mut Editor, at: &ScriptRow, from: String) {
     editor.dialogs.push(ModalDialog::LinkNode(LinkNodeDialog {
-        owner: owner.clone(),
+        at: at.clone(),
         from,
         search: String::new(),
         port: 0,
@@ -1175,14 +1044,14 @@ pub fn link_by_name(editor: &mut Editor, owner: &ScriptOwner, from: String) {
 }
 
 pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
-    let owner = doc.owner.clone();
+    let at = doc.at.clone();
     match action {
         ScriptGraphAction::Connect { from, field, to } => {
             let mut script = doc.script.clone();
             if let Some(node) = script["nodes"].get_mut(&from) {
                 nodes::set_arrow(node, &field, Some(&to));
             }
-            let label = format!("Link {from} to {to} in {}", owner.title());
+            let label = format!("Link {from} to {to} in {}", at.title());
             if !write(editor, doc, script, label)
                 && let Some(callout) = editor.views.script.callout.as_mut()
             {
@@ -1195,7 +1064,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             if let Some(node) = script["nodes"].get_mut(&from) {
                 nodes::set_arrow(node, &field, None);
             }
-            let label = format!("Unlink {from} in {}", owner.title());
+            let label = format!("Unlink {from} in {}", at.title());
             write(editor, doc, script, label);
         }
         ScriptGraphAction::DropInputs(to) => {
@@ -1203,7 +1072,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             if let Some(map) = script["nodes"].as_object_mut() {
                 nodes::unlink(map, &to, catalogue_of(editor.project.as_ref()));
             }
-            let label = format!("Unlink arrows into {to} in {}", owner.title());
+            let label = format!("Unlink arrows into {to} in {}", at.title());
             write(editor, doc, script, label);
         }
         ScriptGraphAction::Delete(name) => delete_nodes(editor, doc, vec![name]),
@@ -1211,7 +1080,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             editor
                 .dialogs
                 .push(ModalDialog::RenameNode(RenameNodeDialog {
-                    owner,
+                    at,
                     old: name.clone(),
                     draft: name,
                 }));
@@ -1221,7 +1090,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             editor
                 .views
                 .script
-                .view_mut(&owner, &editor.user, editor.project.as_ref())
+                .view_mut(&at, &editor.user, editor.project.as_ref())
                 .palette = Some(palette::NodePalette::new(open));
         }
         ScriptGraphAction::AddLine(name) => {
@@ -1229,19 +1098,19 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             if let Some(lines) = script["nodes"][&name]["lines"].as_array_mut() {
                 lines.push(doc.default_speaker().blank_line());
             }
-            let label = format!("Add a line to {name} in {}", owner.title());
+            let label = format!("Add a line to {name} in {}", at.title());
             write(editor, doc, script, label);
         }
         ScriptGraphAction::EditLine { name, index, text } => {
             let mut script = doc.script.clone();
             script["nodes"][&name]["lines"][index]["text"] = text;
-            let label = format!("Edit line {} of {name} · {}", index + 1, owner.title());
+            let label = format!("Edit line {} of {name} · {}", index + 1, at.title());
             write(editor, doc, script, label);
         }
         ScriptGraphAction::AddChoice(name) => {
             let mut script = doc.script.clone();
             add_choice(&mut script["nodes"][&name]);
-            let label = format!("Add a choice to {name} in {}", owner.title());
+            let label = format!("Add a choice to {name} in {}", at.title());
             write(editor, doc, script, label);
         }
     }
@@ -1258,7 +1127,7 @@ pub fn add_choice(node: &mut Value) {
 }
 
 fn duplicate(editor: &mut Editor, doc: &ScriptDoc, name: &str) {
-    let owner = doc.owner.clone();
+    let at = doc.at.clone();
     let Some(mut copy) = doc.nodes().get(name).cloned() else {
         return;
     };
@@ -1279,12 +1148,12 @@ fn duplicate(editor: &mut Editor, doc: &ScriptDoc, name: &str) {
             nodes::set_arrow(source, &field, Some(&fresh));
         }
     }
-    let label = format!("Duplicate {name} in {}", owner.title());
+    let label = format!("Duplicate {name} in {}", at.title());
     if write(editor, doc, script, label) {
         let view = editor
             .views
             .script
-            .view_mut(&owner, &editor.user, editor.project.as_ref());
+            .view_mut(&at, &editor.user, editor.project.as_ref());
         let at = beside(&view.graph, name);
         view.place_node(&fresh, at);
         select_nodes(editor, doc, &[fresh]);
@@ -1325,27 +1194,27 @@ pub fn delete_nodes(editor: &mut Editor, doc: &ScriptDoc, names: Vec<String>) {
             label: format!("Delete {} nodes", names.len() + newly_stranded.len()),
             compare: None,
             action: ConfirmAction::DeleteScriptNodes {
-                owner: doc.owner.clone(),
+                script: doc.at.clone(),
                 names: names.iter().chain(newly_stranded.iter()).cloned().collect(),
             },
         }));
         return;
     }
     let label = match names.as_slice() {
-        [one] => format!("Delete {one} in {}", doc.owner.title()),
-        many => format!("Delete {} nodes in {}", many.len(), doc.owner.title()),
+        [one] => format!("Delete {one} in {}", doc.at.title()),
+        many => format!("Delete {} nodes in {}", many.len(), doc.at.title()),
     };
     if write(editor, doc, script, label) {
         select_nodes(editor, doc, &[]);
     }
 }
 
-pub fn delete_nodes_now(editor: &mut Editor, owner: &ScriptOwner, names: Vec<String>) {
-    let Some(doc) = ScriptDoc::load(editor, owner) else {
+pub fn delete_nodes_now(editor: &mut Editor, at: &ScriptRow, names: Vec<String>) {
+    let Some(doc) = ScriptDoc::load(editor, at) else {
         return;
     };
     let script = remove_nodes(&doc, &names, catalogue_of(editor.project.as_ref()));
-    let label = format!("Delete {} nodes in {}", names.len(), owner.title());
+    let label = format!("Delete {} nodes in {}", names.len(), at.title());
     if write(editor, &doc, script, label) {
         select_nodes(editor, &doc, &[]);
     }
@@ -1380,7 +1249,7 @@ pub fn add_node(
         }
     }
     let base = if nodes::is_dialogue(&node) {
-        doc.owner.key()
+        &doc.at.key
     } else {
         kind
     };
@@ -1394,16 +1263,16 @@ pub fn add_node(
             nodes::set_arrow(source, field, Some(&name));
         }
     }
-    let owner = doc.owner.clone();
+    let script_row = doc.at.clone();
     let label = match &link {
-        Some((from, _)) => format!("Add {kind} after {from} in {}", owner.title()),
-        None => format!("Add {kind} to {}", owner.title()),
+        Some((from, _)) => format!("Add {kind} after {from} in {}", script_row.title()),
+        None => format!("Add {kind} to {}", script_row.title()),
     };
     if write(editor, doc, script, label) {
         let view = editor
             .views
             .script
-            .view_mut(&owner, &editor.user, editor.project.as_ref());
+            .view_mut(&script_row, &editor.user, editor.project.as_ref());
         let graph_pos = match (at, view.to_global) {
             (Some(at), Some(to_global)) => to_global.inverse() * at,
             (Some(at), None) => at,
@@ -1417,9 +1286,8 @@ pub fn add_node(
 }
 
 pub fn write(editor: &mut Editor, doc: &ScriptDoc, script: Value, label: String) -> bool {
-    let row = doc.row_with(script);
     let mut edit = ContentEdit::new(label);
-    edit.write_json(doc.file.clone(), &row);
+    edit.write_json(doc.file.clone(), &script);
     let written = editor.apply(edit);
     editor.views.script.callout = (!written)
         .then_some(editor.last_refusal.as_ref())
@@ -1431,10 +1299,10 @@ pub fn write(editor: &mut Editor, doc: &ScriptDoc, script: Value, label: String)
             let selected = editor
                 .views
                 .script
-                .view(&doc.owner)
+                .view(&doc.at)
                 .and_then(|view| view.selected.first().cloned());
             ScriptCallout {
-                owner: doc.owner.clone(),
+                at: doc.at.clone(),
                 node: named.or(selected).unwrap_or_default(),
                 to: None,
                 rule: refusal.problem.rule.replace('_', " "),
@@ -1453,7 +1321,7 @@ pub fn rename_node_dialog(
     ctx: &egui::Context,
     mut dialog: RenameNodeDialog,
 ) -> Option<RenameNodeDialog> {
-    let doc = ScriptDoc::load(editor, &dialog.owner)?;
+    let doc = ScriptDoc::load(editor, &dialog.at)?;
     let mut outcome: Option<Option<String>> = None;
     dialogs::card(ctx, "rename-node", 360.0, |ui| {
         let pressed = dialogs::keys(ui);
@@ -1512,13 +1380,13 @@ pub fn rename_node(editor: &mut Editor, doc: &ScriptDoc, old: &str, new: &str) {
     if let Some(map) = script["nodes"].as_object_mut() {
         nodes::rename(map, old, new, catalogue_of(editor.project.as_ref()));
     }
-    let owner = doc.owner.clone();
-    let label = format!("Rename {old} to {new} in {}", owner.title());
+    let at = doc.at.clone();
+    let label = format!("Rename {old} to {new} in {}", at.title());
     if write(editor, doc, script, label) {
         editor
             .views
             .script
-            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .view_mut(&at, &editor.user, editor.project.as_ref())
             .rename_node(old, new);
         select_nodes(editor, doc, &[new.to_owned()]);
     }
@@ -1529,7 +1397,7 @@ pub fn link_node_dialog(
     ctx: &egui::Context,
     mut dialog: LinkNodeDialog,
 ) -> Option<LinkNodeDialog> {
-    let doc = ScriptDoc::load(editor, &dialog.owner)?;
+    let doc = ScriptDoc::load(editor, &dialog.at)?;
     let ports = doc
         .nodes()
         .get(&dialog.from)
@@ -1601,14 +1469,14 @@ pub fn link_node_dialog(
     }
 }
 
-fn save_layout(editor: &mut Editor, ui: &Ui, owner: &ScriptOwner) {
+fn save_layout(editor: &mut Editor, ui: &Ui, at: &ScriptRow) {
     if ui.input(|input| input.pointer.any_down()) {
         return;
     }
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(view) = editor.views.script.existing_view_mut(owner) else {
+    let Some(view) = editor.views.script.existing_view_mut(at) else {
         return;
     };
     if !view.layout_dirty {
@@ -1616,29 +1484,7 @@ fn save_layout(editor: &mut Editor, ui: &Ui, owner: &ScriptOwner) {
     }
     view.layout_dirty = false;
     let layout = ScriptGraphLayout::of(&view.graph, view.outline);
-    if let Err(error) = editor
-        .user
-        .save_layout(&project.root, &owner.slug(), &layout)
-    {
+    if let Err(error) = editor.user.save_layout(&project.root, &at.slug(), &layout) {
         editor.toast(format!("The graph layout was not saved: {error}"));
-    }
-}
-
-pub fn open_inline(editor: &mut Editor, table: &str, key: &str, pointer: &str) {
-    match ScriptOwner::inline(table, key, pointer) {
-        Some(owner) => editor.open_tab(EditorTab::Script(owner)),
-        None => editor.open_tab(EditorTab::for_row(table, key)),
-    }
-}
-
-pub fn open_inline_or_row(editor: &mut Editor, table: &str, key: &str, pointer: &str) {
-    let inline = editor
-        .row_value(table, key)
-        .and_then(|row| row.pointer(pointer).cloned())
-        .is_some_and(|module| module.script_kind() == Some(ScriptModuleKind::Inline));
-    if inline {
-        open_inline(editor, table, key, pointer);
-    } else {
-        editor.open_tab(EditorTab::for_row(table, key));
     }
 }

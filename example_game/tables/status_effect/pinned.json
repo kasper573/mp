@@ -5,25 +5,8 @@
   "description": "An arrow through the cloak: hardly a step to be had.",
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "hold"
-        },
-        "hold": {
-          "type": "boost",
-          "stat": "movement_speed",
-          "by": {
-            "type": "multiply",
-            "a": {
-              "type": "status_power"
-            },
-            "b": -1.0
-          }
-        }
-      }
+      "type": "script",
+      "script": "pinned_activated"
     }
   ]
 }

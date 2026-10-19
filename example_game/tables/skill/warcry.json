@@ -20,39 +20,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "roar": {
-          "type": "apply_status",
-          "who": {
-            "type": "skill_targets"
-          },
-          "effect": "emboldened",
-          "power": {
-            "type": "skill_stat",
-            "skill": "warcry",
-            "stat": "power"
-          },
-          "seconds": {
-            "type": "skill_stat",
-            "skill": "warcry",
-            "stat": "duration"
-          }
-        },
-        "sweep": {
-          "type": "vfx",
-          "vfx": "rally",
-          "on": {
-            "type": "skill_area"
-          },
-          "next": "roar"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "sweep"
-        }
-      }
+      "type": "script",
+      "script": "warcry_used"
     }
   ]
 }

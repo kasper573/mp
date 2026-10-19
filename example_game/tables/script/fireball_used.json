@@ -1,0 +1,53 @@
+{
+  "owner": "skill/fireball",
+  "runs_on": "skill",
+  "nodes": {
+    "blast": {
+      "type": "vfx",
+      "vfx": "fireball_blast",
+      "on": {
+        "type": "skill_area"
+      },
+      "next": "hit"
+    },
+    "burn": {
+      "type": "apply_status",
+      "who": {
+        "type": "skill_targets"
+      },
+      "effect": "burning",
+      "power": 1.0,
+      "seconds": 6.0
+    },
+    "cast": {
+      "type": "animate",
+      "action": "attack",
+      "wait": "apex",
+      "next": "blast"
+    },
+    "hit": {
+      "type": "damage",
+      "who": {
+        "type": "skill_targets"
+      },
+      "by": {
+        "type": "multiply",
+        "a": {
+          "type": "stat",
+          "stat": "damage"
+        },
+        "b": {
+          "type": "skill_stat",
+          "skill": "fireball",
+          "stat": "power"
+        }
+      },
+      "next": "burn"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "cast"
+    }
+  }
+}

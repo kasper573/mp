@@ -45,18 +45,24 @@ fn camp() -> (Sim, Entity) {
             "potion",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "drink" },
-                        "drink": { "type": "items", "take": [{ "item": "potion" }], "done": "mend" },
-                        "mend": { "type": "heal", "by": 25.0 },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "potion_drink" }],
+            }),
+        )
+        .script(
+            "potion_drink",
+            "item/potion",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "drink" },
+                "drink": { "type": "items", "take": [{ "item": "potion" }], "done": "mend" },
+                "mend": { "type": "heal", "by": 25.0 },
             }),
         )
         .item("tusk", json!({ "kind": { "type": "resource" } }))
-        .item("helmet", json!({ "kind": { "type": "equipment", "slot": "head" } }))
+        .item(
+            "helmet",
+            json!({ "kind": { "type": "equipment", "slot": "head" } }),
+        )
         .vfx("damage_taken")
         .shader("damage_pop")
         .vfx("healed")

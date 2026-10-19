@@ -14,21 +14,8 @@
   },
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "hold"
-        },
-        "hold": {
-          "type": "boost",
-          "stat": "max_health",
-          "by": {
-            "type": "status_power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "warded_activated"
     }
   ]
 }

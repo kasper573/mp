@@ -434,9 +434,10 @@ fn yard() -> (Sim, Entity) {
                     "cooldown": 6.0,
                     "levels": [{ "cost": 1, "stats": {} }, { "cost": 1, "stats": {} }],
                 }),
-                strike_nodes(),
+                "cleave_strike",
             ),
         )
+        .script("cleave_strike", "skill/cleave", "skill", strike_nodes())
         .row(
             "skill",
             "throw_knife",
@@ -449,23 +450,29 @@ fn yard() -> (Sim, Entity) {
                     "cost": [{ "item": "knife" }],
                     "levels": [{ "cost": 1, "stats": {} }],
                 }),
-                strike_nodes(),
+                "throw_knife_strike",
             ),
         )
-        .row("skill", "guard", self_skill("Guard"))
-        .row("skill", "second_wind", self_skill("Second Wind"))
+        .script("throw_knife_strike", "skill/throw_knife", "skill", strike_nodes())
+        .row("skill", "guard", self_skill("Guard", "guard_breathe"))
+        .script("guard_breathe", "skill/guard", "skill", breathing())
+        .row("skill", "second_wind", self_skill("Second Wind", "second_wind_breathe"))
+        .script("second_wind_breathe", "skill/second_wind", "skill", breathing())
         .asset("icons/skill.png", testkit::png(1, 1))
         .item(
             "potion",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "stack", "max": 5 }, {
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "drink" },
-                        "drink": { "type": "items", "take": [{ "item": "potion" }] },
-                    },
-                }],
+                "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": "potion_drink" }],
+            }),
+        )
+        .script(
+            "potion_drink",
+            "item/potion",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "drink" },
+                "drink": { "type": "items", "take": [{ "item": "potion" }] },
             }),
         )
         .item("knife", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 20 }] }))
@@ -473,14 +480,17 @@ fn yard() -> (Sim, Entity) {
             "draught",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "ask" },
-                        "ask": { "type": "reset_skills", "accepted": "drink" },
-                        "drink": { "type": "items", "take": [{ "item": "draught" }] },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "draught_drink" }],
+            }),
+        )
+        .script(
+            "draught_drink",
+            "item/draught",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "ask" },
+                "ask": { "type": "reset_skills", "accepted": "drink" },
+                "drink": { "type": "items", "take": [{ "item": "draught" }] },
             }),
         )
         .npc("dummy", 100.0, json!([]))
@@ -530,11 +540,11 @@ fn yard() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn skill(name: &str, fields: Value, nodes: Value) -> Value {
+fn skill(name: &str, fields: Value, script: &str) -> Value {
     let mut row = json!({
         "name": name,
         "icon": "icons/skill.png",
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": script }],
     });
     for (field, value) in fields.as_object().expect("a skill's fields") {
         row[field] = value.clone();
@@ -542,15 +552,19 @@ fn skill(name: &str, fields: Value, nodes: Value) -> Value {
     row
 }
 
-fn self_skill(name: &str) -> Value {
+fn self_skill(name: &str, script: &str) -> Value {
     skill(
         name,
         json!({ "target": "self", "cooldown": 20.0, "levels": [{ "cost": 1, "stats": {} }] }),
-        json!({
-            "used": { "type": "on", "event": "used", "next": "breathe" },
-            "breathe": { "type": "heal", "who": { "type": "skill_targets" }, "by": { "type": "stat", "stat": "damage" } },
-        }),
+        script,
     )
+}
+
+fn breathing() -> Value {
+    json!({
+        "used": { "type": "on", "event": "used", "next": "breathe" },
+        "breathe": { "type": "heal", "who": { "type": "skill_targets" }, "by": { "type": "stat", "stat": "damage" } },
+    })
 }
 
 fn strike_nodes() -> Value {

@@ -81,7 +81,6 @@ pub struct Phased<T> {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StatusModule {
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 

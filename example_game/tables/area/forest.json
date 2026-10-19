@@ -24,7 +24,6 @@
       },
       "scripts": [
         {
-          "type": "shared_script",
           "script": "warp",
           "values": {
             "to": {
@@ -48,7 +47,6 @@
       },
       "scripts": [
         {
-          "type": "shared_script",
           "script": "warp",
           "values": {
             "to": {
@@ -72,85 +70,13 @@
       "look": "icons/misc/rune_stone.png",
       "scripts": [
         {
-          "type": "inline_script",
-          "nodes": {
-            "found": {
-              "type": "complete_task",
-              "quest": "x_marks_the_spot",
-              "task": "find_stone",
-              "next": "matches"
-            },
-            "interacted": {
-              "type": "on",
-              "event": "interacted",
-              "verb": "use",
-              "reach": 1.5,
-              "next": "on_quest"
-            },
-            "look": {
-              "type": "dialogue",
-              "lines": [
-                {
-                  "by": {
-                    "type": "narrator"
-                  },
-                  "text": [
-                    "Moss has crept over the runes. Whoever carved them wanted them found, then forgot why."
-                  ]
-                }
-              ],
-              "choices": [
-                {
-                  "label": [
-                    "Step away."
-                  ]
-                }
-              ]
-            },
-            "matches": {
-              "type": "dialogue",
-              "lines": [
-                {
-                  "by": {
-                    "type": "narrator"
-                  },
-                  "text": [
-                    "The stone matches the drawing, down to the crack in its side."
-                  ]
-                }
-              ],
-              "next": "turn_in"
-            },
-            "on_quest": {
-              "type": "if",
-              "test": {
-                "type": "on_quest",
-                "quest": "x_marks_the_spot"
-              },
-              "yes": "found",
-              "no": "look"
-            },
-            "turn_in": {
-              "type": "turn_in",
-              "quest": "x_marks_the_spot"
-            }
-          }
+          "script": "standing_stone"
         }
       ]
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "discovered": {
-          "type": "on",
-          "event": "discovered",
-          "next": "intro"
-        },
-        "intro": {
-          "type": "notify",
-          "notification": "forest_intro"
-        }
-      }
+      "type": "script",
+      "script": "forest_discovered"
     },
     {
       "type": "population",

@@ -36,32 +36,30 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     );
     let scripts: Vec<String> = modules
         .iter()
-        .filter(|module| module.script_kind().is_some())
-        .map(|m| match m["script"].as_str() {
-            Some(script) => {
-                let values: Vec<String> = m["values"]
-                    .as_object()
-                    .into_iter()
-                    .flat_map(|v| v.iter())
-                    .map(|(k, v)| {
-                        format!(
-                            "{k} {}",
-                            v.as_f64()
-                                .map(|number| number.to_string())
-                                .unwrap_or_else(|| v
-                                    .as_str()
-                                    .map(str::to_owned)
-                                    .unwrap_or_else(|| v.to_string()))
-                        )
-                    })
-                    .collect();
-                if values.is_empty() {
-                    script.to_owned()
-                } else {
-                    format!("{script} · {}", values.join(" · "))
-                }
-            }
-            None => "inline script".to_owned(),
+        .filter(|module| module.is_script_module())
+        .filter_map(|m| {
+            let script = m["script"].as_str()?;
+            let values: Vec<String> = m["values"]
+                .as_object()
+                .into_iter()
+                .flat_map(|v| v.iter())
+                .map(|(k, v)| {
+                    format!(
+                        "{k} {}",
+                        v.as_f64()
+                            .map(|number| number.to_string())
+                            .unwrap_or_else(|| v
+                                .as_str()
+                                .map(str::to_owned)
+                                .unwrap_or_else(|| v.to_string()))
+                    )
+                })
+                .collect();
+            Some(if values.is_empty() {
+                script.to_owned()
+            } else {
+                format!("{script} · {}", values.join(" · "))
+            })
         })
         .collect();
     widgets::kv_text(

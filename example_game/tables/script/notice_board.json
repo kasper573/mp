@@ -1,0 +1,68 @@
+{
+  "owner": "area/island",
+  "runs_on": "object",
+  "nodes": {
+    "interacted": {
+      "type": "on",
+      "event": "interacted",
+      "verb": "read",
+      "reach": 1.5,
+      "next": "read"
+    },
+    "read": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "narrator"
+          },
+          "text": [
+            "Notices flap on the post, nailed over older notices."
+          ]
+        },
+        {
+          "by": {
+            "type": "object"
+          },
+          "text": [
+            {
+              "text": "FERRY SUSPENDED",
+              "voice": "shout"
+            },
+            " until the orc trouble passes. By order of ",
+            {
+              "text": "Captain Bram",
+              "ink": "name"
+            },
+            "."
+          ]
+        },
+        {
+          "by": {
+            "type": "object"
+          },
+          "text": [
+            "WANTED: strong arms for the ",
+            {
+              "text": "north shore",
+              "ink": "place"
+            },
+            ". Ask ",
+            {
+              "text": "Mara",
+              "ink": "name"
+            },
+            " at the market."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Step away."
+          ]
+        }
+      ]
+    }
+  }
+}

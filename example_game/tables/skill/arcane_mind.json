@@ -25,23 +25,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "sharpen"
-        },
-        "sharpen": {
-          "type": "boost",
-          "stat": "damage",
-          "by": {
-            "type": "skill_stat",
-            "skill": "arcane_mind",
-            "stat": "power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "arcane_mind_activated"
     }
   ]
 }

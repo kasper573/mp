@@ -136,16 +136,24 @@ fn border(modules: Value) -> Sim {
         .npc(
             "wanderer",
             25.0,
-            json!([{
-                "type": "inline_script",
-                "nodes": {
-                    "spawned": { "type": "on", "event": "started", "next": "roam" },
-                    "roam": { "type": "wander", "priority": 1, "next": "rest" },
-                    "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "roam" },
-                },
-            }]),
+            json!([{ "type": "script", "script": "wanderer_roam" }]),
         )
-        .npc("hunter", 1_000.0, hunting())
+        .script(
+            "wanderer_roam",
+            "npc/wanderer",
+            "npc",
+            json!({
+                "spawned": { "type": "on", "event": "started", "next": "roam" },
+                "roam": { "type": "wander", "priority": 1, "next": "rest" },
+                "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "roam" },
+            }),
+        )
+        .npc(
+            "hunter",
+            1_000.0,
+            json!([{ "type": "script", "script": "hunter_hunt" }]),
+        )
+        .owned("script", "hunter_hunt", "npc/hunter", hunting())
         .edit("npc", "hunter", |hunter| {
             hunter["basic_attack"] = json!("strike")
         })
@@ -184,8 +192,8 @@ fn border(modules: Value) -> Sim {
 }
 
 fn hunting() -> Value {
-    json!([{
-        "type": "inline_script",
+    json!({
+        "runs_on": "npc",
         "locals": { "target": "actor" },
         "nodes": {
             "spawned": { "type": "on", "event": "started", "next": "hostile" },
@@ -215,7 +223,7 @@ fn hunting() -> Value {
             },
             "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
         },
-    }])
+    })
 }
 
 fn spawn(sim: &mut Sim, key: &str, at: Pos<Tiles>) -> Entity {

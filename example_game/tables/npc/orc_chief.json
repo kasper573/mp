@@ -51,58 +51,15 @@
       ]
     },
     {
-      "type": "shared_script",
+      "type": "script",
       "script": "combat_protective",
       "values": {
         "aggro": 9.0
       }
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "came_near": {
-          "type": "on",
-          "event": "came_near",
-          "within": 8.0,
-          "by": "characters",
-          "next": "hunting_me"
-        },
-        "challenge": {
-          "type": "notify",
-          "notification": "chief_challenge",
-          "next": "threat"
-        },
-        "hunting_me": {
-          "type": "if",
-          "test": {
-            "type": "all",
-            "of": [
-              {
-                "type": "on_quest",
-                "quest": "tusks_for_the_chief"
-              },
-              {
-                "type": "not",
-                "of": {
-                  "type": "set_within",
-                  "memory": "chief_taunted_you",
-                  "seconds": 120
-                }
-              }
-            ]
-          },
-          "yes": "taunted"
-        },
-        "taunted": {
-          "type": "remember",
-          "memory": "chief_taunted_you",
-          "next": "challenge"
-        },
-        "threat": {
-          "type": "notify",
-          "notification": "chief_threat"
-        }
-      }
+      "type": "script",
+      "script": "orc_chief_came_near"
     }
   ]
 }

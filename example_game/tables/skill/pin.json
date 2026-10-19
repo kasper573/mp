@@ -25,60 +25,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "hit": {
-          "type": "damage",
-          "who": {
-            "type": "skill_targets"
-          },
-          "by": {
-            "type": "multiply",
-            "a": {
-              "type": "stat",
-              "stat": "damage"
-            },
-            "b": {
-              "type": "skill_stat",
-              "skill": "pin",
-              "stat": "power"
-            }
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "arrow_hit",
-          "on": {
-            "type": "skill_targets"
-          },
-          "next": "stick"
-        },
-        "stick": {
-          "type": "apply_status",
-          "who": {
-            "type": "skill_targets"
-          },
-          "effect": "pinned",
-          "power": 1.0,
-          "seconds": {
-            "type": "skill_stat",
-            "skill": "pin",
-            "stat": "duration"
-          }
-        },
-        "swing": {
-          "type": "animate",
-          "action": "attack",
-          "wait": "apex",
-          "next": "hit"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "swing"
-        }
-      }
+      "type": "script",
+      "script": "pin_used"
     }
   ]
 }

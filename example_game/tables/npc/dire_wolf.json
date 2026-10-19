@@ -36,7 +36,7 @@
       ]
     },
     {
-      "type": "shared_script",
+      "type": "script",
       "script": "combat_aggressive",
       "values": {
         "aggro": 8.0

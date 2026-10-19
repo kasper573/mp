@@ -8,21 +8,8 @@
   },
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "hold"
-        },
-        "hold": {
-          "type": "boost",
-          "stat": "damage",
-          "by": {
-            "type": "status_power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "rallied_activated"
     }
   ]
 }

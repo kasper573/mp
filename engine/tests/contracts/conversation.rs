@@ -242,9 +242,19 @@ fn inn() -> Sim {
                 "modules": [{ "type": "stack", "max": 100_000 }],
             }),
         )
-        .npc("keeper", 40.0, json!([keeping()]))
+        .npc(
+            "keeper",
+            40.0,
+            json!([{ "type": "script", "script": "keeper_talk" }]),
+        )
+        .script("keeper_talk", "npc/keeper", "npc", keeping())
         .busts("keeper")
-        .npc("crier", 40.0, json!([crying()]))
+        .npc(
+            "crier",
+            40.0,
+            json!([{ "type": "script", "script": "crier_talk" }]),
+        )
+        .script("crier_talk", "npc/crier", "npc", crying())
         .row(
             "memory",
             "favour",
@@ -296,8 +306,6 @@ fn inn() -> Sim {
 
 fn keeping() -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": {
                 "type": "on",
                 "event": "interacted",
@@ -332,14 +340,11 @@ fn keeping() -> Value {
                 "lines": [{ "by": { "type": "npc", "npc": "keeper", "face": "happy" }, "text": ["Cheers!"] }],
                 "choices": [{ "label": ["Goodbye."] }],
             },
-        },
     })
 }
 
 fn crying() -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": {
                 "type": "on",
                 "event": "interacted",
@@ -378,7 +383,6 @@ fn crying() -> Value {
                 "lines": [{ "by": { "type": "narrator" }, "text": ["Hear ye!"] }],
                 "choices": [{ "label": ["Thanks."] }],
             },
-        },
     })
 }
 

@@ -20,7 +20,7 @@
       "after": 300.0
     },
     {
-      "type": "shared_script",
+      "type": "script",
       "script": "idle_stroll"
     }
   ]

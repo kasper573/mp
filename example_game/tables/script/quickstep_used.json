@@ -1,0 +1,28 @@
+{
+  "owner": "skill/quickstep",
+  "runs_on": "skill",
+  "nodes": {
+    "dash": {
+      "type": "apply_status",
+      "who": {
+        "type": "skill_targets"
+      },
+      "effect": "quickened",
+      "power": {
+        "type": "skill_stat",
+        "skill": "quickstep",
+        "stat": "power"
+      },
+      "seconds": {
+        "type": "skill_stat",
+        "skill": "quickstep",
+        "stat": "duration"
+      }
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "dash"
+    }
+  }
+}

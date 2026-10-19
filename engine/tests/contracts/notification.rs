@@ -337,36 +337,38 @@ fn a_pop_is_never_kept_in_history() {
 /// An island with a pier the gulls haunt, a forest across the water that greets newcomers, and a
 /// chief who taunts whoever is after his tusks.
 fn game() -> Content {
-    let intro = |key: &str| {
-        json!([{
-            "type": "inline_script",
-            "nodes": {
-                "discovered": { "type": "on", "event": "discovered", "next": "intro" },
-                "intro": { "type": "notify", "notification": key },
-            },
-        }])
-    };
-    let mut island_modules = intro("island_intro");
-    island_modules.as_array_mut().expect("modules").extend([
-        json!({ "type": "resident", "npc": "talker", "at": { "x": 2.0, "y": 2.0 } }),
+    let intro = |notice: &str| {
         json!({
+            "discovered": { "type": "on", "event": "discovered", "next": "intro" },
+            "intro": { "type": "notify", "notification": notice },
+        })
+    };
+    let island_modules = json!([
+        { "type": "script", "script": "island_intro" },
+        { "type": "resident", "npc": "talker", "at": { "x": 2.0, "y": 2.0 } },
+        {
             "type": "object",
             "name": "pier",
             "shape": { "type": "rect", "x": 9.5, "y": 5.5, "w": 2.0, "h": 2.0 },
-            "scripts": [{
-                "type": "inline_script",
-                "nodes": {
-                    "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
-                    "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls", "seconds": 600 }, "no": "remember" },
-                    "remember": { "type": "remember", "memory": "heard_gulls", "next": "gulls" },
-                    "gulls": { "type": "notify", "notification": "gulls" },
-                },
-            }],
-        }),
+            "scripts": [{ "script": "pier_gulls" }],
+        },
     ]);
     Game::new()
         .area("island", &Map::open(12, 12), island_modules)
-        .area("forest", &Map::open(8, 8), intro("forest_intro"))
+        .script("island_intro", "area/island", "area", intro("island_intro"))
+        .script(
+            "pier_gulls",
+            "area/island",
+            "object",
+            json!({
+                "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
+                "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls", "seconds": 600 }, "no": "remember" },
+                "remember": { "type": "remember", "memory": "heard_gulls", "next": "gulls" },
+                "gulls": { "type": "notify", "notification": "gulls" },
+            }),
+        )
+        .area("forest", &Map::open(8, 8), json!([{ "type": "script", "script": "forest_intro" }]))
+        .script("forest_intro", "area/forest", "area", intro("forest_intro"))
         .hero("island", 3.0, 8.0)
         .edit("class", "hero", |hero| {
             hero["levels"] = json!([{ "xp": 0, "skill_points": 1 }, { "xp": 20 }])
@@ -374,39 +376,45 @@ fn game() -> Content {
         .npc(
             "talker",
             40.0,
-            json!([{
-                "type": "inline_script",
-                "nodes": {
-                    "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
-                    "hello": {
-                        "type": "dialogue",
-                        "lines": [{ "by": { "type": "narrator" }, "text": ["Fine weather."] }],
-                        "choices": [{ "label": ["Goodbye."] }],
-                    },
+            json!([{ "type": "script", "script": "talker_talk" }]),
+        )
+        .script(
+            "talker_talk",
+            "npc/talker",
+            "npc",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
+                "hello": {
+                    "type": "dialogue",
+                    "lines": [{ "by": { "type": "narrator" }, "text": ["Fine weather."] }],
+                    "choices": [{ "label": ["Goodbye."] }],
                 },
-            }]),
+            }),
         )
         .babble("chief")
         .npc(
             "chief",
             40.0,
-            json!([{ "type": "voice", "babble": "chief" }, {
-                "type": "inline_script",
-                "nodes": {
-                    "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
-                    "hunting_me": {
-                        "type": "if",
-                        "test": { "type": "all", "of": [
-                            { "type": "on_quest", "quest": "tusks" },
-                            { "type": "not", "of": { "type": "set_within", "memory": "taunted", "seconds": 120 } },
-                        ] },
-                        "yes": "taunted",
-                    },
-                    "taunted": { "type": "remember", "memory": "taunted", "next": "challenge" },
-                    "challenge": { "type": "notify", "notification": "challenge", "next": "threat" },
-                    "threat": { "type": "notify", "notification": "threat" },
+            json!([{ "type": "voice", "babble": "chief" }, { "type": "script", "script": "chief_taunt" }]),
+        )
+        .script(
+            "chief_taunt",
+            "npc/chief",
+            "npc",
+            json!({
+                "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
+                "hunting_me": {
+                    "type": "if",
+                    "test": { "type": "all", "of": [
+                        { "type": "on_quest", "quest": "tusks" },
+                        { "type": "not", "of": { "type": "set_within", "memory": "taunted", "seconds": 120 } },
+                    ] },
+                    "yes": "taunted",
                 },
-            }]),
+                "taunted": { "type": "remember", "memory": "taunted", "next": "challenge" },
+                "challenge": { "type": "notify", "notification": "challenge", "next": "threat" },
+                "threat": { "type": "notify", "notification": "threat" },
+            }),
         )
         .npc("dummy", 40.0, json!([]))
         .item("tusk", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 50 }] }))

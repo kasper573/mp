@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, row_file};
-use engine::core::script::ScriptModuleKind;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
@@ -194,7 +193,7 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
                 return;
             }
             let sub = match path.len() {
-                1 => short_tag(&variant.tag),
+                1 => variant.tag.clone(),
                 _ => path[path.len() - 2].trim_end_matches('s').to_owned(),
             };
             columns.push(SpreadsheetColumn {
@@ -244,14 +243,6 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
         }
     }
     columns
-}
-
-fn short_tag(tag: &str) -> String {
-    match ScriptModuleKind::of(tag) {
-        Some(ScriptModuleKind::Shared) => "shared".to_owned(),
-        Some(ScriptModuleKind::Inline) => "inline".to_owned(),
-        None => tag.to_owned(),
-    }
 }
 
 fn is_numeric(root: &Value, schema: &Value) -> bool {
@@ -1031,7 +1022,7 @@ fn edit_cell(
     let state = views.spreadsheet.state_mut(table);
     let autofocus = std::mem::take(&mut state.focus_editor);
     let mut cx = FormCx::new(project, root, shapes, &mut state.form, &mut actions)
-        .owned_by(table, Some(&row.key));
+        .editing(table, Some(&row.key));
     cx.autofocus = autofocus;
     let changed = ui
         .push_id(("sheet-cell", &row.key, &column.id), |ui| {

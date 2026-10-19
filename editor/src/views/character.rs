@@ -174,7 +174,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             } = editor;
             let project = project.as_ref().expect("a project");
             let mut cx = FormCx::new(project, root, shapes, form, &mut actions)
-                .owned_by(CharacterSnapshot::TABLE, Some(key));
+                .editing(CharacterSnapshot::TABLE, Some(key));
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
                 ui.horizontal_top(|ui| {
@@ -1230,7 +1230,7 @@ fn quests(
     if let Some((quest, moment)) = setup {
         *label = format!(
             "Set up {} for {quest} · {}",
-            cx.owner_key.clone().unwrap_or_default(),
+            cx.row_key.clone().unwrap_or_default(),
             moment.label()
         );
         apply_moment(cx, value, &quest, moment, parties.as_ref());

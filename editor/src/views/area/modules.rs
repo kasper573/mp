@@ -360,10 +360,7 @@ pub const ADD_MENU: &[(&str, &[(AreaModuleKind, &str)])] = &[
     ),
     (
         "Area-wide",
-        &[
-            (AreaModuleKind::InlineScript, "its nodes in this area"),
-            (AreaModuleKind::SharedScript, "names a script row"),
-        ],
+        &[(AreaModuleKind::Script, "names a script row")],
     ),
 ];
 
@@ -392,9 +389,6 @@ pub fn module_template(editor: &Editor, kind: AreaModuleKind, cell: CellPos) -> 
         AreaModuleKind::Scenery => {
             module["at"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5 });
         }
-        AreaModuleKind::InlineScript => {
-            module["nodes"] = serde_json::json!({});
-        }
         _ => {}
     }
     Some(module)
@@ -418,7 +412,7 @@ pub fn add_module(
     let reference = match kind {
         AreaModuleKind::Population | AreaModuleKind::Resident => Some("npc"),
         AreaModuleKind::Blueprint => Some("blueprint"),
-        AreaModuleKind::SharedScript => Some("script"),
+        AreaModuleKind::Script => Some("script"),
         AreaModuleKind::Scenery => Some("tileset"),
         _ => None,
     };

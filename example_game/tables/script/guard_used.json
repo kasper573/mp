@@ -1,0 +1,28 @@
+{
+  "owner": "skill/guard",
+  "runs_on": "skill",
+  "nodes": {
+    "brace": {
+      "type": "apply_status",
+      "who": {
+        "type": "skill_targets"
+      },
+      "effect": "guarded",
+      "power": {
+        "type": "skill_stat",
+        "skill": "guard",
+        "stat": "power"
+      },
+      "seconds": {
+        "type": "skill_stat",
+        "skill": "guard",
+        "stat": "duration"
+      }
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "brace"
+    }
+  }
+}

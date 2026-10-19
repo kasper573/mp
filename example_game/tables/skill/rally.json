@@ -27,39 +27,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "cheer": {
-          "type": "apply_status",
-          "who": {
-            "type": "skill_targets"
-          },
-          "effect": "rallied",
-          "power": {
-            "type": "skill_stat",
-            "skill": "rally",
-            "stat": "power"
-          },
-          "seconds": {
-            "type": "skill_stat",
-            "skill": "rally",
-            "stat": "duration"
-          }
-        },
-        "sweep": {
-          "type": "vfx",
-          "vfx": "rally",
-          "on": {
-            "type": "skill_area"
-          },
-          "next": "cheer"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "sweep"
-        }
-      }
+      "type": "script",
+      "script": "rally_used"
     }
   ]
 }

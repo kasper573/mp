@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
 use engine::core::content::{ModuleRule, row_file};
-use engine::core::script::ScriptModuleKind;
 use engine::systems::registry;
+use engine::systems::script::ScriptModule;
 use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup, theme, widgets};
@@ -50,7 +50,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, root, shapes, form, &mut actions).owned_by(&table, None);
+        let mut cx = FormCx::new(project, root, shapes, form, &mut actions).editing(&table, None);
         let shared_card = |ui: &mut Ui, cx: &mut FormCx, edits: &mut Vec<(String, Value)>| {
             widgets::card_frame(false).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -153,7 +153,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                                 }
                             }
                         }
-                    } else if ScriptModuleKind::of(tag) == Some(ScriptModuleKind::Shared) {
+                    } else if tag == ScriptModule::TAG {
                         let mut by_script: BTreeMap<String, Vec<String>> = BTreeMap::new();
                         for (key, _, module) in &firsts {
                             by_script

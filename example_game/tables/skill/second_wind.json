@@ -27,25 +27,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "breathe": {
-          "type": "heal",
-          "who": {
-            "type": "skill_targets"
-          },
-          "by": {
-            "type": "skill_stat",
-            "skill": "second_wind",
-            "stat": "power"
-          }
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "breathe"
-        }
-      }
+      "type": "script",
+      "script": "second_wind_used"
     }
   ]
 }

@@ -23,7 +23,7 @@ use crate::rows::{self, UsageDecision, UsageSummary};
 use crate::templates::{self, GameTemplate};
 use crate::ui::{self, start};
 use crate::views::area::{self, layers, pick, resize};
-use crate::views::script::{self, inspect};
+use crate::views::script;
 use crate::views::world;
 use crate::{import, play};
 
@@ -363,7 +363,7 @@ fn template_counts(template: &GameTemplate) -> String {
     let players = template.rows_in(PlayerDef::TABLE);
     let scripts = template.rows_in(ScriptDef::TABLE);
     format!(
-        "{areas} area{} · {players} player{} · {scripts} shared script{}",
+        "{areas} area{} · {players} player{} · {scripts} script{}",
         widgets::plural(areas),
         widgets::plural(players),
         widgets::plural(scripts)
@@ -901,12 +901,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::Import(dialog) => {
             import::dialog(editor, ctx, *dialog).map(|next| ModalDialog::Import(Box::new(next)))
         }
-        ModalDialog::MakeShared(dialog) => {
-            inspect::make_shared_body(editor, ctx, dialog).map(ModalDialog::MakeShared)
-        }
-        ModalDialog::MakeInline(dialog) => {
-            inspect::make_inline_body(editor, ctx, dialog).map(ModalDialog::MakeInline)
-        }
         ModalDialog::RenameNode(dialog) => {
             script::rename_node_dialog(editor, ctx, dialog).map(ModalDialog::RenameNode)
         }
@@ -986,8 +980,8 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
             }
         }
         ConfirmAction::RemoveLayer { area, layer } => area::remove_layer(editor, &area, &layer),
-        ConfirmAction::DeleteScriptNodes { owner, names } => {
-            script::delete_nodes_now(editor, &owner, names)
+        ConfirmAction::DeleteScriptNodes { script, names } => {
+            script::delete_nodes_now(editor, &script, names)
         }
     }
 }

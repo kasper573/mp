@@ -1,0 +1,760 @@
+{
+  "owner": "npc/grisha",
+  "runs_on": "npc",
+  "nodes": {
+    "anything_else": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "neutral"
+          },
+          "text": [
+            "Suit yourself. Anything else?"
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "not",
+            "of": {
+              "type": "at_least",
+              "a": {
+                "type": "memory",
+                "memory": "inn_favour"
+              },
+              "b": 3
+            }
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_bed"
+        },
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "at_least",
+            "a": {
+              "type": "memory",
+              "memory": "inn_favour"
+            },
+            "b": 3
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_regular_bed"
+        },
+        {
+          "label": [
+            "Buy a round for the room."
+          ],
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_round"
+        },
+        {
+          "label": [
+            "Chat."
+          ],
+          "to": "chat"
+        },
+        {
+          "label": [
+            "Goodbye."
+          ]
+        }
+      ]
+    },
+    "chat": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "happy"
+          },
+          "text": [
+            "Ask away. Gossip's free, the ale isn't."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Tell me about this island."
+          ],
+          "to": "island"
+        },
+        {
+          "label": [
+            "Any rumours?"
+          ],
+          "requires": {
+            "type": "all",
+            "of": [
+              {
+                "type": "not",
+                "of": {
+                  "type": "at_least",
+                  "a": {
+                    "type": "memory",
+                    "memory": "inn_favour"
+                  },
+                  "b": 1
+                }
+              },
+              {
+                "type": "not",
+                "of": {
+                  "type": "on_quest",
+                  "quest": "tusks_for_the_chief"
+                }
+              }
+            ]
+          },
+          "to": "rumour_wren"
+        },
+        {
+          "label": [
+            "Any rumours?"
+          ],
+          "requires": {
+            "type": "all",
+            "of": [
+              {
+                "type": "at_least",
+                "a": {
+                  "type": "memory",
+                  "memory": "inn_favour"
+                },
+                "b": 1
+              },
+              {
+                "type": "not",
+                "of": {
+                  "type": "on_quest",
+                  "quest": "tusks_for_the_chief"
+                }
+              }
+            ]
+          },
+          "to": "rumour_bram"
+        },
+        {
+          "label": [
+            "Any rumours?"
+          ],
+          "requires": {
+            "type": "on_quest",
+            "quest": "tusks_for_the_chief"
+          },
+          "to": "rumour_chief"
+        },
+        {
+          "label": [
+            "Never mind."
+          ],
+          "to": "anything_else"
+        }
+      ]
+    },
+    "count_round": {
+      "type": "remember",
+      "memory": "inn_favour",
+      "to": {
+        "type": "add",
+        "a": {
+          "type": "memory",
+          "memory": "inn_favour"
+        },
+        "b": 1
+      },
+      "next": "round"
+    },
+    "favoured": {
+      "type": "if",
+      "test": {
+        "type": "at_least",
+        "a": {
+          "type": "memory",
+          "memory": "inn_favour"
+        },
+        "b": 3
+      },
+      "yes": "regular",
+      "no": "hello"
+    },
+    "heal": {
+      "type": "heal",
+      "by": "full",
+      "next": "rested"
+    },
+    "hello": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "happy"
+          },
+          "text": [
+            "Welcome to the ",
+            {
+              "text": "Driftwood Inn",
+              "ink": "place"
+            },
+            "! A bed, a bowl, and all the gossip you can stomach."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "not",
+            "of": {
+              "type": "at_least",
+              "a": {
+                "type": "memory",
+                "memory": "inn_favour"
+              },
+              "b": 3
+            }
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_bed"
+        },
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "at_least",
+            "a": {
+              "type": "memory",
+              "memory": "inn_favour"
+            },
+            "b": 3
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_regular_bed"
+        },
+        {
+          "label": [
+            "Buy a round for the room."
+          ],
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_round"
+        },
+        {
+          "label": [
+            "Chat."
+          ],
+          "to": "chat"
+        },
+        {
+          "label": [
+            "Goodbye."
+          ]
+        }
+      ]
+    },
+    "interacted": {
+      "type": "on",
+      "event": "interacted",
+      "verb": "talk",
+      "reach": 2.0,
+      "marks": [
+        "innkeeper"
+      ],
+      "next": "favoured"
+    },
+    "island": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "narrator"
+          },
+          "text": [
+            "Grisha polishes a mug that will never be clean."
+          ]
+        },
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "neutral"
+          },
+          "text": [
+            "This rock? Fishers, a market, my ",
+            {
+              "text": "inn",
+              "ink": "place"
+            },
+            ", and ",
+            {
+              "text": "Bram",
+              "ink": "name"
+            },
+            "'s ferry to the ",
+            {
+              "text": "forest shore",
+              "ink": "place"
+            },
+            "."
+          ]
+        },
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "thinking"
+          },
+          "text": [
+            "Past the town it's sand and ",
+            {
+              "text": "skeletons",
+              "ink": "danger"
+            },
+            ", and ",
+            {
+              "text": "orcs",
+              "ink": "danger"
+            },
+            " up the ",
+            {
+              "text": "north shore",
+              "ink": "place"
+            },
+            ". ",
+            {
+              "text": "Ilsa",
+              "ink": "name"
+            },
+            " minds the ",
+            {
+              "text": "forest road",
+              "ink": "place"
+            },
+            "."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Ok."
+          ],
+          "to": "chat"
+        }
+      ]
+    },
+    "pay_bed": {
+      "type": "items",
+      "take": [
+        {
+          "item": "gold",
+          "count": 5
+        }
+      ],
+      "done": "heal"
+    },
+    "pay_regular_bed": {
+      "type": "items",
+      "take": [
+        {
+          "item": "gold",
+          "count": 3
+        }
+      ],
+      "done": "heal"
+    },
+    "pay_round": {
+      "type": "items",
+      "take": [
+        {
+          "item": "gold",
+          "count": 10
+        }
+      ],
+      "done": "round_counted"
+    },
+    "regular": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "happy"
+          },
+          "text": [
+            "My favourite guest! Rest your bones. For you, three ",
+            {
+              "text": "Gold",
+              "ink": "item"
+            },
+            "."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "not",
+            "of": {
+              "type": "at_least",
+              "a": {
+                "type": "memory",
+                "memory": "inn_favour"
+              },
+              "b": 3
+            }
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_bed"
+        },
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "at_least",
+            "a": {
+              "type": "memory",
+              "memory": "inn_favour"
+            },
+            "b": 3
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_regular_bed"
+        },
+        {
+          "label": [
+            "Buy a round for the room."
+          ],
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_round"
+        },
+        {
+          "label": [
+            "Chat."
+          ],
+          "to": "chat"
+        },
+        {
+          "label": [
+            "Goodbye."
+          ]
+        }
+      ]
+    },
+    "rested": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "neutral"
+          },
+          "text": [
+            "There. Slept like a log, you did."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Good as new. Thanks, Grisha."
+          ]
+        }
+      ]
+    },
+    "round": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "narrator"
+          },
+          "text": [
+            "The room cheers. Someone starts a song about a mermaid and a very confused sailor."
+          ]
+        },
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "happy"
+          },
+          "text": [
+            "Keep that up and you'll be a regular in no time."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "not",
+            "of": {
+              "type": "at_least",
+              "a": {
+                "type": "memory",
+                "memory": "inn_favour"
+              },
+              "b": 3
+            }
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_bed"
+        },
+        {
+          "label": [
+            "Rest until I'm mended."
+          ],
+          "requires": {
+            "type": "at_least",
+            "a": {
+              "type": "memory",
+              "memory": "inn_favour"
+            },
+            "b": 3
+          },
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_regular_bed"
+        },
+        {
+          "label": [
+            "Buy a round for the room."
+          ],
+          "reveal": [
+            "costs"
+          ],
+          "to": "pay_round"
+        },
+        {
+          "label": [
+            "Chat."
+          ],
+          "to": "chat"
+        },
+        {
+          "label": [
+            "Goodbye."
+          ]
+        }
+      ]
+    },
+    "round_counted": {
+      "type": "if",
+      "test": {
+        "type": "set_within",
+        "memory": "inn_favour",
+        "seconds": 300
+      },
+      "yes": "round",
+      "no": "count_round"
+    },
+    "rumour_bram": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "sad"
+          },
+          "text": [
+            "Between you and me? ",
+            {
+              "text": "Bram",
+              "ink": "name"
+            },
+            "'s ferry hasn't left since the orcs came. He's waiting on a brave fool."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Ok."
+          ],
+          "to": "chat"
+        }
+      ]
+    },
+    "rumour_chief": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "thinking"
+          },
+          "text": [
+            "The orc ",
+            {
+              "text": "chief",
+              "ink": "danger"
+            },
+            "? Camps on the ",
+            {
+              "text": "north shore",
+              "ink": "place"
+            },
+            " with his guard around him."
+          ]
+        },
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "neutral"
+          },
+          "text": [
+            "There's a shaman with that clan, out in the ",
+            {
+              "text": "Forest",
+              "ink": "place"
+            },
+            ". ",
+            {
+              "text": "They say she's not keen on the fighting.",
+              "voice": "whisper"
+            }
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Ok."
+          ],
+          "to": "chat"
+        }
+      ]
+    },
+    "rumour_wren": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "thinking"
+          },
+          "text": [
+            {
+              "text": "Wren",
+              "ink": "name"
+            },
+            " pays good tokens for bones. Don't ask what she does with them."
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "What does she do with them?"
+          ],
+          "to": "wren_secret"
+        },
+        {
+          "label": [
+            "Ok."
+          ],
+          "to": "chat"
+        }
+      ]
+    },
+    "wren_secret": {
+      "type": "dialogue",
+      "lines": [
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "angry"
+          },
+          "text": [
+            "What did I ",
+            {
+              "text": "just",
+              "voice": "shout"
+            },
+            " say?"
+          ]
+        },
+        {
+          "by": {
+            "type": "narrator"
+          },
+          "text": [
+            "She leans over the bar anyway."
+          ]
+        },
+        {
+          "by": {
+            "type": "npc",
+            "npc": "grisha",
+            "face": "thinking"
+          },
+          "text": [
+            {
+              "text": "Soup, or charms. Depends who's asking, and who's buying.",
+              "voice": "whisper"
+            }
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "label": [
+            "Ok."
+          ],
+          "to": "chat"
+        }
+      ]
+    }
+  }
+}

@@ -12,7 +12,6 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, ModuleRule, row_file};
-use engine::core::script::ScriptModuleKind;
 use engine::core::vfx::VfxShaderDef;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::AreaDef;
@@ -21,16 +20,14 @@ use engine::systems::class::ClassDef;
 use engine::systems::input::map::InputDef;
 use engine::systems::quest::{ObjectiveKind, QuestDef};
 use engine::systems::registry;
+use engine::systems::script::ScriptModule;
 use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
 use self::preview::PreviewPlace;
 use self::rows::{fieldless_note, free_singles, show_rows};
-use self::scripts::{
-    module_lines, outline_block, script_extras, script_summary, script_values, speaker_of,
-    summary_of,
-};
+use self::scripts::{module_lines, script_module_body, script_summary, speaker_of, summary_of};
 use super::{theme, widgets};
 use crate::app::{
     Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
@@ -40,10 +37,8 @@ use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
-use crate::tabs::EditorTab;
 use crate::ui::browser::{self};
 use crate::value::RowValue;
-use crate::views::script::{self, PendingScriptAction, ScriptOwner};
 use crate::views::{class, model, skill, tileset, vfx};
 use crate::{schema, stage};
 
@@ -146,7 +141,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx =
-            FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, Some(key));
+            FormCx::new(project, root, shapes, form, &mut actions).editing(table, Some(key));
         cx.speaker = speaker_of(table, key);
         ui.push_id(("row", table, key), |ui| {
             if wide && second_column {
@@ -323,7 +318,7 @@ fn modules_column(
     let shown = if scripts_only {
         value["modules"].as_array().map_or(0, |list| {
             list.iter()
-                .filter(|module| module.script_kind().is_some())
+                .filter(|module| module.is_script_module())
                 .count()
         })
     } else {
@@ -384,8 +379,7 @@ fn modules_column(
         let path = format!("/modules/{index}");
         let module = &mut value["modules"][index];
         let tag = module.kind_or("module").to_owned();
-        let script_kind = module.script_kind();
-        let is_script = script_kind.is_some();
+        let is_script = module.is_script_module();
         if scripts_only && !is_script {
             continue;
         }
@@ -446,14 +440,7 @@ fn modules_column(
                             theme::FAINT,
                         );
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.label(
-                                theme::strong(if is_script {
-                                    tag.replace('_', " ")
-                                } else {
-                                    tag.clone()
-                                })
-                                .monospace(),
-                            );
+                            ui.label(theme::strong(&tag).monospace());
                             if folded || !is_script {
                                 ui.add(
                                     egui::Label::new(
@@ -482,9 +469,6 @@ fn modules_column(
                 changed |= card_body(ui, cx, table, &variants, module, &path);
             }
         });
-        if !folded && script_kind == Some(ScriptModuleKind::Inline) {
-            outline_block(ui, cx, &value["modules"][index]);
-        }
         ui.add_space(2.0);
     }
     let list = value["modules"].as_array_mut().expect("modules");
@@ -514,39 +498,29 @@ pub(super) fn card_body(
 ) -> FormChange {
     ui.add_space(4.0);
     let mut changed = FormChange::default();
-    if let Some(variant) = schema::variant_of(variants, module) {
-        let script_kind = ScriptModuleKind::of(&variant.tag);
-        let hidden: &[&str] = match script_kind {
-            Some(ScriptModuleKind::Inline) => &["nodes"],
-            Some(ScriptModuleKind::Shared) => &["values"],
-            None => &[],
-        };
-        let fieldless = variant.schema["properties"]
-            .as_object()
-            .is_none_or(|fields| {
-                fields
-                    .keys()
-                    .all(|name| name == "type" || hidden.contains(&name.as_str()))
-            });
-        if fieldless {
-            widgets::hint(ui, &fieldless_note(variant.schema));
-        } else {
-            changed |= forms::object_without(ui, cx, variant.schema, module, path, hidden);
+    match schema::variant_of(variants, module) {
+        Some(variant) if variant.tag == ScriptModule::TAG => {
+            changed |= script_module_body(ui, cx, table, variant.schema, module, path);
         }
-        if script_kind == Some(ScriptModuleKind::Shared) {
-            changed |= script_values(ui, cx, module, path);
+        Some(variant) => {
+            let fieldless = variant.schema["properties"]
+                .as_object()
+                .is_none_or(|fields| fields.keys().all(|name| name == "type"));
+            if fieldless {
+                widgets::hint(ui, &fieldless_note(variant.schema));
+            } else {
+                changed |= forms::object_without(ui, cx, variant.schema, module, path, &[]);
+            }
         }
-    } else {
-        changed |= forms::raw_json(ui, cx, module, path);
+        None => changed |= forms::raw_json(ui, cx, module, path),
     }
-    script_extras(ui, cx, table, module, path);
     changed
 }
 
 fn module_counts(ui: &mut Ui, value: &Value) {
     let mut counts: BTreeMap<String, usize> = Default::default();
     for module in value["modules"].as_array().into_iter().flatten() {
-        if module.script_kind().is_some() {
+        if module.is_script_module() {
             continue;
         }
         let kind = module.kind_or("module");
@@ -594,8 +568,8 @@ pub(super) fn add_module_popup(
         .max_height(360.0)
         .show(ui, |ui| {
             for variant in variants {
-                let script_kind = ScriptModuleKind::of(&variant.tag);
-                if scripts_only && script_kind.is_none() {
+                let is_script = variant.tag == ScriptModule::TAG;
+                if scripts_only && !is_script {
                     continue;
                 }
                 offered += 1;
@@ -614,15 +588,14 @@ pub(super) fn add_module_popup(
                 let description = variant.schema["description"]
                     .as_str()
                     .map(str::to_owned)
-                    .unwrap_or_else(|| match script_kind {
-                        Some(ScriptModuleKind::Inline) => {
-                            "any number · nodes in this row".to_owned()
-                        }
-                        Some(ScriptModuleKind::Shared) => {
+                    .unwrap_or_else(|| {
+                        if is_script {
                             "any number · names a script row".to_owned()
+                        } else if at_most_one {
+                            "at most one".to_owned()
+                        } else {
+                            "any number".to_owned()
                         }
-                        None if at_most_one => "at most one".to_owned(),
-                        None => "any number".to_owned(),
                     });
                 let line = if blocked {
                     "at most one · already added".to_owned()
@@ -706,26 +679,6 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
             editor.open_row(&table, &key);
         }
         FormAction::OpenNode { .. } => {}
-        FormAction::OpenScript { pointer } => {
-            script::open_inline(editor, table, key, &pointer);
-        }
-        FormAction::MakeShared { pointer } => {
-            script::open_inline(editor, table, key, &pointer);
-            if let Some(owner) = ScriptOwner::inline(table, key, &pointer) {
-                editor
-                    .views
-                    .script
-                    .set_pending(&owner, PendingScriptAction::MakeShared);
-            }
-        }
-        FormAction::MakeInline { script } => {
-            let owner = ScriptOwner::Shared { key: script };
-            editor.open_tab(EditorTab::Script(owner.clone()));
-            editor
-                .views
-                .script
-                .set_pending(&owner, PendingScriptAction::MakeInline);
-        }
         FormAction::PickPlace { path } => {
             editor.pick = Some(PlacePick {
                 file: row_file(table, key),

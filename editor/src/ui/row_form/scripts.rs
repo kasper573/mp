@@ -1,49 +1,48 @@
 use std::str::FromStr;
 
-use design_tokens::glyph;
 use egui::{Align, Layout, Ui};
 use engine::core::content::{ContentRow, row_file};
-use engine::core::script::{ScriptModuleKind, VariableType};
+use engine::core::script::VariableType;
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{RiftScripts, ScriptDef};
+use engine::systems::script::{RiftScripts, ScriptDef, ScriptModule};
 use serde_json::Value;
 
-use super::{card_body, theme, widgets};
+use super::{theme, widgets};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::value::RowValue;
 use crate::views::model::busts;
-use crate::views::script::{graph, nodes, panel};
+use crate::views::script::panel;
 use crate::{condition, schema};
 
 pub fn script_cards(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    owner: &mut Value,
+    holder: &mut Value,
     field: &str,
     path: &str,
 ) -> FormChange {
-    let variants: Vec<schema::SchemaVariant> = cx
+    let item_schema = cx
         .shapes
         .module_variants(table)
         .into_iter()
-        .filter(|variant| ScriptModuleKind::of(&variant.tag).is_some())
-        .collect();
-    if !owner[field].is_array() {
-        owner[field] = Value::Array(Vec::new());
+        .find(|variant| variant.tag == holder.kind())
+        .map(|variant| schema::resolve(cx.root, &variant.schema["properties"][field]["items"]))
+        .unwrap_or(&Value::Null);
+    if !holder[field].is_array() {
+        holder[field] = Value::Array(Vec::new());
     }
     let mut changed = FormChange::default();
-    let count = owner[field].as_array().map_or(0, Vec::len);
+    let count = holder[field].as_array().map_or(0, Vec::len);
     let mut remove = None;
     let mut duplicate = None;
     for index in 0..count {
         let module_path = format!("{path}/{field}/{index}");
-        let module = &mut owner[field][index];
-        let tag = module.kind_or("script").to_owned();
+        let module = &mut holder[field][index];
         widgets::card_frame(true).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.label(theme::strong(tag.replace('_', " ")).monospace());
+                ui.label(theme::strong(ScriptModule::TAG).monospace());
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.menu_button(theme::faint("…"), |ui| {
                         if ui.button("Duplicate").clicked() {
@@ -57,43 +56,20 @@ pub fn script_cards(
                     });
                 });
             });
-            changed |= card_body(ui, cx, table, &variants, module, &module_path);
+            ui.add_space(4.0);
+            changed |= script_module_body(ui, cx, table, item_schema, module, &module_path);
         });
-        if module.script_kind() == Some(ScriptModuleKind::Inline) {
-            outline_block(ui, cx, &owner[field][index]);
-        }
         ui.add_space(2.0);
     }
-    ui.horizontal(|ui| {
-        let button = design_tokens::controls::button(ui, "+ Add script");
-        egui::Popup::from_toggle_button_response(&button)
-            .id(ui.id().with(("add-script", path)))
-            .width(300.0)
-            .show(|ui| {
-                for variant in &variants {
-                    let description = match ScriptModuleKind::of(&variant.tag) {
-                        Some(ScriptModuleKind::Inline) => "its nodes on this object",
-                        _ => "names a script row",
-                    };
-                    if ui
-                        .add(
-                            egui::Button::new(format!(
-                                "{}  ·  {description}",
-                                variant.tag.replace('_', " ")
-                            ))
-                            .frame(false),
-                        )
-                        .clicked()
-                    {
-                        let template = schema::variant_template(cx.root, variant);
-                        owner[field].as_array_mut().expect("scripts").push(template);
-                        changed = FormChange::at(&format!("{path}/{field}"));
-                        ui.close();
-                    }
-                }
-            });
-    });
-    let list = owner[field].as_array_mut().expect("scripts");
+    if design_tokens::controls::button(ui, "+ Add script").clicked() {
+        let template = schema::template(cx.root, item_schema);
+        holder[field]
+            .as_array_mut()
+            .expect("scripts")
+            .push(template);
+        changed = FormChange::at(&format!("{path}/{field}"));
+    }
+    let list = holder[field].as_array_mut().expect("scripts");
     if let Some(index) = remove {
         list.remove(index);
         changed = FormChange::at(&format!("{path}/{field}"));
@@ -106,65 +82,43 @@ pub fn script_cards(
     changed
 }
 
-pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path: &str) {
-    let Some(script_kind) = module.script_kind() else {
-        return;
-    };
+/// The fields of a module naming a script row: which script, the values for its variables, and
+/// what the script may do for the row running it.
+pub(super) fn script_module_body(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    table: &str,
+    module_schema: &Value,
+    module: &mut Value,
+    path: &str,
+) -> FormChange {
+    let mut changed = forms::object_without(ui, cx, module_schema, module, path, &["values"]);
+    changed |= script_values(ui, cx, module, path);
+    script_extras(ui, cx, table, module, path);
+    changed
+}
+
+fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path: &str) {
     let Some(pointer) = path.find("/modules/").map(|at| path[at..].to_owned()) else {
         return;
     };
     let key = cx.speaker.clone();
-    let inline = script_kind == ScriptModuleKind::Inline;
-    if inline {
-        let count = module["nodes"].as_object().map_or(0, |nodes| nodes.len());
-        let dialogue = module["nodes"].as_object().map_or(0, |nodes| {
-            nodes.values().filter(|n| n["type"] == "dialogue").count()
-        });
-        widgets::kv_text(
-            ui,
-            "nodes",
-            if dialogue > 0 {
-                format!("{count} · {dialogue} dialogue")
-            } else {
-                count.to_string()
-            },
-        );
-        let events: Vec<String> = module["nodes"]
-            .as_object()
-            .into_iter()
-            .flat_map(|nodes| nodes.values())
-            .filter(|node| node["type"] == "on")
-            .filter_map(|node| node["event"].as_str().map(str::to_owned))
-            .collect();
+    if let (Some(content), Some(row_key)) =
+        (cx.content.clone(), key.as_deref().or(cx.row_key.as_deref()))
+        && content.has_built::<RiftScripts>()
+        && let Some(bound) = panel::owner_row(&content, table, row_key, &pointer)
+    {
+        let may = content.built::<RiftScripts>().may_do(bound.row);
+        let answers: Vec<&str> = may.answers.iter().map(|kind| kind.name()).collect();
         widgets::kv_text(
             ui,
             "answers",
-            if events.is_empty() {
-                "nothing yet".to_owned()
+            if answers.is_empty() {
+                "nothing".to_owned()
             } else {
-                events.join(" · ")
+                answers.join(" · ")
             },
         );
-    }
-    if let (Some(content), Some(owner_key)) = (
-        cx.content.clone(),
-        key.as_deref().or(cx.owner_key.as_deref()),
-    ) && content.has_built::<RiftScripts>()
-        && let Some(bound) = panel::owner_row(&content, table, owner_key, &pointer)
-    {
-        let may = content.built::<RiftScripts>().may_do(bound.row);
-        if !inline {
-            let answers: Vec<&str> = may.answers.iter().map(|kind| kind.name()).collect();
-            widgets::kv_text(
-                ui,
-                "answers",
-                if answers.is_empty() {
-                    "nothing".to_owned()
-                } else {
-                    answers.join(" · ")
-                },
-            );
-        }
         let mut lines: Vec<String> = may
             .reaches
             .iter()
@@ -189,122 +143,30 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
             );
         });
     }
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        if inline {
-            if ui.button("→ Open script").clicked() {
-                cx.actions.push(FormAction::OpenScript {
-                    pointer: pointer.clone(),
-                });
-            }
-            if ui
-                .button("Make shared…")
-                .on_hover_text("Move these nodes into a new script row")
-                .clicked()
-            {
-                cx.actions.push(FormAction::MakeShared {
-                    pointer: pointer.clone(),
-                });
-            }
-        } else if let Some(script) = module["script"].as_str() {
-            if ui.button("→ Open script").clicked() {
-                cx.actions.push(FormAction::OpenRow {
-                    table: ScriptDef::TABLE.to_owned(),
-                    key: script.to_owned(),
-                });
-            }
-            if ui
-                .button("Make inline")
-                .on_hover_text("Copy the script's nodes into this row")
-                .clicked()
-            {
-                cx.actions.push(FormAction::MakeInline {
-                    script: script.to_owned(),
-                });
-            }
+    if let Some(script) = module["script"].as_str().filter(|key| !key.is_empty()) {
+        ui.add_space(4.0);
+        if ui.button("→ Open script").clicked() {
+            cx.actions.push(FormAction::OpenRow {
+                table: ScriptDef::TABLE.to_owned(),
+                key: script.to_owned(),
+            });
         }
-    });
-}
-
-pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
-    let Some(nodes) = module["nodes"]
-        .as_object()
-        .filter(|nodes| !nodes.is_empty())
-    else {
-        return;
-    };
-    ui.add_space(4.0);
-    widgets::section(ui, "Outline · read-only");
-    let catalogue = cx.catalogue;
-    let rows = nodes::outline(nodes, catalogue);
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(8.0)
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.spacing_mut().item_spacing.y = 2.0;
-            for row in rows.iter().take(40) {
-                let node = &nodes[&row.name];
-                let summary = nodes::summary(node, catalogue);
-                ui.horizontal(|ui| {
-                    ui.add_space(14.0 * row.depth as f32);
-                    if let Some(via) = &row.via {
-                        ui.label(theme::code(format!("{via} →")).size(12.0));
-                    }
-                    let (mark, color) = graph::kind_mark(node);
-                    glyph::show(ui, mark, 11.0, color);
-                    ui.label(theme::mono(node.kind()).size(12.5).strong());
-                    ui.label(theme::mono(&row.name).size(12.5).color(theme::CODE));
-                    if !summary.is_empty() {
-                        ui.label(
-                            theme::muted(format!("· {}", widgets::clip(&summary, 60))).size(12.0),
-                        );
-                    }
-                });
-            }
-            if rows.len() > 40 {
-                ui.label(theme::faint(format!("… {} more", rows.len() - 40)));
-            }
-        });
+    }
 }
 
 pub(super) fn script_summary(module: &Value) -> String {
-    if module.script_kind() == Some(ScriptModuleKind::Shared) {
-        let mut parts = vec!["shared".to_owned()];
-        if let Some(values) = module["values"]
-            .as_object()
-            .or_else(|| module["variables"].as_object())
-        {
-            for (name, value) in values {
-                parts.push(format!(
-                    "{name} {}",
-                    value
-                        .as_str()
-                        .map(str::to_owned)
-                        .or_else(|| value.as_f64().map(|number| number.to_string()))
-                        .unwrap_or_else(|| value.to_string())
-                ));
-            }
-        } else if let Some(script) = module["script"].as_str() {
-            parts.push(script.to_owned());
-        }
-        return parts.join(" · ");
+    let mut parts = vec![module.text_or("script", "?").to_owned()];
+    for (name, value) in module["values"].as_object().into_iter().flatten() {
+        parts.push(format!(
+            "{name} {}",
+            value
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| value.as_f64().map(|number| number.to_string()))
+                .unwrap_or_else(|| value.to_string())
+        ));
     }
-    let nodes = module["nodes"].as_object();
-    let events: Vec<String> = nodes
-        .into_iter()
-        .flat_map(|nodes| nodes.values())
-        .filter(|node| node["type"] == "on")
-        .filter_map(|node| node["event"].as_str().map(str::to_owned))
-        .collect();
-    let count = nodes.map_or(0, |nodes| nodes.len());
-    if events.is_empty() {
-        format!("{count} nodes")
-    } else {
-        format!("{} · {count} nodes", events.join(", "))
-    }
+    parts.join(" · ")
 }
 
 pub(super) fn script_values(

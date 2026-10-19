@@ -118,8 +118,7 @@ pub fn label(module: &Value) -> String {
         ),
         Some(AreaModuleKind::Resident) => format!("resident {}", module.text_or("npc", "npc")),
         Some(AreaModuleKind::Scenery) => format!("scenery {}", module.text("tileset")),
-        Some(AreaModuleKind::SharedScript) => format!("script {}", module.text("script")),
-        Some(AreaModuleKind::InlineScript) => "inline script".to_owned(),
+        Some(AreaModuleKind::Script) => format!("script {}", module.text("script")),
         Some(other) => other.tag().replace('_', " "),
         None => module.kind_or("module").replace('_', " "),
     }

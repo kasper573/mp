@@ -89,13 +89,16 @@ fn wardrobe() -> (Sim, Entity) {
             "rock",
             json!({
                 "kind": { "type": "equipment", "slot": "head" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "activated": { "type": "on", "event": "activated", "next": "lower" },
-                        "lower": { "type": "boost", "stat": "max_health", "by": -10.0 },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "rock_lower" }],
+            }),
+        )
+        .script(
+            "rock_lower",
+            "item/rock",
+            "item",
+            json!({
+                "activated": { "type": "on", "event": "activated", "next": "lower" },
+                "lower": { "type": "boost", "stat": "max_health", "by": -10.0 },
             }),
         )
         .load();

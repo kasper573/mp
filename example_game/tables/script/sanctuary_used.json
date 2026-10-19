@@ -1,0 +1,36 @@
+{
+  "owner": "skill/sanctuary",
+  "runs_on": "skill",
+  "nodes": {
+    "bless": {
+      "type": "apply_status",
+      "who": {
+        "type": "skill_targets"
+      },
+      "effect": "sanctified",
+      "power": {
+        "type": "skill_stat",
+        "skill": "sanctuary",
+        "stat": "power"
+      },
+      "seconds": {
+        "type": "skill_stat",
+        "skill": "sanctuary",
+        "stat": "duration"
+      }
+    },
+    "shine": {
+      "type": "vfx",
+      "vfx": "sanctuary",
+      "on": {
+        "type": "skill_area"
+      },
+      "next": "bless"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "shine"
+    }
+  }
+}

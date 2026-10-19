@@ -21,31 +21,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "raise": {
-          "type": "apply_status",
-          "who": {
-            "type": "skill_targets"
-          },
-          "effect": "warded",
-          "power": {
-            "type": "skill_stat",
-            "skill": "ward",
-            "stat": "power"
-          },
-          "seconds": {
-            "type": "skill_stat",
-            "skill": "ward",
-            "stat": "duration"
-          }
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "raise"
-        }
-      }
+      "type": "script",
+      "script": "ward_used"
     }
   ]
 }

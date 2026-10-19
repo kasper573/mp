@@ -16,19 +16,8 @@
       "text": "It's a rock. Wearing it on your head was your idea."
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "boost_max_health"
-        },
-        "boost_max_health": {
-          "type": "boost",
-          "stat": "max_health",
-          "by": -10.0
-        }
-      }
+      "type": "script",
+      "script": "fruloos_rock_activated"
     }
   ]
 }

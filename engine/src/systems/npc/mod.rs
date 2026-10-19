@@ -172,7 +172,6 @@ pub enum NpcModule {
     Voice(Voice),
     Respawn(Respawn),
     Loot(Loot),
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 

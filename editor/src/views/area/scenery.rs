@@ -363,7 +363,7 @@ pub(super) fn scenery_extras(
     index: usize,
 ) {
     let under = cx
-        .owner_key
+        .row_key
         .as_deref()
         .and_then(|key| blocked_under(cx, key, module))
         .unwrap_or(0);

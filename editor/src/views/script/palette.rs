@@ -54,7 +54,7 @@ struct Refused<'a> {
 }
 
 pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
-    let owner = doc.owner.clone();
+    let owner = doc.at.clone();
     let Some(mut palette) = editor
         .views
         .script

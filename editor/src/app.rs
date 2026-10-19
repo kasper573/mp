@@ -37,8 +37,7 @@ use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
 use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
-use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
-use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
+use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptRow};
 use crate::views::world::ArrangeDialog;
 use crate::views::{self, EditorCamera, EditorViews};
 
@@ -249,8 +248,6 @@ pub enum ModalDialog {
     Arrange(ArrangeDialog),
     Import(Box<import::ImportDialog>),
     PickRow(PickRowDialog),
-    MakeShared(MakeSharedDialog),
-    MakeInline(MakeInlineDialog),
     RenameNode(RenameNodeDialog),
     LinkNode(LinkNodeDialog),
 }
@@ -331,7 +328,7 @@ pub enum ConfirmAction {
         layer: String,
     },
     DeleteScriptNodes {
-        owner: ScriptOwner,
+        script: ScriptRow,
         names: Vec<String>,
     },
 }
@@ -789,8 +786,7 @@ impl Editor {
                 ..
             } = self;
             let project = project.as_ref()?;
-            let mut cx =
-                FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, key);
+            let mut cx = FormCx::new(project, root, shapes, form, &mut actions).editing(table, key);
             show(&mut cx)
         };
         for action in actions {

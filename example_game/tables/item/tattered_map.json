@@ -19,84 +19,8 @@
       "type": "quest_item"
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "card": {
-          "type": "offer_quest",
-          "quest": "x_marks_the_spot"
-        },
-        "offer": {
-          "type": "dialogue",
-          "lines": [
-            {
-              "by": {
-                "type": "narrator"
-              },
-              "text": [
-                "Salt has eaten most of the ink. A cross is scrawled beside a ",
-                {
-                  "text": "standing stone",
-                  "ink": "place"
-                },
-                " in the ",
-                {
-                  "text": "Forest",
-                  "ink": "place"
-                },
-                "."
-              ]
-            },
-            {
-              "by": {
-                "type": "narrator"
-              },
-              "text": [
-                "Someone buried something there."
-              ]
-            }
-          ],
-          "next": "card"
-        },
-        "read": {
-          "type": "if",
-          "test": {
-            "type": "on_quest",
-            "quest": "x_marks_the_spot"
-          },
-          "yes": "waiting",
-          "no": "offer"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "read"
-        },
-        "waiting": {
-          "type": "dialogue",
-          "lines": [
-            {
-              "by": {
-                "type": "narrator"
-              },
-              "text": [
-                "The cross sits beside a standing stone, somewhere in the ",
-                {
-                  "text": "Forest",
-                  "ink": "place"
-                },
-                "."
-              ]
-            }
-          ],
-          "choices": [
-            {
-              "label": [
-                "Fold it away."
-              ]
-            }
-          ]
-        }
-      }
+      "type": "script",
+      "script": "tattered_map_used"
     }
   ]
 }

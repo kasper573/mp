@@ -12,7 +12,7 @@ use engine::systems::stat::StatKind;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};
-use super::{ScriptDoc, ScriptOwner, ScriptPanel, ScriptPath, ScriptRef, run};
+use super::{ScriptDoc, ScriptPanel, ScriptPath, ScriptRef, ScriptRow, run};
 use crate::app::Editor;
 use crate::condition;
 use crate::project::RowSelection;
@@ -40,33 +40,24 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
     let Some(content) = project.content.clone() else {
         return Vec::new();
     };
-    match &doc.owner {
-        ScriptOwner::Inline { table, key, module } => {
-            owner_row(&content, table, key, &module.pointer())
-                .into_iter()
-                .collect()
+    let mut found: Vec<ScriptBinding> = Vec::new();
+    for usage in project.usages.of_row(ScriptDef::TABLE, &doc.at.key) {
+        let Some((table, row_key)) = row_of(&usage.file) else {
+            continue;
+        };
+        let Some(module) = ScriptRef::parse(&usage.pointer).module else {
+            continue;
+        };
+        if table == ScriptDef::TABLE {
+            continue;
         }
-        ScriptOwner::Shared { key } => {
-            let mut found: Vec<ScriptBinding> = Vec::new();
-            for usage in project.usages.of_row(ScriptDef::TABLE, key) {
-                let Some((table, row_key)) = row_of(&usage.file) else {
-                    continue;
-                };
-                let Some(module) = ScriptRef::parse(&usage.pointer).module else {
-                    continue;
-                };
-                if table == ScriptDef::TABLE {
-                    continue;
-                }
-                if let Some(bound) = owner_row(&content, table, row_key, &module.pointer())
-                    && !found.iter().any(|known| known.row == bound.row)
-                {
-                    found.push(bound);
-                }
-            }
-            found
+        if let Some(bound) = owner_row(&content, table, row_key, &module.pointer())
+            && !found.iter().any(|known| known.row == bound.row)
+        {
+            found.push(bound);
         }
     }
+    found
 }
 
 pub fn owner_row(
@@ -151,14 +142,12 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     };
     let bound = bindings(editor, doc);
     if bound.is_empty() {
-        ui.label(theme::muted(if doc.is_shared() {
-            "No owner names this script yet, so it may do nothing in play."
-        } else {
-            "No owner found for this script."
-        }));
+        ui.label(theme::muted(
+            "No row names this script yet, so it may do nothing in play.",
+        ));
         return;
     }
-    let pick_id = ui.id().with(("may-do-owner", doc.owner.slug()));
+    let pick_id = ui.id().with(("may-do-owner", doc.at.slug()));
     let mut picked: usize = ui.ctx().data(|d| d.get_temp(pick_id)).unwrap_or(0);
     if bound.len() > 1 {
         ui.horizontal(|ui| {
@@ -193,7 +182,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let read_by = read_by_rows(&content, &may);
     let wide = ui.available_width() > 760.0 && !read_by.is_empty();
     egui::ScrollArea::vertical()
-        .id_salt(("may-do", doc.owner.slug()))
+        .id_salt(("may-do", doc.at.slug()))
         .show(ui, |ui| {
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
@@ -644,160 +633,133 @@ struct Open {
 
 fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut open: Option<Open> = None;
-    match &doc.owner {
-        ScriptOwner::Inline { table, key, module } => {
-            let response = ui
-                .horizontal(|ui| {
-                    ui.label(theme::code(format!("{table}/{key}")).size(13.0));
-                    ui.label(theme::muted("holds it in its own row").size(13.0));
-                })
-                .response
-                .interact(egui::Sense::click());
-            if response
-                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .clicked()
-            {
-                open = Some(Open {
-                    table: table.clone(),
-                    key: key.clone(),
-                    module: Some(*module),
-                });
-            }
-        }
-        ScriptOwner::Shared { key } => {
-            let Some(project) = &editor.project else {
-                return;
+    let key = &doc.at.key;
+    let Some(project) = &editor.project else {
+        return;
+    };
+    let mut rows: Vec<NamedBy> = Vec::new();
+    for (file, pointers) in project.usages.files_naming(ScriptDef::TABLE, key) {
+        let row = project.files.json(&file);
+        let Some((table, row_key)) = row_of(&file) else {
+            continue;
+        };
+        for pointer in pointers {
+            let at = ScriptRef::parse(&pointer);
+            let module_json = at
+                .module
+                .and_then(|module| row.as_ref()?.pointer(&module.pointer()).cloned());
+            let (name, what) = match at.node {
+                Some(node) => (node, "run node".to_owned()),
+                None => (
+                    module_json
+                        .as_ref()
+                        .and_then(|module| module["name"].as_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    module_json
+                        .as_ref()
+                        .map(|module| summarise_values(&module["values"]))
+                        .unwrap_or_default(),
+                ),
             };
-            let mut rows: Vec<NamedBy> = Vec::new();
-            for (file, pointers) in project.usages.files_naming(ScriptDef::TABLE, key) {
-                let row = project.files.json(&file);
-                let Some((table, row_key)) = row_of(&file) else {
-                    continue;
-                };
-                for pointer in pointers {
-                    let at = ScriptRef::parse(&pointer);
-                    let module_json = at
-                        .module
-                        .and_then(|module| row.as_ref()?.pointer(&module.pointer()).cloned());
-                    let (name, what) = match at.node {
-                        Some(node) => (node, "run node".to_owned()),
-                        None => (
-                            module_json
-                                .as_ref()
-                                .and_then(|module| module["name"].as_str())
-                                .unwrap_or_default()
-                                .to_owned(),
-                            module_json
-                                .as_ref()
-                                .map(|module| summarise_values(&module["values"]))
-                                .unwrap_or_default(),
-                        ),
-                    };
-                    rows.push(NamedBy {
-                        table: table.to_owned(),
-                        key: row_key.to_owned(),
-                        name,
-                        module: at.module,
-                        what,
-                    });
-                }
-            }
-            if rows.is_empty() {
-                widgets::hint(ui, "Nothing names this script yet.");
-                return;
-            }
-            let owners: BTreeSet<(&str, &str)> = rows
-                .iter()
-                .map(|row| (row.table.as_str(), row.key.as_str()))
-                .collect();
-            let shown = 8;
-            egui::ScrollArea::vertical()
-                .id_salt(("used-by", key))
-                .show(ui, |ui| {
-                    for row in rows.iter().take(shown) {
-                        let response = ui
-                            .horizontal(|ui| {
-                                ui.add_sized(
-                                    egui::vec2(150.0, 20.0),
-                                    egui::Label::new(
-                                        theme::code(format!("{}/{}", row.table, row.key))
-                                            .size(13.0),
-                                    )
-                                    .truncate(),
-                                );
-                                ui.add_sized(
-                                    egui::vec2(120.0, 20.0),
-                                    egui::Label::new(theme::mono(&row.name).size(13.0)).truncate(),
-                                );
-                                ui.label(theme::muted(&row.what).size(13.0));
-                            })
-                            .response
-                            .interact(egui::Sense::click());
-                        if response
-                            .on_hover_cursor(egui::CursorIcon::PointingHand)
-                            .clicked()
-                        {
-                            open = Some(Open {
-                                table: row.table.clone(),
-                                key: row.key.clone(),
-                                module: row.module,
-                            });
-                        }
-                        widgets::rule(ui);
-                    }
-                    if rows.len() > shown {
-                        let all_areas = owners.iter().all(|(table, _)| *table == AreaDef::TABLE);
-                        ui.label(
-                            theme::muted(format!(
-                                "… {} more in {} {}{} · click one to open its {}",
-                                rows.len() - shown,
-                                owners.len(),
-                                if all_areas { "area" } else { "owner" },
-                                widgets::plural(owners.len()),
-                                if all_areas {
-                                    "area with it selected"
-                                } else {
-                                    "row"
-                                }
-                            ))
-                            .monospace()
-                            .size(12.5),
-                        );
-                    } else {
-                        ui.label(
-                            theme::muted("click one to open its row")
-                                .monospace()
-                                .size(12.5),
-                        );
-                    }
-                });
+            rows.push(NamedBy {
+                table: table.to_owned(),
+                key: row_key.to_owned(),
+                name,
+                module: at.module,
+                what,
+            });
         }
     }
+    if rows.is_empty() {
+        widgets::hint(ui, "Nothing names this script yet.");
+        return;
+    }
+    let owners: BTreeSet<(&str, &str)> = rows
+        .iter()
+        .map(|row| (row.table.as_str(), row.key.as_str()))
+        .collect();
+    let shown = 8;
+    egui::ScrollArea::vertical()
+        .id_salt(("used-by", key))
+        .show(ui, |ui| {
+            for row in rows.iter().take(shown) {
+                let response = ui
+                    .horizontal(|ui| {
+                        ui.add_sized(
+                            egui::vec2(150.0, 20.0),
+                            egui::Label::new(
+                                theme::code(format!("{}/{}", row.table, row.key)).size(13.0),
+                            )
+                            .truncate(),
+                        );
+                        ui.add_sized(
+                            egui::vec2(120.0, 20.0),
+                            egui::Label::new(theme::mono(&row.name).size(13.0)).truncate(),
+                        );
+                        ui.label(theme::muted(&row.what).size(13.0));
+                    })
+                    .response
+                    .interact(egui::Sense::click());
+                if response
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    open = Some(Open {
+                        table: row.table.clone(),
+                        key: row.key.clone(),
+                        module: row.module,
+                    });
+                }
+                widgets::rule(ui);
+            }
+            if rows.len() > shown {
+                let all_areas = owners.iter().all(|(table, _)| *table == AreaDef::TABLE);
+                ui.label(
+                    theme::muted(format!(
+                        "… {} more in {} {}{} · click one to open its {}",
+                        rows.len() - shown,
+                        owners.len(),
+                        if all_areas { "area" } else { "owner" },
+                        widgets::plural(owners.len()),
+                        if all_areas {
+                            "area with it selected"
+                        } else {
+                            "row"
+                        }
+                    ))
+                    .monospace()
+                    .size(12.5),
+                );
+            } else {
+                ui.label(
+                    theme::muted("click one to open its row")
+                        .monospace()
+                        .size(12.5),
+                );
+            }
+        });
     let Some(Open { table, key, module }) = open else {
         return;
     };
     editor.select(RowSelection::row(&table, &key));
     match module {
-        Some(ScriptPath::Module(index)) if table == AreaDef::TABLE => {
+        Some(module) if table == AreaDef::TABLE => {
             editor.select(RowSelection::parts(
                 &table,
                 &key,
-                vec![format!("/modules/{index}")],
+                vec![format!("/modules/{}", module.module())],
             ));
             editor.open_tab(EditorTab::Area { key });
         }
-        Some(module) => super::open_inline_or_row(editor, &table, &key, &module.pointer()),
-        None => editor.open_tab(EditorTab::for_row(&table, &key)),
+        _ => editor.open_tab(EditorTab::for_row(&table, &key)),
     }
 }
 
-pub fn used_by_count(editor: &Editor, owner: &ScriptOwner) -> usize {
-    match owner {
-        ScriptOwner::Inline { .. } => 1,
-        ScriptOwner::Shared { key } => editor.project.as_ref().map_or(0, |project| {
-            project.usages.of_row(ScriptDef::TABLE, key).len()
-        }),
-    }
+pub fn used_by_count(editor: &Editor, script: &ScriptRow) -> usize {
+    editor.project.as_ref().map_or(0, |project| {
+        project.usages.of_row(ScriptDef::TABLE, &script.key).len()
+    })
 }
 
 fn summarise_values(values: &Value) -> String {

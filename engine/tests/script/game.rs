@@ -13,13 +13,15 @@ use engine::systems::interact::{self, InteractRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::script::{
-    self, EventKind, Owner, Procedure, RiftEffect, RiftInstances, RunnerKind, ScriptModule,
+    self, EventKind, Owner, Procedure, RiftInstances, RunnerKind, ScriptModule,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, skill};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use testkit::{Game, Map, Sim};
+
+use crate::{behaviour, compile, flow};
 
 /// The rows every script under test names, loaded once a process.
 pub fn content() -> &'static Content {
@@ -29,7 +31,11 @@ pub fn content() -> &'static Content {
 
 /// Reads a value as the loader would, with every row key resolved against the test game.
 pub fn parse<T: DeserializeOwned>(value: Value) -> T {
-    let (result, scope) = with_content(ContentScope::of(content()), || {
+    parse_in(content(), value)
+}
+
+pub fn parse_in<T: DeserializeOwned>(content: &Content, value: Value) -> T {
+    let (result, scope) = with_content(ContentScope::of(content), || {
         serde_json::from_value::<T>(value.clone())
     });
     let problems: Vec<_> = scope.leaves().iter().filter_map(Leaf::reported).collect();
@@ -37,16 +43,9 @@ pub fn parse<T: DeserializeOwned>(value: Value) -> T {
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 
-pub fn inline(nodes: Value) -> ScriptModule {
-    parse(json!({ "type": "inline_script", "nodes": nodes }))
-}
-
-pub fn inline_with(locals: Value, nodes: Value) -> ScriptModule {
-    parse(json!({ "type": "inline_script", "locals": locals, "nodes": nodes }))
-}
-
-pub fn effect(value: Value) -> RiftEffect {
-    parse(value)
+/// The module that runs the test game's script row under `key`.
+pub fn module(key: &str) -> ScriptModule {
+    parse(json!({ "script": key }))
 }
 
 /// A fighter alone in the middle of a field, where the test game's characters can be set loose.
@@ -114,9 +113,10 @@ pub fn health(sim: &Sim, who: Entity) -> f32 {
     stat::effective(&sim.world, who, StatKind::Health)
 }
 
-fn game() -> Game {
-    let fighter = |script: &str| json!([{ "type": "shared_script", "script": script, "values": { "aggro": 4.0 } }]);
-    Game::new()
+pub fn game() -> Game {
+    let fighter =
+        |script: &str| json!([{ "type": "script", "script": script, "values": { "aggro": 4.0 } }]);
+    let game = Game::new()
         .area(
             "field",
             &Map::open(32, 32),
@@ -130,8 +130,8 @@ fn game() -> Game {
         .npc("hunter", 30.0, fighter("hunts"))
         .npc("guard", 30.0, fighter("defends"))
         .npc("chief", 30.0, fighter("protects"))
-        .npc("bat", 30.0, json!([{ "type": "shared_script", "script": "flees" }]))
-        .npc("stroller", 30.0, json!([{ "type": "shared_script", "script": "strolls" }]))
+        .npc("bat", 30.0, json!([{ "type": "script", "script": "flees" }]))
+        .npc("stroller", 30.0, json!([{ "type": "script", "script": "strolls" }]))
         .edit("npc", "fighter", striking)
         .edit("npc", "hunter", striking)
         .edit("npc", "guard", striking)
@@ -171,13 +171,16 @@ fn game() -> Game {
             "map",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "look" },
-                        "look": { "type": "notify", "notification": "gulls" },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "map_read" }],
+            }),
+        )
+        .script(
+            "map_read",
+            "item/map",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "look" },
+                "look": { "type": "notify", "notification": "gulls" },
             }),
         )
         .row("memory", "bribed", remembered("Bribed"))
@@ -254,7 +257,11 @@ fn game() -> Game {
         .shader("damage_pop")
         .vfx("healed")
         .shader("heal_pop")
-        .vfx("defeated")
+        .vfx("defeated");
+    [flow::scripts(), behaviour::scripts(), compile::scripts()]
+        .into_iter()
+        .flatten()
+        .fold(game, |game, (key, row)| game.row("script", key, row))
 }
 
 /// A temperament that fights the nearest of `among` within its aggro, and roams while none is.

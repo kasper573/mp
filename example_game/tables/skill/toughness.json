@@ -25,23 +25,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "harden"
-        },
-        "harden": {
-          "type": "boost",
-          "stat": "max_health",
-          "by": {
-            "type": "skill_stat",
-            "skill": "toughness",
-            "stat": "power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "toughness_activated"
     }
   ]
 }

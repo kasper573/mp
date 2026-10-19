@@ -274,42 +274,53 @@ fn clinic() -> (Sim, Entity) {
                 "fireball": { "skill": "fireball", "at": { "x": 80.0, "y": 0.0 } },
             });
         })
-        .row("status_effect", "guarded", effect("buff", json!({ "on_activate": "guard_up" }), boost_by_power()))
+        .row("status_effect", "guarded", effect("buff", json!({ "on_activate": "guard_up" }), "guarded_boost"))
+        .script("guarded_boost", "status_effect/guarded", "status_effect", boost_by_power())
         .row(
             "status_effect",
             "warded",
             effect(
                 "buff",
                 json!({ "on_activate": "ward_up", "during": "ward_bubble", "on_expire": "ward_break" }),
-                boost_by_power(),
+                "warded_boost",
             ),
         )
+        .script("warded_boost", "status_effect/warded", "status_effect", boost_by_power())
         .row(
             "status_effect",
             "poisoned",
-            effect("debuff", json!({ "during": "poison_bubbles" }), every(2.0, "damage")),
+            effect("debuff", json!({ "during": "poison_bubbles" }), "poisoned_damage"),
         )
+        .script("poisoned_damage", "status_effect/poisoned", "status_effect", every(2.0, "damage"))
         .row(
             "status_effect",
             "sanctified",
-            effect("buff", json!({ "during": "holy_motes" }), every(2.0, "heal")),
+            effect("buff", json!({ "during": "holy_motes" }), "sanctified_heal"),
         )
+        .script("sanctified_heal", "status_effect/sanctified", "status_effect", every(2.0, "heal"))
         .row(
             "status_effect",
             "burning",
-            effect("debuff", json!({ "during": "embers" }), every(1.0, "damage")),
+            effect("debuff", json!({ "during": "embers" }), "burning_damage"),
         )
+        .script("burning_damage", "status_effect/burning", "status_effect", every(1.0, "damage"))
         .asset("icons/status.png", testkit::png(1, 1))
-        .item(
-            "antidote",
-            usable(json!({
+        .item("antidote", usable("antidote_drink"))
+        .script(
+            "antidote_drink",
+            "item/antidote",
+            "item",
+            drinking(json!({
                 "drink": { "type": "items", "take": [{ "item": "antidote" }], "done": "cleanse" },
                 "cleanse": { "type": "remove_status", "category": "debuff" },
             })),
         )
-        .item(
-            "bog_water",
-            usable(json!({
+        .item("bog_water", usable("bog_water_drink"))
+        .script(
+            "bog_water_drink",
+            "item/bog_water",
+            "item",
+            drinking(json!({
                 "drink": { "type": "items", "take": [{ "item": "bog_water" }], "done": "sicken" },
                 "sicken": { "type": "apply_status", "effect": "poisoned", "power": 2.0, "seconds": 12.0 },
             })),
@@ -318,16 +329,18 @@ fn clinic() -> (Sim, Entity) {
             "wing",
             json!({
                 "kind": { "type": "resource" },
-                "modules": [{ "type": "stack", "max": 50 }, boosting("movement_speed", 0.5)],
+                "modules": [{ "type": "stack", "max": 50 }, { "type": "script", "script": "wing_boost" }],
             }),
         )
+        .script("wing_boost", "item/wing", "item", boosting("movement_speed", 0.5))
         .item(
             "blade",
             json!({
                 "kind": { "type": "equipment", "slot": "weapon" },
-                "modules": [boosting("damage", 4.0)],
+                "modules": [{ "type": "script", "script": "blade_boost" }],
             }),
         )
+        .script("blade_boost", "item/blade", "item", boosting("damage", 4.0))
         .row(
             "skill",
             "toughness",
@@ -337,17 +350,20 @@ fn clinic() -> (Sim, Entity) {
                 "kind": "passive",
                 "target": "self",
                 "levels": [{ "cost": 1, "stats": { "power": 6.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "activated": { "type": "on", "event": "activated", "next": "harden" },
-                        "harden": {
-                            "type": "boost",
-                            "stat": "max_health",
-                            "by": { "type": "skill_stat", "skill": "toughness", "stat": "power" },
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "toughness_harden" }],
+            }),
+        )
+        .script(
+            "toughness_harden",
+            "skill/toughness",
+            "skill",
+            json!({
+                "activated": { "type": "on", "event": "activated", "next": "harden" },
+                "harden": {
+                    "type": "boost",
+                    "stat": "max_health",
+                    "by": { "type": "skill_stat", "skill": "toughness", "stat": "power" },
+                },
             }),
         )
         .row(
@@ -360,34 +376,36 @@ fn clinic() -> (Sim, Entity) {
                 "range": 6.0,
                 "area": { "type": "circle", "radius": 2.0 },
                 "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "cast" },
-                        "cast": { "type": "animate", "action": "attack", "wait": "apex", "next": "burn" },
-                        "burn": {
-                            "type": "apply_status",
-                            "who": { "type": "skill_targets" },
-                            "effect": "burning",
-                            "power": 1.0,
-                            "seconds": 6.0,
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "fireball_burn" }],
+            }),
+        )
+        .script(
+            "fireball_burn",
+            "skill/fireball",
+            "skill",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "cast" },
+                "cast": { "type": "animate", "action": "attack", "wait": "apex", "next": "burn" },
+                "burn": {
+                    "type": "apply_status",
+                    "who": { "type": "skill_targets" },
+                    "effect": "burning",
+                    "power": 1.0,
+                    "seconds": 6.0,
+                },
             }),
         )
         .npc("dummy", 100.0, json!([]))
-        .npc(
-            "roamer",
-            100.0,
-            json!([{
-                "type": "inline_script",
-                "nodes": {
-                    "spawned": { "type": "on", "event": "started", "next": "hostile" },
-                    "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "rest" },
-                    "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
-                },
-            }]),
+        .npc("roamer", 100.0, json!([{ "type": "script", "script": "roamer_rest" }]))
+        .script(
+            "roamer_rest",
+            "npc/roamer",
+            "npc",
+            json!({
+                "spawned": { "type": "on", "event": "started", "next": "hostile" },
+                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "rest" },
+                "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
+            }),
         )
         .vfx("guard_up")
         .vfx("ward_up")
@@ -433,14 +451,14 @@ fn clinic() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn effect(category: &str, vfx: Value, nodes: Value) -> Value {
+fn effect(category: &str, vfx: Value, script: &str) -> Value {
     json!({
         "name": "Effect",
         "icon": "icons/status.png",
         "category": category,
         "description": "An effect.",
         "vfx": vfx,
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": script }],
     })
 }
 
@@ -458,21 +476,22 @@ fn every(seconds: f32, act: &str) -> Value {
     })
 }
 
-fn usable(mut nodes: Value) -> Value {
-    nodes["used"] = json!({ "type": "on", "event": "used", "next": "drink" });
+fn usable(script: &str) -> Value {
     json!({
         "kind": { "type": "usable" },
-        "modules": [{ "type": "stack", "max": 5 }, { "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": script }],
     })
+}
+
+fn drinking(mut nodes: Value) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "drink" });
+    nodes
 }
 
 fn boosting(stat: &str, by: f32) -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
-            "activated": { "type": "on", "event": "activated", "next": "boost" },
-            "boost": { "type": "boost", "stat": stat, "by": by },
-        },
+        "activated": { "type": "on", "event": "activated", "next": "boost" },
+        "boost": { "type": "boost", "stat": stat, "by": by },
     })
 }
 

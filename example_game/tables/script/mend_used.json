@@ -1,0 +1,30 @@
+{
+  "owner": "skill/mend",
+  "runs_on": "skill",
+  "nodes": {
+    "close": {
+      "type": "heal",
+      "who": {
+        "type": "skill_targets"
+      },
+      "by": {
+        "type": "skill_stat",
+        "skill": "mend",
+        "stat": "power"
+      },
+      "next": "show"
+    },
+    "show": {
+      "type": "vfx",
+      "vfx": "mend_glow",
+      "on": {
+        "type": "skill_targets"
+      }
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "close"
+    }
+  }
+}

@@ -20,29 +20,8 @@
       "max": 5
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "drink": {
-          "type": "items",
-          "take": [
-            {
-              "item": "bog_water"
-            }
-          ],
-          "done": "sicken"
-        },
-        "sicken": {
-          "type": "apply_status",
-          "effect": "poisoned",
-          "power": 2.0,
-          "seconds": 12.0
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "drink"
-        }
-      }
+      "type": "script",
+      "script": "bog_water_used"
     }
   ]
 }

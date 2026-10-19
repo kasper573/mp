@@ -218,7 +218,7 @@ pub fn picture_of(files: &ProjectFiles, table: &str, key: &str) -> Option<Pictur
 fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     match table {
         ScriptDef::TABLE => {
-            let kind = runner_kind(cx.owner_table.as_deref()?);
+            let kind = runner_kind(cx.row_table.as_deref()?);
             let owner = script_owner(cx, key);
             (runner_kind(&owner) != kind).then(|| format!("owner {owner}"))
         }
@@ -226,11 +226,11 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
             let row = cx.files.json(&row_file(SkillDef::TABLE, key))?;
             (row["basic_attack"] != true).then(|| "not flagged as a basic attack".to_owned())
         }
-        SkillDef::TABLE if cx.owner_table.as_deref() == Some(ClassDef::TABLE) => {
+        SkillDef::TABLE if cx.row_table.as_deref() == Some(ClassDef::TABLE) => {
             let node = path.strip_prefix("/tree/")?.strip_suffix("/skill")?;
             let class = cx
                 .files
-                .json(&row_file(ClassDef::TABLE, cx.owner_key.as_deref()?))?;
+                .json(&row_file(ClassDef::TABLE, cx.row_key.as_deref()?))?;
             let (holder, _) = class["tree"]
                 .as_object()?
                 .iter()
@@ -238,7 +238,7 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
             Some(format!("already the node {holder}"))
         }
         NpcDef::TABLE
-            if cx.owner_table.as_deref() == Some(QuestDef::TABLE) && path.ends_with("/npc") =>
+            if cx.row_table.as_deref() == Some(QuestDef::TABLE) && path.ends_with("/npc") =>
         {
             let content = cx.content.as_ref()?;
             let scripts = content

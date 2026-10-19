@@ -371,7 +371,6 @@ pub enum ItemModule {
     QuestItem,
     Bound,
     Currency,
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 

@@ -23,19 +23,8 @@
       "text": "Ribs lashed to a plank. It creaks when struck, but it holds."
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "boost_max_health"
-        },
-        "boost_max_health": {
-          "type": "boost",
-          "stat": "max_health",
-          "by": 5.0
-        }
-      }
+      "type": "script",
+      "script": "bone_shield_activated"
     }
   ]
 }

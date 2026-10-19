@@ -219,7 +219,6 @@ impl ScriptedRow for SkillDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SkillModule {
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 

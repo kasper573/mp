@@ -230,16 +230,19 @@ fn market() -> Sim {
                     "label": "Honesty box",
                     "shape": { "type": "point", "x": 7.0, "y": 10.0 },
                     "look": "objects/box.png",
-                    "scripts": [{
-                        "type": "inline_script",
-                        "nodes": {
-                            "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
-                            "note": said("Pay what's written.", "shop"),
-                            "shop": { "type": "open_shop", "shop": "box" },
-                        },
-                    }],
+                    "scripts": [{ "script": "box_use" }],
                 },
             ]),
+        )
+        .script(
+            "box_use",
+            "area/market",
+            "object",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
+                "note": said("Pay what's written.", "shop"),
+                "shop": { "type": "open_shop", "shop": "box" },
+            }),
         )
         .asset("objects/box.png", testkit::png(1, 1))
         .hero("market", 7.0, 7.0)
@@ -251,15 +254,19 @@ fn market() -> Sim {
         .item("token", stacked())
         .item("tusk", stacked())
         .item("steak", stacked())
-        .npc(
-            "merchant",
-            40.0,
-            json!([keeper("Show me your wares.", "wares", "wares")]),
+        .npc("merchant", 40.0, json!([{ "type": "script", "script": "merchant_talk" }]))
+        .script(
+            "merchant_talk",
+            "npc/merchant",
+            "npc",
+            keeper("Show me your wares.", "wares", "wares"),
         )
-        .npc(
-            "collector",
-            40.0,
-            json!([keeper("I've brought bones.", "counter", "exchange")]),
+        .npc("collector", 40.0, json!([{ "type": "script", "script": "collector_talk" }]))
+        .script(
+            "collector_talk",
+            "npc/collector",
+            "npc",
+            keeper("I've brought bones.", "counter", "exchange"),
         )
         .row(
             "shop",
@@ -365,7 +372,7 @@ fn keeper(ask: &str, browsing: &str, shop: &str) -> Value {
         "shop": { "type": "open_shop", "shop": shop },
     });
     nodes[browsing] = said("Take your time.", "shop");
-    json!({ "type": "inline_script", "nodes": nodes })
+    nodes
 }
 
 fn said(text: &str, next: &str) -> Value {

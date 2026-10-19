@@ -1,0 +1,23 @@
+{
+  "owner": "item/shamans_draught",
+  "runs_on": "item",
+  "nodes": {
+    "ask": {
+      "type": "reset_skills",
+      "accepted": "drink"
+    },
+    "drink": {
+      "type": "items",
+      "take": [
+        {
+          "item": "shamans_draught"
+        }
+      ]
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "ask"
+    }
+  }
+}

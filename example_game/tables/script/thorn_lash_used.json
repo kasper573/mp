@@ -1,0 +1,51 @@
+{
+  "owner": "skill/thorn_lash",
+  "runs_on": "skill",
+  "nodes": {
+    "hit": {
+      "type": "damage",
+      "who": {
+        "type": "skill_targets"
+      },
+      "by": {
+        "type": "multiply",
+        "a": {
+          "type": "stat",
+          "stat": "damage"
+        },
+        "b": {
+          "type": "skill_stat",
+          "skill": "thorn_lash",
+          "stat": "power"
+        }
+      },
+      "next": "show"
+    },
+    "show": {
+      "type": "vfx",
+      "vfx": "thorns",
+      "on": {
+        "type": "skill_targets"
+      }
+    },
+    "sweep": {
+      "type": "vfx",
+      "vfx": "sweep",
+      "on": {
+        "type": "skill_area"
+      },
+      "next": "hit"
+    },
+    "swing": {
+      "type": "animate",
+      "action": "attack",
+      "wait": "apex",
+      "next": "sweep"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "swing"
+    }
+  }
+}

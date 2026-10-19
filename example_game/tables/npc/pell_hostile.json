@@ -31,32 +31,15 @@
       ]
     },
     {
-      "type": "shared_script",
+      "type": "script",
       "script": "combat_aggressive",
       "values": {
         "aggro": 10.0
       }
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "dead": {
-          "type": "remember",
-          "memory": "pell_dead"
-        },
-        "defeated": {
-          "type": "on",
-          "event": "defeated",
-          "next": "fight_over"
-        },
-        "fight_over": {
-          "type": "forget",
-          "memories": [
-            "pell_fighting"
-          ],
-          "next": "dead"
-        }
-      }
+      "type": "script",
+      "script": "pell_hostile_defeated"
     }
   ]
 }

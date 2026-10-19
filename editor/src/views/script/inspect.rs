@@ -1,32 +1,27 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use design_tokens::glyph::{self, Mark};
-use egui::{RichText, Ui};
+use egui::Ui;
 use engine::core::content::{ContentRow, row_file, row_of};
-use engine::core::script::{NodeKind, RunnerKindDef, ScriptModuleKind, VariableType};
+use engine::core::script::{NodeKind, RunnerKindDef};
 use engine::systems::area::blueprint::holes;
-use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::memory::MemoryDef;
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{RiftEffectKind, RunnerKind, ScriptDef};
-use serde_json::{Map, Value};
-use strum::VariantArray;
+use engine::systems::script::{RiftEffectKind, ScriptDef};
+use serde_json::Value;
 
 use super::graph::ScriptGraphAction;
 use super::nodes::{self, LineSpeaker};
-use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
+use super::{RenameNodeDialog, ScriptDoc, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
-use crate::tabs::EditorTab;
-use crate::ui::{dialogs, row_form, sidebar, theme, widgets};
+use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
-use crate::views::area::holes::fill_holes;
-use crate::{condition, picker, rows, schema, spans, thumbs};
+use crate::{condition, picker, spans, thumbs};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
-    let owner = doc.owner.clone();
     super::sync_with_content(editor);
     let names = selected_nodes(doc, selection);
     let choice: Option<(String, usize)> = selection
@@ -36,7 +31,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
         .and_then(|rest| rest.rsplit_once('#'))
         .and_then(|(name, index)| Some((name.to_owned(), index.parse().ok()?)));
     egui::ScrollArea::vertical()
-        .id_salt(("script-inspector", owner.slug()))
+        .id_salt(("script-inspector", doc.at.slug()))
         .show(ui, |ui| match names.as_slice() {
             [] => {
                 if !super::run::inspector(editor, ui, doc) {
@@ -53,10 +48,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
                 }
             }
             many => {
-                breadcrumb(
-                    ui,
-                    &format!("{} › {} nodes", owner_short(editor, doc), many.len()),
-                );
+                breadcrumb(ui, &format!("{} › {} nodes", doc.at.title(), many.len()));
                 widgets::card_frame(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     widgets::card_title(ui, &format!("{} nodes", many.len()));
@@ -84,14 +76,6 @@ fn breadcrumb(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
 }
 
-fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
-    let label = super::owner_label(editor, doc);
-    match label.rsplit_once(" · object ") {
-        Some((_, object)) => object.to_owned(),
-        None => label,
-    }
-}
-
 fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
     selection
         .parts
@@ -103,89 +87,8 @@ fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
 
 pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
-    if doc.is_shared() {
-        shared_inspector(editor, ui, doc);
-    } else {
-        inline_inspector(editor, ui, doc);
-    }
-}
-
-pub fn names_of(map: &Value) -> String {
-    let names: Vec<&str> = map
-        .as_object()
-        .into_iter()
-        .flatten()
-        .map(|(name, _)| name.as_str())
-        .collect();
-    if names.is_empty() {
-        "none".to_owned()
-    } else {
-        names.join(" · ")
-    }
-}
-
-fn nodes_line(doc: &ScriptDoc) -> String {
-    let count = doc.nodes().len();
-    let dialogue = doc
-        .nodes()
-        .values()
-        .filter(|node| nodes::is_dialogue(node))
-        .count();
-    if dialogue > 0 {
-        format!("{count} · {dialogue} dialogue")
-    } else {
-        count.to_string()
-    }
-}
-
-fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let owner_key = doc.owner.row_label();
-    breadcrumb(ui, &format!("{} › inline script", owner_short(editor, doc)));
-    let mut open_owner = false;
-    let mut make = false;
-    widgets::card_frame(false).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        widgets::card_header(ui, "inline script", "in its owner's row", |ui| {
-            if ui.button("Open the owner's row").clicked() {
-                open_owner = true;
-                ui.close();
-            }
-            if ui.button("Make shared…").clicked() {
-                make = true;
-                ui.close();
-            }
-        });
-        widgets::kv(ui, "owner", |ui| {
-            if ui
-                .add(
-                    egui::Label::new(theme::mono(&owner_key).size(13.0))
-                        .sense(egui::Sense::click()),
-                )
-                .on_hover_text("Open the row")
-                .clicked()
-            {
-                open_owner = true;
-            }
-        });
-        widgets::kv_text(ui, "state", names_of(&doc.script["state"]));
-        widgets::kv_text(ui, "locals", names_of(&doc.script["locals"]));
-        widgets::kv_text(ui, "nodes", nodes_line(doc));
-    });
-    events_section(editor, ui, doc);
-    other_scripts_section(editor, ui, doc);
-    owner_section(editor, ui, doc);
-    action_buttons(editor, ui, doc);
-    if open_owner {
-        editor.open_row(doc.owner.table(), doc.owner.key());
-    }
-    if make {
-        make_shared_dialog(editor, doc);
-    }
-}
-
-fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let key = doc.owner.key().to_owned();
-    breadcrumb(ui, &format!("script/{key}"));
+    let key = doc.at.key.clone();
+    breadcrumb(ui, &doc.at.title());
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
     let runner_schema = root
@@ -194,18 +97,17 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .unwrap_or(Value::Null);
     let mut script = doc.script.clone();
     let mut actions = Vec::new();
-    let mut make = false;
+    let what = if doc.owner().is_some() {
+        "local script"
+    } else {
+        "script"
+    };
     let changed = {
         let mut cx = doc.form_cx(editor, root, &mut actions);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &key, "shared script", |ui| {
-                    if ui.button("Make inline…").clicked() {
-                        make = true;
-                        ui.close();
-                    }
-                });
+                widgets::card_header(ui, &key, what, |_| {});
                 let mut changed = FormChange::default();
                 widgets::kv(ui, "runs on", |ui| {
                     let mut runner = script["runs_on"].clone();
@@ -245,11 +147,37 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if changed.is_some() {
         write(editor, doc, script, format!("Edit script/{key}"));
     }
+    events_section(editor, ui, doc);
     variables_section(editor, ui, doc);
     run_by_section(editor, ui, doc);
     action_buttons(editor, ui, doc);
-    if make {
-        make_inline_dialog(editor, doc);
+}
+
+pub fn names_of(map: &Value) -> String {
+    let names: Vec<&str> = map
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(name, _)| name.as_str())
+        .collect();
+    if names.is_empty() {
+        "none".to_owned()
+    } else {
+        names.join(" · ")
+    }
+}
+
+fn nodes_line(doc: &ScriptDoc) -> String {
+    let count = doc.nodes().len();
+    let dialogue = doc
+        .nodes()
+        .values()
+        .filter(|node| nodes::is_dialogue(node))
+        .count();
+    if dialogue > 0 {
+        format!("{count} · {dialogue} dialogue")
+    } else {
+        count.to_string()
     }
 }
 
@@ -301,210 +229,8 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     }
 }
 
-fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let ScriptOwner::Inline { table, key, module } = &doc.owner else {
-        return;
-    };
-    let Some(row) = editor.row_value(table, key) else {
-        return;
-    };
-    let display = row["name"]
-        .as_str()
-        .or(row["title"].as_str())
-        .or(row["label"].as_str())
-        .map(str::to_owned)
-        .unwrap_or_else(|| key.clone());
-    let possessive = if display.ends_with('s') {
-        format!("{display}'")
-    } else {
-        format!("{display}'s")
-    };
-    widgets::section(ui, &format!("{possessive} other scripts"));
-    let (holder, scripts_field) = match module.object() {
-        Some(index) => (row["modules"][index].clone(), "scripts"),
-        None => (row.clone(), "modules"),
-    };
-    let mut open: Option<ScriptOwner> = None;
-    let mut any = false;
-    for (index, sibling) in holder[scripts_field]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .enumerate()
-    {
-        let Some(script_kind) = sibling.script_kind() else {
-            continue;
-        };
-        let sibling_module = match module.object() {
-            Some(object) => ScriptPath::ObjectScript {
-                object,
-                script: index,
-            },
-            None => ScriptPath::Module(index),
-        };
-        if sibling_module == *module {
-            continue;
-        }
-        any = true;
-        let (word, name, detail) = if script_kind == ScriptModuleKind::Shared {
-            let script = sibling.text_or("script", "?").to_owned();
-            let values = sibling["values"]
-                .as_object()
-                .map(|v| {
-                    v.iter()
-                        .map(|(k, v)| format!("{k} {}", condition::summary(v)))
-                        .collect::<Vec<_>>()
-                        .join(" · ")
-                })
-                .unwrap_or_default();
-            ("shared", script, values)
-        } else {
-            let count = sibling["nodes"].as_object().map_or(0, |n| n.len());
-            ("inline", format!("{count} nodes"), String::new())
-        };
-        let response = ui
-            .horizontal(|ui| {
-                widgets::badge(ui, "script");
-                ui.label(theme::muted(word).monospace().size(13.0));
-                ui.label(theme::strong(&name).monospace().size(13.0));
-                if !detail.is_empty() {
-                    ui.label(theme::muted(detail).monospace().size(12.5));
-                }
-            })
-            .response
-            .interact(egui::Sense::click());
-        if response
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .clicked()
-        {
-            open = Some(if script_kind == ScriptModuleKind::Shared {
-                ScriptOwner::Shared {
-                    key: sibling.text("script").to_owned(),
-                }
-            } else {
-                ScriptOwner::Inline {
-                    table: table.clone(),
-                    key: key.clone(),
-                    module: sibling_module,
-                }
-            });
-        }
-    }
-    if !any {
-        ui.horizontal(|ui| {
-            widgets::badge(ui, "script");
-            ui.label(theme::strong("none").monospace().size(13.0));
-            let stands = match doc.kind {
-                RunnerKind::Npc => "stands where it spawns",
-                RunnerKind::Object => "does nothing else",
-                _ => "nothing else",
-            };
-            ui.label(theme::muted(stands).monospace().size(12.5));
-        });
-    }
-    if let Some(owner) = open {
-        editor.open_tab(EditorTab::Script(owner));
-    }
-}
-
-fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let ScriptOwner::Inline { table, key, module } = &doc.owner else {
-        return;
-    };
-    let mut open = false;
-    match module.object() {
-        Some(index) => {
-            let row = editor.row_value(table, key).unwrap_or(Value::Null);
-            let module = &row["modules"][index];
-            let name = module.text_or("name", "object").to_owned();
-            let label = module["label"]
-                .as_str()
-                .map(str::to_owned)
-                .unwrap_or_default();
-            widgets::section(ui, "Owner");
-            let response = ui
-                .horizontal(|ui| {
-                    widgets::badge(ui, "object");
-                    ui.label(
-                        theme::strong(format!("{table}/{key}"))
-                            .monospace()
-                            .size(13.0),
-                    );
-                    ui.label(theme::muted("·").size(13.0));
-                    ui.label(theme::strong(&name).monospace().size(13.0));
-                    if !label.is_empty() {
-                        ui.label(theme::muted(label).monospace().size(12.5));
-                    }
-                })
-                .response
-                .interact(egui::Sense::click());
-            if response
-                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .clicked()
-            {
-                open = true;
-            }
-        }
-        None if doc.kind == RunnerKind::Npc => {
-            let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
-                return;
-            };
-            let placed: Vec<String> = content
-                .ids::<AreaDef>()
-                .filter(|area| {
-                    area::placed(&content, *area)
-                        .iter()
-                        .any(|place| matches!(&place.module, AreaModule::Resident(resident) if resident.npc.key(&content) == key))
-                })
-                .map(|area| area.key(&content).to_owned())
-                .collect();
-            widgets::section(
-                ui,
-                &format!(
-                    "Owner · placed {}",
-                    match placed.len() {
-                        0 => "nowhere".to_owned(),
-                        1 => "once".to_owned(),
-                        n => format!("{n} times"),
-                    }
-                ),
-            );
-            let response = ui
-                .horizontal(|ui| {
-                    widgets::badge(ui, "npc");
-                    ui.label(theme::strong(format!("npc/{key}")).monospace().size(13.0));
-                    match placed.as_slice() {
-                        [] => ui.label(theme::muted("no resident yet").monospace().size(12.5)),
-                        [one] => ui.label(
-                            theme::muted(format!("resident of area/{one}"))
-                                .monospace()
-                                .size(12.5),
-                        ),
-                        many => ui.label(
-                            theme::muted(format!("resident of {} areas", many.len()))
-                                .monospace()
-                                .size(12.5),
-                        ),
-                    };
-                })
-                .response
-                .interact(egui::Sense::click());
-            if response
-                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .clicked()
-            {
-                open = true;
-            }
-        }
-        None => {}
-    }
-    if open {
-        editor.open_row(table, key);
-    }
-}
-
 fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let key = doc.owner.key().to_owned();
+    let key = doc.at.key.clone();
     let variables: Vec<(String, Value)> = doc.script["variables"]
         .as_object()
         .into_iter()
@@ -645,13 +371,12 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 }
 
 struct Caller {
-    owner: String,
-    kind: &'static str,
+    row: String,
     node: String,
 }
 
 fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let key = doc.owner.key().to_owned();
+    let key = doc.at.key.clone();
     let Some(project) = editor.project.as_ref() else {
         return;
     };
@@ -663,12 +388,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             let (table, row_key) = row_of(&usage.file)?;
             let at = ScriptRef::parse(&usage.pointer);
             Some(Caller {
-                owner: format!("{table}/{row_key}"),
-                kind: if at.module.is_some() {
-                    "inline"
-                } else {
-                    "shared"
-                },
+                row: format!("{table}/{row_key}"),
                 node: at.node?,
             })
         })
@@ -680,12 +400,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             let response = ui
                 .horizontal(|ui| {
                     widgets::badge(ui, "script");
-                    ui.label(theme::strong(&caller.owner).monospace().size(13.0));
-                    ui.label(
-                        theme::muted(format!("· {}", caller.kind))
-                            .monospace()
-                            .size(12.5),
-                    );
+                    ui.label(theme::strong(&caller.row).monospace().size(13.0));
                     ui.label(
                         theme::muted(format!("from run · {}", caller.node))
                             .monospace()
@@ -698,10 +413,10 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .clicked()
             {
-                open = Some(caller.owner.clone());
+                open = Some(caller.row.clone());
             }
         }
-        if let Some((table, row_key)) = open.as_deref().and_then(|owner| owner.split_once('/')) {
+        if let Some((table, row_key)) = open.as_deref().and_then(|row| row.split_once('/')) {
             editor.open_row(table, row_key);
         }
     }
@@ -720,12 +435,15 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 ui.label(theme::strong(format!("npc/{npc}")).monospace().size(13.0));
                 let through = callers
                     .iter()
-                    .find(|caller| caller.owner == format!("npc/{npc}"))
-                    .map(|caller| format!("through its {} script", caller.kind));
+                    .any(|caller| caller.row == format!("npc/{npc}"));
                 ui.label(
-                    theme::muted(through.unwrap_or_else(|| "in its lines".to_owned()))
-                        .monospace()
-                        .size(12.5),
+                    theme::muted(if through {
+                        "through its script"
+                    } else {
+                        "in its lines"
+                    })
+                    .monospace()
+                    .size(12.5),
                 );
             });
         }
@@ -737,11 +455,10 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let outline = editor
         .views
         .script
-        .view(&doc.owner)
+        .view(&doc.at)
         .is_some_and(|view| view.outline);
     let mut fire = false;
     let mut toggle_outline = false;
-    let mut make = false;
     ui.horizontal(|ui| {
         if widgets::keyed_button(ui, "▶ Run", Some(EditorKey::RunScript), true).clicked() {
             fire = true;
@@ -756,34 +473,17 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         {
             toggle_outline = true;
         }
-        if ui
-            .button(if doc.is_shared() {
-                "Make inline…"
-            } else {
-                "Make shared…"
-            })
-            .clicked()
-        {
-            make = true;
-        }
     });
     if fire {
         editor.panels.bottom = BottomTab::Run;
-        editor.views.script.fire(&doc.owner);
+        editor.views.script.fire(&doc.at);
     }
     if toggle_outline {
         editor
             .views
             .script
-            .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+            .view_mut(&doc.at, &editor.user, editor.project.as_ref())
             .toggle_outline();
-    }
-    if make {
-        if doc.is_shared() {
-            make_inline_dialog(editor, doc);
-        } else {
-            make_shared_dialog(editor, doc);
-        }
     }
 }
 
@@ -792,10 +492,10 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         return;
     };
     let kind = node.kind().to_owned();
-    breadcrumb(ui, &format!("{} › {name}", owner_short(editor, doc)));
+    breadcrumb(ui, &format!("{} › {name}", doc.at.title()));
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
-    let path = format!("{}/nodes/{name}", doc.owner.pointer());
+    let path = format!("/nodes/{name}");
     let (outs, unwired, ins, blurb) = {
         let catalogue = catalogue_of(editor.project.as_ref());
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
@@ -820,7 +520,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     };
     let mut draft = node.clone();
     let mut actions = Vec::new();
-    let mut label = format!("Edit {name} in {}", doc.owner.title());
+    let mut label = format!("Edit {name} in {}", doc.at.title());
     let mut rename = false;
     let mut delete = false;
     let mut duplicate = false;
@@ -917,7 +617,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         .script
         .callout
         .as_ref()
-        .filter(|callout| callout.live(&doc.owner) && callout.node == name)
+        .filter(|callout| callout.live(&doc.at) && callout.node == name)
     {
         ui.label(theme::strong(&callout.rule).size(13.0).color(theme::DANGER));
         ui.label(theme::muted(&callout.text).size(12.5));
@@ -930,7 +630,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         editor
             .dialogs
             .push(ModalDialog::RenameNode(RenameNodeDialog {
-                owner: doc.owner.clone(),
+                at: doc.at.clone(),
                 old: name.to_owned(),
                 draft: name.to_owned(),
             }));
@@ -1057,9 +757,13 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
 }
 
 fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
-    let owner = doc.owner.key().to_owned();
+    let runner = doc.kind.name();
     for (title, field, sentence) in [
-        ("state", "state", format!("{owner}'s, shared by its flows")),
+        (
+            "state",
+            "state",
+            format!("its {runner}'s, shared by its flows"),
+        ),
         ("locals", "locals", "values that last one flow".to_owned()),
     ] {
         widgets::card_frame(false).show(ui, |ui| {
@@ -1072,14 +776,10 @@ fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         widgets::card_title(ui, "variables");
-        let text = if doc.is_shared() {
-            format!(
-                "{} · each owner's values",
-                names_of(&doc.script["variables"])
-            )
-        } else {
-            "only in a shared script: each owner's values".to_owned()
-        };
+        let text = format!(
+            "{} · each runner's values",
+            names_of(&doc.script["variables"])
+        );
         ui.label(theme::muted(text).size(13.0));
     });
 }
@@ -1233,7 +933,7 @@ fn dialogue_form(
     {
         lines.remove(index);
         changed = FormChange::at(path);
-        *label = format!("Remove a line in {}", doc.owner.title());
+        *label = format!("Remove a line in {}", doc.at.title());
     }
     if let Some((a, b)) = swap_line
         && let Some(lines) = node["lines"].as_array_mut()
@@ -1250,7 +950,7 @@ fn dialogue_form(
             lines.push(doc.default_speaker().blank_line());
         }
         changed = FormChange::at(path);
-        *label = format!("Add a line in {}", doc.owner.title());
+        *label = format!("Add a line in {}", doc.at.title());
     }
     widgets::section(ui, "Choices");
     let mut go: Option<String> = None;
@@ -1274,7 +974,7 @@ fn dialogue_form(
     {
         choices.remove(index);
         changed = FormChange::at(path);
-        *label = format!("Remove a choice in {}", doc.owner.title());
+        *label = format!("Remove a choice in {}", doc.at.title());
     }
     if let Some((a, b)) = menu.swap
         && let Some(choices) = node["choices"].as_array_mut()
@@ -1289,7 +989,7 @@ fn dialogue_form(
     {
         super::add_choice(node);
         changed = FormChange::at(path);
-        *label = format!("Add a choice in {}", doc.owner.title());
+        *label = format!("Add a choice in {}", doc.at.title());
     }
     if let Some(name) = go {
         cx.actions.push(FormAction::OpenNode { name });
@@ -1518,13 +1218,13 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &st
         ui,
         &format!(
             "{} › {name} › {}",
-            owner_short(editor, doc),
+            doc.at.title(),
             widgets::clip(&label_text, 40)
         ),
     );
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
-    let path = format!("{}/nodes/{name}", doc.owner.pointer());
+    let path = format!("/nodes/{name}");
     let choice_schema = nodes::variant_schema(root, NodeKind::Dialogue.name())
         .and_then(|schema| schema.pointer("/properties/choices/items").cloned())
         .unwrap_or(Value::Null);
@@ -1549,13 +1249,13 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &st
     for action in actions {
         act(editor, action, doc);
     }
-    let mut label = format!("Edit a choice in {}", doc.owner.title());
+    let mut label = format!("Edit a choice in {}", doc.at.title());
     if let Some(removed) = menu.remove
         && let Some(choices) = draft["choices"].as_array_mut()
     {
         choices.remove(removed);
         changed = FormChange::at(&path);
-        label = format!("Remove a choice in {}", doc.owner.title());
+        label = format!("Remove a choice in {}", doc.at.title());
     }
     if let Some((a, b)) = menu.swap
         && let Some(choices) = draft["choices"].as_array_mut()
@@ -1660,7 +1360,7 @@ fn speaker_rows(
 }
 
 fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
-    row_form::act(editor, action, doc.owner.table(), doc.owner.key());
+    row_form::act(editor, action, ScriptDef::TABLE, &doc.at.key);
 }
 
 /// Carries out what a node's card asked for, but for the node it asks to go to, which the card
@@ -1674,519 +1374,4 @@ fn act_but_go(editor: &mut Editor, actions: Vec<FormAction>, doc: &ScriptDoc) ->
         }
     }
     go_to
-}
-
-#[derive(Clone, Debug)]
-pub struct ScriptConstant {
-    pub node: String,
-    pub field: String,
-    pub value: Value,
-    pub ty: VariableType,
-    pub table: Option<String>,
-    pub name: String,
-    pub ticked: bool,
-}
-
-pub struct MakeSharedDialog {
-    pub owner: ScriptOwner,
-    pub key: String,
-    pub kind: String,
-    pub constants: Vec<ScriptConstant>,
-    pub error: Option<String>,
-}
-
-pub struct InlineScriptTarget {
-    pub table: String,
-    pub key: String,
-    pub module: ScriptPath,
-}
-
-pub struct MakeInlineDialog {
-    pub key: String,
-    pub users: Vec<InlineScriptTarget>,
-    pub picked: usize,
-}
-
-pub fn make_shared_dialog(editor: &mut Editor, doc: &ScriptDoc) {
-    if doc.is_shared() {
-        return;
-    }
-    let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(ScriptDef::TABLE);
-    let mut constants = Vec::new();
-    let mut taken: BTreeMap<String, usize> = BTreeMap::new();
-    for (name, node) in doc.nodes() {
-        let Some(schema) = nodes::variant_schema(root, node.kind()) else {
-            continue;
-        };
-        for (field, field_schema) in schema::properties(schema) {
-            if field == "type" {
-                continue;
-            }
-            let Some(value) = node.get(field) else {
-                continue;
-            };
-            let (ty, table) = match (schema::marker(field_schema), value) {
-                (Some("x-table"), Value::String(_)) => (
-                    VariableType::Row,
-                    schema::table_of(field_schema).map(str::to_owned),
-                ),
-                (Some("x-place"), Value::Object(_)) => (VariableType::Place, None),
-                (None, Value::Number(n)) if n.is_i64() => (VariableType::Integer, None),
-                (None, Value::Number(_)) => (VariableType::Number, None),
-                (None, Value::Bool(_)) => (VariableType::Boolean, None),
-                (None, Value::String(_)) if schema::type_names(field_schema) == vec!["string"] => {
-                    (VariableType::Text, None)
-                }
-                _ => continue,
-            };
-            let base = field.clone();
-            let count = taken.entry(base.clone()).or_default();
-            *count += 1;
-            let var_name = if *count == 1 {
-                base
-            } else {
-                format!("{name}_{field}")
-            };
-            constants.push(ScriptConstant {
-                node: name.clone(),
-                field: field.clone(),
-                value: value.clone(),
-                ty,
-                table,
-                name: var_name,
-                ticked: false,
-            });
-        }
-    }
-    let files = editor.project.as_ref().map(|p| &p.files);
-    let key = files.map_or_else(
-        || doc.owner.key().to_owned(),
-        |files| rows::free_key(files, "script", doc.owner.key()),
-    );
-    editor
-        .dialogs
-        .push(ModalDialog::MakeShared(MakeSharedDialog {
-            owner: doc.owner.clone(),
-            key,
-            kind: doc.kind.name().to_owned(),
-            constants,
-            error: None,
-        }));
-}
-
-pub fn make_shared_body(
-    editor: &mut Editor,
-    ctx: &egui::Context,
-    mut dialog: MakeSharedDialog,
-) -> Option<MakeSharedDialog> {
-    let mut outcome = None;
-    let owner = dialog
-        .owner
-        .title()
-        .split(" › ")
-        .next()
-        .unwrap_or("")
-        .to_owned();
-    let count = ScriptDoc::load(editor, &dialog.owner).map_or(0, |doc| doc.nodes().len());
-    let problem = editor
-        .project
-        .as_ref()
-        .and_then(|project| rows::key_problem(&project.files, ScriptDef::TABLE, &dialog.key));
-    let valid = problem
-        .as_deref()
-        .is_none_or(|problem| problem.contains("already exists"));
-    let free = problem.is_none();
-    dialogs::card(ctx, "make-shared", 620.0, |ui| {
-        let pressed = dialogs::keys(ui);
-        ui.label(RichText::new("Make shared").strong().size(18.0));
-        ui.add_space(6.0);
-        ui.label(
-            theme::muted(format!(
-                "The {count} nodes move into a new script row, which {owner} names in their place."
-            ))
-            .size(13.5),
-        );
-        ui.add_space(10.0);
-        widgets::kv(ui, "key", |ui| {
-            ui.scope(|ui| {
-                ui.set_width(160.0);
-                let response = forms::boxed_input(ui, None, |ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(&mut dialog.key)
-                            .frame(egui::Frame::NONE)
-                            .font(egui::TextStyle::Monospace)
-                            .desired_width(f32::INFINITY),
-                    )
-                });
-                widgets::default_focus(ui, &response);
-            });
-            let standing = if !valid {
-                "letters, digits, _ and - only".to_owned()
-            } else if free {
-                format!("script/{} · free", dialog.key)
-            } else {
-                format!("script/{} · taken", dialog.key)
-            };
-            ui.label(theme::faint(standing).size(12.5).monospace());
-        });
-        widgets::kv(ui, "owner", |ui| {
-            widgets::combo("make-shared-kind")
-                .width(ui.available_width() - 8.0)
-                .selected_text(theme::mono(&dialog.kind).size(13.0))
-                .show_ui(ui, |ui| {
-                    for kind in RunnerKind::VARIANTS {
-                        ui.selectable_value(&mut dialog.kind, kind.name().to_owned(), kind.name());
-                    }
-                });
-        });
-        if !dialog.constants.is_empty() {
-            ui.add_space(8.0);
-            widgets::section(ui, "Turn constants into variables");
-            egui::ScrollArea::vertical()
-                .max_height(260.0)
-                .show(ui, |ui| {
-                    for constant in &mut dialog.constants {
-                        ui.horizontal(|ui| {
-                            ui.checkbox(&mut constant.ticked, "");
-                            ui.add_space(8.0);
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(300.0, 20.0),
-                                egui::Layout::left_to_right(egui::Align::Center),
-                                |ui| {
-                                    ui.label(theme::mono(&constant.field).size(13.0));
-                                    let shown = match &constant.value {
-                                        Value::String(text) => text.clone(),
-                                        other => condition::summary(other),
-                                    };
-                                    ui.label(theme::strong(widgets::clip(&shown, 32)).size(13.0));
-                                },
-                            );
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if constant.ticked {
-                                        let what = match &constant.table {
-                                            Some(table) => format!("variable {table} · row"),
-                                            None => format!("variable {}", constant.ty.name()),
-                                        };
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut constant.name)
-                                                .desired_width(110.0)
-                                                .font(egui::TextStyle::Monospace),
-                                        );
-                                        ui.label(theme::muted(what).size(12.5));
-                                    } else {
-                                        ui.label(theme::muted("stays a constant").size(12.5));
-                                    }
-                                },
-                            );
-                        });
-                        widgets::rule(ui);
-                        ui.add_space(4.0);
-                    }
-                });
-            ui.add_space(6.0);
-            ui.label(theme::muted(format!("Variables start without defaults; {owner} gives today's values. Make inline is the way back.")).size(13.0));
-        }
-        if let Some(error) = &dialog.error {
-            ui.colored_label(theme::DANGER, error);
-        }
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled_ui(valid && free, |ui| {
-                    widgets::primary(ui, "Make shared · one step")
-                })
-                .inner
-                .clicked()
-                || (pressed.enter && valid && free)
-            {
-                outcome = Some(true);
-            }
-            if ui.button("Cancel").clicked() || pressed.escape {
-                outcome = Some(false);
-            }
-        });
-    });
-    editor
-        .status
-        .left
-        .push(format!("{owner} › inline script · make shared"));
-    editor.status.right.push(format!(
-        "{} makes it · {} cancels",
-        EditorKey::Confirm.name(),
-        EditorKey::Cancel.name()
-    ));
-    match outcome {
-        Some(true) => match make_shared(editor, &dialog) {
-            Ok(()) => None,
-            Err(error) => {
-                dialog.error = Some(error);
-                Some(dialog)
-            }
-        },
-        Some(false) => None,
-        None => Some(dialog),
-    }
-}
-
-fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), String> {
-    let doc = ScriptDoc::load(editor, &dialog.owner).ok_or("the script is gone")?;
-    let files = &editor.project.as_ref().ok_or("no project")?.files;
-    if let Some(problem) = rows::key_problem(files, "script", &dialog.key) {
-        return Err(problem);
-    }
-    let mut nodes_map = doc.nodes().clone();
-    let mut variables = Map::new();
-    let mut values = Map::new();
-    for constant in dialog.constants.iter().filter(|c| c.ticked) {
-        let name = constant.name.trim();
-        if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            return Err(format!("{} is not a variable name", constant.name));
-        }
-        if let Some(node) = nodes_map.get_mut(&constant.node) {
-            node[&constant.field] = serde_json::json!({ "var": name });
-        }
-        let mut declared = serde_json::json!({ "type": constant.ty.name() });
-        if let Some(table) = &constant.table {
-            declared["table"] = Value::String(table.clone());
-        }
-        variables.insert(name.to_owned(), declared);
-        values.insert(name.to_owned(), constant.value.clone());
-    }
-    let mut script = serde_json::json!({ "runs_on": dialog.kind });
-    for field in ["state", "locals"] {
-        if let Some(value) = doc.script.get(field) {
-            script[field] = value.clone();
-        }
-    }
-    if !variables.is_empty() {
-        script["variables"] = Value::Object(variables);
-    }
-    script["nodes"] = Value::Object(nodes_map);
-    let mut module =
-        serde_json::json!({ "type": ScriptModuleKind::Shared.tag(), "script": dialog.key });
-    if !values.is_empty() {
-        module["values"] = Value::Object(values);
-    }
-    let row = doc.row_with(module);
-    let mut edit = ContentEdit::new(format!(
-        "Make {} shared as script/{}",
-        dialog.owner.title(),
-        dialog.key
-    ));
-    edit.write_json(row_file(ScriptDef::TABLE, &dialog.key), &script);
-    edit.write_json(doc.file.clone(), &row);
-    editor.try_apply(edit)?;
-    let shared = ScriptOwner::Shared {
-        key: dialog.key.clone(),
-    };
-    editor.views.script.relocate(&dialog.owner, shared.clone());
-    let from = EditorTab::Script(dialog.owner.clone());
-    editor.rename_tabs(|tab| (*tab == from).then(|| EditorTab::Script(shared.clone())));
-    editor.select(RowSelection::row(ScriptDef::TABLE, &dialog.key));
-    Ok(())
-}
-
-pub fn make_inline_dialog(editor: &mut Editor, doc: &ScriptDoc) {
-    let ScriptOwner::Shared { key } = &doc.owner else {
-        return;
-    };
-    let Some(project) = &editor.project else {
-        return;
-    };
-    let mut users = Vec::new();
-    for usage in project.usages.of_row(ScriptDef::TABLE, key) {
-        let Some((table, row_key)) = row_of(&usage.file) else {
-            continue;
-        };
-        let at = ScriptRef::parse(&usage.pointer);
-        let Some(module) = at
-            .module
-            .filter(|_| table != ScriptDef::TABLE && at.node.is_none())
-        else {
-            continue;
-        };
-        users.push(InlineScriptTarget {
-            table: table.to_owned(),
-            key: row_key.to_owned(),
-            module,
-        });
-    }
-    if users.is_empty() {
-        editor.toast("No owner names this script, so there is nowhere to copy it inline");
-        return;
-    }
-    editor
-        .dialogs
-        .push(ModalDialog::MakeInline(MakeInlineDialog {
-            key: key.clone(),
-            users,
-            picked: 0,
-        }));
-}
-
-pub fn make_inline_body(
-    editor: &mut Editor,
-    ctx: &egui::Context,
-    mut dialog: MakeInlineDialog,
-) -> Option<MakeInlineDialog> {
-    let mut outcome = None;
-    let count = editor
-        .row_value(ScriptDef::TABLE, &dialog.key)
-        .map_or(0, |script| script["nodes"].as_object().map_or(0, Map::len));
-    let variables = editor
-        .row_value(ScriptDef::TABLE, &dialog.key)
-        .map_or(0, |script| {
-            script["variables"].as_object().map_or(0, Map::len)
-        });
-    let names: Vec<String> = dialog
-        .users
-        .iter()
-        .map(|target| {
-            let index = target.module.module();
-            editor
-                .row_value(&target.table, &target.key)
-                .and_then(|row| row["modules"][index]["name"].as_str().map(str::to_owned))
-                .unwrap_or_else(|| format!("module {index}"))
-        })
-        .collect();
-    dialogs::card(ctx, "make-inline", 620.0, |ui| {
-        let pressed = dialogs::keys(ui);
-        ui.label(RichText::new("Make inline").strong().size(18.0));
-        ui.add_space(6.0);
-        ui.label(theme::muted(format!("The {count} nodes of script/{} are copied into one owner's row, its values written in. The script row stays.", dialog.key)).size(13.5));
-        ui.add_space(10.0);
-        widgets::section(ui, "Into which owner");
-        egui::ScrollArea::vertical()
-            .max_height(300.0)
-            .show(ui, |ui| {
-                for (index, target) in dialog.users.iter().enumerate() {
-                    let picked = dialog.picked == index;
-                    let module = names.get(index).cloned().unwrap_or_default();
-                    let response = egui::Frame::new()
-                        .fill(if picked {
-                            theme::ACCENT_SOFT
-                        } else {
-                            theme::PANEL
-                        })
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if picked { theme::ACCENT } else { theme::BORDER },
-                        ))
-                        .corner_radius(5.0)
-                        .inner_margin(egui::Margin::symmetric(10, 6))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.horizontal(|ui| {
-                                widgets::badge(ui, &target.table);
-                                ui.label(
-                                    theme::mono(format!("{}/{}", target.table, target.key))
-                                        .size(13.0),
-                                );
-                                ui.label(theme::muted(module).size(12.5));
-                            });
-                        })
-                        .response
-                        .interact(egui::Sense::click());
-                    if response.clicked() {
-                        dialog.picked = index;
-                    }
-                }
-            });
-        ui.add_space(6.0);
-        ui.label(
-            theme::muted(if variables == 0 {
-                "No variables: the nodes copy as they are.".to_owned()
-            } else {
-                format!(
-                    "{variables} {} take the owner's values, or the defaults where it gives none.",
-                    if variables == 1 {
-                        "variable"
-                    } else {
-                        "variables"
-                    }
-                )
-            })
-            .size(13.0),
-        );
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            if widgets::primary(ui, "Make inline · one step").clicked() || pressed.enter {
-                outcome = Some(true);
-            }
-            if ui.button("Cancel").clicked() || pressed.escape {
-                outcome = Some(false);
-            }
-        });
-    });
-    editor
-        .status
-        .left
-        .push(format!("script/{} · make inline", dialog.key));
-    editor.status.right.push(format!(
-        "{} makes it · {} cancels",
-        EditorKey::Confirm.name(),
-        EditorKey::Cancel.name()
-    ));
-    match outcome {
-        Some(true) => {
-            make_inline(editor, &dialog);
-            None
-        }
-        Some(false) => None,
-        None => Some(dialog),
-    }
-}
-
-fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
-    let Some(target) = dialog.users.get(dialog.picked) else {
-        return;
-    };
-    let (table, key, pointer) = (&target.table, &target.key, target.module.pointer());
-    let Some(script) = editor.row_value(ScriptDef::TABLE, &dialog.key) else {
-        return;
-    };
-    let Some(mut row) = editor.row_value(table, key) else {
-        return;
-    };
-    let Some(module) = row.pointer(&pointer).cloned() else {
-        return;
-    };
-    let mut values: Map<String, Value> = module["values"].as_object().cloned().unwrap_or_default();
-    for (name, variable) in script["variables"].as_object().into_iter().flatten() {
-        if !values.contains_key(name)
-            && let Some(default) = variable.get("default")
-        {
-            values.insert(name.clone(), default.clone());
-        }
-    }
-    let mut nodes_value = script["nodes"].clone();
-    fill_holes(&mut nodes_value, &Value::Object(values), &BTreeMap::new());
-    let mut inline =
-        serde_json::json!({ "type": ScriptModuleKind::Inline.tag(), "nodes": nodes_value });
-    for field in ["state", "locals"] {
-        if let Some(value) = script.get(field)
-            && !value.is_null()
-        {
-            inline[field] = value.clone();
-        }
-    }
-    if let Some(slot) = row.pointer_mut(&pointer) {
-        *slot = inline;
-    }
-    let mut edit = ContentEdit::new(format!(
-        "Make script/{} inline in {table}/{key}",
-        dialog.key
-    ));
-    edit.write_json(row_file(table, key), &row);
-    if editor.apply(edit) {
-        editor.select(RowSelection::row(table, key));
-        editor.open_tab(EditorTab::Script(ScriptOwner::Inline {
-            table: table.clone(),
-            key: key.clone(),
-            module: target.module,
-        }));
-    }
 }

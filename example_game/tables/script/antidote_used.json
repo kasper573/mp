@@ -1,0 +1,24 @@
+{
+  "owner": "item/antidote",
+  "runs_on": "item",
+  "nodes": {
+    "cleanse": {
+      "type": "remove_status",
+      "category": "debuff"
+    },
+    "drink": {
+      "type": "items",
+      "take": [
+        {
+          "item": "antidote"
+        }
+      ],
+      "done": "cleanse"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "drink"
+    }
+  }
+}

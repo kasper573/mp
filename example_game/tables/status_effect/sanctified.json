@@ -11,21 +11,8 @@
   },
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "every": {
-          "type": "on",
-          "event": "interval",
-          "seconds": 2.0,
-          "next": "mend"
-        },
-        "mend": {
-          "type": "heal",
-          "by": {
-            "type": "status_power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "sanctified_interval"
     }
   ]
 }

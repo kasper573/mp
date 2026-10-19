@@ -26,49 +26,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "arc": {
-          "type": "vfx",
-          "vfx": "chain_lightning",
-          "on": {
-            "type": "skill_targets"
-          },
-          "site": {
-            "type": "path"
-          },
-          "next": "hit"
-        },
-        "cast": {
-          "type": "animate",
-          "action": "attack",
-          "wait": "apex",
-          "next": "arc"
-        },
-        "hit": {
-          "type": "damage",
-          "who": {
-            "type": "skill_targets"
-          },
-          "by": {
-            "type": "multiply",
-            "a": {
-              "type": "stat",
-              "stat": "damage"
-            },
-            "b": {
-              "type": "skill_stat",
-              "skill": "chain_lightning",
-              "stat": "power"
-            }
-          }
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "cast"
-        }
-      }
+      "type": "script",
+      "script": "chain_lightning_used"
     }
   ]
 }

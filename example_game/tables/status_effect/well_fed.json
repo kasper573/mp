@@ -5,21 +5,8 @@
   "description": "A full belly carries more.",
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "hold"
-        },
-        "hold": {
-          "type": "boost",
-          "stat": "max_health",
-          "by": {
-            "type": "status_power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "well_fed_activated"
     }
   ]
 }

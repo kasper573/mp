@@ -10,7 +10,7 @@ use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
 
-use crate::views::script::ScriptOwner;
+use crate::views::script::ScriptRow;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EditorTab {
@@ -19,7 +19,7 @@ pub enum EditorTab {
     Rows { table: String, keys: Vec<String> },
     Area { key: String },
     Blueprint { key: String },
-    Script(ScriptOwner),
+    Script(ScriptRow),
     Model { key: String },
     Tileset { key: String },
     Spreadsheet { table: String },
@@ -117,9 +117,7 @@ impl EditorTab {
             TilesetDef::TABLE => EditorTab::Tileset {
                 key: key.to_owned(),
             },
-            ScriptDef::TABLE => EditorTab::Script(ScriptOwner::Shared {
-                key: key.to_owned(),
-            }),
+            ScriptDef::TABLE => EditorTab::Script(ScriptRow::new(key)),
             WorldMapDef::TABLE => EditorTab::World,
             _ => EditorTab::Row {
                 table: table.to_owned(),

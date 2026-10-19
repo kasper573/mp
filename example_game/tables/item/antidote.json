@@ -20,27 +20,8 @@
       "max": 5
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "cleanse": {
-          "type": "remove_status",
-          "category": "debuff"
-        },
-        "drink": {
-          "type": "items",
-          "take": [
-            {
-              "item": "antidote"
-            }
-          ],
-          "done": "cleanse"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "drink"
-        }
-      }
+      "type": "script",
+      "script": "antidote_used"
     }
   ]
 }

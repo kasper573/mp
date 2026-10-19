@@ -20,26 +20,8 @@
       "max": 5
     },
     {
-      "type": "inline_script",
-      "nodes": {
-        "ask": {
-          "type": "reset_skills",
-          "accepted": "drink"
-        },
-        "drink": {
-          "type": "items",
-          "take": [
-            {
-              "item": "shamans_draught"
-            }
-          ]
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "ask"
-        }
-      }
+      "type": "script",
+      "script": "shamans_draught_used"
     }
   ]
 }

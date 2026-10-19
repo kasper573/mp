@@ -226,7 +226,6 @@ pub enum AreaModule {
     Blueprint(Placement),
     Population(Population),
     Resident(Resident),
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 
@@ -240,8 +239,7 @@ pub enum AreaModuleKind {
     Blueprint,
     Population,
     Resident,
-    SharedScript,
-    InlineScript,
+    Script,
 }
 
 impl AreaModuleKind {
@@ -260,8 +258,7 @@ impl AreaModule {
             AreaModule::Blueprint(_) => AreaModuleKind::Blueprint,
             AreaModule::Population(_) => AreaModuleKind::Population,
             AreaModule::Resident(_) => AreaModuleKind::Resident,
-            AreaModule::Script(ScriptModule::Shared { .. }) => AreaModuleKind::SharedScript,
-            AreaModule::Script(ScriptModule::Inline(_)) => AreaModuleKind::InlineScript,
+            AreaModule::Script(_) => AreaModuleKind::Script,
         }
     }
 

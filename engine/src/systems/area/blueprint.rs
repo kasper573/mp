@@ -32,7 +32,13 @@ pub struct BlueprintDef {
     pub variables: BTreeMap<String, Variable<RiftScripting>>,
     pub parts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub modules: Vec<ScriptModule>,
+    pub modules: Vec<BlueprintModule>,
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BlueprintModule {
+    Script(ScriptModule),
 }
 
 impl ContentRow for BlueprintDef {
@@ -361,7 +367,7 @@ impl Expansion<'_> {
                     FlattenAt::Blueprint(placement.blueprint, part_pointer),
                     "module not allowed here",
                     "an area script".to_owned(),
-                    "any area module but shared_script and inline_script".to_owned(),
+                    "any area module but script".to_owned(),
                 ),
                 AreaModule::Blueprint(nested) => {
                     let nested_at = at + flip.apply(nested.at).to_vector();
@@ -405,7 +411,7 @@ impl Expansion<'_> {
     ) -> Vec<ScriptModule> {
         let content = self.content.clone();
         let mut scripts = Vec::new();
-        for (index, module) in def.modules.iter().enumerate() {
+        for (index, BlueprintModule::Script(module)) in def.modules.iter().enumerate() {
             let pointer = format!("/modules/{index}");
             let Ok(mut json) =
                 with_content(ContentScope::of(&content), || serde_json::to_value(module)).0

@@ -1,0 +1,32 @@
+{
+  "owner": "area/island",
+  "runs_on": "object",
+  "nodes": {
+    "cross": {
+      "type": "warp",
+      "to": {
+        "area": "forest",
+        "x": 3.0,
+        "y": 18.0
+      }
+    },
+    "entered": {
+      "type": "on",
+      "event": "entered",
+      "by": "characters",
+      "next": "pass"
+    },
+    "pass": {
+      "type": "if",
+      "test": {
+        "type": "at_least",
+        "a": {
+          "type": "holding",
+          "item": "road_pass"
+        },
+        "b": 1
+      },
+      "yes": "cross"
+    }
+  }
+}

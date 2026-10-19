@@ -128,7 +128,7 @@ pub fn param_fill(
     let fill = fills
         .get(&spec.name)
         .and_then(|fill| serde_json::from_value::<ParamFill>(fill.clone()).ok());
-    let bindable: Vec<String> = match (&cx.owner_table, &cx.owner_key) {
+    let bindable: Vec<String> = match (&cx.row_table, &cx.row_key) {
         (Some(table), Some(key)) if table == VfxDef::TABLE => {
             params_of(cx.files, VfxDef::TABLE, key)
                 .into_iter()

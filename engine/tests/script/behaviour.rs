@@ -6,10 +6,10 @@ use engine::systems::movement::{self, position};
 use engine::systems::npc::{Home, body};
 use engine::systems::script::{EventKind, Owner, RiftInstances, RunnerKind};
 use engine::systems::stat::{self, StatKind};
-use serde_json::json;
+use serde_json::{Value, json};
 use testkit::Sim;
 
-use crate::game::{compiled, field, health, inline_with, spawn};
+use crate::game::{compiled, field, health, module, spawn};
 
 const FAR: Pos<Tiles> = Pos::new(28.0, 28.0);
 
@@ -130,43 +130,50 @@ fn targets(sim: &mut Sim, npc: Entity, player: Entity, within: f32) -> bool {
 
 /// A fighter that fights the nearest other character it finds, whatever its pack.
 fn brawling_npc(sim: &mut Sim, near: Entity, offset: Offset<Tiles>, pack: u32) -> Entity {
-    let script = inline_with(
-        json!({ "target": "actor" }),
-        json!({
-            "spawned": { "type": "on", "event": "started", "next": "hostile" },
-            "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
-            "look": {
-                "type": "set",
-                "values": [{
-                    "local": "target",
-                    "to": { "type": "nearest", "among": "npcs", "within": 10.0 }
-                }],
-                "next": "found"
-            },
-            "found": {
-                "type": "if",
-                "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
-                "yes": "fight",
-                "no": "roam"
-            },
-            "fight": {
-                "type": "attack",
-                "target": { "type": "local", "local": "target" },
-                "within": 10.0,
-                "priority": 5,
-                "defeated": "look",
-                "lost": "look",
-                "interrupted": "look"
-            },
-            "roam": { "type": "wander", "priority": 1, "next": "tick" },
-            "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
-        }),
-    );
     let npc = spawn(sim, "fighter", near, offset, pack);
     let owner = Owner::Entity(RunnerKind::Npc, npc);
     let mut instances = sim.world.resource_mut::<RiftInstances>();
     instances.remove_owner(owner);
-    instances.spawn_owner(owner, compiled("test/brawler", &[&script]));
+    instances.spawn_owner(owner, compiled("test/brawler", &[&module("brawl")]));
     instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
     npc
+}
+
+pub fn scripts() -> Vec<(&'static str, Value)> {
+    vec![(
+        "brawl",
+        json!({
+            "runs_on": "npc",
+            "locals": { "target": "actor" },
+            "nodes": {
+                "spawned": { "type": "on", "event": "started", "next": "hostile" },
+                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
+                "look": {
+                    "type": "set",
+                    "values": [{
+                        "local": "target",
+                        "to": { "type": "nearest", "among": "npcs", "within": 10.0 }
+                    }],
+                    "next": "found"
+                },
+                "found": {
+                    "type": "if",
+                    "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
+                    "yes": "fight",
+                    "no": "roam"
+                },
+                "fight": {
+                    "type": "attack",
+                    "target": { "type": "local", "local": "target" },
+                    "within": 10.0,
+                    "priority": 5,
+                    "defeated": "look",
+                    "lost": "look",
+                    "interrupted": "look"
+                },
+                "roam": { "type": "wander", "priority": 1, "next": "tick" },
+                "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
+            },
+        }),
+    )]
 }

@@ -254,24 +254,29 @@ fn harbour() -> Sim {
                     "type": "object",
                     "name": "road",
                     "shape": { "type": "rect", "x": 12.5, "y": 5.5, "w": 1.0, "h": 1.0 },
-                    "scripts": [{
-                        "type": "inline_script",
-                        "nodes": {
-                            "entered": { "type": "on", "event": "entered", "by": "characters", "next": "pass" },
-                            "pass": { "type": "if", "test": holding_pass(), "yes": "cross" },
-                            "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
-                        },
-                    }],
+                    "scripts": [{ "script": "road_pass" }],
                 },
             ]),
+        )
+        .script(
+            "road_pass",
+            "area/harbour",
+            "object",
+            json!({
+                "entered": { "type": "on", "event": "entered", "by": "characters", "next": "pass" },
+                "pass": { "type": "if", "test": holding_pass(), "yes": "cross" },
+                "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
+            }),
         )
         .area("forest", &Map::open(8, 8), json!([]))
         .hero("harbour", 8.0, 6.0)
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }))
         .item("pass", stacked())
         .item("fish", stacked())
-        .npc("warden", 40.0, json!([warden()]))
-        .npc("ferryman", 40.0, json!([ferryman()]))
+        .npc("warden", 40.0, json!([{ "type": "script", "script": "warden_talk" }]))
+        .script("warden_talk", "npc/warden", "npc", warden())
+        .npc("ferryman", 40.0, json!([{ "type": "script", "script": "ferryman_talk" }]))
+        .script("ferryman_talk", "npc/ferryman", "npc", ferryman())
         .row(
             "memory",
             "sided",
@@ -329,8 +334,6 @@ fn warden() -> Value {
     };
     let seasoned = json!({ "type": "at_least", "a": { "type": "level" }, "b": 3 });
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
             "watches_road": {
                 "type": "on",
@@ -366,14 +369,11 @@ fn warden() -> Value {
             "lets_you_pass": said("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
             "fish": said("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
             "uneasy": said("Then go.", json!([{ "label": ["Thank you."] }])),
-        },
     })
 }
 
 fn ferryman() -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
             "hello": {
                 "type": "dialogue",
@@ -392,7 +392,6 @@ fn ferryman() -> Value {
             "fare": { "type": "items", "take": [{ "item": "gold", "count": 20 }], "done": "sail" },
             "sail": { "type": "notify", "notification": "sails", "next": "cross" },
             "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
-        },
     })
 }
 

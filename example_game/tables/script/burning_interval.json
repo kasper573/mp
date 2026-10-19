@@ -1,0 +1,18 @@
+{
+  "owner": "status_effect/burning",
+  "runs_on": "status_effect",
+  "nodes": {
+    "bite": {
+      "type": "damage",
+      "by": {
+        "type": "status_power"
+      }
+    },
+    "every": {
+      "type": "on",
+      "event": "interval",
+      "seconds": 1.0,
+      "next": "bite"
+    }
+  }
+}

@@ -37,46 +37,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "hit": {
-          "type": "damage",
-          "who": {
-            "type": "skill_targets"
-          },
-          "by": {
-            "type": "multiply",
-            "a": {
-              "type": "stat",
-              "stat": "damage"
-            },
-            "b": {
-              "type": "skill_stat",
-              "skill": "aimed_shot",
-              "stat": "power"
-            }
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "arrow_hit",
-          "on": {
-            "type": "skill_targets"
-          }
-        },
-        "swing": {
-          "type": "animate",
-          "action": "attack",
-          "wait": "apex",
-          "next": "hit"
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "swing"
-        }
-      }
+      "type": "script",
+      "script": "aimed_shot_used"
     }
   ]
 }

@@ -396,7 +396,7 @@ fn attitude(content: &Content, table: &str, key: &str, value: &Value) -> Option<
         .flatten()
         .enumerate()
     {
-        if module.script_kind().is_none() {
+        if !module.is_script_module() {
             continue;
         }
         let Some(bound) = panel::owner_row(content, table, key, &format!("/modules/{index}"))

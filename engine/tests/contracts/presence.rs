@@ -139,8 +139,14 @@ fn arena() -> Sim {
         .npc(
             "hunter",
             25.0,
-            json!([{
-                "type": "inline_script",
+            json!([{ "type": "script", "script": "hunter_hunt" }]),
+        )
+        .owned(
+            "script",
+            "hunter_hunt",
+            "npc/hunter",
+            json!({
+                "runs_on": "npc",
                 "locals": { "target": "actor" },
                 "nodes": {
                     "spawned": { "type": "on", "event": "started", "next": "hostile" },
@@ -170,7 +176,7 @@ fn arena() -> Sim {
                     },
                     "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
                 },
-            }]),
+            }),
         )
         .edit("npc", "hunter", |hunter| hunter["basic_attack"] = json!("strike"))
         .row(

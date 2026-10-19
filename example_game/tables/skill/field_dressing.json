@@ -26,25 +26,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "bind": {
-          "type": "heal",
-          "who": {
-            "type": "skill_targets"
-          },
-          "by": {
-            "type": "skill_stat",
-            "skill": "field_dressing",
-            "stat": "power"
-          }
-        },
-        "used": {
-          "type": "on",
-          "event": "used",
-          "next": "bind"
-        }
-      }
+      "type": "script",
+      "script": "field_dressing_used"
     }
   ]
 }

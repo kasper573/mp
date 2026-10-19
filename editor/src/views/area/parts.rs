@@ -150,12 +150,7 @@ pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
     for (group, kinds) in modules::ADD_MENU {
         let kinds: Vec<&(AreaModuleKind, &str)> = kinds
             .iter()
-            .filter(|(kind, _)| {
-                !matches!(
-                    kind,
-                    AreaModuleKind::InlineScript | AreaModuleKind::SharedScript
-                )
-            })
+            .filter(|(kind, _)| *kind != AreaModuleKind::Script)
             .collect();
         if kinds.is_empty() {
             continue;
@@ -173,11 +168,7 @@ pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
     }
     ui.separator();
     ui.add_enabled_ui(false, |ui| {
-        ui.label(
-            RichText::new("inline · shared script")
-                .monospace()
-                .color(theme::FAINT),
-        );
+        ui.label(RichText::new("script").monospace().color(theme::FAINT));
         ui.label(
             RichText::new("the blueprint's own, under Modules")
                 .size(11.5)
@@ -228,7 +219,7 @@ pub(super) fn part_cards(
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by(BlueprintDef::TABLE, Some(key));
+            .editing(BlueprintDef::TABLE, Some(key));
         for &index in selected {
             let path = super::blueprint_part(index);
             let Some(part) = row["parts"].get_mut(index) else {

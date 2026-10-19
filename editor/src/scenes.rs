@@ -21,7 +21,7 @@ use crate::views::character::CharacterSection;
 use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
 use crate::views::model::{self, FrameCueKind, ModelPage, ModelStrip, busts};
-use crate::views::script::{PendingScriptAction, ScriptOwner};
+use crate::views::script::{PendingScriptAction, ScriptRow};
 use crate::views::tileset::{
     self, NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
     TilesetMode, WalkBrush,
@@ -72,10 +72,8 @@ pub enum SceneStep {
         key: String,
         module: usize,
     },
-    Script(ScriptTarget),
+    Script(String),
     Node(Vec<String>),
-    MakeShared,
-    MakeInline,
     Connect {
         from: String,
         field: String,
@@ -96,19 +94,6 @@ pub enum SceneStep {
     Dialog(DialogName),
     Game,
     Asset(String),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ScriptTarget {
-    Shared {
-        key: String,
-    },
-    Inline {
-        table: String,
-        key: String,
-        pointer: String,
-    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -348,15 +333,16 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
                 origin: Some(origin),
             });
         }
-        SceneStep::Script(target) => open_script(editor, target),
+        SceneStep::Script(key) => {
+            editor.select(RowSelection::row(ScriptDef::TABLE, key));
+            editor.open_tab(EditorTab::Script(ScriptRow::new(key.clone())));
+        }
         SceneStep::Node(names) => {
-            if let Some(owner) = last_script_owner(editor) {
+            if let Some(script) = last_script(editor) {
                 let parts = names.iter().map(|name| format!("node:{name}")).collect();
-                editor.select(RowSelection::parts(owner.table(), owner.key(), parts));
+                editor.select(RowSelection::parts(ScriptDef::TABLE, &script.key, parts));
             }
         }
-        SceneStep::MakeShared => set_pending(editor, PendingScriptAction::MakeShared),
-        SceneStep::MakeInline => set_pending(editor, PendingScriptAction::MakeInline),
         SceneStep::Connect { from, field, to } => set_pending(
             editor,
             PendingScriptAction::Connect {
@@ -413,39 +399,20 @@ fn fold(editor: &mut Editor, table: &str, modules: &[usize], folded: bool) {
     }
 }
 
-fn open_script(editor: &mut Editor, target: &ScriptTarget) {
-    match target {
-        ScriptTarget::Shared { key } => {
-            editor.select(RowSelection::row(ScriptDef::TABLE, key));
-            editor.open_tab(EditorTab::Script(ScriptOwner::Shared { key: key.clone() }));
-        }
-        ScriptTarget::Inline {
-            table,
-            key,
-            pointer,
-        } => {
-            if let Some(owner) = ScriptOwner::inline(table, key, pointer) {
-                editor.select(RowSelection::row(table, key));
-                editor.open_tab(EditorTab::Script(owner));
-            }
-        }
-    }
-}
-
 fn set_pending(editor: &mut Editor, action: PendingScriptAction) {
-    if let Some(owner) = last_script_owner(editor) {
-        editor.views.script.set_pending(&owner, action);
+    if let Some(script) = last_script(editor) {
+        editor.views.script.set_pending(&script, action);
     }
 }
 
-fn last_script_owner(editor: &Editor) -> Option<ScriptOwner> {
+fn last_script(editor: &Editor) -> Option<ScriptRow> {
     editor
         .open_tabs
         .iter()
         .map(|(tab, _)| tab)
         .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
         .filter_map(|tab| match tab {
-            EditorTab::Script(owner) => Some(owner.clone()),
+            EditorTab::Script(script) => Some(script.clone()),
             _ => None,
         })
         .last()

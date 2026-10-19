@@ -1,0 +1,22 @@
+{
+  "owner": "npc/pell_hostile",
+  "runs_on": "npc",
+  "nodes": {
+    "dead": {
+      "type": "remember",
+      "memory": "pell_dead"
+    },
+    "defeated": {
+      "type": "on",
+      "event": "defeated",
+      "next": "fight_over"
+    },
+    "fight_over": {
+      "type": "forget",
+      "memories": [
+        "pell_fighting"
+      ],
+      "next": "dead"
+    }
+  }
+}

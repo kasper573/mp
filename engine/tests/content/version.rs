@@ -8,7 +8,7 @@ use crate::support::game;
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(registry().version().0, "3c0dcb26");
+    assert_eq!(registry().version().0, "f3145c2b");
 }
 
 #[test]

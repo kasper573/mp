@@ -13,8 +13,8 @@ use super::node::{
 use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, QueryDef, RunnerKindDef, ScriptError,
-    ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
+    Arrow, EffectDef, EventDef, Fill, LineDef, QueryDef, RunnerKindDef, ScriptError, ScriptFault,
+    ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::id::nearest;
 use crate::core::content::{Content, ContentId, ContentRow};
@@ -178,22 +178,16 @@ impl<V: Vocabulary> Procedure<V> {
 }
 
 #[derive(Clone, Copy)]
-pub enum Call<'c, V: Vocabulary> {
-    Shared {
-        script: ScriptId<V>,
-        values: &'c BTreeMap<String, VarValue<V>>,
-    },
-    Inline(&'c InlineScript<V>),
+pub struct Call<'c, V: Vocabulary> {
+    pub script: ScriptId<V>,
+    pub values: &'c BTreeMap<String, VarValue<V>>,
 }
 
 impl<'c, V: Vocabulary> Call<'c, V> {
     pub fn of(module: &'c ScriptModule<V>) -> Call<'c, V> {
-        match module {
-            ScriptModule::Shared { script, values } => Call::Shared {
-                script: *script,
-                values,
-            },
-            ScriptModule::Inline(inline) => Call::Inline(inline),
+        Call {
+            script: module.script,
+            values: &module.values,
         }
     }
 }
@@ -365,10 +359,8 @@ fn compile_source<'c, V: Vocabulary>(
     binding: &Binding<'c, V>,
     stack: &[ScriptId<V>],
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
-    let shared = match binding.call {
-        Call::Shared { script, .. } => Some(script.key(content).to_owned()),
-        Call::Inline(_) => None,
-    };
+    let Call { script, values } = binding.call;
+    let shared = Some(script.key(content).to_owned());
     let fail = |rule: &'static str, node: Option<&str>, expected: String| ScriptError {
         rule,
         owner: binding.label.clone(),
@@ -383,8 +375,8 @@ fn compile_source<'c, V: Vocabulary>(
         expected,
         script: None,
     };
-    let (source, values, declared) = match binding.call {
-        Call::Shared { script, values } => {
+    let (source, values, declared) = {
+        {
             let def = script.get(content);
             let called = !stack.is_empty();
             if called {
@@ -416,16 +408,6 @@ fn compile_source<'c, V: Vocabulary>(
                 Some(&def.variables),
             )
         }
-        Call::Inline(inline) => (
-            Source {
-                state: slots(&inline.state),
-                locals: slots(&inline.locals),
-                nodes: &inline.nodes,
-                label: binding.label.clone(),
-            },
-            None,
-            None,
-        ),
     };
     if source.nodes.len() > MAX_NODES {
         return Err(fail(
@@ -703,7 +685,7 @@ fn compile_source<'c, V: Vocabulary>(
                         owner: binding.owner,
                         row: binding.row,
                         label: format!("{} › script/{}", source.label, script.key(content)),
-                        call: Call::Shared {
+                        call: Call {
                             script: *script,
                             values,
                         },

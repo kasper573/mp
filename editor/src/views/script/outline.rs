@@ -5,6 +5,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Color32, FontId, Sense, Ui};
 use engine::core::content::ContentRow;
 use engine::systems::npc::NpcDef;
+use engine::systems::script::ScriptDef;
 use serde_json::Value;
 
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
@@ -25,7 +26,7 @@ pub fn show(
     doc: &ScriptDoc,
     actions: &mut Vec<ScriptGraphAction>,
 ) {
-    let owner = doc.owner.clone();
+    let owner = doc.at.clone();
     let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), catalogue_of(editor.project.as_ref()));
     let summaries = summaries(editor, doc);
     let (focus, folded) = editor
@@ -141,7 +142,7 @@ pub fn show(
                     && index < choices.len()
                 {
                     choices.remove(index);
-                    let label = format!("Remove a choice in {}", doc.owner.title());
+                    let label = format!("Remove a choice in {}", doc.at.title());
                     super::write(editor, doc, script, label);
                 }
             }
@@ -348,8 +349,8 @@ fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
             editor.select(RowSelection::parts(
-                doc.owner.table(),
-                doc.owner.key(),
+                ScriptDef::TABLE,
+                &doc.at.key,
                 vec![
                     format!("node:{}", row.name),
                     format!("choice:{}#{index}", row.name),
@@ -358,7 +359,7 @@ fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
             editor
                 .views
                 .script
-                .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+                .view_mut(&doc.at, &editor.user, editor.project.as_ref())
                 .selected = vec![row.name.clone()];
         }
         None if !row.link => select_nodes(editor, doc, std::slice::from_ref(&row.name)),

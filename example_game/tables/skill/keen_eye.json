@@ -19,23 +19,8 @@
   ],
   "modules": [
     {
-      "type": "inline_script",
-      "nodes": {
-        "activated": {
-          "type": "on",
-          "event": "activated",
-          "next": "sharpen"
-        },
-        "sharpen": {
-          "type": "boost",
-          "stat": "range",
-          "by": {
-            "type": "skill_stat",
-            "skill": "keen_eye",
-            "stat": "power"
-          }
-        }
-      }
+      "type": "script",
+      "script": "keen_eye_activated"
     }
   ]
 }

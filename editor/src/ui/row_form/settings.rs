@@ -57,12 +57,7 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
                 });
                 editor.toast("Click a walkable cell on an area to put the initial spawn there");
             }
-            FormAction::OpenNode { .. }
-            | FormAction::OpenScript { .. }
-            | FormAction::MakeShared { .. }
-            | FormAction::MakeInline { .. }
-            | FormAction::NewRow { .. }
-            | FormAction::RowAction(_) => {}
+            FormAction::OpenNode { .. } | FormAction::NewRow { .. } | FormAction::RowAction(_) => {}
         }
     }
 }

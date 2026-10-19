@@ -27,7 +27,6 @@
       },
       "scripts": [
         {
-          "type": "shared_script",
           "script": "warp",
           "values": {
             "to": {

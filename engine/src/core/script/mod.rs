@@ -24,7 +24,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::content::{Content, ContentId, ContentRow};
 
@@ -202,46 +202,19 @@ impl<V: Vocabulary> ContentRow for ScriptDef<V> {
 
 pub type ScriptId<V> = ContentId<ScriptDef<V>>;
 
+/// A script row run by the row holding the module, with values for the script's variables.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(bound = "", deny_unknown_fields)]
 #[schemars(bound = "")]
-pub struct InlineScript<V: Vocabulary> {
+pub struct ScriptModule<V: Vocabulary> {
+    pub script: ScriptId<V>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub state: BTreeMap<String, ValueType>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub locals: BTreeMap<String, ValueType>,
-    pub nodes: BTreeMap<String, Node<V>>,
+    pub values: BTreeMap<String, VarValue<V>>,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
-#[serde(tag = "type", rename_all = "snake_case", bound = "")]
-#[schemars(bound = "")]
-#[strum_discriminants(
-    name(ScriptModuleKind),
-    derive(EnumString, IntoStaticStr, VariantArray)
-)]
-pub enum ScriptModule<V: Vocabulary> {
-    #[serde(rename = "shared_script")]
-    #[strum_discriminants(strum(serialize = "shared_script"))]
-    Shared {
-        script: ScriptId<V>,
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-        values: BTreeMap<String, VarValue<V>>,
-    },
-    #[serde(rename = "inline_script")]
-    #[strum_discriminants(strum(serialize = "inline_script"))]
-    Inline(InlineScript<V>),
-}
-
-impl ScriptModuleKind {
-    /// The kind of script module a `type` tag names, when it names one.
-    pub fn of(tag: &str) -> Option<ScriptModuleKind> {
-        tag.parse().ok()
-    }
-
-    pub fn tag(self) -> &'static str {
-        self.into()
-    }
+impl<V: Vocabulary> ScriptModule<V> {
+    /// The `type` a script module is tagged with in a row's list of modules.
+    pub const TAG: &'static str = "script";
 }
 
 #[derive(

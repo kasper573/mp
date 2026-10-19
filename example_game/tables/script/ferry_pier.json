@@ -1,0 +1,30 @@
+{
+  "owner": "area/island",
+  "runs_on": "object",
+  "nodes": {
+    "entered": {
+      "type": "on",
+      "event": "entered",
+      "by": "characters",
+      "next": "heard"
+    },
+    "gulls": {
+      "type": "notify",
+      "notification": "gulls"
+    },
+    "heard": {
+      "type": "if",
+      "test": {
+        "type": "set_within",
+        "memory": "heard_gulls",
+        "seconds": 600
+      },
+      "no": "remember"
+    },
+    "remember": {
+      "type": "remember",
+      "memory": "heard_gulls",
+      "next": "gulls"
+    }
+  }
+}
