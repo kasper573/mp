@@ -22,7 +22,7 @@ use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
 };
 use crate::systems::skill::{self, Learned, SkillDef};
-use crate::systems::stat::{Stat, StatMap};
+use crate::systems::stat::{Stat, Stats};
 use crate::systems::vfx::{self, VfxFixture, VfxShaderFixture};
 
 pub fn register(app: &mut App) {
@@ -110,8 +110,8 @@ impl ContentRow for ClassDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ClassLevel {
     pub xp: u32,
-    #[serde(default, skip_serializing_if = "StatMap::is_empty")]
-    pub stats: StatMap,
+    #[serde(default, skip_serializing_if = "Stats::is_empty")]
+    pub stats: Stats,
     #[serde(default, skip_serializing_if = "SkillPoints::is_zero")]
     pub skill_points: SkillPoints,
 }

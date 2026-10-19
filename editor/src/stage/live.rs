@@ -25,7 +25,7 @@ use engine::systems::player::{ClientId, JoinRequest, Players, SpawnPolicy, Spawn
 use engine::systems::script::{Condition, Place, RiftQuery};
 use engine::systems::skill::casting::{self, CastAim};
 use engine::systems::skill::{self, Rank, SkillDef, SkillId, Targeting};
-use engine::systems::stat::{self, StatKind, StatMap};
+use engine::systems::stat::{self, StatKind, Stats};
 use engine::systems::status::{self, StatusEffectId};
 use engine::systems::{GameSettings, TICK_HZ, from_client, server_app, start_server};
 
@@ -404,7 +404,7 @@ fn spawn_sturdy(
     let def = NpcDef {
         name: model.key(content).to_owned(),
         model,
-        stats: StatMap(BTreeMap::from([
+        stats: Stats(BTreeMap::from([
             (StatKind::MaxHealth, STURDY),
             (StatKind::Health, STURDY),
         ])),

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bevy_ecs::change_detection::DetectChanges;
 use bevy_ecs::prelude::*;
 use engine::systems::equipment::{self, Equipment, EquipmentSlot, UnequipRequest};
@@ -112,10 +114,10 @@ fn wardrobe() -> (Sim, Entity) {
 }
 
 fn set_vitals(sim: &mut Sim, player: Entity, health: f32, max: f32) {
-    *sim.world.get_mut::<Stats>(player).expect("stats") = Stats(vec![
-        StatKind::Health.of(health),
-        StatKind::MaxHealth.of(max),
-    ]);
+    *sim.world.get_mut::<Stats>(player).expect("stats") = Stats(BTreeMap::from([
+        (StatKind::Health, health),
+        (StatKind::MaxHealth, max),
+    ]));
 }
 
 fn worn(sim: &Sim, player: Entity, slot: EquipmentSlot) -> Option<ItemId> {

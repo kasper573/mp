@@ -36,7 +36,7 @@ use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::skill::{BasicAttack, Hotbar, Learned};
-use crate::systems::stat::{self, StatKind, StatMap, Stats};
+use crate::systems::stat::{self, Immortal, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
 use snapshot::{CharacterSnapshot, JoinAs};
@@ -115,16 +115,13 @@ pub struct Welcome {
     pub now: UnixMillis,
 }
 
-/// High enough that nothing in the world can grind it down.
-const IMMORTAL_HEALTH: f32 = 9999.0;
-
 pub type PlayerDefId = ContentId<PlayerDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
     pub model: ModelId,
     pub class: ClassId,
-    pub stats: StatMap,
+    pub stats: Stats,
     #[schemars(extend("x-usage" = "worn at creation"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wearing: Vec<ItemId>,
@@ -316,7 +313,7 @@ pub fn join(world: &mut World) {
                 let (snapshot, start) = (snapshot.clone(), *start);
                 (
                     movement::place_beside(world, zone, &area.grid, start.at),
-                    snapshot::materialize(&content, &snapshot, start, clock, immortal),
+                    snapshot::materialize(&content, &snapshot, start, clock),
                 )
             }
             _ => {
@@ -327,11 +324,14 @@ pub fn join(world: &mut World) {
                 let at = movement::place_beside(world, zone, &area.grid, spawn);
                 let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
                 let start = Place { area: zone, at };
-                let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
+                let state = snapshot::materialize(&content, &fresh, start, clock);
                 (at, state)
             }
         };
         let entity = place(world, client, zone, at, state);
+        if immortal {
+            world.entity_mut(entity).insert(Immortal);
+        }
         spawned(world, entity);
     }
 }
@@ -405,18 +405,6 @@ impl CharacterState {
             history: world.get::<History>(entity).cloned().unwrap_or_default(),
         })
     }
-}
-
-pub fn player_stats(stats: &stat::StatMap, immortal: bool) -> Stats {
-    Stats(
-        stats
-            .listed()
-            .map(|stat| match stat.kind {
-                StatKind::Health | StatKind::MaxHealth if immortal => stat.kind.of(IMMORTAL_HEALTH),
-                _ => stat,
-            })
-            .collect(),
-    )
 }
 
 pub(crate) fn place(

@@ -2,8 +2,8 @@ mod health;
 pub mod widget;
 
 pub use health::{
-    apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill, regenerate,
-    revive, settle_health, stands,
+    Immortal, apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill,
+    regenerate, revive, settle_health, stands,
 };
 
 use std::collections::BTreeMap;
@@ -70,12 +70,12 @@ impl Stat {
     }
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Component, JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(transparent)]
 #[schemars(transform = schema_with_units)]
-pub struct StatMap(pub BTreeMap<StatKind, f32>);
+pub struct Stats(pub BTreeMap<StatKind, f32>);
 
-impl StatMap {
+impl Stats {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -86,18 +86,6 @@ impl StatMap {
 
     pub fn listed(&self) -> impl Iterator<Item = Stat> + '_ {
         self.0.iter().map(|(&kind, &value)| kind.of(value))
-    }
-}
-
-#[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct Stats(pub Vec<Stat>);
-
-impl Stats {
-    pub fn get(&self, kind: StatKind) -> f32 {
-        self.0
-            .iter()
-            .find(|stat| stat.kind == kind)
-            .map_or(0.0, |stat| stat.value)
     }
 }
 
@@ -155,7 +143,7 @@ pub fn effective_all(world: &World, entity: Entity) -> Stats {
                     .filter(|stat| stat.kind == kind)
                     .map(|stat| stat.value)
                     .sum();
-                kind.of(base(world, entity, kind) + delta)
+                (kind, base(world, entity, kind) + delta)
             })
             .collect(),
     )

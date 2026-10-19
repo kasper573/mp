@@ -33,7 +33,7 @@ use crate::systems::script::{
     ScriptModule, ScriptedRow, area_owner,
 };
 use crate::systems::skill::{self, Rank, SkillId};
-use crate::systems::stat::{StatMap, Stats};
+use crate::systems::stat::Stats;
 use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
@@ -93,7 +93,7 @@ pub struct Near(Vec<Entity>);
 pub struct NpcDef {
     pub name: String,
     pub model: ModelId,
-    pub stats: StatMap,
+    pub stats: Stats,
     #[schemars(extend("x-usage" = "the skill a click on a target uses"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_attack: Option<SkillId>,
@@ -508,7 +508,7 @@ fn actor_bundle(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -
         },
         AreaTag { area },
     );
-    (character, Stats(def.stats.listed().collect()))
+    (character, def.stats.clone())
 }
 
 fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {

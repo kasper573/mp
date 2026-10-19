@@ -23,7 +23,7 @@ use engine::systems::player::{SpawnPolicy, SpawnRules, Xp};
 use engine::systems::quest::{QuestDef, QuestLog, QuestResult};
 use engine::systems::script::Place;
 use engine::systems::shop::{Sale, ShopDef, ShopLedger};
-use engine::systems::stat::{StatKind, StatMap, Stats};
+use engine::systems::stat::{StatKind, Stats};
 use engine::systems::text::LineText;
 use serde_json::json;
 use testkit::{Game, Map, Sim};
@@ -237,7 +237,7 @@ fn tess(content: &Content, start: Place) -> CharacterSnapshot {
         skills: Vec::new(),
         hotbar: Vec::new(),
         basic_attack: None,
-        stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
+        stats: Stats(BTreeMap::from([(StatKind::Damage, 9.0)])),
         bag: vec![
             ItemStack::new(id(content, "tusk"), 5),
             ItemStack::new(id(content, "gold"), 20),

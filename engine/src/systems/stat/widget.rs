@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use design_tokens::{face, sheet};
 use egui::{Ui, Vec2};
 
+use crate::core::content::Content;
 use crate::systems::class;
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::InputAction;
@@ -52,7 +53,7 @@ fn stat_rows(world: &World) -> Vec<(String, String)> {
     };
     let entity = me.id();
     let stats = stat::effective_all(world, entity);
-    let content = world.resource::<crate::core::content::Content>();
+    let content = world.resource::<Content>();
     let class = class::of(world, entity)
         .map(|class| class.get(content).name.clone())
         .unwrap_or_default();
@@ -63,8 +64,7 @@ fn stat_rows(world: &World) -> Vec<(String, String)> {
     .into_iter()
     .chain(
         stats
-            .0
-            .iter()
+            .listed()
             .map(|stat| (stat.label().to_owned(), shown_value(stat.value))),
     )
     .collect()

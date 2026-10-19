@@ -5,6 +5,12 @@ use crate::core::vfx::VfxSite;
 use crate::systems::notification;
 use crate::systems::vfx::{VfxFixture, VfxShaderFixture, fixture};
 
+/// Worn down by damage like anyone, but always left standing.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct Immortal;
+
+const IMMORTAL_FLOOR: f32 = 1.0;
+
 pub fn current_health(world: &World, entity: Entity) -> f32 {
     base(world, entity, StatKind::Health)
 }
@@ -39,7 +45,12 @@ pub fn apply_damage(world: &mut World, entity: Entity, amount: f32) {
     if is_dead(world, entity) {
         return;
     }
-    set_health(world, entity, |health, _| (health - amount).max(0.0));
+    let floor = if world.get::<Immortal>(entity).is_some() {
+        IMMORTAL_FLOOR
+    } else {
+        0.0
+    };
+    set_health(world, entity, |health, _| (health - amount).max(floor));
     if amount > 0.0 {
         fixture::play(world, VfxFixture::DamageTaken, VfxSite::Actor(entity));
         let shown = whole(amount).to_string();
@@ -87,24 +98,17 @@ pub fn settle_health(world: &mut World, living: &mut QueryState<Entity, With<Sta
 
 fn set_health(world: &mut World, entity: Entity, f: impl Fn(f32, f32) -> f32) {
     let max = max_health(world, entity);
-    let Some(stats) = world.get::<Stats>(entity) else {
+    let Some(&health) = world
+        .get::<Stats>(entity)
+        .and_then(|stats| stats.0.get(&StatKind::Health))
+    else {
         return;
     };
-    let changes = stats
-        .0
-        .iter()
-        .any(|stat| stat.kind == StatKind::Health && f(stat.value.min(max), max) != stat.value);
-    if !changes {
-        return;
-    }
-    if let Some(mut stats) = world.get_mut::<Stats>(entity) {
-        for stat in stats
-            .0
-            .iter_mut()
-            .filter(|stat| stat.kind == StatKind::Health)
-        {
-            stat.value = f(stat.value.min(max), max);
-        }
+    let settled = f(health.min(max), max);
+    if settled != health
+        && let Some(mut stats) = world.get_mut::<Stats>(entity)
+    {
+        stats.0.insert(StatKind::Health, settled);
     }
 }
 
