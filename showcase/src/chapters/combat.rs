@@ -86,19 +86,23 @@ fn play(shoot: &mut Shoot) {
     chase_ends(&mut me, &chaser);
 
     me.caption("Out in the wilds a whole pack comes for you");
-    me.look_out(PACK, |snapshot| nearest_npc(snapshot, PACK).is_some());
-    me.fight(
-        |_, actor| npc_is(actor, PACK),
-        |snapshot| surrounded_by(snapshot, PACK, 3),
-    );
+    let ground = me.look_out(PACK, |snapshot| nearest_npc(snapshot, PACK).is_some());
+    me.walk_to(ground);
+    me.wait_within("the pack around me", SURROUNDING, |snapshot| {
+        surrounded_by(snapshot, PACK, 3).then_some(())
+    });
     me.caption("They surround you, each on a tile of its own");
     me.hold();
 }
 
 const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
 
-// They fight whoever comes near, so a few at once close in.
+// They fight whoever comes near, so a few at once close in, given a while to wander into sight.
 const PACK: &str = "glow_moth";
+const SURROUNDING: WaitBudget = WaitBudget {
+    time: Duration::from_secs(40),
+    frames: 2400,
+};
 
 // Loot lying under a monster can't be clicked until it moves or falls, so it's given a while.
 const LOOTING: WaitBudget = WaitBudget {
