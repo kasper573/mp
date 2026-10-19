@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use engine::core::audio;
 use engine::core::audio::loader::{self, DecodedAudio};
+use engine::core::content::asset_file;
 
 use crate::project::ProjectFiles;
 
@@ -39,7 +40,7 @@ pub struct WaveformCache {
 
 impl WaveformCache {
     pub fn wave(&mut self, files: &ProjectFiles, path: &str) -> Option<Waveform> {
-        let file = format!("assets/{path}");
+        let file = asset_file(path);
         let hash = files.hash_of(&file)?;
         if let Some((seen, wave)) = self.waves.get(&file)
             && seen == hash

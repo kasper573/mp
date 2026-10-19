@@ -1,5 +1,5 @@
 use egui::{Sense, Ui};
-use engine::core::content::{ContentRow, row_file, row_of};
+use engine::core::content::{ContentRow, TABLES_DIR, row_file, row_of};
 use engine::systems::area::{AreaDef, AreaModuleKind};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::{Fill, RiftEffectKind, ScriptDef};
@@ -116,7 +116,10 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
             }
         }
     };
-    let paths: Vec<String> = files.paths_under("tables/").cloned().collect();
+    let paths: Vec<String> = files
+        .paths_under(&format!("{TABLES_DIR}/"))
+        .cloned()
+        .collect();
     for path in paths {
         let Some((table, key)) = row_of(&path) else {
             continue;

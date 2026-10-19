@@ -4,7 +4,9 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui};
 use engine::core::assets::AssetKind;
-use engine::core::content::{ContentRow, GAME_FILE, row_of};
+use engine::core::content::{
+    ASSETS_DIR, ContentRow, GAME_FILE, TABLES_DIR, asset_of, row_file, row_of,
+};
 use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
@@ -126,14 +128,12 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         paths.extend(
             project
                 .files
-                .paths_under(&format!("tables/{table}/"))
-                .filter(|file| {
-                    row_of(file).is_some_and(|(_, key)| {
-                        (!only_unsaved || project.is_unsaved(file))
-                            && (!only_fixtures || editor.shapes.is_fixture(table, key))
-                    })
+                .keys_of(table)
+                .filter(|key| {
+                    (!only_unsaved || project.is_unsaved(&row_file(table, key)))
+                        && (!only_fixtures || editor.shapes.is_fixture(table, key))
                 })
-                .map(|file| file.trim_start_matches("tables/").to_owned()),
+                .map(|key| format!("{table}/{key}.json")),
         );
     }
     let selection = editor.selection.clone();
@@ -145,7 +145,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         tree::from_paths(
             paths.iter().map(String::as_str),
             &mut |path| {
-                let file = format!("tables/{path}");
+                let file = format!("{TABLES_DIR}/{path}");
                 let (table, key) = row_of(&file)?;
                 let mut node = TreeNode::leaf(&file, key);
                 node.selected = selection.table == table && selection.keys.iter().any(|k| k == key);
@@ -394,13 +394,7 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
         let keys: Vec<String> = editor
             .project
             .as_ref()
-            .map(|project| {
-                project
-                    .files
-                    .paths_under(&format!("tables/{table}/"))
-                    .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-                    .collect()
-            })
+            .map(|project| project.files.keys_of(table).map(str::to_owned).collect())
             .unwrap_or_default();
         let (a, b) = (
             keys.iter().position(|k| *k == last).unwrap_or(0),
@@ -466,16 +460,14 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         let mut modules = Vec::new();
         let mut files = Vec::new();
         for table in editor.shapes.order.clone() {
-            for file in project.files.paths_under(&format!("tables/{table}/")) {
-                let Some((_, key)) = row_of(file) else {
-                    continue;
-                };
-                if (only_unsaved && !project.is_unsaved(file))
+            for key in project.files.keys_of(&table) {
+                let file = row_file(&table, key);
+                if (only_unsaved && !project.is_unsaved(&file))
                     || (only_fixtures && !editor.shapes.is_fixture(&table, key))
                 {
                     continue;
                 }
-                let row = project.files.json(file);
+                let row = project.files.json(&file);
                 let name_hit = row.as_ref().is_some_and(|row| {
                     ["name", "title", "label"].iter().any(|f| {
                         row[*f]
@@ -519,8 +511,8 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
             }
         }
         let mut folders: BTreeSet<String> = BTreeSet::new();
-        for path in project.files.paths_under("assets/") {
-            let relative = path.trim_start_matches("assets/");
+        for path in project.files.paths_under(&format!("{ASSETS_DIR}/")) {
+            let relative = asset_of(path);
             if AssetKind::of(relative).is_none() {
                 continue;
             }
