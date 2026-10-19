@@ -14,9 +14,9 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::fixture::{Fixture, FixtureLock};
-use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
+use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
-use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE};
+use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
 use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_folder, table_folder};
@@ -831,43 +831,19 @@ fn whole_file(
 }
 
 pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<LoadError> {
-    let mut errors = Vec::new();
-    for (leaf, found) in placed(leaves, index) {
-        let Some(leaf_problem) = &leaf.problem else {
-            continue;
-        };
-        let at = match found {
-            Some(value) => ErrorPlace::Json {
-                line: value.line,
-                column: value.column,
-                pointer: value.pointer.clone(),
-            },
-            None => ErrorPlace::WholeFile,
-        };
-        let (rule, expected, nearest) = match (&leaf.kind, leaf_problem) {
-            (LeafKind::Row(table), LeafProblem::Unknown { nearest }) => (
-                "unknown row",
-                format!("the key of {} {table} row", article(table)),
-                nearest.as_ref().map(|key| format!("{key:?}")),
-            ),
-            (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
-                "missing file",
-                "a file under assets/".to_owned(),
-                nearest.as_ref().map(|path| format!("{path:?}")),
-            ),
-            (_, LeafProblem::Unsafe) => (
-                "unsafe path",
-                "a path under assets/: forward slashes, never absolute or through ..".to_owned(),
-                None,
-            ),
-        };
-        errors.push(LoadError {
-            file: file.to_owned(),
-            at,
-            problem: ContentProblem::new(rule, format!("{:?}", leaf.value), expected).near(nearest),
-        });
-    }
-    errors
+    placed(leaves, index)
+        .filter_map(|(leaf, found)| {
+            Some(LoadError {
+                file: file.to_owned(),
+                at: found.map_or(ErrorPlace::WholeFile, |value| ErrorPlace::Json {
+                    line: value.line,
+                    column: value.column,
+                    pointer: value.pointer.clone(),
+                }),
+                problem: leaf.reported()?,
+            })
+        })
+        .collect()
 }
 
 // A leaf is written where its value is. The parse may meet the leaves in another order than the
@@ -889,13 +865,6 @@ fn placed<'a>(
             .and_then(VecDeque::pop_front);
         (leaf, found)
     })
-}
-
-fn article(word: &str) -> &'static str {
-    match word.chars().next() {
-        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
-        _ => "a",
-    }
 }
 
 pub fn pointer_of(path: &serde_path_to_error::Path) -> String {

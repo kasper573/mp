@@ -781,12 +781,11 @@ fn read_grids(loading: &mut Loading) {
                 errors.push(LoadError {
                     file: palette_file.clone(),
                     at,
-                    problem: ContentProblem::new(
-                        "unknown row",
-                        format!("{:?}", row.tileset),
-                        "the key of a tileset row",
-                    )
-                    .near(nearest(tilesets.keys(), &row.tileset).map(|n| format!("{n:?}"))),
+                    problem: ContentProblem::unknown_row(
+                        tileset::TilesetDef::TABLE,
+                        &row.tileset,
+                        nearest(tilesets.keys(), &row.tileset).as_deref(),
+                    ),
                 });
                 ok = false;
                 continue;

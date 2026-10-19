@@ -87,6 +87,15 @@ impl ContentProblem {
     pub fn near(self, nearest: Option<String>) -> ContentProblem {
         ContentProblem { nearest, ..self }
     }
+
+    pub fn unknown_row(table: &str, key: &str, nearest: Option<&str>) -> ContentProblem {
+        ContentProblem::new(
+            "unknown row",
+            format!("{key:?}"),
+            format!("the key of {} {table} row", article(table)),
+        )
+        .near(nearest.map(|near| format!("{near:?}")))
+    }
 }
 
 impl Display for ContentProblem {
@@ -228,5 +237,12 @@ fn plural(count: usize, what: &str) -> String {
         format!("1 {what}")
     } else {
         format!("{count} {what}s")
+    }
+}
+
+pub(super) fn article(word: &str) -> &'static str {
+    match word.chars().next() {
+        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
     }
 }

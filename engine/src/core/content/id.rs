@@ -12,6 +12,8 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
+use super::ASSETS_DIR;
+use super::report::ContentProblem;
 use super::table::{Content, ContentRow};
 
 /// In files a key, in memory and on the wire the index among the table's keys sorted bytewise, so
@@ -147,17 +149,41 @@ impl<'de, Row: ContentRow> Deserialize<'de> for ContentId<Row> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnknownRow {
-    pub table: &'static str,
-    pub key: String,
-    pub nearest: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Leaf {
     pub kind: LeafKind,
     pub value: String,
     pub problem: Option<LeafProblem>,
+}
+
+impl Leaf {
+    /// What is wrong with the leaf, as a content problem, when anything is.
+    pub fn reported(&self) -> Option<ContentProblem> {
+        let (rule, expected, nearest) = match (&self.kind, self.problem.as_ref()?) {
+            (LeafKind::Row(table), LeafProblem::Unknown { nearest }) => {
+                return Some(ContentProblem::unknown_row(
+                    table,
+                    &self.value,
+                    nearest.as_deref(),
+                ));
+            }
+            (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
+                "missing file",
+                format!("a file under {ASSETS_DIR}/"),
+                nearest.as_ref(),
+            ),
+            (_, LeafProblem::Unsafe) => (
+                "unsafe path",
+                format!(
+                    "a path under {ASSETS_DIR}/: forward slashes, never absolute or through .."
+                ),
+                None,
+            ),
+        };
+        Some(
+            ContentProblem::new(rule, format!("{:?}", self.value), expected)
+                .near(nearest.map(|near| format!("{near:?}"))),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,25 +241,6 @@ impl ContentScope {
 
     pub fn leaves(&self) -> &[Leaf] {
         &self.leaves
-    }
-
-    pub fn unknown(&self) -> impl Iterator<Item = UnknownRow> + '_ {
-        self.leaves
-            .iter()
-            .filter_map(|leaf| match (&leaf.kind, &leaf.problem) {
-                (LeafKind::Row(table), Some(LeafProblem::Unknown { nearest })) => {
-                    Some(UnknownRow {
-                        table,
-                        key: leaf.value.clone(),
-                        nearest: nearest.clone(),
-                    })
-                }
-                _ => None,
-            })
-    }
-
-    pub fn has_problems(&self) -> bool {
-        self.leaves.iter().any(|leaf| leaf.problem.is_some())
     }
 
     pub fn asset(&mut self, path: &str) {

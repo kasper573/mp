@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::grid::Flip;
 use super::{AreaDef, AreaModule, ObjectShape};
 use crate::core::audio::soundscape::SoundscapeShape;
-use crate::core::content::id::{LeafKind, LeafProblem, nearest};
+use crate::core::content::id::{Leaf, nearest};
 use crate::core::content::locate::escape;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, ContentScope, RowCheck, pointer_of, row_file,
@@ -334,29 +334,10 @@ impl Expansion<'_> {
                 let (result, scope) = with_content(ContentScope::of(&content), || {
                     serde_path_to_error::deserialize::<_, AreaModule>(json)
                 });
-                for leaf in scope.leaves() {
-                    let Some(problem) = &leaf.problem else {
-                        continue;
-                    };
-                    let (rule, expected) = match (&leaf.kind, problem) {
-                        (LeafKind::Row(table), LeafProblem::Unknown { .. }) => {
-                            ("unknown row", format!("the key of a {table} row"))
-                        }
-                        (LeafKind::Asset, LeafProblem::Unknown { .. }) => {
-                            ("missing file", "a file under assets/".to_owned())
-                        }
-                        (_, LeafProblem::Unsafe) => {
-                            ("unsafe path", "a path under assets/".to_owned())
-                        }
-                    };
-                    let near = match problem {
-                        LeafProblem::Unknown { nearest } => nearest.clone(),
-                        LeafProblem::Unsafe => None,
-                    };
+                for problem in scope.leaves().iter().filter_map(Leaf::reported) {
                     self.errors.push(FlattenError {
                         at: FlattenAt::Blueprint(placement.blueprint, part_pointer.clone()),
-                        problem: ContentProblem::new(rule, format!("{:?}", leaf.value), expected)
-                            .near(near.map(|n| format!("{n:?}"))),
+                        problem,
                     });
                 }
                 match result {
@@ -517,16 +498,13 @@ fn typed_value(
             let table = variable.table.as_deref().unwrap_or("");
             match RiftScripting::row_value(content, table, key) {
                 Some(_) => json(value),
-                None => Err(ContentProblem::new(
-                    "unknown row",
-                    format!("{key:?}"),
-                    format!("the key of a {table} row"),
-                )
-                .near(
+                None => Err(ContentProblem::unknown_row(
+                    table,
+                    key,
                     content
                         .table_named(table)
                         .and_then(|rows| nearest(rows.keys(), key))
-                        .map(|n| format!("{n:?}")),
+                        .as_deref(),
                 )),
             }
         }

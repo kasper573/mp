@@ -15,6 +15,7 @@ use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ConnectedClient, RepliconChannels};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use bevy_replicon_renet2::RenetChannelsExt;
+use engine::core::content::id::Leaf;
 use engine::core::content::sync::{ServedContent, well_formed_hash};
 use engine::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
 use engine::core::math::Rng;
@@ -673,12 +674,8 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
         Ok(request) => request,
         Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
     };
-    if let Some(unknown) = scope.unknown().next() {
-        return (
-            StatusCode::BAD_REQUEST,
-            format!("no {} `{}`", unknown.table, unknown.key),
-        )
-            .into_response();
+    if let Some(problem) = scope.leaves().iter().find_map(Leaf::reported) {
+        return (StatusCode::BAD_REQUEST, problem.to_string()).into_response();
     }
     let Some(character) = content.by_key::<CharacterSnapshot>(&request.test_character) else {
         return (
