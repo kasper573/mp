@@ -17,10 +17,10 @@ use crate::recording::{Footage, Recording};
 use crate::seen::area_key;
 use crate::server::Server;
 
-// The machine a desktop client plays on: a screen and speakers of its own, recorded, and a probe to
-// ask the client what it shows. Input goes in through the X server, as a player's would, and every
-// input waits until the game has received it, so nothing is lost or merged however slowly frames
-// come, and nothing waits longer than the game takes.
+/// The machine a desktop client plays on: a screen and speakers of its own, recorded, and a probe
+/// to ask the client what it shows. Input goes in through the X server, as a player's would, and
+/// every input waits until the game has received it, so nothing is lost or merged however slowly
+/// frames come, and nothing waits longer than the game takes.
 pub struct Desktop {
     client: Child,
     questions: TcpStream,
@@ -38,7 +38,7 @@ pub struct Desktop {
 
 type Observer = Box<dyn FnMut(&ProbeSnapshot)>;
 
-// Waits give up only once both run out, so a slow machine gets the frames a fast one does.
+/// Waits give up only once both run out, so a slow machine gets the frames a fast one does.
 #[derive(Clone, Copy)]
 pub struct WaitBudget {
     pub time: Duration,
@@ -66,13 +66,12 @@ impl Desktop {
         token: Option<String>,
         folder: &Path,
         recorded: bool,
-        size: (u32, u32),
     ) -> Desktop {
         std::fs::create_dir_all(folder).expect("a folder for the desktop");
-        let screen = Screen::open(folder, size);
+        let screen = Screen::open(folder, SCREEN);
         let speakers = Speakers::plug();
-        let recording =
-            recorded.then(|| Recording::start(&screen.display, size, &speakers.monitor(), folder));
+        let recording = recorded
+            .then(|| Recording::start(&screen.display, SCREEN, &speakers.monitor(), folder));
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a probe port");
         let config = ClientConfig {
             game_server_url: server.http_url(),
@@ -114,7 +113,7 @@ impl Desktop {
         };
         // Nothing fits windows to the screen or hands out keyboard focus without a window manager.
         let pid = desktop.client.id().to_string();
-        let (width, height) = (size.0.to_string(), size.1.to_string());
+        let (width, height) = (SCREEN.0.to_string(), SCREEN.1.to_string());
         desktop.xdotool(&[
             "search",
             "--sync",
@@ -136,7 +135,7 @@ impl Desktop {
         desktop
     }
 
-    // What the client shows in a frame after asking.
+    /// What the client shows in a frame after asking.
     pub fn snapshot(&mut self) -> ProbeSnapshot {
         writeln!(self.questions).expect("the client takes questions");
         let mut line = String::new();
@@ -163,7 +162,7 @@ impl Desktop {
         self.frame
     }
 
-    // Sees every frame the driver asks for.
+    /// Sees every frame the driver asks for.
     pub fn observe(&mut self, observer: impl FnMut(&ProbeSnapshot) + 'static) {
         self.observer = Some(Box::new(observer));
     }
@@ -183,8 +182,8 @@ impl Desktop {
         seen
     }
 
-    // Through every point in turn as fast as a flick of the hand, many to a frame, coming to rest on
-    // the last.
+    /// Through every point in turn as fast as a flick of the hand, many to a frame, coming to rest
+    /// on the last.
     pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
         let to = through.last().expect("a point to sweep to").round();
         let moves: Vec<String> = through
@@ -209,9 +208,10 @@ impl Desktop {
         seen
     }
 
-    // Both clicks of a double click go out together: the game counts it by the time between them. Frames
-    // far enough apart can still split them, and then, as a player would, it clicks again. Each try
-    // waits out the run of clicks before it, which the game would otherwise count it on from.
+    /// Both clicks of a double click go out together: the game counts it by the time between them.
+    /// Frames far enough apart can still split them, and then, as a player would, it clicks again.
+    /// Each try waits out the run of clicks before it, which the game would otherwise count it on
+    /// from.
     pub fn click(&mut self, button: Button, times: u8) -> ProbeSnapshot {
         let deadline = Deadline::from(self, BUDGET);
         loop {
@@ -246,7 +246,7 @@ impl Desktop {
         })
     }
 
-    // X turns the wheel by clicking buttons 4 (up) and 5 (down), a line per click.
+    /// X turns the wheel by clicking buttons 4 (up) and 5 (down), a line per click.
     pub fn wheel(&mut self, lines: i32) -> ProbeSnapshot {
         let before = self.seen;
         let button = if lines < 0 { "4" } else { "5" };
@@ -278,12 +278,13 @@ impl Desktop {
         })
     }
 
-    // Releases count nowhere, but X delivers them before anything sent after.
+    /// Releases count nowhere, but X delivers them before anything sent after.
     pub fn key_up(&mut self, keysym: &str) {
         self.xdotool(&["keyup", keysym]);
     }
 
-    // Typed keys queue up in order, so they go out together; `landed` says when the game has them all.
+    /// Typed keys queue up in order, so they go out together; `landed` says when the game has them
+    /// all.
     pub fn type_text(
         &mut self,
         text: &str,
@@ -312,7 +313,7 @@ impl Desktop {
         }
     }
 
-    // As `wait_for`, but running out is an answer rather than a failure.
+    /// As `wait_for`, but running out is an answer rather than a failure.
     pub fn try_wait_for<T>(
         &mut self,
         budget: WaitBudget,
@@ -354,7 +355,7 @@ impl Desktop {
         landed
     }
 
-    // What the player saw last is left beside the steps that led there.
+    /// What the player saw last is left beside the steps that led there.
     pub fn fail(&mut self, why: &str) -> ! {
         let snapshot = self.snapshot();
         self.note(&snapshot, why);
@@ -377,7 +378,7 @@ impl Desktop {
         );
     }
 
-    // Ends the client and its recording.
+    /// Ends the client and its recording.
     pub fn stop(&mut self) -> Option<Footage> {
         let _ = self.client.kill();
         let _ = self.client.wait();
@@ -437,8 +438,8 @@ const STALL: Duration = Duration::from_secs(300);
 // Seconds between the moves of a sweep: a mouse reports a few hundred times a second.
 const SWEEP_STEP: &str = "0.004";
 
-// A virtual X screen of the desktop's own: a rootful Xwayland on a headless Wayland compositor. Unlike
-// on Xvfb, a GPU's driver hands it frames without copying each one through the CPU.
+// A virtual X screen of the desktop's own: a rootful Xwayland on a headless Wayland compositor.
+// Unlike on Xvfb, a GPU's driver hands it frames without copying each one through the CPU.
 struct Screen {
     display: String,
     _x: ScreenServer,
@@ -471,7 +472,8 @@ impl Screen {
                     "--renderer=gl",
                     "--shell=kiosk",
                     "--no-config",
-                    // Input goes to Xwayland, out of weston's sight: idle, it would blank the screen.
+                    // Input goes to Xwayland, out of weston's sight: idle, it would blank the
+                    // screen.
                     "--idle-time=0",
                     "--modules=systemd-notify.so",
                 ])
@@ -544,7 +546,8 @@ impl Speakers {
     }
 }
 
-// Unplugged when dropped, so a desktop that fails to start leaves no sink behind on the sound server.
+// Unplugged when dropped, so a desktop that fails to start leaves no sink behind on the sound
+// server.
 impl Drop for Speakers {
     fn drop(&mut self) {
         let _ = Command::new("pactl")

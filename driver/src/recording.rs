@@ -7,8 +7,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use engine::core::time::Seconds;
 
-// A screen and its speakers, recorded apart so neither waits on the other. Both keep the wall clock,
-// so the footage of several screens, and whatever was noted while they ran, line up afterwards.
+/// A screen and its speakers, recorded apart so neither waits on the other. Both keep the wall
+/// clock, so the footage of several screens, and whatever was noted while they ran, line up
+/// afterwards.
 pub struct Recording {
     picture: Child,
     sound: Child,
@@ -23,17 +24,17 @@ pub struct Footage {
     sound_started: SystemTime,
 }
 
-// What a film lays over footage, timed in seconds from `origin`, where the video starts.
+/// What a film lays over footage, timed in seconds from `origin`, where the video starts.
 pub struct FootageOverlay {
     pub origin: SystemTime,
     pub subtitles: PathBuf,
     pub blur_until: Seconds,
     pub insets: Vec<InsetCut>,
-    // Rows of plain ground added under the picture, for subtitles that must not cover it.
+    /// Rows of plain ground added under the picture, for subtitles that must not cover it.
     pub below: u32,
 }
 
-// Another screen's footage, scaled down into a framed corner of this one's.
+/// Another screen's footage, scaled down into a framed corner of this one's.
 pub struct InsetCut {
     pub footage: Footage,
     pub from: Seconds,
@@ -103,7 +104,7 @@ impl Recording {
 }
 
 impl Footage {
-    // Picture and sound in one file, with whatever a film lays over them.
+    /// Picture and sound in one file, with whatever a film lays over them.
     pub fn render(&self, out: &Path, overlay: Option<&FootageOverlay>) {
         let mut ffmpeg = Command::new("ffmpeg");
         ffmpeg
@@ -185,7 +186,7 @@ impl Footage {
     }
 }
 
-// When it happened, counted from the origin: before it is negative.
+/// When it happened, counted from the origin: before it is negative.
 pub fn seconds(at: SystemTime, origin: SystemTime) -> Seconds {
     match at.duration_since(origin) {
         Ok(after) => Seconds(after.as_secs_f32()),
