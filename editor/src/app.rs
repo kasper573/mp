@@ -678,6 +678,11 @@ impl Editor {
         self.selection = selection;
     }
 
+    pub fn open_row(&mut self, table: &str, key: &str) {
+        self.select(RowSelection::row(table, key));
+        self.open_tab(EditorTab::for_row(table, key));
+    }
+
     pub fn has_unsaved(&self) -> bool {
         self.project
             .as_ref()

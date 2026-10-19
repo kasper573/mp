@@ -27,8 +27,6 @@ use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
 use crate::keymap::EditorKey;
-use crate::project::RowSelection;
-use crate::tabs::EditorTab;
 use crate::ui::{self, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, play};
@@ -428,8 +426,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         start(editor, None);
     }
     if edit && let Some(key) = current_character(editor) {
-        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &key));
-        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &key));
+        editor.open_row(CharacterSnapshot::TABLE, &key);
     }
     if stop_now {
         stop(editor);

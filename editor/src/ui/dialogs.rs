@@ -4,7 +4,8 @@ use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
-use engine::core::content::{ContentRow, GAME_FILE, row_file, row_of, version};
+use engine::core::content::{ContentRow, GAME_FILE, is_asset_file, row_file, row_of, version};
+use engine::systems::area::AreaDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
@@ -15,7 +16,7 @@ use crate::app::{
     RenameTarget,
 };
 use crate::keymap::{EditorKey, KeyScope};
-use crate::project::ContentEdit;
+use crate::project::{ContentEdit, files};
 use crate::rows::{self, UsageDecision, UsageSummary};
 use crate::templates::{self, GameTemplate};
 use crate::ui::{self, start};
@@ -179,17 +180,9 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                     ui.vertical(|ui| {
                         ui.set_width(300.0);
                         widgets::section(ui, "Copied");
-                        let rows: usize = std::fs::read_dir(source.join("tables"))
-                            .map(|tables| {
-                                tables
-                                    .flatten()
-                                    .map(|t| {
-                                        std::fs::read_dir(t.path()).map(|r| r.count()).unwrap_or(0)
-                                    })
-                                    .sum()
-                            })
-                            .unwrap_or(0);
-                        let assets = count_files_in(&source.join("assets"));
+                        let files = files::content_files(source).unwrap_or_default();
+                        let rows = files.iter().filter(|file| row_of(file).is_some()).count();
+                        let assets = files.iter().filter(|file| is_asset_file(file)).count();
                         ui.label(theme::mono(format!("{GAME_FILE}   name → {}", dialog.name)));
                         ui.label(theme::mono(format!("tables/     {rows} rows")));
                         ui.label(theme::mono(format!("assets/     {assets} files")));
@@ -368,19 +361,12 @@ fn template_cards(ui: &mut Ui, picked: &mut String, templates: &[GameTemplate]) 
 }
 
 fn template_counts(template: &GameTemplate) -> String {
-    let rows_in = |table: &str| {
-        template
-            .tables
-            .iter()
-            .find(|(t, _)| t == table)
-            .map_or(0, |(_, keys)| keys.len())
-    };
-    let players = rows_in(PlayerDef::TABLE);
-    let scripts = rows_in(ScriptDef::TABLE);
+    let areas = template.rows_in(AreaDef::TABLE);
+    let players = template.rows_in(PlayerDef::TABLE);
+    let scripts = template.rows_in(ScriptDef::TABLE);
     format!(
-        "{} area{} · {players} player{} · {scripts} shared script{}",
-        template.areas.len(),
-        widgets::plural(template.areas.len()),
+        "{areas} area{} · {players} player{} · {scripts} shared script{}",
+        widgets::plural(areas),
         widgets::plural(players),
         widgets::plural(scripts)
     )
@@ -396,7 +382,7 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
         widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
         widgets::kv(ui, "holds", |ui| {
             let mut parts: Vec<String> = vec![GAME_FILE.to_owned(), "every fixture".to_owned()];
-            for (table, keys) in &template.tables {
+            for (table, keys) in &template.rows {
                 let own: Vec<&str> = keys
                     .iter()
                     .map(String::as_str)
@@ -409,23 +395,6 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
             ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
         });
     });
-}
-
-fn count_files_in(folder: &Path) -> usize {
-    std::fs::read_dir(folder)
-        .map(|entries| {
-            entries
-                .flatten()
-                .map(|entry| {
-                    if entry.path().is_dir() {
-                        count_files_in(&entry.path())
-                    } else {
-                        1
-                    }
-                })
-                .sum()
-        })
-        .unwrap_or(0)
 }
 
 fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Option<ModalDialog> {

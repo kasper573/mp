@@ -436,8 +436,7 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
 pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
     match action {
         BrowserAction::Open | BrowserAction::OpenTab => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+            editor.open_row(table, key);
         }
         BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
@@ -455,8 +454,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         }
         BrowserAction::Duplicate => rows::duplicate(editor, table, key),
         BrowserAction::Usages => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+            editor.open_row(table, key);
             editor.panels.bottom = BottomTab::UsedBy;
         }
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),

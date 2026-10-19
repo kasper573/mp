@@ -294,7 +294,7 @@ pub fn new_game_dialog(editor: &mut Editor, copy: Option<PathBuf>) {
             let key = templates::list()
                 .first()
                 .map(|template| template.key.clone())
-                .unwrap_or_else(|| "new_game".to_owned());
+                .unwrap_or_default();
             (NewGameSource::Template(key), "My game".to_owned())
         }
     };

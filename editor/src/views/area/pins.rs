@@ -6,8 +6,7 @@ use engine::systems::area::{self, AreaDef, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
-use crate::project::{ContentEdit, ProjectFiles, RowSelection};
-use crate::tabs::EditorTab;
+use crate::project::{ContentEdit, ProjectFiles};
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
 
@@ -175,8 +174,7 @@ pub fn open_pin(editor: &mut Editor, pin: PinHit) {
         PinHit::Place { file, pointer } => {
             if let Some((table, key)) = row_of(&file) {
                 let (table, key) = (table.to_owned(), key.to_owned());
-                editor.select(RowSelection::row(&table, &key));
-                editor.open_tab(EditorTab::for_row(&table, &key));
+                editor.open_row(&table, &key);
                 editor.toast(format!("{table}/{key} {pointer}"));
             }
         }

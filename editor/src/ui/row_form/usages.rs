@@ -3,8 +3,6 @@ use engine::core::content::row_of;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::RowSelection;
-use crate::tabs::EditorTab;
 
 pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, titled: bool) {
     let Some(project) = &editor.project else {
@@ -63,8 +61,7 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &
     if let Some(file) = open
         && let Some((table, key)) = file.split_once('/')
     {
-        editor.select(RowSelection::row(table, key));
-        editor.open_tab(EditorTab::for_row(table, key));
+        editor.open_row(table, key);
     }
 }
 
@@ -131,7 +128,6 @@ pub fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
     if let Some(file) = open
         && let Some((table, key)) = row_of(&file)
     {
-        editor.select(RowSelection::row(table, key));
-        editor.open_tab(EditorTab::for_row(table, key));
+        editor.open_row(table, key);
     }
 }

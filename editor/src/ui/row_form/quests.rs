@@ -7,8 +7,6 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::RowSelection;
-use crate::tabs::EditorTab;
 use crate::value::RowValue;
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
@@ -58,8 +56,7 @@ pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &s
         }
     }
     if let Some((table, key)) = open.filter(|(table, _)| !table.is_empty()) {
-        editor.select(RowSelection::row(&table, &key));
-        editor.open_tab(EditorTab::for_row(&table, &key));
+        editor.open_row(&table, &key);
     }
 }
 

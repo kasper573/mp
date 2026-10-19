@@ -28,7 +28,7 @@ use engine::systems::player::snapshot::CharacterSnapshot;
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
-use crate::project::{self, EditRefusal, RowSelection};
+use crate::project::{self, EditRefusal};
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::{self, ScriptKeys};
 use crate::views::{self, area, character, class, model, spreadsheet, tileset, vfx, world};
@@ -62,13 +62,8 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     if ctx.input(|i| i.viewport().close_requested()) && !editor.quit {
         if editor.has_unsaved() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            editor.dialogs.push(ModalDialog::Close(CloseDialog {
-                then: CloseThen::Quit,
-            }));
-        } else {
-            editor.close_project();
-            editor.quit = true;
         }
+        request_close(editor, CloseThen::Quit);
     }
 }
 
@@ -212,8 +207,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         views::play_here(editor);
     }
     if played && let Some(key) = play::current_character(editor) {
-        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &key));
-        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &key));
+        editor.open_row(CharacterSnapshot::TABLE, &key);
     }
     if editor.play.running.is_some() {
         ctx.request_repaint_after(Duration::from_millis(100));

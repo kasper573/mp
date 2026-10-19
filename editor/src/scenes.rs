@@ -318,8 +318,7 @@ fn open_one(editor: &mut Editor, step: &Step) {
             }));
         }
         Step::Row { table, key } => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+            editor.open_row(table, key);
         }
         Step::Rows { table, keys } => {
             editor.select(RowSelection::rows(table, keys.clone()));

@@ -22,7 +22,7 @@ use strum::{AsRefStr, VariantArray};
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
-use crate::project::{ContentEdit, RowSelection};
+use crate::project::ContentEdit;
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
@@ -289,8 +289,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         row_form::act(editor, action, CharacterSnapshot::TABLE, key);
     }
     if let Some(other) = switch {
-        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &other));
-        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &other));
+        editor.open_row(CharacterSnapshot::TABLE, &other);
     }
 }
 

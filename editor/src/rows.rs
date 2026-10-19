@@ -11,7 +11,7 @@ use engine::systems::registry;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
-use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection};
+use crate::project::{ContentEdit, Project, ProjectFiles};
 use crate::schema::{self, SchemaShapes};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
@@ -159,8 +159,7 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
         edit.write_json(file, &target);
     }
     editor.try_apply(edit)?;
-    editor.select(RowSelection::row(&dialog.table, &key));
-    editor.open_tab(EditorTab::for_row(&dialog.table, &key));
+    editor.open_row(&dialog.table, &key);
     Ok(())
 }
 
@@ -183,8 +182,7 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
         world::card_beside(project, &mut edit, key, &copy);
     }
     if editor.apply(edit) {
-        editor.select(RowSelection::row(table, &copy));
-        editor.open_tab(EditorTab::for_row(table, &copy));
+        editor.open_row(table, &copy);
     }
 }
 

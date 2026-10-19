@@ -23,18 +23,9 @@ struct Stored {
 impl ProjectFiles {
     pub fn read_dir(root: &Path) -> io::Result<ProjectFiles> {
         let mut files = ProjectFiles::default();
-        let entries = WalkDir::new(root)
-            .min_depth(1)
-            .follow_links(true)
-            .into_iter()
-            .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
-        for entry in entries {
-            let entry = entry?;
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let file = folder_file(root, entry.path()).expect("a walked file lies under its root");
-            files.insert(file, FileBytes::from(std::fs::read(entry.path())?));
+        for file in content_files(root)? {
+            let bytes = std::fs::read(root.join(&file))?;
+            files.insert(file, FileBytes::from(bytes));
         }
         Ok(files)
     }
@@ -172,6 +163,23 @@ impl PartialEq for FileChange {
                 _ => false,
             }
     }
+}
+
+/// The folder-relative names of the files under `root` that make up its content.
+pub fn content_files(root: &Path) -> io::Result<Vec<String>> {
+    let mut files = Vec::new();
+    let entries = WalkDir::new(root)
+        .min_depth(1)
+        .follow_links(true)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_type().is_file() {
+            files.push(folder_file(root, entry.path()).expect("a walked file lies under its root"));
+        }
+    }
+    Ok(files)
 }
 
 /// Whether a file or folder of that name is kept out of the game folder's content: dotfiles, and
