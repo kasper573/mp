@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use engine::core::content::{
-    Content, ContentId, ContentRow, ContentScope, FilesystemFolder, key_of, with_content,
+    Content, ContentId, ContentRow, ContentScope, FilesystemFolder, with_content,
 };
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
@@ -53,7 +53,7 @@ pub fn input_names(action: InputAction) -> Vec<String> {
 
 pub fn id<Row: ContentRow>(name: &str) -> ContentId<Row> {
     content()
-        .by_key::<Row>(key_of(name).as_str())
+        .by_key::<Row>(name)
         .unwrap_or_else(|| panic!("no {} named {name}", Row::TABLE))
 }
 

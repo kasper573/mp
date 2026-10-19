@@ -432,7 +432,7 @@ fn check_equipment(content: &Content, snapshot: &CharacterSnapshot, check: &mut 
             ItemKind::Equipment { slot: made_for, .. } if made_for == slot
         );
         if !fits {
-            let slot = key_of(slot.label()).as_str().to_owned();
+            let slot = key_of(slot.label());
             check.error(
                 format!("/equipment/{slot}"),
                 "not wearable",

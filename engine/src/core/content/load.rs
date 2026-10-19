@@ -67,9 +67,9 @@ pub struct ContentRegistry {
 /// entry names an unknown variant reports `rule`, and asks for `expected` in its place.
 #[derive(Clone, Copy, Debug)]
 struct ListKind {
-    pub field: &'static str,
-    pub rule: &'static str,
-    pub expected: &'static str,
+    field: &'static str,
+    rule: &'static str,
+    expected: &'static str,
 }
 
 type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
@@ -246,10 +246,6 @@ impl ContentRegistry {
 
     pub(super) fn settings_loader(&self) -> Option<&dyn SettingsLoader> {
         self.settings.as_deref()
-    }
-
-    fn list_kinds(&self) -> &[ListKind] {
-        &self.list_kinds
     }
 
     pub(super) fn row_loaders(&self) -> &[Box<dyn TableLoader>] {
@@ -575,7 +571,7 @@ impl Loading {
                     root.as_ref(),
                     &file,
                     &scope,
-                    registry.list_kinds(),
+                    &registry.list_kinds,
                     |text| loader.parse(text),
                 );
                 (index, key, parsed)
@@ -606,7 +602,7 @@ impl Loading {
             root.as_ref(),
             GAME_FILE,
             &scope,
-            registry.list_kinds(),
+            &registry.list_kinds,
             |text| {
                 registry
                     .settings_loader()

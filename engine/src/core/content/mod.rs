@@ -15,7 +15,7 @@ pub mod version;
 pub use check::RowCheck;
 pub use fixture::Fixture;
 pub use id::{ContentId, ContentScope, UnknownRow, with_content};
-pub use key::{KeyBuf, key_of};
+pub use key::key_of;
 pub use load::{
     ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
     LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
