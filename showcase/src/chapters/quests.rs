@@ -72,9 +72,10 @@ fn play(shoot: &mut Shoot) {
     });
     me.caption("The tracker counts it down");
 
-    me.caption(
-        "L opens the quest log, grouped by category; the chosen quest lies on the page as a card",
-    );
+    me.caption(&format!(
+        "{} opens the quest log, grouped by category; the chosen quest lies on the page as a card",
+        input_name(InputAction::ToggleQuestLog)
+    ));
     me.act(InputAction::ToggleQuestLog);
     me.find_ui("Active quests");
     me.click_ui(UiTarget::button("Low Tide"));

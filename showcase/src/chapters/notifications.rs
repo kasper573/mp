@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
 use driver::{
-    Player, UiTarget, arrived_in, content, erred, holding, marker_at, nearest_npc, noticed, npc_is,
-    portal, told_by,
+    Player, UiTarget, arrived_in, content, erred, holding, input_name, marker_at, nearest_npc,
+    noticed, npc_is, portal, told_by,
 };
 use engine::core::math::Offset;
 use engine::systems::history::HistoryTopic;
@@ -72,9 +72,21 @@ fn play(shoot: &mut Shoot) {
     me.hover_ui(squabble());
     me.caption("Hovering holds the captions, so you can finish reading");
     me.hold();
-    me.caption("Every line is kept in history as well — H shows it");
+    me.caption(&format!(
+        "Every line is kept in history as well — {} shows it. A window lies over the captions: only alerts and errors rise above windows",
+        input_name(InputAction::ToggleHistory)
+    ));
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
+    let caption = me.find_ui(squabble()).rect;
+    let title = me.find_ui("History").rect;
+    me.drag_ui(
+        "History",
+        Offset::new(
+            caption.center().x - title.center().x,
+            caption.center().y - title.min_y(),
+        ),
+    );
     me.hold();
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);

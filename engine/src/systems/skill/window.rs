@@ -559,11 +559,7 @@ fn draw_node(
     let (fill, stroke) = match state {
         NodeState::Locked => (ink::wash(ink::INK, 0.8), Stroke::new(1.0, ink::INK3)),
         NodeState::Available => (ink::INK, Stroke::new(1.5, ink::GOLD)),
-        NodeState::Learned => (ink::INK, Stroke::new(2.0, ink::LIGHT)),
-        NodeState::Maxed => (
-            ink::on(ink::INK, ink::GOLD, 0.35),
-            Stroke::new(2.0, ink::GOLD),
-        ),
+        NodeState::Learned | NodeState::Maxed => (ink::INK, Stroke::new(2.0, ink::LIGHT)),
         NodeState::Picked(_) => (
             ink::on(ink::INK, ink::GOLD2, 0.25),
             Stroke::new(2.5, ink::GOLD2),
@@ -612,11 +608,7 @@ fn draw_node(
             corner,
             Align2::CENTER_CENTER,
             &format!("{}/{}", held.0, def.rank_count()),
-            if state == NodeState::Maxed {
-                ink::OCHRE
-            } else {
-                ink::INK
-            },
+            ink::INK,
         ),
         NodeState::Picked(rank) => glyph::badge(
             painter,

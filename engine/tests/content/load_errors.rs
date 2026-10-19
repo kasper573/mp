@@ -180,6 +180,23 @@ fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
 }
 
 #[test]
+fn a_shader_parameter_named_with_a_leading_underscore_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.edit("tables/vfx_shader/tint.json", |row| {
+        row["params"][0]["name"] = "_color".into();
+    });
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "tables/vfx_shader/tint.json")
+        .expect("the shader row is refused");
+    assert_eq!(error.problem.rule, "invalid parameter name");
+}
+
+#[test]
 fn a_shader_that_does_not_compile_is_refused_at_its_line() {
     let folder = TempFolder::of_template();
     folder.write(
