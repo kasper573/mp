@@ -364,7 +364,7 @@ impl Grid {
     /// The random pickers draw only among the tiles that `fits`, so a caller can pass over tiles
     /// someone has claimed.
     pub fn random_node(&self, rng: &mut Rng, fits: impl Fn(CellPos) -> bool) -> Option<Pos<Tiles>> {
-        pick(rng, self.nodes.iter().copied(), fits)
+        pick(rng, &self.nodes, fits)
     }
 
     pub fn random_reachable(
@@ -374,11 +374,7 @@ impl Grid {
         fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
         let component = self.component(from)? as usize;
-        pick(
-            rng,
-            self.nodes_by_component.get(component)?.iter().copied(),
-            fits,
-        )
+        pick(rng, self.nodes_by_component.get(component)?, fits)
     }
 
     pub fn random_node_within(
@@ -387,8 +383,7 @@ impl Grid {
         bounds: Rect<Tiles>,
         fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
-        let nodes = self.nodes.iter().copied();
-        pick(rng, nodes.filter(|&node| bounds.contains(node)), fits)
+        pick(rng, &within(&self.nodes, bounds), fits)
     }
 
     pub fn random_reachable_within(
@@ -431,11 +426,10 @@ impl Grid {
         fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
         let component = self.component(from)?;
-        pick(
-            rng,
-            nodes.filter(|&node| self.component(node) == Some(component)),
-            fits,
-        )
+        let reachable: Vec<Pos<Tiles>> = nodes
+            .filter(|&node| self.component(node) == Some(component))
+            .collect();
+        pick(rng, &reachable, fits)
     }
 
     fn component_at_cell(&self, c: CellPos) -> Option<u32> {
@@ -670,17 +664,35 @@ fn airborne(world: &World, entity: Entity) -> bool {
         .is_some_and(|actor| ActorModel::get(content, actor.model).airborne())
 }
 
-fn pick(
-    rng: &mut Rng,
-    nodes: impl Iterator<Item = Pos<Tiles>>,
-    fits: impl Fn(CellPos) -> bool,
-) -> Option<Pos<Tiles>> {
-    let nodes: Vec<Pos<Tiles>> = nodes.filter(|node| fits(node.cell())).collect();
-    if nodes.is_empty() {
-        return None;
-    }
-    Some(nodes[rng.rand_range(0..nodes.len() as u32) as usize])
+fn within(nodes: &[Pos<Tiles>], bounds: Rect<Tiles>) -> Vec<Pos<Tiles>> {
+    nodes
+        .iter()
+        .copied()
+        .filter(|&node| bounds.contains(node))
+        .collect()
 }
+
+/// Draws a node that fits, each as likely as any other. Most nodes fit, so a few draws find one
+/// without sifting the whole set; only when they keep missing is the set sifted.
+fn pick(rng: &mut Rng, nodes: &[Pos<Tiles>], fits: impl Fn(CellPos) -> bool) -> Option<Pos<Tiles>> {
+    let mut draw = |nodes: &[Pos<Tiles>]| {
+        (!nodes.is_empty()).then(|| nodes[rng.rand_range(0..nodes.len() as u32) as usize])
+    };
+    for _ in 0..PICK_DRAWS {
+        let node = draw(nodes)?;
+        if fits(node.cell()) {
+            return Some(node);
+        }
+    }
+    let fitting: Vec<Pos<Tiles>> = nodes
+        .iter()
+        .copied()
+        .filter(|node| fits(node.cell()))
+        .collect();
+    draw(&fitting)
+}
+
+const PICK_DRAWS: usize = 8;
 
 fn compute_components(size: GridSize, walkable: &[bool]) -> Vec<u32> {
     let mut components = vec![0u32; walkable.len()];

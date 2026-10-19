@@ -117,6 +117,9 @@ pub fn settle(world: &mut World, entity: Entity, aim: Aim, reach: Tiles) {
         .actor()
         .and_then(|actor| claim_of(world, actor))
         .is_some_and(|claim| claim.cell == here);
+    if !on_target && crowd < 2 {
+        return;
+    }
     let Some(best) = berth(world, entity, at, &sight, reach, false) else {
         return;
     };
