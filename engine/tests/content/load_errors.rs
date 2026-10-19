@@ -146,7 +146,8 @@ fn a_binding_the_game_never_reads_for_its_action_is_refused() {
                 "bindings": [{ "type": "click", "button": "Left", "times": 1 }],
             }),
         )
-        .try_load_whole()
+        .whole()
+        .try_load()
         .err()
         .expect("refused");
 
@@ -160,7 +161,8 @@ fn a_binding_the_game_never_reads_for_its_action_is_refused() {
 fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
     let report = Game::new()
         .shader("skill_area")
-        .try_load_whole()
+        .whole()
+        .try_load()
         .err()
         .expect("refused");
 
@@ -297,7 +299,8 @@ fn a_game_file_that_does_not_parse_is_refused_at_its_field() {
 fn a_folder_without_a_game_file_is_refused() {
     let report = Game::new()
         .remove("game.json")
-        .try_load_whole()
+        .whole()
+        .try_load()
         .err()
         .expect("refused");
 
@@ -311,7 +314,7 @@ fn a_folder_without_a_game_file_is_refused() {
 
 #[test]
 fn a_fixture_without_its_row_is_refused() {
-    let report = Game::new().try_load_whole().err().expect("refused");
+    let report = Game::new().whole().try_load().err().expect("refused");
 
     assert_eq!(
         rules_in(&report, "tables/input/interact.json"),
@@ -330,7 +333,8 @@ fn a_row_of_its_own_in_a_table_of_fixtures_alone_is_refused() {
             "wave_hello",
             json!({ "label": "Wave hello", "bindings": [] }),
         )
-        .try_load_whole()
+        .whole()
+        .try_load()
         .err()
         .expect("refused");
 
@@ -360,6 +364,15 @@ fn a_class_tree_naming_a_skill_that_did_not_load_reports_only_the_skill() {
         .collect();
     assert!(files.contains(&"tables/skill/broken.json"), "{report}");
     assert!(!files.contains(&"tables/class/hero.json"), "{report}");
+}
+
+#[test]
+fn a_game_of_only_what_the_engine_requires_loads_as_a_whole_one() {
+    let loaded = game().engine_rows().whole().try_load();
+
+    if let Err(report) = loaded {
+        panic!("{report}");
+    }
 }
 
 fn rules_in<'a>(report: &'a LoadReport, file: &str) -> Vec<(&'a str, &'a str)> {

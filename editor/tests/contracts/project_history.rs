@@ -6,13 +6,13 @@ use editor::project::{
     RowSelection, json_bytes,
 };
 use editor::schema::SchemaShapes;
-use editor::templates;
+
+use crate::support::game_folder;
 
 #[test]
 fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
-    let folder = scratch.path().join("game");
-    templates::new_game("new_game", "Saltmarsh", &folder).expect("writes");
+    let folder = game_folder(scratch.path().join("game"));
     let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
 
     project

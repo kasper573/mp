@@ -17,7 +17,7 @@ editor grow by building it: every feature is made for it and proven on it.
 | [`example_game/`](example_game) | The example game: a game folder like any other, and what production runs. |
 | [`design_tokens/`](design_tokens) | The look the editor and the game share: colors, shapes, text roles, fonts and themed egui helpers. |
 | [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and server-authoritative terminal channels. |
-| [`driver/`](driver), [`testkit/`](testkit), [`showcase/`](showcase) | Playing the game to test and show it: real clients driven by real input, a simulated server for contract tests, and the showcase's recorded chapters. |
+| [`testkit/`](testkit), [`driver/`](driver), [`showcase/`](showcase) | Testing and showing the game: small games declared in code and a bare world of only the systems a test runs, and real clients driven by real input for the showcase's recorded chapters. |
 | [`website/`](website), [`service/`](service), [`docker/`](docker), [`e2e/`](e2e) | The hosted game: the website, the stack it runs in, and the browser suite that tests it. |
 
 ## Development
@@ -30,10 +30,9 @@ One-time setup:
 - `wasm-bindgen-cli` for building the wasm client:
   `cargo install wasm-bindgen-cli --locked`
 - `cargo-watch` for the dev loop: `cargo install cargo-watch --locked`
-- To run the gameplay tests (`just test`) and record the showcase (`just showcase`): `weston`,
-  `xwayland`, `xdotool`, [ffmpeg](https://ffmpeg.org/) built with libass, and a PulseAudio server
-  (PipeWire's will do) with its `pactl` and `parecord`. A GPU keeps them fast; without one they render
-  in software. See [Tests](#tests).
+- To record the showcase (`just showcase`): `weston`, `xwayland`, `xdotool`,
+  [ffmpeg](https://ffmpeg.org/) built with libass, and a PulseAudio server (PipeWire's will do) with
+  its `pactl` and `parecord`. A GPU keeps it fast; without one it renders in software.
 - To run the browser suite (`just e2e`): [Node.js](https://nodejs.org/), Google Chrome and `xvfb`. It
   is [Playwright](https://playwright.dev) (in [`e2e/`](e2e)); `just e2e` installs its npm deps on
   first run and drives Chrome on a virtual display, so it's zero-config and never touches your
@@ -62,19 +61,20 @@ The website lives at <https://rift.localhost> and Grafana at <https://grafana.ri
 
 ## Tests
 
-`just test` runs every crate's tests. The gameplay tests among them
-([`engine/tests/gameplay/`](engine/tests/gameplay)) play the game for real, through the same
-[`driver`](driver) the showcase plays through: each runs a game server and desktop clients natively,
-every client on a virtual display with a sound server sink of its own, played with mouse and keyboard
-through the game's own input bindings and recorded, picture and sound. Clients draw as fast as the
-machine lets them, and waits count the game's frames as well as time, so a slow machine plays slower
-rather than failing. A failed test keeps its
-recording, logs, input steps and last snapshot in `target/tmp/gameplay/`, and CI uploads them.
+`just test` runs every crate's tests, in seconds once built: unit and integration tests of the
+engine's mechanics and the editor, none of which starts a server, a client or the stack. A test
+declares the small game it needs in code, with [`testkit`](testkit)'s `Game` (only the rows it reads,
+loaded through the engine's own loader), and plays it out in `testkit`'s `Sim`: a bare world holding
+that game, stepped tick by tick through only the engine systems the test adds, in the server's order.
+No test reads [`example_game/`](example_game) or the editor's templates; `just lint` checks that those
+load and read exactly as the editor writes them.
 
-`just e2e` is the browser suite, run against the docker stack: the website and the game as a browser
-gets them. Gameplay has a single smoke test there, a new player signing up and appearing in the game
-at the spawn location (compared against the reference image beside it in [`e2e/tests/`](e2e/tests));
-the rest of gameplay is the gameplay tests' job.
+Playing the real game is for the showcase and the browser suite alone. The showcase plays every
+mechanic through the [`driver`](driver), with desktop clients against a game server, as a player
+would. `just e2e` is the browser suite, run against the docker stack: the website and the game as a
+browser gets them. Gameplay has a single smoke test there, a new player signing up and appearing in
+the game at the spawn location (compared against the reference image beside it in
+[`e2e/tests/`](e2e/tests)).
 
 ## A game is a folder
 

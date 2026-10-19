@@ -3547,6 +3547,7 @@ dependencies = [
  "strip-ansi-escapes",
  "strum",
  "tempfile",
+ "testkit",
  "ureq",
  "walkdir",
 ]

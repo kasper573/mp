@@ -3,6 +3,7 @@
 
 mod art;
 mod bag;
+mod fixtures;
 mod game;
 mod notices;
 mod players;
@@ -10,6 +11,6 @@ mod sim;
 mod talk;
 
 pub use art::{png, wav};
-pub use game::{Game, Map, settled_tables, stats};
+pub use game::{Game, Map, stats};
 pub use sim::{Sim, drawn_seed};
 pub use talk::{labels, locked};

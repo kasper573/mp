@@ -2,7 +2,7 @@ name: Set up the build environment
 description: Pinned toolchain, just, the Linux system libraries cargo can't provide, and the build cache.
 inputs:
   deps:
-    description: "What the job runs, which decides the Linux system packages it gets: build | test | e2e."
+    description: "What the job runs, which decides the Linux system packages it gets: build | e2e."
     default: build
   cache:
     description: "The build cache entry the job restores, one per kind of build."
@@ -37,23 +37,15 @@ runs:
       # The one system C library a `-sys` crate links that cargo can't supply (the one platform-specific
       # place, per the repo's platform rule): alsa, for kira's cpal backend (the client audio code
       # compiles natively too), found through pkg-config; the windowing and graphics libraries load at
-      # runtime. The gameplay tests run the desktop client on Xwayland in a headless weston through
-      # Mesa's software Vulkan, its keyboard through the xkbcommon-x11 winit loads at runtime, drive it
-      # with xdotool, and record its picture with ffmpeg and its sound with parecord, from a PulseAudio
-      # sink it plays into through ALSA's pulse plugin. xvfb + the Mesa DRI driver are for the e2e's
-      # headed browsers (software WebGL). Drop the runner's microsoft/azure apt sources first — unused,
-      # and they 403 intermittently.
+      # runtime. xvfb + the Mesa DRI driver are for the e2e's headed browsers (software WebGL). Drop the
+      # runner's microsoft/azure apt sources first — unused, and they 403 intermittently.
       env:
         BUILD_PACKAGES: pkg-config libasound2-dev
-        TEST_PACKAGES: >-
-          mesa-vulkan-drivers weston xwayland libxkbcommon-x11-0 xdotool ffmpeg pulseaudio
-          pulseaudio-utils libasound2-plugins
         E2E_PACKAGES: xvfb libgl1-mesa-dri
         DEPS: ${{ inputs.deps }}
       run: |
         case "$DEPS" in
           build) packages="$BUILD_PACKAGES" ;;
-          test) packages="$BUILD_PACKAGES $TEST_PACKAGES" ;;
           e2e) packages="$BUILD_PACKAGES $E2E_PACKAGES" ;;
           *) echo "::error::unknown deps '$DEPS'"; exit 1 ;;
         esac

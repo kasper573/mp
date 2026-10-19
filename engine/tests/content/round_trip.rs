@@ -2,9 +2,10 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
+use engine::core::content::ContentRegistry;
 use engine::core::content::{Content, FilesystemFolder, version, write};
 use serde_json::json;
-use testkit::{Game, settled_tables};
+use testkit::Game;
 use walkdir::WalkDir;
 
 use crate::support::game;
@@ -15,7 +16,7 @@ fn a_folder_written_from_scratch_lists_every_row_and_grid() {
     let declared = rows_and_grids(&game);
     let out = tempfile::tempdir().expect("a temp folder");
 
-    let writer = write(settled_tables(), game.load(), out.path()).expect("written");
+    let writer = write(game.registry(), game.load(), out.path()).expect("written");
 
     let written: BTreeSet<String> = writer.written().iter().cloned().collect();
     assert_eq!(written, declared);
@@ -33,10 +34,11 @@ fn writing_a_written_folder_back_changes_no_bytes() {
             std::fs::write(file, bytes).expect("an asset");
         }
     }
-    let first = write(settled_tables(), game.load(), out.path()).expect("written");
+    let registry = game.registry();
+    let first = write(registry, game.load(), out.path()).expect("written");
 
-    let reread = load(out.path());
-    let again = write(settled_tables(), reread, out.path()).expect("written again");
+    let reread = load(registry, out.path());
+    let again = write(registry, reread, out.path()).expect("written again");
 
     assert_eq!(again.written(), &[] as &[String], "rewritten files");
     assert_eq!(again.kept(), first.written().len());
@@ -68,9 +70,9 @@ fn rich_game() -> Game {
         .mark("news")
 }
 
-fn load(folder: &Path) -> Content {
+fn load(registry: &ContentRegistry, folder: &Path) -> Content {
     engine::core::content::load(
-        settled_tables(),
+        registry,
         Arc::new(FilesystemFolder(folder.to_path_buf())),
         version::build(),
         "the written folder did not load",

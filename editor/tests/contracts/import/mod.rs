@@ -1,3 +1,4 @@
+mod art;
 mod exports;
 
 use std::collections::BTreeMap;
@@ -11,19 +12,19 @@ use engine::systems::area::grid::{self, PaletteRow};
 use image::RgbaImage;
 use serde_json::Value;
 
-const CONTENT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../example_game");
+use self::art::{FRAME, TILE, fill};
 
 #[test]
 fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let row = art::walker_row();
+    let sheet = art::walker_sheet();
     let strips = strips_of(&row, &sheet);
-    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, true);
+    let files = exports::aseprite(dir.path(), "walker", &strips, true);
     let dropped = formats::sort_out(&files).expect("a sheet and its json");
     let export = formats::decode(&dropped).expect("decodes");
     assert_eq!(export.kind, ExportFormat::SheetJson);
-    assert_eq!(export.frame, (48, 64));
+    assert_eq!(export.frame, FRAME);
     assert!(export.trimmed);
     assert_eq!(export.strips.len(), 40);
     assert!(export.timed());
@@ -31,10 +32,10 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
     assert!(plan.missing.is_empty());
     assert_eq!(plan.ready(), Ok(()));
     assert_eq!(plan.cues_kept(), plan.cues_total);
-    let built = model::build(&plan, &export, Some(&row), "farmer_girl").expect("builds");
-    assert_eq!(built.image, "models/farmer-girl.png");
+    let built = model::build(&plan, &export, Some(&row), "walker").expect("builds");
+    assert_eq!(built.image, "models/walker.png");
     let image = formats::decode_image_bytes(&built.png).expect("a png");
-    assert_eq!(image.dimensions(), (8 * 48, 40 * 64));
+    assert_eq!(image.dimensions(), (8 * FRAME.0, 40 * FRAME.1));
     for (name, frames) in &strips {
         let (action, direction) = name.split_once('_').unwrap();
         let after = built.row["sprites"]["actions"][action][direction]
@@ -44,8 +45,14 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
         for (frame, (pixels, ms)) in after.iter().zip(frames) {
             assert_eq!(frame["ms"].as_u64().unwrap() as u32, *ms, "{name}");
             let index = frame["frame"].as_u64().unwrap() as u32;
-            let cut = image::imageops::crop_imm(&image, (index % 8) * 48, (index / 8) * 64, 48, 64)
-                .to_image();
+            let cut = image::imageops::crop_imm(
+                &image,
+                (index % 8) * FRAME.0,
+                (index / 8) * FRAME.1,
+                FRAME.0,
+                FRAME.1,
+            )
+            .to_image();
             assert_eq!(
                 formats::pixel_hash(&cut),
                 formats::pixel_hash(pixels),
@@ -70,10 +77,10 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
 #[test]
 fn a_texturepacker_sheet_with_rotated_frames_imports_alike() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let row = art::walker_row();
+    let sheet = art::walker_sheet();
     let strips = strips_of(&row, &sheet);
-    let files = exports::texturepacker(dir.path(), "farmer-girl", &strips);
+    let files = exports::texturepacker(dir.path(), "walker", &strips);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     assert_eq!(export.strips.len(), 40);
     assert!(!export.timed(), "TexturePacker carries no durations");
@@ -99,15 +106,15 @@ fn a_texturepacker_sheet_with_rotated_frames_imports_alike() {
 #[test]
 fn a_grid_asks_the_frame_size_and_maps_rows_by_order() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let row = art::walker_row();
+    let sheet = art::walker_sheet();
     let strips = strips_of(&row, &sheet);
-    let file = exports::grid(dir.path(), "farmer-girl", &strips, (48, 64));
+    let file = exports::grid(dir.path(), "walker", &strips, FRAME);
     let mut export = formats::decode(&formats::sort_out(&[file]).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Grid);
     assert!(export.strips.is_empty());
-    assert!(export.cut_grid(50, 64).is_err());
-    export.cut_grid(48, 64).expect("cuts");
+    assert!(export.cut_grid(FRAME.0 + 2, FRAME.1).is_err());
+    export.cut_grid(FRAME.0, FRAME.1).expect("cuts");
     assert_eq!(export.strips.len(), 40);
     let (mapping, notes) = model::default_mapping(&export);
     assert_eq!(mapping["row 1"].as_deref(), Some("idle_s"));
@@ -122,8 +129,8 @@ fn a_grid_asks_the_frame_size_and_maps_rows_by_order() {
 #[test]
 fn a_numbered_sequence_imports_and_a_gap_is_refused() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let row = art::walker_row();
+    let sheet = art::walker_sheet();
     let strips = strips_of(&row, &sheet);
     let files = exports::sequence(dir.path(), &strips[8..11]);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
@@ -141,14 +148,12 @@ fn a_numbered_sequence_imports_and_a_gap_is_refused() {
 #[test]
 fn a_gif_and_an_apng_carry_their_lengths() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let water = asset("tilesets/beach-tileset.png");
-    let frames: Vec<RgbaImage> = (0..4)
-        .map(|k| image::imageops::crop_imm(&water, (1 + 9 * k) * 16, 16, 112, 112).to_image())
-        .collect();
+    let water = art::tileset();
+    let frames = art::water(&water);
     let gif = exports::gif(dir.path(), "beach-water", &frames, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Gif);
-    assert_eq!(export.frame, (112, 112));
+    assert_eq!(export.frame, (art::WATER * TILE, art::WATER * TILE));
     let strip = &export.strips[0];
     assert_eq!(strip.tag, "beach-water");
     assert_eq!(
@@ -167,8 +172,8 @@ fn a_gif_and_an_apng_carry_their_lengths() {
 #[test]
 fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let row = art::walker_row();
+    let sheet = art::walker_sheet();
     let mut strips = strips_of(&row, &sheet);
     let run_e = strips.iter_mut().find(|(name, _)| name == "run_e").unwrap();
     run_e.1.remove(5);
@@ -179,7 +184,7 @@ fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
         .unwrap();
     attack_s.1.remove(2);
     attack_s.1.remove(1);
-    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, true);
+    let files = exports::aseprite(dir.path(), "walker", &strips, true);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     let plan = plan_for(&row, &sheet, &export, None);
     let run = plan.strips.iter().find(|s| s.name == "run_e").unwrap();
@@ -204,7 +209,7 @@ fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
     let mut plan = plan;
     plan.strip_mut("run_e").unwrap().cues[1].choice = Some(CuePlacement::Frame(3));
     assert_eq!(plan.ready(), Ok(()));
-    let built = model::build(&plan, &export, Some(&row), "farmer_girl").expect("builds");
+    let built = model::build(&plan, &export, Some(&row), "walker").expect("builds");
     let after = built.row["sprites"]["actions"]["run"]["e"]
         .as_array()
         .unwrap();
@@ -227,10 +232,10 @@ fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
 #[test]
 fn importing_again_asks_before_replacing_lengths_edited_here() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let mut row = row("model", "farmer_girl");
-    let sheet = asset("models/farmer-girl.png");
+    let mut row = art::walker_row();
+    let sheet = art::walker_sheet();
     let strips = strips_of(&row, &sheet);
-    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, false);
+    let files = exports::aseprite(dir.path(), "walker", &strips, false);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     let (mapping, _) = model::default_mapping(&export);
     let plan = model::plan(
@@ -241,12 +246,9 @@ fn importing_again_asks_before_replacing_lengths_edited_here() {
         &BTreeMap::new(),
         None,
     );
-    let built = model::build(&plan, &export, Some(&row), "farmer_girl").unwrap();
-    let record = model::record(&export, "farmer_girl", &mapping, built.lengths.clone());
-    assert_eq!(
-        record.strips["attack_s"],
-        vec![120, 110, 110, 100, 60, 70, 110, 120]
-    );
+    let built = model::build(&plan, &export, Some(&row), "walker").unwrap();
+    let record = model::record(&export, "walker", &mapping, built.lengths.clone());
+    assert_eq!(record.strips["attack_s"], art::ATTACK_MS.to_vec());
     row["sprites"]["actions"]["attack"]["s"][4]["ms"] = Value::from(90);
     row["sprites"]["actions"]["attack"]["s"][5]["ms"] = Value::from(80);
     let plan = model::plan(
@@ -285,9 +287,9 @@ fn importing_again_asks_before_replacing_lengths_edited_here() {
 #[test]
 fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("tileset", "beach_tileset");
-    let old = asset("tilesets/beach-tileset.png");
-    let spaced = exports::spaced_grid(dir.path(), "beach-tileset", &old, 16, 2, 1, 1);
+    let row = art::tileset_row();
+    let old = art::tileset();
+    let spaced = exports::spaced_grid(dir.path(), "beach", &old, 16, 2, 1, 1);
     let export = formats::decode(&formats::sort_out(&[spaced]).unwrap()).unwrap();
     let settings = tileset::TileGridSettings {
         tile: 16,
@@ -296,7 +298,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
         extruded: 1,
     };
     let cut = tileset::cut_grid(export.sheet.as_ref().unwrap(), settings).expect("whole tiles");
-    assert_eq!((cut.columns, cut.rows), (36, 26));
+    assert_eq!((cut.columns, cut.rows), (art::COLUMNS, art::ROWS));
     assert_eq!(
         formats::pixel_hash(&cut.image),
         formats::pixel_hash(&old),
@@ -326,21 +328,22 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     let mut wide = RgbaImage::new(old.width() + 64, old.height());
     image::GenericImage::copy_from(&mut wide, &old, 0, 0).unwrap();
     fill(&mut wide, old.width(), 0, 64, 16, [200, 90, 120, 255]);
-    let island =
-        std::fs::read_to_string(format!("{CONTENT}/tables/area/island/palette.csv")).unwrap();
+    let island = art::island_palette();
     let palettes = vec![("island".to_owned(), palette(&island))];
-    let plan = tileset::tile_plan(&old, &row, &wide, "beach_tileset", &palettes);
-    assert_eq!((plan.old_columns, plan.new_columns), (36, 40));
+    let plan = tileset::tile_plan(&old, &row, &wide, "beach", &palettes);
+    assert_eq!(
+        (plan.old_columns, plan.new_columns),
+        (art::COLUMNS, art::COLUMNS + 4)
+    );
     assert!(plan.gone.is_empty());
     assert_eq!(plan.new_tiles, 4);
     assert_eq!(
-        plan.matches[&450],
-        12 * 40 + 18,
+        plan.matches[&art::PAVED],
+        (art::PAVED / art::COLUMNS) * (art::COLUMNS + 4) + art::PAVED % art::COLUMNS,
         "found by pixels at the same column and row"
     );
     assert_eq!(plan.ready(), Ok(()));
-    let (new_row, rewritten) =
-        tileset::apply_tile_plan(&plan, &row, "beach_tileset", &palettes).unwrap();
+    let (new_row, rewritten) = tileset::apply_tile_plan(&plan, &row, "beach", &palettes).unwrap();
     let old_tiles = row["tiles"].as_object().unwrap();
     let new_tiles = new_row["tiles"].as_object().unwrap();
     assert_eq!(
@@ -352,7 +355,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
         let old_index: u32 = index.parse().unwrap();
         let Some(target) = plan.matches.get(&old_index) else {
             assert!(
-                tileset::tile_image(&old, 16, old_index).is_some_and(|t| formats::is_blank(&t))
+                tileset::tile_image(&old, TILE, old_index).is_some_and(|t| formats::is_blank(&t))
             );
             continue;
         };
@@ -382,11 +385,10 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     }
 
     let game = dir.path().join("game");
-    editor::templates::new_game_from(std::path::Path::new(CONTENT), "Beach", &game).unwrap();
-    wide.save(game.join("assets/tilesets/beach-tileset.png"))
-        .unwrap();
+    beach_game().write_to(&game);
+    wide.save(game.join("assets/tilesets/beach.png")).unwrap();
     std::fs::write(
-        game.join("tables/tileset/beach_tileset.json"),
+        game.join("tables/tileset/beach.json"),
         serde_json::to_string_pretty(&new_row).unwrap(),
     )
     .unwrap();
@@ -404,44 +406,49 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
 
 #[test]
 fn a_gone_tile_still_painted_blocks_until_replaced() {
-    let row = row("tileset", "beach_tileset");
-    let old = asset("tilesets/beach-tileset.png");
+    let row = art::tileset_row();
+    let old = art::tileset();
     let mut changed = old.clone();
     fill(
         &mut changed,
-        (450 % 36) * 16,
-        (450 / 36) * 16,
-        16,
-        16,
+        (art::PAVED % art::COLUMNS) * TILE,
+        (art::PAVED / art::COLUMNS) * TILE,
+        TILE,
+        TILE,
         [1, 2, 3, 255],
     );
     let palettes = vec![(
         "island".to_owned(),
-        palette("tileset,tile,flip\nbeach_tileset,450,\nbeach_tileset,451,\n"),
+        palette(&format!(
+            "tileset,tile,flip\nbeach,{},\nbeach,{},\n",
+            art::PAVED,
+            art::PAVED + 1
+        )),
     )];
-    let mut plan = tileset::tile_plan(&old, &row, &changed, "beach_tileset", &palettes);
-    assert_eq!(plan.gone, vec![450]);
-    assert!(plan.gone_used.contains_key(&450));
+    let mut plan = tileset::tile_plan(&old, &row, &changed, "beach", &palettes);
+    assert_eq!(plan.gone, vec![art::PAVED]);
+    assert!(plan.gone_used.contains_key(&art::PAVED));
     assert!(plan.ready().is_err());
-    plan.replacements.insert(450, Some(451));
+    plan.replacements.insert(art::PAVED, Some(art::PAVED + 1));
     assert_eq!(plan.ready(), Ok(()));
-    let (_, rewritten) = tileset::apply_tile_plan(&plan, &row, "beach_tileset", &palettes).unwrap();
-    assert_eq!(palette(&rewritten[0].1)[0].tile, 451);
+    let (_, rewritten) = tileset::apply_tile_plan(&plan, &row, "beach", &palettes).unwrap();
+    assert_eq!(palette(&rewritten[0].1)[0].tile, art::PAVED + 1);
 }
 
 #[test]
 fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     let dir = tempfile::tempdir().expect("a scratch folder");
-    let row = row("tileset", "beach_tileset");
-    let water = asset("tilesets/beach-tileset.png");
-    let frames: Vec<RgbaImage> = (0..4)
-        .map(|k| image::imageops::crop_imm(&water, (1 + 9 * k) * 16, 16, 112, 112).to_image())
-        .collect();
+    let row = art::tileset_row();
+    let water = art::tileset();
+    let frames = art::water(&water);
     let gif = exports::gif(dir.path(), "beach-water", &frames, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).unwrap();
     let plan = tileset::anim_plan(&water, &row, &export, true, (1, 1)).expect("plans");
-    assert_eq!(plan.animated(), 33);
-    assert_eq!(plan.still, 16);
+    assert_eq!(
+        plan.animated() as u32,
+        art::WATER * art::WATER - art::STILL_WATER
+    );
+    assert_eq!(plan.still as u32, art::STILL_WATER);
     assert!(
         plan.new_images.is_empty(),
         "every frame is on the tileset already"
@@ -449,12 +456,15 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     assert!(plan.fits.is_some());
     let (png, new_row) = tileset::apply_anim_plan(&plan, &water, &row, &export).unwrap();
     assert!(png.is_none(), "nothing appended, nothing redrawn");
-    let animation = new_row["tiles"]["37"]["animation"].as_array().unwrap();
-    let tiles: Vec<u64> = animation
+    let first = art::COLUMNS + 1;
+    let animation = new_row["tiles"][first.to_string()]["animation"]
+        .as_array()
+        .unwrap();
+    let tiles: Vec<u32> = animation
         .iter()
-        .map(|f| f["tile"].as_u64().unwrap())
+        .map(|f| f["tile"].as_u64().unwrap() as u32)
         .collect();
-    assert_eq!(tiles, vec![37, 46, 55, 64]);
+    assert_eq!(tiles, (0..4).map(|k| first + 9 * k).collect::<Vec<_>>());
     assert!(animation.iter().all(|f| f["ms"] == 250));
     let frozen = exports::gif(
         dir.path(),
@@ -466,7 +476,7 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     let still = tileset::anim_plan(&water, &row, &frozen, true, (1, 1));
     assert!(still.is_err(), "a block that never changes is refused");
     let mut fresh = frames.clone();
-    fill(&mut fresh[1], 0, 0, 16, 16, [9, 9, 9, 255]);
+    fill(&mut fresh[1], 0, 0, TILE, TILE, [9, 9, 9, 255]);
     let gif = exports::gif(dir.path(), "beach-water-new", &fresh, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).unwrap();
     let plan = tileset::anim_plan(&water, &row, &export, true, (1, 1)).unwrap();
@@ -475,25 +485,38 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     let grown = formats::decode_image_bytes(&png.expect("appended")).unwrap();
     assert_eq!(
         grown.height(),
-        water.height() + 16,
+        water.height() + TILE,
         "new frames go after the last tile"
     );
     assert_eq!(
-        new_row["tiles"]["37"]["animation"][1]["tile"],
-        Value::from(36 * 26)
+        new_row["tiles"][first.to_string()]["animation"][1]["tile"],
+        Value::from(art::COLUMNS * art::ROWS)
     );
 }
 
-fn row(table: &str, key: &str) -> Value {
-    let text =
-        std::fs::read_to_string(format!("{CONTENT}/tables/{table}/{key}.json")).expect("the row");
-    serde_json::from_str(&text).expect("json")
-}
-
-fn asset(path: &str) -> RgbaImage {
-    image::open(format!("{CONTENT}/assets/{path}"))
-        .expect("the asset")
-        .into_rgba8()
+/// A whole game whose island is painted with the beach tileset.
+fn beach_game() -> testkit::Game {
+    let mut tileset = Vec::new();
+    art::tileset()
+        .write_to(
+            &mut std::io::Cursor::new(&mut tileset),
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+    testkit::Game::new()
+        .area("island", &testkit::Map::open(5, 5), serde_json::json!([]))
+        .hero("island", 2.0, 2.0)
+        .engine_rows()
+        .sfx("step")
+        .row(
+            "surface",
+            "sand",
+            serde_json::json!({ "name": "Sand", "footstep": "step" }),
+        )
+        .row("tileset", "beach", art::tileset_row())
+        .asset("tilesets/beach.png", tileset)
+        .file("tables/area/island/palette.csv", art::island_palette())
+        .whole()
 }
 
 fn strips_of(row: &Value, sheet: &RgbaImage) -> Vec<(String, Vec<(RgbaImage, u32)>)> {
@@ -534,14 +557,6 @@ fn palette(text: &str) -> Vec<PaletteRow> {
         text,
     };
     grid::read_palette(file, &mut Vec::new()).expect("a palette")
-}
-
-fn fill(image: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, color: [u8; 4]) {
-    for dy in 0..h {
-        for dx in 0..w {
-            image.put_pixel(x + dx, y + dy, image::Rgba(color));
-        }
-    }
 }
 
 fn plan_for(

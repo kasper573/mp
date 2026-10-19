@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::{Arc, LazyLock};
 
 use engine::core::content::{Content, ContentRegistry, LoadReport, MemoryFolder, version};
@@ -15,16 +16,12 @@ use crate::art::{png, wav};
 pub struct Game {
     files: BTreeMap<String, Arc<[u8]>>,
     settings: Option<Value>,
+    whole: bool,
 }
 
 // Built once a process: hashing every shape for the content version takes a while.
 static TABLES: LazyLock<ContentRegistry> = LazyLock::new(engine::systems::tables);
 static SETTLED_TABLES: LazyLock<ContentRegistry> = LazyLock::new(engine::systems::settled_tables);
-
-/// Every table a game is made of and the settings its `game.json` holds, built once a process.
-pub fn settled_tables() -> &'static ContentRegistry {
-    &SETTLED_TABLES
-}
 
 /// An area's ground as text, one string per row: `.` walkable, `#` blocked.
 #[derive(Clone)]
@@ -35,6 +32,7 @@ impl Game {
         let mut game = Game {
             files: BTreeMap::new(),
             settings: None,
+            whole: false,
         };
         game.put("game.json", b"{}".to_vec());
         game
@@ -360,19 +358,39 @@ impl Game {
         self.try_load().unwrap_or_else(|report| panic!("{report}"))
     }
 
-    /// Loads the rows and settings declared, as a folder of only some of a game's rows.
-    pub fn try_load(self) -> Result<Content, LoadReport> {
-        let registry = match self.settings {
-            Some(_) => &*SETTLED_TABLES,
-            None => &*TABLES,
-        };
-        load(registry, self.folder())
+    /// Holds the game to everything a whole game must provide besides what it declares: every row
+    /// the engine itself requires, and every quest and shop within a player's reach.
+    pub fn whole(mut self) -> Game {
+        self.whole = true;
+        self
     }
 
-    /// Loads the game as a whole one, held to everything a game must provide besides what it
-    /// declares: every row the engine itself requires, and every quest and shop within reach.
-    pub fn try_load_whole(self) -> Result<Content, LoadReport> {
-        load(engine::systems::registry(), self.folder())
+    pub fn try_load(self) -> Result<Content, LoadReport> {
+        engine::core::content::load(
+            self.registry(),
+            Arc::new(self.folder()),
+            version::build(),
+            "the test game did not load",
+        )
+    }
+
+    /// What the game is held to: a whole game's every table, settings and required row, or, unless
+    /// it is whole, only the tables of the rows declared, with the settings if there are any.
+    pub fn registry(&self) -> &'static ContentRegistry {
+        match (self.whole, &self.settings) {
+            (true, _) => engine::systems::registry(),
+            (false, Some(_)) => &SETTLED_TABLES,
+            (false, None) => &TABLES,
+        }
+    }
+
+    /// Writes the folder's files under `dir`, as a game folder on disk.
+    pub fn write_to(&self, dir: &Path) {
+        for (path, bytes) in self.folder().files {
+            let file = dir.join(path);
+            std::fs::create_dir_all(file.parent().expect("a parent folder")).expect("folders");
+            std::fs::write(file, bytes).expect("a written file");
+        }
     }
 
     /// The folder of every file declared, and of `game.json` holding the settings.
@@ -381,7 +399,7 @@ impl Game {
         if let Some(settings) = &self.settings {
             let mut settings = settings.clone();
             if settings.get("content_version").is_none() {
-                settings["content_version"] = json!(SETTLED_TABLES.version().0);
+                settings["content_version"] = json!(self.registry().version().0);
             }
             files.insert("game.json".to_owned(), json_bytes(&settings).into());
         }
@@ -394,15 +412,6 @@ impl Game {
     fn put(&mut self, path: &str, bytes: Vec<u8>) {
         self.files.insert(path.to_owned(), bytes.into());
     }
-}
-
-fn load(registry: &ContentRegistry, folder: MemoryFolder) -> Result<Content, LoadReport> {
-    engine::core::content::load(
-        registry,
-        Arc::new(folder),
-        version::build(),
-        "the test game did not load",
-    )
 }
 
 impl Default for Game {
