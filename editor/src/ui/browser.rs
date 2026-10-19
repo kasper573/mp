@@ -15,7 +15,7 @@ use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTa
 use crate::keymap::EditorKey;
 use crate::picker::{self, Dragged, PictureFrame};
 use crate::project::{Project, RowSelection};
-use crate::tabs::EditorTab;
+use crate::tabs::{EditorTab, TabOpening};
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
 
@@ -275,6 +275,9 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         .is_some_and(|(path, _)| path == GAME_FILE)
     {
         editor.select(RowSelection::game());
+        editor.preview_tab(EditorTab::Game);
+    }
+    if out.double_clicked.as_deref() == Some(GAME_FILE) {
         editor.open_tab(EditorTab::Game);
     }
     if let Some((path, modifiers)) = out.clicked
@@ -291,7 +294,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     if let Some(path) = out.double_clicked
         && let Some((table, key)) = row_of(&path)
     {
-        action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
+        action = Some((table.to_owned(), key.to_owned(), BrowserAction::OpenTab));
     }
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
@@ -420,8 +423,8 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
     editor.select(selection);
     match keys.as_slice() {
         [] => {}
-        [key] => editor.open_tab(EditorTab::for_row(table, key)),
-        _ => editor.open_tab(EditorTab::Rows {
+        [key] => editor.preview_tab(EditorTab::for_row(table, key)),
+        _ => editor.preview_tab(EditorTab::Rows {
             table: table.to_owned(),
             keys,
         }),
@@ -430,9 +433,8 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
 
 pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
     match action {
-        BrowserAction::Open | BrowserAction::OpenTab => {
-            editor.open_row(table, key);
-        }
+        BrowserAction::Open => editor.preview_row(table, key),
+        BrowserAction::OpenTab => editor.open_row(table, key),
         BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
                 editor.toast(format!("{table}/{key} is a fixture and keeps its key"));
@@ -449,7 +451,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         }
         BrowserAction::Duplicate => rows::duplicate(editor, table, key),
         BrowserAction::Usages => {
-            editor.open_row(table, key);
+            editor.preview_row(table, key);
             editor.panels.bottom = BottomTab::UsedBy;
         }
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
@@ -551,7 +553,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     ));
     let mut clicked: Option<(String, String, bool, bool)> = None;
     let mut action: Option<(String, String, BrowserAction)> = None;
-    let mut open_module: Option<(String, String, usize)> = None;
+    let mut open_module: Option<(String, String, usize, TabOpening)> = None;
     let mut open_file: Option<String> = None;
     let mut heading: Option<&str> = None;
     egui::ScrollArea::vertical()
@@ -590,7 +592,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             clicked = Some((table.clone(), key.clone(), toggle, extend));
                         }
                         if response.double_clicked() {
-                            action = Some((table.clone(), key.clone(), BrowserAction::Open));
+                            action = Some((table.clone(), key.clone(), BrowserAction::OpenTab));
                         }
                         let fixture = editor.shapes.is_fixture(table, key);
                         response.context_menu(|ui| {
@@ -616,7 +618,12 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             false,
                         );
                         if response.clicked() {
-                            open_module = Some((table.clone(), key.clone(), *index));
+                            open_module =
+                                Some((table.clone(), key.clone(), *index, TabOpening::Preview));
+                        }
+                        if response.double_clicked() {
+                            open_module =
+                                Some((table.clone(), key.clone(), *index, TabOpening::Kept));
                         }
                     }
                     Hit::File { path, folder } => {
@@ -663,7 +670,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
             }
             Hit::Module {
                 table, key, index, ..
-            } => open_module = Some((table.clone(), key.clone(), *index)),
+            } => open_module = Some((table.clone(), key.clone(), *index, TabOpening::Preview)),
             Hit::File { path, .. } => open_file = Some(path.clone()),
         }
     }
@@ -677,20 +684,24 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
     }
-    if let Some((table, key, index)) = open_module {
+    if let Some((table, key, index, opening)) = open_module {
         editor.select(RowSelection {
             table: table.clone(),
             keys: vec![key.clone()],
             parts: vec![format!("/modules/{index}")],
         });
-        editor.open_tab(EditorTab::for_row(&table, &key));
+        let tab = EditorTab::for_row(&table, &key);
+        match opening {
+            TabOpening::Preview => editor.preview_tab(tab),
+            TabOpening::Kept => editor.open_tab(tab),
+        }
     }
     if let Some(path) = open_file {
         editor.panels.left = LeftTab::Assets;
         editor.views.assets.search = path.trim_end_matches('/').to_owned();
         if !path.ends_with('/') {
             editor.select(RowSelection::row("asset", &path));
-            editor.open_tab(EditorTab::Asset { path });
+            editor.preview_tab(EditorTab::Asset { path });
         }
     }
 }

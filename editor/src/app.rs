@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -31,7 +32,7 @@ use crate::project::{
 use crate::rows;
 use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
-use crate::tabs::{CloseTabs, EditorTab};
+use crate::tabs::{self, CloseTabs, EditorTab, TabOpening};
 use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
@@ -123,7 +124,8 @@ pub struct Editor {
     pub dialogs: Vec<ModalDialog>,
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
-    pub open_tabs: Vec<EditorTab>,
+    pub open_tabs: Vec<(EditorTab, TabOpening)>,
+    pub preview: Option<EditorTab>,
     pub close_tabs: Option<CloseTabs>,
     pub scene: Option<Vec<SceneStep>>,
     pub clipboard: Option<Clipboard>,
@@ -394,6 +396,7 @@ impl Editor {
             toast: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
+            preview: None,
             close_tabs: None,
             scene: None,
             clipboard: None,
@@ -565,6 +568,11 @@ impl Editor {
             camera: self.views.camera_state(),
         };
         let label = edit.label.clone();
+        let files: Vec<String> = edit
+            .changes
+            .iter()
+            .map(|change| change.file.clone())
+            .collect();
         let outcome = match &mut self.project {
             Some(project) => project.apply(edit, viewpoint),
             None => return Err("no folder is open".to_owned()),
@@ -573,6 +581,13 @@ impl Editor {
             Ok(()) => {
                 self.form.errors.clear();
                 self.views.content_changed();
+                if self
+                    .preview
+                    .as_ref()
+                    .is_some_and(|tab| files.iter().any(|file| tab.shows(file)))
+                {
+                    self.preview = None;
+                }
                 Ok(())
             }
             Err(refusal) => {
@@ -664,7 +679,33 @@ impl Editor {
     }
 
     pub fn open_tab(&mut self, tab: EditorTab) {
-        self.open_tabs.push(tab);
+        self.open_tabs.push((tab, TabOpening::Kept));
+    }
+
+    pub fn preview_tab(&mut self, tab: EditorTab) {
+        self.open_tabs.push((tab, TabOpening::Preview));
+    }
+
+    /// Puts the tabs asked for since the dock was last drawn in it, in the order they were asked.
+    pub fn place_tabs(&mut self) {
+        for (tab, opening) in mem::take(&mut self.open_tabs) {
+            tabs::place(&mut self.dock, &mut self.preview, tab, opening);
+        }
+    }
+
+    /// Gives every open, queued or previewed tab the new identity `renamed` answers for it, if any.
+    pub fn rename_tabs(&mut self, renamed: impl Fn(&EditorTab) -> Option<EditorTab>) {
+        let tabs = self
+            .dock
+            .iter_all_tabs_mut()
+            .map(|(_, tab)| tab)
+            .chain(self.open_tabs.iter_mut().map(|(tab, _)| tab))
+            .chain(self.preview.as_mut());
+        for tab in tabs {
+            if let Some(fresh) = renamed(tab) {
+                *tab = fresh;
+            }
+        }
     }
 
     pub fn select(&mut self, selection: RowSelection) {
@@ -674,6 +715,11 @@ impl Editor {
     pub fn open_row(&mut self, table: &str, key: &str) {
         self.select(RowSelection::row(table, key));
         self.open_tab(EditorTab::for_row(table, key));
+    }
+
+    pub fn preview_row(&mut self, table: &str, key: &str) {
+        self.select(RowSelection::row(table, key));
+        self.preview_tab(EditorTab::for_row(table, key));
     }
 
     pub fn has_unsaved(&self) -> bool {

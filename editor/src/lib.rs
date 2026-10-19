@@ -13,7 +13,7 @@ pub mod scenes;
 pub mod schema;
 pub mod spans;
 mod stage;
-mod tabs;
+pub mod tabs;
 pub mod templates;
 pub mod thumbs;
 pub mod ui;

@@ -11,4 +11,5 @@ mod project_history;
 mod scenes;
 mod spans;
 mod support;
+mod tabs;
 mod thumbnails;

@@ -48,9 +48,7 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     );
     sheet::vellum(root.painter(), ctx.viewport_rect());
     top_bar(editor, &mut root);
-    for tab in mem::take(&mut editor.open_tabs) {
-        focus_tab(&mut editor.dock, tab);
-    }
+    editor.place_tabs();
     if editor.project.is_some() {
         workspace(editor, &mut root);
         report::not_loaded(editor, ctx);
@@ -78,45 +76,6 @@ pub fn panel_body(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     child.set_clip_rect(rect.intersect(ui.clip_rect()));
     body(&mut child);
     ui.allocate_rect(rect, egui::Sense::hover());
-}
-
-pub fn focus_tab(dock: &mut DockState<EditorTab>, tab: EditorTab) {
-    if let EditorTab::Rows { table, .. } = &tab {
-        let replaced = dock
-            .iter_all_tabs_mut()
-            .map(|(_, existing)| existing)
-            .find(|existing| matches!(existing, EditorTab::Rows { table: t, .. } if t == table))
-            .map(|existing| {
-                *existing = tab.clone();
-            })
-            .is_some();
-        if replaced {
-            if let Some(path) = dock.find_tab(&tab) {
-                let _ = dock.set_active_tab(path);
-            }
-            return;
-        }
-    }
-    if let Some(path) = dock.find_tab(&tab) {
-        let _ = dock.set_active_tab(path);
-        return;
-    }
-    if dock.iter_all_tabs().next().is_none() {
-        *dock = DockState::new(vec![tab]);
-        return;
-    }
-    if dock.focused_leaf().is_none() {
-        let first = dock
-            .main_surface()
-            .iter()
-            .enumerate()
-            .find(|(_, node)| node.is_leaf())
-            .map(|(index, _)| egui_dock::NodeIndex(index));
-        if let Some(index) = first {
-            dock.main_surface_mut().set_focused_node(index);
-        }
-    }
-    dock.push_to_focused_leaf(tab);
 }
 
 pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
@@ -641,6 +600,12 @@ impl TabViewer for Viewer<'_> {
                         }
                     });
             }
+        }
+    }
+
+    fn on_tab_button(&mut self, tab: &mut EditorTab, response: &egui::Response) {
+        if response.double_clicked() && self.editor.preview.as_ref() == Some(tab) {
+            self.editor.preview = None;
         }
     }
 

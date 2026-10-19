@@ -442,6 +442,7 @@ fn last_script_owner(editor: &Editor) -> Option<ScriptOwner> {
     editor
         .open_tabs
         .iter()
+        .map(|(tab, _)| tab)
         .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
         .filter_map(|tab| match tab {
             EditorTab::Script(owner) => Some(owner.clone()),
@@ -457,10 +458,14 @@ fn sheet_step(editor: &mut Editor, step: &SheetStep) {
         });
         return;
     }
-    let pending = editor.open_tabs.iter().rev().find_map(|tab| match tab {
-        EditorTab::Spreadsheet { table } => Some(table.clone()),
-        _ => None,
-    });
+    let pending = editor
+        .open_tabs
+        .iter()
+        .rev()
+        .find_map(|(tab, _)| match tab {
+            EditorTab::Spreadsheet { table } => Some(table.clone()),
+            _ => None,
+        });
     let active = match ui::active_tab(editor) {
         Some(EditorTab::Spreadsheet { table }) => Some(table),
         _ => None,

@@ -1,4 +1,7 @@
-use engine::core::content::{ContentRow, Fixture};
+use egui_dock::DockState;
+use engine::core::content::{
+    ContentRow, Fixture, GAME_FILE, asset_file, row_file, row_folder, table_folder,
+};
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -22,6 +25,14 @@ pub enum EditorTab {
     Spreadsheet { table: String },
     Game,
     Asset { path: String },
+}
+
+/// How long an opened tab stays: a preview gives way to the next preview, so browsing leaves one
+/// tab behind, while a kept tab stays until it is closed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TabOpening {
+    Preview,
+    Kept,
 }
 
 /// What a tab's context menu asked to close, done once the dock is no longer being drawn.
@@ -69,6 +80,21 @@ impl EditorTab {
         }
     }
 
+    /// Whether `file` holds any of what the tab shows, so changing it changes the tab.
+    pub fn shows(&self, file: &str) -> bool {
+        match self {
+            EditorTab::Rows { table, keys } => keys.iter().any(|key| holds_row(table, key, file)),
+            EditorTab::Spreadsheet { table } => {
+                file.starts_with(&format!("{}/", table_folder(table)))
+            }
+            EditorTab::Game => file == GAME_FILE,
+            EditorTab::Asset { path } => file == asset_file(path),
+            other => other
+                .row()
+                .is_some_and(|(table, key)| holds_row(&table, &key, file)),
+        }
+    }
+
     pub fn is_row(&self, table: &str, key: &str) -> bool {
         match self {
             EditorTab::Script(owner) => owner.is_row(table, key),
@@ -100,4 +126,57 @@ impl EditorTab {
             },
         }
     }
+}
+
+/// Brings `tab` to the front of the dock. A preview takes the place of the tab previewed before
+/// it, and opening a previewed tab to keep it keeps it where it is.
+pub(crate) fn place(
+    dock: &mut DockState<EditorTab>,
+    preview: &mut Option<EditorTab>,
+    tab: EditorTab,
+    opening: TabOpening,
+) {
+    let previewed = preview
+        .as_ref()
+        .and_then(|previewed| dock.find_tab(previewed));
+    if previewed.is_none() {
+        *preview = None;
+    }
+    if let Some(path) = dock.find_tab(&tab) {
+        let _ = dock.set_active_tab(path);
+        if opening == TabOpening::Kept && preview.as_ref() == Some(&tab) {
+            *preview = None;
+        }
+        return;
+    }
+    if opening == TabOpening::Preview {
+        *preview = Some(tab.clone());
+        if let Some(path) = previewed
+            && let Ok(leaf) = dock.leaf_mut(path.node_path())
+        {
+            leaf.tabs[path.tab.0] = tab;
+            let _ = dock.set_active_tab(path);
+            return;
+        }
+    }
+    if dock.iter_all_tabs().next().is_none() {
+        *dock = DockState::new(vec![tab]);
+        return;
+    }
+    if dock.focused_leaf().is_none() {
+        let first = dock
+            .main_surface()
+            .iter()
+            .enumerate()
+            .find(|(_, node)| node.is_leaf())
+            .map(|(index, _)| egui_dock::NodeIndex(index));
+        if let Some(index) = first {
+            dock.main_surface_mut().set_focused_node(index);
+        }
+    }
+    dock.push_to_focused_leaf(tab);
+}
+
+fn holds_row(table: &str, key: &str, file: &str) -> bool {
+    file == row_file(table, key) || file.starts_with(&format!("{}/", row_folder(table, key)))
 }

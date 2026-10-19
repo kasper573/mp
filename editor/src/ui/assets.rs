@@ -87,6 +87,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .inner;
     if let Some((path, _)) = out.clicked {
         editor.select(RowSelection::row("asset", &path));
+        editor.preview_tab(EditorTab::Asset { path });
+    }
+    if let Some(path) = out.double_clicked {
         editor.open_tab(EditorTab::Asset { path });
     }
     if !needle.is_empty() {

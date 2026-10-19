@@ -278,16 +278,11 @@ fn split_pointer(pointer: &str) -> (&str, String) {
 }
 
 fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
-    for (_, tab) in editor.dock.iter_all_tabs_mut() {
-        let fresh = match &*tab {
-            EditorTab::Script(owner) => owner.renamed(table, key, new_key).map(EditorTab::Script),
-            other if other.is_row(table, key) => Some(EditorTab::for_row(table, new_key)),
-            _ => None,
-        };
-        if let Some(fresh) = fresh {
-            *tab = fresh;
-        }
-    }
+    editor.rename_tabs(|tab| match tab {
+        EditorTab::Script(owner) => owner.renamed(table, key, new_key).map(EditorTab::Script),
+        other if other.is_row(table, key) => Some(EditorTab::for_row(table, new_key)),
+        _ => None,
+    });
 }
 
 /// The file a row owns by convention besides its own, which follows the row through a copy, a

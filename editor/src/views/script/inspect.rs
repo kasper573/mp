@@ -1983,14 +1983,7 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
     };
     editor.views.script.relocate(&dialog.owner, shared.clone());
     let from = EditorTab::Script(dialog.owner.clone());
-    let tabs = editor
-        .dock
-        .iter_all_tabs_mut()
-        .map(|(_, tab)| tab)
-        .chain(&mut editor.open_tabs);
-    for tab in tabs.filter(|tab| **tab == from) {
-        *tab = EditorTab::Script(shared.clone());
-    }
+    editor.rename_tabs(|tab| (*tab == from).then(|| EditorTab::Script(shared.clone())));
     editor.select(RowSelection::row(ScriptDef::TABLE, &dialog.key));
     Ok(())
 }
