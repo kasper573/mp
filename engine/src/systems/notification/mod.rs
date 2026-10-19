@@ -29,7 +29,7 @@ use crate::core::math::Rgba;
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::text::TextMotion;
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, UnixMillis, WallClock};
+use crate::core::time::{Seconds, WallClock};
 use crate::core::vfx::{VfxParams, VfxShaderId};
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
@@ -130,7 +130,6 @@ pub struct NotificationSent {
     /// The actor the notification comes from, when it has one in the world.
     #[entities]
     pub actor: Option<Entity>,
-    pub at: UnixMillis,
 }
 
 pub fn notify(world: &mut World, player: Entity, notification: Notification) {
@@ -145,7 +144,6 @@ pub fn local_error(world: &mut World, text: impl Into<String>) {
         NotificationSent {
             notification: Notification::new(kind, LineText::plain(text.into())),
             actor: None,
-            at: UnixMillis(0),
         },
     );
 }
@@ -181,7 +179,6 @@ pub fn notify_from(
             NotificationSent {
                 notification,
                 actor: speaker,
-                at,
             },
         );
     }

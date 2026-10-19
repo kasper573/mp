@@ -14,7 +14,7 @@ use crate::core::math::{Pos, Rng};
 use crate::core::render::camera::tile_to_window;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, WallClock};
+use crate::core::time::Seconds;
 use crate::core::vfx::render::{
     ParamsUniform, Run, SiteFrame, SiteTexture, compiled_shader, hide, place_in_depth,
     present_shader, screen_layer, shader_piece,
@@ -51,14 +51,12 @@ pub fn pop(
     shader: Option<VfxShaderId>,
     params: VfxParams,
 ) {
-    let at = world.resource::<WallClock>().now;
     let sent = NotificationSent {
         notification: Notification::new(
             NotificationKind::Pop { shader, params },
             LineText::plain(text.into()),
         ),
         actor: Some(actor),
-        at,
     };
     for client in visibility::seen_by(world, actor) {
         visibility::send_to(world, client, sent.clone());
