@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use design_tokens::card;
-use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::controls::{self, RowLook};
 use design_tokens::sheet::{self, Depth};
 use design_tokens::{TextRole, face, ink};
 use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
@@ -23,8 +23,7 @@ const COUNTER_HEIGHT: f32 = 400.0;
 const PAGE_GAP: f32 = 10.0;
 const HINT_ROOM: f32 = 24.0;
 const ICON: f32 = 24.0;
-const COST_ICON: f32 = 16.0;
-const PILL_ICON: f32 = 14.0;
+const BUTTON_GAP: f32 = 10.0;
 
 pub struct ShopCounterPlugin;
 
@@ -242,7 +241,7 @@ fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui
                 ui.with_layout(Layout::top_down(Align::Max), |ui| {
                     ui.spacing_mut().item_spacing.y = 2.0;
                     for (stack, have) in ware.price.iter().zip(&ware.held) {
-                        price_pill(ui, world, *have, *stack);
+                        price(ui, world, *have, *stack);
                     }
                 });
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
@@ -268,51 +267,18 @@ fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui
 fn ware_card(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize, most: f32) {
     let look = CardLook {
         width: card::SHOP_PAGE_WIDTH,
-        max_height: most.min(card::MAX_HEIGHT),
+        max_height: (most - BUTTON_GAP - controls::CONTROL_HEIGHT - card::MARGIN)
+            .min(card::MAX_HEIGHT),
         art: card::ART_SHORT,
         closable: false,
         depth: Depth::Front,
     };
-    item::card::show(ui, world, ware.item, look, |ui, world| {
-        price(ui, world, tab, ware, index);
-    });
-}
-
-fn price(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize) {
-    let content = world.resource::<Content>().clone();
-    let heading = match ware.count {
-        1 => "price".to_owned(),
-        count => format!("price for {count}"),
-    };
-    card::heading(ui, &heading);
-    for (stack, &have) in ware.price.iter().zip(&ware.held) {
-        let color = if have >= stack.count {
-            ink::INK
-        } else {
-            ink::RUBRIC
-        };
-        let item = stack.item.get(&content);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            hud::icon(ui, world, &item.icon, COST_ICON);
-            sheet::label(
-                ui,
-                TextRole::CardBody,
-                &format!("{} {} · you have {have}", stack.count, item.name),
-                color,
-            );
-        });
-    }
-    if let Some(reason) = unavailable(ware) {
-        ui.add(egui::Label::new(TextRole::CardBody.rich(reason).color(ink::RUBRIC)).wrap());
-    }
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
+    item::card::show(ui, world, ware.item, look);
+    ui.add_space(BUTTON_GAP);
+    ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
+        ui.add_space(card::MARGIN);
         if trade_button(ui, tab, ware).clicked() {
             trade(world, tab, index);
-        }
-        if let Some(note) = &ware.note {
-            sheet::label(ui, TextRole::Small, note, ink::INK3);
         }
     });
 }
@@ -339,16 +305,17 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
     InterfaceSound::UiPick.play(world);
 }
 
-fn price_pill(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
-    let pill = if have >= stack.count {
-        Pill::Gold
+fn price(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
+    let color = if have >= stack.count {
+        ink::INK
     } else {
-        Pill::Rubric
+        ink::RUBRIC
     };
     let icon = stack.item.get(world.resource::<Content>()).icon.clone();
-    controls::pill_with(ui, pill, |ui| {
-        ui.label(stack.count.to_string());
-        hud::icon(ui, world, &icon, PILL_ICON);
+    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        ui.label(face::body(stack.count.to_string()).color(color));
+        hud::icon(ui, world, &icon, ICON);
     });
 }
 

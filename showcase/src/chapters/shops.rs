@@ -34,7 +34,7 @@ fn play(shoot: &mut Shoot) {
     );
 
     me.caption(
-        "The chosen ware lies on the page as a card, its price beneath: a part you can't cover turns rubric",
+        "The chosen ware lies on the page as its own card, the trade button under it; a price you can't cover turns rubric in the list",
     );
     me.click_ui("Greater Health Potion");
     me.caption("The list stays as narrow as its wares, and browsing never shifts it");
