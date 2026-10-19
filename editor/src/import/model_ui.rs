@@ -20,7 +20,7 @@ use crate::tabs::EditorTab;
 use crate::ui::widgets;
 use crate::ui::{dialogs, theme};
 use crate::views::model::{StripFrame, frame_size};
-use crate::{rows, schema};
+use crate::{rows, schema, thumbs};
 
 const FRAME_CARD: f32 = 48.0;
 
@@ -729,16 +729,7 @@ fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
     widgets::section(ui, "What the import does");
     let plan = &dialog.plan;
     let (fw, fh) = plan.frame;
-    let line = |ui: &mut Ui, ok: bool, text: String| {
-        ui.horizontal_wrapped(|ui| {
-            if ok {
-                glyph::show(ui, Mark::Tick, 14.0, theme::OK);
-            } else {
-                glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
-            }
-            ui.label(theme::muted(text).size(12.5));
-        });
-    };
+    let line = super::check_line;
     if plan.trimmed {
         line(
             ui,
@@ -838,12 +829,7 @@ fn draw_fit(painter: &egui::Painter, rect: Rect, texture: &TextureHandle, frame:
     let scale = (rect.width() / fw).min(rect.height() / fh);
     let size = Vec2::new(fw * scale, fh * scale);
     let fitted = Rect::from_center_size(rect.center(), size);
-    painter.image(
-        texture.id(),
-        fitted,
-        Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-        Color32::WHITE,
-    );
+    painter.image(texture.id(), fitted, thumbs::FULL_UV, Color32::WHITE);
 }
 
 pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDialog> {

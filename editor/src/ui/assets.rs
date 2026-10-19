@@ -102,7 +102,7 @@ pub fn icon_image(thumb: &thumbs::Thumbnail) -> IconImage {
     let scale = (16.0 / h.max(1) as f32).min(16.0 / w.max(1) as f32);
     IconImage {
         texture: thumb.texture.id(),
-        uv: egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        uv: thumbs::FULL_UV,
         size: egui::vec2(w as f32 * scale, h as f32 * scale),
     }
 }

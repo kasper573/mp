@@ -210,7 +210,7 @@ fn card(
             painter.image(
                 thumb.texture.id(),
                 ERect::from_center_size(art.center(), shown),
-                ERect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                thumbs::FULL_UV,
                 Color32::WHITE,
             );
         }

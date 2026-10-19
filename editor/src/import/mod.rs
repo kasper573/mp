@@ -18,7 +18,8 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 
-use egui::Context;
+use design_tokens::glyph::{self, Mark};
+use egui::{Context, Ui};
 use engine::core::content::{ContentRow, asset_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
@@ -417,6 +418,17 @@ fn free_key(editor: &Editor, table: &str, export: &AnimationExport) -> String {
 
 fn asset_name(folder: &str, key: &str) -> String {
     format!("{folder}/{}.png", key.replace('_', "-"))
+}
+
+fn check_line(ui: &mut Ui, ok: bool, text: String) {
+    ui.horizontal_wrapped(|ui| {
+        if ok {
+            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+        } else {
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
+        }
+        ui.label(theme::muted(text).size(12.5));
+    });
 }
 
 fn content_parent(editor: &Editor) -> Option<&Path> {

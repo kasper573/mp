@@ -202,7 +202,7 @@ impl ModelSheet {
 
     pub fn uv(&self, frame: u32) -> ERect {
         let Some(thumb) = &self.thumb else {
-            return ERect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
+            return thumbs::FULL_UV;
         };
         let columns = self.columns.max(1);
         thumbs::uv(

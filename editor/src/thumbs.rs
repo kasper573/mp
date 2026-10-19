@@ -25,6 +25,7 @@ pub struct Thumbnail {
 }
 
 pub const ICON: u32 = 32;
+pub const FULL_UV: egui::Rect = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
 
 impl Thumbnails {
     pub fn image(

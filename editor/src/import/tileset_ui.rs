@@ -22,7 +22,7 @@ use crate::ui::{dialogs, theme};
 use crate::value::RowValue;
 use crate::views::area;
 use crate::views::tileset::{ANIMATION_PART, tile_size};
-use crate::{forms, rows, schema};
+use crate::{forms, rows, schema, thumbs};
 
 pub struct TilesetDialog {
     pub key: String,
@@ -295,12 +295,7 @@ pub fn dialog(
                 let scale = (rect.width() / iw as f32).min(rect.height() / ih as f32);
                 let shown =
                     Rect::from_min_size(rect.min, Vec2::new(iw as f32 * scale, ih as f32 * scale));
-                painter.image(
-                    texture.id(),
-                    shown,
-                    Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
+                painter.image(texture.id(), shown, thumbs::FULL_UV, Color32::WHITE);
                 if let Ok(cut) = &dialog.cut {
                     let settings = cut.settings;
                     let pitch =
@@ -572,12 +567,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 let scale = (rect.width() / iw.max(1) as f32).min(rect.height() / ih.max(1) as f32);
                 let shown =
                     Rect::from_min_size(rect.min, Vec2::new(iw as f32 * scale, ih as f32 * scale));
-                painter.image(
-                    texture.id(),
-                    shown,
-                    Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
+                painter.image(texture.id(), shown, thumbs::FULL_UV, Color32::WHITE);
                 if plan.new_columns > plan.old_columns && columns == plan.new_columns {
                     let x = shown.min.x + (plan.old_columns * plan.tile) as f32 * scale;
                     let dashes = egui::Shape::dashed_line(
@@ -927,7 +917,7 @@ pub fn animation_dialog(
                                 ui.painter().image(
                                     texture.id(),
                                     shown,
-                                    Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                                    thumbs::FULL_UV,
                                     Color32::WHITE,
                                 );
                                 ui.label(theme::mono(format!("frame {} · {} ms", index + 1, frame.ms.unwrap_or(formats::DEFAULT_MS))).size(11.0).color(theme::MUTED));
@@ -957,7 +947,7 @@ pub fn animation_dialog(
                 painter.image(
                     texture.id(),
                     shown,
-                    Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    thumbs::FULL_UV,
                     Color32::WHITE,
                 );
                 let tile = dialog.tile as f32 * scale;
@@ -1003,16 +993,7 @@ pub fn animation_dialog(
                 widgets::section(ui, "What the import does");
                 match &dialog.plan {
                     Ok(plan) => {
-                        let line = |ui: &mut Ui, ok: bool, text: String| {
-                            ui.horizontal_wrapped(|ui| {
-                                if ok {
-                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
-                    } else {
-                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
-                    }
-                                ui.label(theme::muted(text).size(12.5));
-                            });
-                        };
+                        let line = super::check_line;
                         line(
                             ui,
                             true,
