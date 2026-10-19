@@ -15,7 +15,6 @@ use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
-use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
@@ -336,9 +335,15 @@ pub enum ConfirmAction {
         owner: ScriptOwner,
         names: Vec<String>,
     },
-    RestartPlay {
-        start: Option<Place>,
-    },
+}
+
+impl ConfirmAction {
+    pub fn destroys(&self) -> bool {
+        match self {
+            ConfirmAction::ReplaceModule { .. } => false,
+            ConfirmAction::RemoveLayer { .. } | ConfirmAction::DeleteScriptNodes { .. } => true,
+        }
+    }
 }
 
 pub struct RenameDialog {

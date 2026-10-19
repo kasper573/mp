@@ -337,7 +337,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                 (LeftTab::Content, "Content".to_owned()),
                 (LeftTab::Assets, "Assets".to_owned()),
             ];
-            widgets::tab_strip(ui, &tabs, &mut editor.panels.left);
+            widgets::tabs(ui, &tabs, &mut editor.panels.left);
             panel_body(ui, |ui| {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))
@@ -367,7 +367,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
             ..egui::Margin::ZERO
         }))
         .show(root, |ui| {
-            widgets::tab_strip(ui, &bottom_tabs, &mut editor.panels.bottom);
+            widgets::tabs(ui, &bottom_tabs, &mut editor.panels.bottom);
             panel_body(ui, |ui| {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))

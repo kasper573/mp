@@ -183,9 +183,9 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
         ui.add_space(6.0);
         ui.label(
             theme::muted(format!(
-                "The editor closed at {when} with {} unsaved {} of {}, kept in its journal outside the content folder.",
+                "The editor closed at {when} with {} unsaved row{} of {}, kept in its journal outside the content folder.",
                 data.files.len(),
-                if data.files.len() == 1 { "row" } else { "rows" },
+                widgets::plural(data.files.len()),
                 super::pretty_path(folder)
             ))
             .size(13.5),

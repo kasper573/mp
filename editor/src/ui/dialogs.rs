@@ -557,9 +557,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     }
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
-                        let danger = confirm.label.starts_with("Delete")
-                            || confirm.label.starts_with("Remove");
-                        let clicked = if danger {
+                        let clicked = if confirm.action.destroys() {
                             widgets::danger(ui, &confirm.label).clicked()
                         } else {
                             widgets::primary(ui, &confirm.label).clicked()
@@ -1011,7 +1009,6 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
         ConfirmAction::DeleteScriptNodes { owner, names } => {
             script::delete_nodes_now(editor, &owner, names)
         }
-        ConfirmAction::RestartPlay { start } => play::start(editor, start),
     }
 }
 

@@ -428,10 +428,7 @@ fn modules_column(
                 .iter()
                 .find_map(|op| condition[op].as_array().map(Vec::len))
                 .unwrap_or(1);
-            format!(
-                "condition · {blocks} {}",
-                if blocks == 1 { "block" } else { "blocks" }
-            )
+            format!("condition · {blocks} block{}", widgets::plural(blocks))
         } else {
             summary_of(cx.root, module)
         };
