@@ -46,6 +46,17 @@ pub struct Stages {
     indices: Vec<usize>,
 }
 
+impl Stages {
+    fn stage(&mut self, world: &mut World, key: &str) -> &mut Stage {
+        let indices = &mut self.indices;
+        self.stages.entry(key.to_owned()).or_insert_with(|| {
+            let index = (0..).find(|index| !indices.contains(index)).unwrap_or(0);
+            indices.push(index);
+            Stage::spawn(world, index)
+        })
+    }
+}
+
 /// What a window asks to see this frame.
 #[derive(Clone, PartialEq)]
 pub enum Scene {
@@ -287,9 +298,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
                             .insert_entry(live)
                             .into_mut(),
                         Err(problem) => {
-                            if let Some(stage) = stages.stages.get_mut(&request.key) {
-                                stage.problems = vec![problem];
-                            }
+                            stages.stage(world, &request.key).problems = vec![problem];
                             continue;
                         }
                     },
@@ -300,13 +309,9 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
             }
         };
         frame.behind = behind;
-        let taken: Vec<usize> = stages.indices.clone();
-        let stage = stages.stages.entry(request.key.clone()).or_insert_with(|| {
-            let index = (0..).find(|index| !taken.contains(index)).unwrap_or(0);
-            stages.indices.push(index);
-            Stage::spawn(world, index)
-        });
-        stage.render(world, &mut views.area.scenes, &frame);
+        stages
+            .stage(world, &request.key)
+            .render(world, &mut views.area.scenes, &frame);
     }
 }
 
