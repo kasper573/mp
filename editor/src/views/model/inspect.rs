@@ -118,14 +118,10 @@ fn strip_card(
             .iter()
             .enumerate()
             .flat_map(|(index, frame)| {
-                frame.cues().into_iter().map(move |cue| match cue {
-                    FrameCueKind::Sound => format!(
-                        "{} on frame {}",
-                        frame.sound.clone().unwrap_or_default(),
-                        index + 1
-                    ),
-                    other => format!("{} on frame {}", other.key(), index + 1),
-                })
+                frame
+                    .cues()
+                    .into_iter()
+                    .map(move |cue| format!("{} on frame {}", cue.label(), index + 1))
             })
             .collect();
         widgets::kv_text(

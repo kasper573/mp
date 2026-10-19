@@ -1040,12 +1040,7 @@ pub fn keys(
         let cues: Vec<String> = sorted
             .iter()
             .filter_map(|index| frames.get(*index))
-            .flat_map(|frame| {
-                frame.cues().into_iter().map(move |cue| match cue {
-                    FrameCueKind::Sound => frame.sound.clone().unwrap_or_default(),
-                    other => other.key().to_owned(),
-                })
-            })
+            .flat_map(|frame| frame.cues().into_iter().map(|cue| cue.label()))
             .collect();
         let kept: Vec<StripFrame> = frames
             .iter()

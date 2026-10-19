@@ -11,14 +11,14 @@ use serde_json::Value;
 
 use super::formats::{self, AnimationExport, ExportFormat};
 use super::model::{
-    self, CueMove, CuePlacement, FrameCue, MappingNote, ModelImportPlan, StripPlan, StripRetiming,
+    self, CueMove, CuePlacement, MappingNote, ModelImportPlan, StripPlan, StripRetiming,
 };
 use super::records::{DueReimport, ImportRecord};
 use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, theme, widgets};
-use crate::views::model::{StripFrame, frame_size};
+use crate::views::model::{FrameCue, StripFrame, frame_size};
 use crate::{rows, schema, thumbs};
 
 const FRAME_CARD: f32 = 48.0;
@@ -1158,7 +1158,8 @@ fn strip_section(
 }
 
 fn cue_labels(frame: &StripFrame) -> String {
-    FrameCue::of(frame)
+    frame
+        .cues()
         .iter()
         .map(FrameCue::label)
         .collect::<Vec<_>>()

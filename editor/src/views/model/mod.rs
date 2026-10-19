@@ -20,7 +20,7 @@ use engine::systems::npc::NpcDef;
 use engine::systems::player::PlayerDef;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum::{EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
 use crate::audio::WaveformCache;
@@ -49,15 +49,27 @@ pub enum ModelPage {
     Busts,
 }
 
-#[derive(
-    Clone, Copy, PartialEq, Eq, Debug, EnumString, IntoStaticStr, VariantArray, Deserialize,
+/// What a strip frame marks: the apex of an action, a sound it plays, or a footstep.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, EnumDiscriminants)]
+#[strum_discriminants(
+    name(FrameCueKind),
+    derive(EnumString, IntoStaticStr, VariantArray, Deserialize),
+    strum(serialize_all = "lowercase"),
+    serde(rename_all = "lowercase")
 )]
-#[strum(serialize_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum FrameCueKind {
+pub enum FrameCue {
     Apex,
-    Sound,
+    Sound(String),
     Step,
+}
+
+impl FrameCue {
+    pub fn label(&self) -> String {
+        match self {
+            FrameCue::Sound(sound) => sound.clone(),
+            other => FrameCueKind::from(other).key().to_owned(),
+        }
+    }
 }
 
 impl FrameCueKind {
@@ -170,12 +182,24 @@ impl Default for StripFrame {
 }
 
 impl StripFrame {
-    pub fn cues(&self) -> Vec<FrameCueKind> {
-        FrameCueKind::VARIANTS
-            .iter()
-            .copied()
-            .filter(|kind| self.has(*kind))
-            .collect()
+    pub fn cues(&self) -> Vec<FrameCue> {
+        let mut cues = Vec::new();
+        if self.apex {
+            cues.push(FrameCue::Apex);
+        }
+        cues.extend(self.sound.clone().map(FrameCue::Sound));
+        if self.step {
+            cues.push(FrameCue::Step);
+        }
+        cues
+    }
+
+    pub fn mark(&mut self, cue: &FrameCue) {
+        match cue {
+            FrameCue::Apex => self.apex = true,
+            FrameCue::Sound(sound) => self.sound = Some(sound.clone()),
+            FrameCue::Step => self.step = true,
+        }
     }
 
     pub fn has(&self, kind: FrameCueKind) -> bool {

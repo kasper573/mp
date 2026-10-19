@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport, MAX_IMAGE_PX};
 use super::records::{ImportMapping, ImportRecord};
-use crate::views::model::{self, ModelStrip, StripFrame, busts};
+use crate::views::model::{self, FrameCue, ModelStrip, StripFrame, busts};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MappingNote {
@@ -81,47 +81,10 @@ pub struct CueMove {
     pub choice: Option<CuePlacement>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum FrameCue {
-    Apex,
-    Step,
-    Sound(String),
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CuePlacement {
     Frame(usize),
     Remove,
-}
-
-impl FrameCue {
-    pub fn of(frame: &StripFrame) -> Vec<FrameCue> {
-        let mut cues = Vec::new();
-        if frame.apex {
-            cues.push(FrameCue::Apex);
-        }
-        if frame.step {
-            cues.push(FrameCue::Step);
-        }
-        cues.extend(frame.sound.clone().map(FrameCue::Sound));
-        cues
-    }
-
-    pub fn label(&self) -> String {
-        match self {
-            FrameCue::Apex => "apex".to_owned(),
-            FrameCue::Step => "step".to_owned(),
-            FrameCue::Sound(sound) => sound.clone(),
-        }
-    }
-
-    fn place(&self, frame: &mut StripFrame) {
-        match self {
-            FrameCue::Apex => frame.apex = true,
-            FrameCue::Step => frame.step = true,
-            FrameCue::Sound(sound) => frame.sound = Some(sound.clone()),
-        }
-    }
 }
 
 impl CueMove {
@@ -187,7 +150,7 @@ impl StripPlan {
                 continue;
             };
             if let Some(frame) = frames.get_mut(index) {
-                cue.cue.place(frame);
+                frame.mark(&cue.cue);
             }
         }
         frames
@@ -421,7 +384,7 @@ pub fn plan(
         let same_count = before.len() == lengths.len();
         let mut cues = Vec::new();
         for (from, frame) in before.iter().enumerate() {
-            for cue in FrameCue::of(frame) {
+            for cue in frame.cues() {
                 cues_total += 1;
                 let (to, by_pixels) = if same_count {
                     (Some(from), false)

@@ -315,11 +315,8 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.horizontal(|ui| {
                         for cue in frame.cues() {
                             let text = match cue {
-                                super::FrameCueKind::Apex => "apex".to_owned(),
-                                super::FrameCueKind::Sound => {
-                                    format!("sound {}", frame.sound.clone().unwrap_or_default())
-                                }
-                                super::FrameCueKind::Step => "step".to_owned(),
+                                super::FrameCue::Sound(sound) => format!("sound {sound}"),
+                                other => other.label(),
                             };
                             widgets::chip_colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }
