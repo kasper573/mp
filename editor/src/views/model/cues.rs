@@ -1,8 +1,10 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, RichText, Sense, Ui, Vec2};
 use serde_json::Value;
 
 use super::{ModelStrip, StripFrame, play_rule, strip_of, total_ms};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
@@ -29,10 +31,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         ui.label(RichText::new("◆").color(theme::WARN));
         ui.label(theme::strong("apex"));
         ui.label(theme::muted("the hit lands ·"));
-        ui.label(RichText::new("♫").color(theme::ACCENT));
+        glyph::show(ui, Mark::Note, 14.0, theme::ACCENT);
         ui.label(theme::strong("sound"));
         ui.label(theme::muted("plays a sound row ·"));
-        ui.label(RichText::new("●").color(theme::WARN));
+        glyph::show(ui, Mark::Dot, 10.0, theme::WARN);
         ui.label(theme::strong("step"));
         ui.label(theme::muted(
             "plays the footstep of the surface underfoot. Each rides its frame.",
@@ -59,9 +61,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         status.push_str(&format!(" · {} on frame {}", kind.key(), index + 1));
     }
     editor.status.left.push(status);
-    editor.status.left.push(
-        "Space plays with sound · M mutes the preview · A, S, T put cues on the frame".to_owned(),
-    );
+    editor.status.left.push(format!(
+        "{} plays with sound · {} mutes the preview · {}, {}, {} put cues on the frame",
+        EditorKey::PlayPause.name(),
+        EditorKey::Mute.name(),
+        EditorKey::ApexCue.name(),
+        EditorKey::SoundCue.name(),
+        EditorKey::StepCue.name()
+    ));
 }
 
 fn steps(

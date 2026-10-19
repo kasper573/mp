@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
@@ -13,11 +15,13 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
+use crate::keymap::EditorKey;
+use crate::stage;
 use crate::ui::{theme, widgets};
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
-const PREVIEW: Vec2 = Vec2::new(180.0, 350.0);
+const PREVIEW_GAP: f32 = 12.0;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
@@ -44,9 +48,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.ctx().request_repaint();
     let mut open = None;
     let mut pick = None;
-    ui.horizontal_top(|ui| {
+    let grid_width = LABEL_W + Direction::VARIANTS.len() as f32 * (CELL + 8.0);
+    let layout = if ui.available_width() >= grid_width + PREVIEW_GAP + stage::NARROWEST {
+        egui::Layout::left_to_right(egui::Align::Min)
+    } else {
+        egui::Layout::top_down(egui::Align::Min)
+    };
+    ui.with_layout(layout, |ui| {
         ui.vertical(|ui| {
-            ui.set_width(LABEL_W + Direction::VARIANTS.len() as f32 * (CELL + 8.0));
+            ui.set_width(grid_width);
             header(ui);
             let mut strips = 0;
             let mut frames_total = 0;
@@ -96,7 +106,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             let out_of_step: usize = timings.values().map(super::ActionTiming::stragglers).sum();
             ui.horizontal(|ui| {
                 if out_of_step == 0 {
-                    ui.label(RichText::new("✓").color(theme::OK));
+                    glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                     ui.label(theme::muted(format!(
                         "{strips} strips · {frames_total} frames · all match"
                     )));
@@ -107,7 +117,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     )));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("🗋 Import onto this model…").clicked() {
+                    if controls::marked(ui, Mark::Page, "Import onto this model…").clicked() {
                         import::start_for_model(editor, key);
                     }
                 });
@@ -116,7 +126,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 ui.horizontal(|ui| {
                     let export = import::show_path(editor, &record.export);
                     if record.missing() {
-                        ui.label(theme::warn("⚠"));
+                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted(format!(
                             "imported from {export}, which is missing now"
                         )));
@@ -128,9 +138,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 });
             }
         });
-        ui.add_space(12.0);
+        ui.add_space(PREVIEW_GAP);
         ui.vertical(|ui| {
-            ui.set_width(PREVIEW.x);
+            ui.set_width(stage::preview_width(ui.available_width()));
             ui.label(
                 theme::mono(strip.name())
                     .color(theme::CODE),
@@ -162,8 +172,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .left
         .push(format!("model/{key} · {}", strip.name()));
     editor.status.left.push(
-        "Space plays · , and . step frames · arrows move in the matrix · Enter opens the strip"
-            .to_owned(),
+        format!(
+            "{} plays · {} and {} step frames · {} move in the matrix · {} opens the strip",
+            EditorKey::PlayPause.name(),
+            EditorKey::PreviousFrame.name(),
+            EditorKey::NextFrame.name(),
+            EditorKey::Move.name(),
+            EditorKey::Confirm.name()
+        )
+        .to_owned(),
     );
     editor.status.right.push(format!(
         "{used} {} use this model",
@@ -250,19 +267,14 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
     if !super::keyboard_free(ui) {
         return;
     }
-    let (left, right, up, down, enter) = ui.input(|i| {
+    let ([turn, step], enter) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::ArrowLeft),
-            i.key_pressed(egui::Key::ArrowRight),
-            i.key_pressed(egui::Key::ArrowUp),
-            i.key_pressed(egui::Key::ArrowDown),
-            i.key_pressed(egui::Key::Enter),
+            EditorKey::Move.arrow(i).unwrap_or_default(),
+            EditorKey::Confirm.pressed(i),
         )
     });
     let view = editor.views.model.view_mut(key);
     let was = view.strip;
-    let turn = i32::from(right) - i32::from(left);
-    let step = i32::from(down) - i32::from(up);
     view.strip = ModelStrip {
         action: shifted(Action::VARIANTS, was.action, step as isize),
         direction: shifted(Direction::VARIANTS, was.direction, turn as isize),
@@ -302,11 +314,11 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.horizontal(|ui| {
                         for cue in frame.cues() {
                             let text = match cue {
-                                super::FrameCueKind::Apex => "◆ apex".to_owned(),
+                                super::FrameCueKind::Apex => "apex".to_owned(),
                                 super::FrameCueKind::Sound => {
-                                    format!("♫ {}", frame.sound.clone().unwrap_or_default())
+                                    format!("sound {}", frame.sound.clone().unwrap_or_default())
                                 }
-                                super::FrameCueKind::Step => "● step".to_owned(),
+                                super::FrameCueKind::Step => "step".to_owned(),
                             };
                             widgets::chip_colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }
@@ -328,7 +340,13 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             ui.label(theme::faint(format!("{total} ms")).monospace().size(11.5));
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 ui.add_space((ui.available_width() / 2.0 - 120.0).max(0.0));
-                ui.label(theme::faint("Enter opens the strip in the animation editor").size(12.0));
+                ui.label(
+                    theme::faint(format!(
+                        "{} opens the strip in the animation editor",
+                        EditorKey::Confirm.name()
+                    ))
+                    .size(12.0),
+                );
             });
         });
     });

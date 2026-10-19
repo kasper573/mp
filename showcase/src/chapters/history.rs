@@ -1,4 +1,4 @@
-use driver::{UiTarget, on_quest, told_by};
+use driver::{UiTarget, input_name, on_quest, told_by};
 use engine::core::tiling::Tiles;
 use engine::systems::history::HistoryMark;
 use engine::systems::input::map::InputAction;
@@ -51,14 +51,17 @@ fn play(shoot: &mut Shoot) {
         told_by(snapshot, "Gulls")
     });
 
-    me.caption("History has its own slot in the toolbar, or press H");
+    me.caption(&format!(
+        "History has its own slot in the toolbar, or press {}",
+        input_name(InputAction::ToggleHistory)
+    ));
     me.hover_ui(UiTarget::image(HISTORY));
     me.hold();
     me.click_ui(UiTarget::image(HISTORY));
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
-    me.caption_top("All of it, in order: conversations grouped, what you heard, what you gained");
+    me.caption("All of it, in order: conversations grouped, what you heard, what you gained");
     for (tab, says) in TABS {
-        me.caption_top(says);
+        me.caption(says);
         me.open_history_tab(tab);
     }
     me.hold();
@@ -80,7 +83,7 @@ fn play(shoot: &mut Shoot) {
                 .iter()
                 .any(|record| record.mark == Some(HistoryMark::Arrived))
     });
-    me.caption_top("Changing area adds a divider, so you can tell where things happened");
+    me.caption("Changing area adds a divider, so you can tell where things happened");
     me.hold();
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);

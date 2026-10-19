@@ -1,12 +1,14 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 
-use egui::{Align2, Key, Pos2, Ui};
+use egui::{Align2, Pos2, Ui};
 use engine::core::script::OwnerKindDef;
 
 use super::graph::NodePaletteOpen;
 use super::nodes::{NodeCatalogue, NodeEntry};
 use super::{ScriptDoc, add_node, nodes};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::catalogue_of;
 use crate::ui::{theme, widgets};
 
@@ -101,11 +103,11 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let mut close = false;
     let (up, down, right, left, enter) = ui.input(|i| {
         (
-            i.key_pressed(Key::ArrowUp),
-            i.key_pressed(Key::ArrowDown),
-            i.key_pressed(Key::ArrowRight),
-            i.key_pressed(Key::ArrowLeft),
-            i.key_pressed(Key::Enter),
+            EditorKey::Move.arrow(i) == Some([0, -1]),
+            EditorKey::Move.arrow(i) == Some([0, 1]),
+            EditorKey::Move.arrow(i) == Some([1, 0]),
+            EditorKey::Move.arrow(i) == Some([-1, 0]),
+            EditorKey::Confirm.pressed(i),
         )
     });
     if down && !rows.is_empty() {
@@ -180,7 +182,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                 .stroke(egui::Stroke::new(1.0, theme::BORDER))
                 .corner_radius(6.0)
                 .inner_margin(egui::Margin::same(8))
-                .shadow(theme::SHADOW)
+                .shadow(design_tokens::slip::SHADOW)
                 .show(ui, |ui| {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
@@ -260,12 +262,16 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                         }
                         ui.label(
                             theme::faint(
-                                "↑↓ choose · Enter places it at the arrow · words, names and systems all match",
+                                format!(
+                                    "{} choose · {} places it at the arrow · words, names and systems all match",
+                                    EditorKey::Move.name(),
+                                    EditorKey::Confirm.name()
+                                ),
                             )
                             .size(11.5),
                         );
                     }
-                    if ui.input(|i| i.key_pressed(Key::Escape)) {
+                    if ui.input(|i| EditorKey::Cancel.pressed(i)) {
                         close = true;
                     }
                 });
@@ -427,11 +433,17 @@ fn group_row(
     }
     let font = egui::FontId::monospace(12.5);
     let ink = if selected { theme::TEXT } else { theme::MUTED };
-    ui.painter().text(
-        rect.left_center() + egui::vec2(6.0, 0.0),
-        Align2::LEFT_CENTER,
-        if open { "▾" } else { "▸" },
-        egui::FontId::proportional(11.0),
+    glyph::paint(
+        ui.painter(),
+        if open {
+            Mark::ChevronDown
+        } else {
+            Mark::ChevronRight
+        },
+        egui::Rect::from_min_size(
+            rect.left_center() + egui::vec2(6.0, -4.5),
+            egui::vec2(9.0, 9.0),
+        ),
         theme::FAINT,
     );
     let name = ui.painter().text(

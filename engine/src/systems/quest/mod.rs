@@ -26,7 +26,7 @@ use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::class;
 use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
-use crate::systems::interface::{InterfaceIcon, InterfaceSound};
+use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{
     INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack, scatter_drop,
 };
@@ -328,16 +328,13 @@ impl QuestDef {
     }
 
     pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
-        if self.time_limit().is_some() {
-            return &InterfaceIcon::Timed.get(content).image;
-        }
         if self.daily() {
             return &AttentionMark::RepeatableOffered.get(content).icon;
         }
-        self.objectives().next().map_or(
-            &AttentionMark::QuestOffered.get(content).icon,
-            |objective| objective.icon(content),
-        )
+        self.objectives()
+            .next()
+            .and_then(|objective| objective.icon(content))
+            .unwrap_or(&AttentionMark::QuestOffered.get(content).icon)
     }
 
     pub fn hand_in_hint(&self, parties: &Parties, quest: QuestId) -> String {
@@ -399,13 +396,11 @@ pub enum Objective {
 }
 
 impl Objective {
-    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a AssetRef> {
         match self {
-            Objective::Hold(stack) => &stack.item.get(content).icon,
-            Objective::Defeat { .. } => &InterfaceIcon::ObjectiveDefeat.get(content).image,
-            Objective::Task { .. } => &InterfaceIcon::ObjectiveTask.get(content).image,
-            Objective::Deliver { item } => &item.get(content).icon,
-            Objective::Decide { .. } => &InterfaceIcon::ObjectiveDecide.get(content).image,
+            Objective::Hold(stack) => Some(&stack.item.get(content).icon),
+            Objective::Deliver { item } => Some(&item.get(content).icon),
+            Objective::Defeat { .. } | Objective::Task { .. } | Objective::Decide { .. } => None,
         }
     }
 }
@@ -734,7 +729,7 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         world,
         player,
         format!("Quest accepted · {}", def.title),
-        &offered_mark(def).get(&content).icon,
+        Some(&offered_mark(def).get(&content).icon),
         Some(InterfaceSound::QuestAccepted.id(&content)),
     );
     raise(world, quest, EventKind::Accepted, player);
@@ -836,7 +831,7 @@ pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
         world,
         player,
         format!("Quest abandoned · {}", quest.get(&content).title),
-        &AttentionMark::QuestInProgress.get(&content).icon,
+        Some(&AttentionMark::QuestInProgress.get(&content).icon),
         Some(InterfaceSound::QuestAbandoned.id(&content)),
     );
     raise(world, quest, EventKind::Failed, player);
@@ -894,8 +889,17 @@ fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     );
 }
 
-fn tell(world: &mut World, player: Entity, text: String, icon: &AssetRef, sfx: Option<SfxId>) {
-    let mut told = Notification::feed(HistoryTopic::Quest, text).icon(icon.path());
+fn tell(
+    world: &mut World,
+    player: Entity,
+    text: String,
+    icon: Option<&AssetRef>,
+    sfx: Option<SfxId>,
+) {
+    let mut told = Notification::feed(HistoryTopic::Quest, text);
+    if let Some(icon) = icon {
+        told = told.icon(icon.path());
+    }
     if let Some(sfx) = sfx {
         told = told.sound(sfx);
     }
@@ -1224,7 +1228,7 @@ fn announce(world: &mut World, player: Entity, clock: WallClock) {
         world.entity_mut(player).insert(log);
     }
     for (text, icon, sfx) in told {
-        tell(world, player, text, icon, sfx);
+        tell(world, player, text, Some(icon), sfx);
     }
 }
 
@@ -1252,7 +1256,6 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
                             HistoryTopic::Quest,
                             def.objective_label(&content, &parties, active.quest, objective),
                         )
-                        .icon(objective.icon(&content).path())
                         .tally(RecordTally::Progress {
                             have: active.counts[index],
                             need: count,

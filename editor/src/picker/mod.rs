@@ -6,12 +6,15 @@
 pub mod assets;
 pub mod rows;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Color32, Layout, RichText, Sense, Stroke, Ui, Vec2};
 
 pub use self::assets::AssetSource;
 pub use self::rows::{PictureFrame, RowSource, picture_of};
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
+use crate::keymap::EditorKey;
 use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 
@@ -178,12 +181,7 @@ pub fn field(
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         if !pick.is_empty()
             && let Some(action) = source.opens(pick)
-            && ui
-                .add(
-                    egui::Button::new(RichText::new("→").color(Color32::WHITE))
-                        .fill(theme::ACCENT)
-                        .min_size(Vec2::new(26.0, ui.spacing().interact_size.y)),
-                )
+            && controls::button(ui, "→")
                 .on_hover_text(format!("Open {}", source.shown(pick).1))
                 .clicked()
         {
@@ -246,15 +244,8 @@ pub fn field(
 fn chip(ui: &mut Ui, cx: &mut FormCx, source: &dyn PickSource, pick: &Pick) -> egui::Response {
     let empty = pick.is_empty();
     egui::Frame::new()
-        .fill(if empty {
-            theme::INPUT
-        } else {
-            theme::ACCENT_SOFT
-        })
-        .stroke(Stroke::new(
-            1.0,
-            if empty { theme::BORDER } else { theme::ACCENT },
-        ))
+        .fill(theme::INPUT)
+        .stroke(Stroke::new(1.0, theme::BORDER))
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
@@ -289,9 +280,20 @@ fn popover(
     cx.state.status = vec![
         field.to_owned(),
         if pick.is_empty() {
-            "↑ ↓ ← → move · Enter picks · Esc closes".to_owned()
+            format!(
+                "{} move · {} picks · {} closes",
+                EditorKey::Move.name(),
+                EditorKey::Confirm.name(),
+                EditorKey::Cancel.name()
+            )
         } else {
-            format!("↑ ↓ ← → move · Enter picks · Esc keeps {}", pick.key)
+            format!(
+                "{} move · {} picks · {} keeps {}",
+                EditorKey::Move.name(),
+                EditorKey::Confirm.name(),
+                EditorKey::Cancel.name(),
+                pick.key
+            )
         },
     ];
     let search_id = id.with("search");
@@ -343,7 +345,7 @@ fn popover(
         .inner_margin(egui::Margin::symmetric(6, 3))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(theme::muted("🔍"));
+                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut search)
                         .frame(egui::Frame::NONE)
@@ -386,10 +388,10 @@ fn popover(
     }
     let (up, down, enter, escape) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::ArrowUp),
-            i.key_pressed(egui::Key::ArrowDown),
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
+            EditorKey::Move.arrow(i) == Some([0, -1]),
+            EditorKey::Move.arrow(i) == Some([0, 1]),
+            EditorKey::Confirm.pressed(i),
+            EditorKey::Cancel.pressed(i),
         )
     });
     let grid = source.grid();
@@ -403,8 +405,8 @@ fn popover(
     if grid {
         let (left, right) = ui.input(|i| {
             (
-                i.key_pressed(egui::Key::ArrowLeft),
-                i.key_pressed(egui::Key::ArrowRight),
+                EditorKey::Move.arrow(i) == Some([-1, 0]),
+                EditorKey::Move.arrow(i) == Some([1, 0]),
             )
         });
         if right {
@@ -500,7 +502,7 @@ fn line(
         ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
     } else if response.hovered() {
         ui.painter()
-            .rect_filled(rect, 4.0, Color32::from_rgba_unmultiplied(255, 255, 255, 8));
+            .rect_filled(rect, 4.0, design_tokens::ink::gold_wash(0.2));
     }
     let mut child = ui.new_child(
         egui::UiBuilder::new()

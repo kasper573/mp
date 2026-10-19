@@ -29,10 +29,11 @@ pub use blueprint::{
 };
 pub use resize::ResizeDialog;
 
+use design_tokens::glyph::{self, Mark};
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::World;
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
+use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::Content;
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
@@ -46,6 +47,7 @@ use self::overlays::{
 };
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
+use crate::keymap::EditorKey;
 use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::ui::{sidebar, theme, widgets};
@@ -126,16 +128,16 @@ impl AreaTool {
         AreaTool::Module,
     ];
 
-    pub fn key(self) -> egui::Key {
+    pub fn key(self) -> EditorKey {
         match self {
-            AreaTool::Select => egui::Key::V,
-            AreaTool::Paint => egui::Key::B,
-            AreaTool::Terrain => egui::Key::T,
-            AreaTool::Fill => egui::Key::G,
-            AreaTool::Erase => egui::Key::E,
-            AreaTool::Eyedropper => egui::Key::I,
-            AreaTool::Stamp => egui::Key::S,
-            AreaTool::Module => egui::Key::M,
+            AreaTool::Select => EditorKey::SelectTool,
+            AreaTool::Paint => EditorKey::PaintTool,
+            AreaTool::Terrain => EditorKey::TerrainTool,
+            AreaTool::Fill => EditorKey::FillTool,
+            AreaTool::Erase => EditorKey::EraseTool,
+            AreaTool::Eyedropper => EditorKey::EyedropperTool,
+            AreaTool::Stamp => EditorKey::StampTool,
+            AreaTool::Module => EditorKey::ModuleTool,
         }
     }
 
@@ -160,10 +162,6 @@ impl AreaTool {
             AreaTool::Stamp => "Stamp",
             AreaTool::Module => "Module",
         }
-    }
-
-    pub fn icon(self) -> &'static str {
-        self.key().name()
     }
 }
 
@@ -447,7 +445,8 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
-    sidebar::right(ui, "area", |ui| inspect::sidebar(editor, ui, key));
+    sidebar::row(ui, "area", |ui| inspect::row(editor, ui, key));
+    sidebar::inspector(ui, "area", |ui| inspect::sidebar(editor, ui, key));
     show_canvas(editor, ui, &view_key, key, None);
     play::banner(editor, ui);
 }
@@ -500,19 +499,26 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label("No area to preview the blueprint on");
         return;
     };
-    sidebar::right(ui, "blueprint", |ui| {
-        let selection = editor.selection.clone();
-        let indices: Vec<usize> =
-            if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
-                selection
-                    .parts
-                    .iter()
-                    .filter_map(|p| blueprint_part_index(p))
-                    .collect()
-            } else {
-                Vec::new()
-            };
-        parts::show_blueprint(editor, ui, key, &indices);
+    let selection = editor.selection.clone();
+    let indices: Vec<usize> =
+        if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
+            selection
+                .parts
+                .iter()
+                .filter_map(|p| blueprint_part_index(p))
+                .collect()
+        } else {
+            Vec::new()
+        };
+    sidebar::row(ui, "blueprint", |ui| {
+        parts::blueprint_row(editor, ui, key, &indices)
+    });
+    sidebar::inspector(ui, "blueprint", |ui| {
+        if indices.is_empty() {
+            sidebar::nothing_selected(ui, "Select a part to inspect it here.");
+        } else {
+            parts::selected_parts(editor, ui, key, &indices);
+        }
     });
     show_canvas(editor, ui, &view_key, &preview, Some(key));
 }
@@ -644,13 +650,9 @@ fn banners(
             .layout(egui::Layout::top_down(egui::Align::Min)),
     );
     let chip = |ui: &mut Ui, body: &mut dyn FnMut(&mut Ui)| {
-        egui::Frame::new()
-            .fill(Color32::from_rgba_unmultiplied(20, 22, 26, 230))
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(8, 4))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| body(ui));
-            });
+        design_tokens::slip::show(ui, |ui| {
+            ui.horizontal(|ui| body(ui));
+        });
     };
     let mut done = false;
     if let Some(place) = in_place.last() {
@@ -669,19 +671,19 @@ fn banners(
             .unwrap_or(0);
         let name = place.blueprint.clone();
         chip(&mut child, &mut |ui| {
-            ui.label(RichText::new("▣").color(theme::WARN));
+            glyph::show(ui, Mark::Grid, 14.0, theme::WARN);
             ui.label(
                 theme::mono(format!(
                     "Editing blueprint {name} · {count} placement{} on {area_key} change with it",
                     widgets::plural(count)
                 ))
                 .size(13.0)
-                .color(Color32::WHITE),
+                .color(theme::TEXT),
             );
             if widgets::primary(ui, "Done").clicked() {
                 done = true;
             }
-            widgets::key_hint(ui, "Esc");
+            widgets::key_chip(ui, EditorKey::Cancel);
         });
         child.add_space(4.0);
         let crumbs: Vec<String> = std::iter::once(area_key.clone())
@@ -691,19 +693,15 @@ fn banners(
             ui.label(
                 theme::mono(crumbs.join(" › "))
                     .size(13.0)
-                    .color(Color32::WHITE),
+                    .color(theme::TEXT),
             );
         });
     } else if blueprint.is_some() {
         let areas: Vec<String> = content.table::<area::AreaDef>().keys().to_vec();
         let mut picked = preview_area.clone().unwrap_or(area_key.clone());
         chip(&mut child, &mut |ui| {
-            ui.label(theme::muted("👁"));
-            ui.label(
-                theme::mono("preview ground:")
-                    .size(13.0)
-                    .color(Color32::WHITE),
-            );
+            glyph::show(ui, Mark::Eye, 13.0, theme::MUTED);
+            ui.label(theme::mono("preview ground:").size(13.0).color(theme::TEXT));
             widgets::combo_box((view_key, "preview-ground"))
                 .selected_text(theme::mono(&picked).size(13.0))
                 .show_ui(ui, |ui| {
@@ -740,7 +738,7 @@ fn canvas(
 ) {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, 0.0, Color32::from_rgb(20, 20, 24));
+    painter.rect_filled(rect, 0.0, theme::CANVAS);
     let area = area::load(content, area_id);
     let area_key = area_id.key(content).to_owned();
     let ppp = ui.ctx().pixels_per_point();
@@ -1027,7 +1025,7 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection)
             .iter()
             .filter_map(|p| blueprint_part_index(p))
             .collect();
-        parts::show_blueprint(editor, ui, &key, &indices);
+        parts::selected_parts(editor, ui, &key, &indices);
         return;
     }
     inspect::show_parts(editor, ui, selection);

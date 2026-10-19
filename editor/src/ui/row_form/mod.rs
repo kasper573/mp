@@ -2,6 +2,8 @@ pub mod bindings;
 pub mod preview;
 
 use self::preview::PreviewPlace;
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -10,7 +12,7 @@ pub mod usages;
 
 use std::collections::BTreeMap;
 
-use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::ModuleRule;
 use serde_json::Value;
 
@@ -28,9 +30,11 @@ use crate::app::{
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms;
 use crate::forms::{FormAction, FormChange, FormCx};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::rows::new_row_into;
 use crate::schema;
+use crate::stage;
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
@@ -40,8 +44,6 @@ use crate::views::{class, model, script, skill, tileset, vfx};
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
 const SINGLE_COLUMN: f32 = 560.0;
-const PREVIEW: f32 = 384.0;
-const MIN_PREVIEW: f32 = 240.0;
 const COLUMN_GAP: f32 = 16.0;
 
 pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
@@ -64,7 +66,7 @@ pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
             });
         return;
     }
-    let preview_width = (ui.available_width() / 3.0).clamp(MIN_PREVIEW, PREVIEW);
+    let preview_width = stage::preview_width(ui.available_width() / 3.0);
     let form_width = ui.available_width() - preview_width - COLUMN_GAP;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
@@ -151,7 +153,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
                         if table == "input" {
-                            changed |= bindings_section(ui, cx.files, key, &mut value);
+                            changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                         } else {
                             changed |= modules_column(
                                 ui,
@@ -172,7 +174,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
                 if table == "input" {
                     ui.add_space(10.0);
-                    changed |= bindings_section(ui, cx.files, key, &mut value);
+                    changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                 }
                 if has_modules {
                     ui.add_space(10.0);
@@ -263,7 +265,7 @@ fn row_card(
                 }
                 if !fixture
                     && ui
-                        .add(egui::Button::new("Rename key…").shortcut_text("F2"))
+                        .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
                         .clicked()
                 {
                     cx.actions
@@ -278,7 +280,7 @@ fn row_card(
                 if !fixture {
                     ui.separator();
                     if ui
-                        .add(egui::Button::new("Delete…").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
                         .clicked()
                     {
                         cx.actions
@@ -349,51 +351,41 @@ fn modules_column(
     } else {
         count
     };
-    ui.horizontal(|ui| {
-        widgets::section_count(
-            ui,
-            if scripts_only {
-                "Area scripts"
-            } else {
-                "Modules"
-            },
-            shown,
-        );
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let button = ui.add(
-                egui::Button::new(RichText::new("+ Add module").color(Color32::WHITE))
-                    .fill(theme::ACCENT)
-                    .stroke(egui::Stroke::NONE),
-            );
-            let popup = egui::Popup::from_toggle_button_response(&button)
-                .id(ui.id().with("add-module"))
-                .width(330.0);
-            popup.show(|ui| {
-                if let Some(template) = add_module_popup(
-                    ui,
-                    cx,
-                    table,
-                    &variants,
-                    value["modules"].as_array().expect("modules"),
-                    scripts_only,
-                    status,
-                ) {
-                    let list = value["modules"].as_array_mut().expect("modules");
-                    list.push(template);
-                    let path = format!("{table}/modules/{}", list.len() - 1);
-                    cx.state.folded.remove(&path);
-                    changed = FormChange::at("/modules");
-                    ui.close();
-                }
-            });
-            if ui
-                .small_button("Paste")
-                .on_hover_text("Paste copied modules")
-                .clicked()
-            {
-                ops.push(ModuleOp::Paste);
+    let heading = if scripts_only {
+        "Area scripts"
+    } else {
+        "Modules"
+    };
+    widgets::section_with(ui, &format!("{heading} · {shown}"), |ui| {
+        let button = controls::primary(ui, "+ Add module");
+        let popup = egui::Popup::from_toggle_button_response(&button)
+            .id(ui.id().with("add-module"))
+            .width(330.0);
+        popup.show(|ui| {
+            if let Some(template) = add_module_popup(
+                ui,
+                cx,
+                table,
+                &variants,
+                value["modules"].as_array().expect("modules"),
+                scripts_only,
+                status,
+            ) {
+                let list = value["modules"].as_array_mut().expect("modules");
+                list.push(template);
+                let path = format!("{table}/modules/{}", list.len() - 1);
+                cx.state.folded.remove(&path);
+                changed = FormChange::at("/modules");
+                ui.close();
             }
         });
+        if ui
+            .small_button("Paste")
+            .on_hover_text("Paste copied modules")
+            .clicked()
+        {
+            ops.push(ModuleOp::Paste);
+        }
     });
     let free = free_singles(cx, table, &variants, value);
     if !free.is_empty() {
@@ -449,24 +441,6 @@ fn modules_column(
             ui.set_width(ui.available_width());
             let header = ui
                 .horizontal(|ui| {
-                    ui.label(
-                        theme::strong(if is_script {
-                            tag.replace('_', " ")
-                        } else {
-                            tag.clone()
-                        })
-                        .monospace(),
-                    );
-                    if folded || !is_script {
-                        ui.add(
-                            egui::Label::new(
-                                RichText::new(summary.to_uppercase())
-                                    .size(11.0)
-                                    .color(theme::MUTED),
-                            )
-                            .truncate(),
-                        );
-                    }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.menu_button(theme::faint("…"), |ui| {
                             if ui.button("Copy").clicked() {
@@ -492,7 +466,36 @@ fn modules_column(
                                 ui.close();
                             }
                         });
-                        ui.label(theme::faint(if folded { "▸" } else { "▾" }).size(11.0));
+                        glyph::show(
+                            ui,
+                            if folded {
+                                Mark::ChevronRight
+                            } else {
+                                Mark::ChevronDown
+                            },
+                            11.0,
+                            theme::FAINT,
+                        );
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                            ui.label(
+                                theme::strong(if is_script {
+                                    tag.replace('_', " ")
+                                } else {
+                                    tag.clone()
+                                })
+                                .monospace(),
+                            );
+                            if folded || !is_script {
+                                ui.add(
+                                    egui::Label::new(
+                                        RichText::new(summary.to_uppercase())
+                                            .size(11.0)
+                                            .color(theme::MUTED),
+                                    )
+                                    .truncate(),
+                                );
+                            }
+                        });
                     });
                 })
                 .response
@@ -702,7 +705,7 @@ pub(super) fn add_module_popup(
             String::new()
         }
     ));
-    if picked.is_some() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if picked.is_some() || ui.input(|i| EditorKey::Cancel.pressed(i)) {
         clear_draft(ui, id);
         if picked.is_none() {
             ui.close();
@@ -757,9 +760,10 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
                 pointer: path,
                 area: None,
             });
-            editor.toast(
-                "Click a walkable cell on an area to pick the place (Alt-click for any point)",
-            );
+            editor.toast(format!(
+                "Click a walkable cell on an area to pick the place ({} click for any point)",
+                EditorKey::Unsnapped.name()
+            ));
         }
         FormAction::NewRow {
             table: into_table,

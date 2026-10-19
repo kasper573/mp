@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
@@ -12,29 +13,18 @@ use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
-use crate::ui::{dialogs, row_form, theme, widgets};
+use crate::ui::{dialogs, row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    let Some(owner) = editor.views.script.focused() else {
-        ui.label(theme::muted("No script in view"));
-        return;
-    };
-    let Some(doc) = ScriptDoc::load(editor, &owner) else {
-        ui.label(theme::muted(format!("{} is gone", owner.title())));
-        return;
-    };
+pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
+    let owner = doc.owner.clone();
     super::sync_with_content(editor);
-    let names: Vec<String> = selection
-        .parts
-        .iter()
-        .filter_map(|part| part.strip_prefix("node:").map(str::to_owned))
-        .filter(|name| doc.nodes().contains_key(name))
-        .collect();
+    let names = selected_nodes(doc, selection);
     let choice: Option<(String, usize)> = selection
         .parts
         .iter()
@@ -44,20 +34,24 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     egui::ScrollArea::vertical()
         .id_salt(("script-inspector", owner.slug()))
         .show(ui, |ui| match names.as_slice() {
-            [] => script_inspector(editor, ui, &doc),
+            [] => {
+                if !super::run::inspector(editor, ui, doc) {
+                    sidebar::nothing_selected(ui, "Select a node to inspect it here.");
+                }
+            }
             [name] => {
                 let name = name.clone();
                 match &choice {
                     Some((node, index)) if *node == name => {
-                        choice_inspector(editor, ui, &doc, &name, *index)
+                        choice_inspector(editor, ui, doc, &name, *index)
                     }
-                    _ => node_inspector(editor, ui, &doc, &name),
+                    _ => node_inspector(editor, ui, doc, &name),
                 }
             }
             many => {
                 breadcrumb(
                     ui,
-                    &format!("{} › {} nodes", owner_short(editor, &doc), many.len()),
+                    &format!("{} › {} nodes", owner_short(editor, doc), many.len()),
                 );
                 widgets::card_frame(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
@@ -74,7 +68,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     }
                     ui.add_space(6.0);
                     if widgets::danger(ui, "Delete these nodes").clicked() {
-                        super::delete_nodes(editor, &doc, many.to_vec());
+                        super::delete_nodes(editor, doc, many.to_vec());
                     }
                 });
             }
@@ -94,11 +88,17 @@ fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
     }
 }
 
-pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
+    selection
+        .parts
+        .iter()
+        .filter_map(|part| part.strip_prefix("node:").map(str::to_owned))
+        .filter(|name| doc.nodes().contains_key(name))
+        .collect()
+}
+
+pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
-    if super::run::inspector(editor, ui, doc) {
-        return;
-    }
     if doc.is_shared() {
         shared_inspector(editor, ui, doc);
     } else {
@@ -265,7 +265,7 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             .unwrap_or_default();
         let response = ui
             .horizontal(|ui| {
-                ui.label(theme::faint("▸").size(12.0));
+                glyph::show(ui, Mark::ChevronRight, 12.0, theme::FAINT);
                 ui.label(theme::strong(&event).monospace().size(13.0));
                 ui.label(
                     theme::muted(detail.replace(" tiles", ""))
@@ -285,7 +285,10 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if !any {
         widgets::hint(
             ui,
-            "No event yet: Tab opens the palette with the events this owner answers.",
+            &format!(
+                "No event yet: {} opens the palette with the events this owner answers.",
+                EditorKey::Palette.name()
+            ),
         );
     }
     if let Some(name) = go {
@@ -586,11 +589,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                             script["variables"][name]["default"] = value;
                             changed = FormChange::at(&path);
                         }
-                        if ui
-                            .add(
-                                egui::Label::new(theme::faint("✕").size(11.0))
-                                    .sense(egui::Sense::click()),
-                            )
+                        if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                             .on_hover_text("Drop the default")
                             .clicked()
                         {
@@ -742,11 +741,16 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut toggle_outline = false;
     let mut make = false;
     ui.horizontal(|ui| {
-        if widgets::keyed_button(ui, "▶ Run", "F8", true).clicked() {
+        if widgets::keyed_button(ui, "▶ Run", Some(EditorKey::RunScript), true).clicked() {
             fire = true;
         }
-        if widgets::keyed_button(ui, if outline { "Canvas" } else { "Outline" }, "O", true)
-            .clicked()
+        if widgets::keyed_button(
+            ui,
+            if outline { "Canvas" } else { "Outline" },
+            Some(EditorKey::Outline),
+            true,
+        )
+        .clicked()
         {
             toggle_outline = true;
         }
@@ -819,15 +823,24 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 widgets::card_header(ui, &title, "", |ui| {
-                    if ui.button("Rename…  F2").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Rename…", EditorKey::Rename))
+                        .clicked()
+                    {
                         rename = true;
                         ui.close();
                     }
-                    if ui.button("Duplicate  Ctrl D").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
+                        .clicked()
+                    {
                         duplicate = true;
                         ui.close();
                     }
-                    if ui.button("Delete  Del").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Delete", EditorKey::Delete))
+                        .clicked()
+                    {
                         delete = true;
                         ui.close();
                     }
@@ -1254,7 +1267,7 @@ fn dialogue_form(
     }
     if ui
         .button("+ line")
-        .on_hover_text("Enter on the card")
+        .on_hover_text(format!("{} on the card", EditorKey::Confirm.name()))
         .clicked()
     {
         if let Some(lines) = node["lines"].as_array_mut() {
@@ -1295,7 +1308,7 @@ fn dialogue_form(
     }
     if ui
         .button("+ choice")
-        .on_hover_text("Ctrl Enter on the card")
+        .on_hover_text(format!("{} on the card", EditorKey::AddChoice.name()))
         .clicked()
     {
         super::add_choice(node);
@@ -1407,7 +1420,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) 
                     }
                     if ui
                         .add(
-                            egui::Label::new(theme::faint("✕ no condition").size(11.5))
+                            egui::Label::new(theme::faint("remove the condition").size(11.5))
                                 .sense(egui::Sense::click()),
                         )
                         .clicked()
@@ -1618,7 +1631,7 @@ fn speaker_rows(
     else {
         return changed;
     };
-    widgets::kv(ui, "└ npc", |ui| {
+    widgets::kv(ui, "  npc", |ui| {
         if picker::row(ui, cx, "npc", &mut npc, &format!("{path}/npc")) {
             by["npc"] = Value::String(npc.clone());
             changed = FormChange::at(path);
@@ -1639,7 +1652,7 @@ fn speaker_rows(
         .cloned()
         .unwrap_or(serde_json::json!({ "x-face": true, "type": ["string", "null"] }));
     let mut face_value = face.clone().map_or(Value::Null, Value::String);
-    widgets::kv(ui, "└ face", |ui| {
+    widgets::kv(ui, "  face", |ui| {
         let speaker = LineSpeaker::Npc {
             npc: npc.clone(),
             face,
@@ -1914,10 +1927,11 @@ pub fn make_shared_body(
         .status
         .left
         .push(format!("{owner} › inline script · make shared"));
-    editor
-        .status
-        .right
-        .push("Enter makes it · Esc cancels".to_owned());
+    editor.status.right.push(format!(
+        "{} makes it · {} cancels",
+        EditorKey::Confirm.name(),
+        EditorKey::Cancel.name()
+    ));
     match outcome {
         Some(true) => match make_shared(editor, &dialog) {
             Ok(()) => None,
@@ -2131,10 +2145,11 @@ pub fn make_inline_body(
         .status
         .left
         .push(format!("script/{} · make inline", dialog.key));
-    editor
-        .status
-        .right
-        .push("Enter makes it · Esc cancels".to_owned());
+    editor.status.right.push(format!(
+        "{} makes it · {} cancels",
+        EditorKey::Confirm.name(),
+        EditorKey::Cancel.name()
+    ));
     match outcome {
         Some(true) => {
             make_inline(editor, &dialog);

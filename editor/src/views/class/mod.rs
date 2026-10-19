@@ -1,6 +1,7 @@
 pub mod inspect;
 pub mod tree;
 
+use design_tokens::glyph::{self, Mark};
 use std::collections::HashMap;
 
 use egui::Ui;
@@ -58,11 +59,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     let page = editor.views.class.page(key);
     let selection = editor.selection.clone();
-    if page == ClassPage::Tree
-        && selection.keys.first().is_some_and(|k| k == key)
-        && node_of(&selection).is_some()
-    {
-        sidebar::right(ui, "class-node", |ui| inspect::show(editor, ui, &selection));
+    if page == ClassPage::Tree {
+        sidebar::inspector(ui, "class-node", |ui| {
+            if selection.keys.first().is_some_and(|k| k == key) && node_of(&selection).is_some() {
+                inspect::show(editor, ui, &selection);
+            } else {
+                sidebar::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
+            }
+        });
     }
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)
@@ -172,8 +176,7 @@ fn level_card(
                 format!("from {xp} xp")
             }));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                     .on_hover_text("Remove this level")
                     .clicked()
                 {
@@ -233,8 +236,7 @@ fn level_card(
                     &stat_path,
                     false,
                 );
-                if ui
-                    .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                     .on_hover_text(format!("Unset {key}"))
                     .clicked()
                 {

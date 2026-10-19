@@ -307,7 +307,7 @@ fn sound_row(
         egui::Align2::LEFT_CENTER,
         sfx,
         egui::FontId::monospace(12.5),
-        if on { Color32::WHITE } else { theme::TEXT },
+        theme::TEXT,
     );
     let wave_rect = ERect::from_min_max(
         egui::pos2(rect.min.x + 130.0, rect.min.y + 4.0),

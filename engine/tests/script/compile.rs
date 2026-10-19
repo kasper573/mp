@@ -320,7 +320,7 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "animate", "action": "attack", "wait": "apex" }),
         json!({ "type": "use_skill", "skill": "slash", "at": { "type": "subject" } }),
         json!({ "type": "reset_skills" }),
-        json!({ "type": "vfx", "vfx": "damage_taken", "params": { "amount": 3.0 } }),
+        json!({ "type": "vfx", "vfx": "damage_taken" }),
         json!({ "type": "set_attitude", "attitude": "hostile" }),
         json!({ "type": "spawn_npcs", "npc": "orc", "count": 1, "near": "subject", "shown": "everyone" }),
         json!({ "type": "despawn" }),

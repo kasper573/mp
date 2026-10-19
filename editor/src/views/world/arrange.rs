@@ -6,6 +6,7 @@ use engine::systems::area::world_map::WorldMapDef;
 
 use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
 use crate::app::{Editor, ModalDialog};
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
@@ -20,9 +21,9 @@ const HINT: f32 = 0.5;
 const SLACK: f32 = 0.1;
 const ROUNDS: usize = 50;
 const PREVIEW: Vec2 = Vec2::new(330.0, 250.0);
-const PREVIEW_LINK: Color32 = Color32::from_rgba_unmultiplied_const(200, 200, 220, 110);
-const PREVIEW_PINNED: Color32 = Color32::from_rgb(120, 160, 230);
-const PREVIEW_CARD: Color32 = Color32::from_rgb(110, 118, 140);
+const PREVIEW_LINK: Color32 = Color32::from_rgba_premultiplied(19, 14, 9, 115);
+const PREVIEW_PINNED: Color32 = design_tokens::ink::AZURE;
+const PREVIEW_CARD: Color32 = design_tokens::ink::INK3;
 
 pub struct ArrangeDialog {
     options: ArrangeOptions,
@@ -101,7 +102,7 @@ pub fn dialog(
         .count();
     let mut answer = None;
     dialogs::card(ctx, "arrange-world", 720.0, |ui| {
-        ui.label(RichText::new("✲ Arrange the world map").size(17.0).strong());
+        ui.label(RichText::new("Arrange the world map").size(17.0).strong());
         ui.add_space(8.0);
         toggle_row(
             ui,
@@ -148,7 +149,8 @@ pub fn dialog(
         ui.add_space(10.0);
         ui.label(
             RichText::new(format!(
-                "This replaces the positions of {moved} cards. Ctrl Z brings your current layout back."
+                "This replaces the positions of {moved} cards. {} brings your current layout back.",
+                EditorKey::Undo.name()
             ))
             .size(13.0),
         );

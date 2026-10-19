@@ -125,9 +125,9 @@ pub fn draw_arrivals(editor: &Editor, painter: &egui::Painter, frame: &AreaFrame
         pin(painter, at, color);
         if canvas.scale() >= 4.0 {
             let text = if arrival.initial_spawn {
-                "⚑ initial spawn".to_owned()
+                "initial spawn".to_owned()
             } else {
-                format!("⚑ {}", chip_label(editor, &arrival))
+                chip_label(editor, &arrival)
             };
             frame
                 .labels

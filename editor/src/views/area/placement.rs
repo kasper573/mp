@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
@@ -16,6 +18,7 @@ use super::stamp::placed_part;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -134,8 +137,7 @@ pub fn placement_card(
                             changed = true;
                         }
                         if default.is_some()
-                            && ui
-                                .small_button("✕")
+                            && glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                                 .on_hover_text("Back to the blueprint's default")
                                 .clicked()
                         {
@@ -736,7 +738,7 @@ pub(super) fn placement_extras(
         widgets::hint(ui, &placement_count(&content, &key));
     }
     ui.horizontal_wrapped(|ui| {
-        if ui.button("▣ Edit blueprint").clicked() {
+        if controls::marked(ui, Mark::Grid, "Edit blueprint").clicked() {
             out.actions
                 .push(super::AreaAction::OpenBlueprint(key.clone()));
         }
@@ -747,5 +749,5 @@ pub(super) fn placement_extras(
             out.actions.push(super::AreaAction::Replace(index));
         }
     });
-    widgets::key_hint_text(ui, "Enter", "edits the blueprint in place");
+    widgets::key_hint_text(ui, EditorKey::Confirm, "edits the blueprint in place");
 }

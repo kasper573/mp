@@ -1,24 +1,26 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{TextRole, color, widgets};
-use egui::{Color32, Rect, Response, RichText, Ui};
+use design_tokens::card::{self, Art, Card, CardResponse, Plate};
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::Kind;
+use design_tokens::sheet::Depth;
+use design_tokens::{TextRole, face, ink};
+use egui::{Rect, Response, TextureId, Ui};
 
 use crate::core::content::Content;
-use crate::core::gui::Band;
-use crate::core::text::{self, StyledLine, StyledSpan, TextLook, TextPiece, TextVoice};
+use crate::core::gui::{self, Band};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried};
 use crate::systems::input::map::{self, InputAction, input};
-use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
+use crate::systems::item::{Inventory, ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
-use crate::systems::script::condition;
-use crate::systems::skill;
+use crate::systems::script::{Condition, condition};
+use crate::systems::skill::{self, SkillDef};
 use crate::systems::stat::StatKind;
 use crate::systems::status;
 
 const WINDOW_KEY: &str = "Item";
-const ICON: f32 = 48.0;
-const GRANT_ICON: f32 = 24.0;
 
 pub struct ItemCardPlugin;
 
@@ -39,8 +41,8 @@ impl Plugin for ItemCardPlugin {
     }
 }
 
-pub fn open(world: &mut World, item: ItemId) {
-    hud::pin(world, item);
+pub fn open(world: &mut World, item: ItemId, from: Option<Rect>) {
+    hud::pin(world, item, from);
 }
 
 pub fn close(world: &mut World) -> bool {
@@ -65,7 +67,7 @@ pub fn shown(world: &World) -> Option<(ItemId, Rect)> {
 /// `response` must sense clicks.
 pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response {
     if map::clicked(world, InputAction::InspectItem, &response) {
-        open(world, item);
+        open(world, item, Some(response.rect));
     }
     tooltip(world, &response, item);
     response
@@ -102,52 +104,153 @@ pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     }
 }
 
-pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
+pub fn kind(def: &ItemDef) -> Kind {
+    match def.kind {
+        ItemKind::Equipment { .. } => Kind::Equipment,
+        ItemKind::Usable => Kind::Usable,
+        ItemKind::Resource => Kind::Resource,
+    }
+}
+
+pub fn show(
+    ui: &mut Ui,
+    world: &mut World,
+    item: ItemId,
+    look: CardLook,
+    lead: impl FnOnce(&mut Ui, &mut World),
+) -> CardResponse {
     let content = world.resource::<Content>().clone();
     let def = item.get(&content);
-    ui.spacing_mut().item_spacing.y = 8.0;
-    ui.horizontal(|ui| {
-        hud::icon(ui, world, &def.icon, ICON);
-        ui.vertical(|ui| {
-            ui.label(RichText::new(def.name.as_str()).font(TextRole::Heading.font_id()));
-            ui.label(
-                RichText::new(overview(def))
-                    .size(TextRole::Small.size())
-                    .color(color::MUTED),
-            );
+    let held = session::me(world)
+        .and_then(|me| world.get::<Inventory>(me))
+        .map_or(0, |bag| bag.count(item));
+    let numeral = (def.stack_max() > 1 && held > 0).then(|| face::roman(held));
+    let icon = gui::image(world, &def.icon).map(|image| image.texture);
+    let mut card = face_of(def, icon, look);
+    card.numeral = numeral.as_deref();
+    card.show(ui, |ui, plate| {
+        summary(ui, &content, item, plate);
+        lead(ui, world);
+        let viewer = session::me(world);
+        details(ui, &content, item, |requirement| {
+            let viewer = viewer?;
+            Some(if condition::holds(world, viewer, requirement) {
+                Judgement::Met
+            } else {
+                Judgement::Unmet {
+                    standing: condition::standing(world, viewer, requirement),
+                }
+            })
         });
-    });
+        grants(ui, world, item);
+        if let Some(verb) = use_verb(def) {
+            let hint = StyledLine::new(vec![
+                input(InputAction::UseItem),
+                TextPiece::text(format!(" in your bag to {verb}")),
+            ]);
+            foot(ui, world, &hint);
+        }
+    })
+}
+
+pub fn face_of(def: &ItemDef, icon: Option<TextureId>, look: CardLook) -> Card<'_> {
+    let mut card = Card::new(kind(def), &def.name);
+    card.art = Art {
+        icon,
+        height: look.art,
+    };
+    card.width = look.width;
+    card.max_height = look.max_height;
+    card.closable = look.closable;
+    card.depth = look.depth;
+    card
+}
+
+pub enum Judgement {
+    Met,
+    Unmet { standing: Option<String> },
+}
+
+pub fn summary(ui: &mut Ui, content: &Content, item: ItemId, plate: Plate) {
+    let def = item.get(content);
+    if plate.name_cut {
+        card::full_name(ui, &def.name);
+    }
+    card::overview(ui, &overview(def));
     let tags = tags(def);
     if !tags.is_empty() {
         ui.horizontal_wrapped(|ui| {
-            for (label, color) in tags {
-                widgets::pill(ui, label, color);
+            for (label, pill) in tags {
+                controls::pill(ui, label, pill);
             }
         });
     }
+}
+
+/// `judge` answers `None` when nobody in particular is reading.
+pub fn details(
+    ui: &mut Ui,
+    content: &Content,
+    item: ItemId,
+    judge: impl Fn(&Condition) -> Option<Judgement>,
+) {
+    let def = item.get(content);
     if let Some(flavor) = def.flavor() {
-        let line = StyledLine::new(vec![
-            StyledSpan::plain(flavor.to_owned())
-                .voice(TextVoice::Whisper)
-                .into(),
-        ]);
-        let look = TextLook {
-            size: TextRole::Prose.size(),
-            color: color::TEXT,
-        };
-        text::show(ui, world, &line, look, None);
+        card::flavour(ui, flavor);
     }
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 3.0;
-        for (fact, color) in facts(world, item, def) {
-            ui.label(RichText::new(fact).color(color));
+    facts(ui, content, item, def, judge);
+}
+
+pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Response {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        icon(ui);
+        ui.label(card::bold(&def.name));
+        ui.label(
+            TextRole::CardBody
+                .rich(def.target.describe())
+                .color(ink::INK2),
+        );
+        if def.basic_attack {
+            controls::pill(ui, skill::card::BASIC_ATTACK_MARK, Pill::Gold);
         }
-    });
-    grants(ui, world, item);
+    })
+    .response
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CardLook {
+    pub width: f32,
+    pub max_height: f32,
+    pub art: f32,
+    pub closable: bool,
+    pub depth: Depth,
+}
+
+impl CardLook {
+    pub const PINNED: CardLook = CardLook {
+        width: card::WIDTH,
+        max_height: card::MAX_HEIGHT,
+        art: card::ART,
+        closable: true,
+        depth: Depth::Front,
+    };
+}
+
+pub fn foot(ui: &mut Ui, world: &World, hint: &StyledLine) {
+    ui.add_space(2.0);
+    let look = TextLook::new(TextRole::Small.size(), ink::INK3);
+    text::show(ui, world, hint, look, None);
 }
 
 fn draw_card(world: &mut World) {
-    hud::draw_pinned::<ItemId>(world, WINDOW_KEY, |ui, world, item| sheet(ui, world, *item));
+    hud::draw_pinned::<ItemId>(world, WINDOW_KEY, |ui, world, item, depth| {
+        let look = CardLook {
+            depth,
+            ..CardLook::PINNED
+        };
+        show(ui, world, *item, look, |_, _| {})
+    });
 }
 
 fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
@@ -156,37 +259,21 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
     if granted.is_empty() {
         return;
     }
-    ui.add_space(4.0);
-    ui.label(
-        RichText::new("Grants while worn")
-            .size(TextRole::Small.size())
-            .family(design_tokens::family::medium())
-            .color(color::MUTED),
-    );
+    card::heading(ui, "grants while worn");
     for &granted in granted {
         let def = granted.get(&content);
-        let response = ui
-            .horizontal(|ui| {
-                hud::icon(ui, world, &def.icon, GRANT_ICON);
-                ui.label(&def.name);
-                ui.label(
-                    RichText::new(def.target.describe())
-                        .size(TextRole::Small.size())
-                        .color(color::MUTED),
-                );
-                if def.basic_attack {
-                    widgets::pill(ui, skill::card::BASIC_ATTACK_MARK, color::WARN);
-                }
-            })
-            .response
-            .interact(egui::Sense::click_and_drag());
+        let response = grant_line(ui, def, |ui| {
+            hud::icon(ui, world, &def.icon, card::GRANT_ICON);
+        })
+        .interact(egui::Sense::click_and_drag());
         if map::drag_started(world, InputAction::CarryItem, &response) {
             hud::carry(ui.ctx(), Carried::Skill(granted));
         } else if map::clicked(world, InputAction::PinToHotbar, &response) {
             skill::bar::pin(world, skill::HotbarEntry::Skill(granted));
         }
         let hint = StyledLine::new(vec![
-            TextPiece::text("Drag it to a slot · "),
+            input(InputAction::CarryItem),
+            TextPiece::text(" carries it to a slot · "),
             input(InputAction::PinToHotbar),
             TextPiece::text(" puts it on the hotbar"),
         ]);
@@ -198,69 +285,69 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
         );
     }
     if granted.iter().any(|skill| skill.get(&content).basic_attack) {
-        ui.label(
-            RichText::new(
-                "Dropping the item on the basic attack slot picks its first basic attack",
-            )
-            .size(TextRole::Small.size())
-            .color(color::FAINT),
+        card::foot(
+            ui,
+            "On the basic attack slot, it lends its first basic attack",
         );
     }
 }
 
-fn tags(def: &ItemDef) -> Vec<(&'static str, Color32)> {
+fn tags(def: &ItemDef) -> Vec<(&'static str, Pill)> {
     [
-        (ItemFlag::Quest, "Quest item", color::WARN),
-        (ItemFlag::Bound, "Bound", color::DANGER),
+        (ItemFlag::Bound, "Bound", Pill::Rubric),
+        (ItemFlag::Quest, "Quest item", Pill::Gold),
     ]
     .into_iter()
     .filter(|(flag, ..)| def.has(*flag))
-    .map(|(_, label, color)| (label, color))
+    .map(|(_, label, pill)| (label, pill))
     .collect()
 }
 
-fn facts(world: &World, item: ItemId, def: &ItemDef) -> Vec<(String, Color32)> {
-    let content = world.resource::<Content>();
-    let plain = |fact: String| (fact, color::TEXT);
-    let mut facts = Vec::new();
+fn facts(
+    ui: &mut Ui,
+    content: &Content,
+    item: ItemId,
+    def: &ItemDef,
+    judge: impl Fn(&Condition) -> Option<Judgement>,
+) {
     let boosts = status::boosts_of(content, item);
     match &def.kind {
         ItemKind::Equipment { slot, requires, .. } => {
-            facts.push(plain(format!(
-                "Worn as your {}",
-                slot.label().to_lowercase()
-            )));
-            facts.extend(boosts.iter().map(|boost| plain(modifier(*boost))));
-            let viewer = session::me(world);
-            facts.extend(requires.iter().map(|requirement| {
-                let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
-                {
-                    Some(true) => color::OK,
-                    Some(false) => color::DANGER,
-                    None => color::TEXT,
-                };
-                (
-                    format!("Requires {}", condition::describe(content, requirement)),
-                    color,
-                )
-            }));
+            card::fact(ui, &format!("Worn as your {}", slot.label().to_lowercase()));
+            for boost in &boosts {
+                card::fact(ui, &modifier(*boost));
+            }
+            if let Some(requirement) = requires {
+                let line = format!("Requires {}", condition::describe(content, requirement));
+                match judge(requirement) {
+                    Some(Judgement::Met) => card::requirement(ui, true, &line),
+                    Some(Judgement::Unmet {
+                        standing: Some(standing),
+                    }) => {
+                        card::requirement(ui, false, &format!("{line} · {standing}"));
+                    }
+                    Some(Judgement::Unmet { standing: None }) => {
+                        card::requirement(ui, false, &line)
+                    }
+                    None => card::fact(ui, &line),
+                }
+            }
         }
-        ItemKind::Usable => facts.push(plain("Can be used".to_owned())),
-        ItemKind::Resource => facts.extend(
-            boosts
-                .iter()
-                .map(|boost| plain(format!("{} while carried", modifier(*boost)))),
-        ),
+        ItemKind::Usable => card::fact(ui, "Can be used"),
+        ItemKind::Resource => {
+            for boost in &boosts {
+                card::fact(ui, &format!("{} while carried", modifier(*boost)));
+            }
+        }
     }
     match def.stack_max() {
         1 => {}
-        u32::MAX => facts.push(plain("Stacks without limit".to_owned())),
-        max => facts.push(plain(format!("Stacks up to {max}"))),
+        u32::MAX => card::fact(ui, "Stacks without limit"),
+        max => card::fact(ui, &format!("Stacks up to {max}")),
     }
     if def.bound() {
-        facts.push(plain("Can't be sold or dropped".to_owned()));
+        card::fact(ui, "Can't be sold or dropped");
     }
-    facts
 }
 
 fn modifier((stat, by): (StatKind, Option<f32>)) -> String {

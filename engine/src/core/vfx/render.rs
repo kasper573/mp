@@ -1,6 +1,6 @@
 //! Draws vfx on the client: each instance's layers as sprites and shader quads in the world or
-//! over the presented frame, and its text through the interface. The site frames, pieces and
-//! presenters are public so the editor's stage draws a vfx exactly as the game does.
+//! over the presented frame, or through the interface on a widget or the screen. The site frames,
+//! pieces and presenters are public so the editor's stage draws a vfx exactly as the game does.
 
 use std::collections::HashSet;
 
@@ -16,15 +16,13 @@ use bevy::sprite::Anchor;
 use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dKey, Material2dPipeline};
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::family;
-use egui::emath::TSTransform;
+use egui::Color32;
 use egui::load::SizedTexture;
-use egui::{Color32, FontId};
 
 use super::shader::PARAMS_BYTES;
 use super::{
-    BodyShape, CompiledVfxShaders, ParamKind, ParamValue, SiteKind, TextFloat, VfxDef, VfxInstance,
-    VfxLayer, VfxParams, VfxShaderDef, VfxShaderId, VfxSite, sprite_cell,
+    BodyShape, CompiledVfxShaders, ParamKind, ParamValue, SiteKind, VfxDef, VfxInstance, VfxLayer,
+    VfxParams, VfxShaderDef, VfxShaderId, VfxSite, sprite_cell,
 };
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
@@ -32,12 +30,10 @@ use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::{Pos, Rgba, Size};
 use crate::core::render::present::{self, PRESENT_LAYER, Viewport};
-use crate::core::render::screen::ToTile;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::render::{
-    self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, atlas_rect, tile_to_window,
+    self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, atlas_rect,
 };
-use crate::core::text::{self, TextShadow};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, ServerClock, UnixMillis};
 
@@ -303,6 +299,20 @@ pub fn present_shader(
     }
 }
 
+/// The shader a row compiles to for the content now loaded, once the client has built it.
+pub fn compiled_shader(world: &World, shader: VfxShaderId) -> Option<Handle<Shader>> {
+    world
+        .get_resource::<VfxShaders>()?
+        .by_id
+        .get(&shader)
+        .cloned()
+}
+
+/// The layer the presented frame is drawn on, where a piece goes that sits over the whole world.
+pub fn screen_layer() -> RenderLayers {
+    RenderLayers::layer(PRESENT_LAYER)
+}
+
 pub fn hide(world: &mut World, piece: Entity) {
     if let Some(mut visibility) = world.get_mut::<Visibility>(piece) {
         visibility.set_if_neq(Visibility::Hidden);
@@ -312,7 +322,7 @@ pub fn hide(world: &mut World, piece: Entity) {
 /// One vfx's layers as they stand at a moment, on the site they play on.
 pub struct Presentation<'a> {
     pub layers: &'a [VfxLayer],
-    pub pieces: &'a [Option<Entity>],
+    pub pieces: &'a [Entity],
     pub frame: Option<&'a SiteFrame>,
     pub elapsed: Seconds,
     pub params: &'a VfxParams,
@@ -324,18 +334,14 @@ pub struct Presentation<'a> {
 /// Shows a vfx's sprite and shader layers on their pieces as the game draws them: each layer at
 /// its own time, placed on the frame and sorted into its depth, hidden before it starts and once
 /// it is over. `shader` answers with a shader's compiled handle, or nothing while it has none. The
-/// sprites a shader layer repaints join `overdrawn`, for `settle_overdrawn` to hide. Text layers
-/// draw through the interface, not here.
+/// sprites a shader layer repaints join `overdrawn`, for `settle_overdrawn` to hide.
 pub fn present_layers(
     world: &mut World,
     shown: &Presentation,
     shader: &dyn Fn(VfxShaderId) -> Option<Handle<Shader>>,
     overdrawn: &mut HashSet<Entity>,
 ) {
-    for (layer, piece) in shown.layers.iter().zip(shown.pieces) {
-        let Some(piece) = *piece else {
-            continue;
-        };
+    for (layer, &piece) in shown.layers.iter().zip(shown.pieces) {
         let Some((frame, time)) = shown.frame.zip(layer.at(shown.elapsed)) else {
             hide(world, piece);
             continue;
@@ -364,26 +370,24 @@ pub fn present_layers(
                 place_in_depth(world, piece, frame, 1.0, shown.screen_layer);
                 overdrawn.extend(frame.sprite);
             }
-            VfxLayer::Text { .. } => {}
         }
     }
 }
 
-/// A piece per layer, each on the sheet `image_of` loads for it; a text layer has none.
+/// A piece per layer, each on the sheet `image_of` loads for it.
 pub fn pieces_for(
     world: &mut World,
     layers: &[VfxLayer],
     image_of: &mut dyn FnMut(&mut World, &AssetRef) -> Handle<Image>,
-) -> Vec<Option<Entity>> {
+) -> Vec<Entity> {
     layers
         .iter()
         .map(|layer| match layer {
             VfxLayer::Sprite { sheet, .. } => {
                 let image = image_of(world, sheet);
-                Some(sprite_piece(world, image))
+                sprite_piece(world, image)
             }
-            VfxLayer::Shader { .. } => Some(shader_piece(world)),
-            VfxLayer::Text { .. } => None,
+            VfxLayer::Shader { .. } => shader_piece(world),
         })
         .collect()
 }
@@ -598,14 +602,32 @@ impl SiteFrame {
         }
     }
 
+    /// A line of text drawn on the screen at `center`, in window pixels from the window's middle
+    /// with y up, over `texture`, the text's coverage as an image's alpha.
+    pub fn text(center: Vec2, size: Vec2, texture: SiteTexture) -> SiteFrame {
+        SiteFrame {
+            kind: SiteKind::Text,
+            center,
+            size,
+            px: 1.0,
+            facing: Radians::default(),
+            heading: Radians::default(),
+            body: SiteBody::image(size / TILE.0),
+            path: SitePath::default(),
+            texture: Some(texture),
+            sprite: None,
+            depth: None,
+        }
+    }
+
     pub fn head(&self) -> Vec2 {
         self.center + Vec2::new(0.0, self.size.y / 2.0)
     }
 
-    /// How many times its own size the site is drawn: the screen as is, a world site with its
-    /// margin.
+    /// How many times its own size the site is drawn: the screen and text as they are, a world
+    /// site with its margin.
     pub fn overscan(&self) -> Vec2 {
-        if self.kind == SiteKind::Screen {
+        if matches!(self.kind, SiteKind::Screen | SiteKind::Text) {
             Vec2::ONE
         } else {
             quad_overscan(self.size)
@@ -750,10 +772,6 @@ impl Material2d for VfxMaterial {
     }
 }
 
-const SHADOW: TextShadow = TextShadow {
-    offset: egui::vec2(1.0, 1.0),
-    color: Color32::BLACK,
-};
 const WIDGET_PULSE: f32 = 0.6;
 
 // A shader asset is keyed by its path, so each load of the content gets paths of its own and the
@@ -768,7 +786,7 @@ struct VfxShaders {
 /// entity so they go when it goes.
 #[derive(Component, Clone)]
 struct VfxView {
-    pieces: Vec<Option<Entity>>,
+    pieces: Vec<Entity>,
 }
 
 #[derive(Component)]
@@ -844,10 +862,10 @@ fn sync(world: &mut World) {
         .collect();
     for (entity, overlay) in overlays {
         let piece = match world.get::<VfxView>(entity) {
-            Some(view) => view.pieces.first().copied().flatten(),
+            Some(view) => view.pieces.first().copied(),
             None => {
                 let piece = shader_piece(world);
-                attach_pieces(world, entity, vec![Some(piece)]);
+                attach_pieces(world, entity, vec![piece]);
                 Some(piece)
             }
         };
@@ -879,7 +897,7 @@ fn sync(world: &mut World) {
     settle_overdrawn(world, &overdrawn);
 }
 
-fn attach(world: &mut World, entity: Entity, def: &VfxDef) -> Vec<Option<Entity>> {
+fn attach(world: &mut World, entity: Entity, def: &VfxDef) -> Vec<Entity> {
     let assets = world.resource::<AssetServer>().clone();
     let pieces = pieces_for(world, &def.layers, &mut |_, sheet| {
         assets.load(sheet.path())
@@ -888,8 +906,8 @@ fn attach(world: &mut World, entity: Entity, def: &VfxDef) -> Vec<Option<Entity>
     pieces
 }
 
-fn attach_pieces(world: &mut World, entity: Entity, pieces: Vec<Option<Entity>>) {
-    for piece in pieces.iter().flatten() {
+fn attach_pieces(world: &mut World, entity: Entity, pieces: Vec<Entity>) {
+    for piece in &pieces {
         world.entity_mut(*piece).insert(ChildOf(entity));
     }
     world.entity_mut(entity).insert((
@@ -970,7 +988,7 @@ fn server_now(world: &World) -> Option<UnixMillis> {
     world.get_resource::<ServerClock>()?.now(uptime)
 }
 
-/// Text layers, and every layer of a widget site, draw through the interface rather than the world.
+/// Every layer of a widget or screen site draws through the interface rather than the world.
 fn draw_overlays(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
@@ -989,7 +1007,7 @@ fn draw_overlays(world: &mut World) {
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let elapsed = now.since(instance.started);
-        let Some(anchor) = overlay_anchor(world, &gui, &instance.site) else {
+        let Some(rect) = overlay_rect(world, &gui, &instance.site) else {
             continue;
         };
         for (index, layer) in def.layers.iter().enumerate() {
@@ -998,35 +1016,6 @@ fn draw_overlays(world: &mut World) {
             };
             let area = gui::world_area(world, ("vfx", entity, index));
             match layer {
-                VfxLayer::Text {
-                    template,
-                    color,
-                    size,
-                    rise,
-                    ..
-                } => {
-                    let text = VfxDef::fill(template, &instance.params);
-                    let float = TextFloat::at(time.progress);
-                    let risen =
-                        anchor.head - egui::vec2(0.0, rise.0 * TILE.0 * anchor.px * float.risen);
-                    let font = FontId::new(*size, family::prose_bold());
-                    let width = gui
-                        .fonts_mut(|fonts| {
-                            fonts.layout_no_wrap(text.clone(), font.clone(), Color32::WHITE)
-                        })
-                        .size();
-                    area.fixed_pos(risen - egui::vec2(width.x / 2.0, width.y))
-                        .show(&gui, |ui| {
-                            text::show_shadowed(
-                                ui,
-                                &text,
-                                font,
-                                Color32::from(*color).gamma_multiply(float.alpha),
-                                SHADOW,
-                                TSTransform::IDENTITY,
-                            );
-                        });
-                }
                 VfxLayer::Sprite {
                     sheet,
                     frame,
@@ -1035,7 +1024,7 @@ fn draw_overlays(world: &mut World) {
                     scale,
                     play,
                     ..
-                } if anchor.rect.is_some() => {
+                } => {
                     let Some(image) = gui::image_file(world, &sheet.path()) else {
                         continue;
                     };
@@ -1048,18 +1037,15 @@ fn draw_overlays(world: &mut World) {
                         egui::pos2(cell.min().x / sheet.width, cell.min().y / sheet.height),
                         egui::pos2(cell.max().x / sheet.width, cell.max().y / sheet.height),
                     );
-                    let drawn = egui::vec2(cell.size.width, cell.size.height) * *scale * anchor.px;
-                    area.fixed_pos(anchor.center - drawn / 2.0)
+                    let drawn = egui::vec2(cell.size.width, cell.size.height) * *scale;
+                    area.fixed_pos(rect.center() - drawn / 2.0)
                         .show(&gui, |ui| {
                             ui.add(
                                 egui::Image::new(SizedTexture::new(image.texture, drawn)).uv(uv),
                             );
                         });
                 }
-                VfxLayer::Shader { shader, params, .. } if anchor.rect.is_some() => {
-                    let Some(rect) = anchor.rect else {
-                        continue;
-                    };
+                VfxLayer::Shader { shader, params, .. } => {
                     let color = shader_color(shader.get(&content), |name| {
                         params.get(name)?.resolve(&instance.params)
                     });
@@ -1072,51 +1058,16 @@ fn draw_overlays(world: &mut World) {
                         );
                     });
                 }
-                VfxLayer::Sprite { .. } | VfxLayer::Shader { .. } => {}
             }
         }
     }
 }
 
-struct OverlayAnchor {
-    center: egui::Pos2,
-    head: egui::Pos2,
-    /// Window pixels per world pixel at this site.
-    px: f32,
-    /// The rect of a widget or screen site, whose every layer draws here.
-    rect: Option<egui::Rect>,
-}
-
-fn overlay_anchor(world: &mut World, gui: &egui::Context, site: &VfxSite) -> Option<OverlayAnchor> {
+/// Where a widget or screen site lies in the window; a world site draws in the world instead.
+fn overlay_rect(world: &World, gui: &egui::Context, site: &VfxSite) -> Option<egui::Rect> {
     match site {
-        VfxSite::Screen => {
-            let rect = gui.content_rect();
-            Some(OverlayAnchor {
-                center: rect.center(),
-                head: egui::pos2(rect.center().x, rect.min.y + rect.height() * 0.3),
-                px: 1.0,
-                rect: Some(rect),
-            })
-        }
-        VfxSite::Widget(name) => {
-            let rect = *world.resource::<WidgetRects>().0.get(&name.0)?;
-            Some(OverlayAnchor {
-                center: rect.center(),
-                head: rect.center_top(),
-                px: 1.0,
-                rect: Some(rect),
-            })
-        }
-        _ => {
-            let frame = SiteFrame::of(world, site, Radians::default())?;
-            let center = tile_to_window(world, frame.center.to_tile())?;
-            let head = tile_to_window(world, frame.head().to_tile())?;
-            Some(OverlayAnchor {
-                center: egui::pos2(center.x, center.y),
-                head: egui::pos2(head.x, head.y),
-                px: world.resource::<Viewport>().scale.max(0.01),
-                rect: None,
-            })
-        }
+        VfxSite::Screen => Some(gui.content_rect()),
+        VfxSite::Widget(name) => world.resource::<WidgetRects>().0.get(&name.0).copied(),
+        _ => None,
     }
 }

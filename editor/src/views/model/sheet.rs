@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use super::{ModelStrip, strip::DraggedFrame, strip_of};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 const CELL: f32 = 76.0;
@@ -44,7 +45,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             ui.add_space(8.0);
             widgets::hint(
                 ui,
-                "drag frames into the timeline, or select and press Insert",
+                &format!(
+                    "drag frames into the timeline, or select and press {}",
+                    EditorKey::InsertFrame.name()
+                ),
             );
         });
     });

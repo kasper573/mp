@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -288,7 +290,7 @@ pub fn dialog(
         .unwrap_or((0, 0));
     dialogs::card(ctx, "import-tileset", width, |ui| {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("🗋").size(16.0).color(theme::MUTED));
+            glyph::show(ui, Mark::Page, 16.0, theme::MUTED);
             ui.label(theme::strong("Import a tileset").size(17.0));
         });
         ui.add_space(4.0);
@@ -408,14 +410,14 @@ pub fn dialog(
                             "Converted to sRGB with straight alpha.".to_owned(),
                         ] {
                             ui.horizontal(|ui| {
-                                ui.label(theme::ok("✓"));
+                                glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                                 ui.label(theme::muted(text));
                             });
                         }
                     }
                     Err(error) => {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(theme::warn("⚠"));
+                            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                             ui.label(theme::muted(error));
                         });
                     }
@@ -436,13 +438,10 @@ pub fn dialog(
             };
             let enabled = dialog.cut.is_ok() && problem.is_none();
             if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new(
-                        egui::RichText::new(format!("Create tileset/{key}")).color(Color32::WHITE),
-                    )
-                    .fill(theme::ACCENT),
-                )
+                .add_enabled_ui(enabled, |ui| {
+                    controls::primary(ui, format!("Create tileset/{key}"))
+                })
+                .inner
                 .clicked()
             {
                 create = true;
@@ -709,25 +708,35 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             widgets::card_title(ui, &format!("importing {names}"));
             for (mark, color, text, count) in [
-                ("✓", theme::OK, "found by their pixels", draft.plan.found),
                 (
-                    "↻",
+                    Mark::Tick,
+                    theme::OK,
+                    "found by their pixels",
+                    draft.plan.found,
+                ),
+                (
+                    Mark::Reload,
                     theme::WARN,
                     "renumbered, longer rows",
                     draft.plan.renumbered,
                 ),
-                ("+", theme::TEXT, "new, no data yet", draft.plan.new_tiles),
-                ("✕", theme::MUTED, "gone", draft.plan.gone.len()),
+                (
+                    Mark::Plus,
+                    theme::TEXT,
+                    "new, no data yet",
+                    draft.plan.new_tiles,
+                ),
+                (Mark::Cross, theme::MUTED, "gone", draft.plan.gone.len()),
             ]
             .into_iter()
             .chain((draft.plan.blank_data > 0).then_some((
-                "·",
+                Mark::Dot,
                 theme::FAINT,
                 "transparent, their data carried nothing",
                 draft.plan.blank_data,
             ))) {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(mark).color(color));
+                    glyph::show(ui, mark, 13.0, color);
                     ui.label(theme::muted(text));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(theme::mono(count.to_string()));
@@ -771,7 +780,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .collect::<Vec<_>>()
                 .join(", ");
             ui.horizontal_wrapped(|ui| {
-                ui.label(theme::warn("⚠"));
+                glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                 ui.label(theme::muted(format!(
                     "tile {tile} is gone; painted in {where_}"
                 )));
@@ -796,11 +805,10 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ready = draft.plan.ready();
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(
-                ready.is_ok(),
-                egui::Button::new(egui::RichText::new("Import, as one step").color(Color32::WHITE))
-                    .fill(theme::ACCENT),
-            )
+            .add_enabled_ui(ready.is_ok(), |ui| {
+                controls::primary(ui, "Import, as one step")
+            })
+            .inner
             .clicked()
         {
             apply = true;
@@ -879,7 +887,7 @@ pub fn animation_dialog(
     let columns_total = (dialog.tileset.width() / dialog.tile.max(1)).max(1);
     dialogs::card(ctx, "import-animation", width, |ui| {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("🗋").size(16.0).color(theme::MUTED));
+            glyph::show(ui, Mark::Page, 16.0, theme::MUTED);
             ui.label(
                 theme::strong(format!("Import an animation onto tileset/{}", dialog.key))
                     .size(17.0),
@@ -1009,7 +1017,11 @@ pub fn animation_dialog(
                     Ok(plan) => {
                         let line = |ui: &mut Ui, ok: bool, text: String| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(if ok { theme::ok("✓") } else { theme::warn("⚠") });
+                                if ok {
+                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                    } else {
+                        glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
+                    }
                                 ui.label(theme::muted(text).size(12.5));
                             });
                         };
@@ -1085,7 +1097,7 @@ pub fn animation_dialog(
                     }
                     Err(error) => {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(theme::warn("⚠"));
+                            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                             ui.label(theme::muted(error));
                         });
                     }
@@ -1096,14 +1108,10 @@ pub fn animation_dialog(
         ui.horizontal(|ui| {
             let count = dialog.plan.as_ref().map(AnimPlan::animated).unwrap_or(0);
             if ui
-                .add_enabled(
-                    dialog.plan.is_ok(),
-                    egui::Button::new(
-                        egui::RichText::new(format!("Animate {count} tiles, as one step"))
-                            .color(Color32::WHITE),
-                    )
-                    .fill(theme::ACCENT),
-                )
+                .add_enabled_ui(dialog.plan.is_ok(), |ui| {
+                    controls::primary(ui, format!("Animate {count} tiles, as one step"))
+                })
+                .inner
                 .clicked()
             {
                 animate = true;

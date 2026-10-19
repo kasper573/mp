@@ -1,3 +1,5 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use std::collections::{BTreeMap, HashSet};
 
 use egui::epaint::QuadraticBezierShape;
@@ -6,9 +8,9 @@ use egui::{
     Vec2,
 };
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
-use engine::systems::area::AreaId;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
+use engine::systems::area::{self, AreaId};
 
 use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
 use super::filters::{self, ColorRanges};
@@ -17,6 +19,7 @@ use super::{
     MAX_ZOOM, MIN_ZOOM, MapLayers, MapPart, MapTileHit, OpenWorldMap, region_color, shows_areas,
 };
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::area::{TILE_PX, scene};
 use crate::views::navigation::{self, Viewport};
@@ -25,18 +28,18 @@ const LABEL: f32 = 28.0;
 const PAD: f32 = 3.0;
 const DOT_STEP: f32 = 32.0;
 const EDGE_HIT: f32 = 7.0;
-const ROUTE: Color32 = Color32::from_rgb(90, 160, 255);
-const WARP: Color32 = Color32::from_rgb(150, 150, 170);
-const DIM: Color32 = Color32::from_rgb(70, 70, 78);
-const DOT: Color32 = Color32::from_rgb(34, 34, 40);
+const ROUTE: Color32 = ink::AZURE;
+const WARP: Color32 = ink::INK3;
+const DIM: Color32 = Color32::from_rgb(120, 112, 96);
+const DOT: Color32 = ink::HONEY2;
 const POPULATION: Color32 = Color32::from_rgb(240, 140, 60);
 const NO_VALUE: Color32 = Color32::from_rgb(110, 110, 120);
-const NOTE_PAPER: Color32 = Color32::from_rgb(250, 230, 150);
-const NOTE_EDGE: Color32 = Color32::from_rgb(200, 180, 100);
-const NOTE_INK: Color32 = Color32::from_rgb(40, 36, 20);
+const NOTE_PAPER: Color32 = ink::LIGHT;
+const NOTE_EDGE: Color32 = ink::HONEY2;
+const NOTE_INK: Color32 = ink::INK;
 const NOTE_WIDTH: f32 = 188.0;
 const NOTE_PAD: f32 = 6.0;
-const MINIMAP_CARD: Color32 = Color32::from_rgb(140, 150, 180);
+const MINIMAP_CARD: Color32 = ink::INK3;
 
 pub struct MapCard {
     pub area: AreaId,
@@ -331,8 +334,8 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
                     card.art.center(),
                     Align2::CENTER_CENTER,
                     &range.text(),
-                    theme::alpha(theme::CANVAS, 200),
-                    Color32::WHITE,
+                    theme::RAISED,
+                    theme::TEXT,
                     12.0,
                 );
             }
@@ -389,11 +392,13 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         }
     }
     if drawing.shown.cards[&card.area].pinned {
-        painter.text(
-            card.art.right_top() + Vec2::new(-3.0, 2.0),
-            Align2::RIGHT_TOP,
-            "📍",
-            FontId::proportional(11.0),
+        glyph::paint(
+            painter,
+            Mark::Pin,
+            egui::Rect::from_min_size(
+                card.art.right_top() + Vec2::new(-14.0, 2.0),
+                Vec2::splat(11.0),
+            ),
             Color32::WHITE,
         );
     }
@@ -403,13 +408,13 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
             .get(&card.area)
             .map_or_else(|| "–".to_owned(), u32::to_string);
         let at = card.art.center();
-        painter.circle_filled(at, 9.0, theme::alpha(theme::CANVAS, 210));
+        painter.circle(at, 9.0, theme::RAISED, Stroke::new(1.0, theme::BORDER));
         painter.text(
             at,
             Align2::CENTER_CENTER,
             text,
             FontId::monospace(11.0),
-            Color32::WHITE,
+            theme::TEXT,
         );
     }
     if !drawing.zoomed {
@@ -462,8 +467,8 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
                 card.frame.right_top() + Vec2::new(-4.0, -4.0),
                 Align2::RIGHT_BOTTOM,
                 &filters::tag_line(sources),
+                theme::RAISED,
                 theme::WARN,
-                Color32::BLACK,
                 11.0,
             )
         });
@@ -473,7 +478,7 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
             painter,
             Pos2::new(card.frame.left(), bottom),
             Align2::LEFT_BOTTOM,
-            "⚑ initial spawn",
+            "initial spawn",
             theme::PANEL,
             theme::OK,
             11.0,
@@ -646,7 +651,11 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                     .map(|snap| format!(" · {snap}"))
                     .unwrap_or_default()
             ),
-            "Alt moves without snapping · P pins".to_owned(),
+            format!(
+                "{} moves without snapping · {} pins",
+                EditorKey::Unsnapped.name(),
+                EditorKey::Pin.name()
+            ),
         ],
         Some(MapDrag::Resize { area, size, .. }) => {
             let tiles = atlas.id(area).map(|id| atlas.size(id)).unwrap_or_default();
@@ -655,7 +664,11 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                     "resizing {area} · {size}% · {} × {} tiles",
                     tiles.width, tiles.height
                 ),
-                "Shift steps by 1% · Esc cancels".to_owned(),
+                format!(
+                    "{} steps by 1% · {} cancels",
+                    EditorKey::FineStep.name(),
+                    EditorKey::Cancel.name()
+                ),
             ]
         }
         _ if shows_areas(canvas.viewport.zoom) => {
@@ -664,18 +677,22 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                 .response
                 .hover_pos()
                 .and_then(|p| canvas.tile_at(atlas, p));
-            vec![
-                match hover {
-                    Some(hit) => format!(
+            match hover {
+                Some(hit) => vec![
+                    format!(
                         "World · zoom {zoom:.0}% · {} {}, {}",
                         hit.area,
                         hit.at.x.floor(),
                         hit.at.y.floor()
                     ),
-                    None => format!("World · zoom {zoom:.0}%"),
-                },
-                "right-click a tile to play there".to_owned(),
-            ]
+                    tile_facts(map, &hit),
+                    "right-click a tile to play there".to_owned(),
+                ],
+                None => vec![
+                    format!("World · zoom {zoom:.0}%"),
+                    "right-click a tile to play there".to_owned(),
+                ],
+            }
         }
         _ => overview_status(editor, map, overlays),
     };
@@ -722,8 +739,11 @@ fn overview_status(editor: &Editor, map: &OpenWorldMap, overlays: &Overlays) -> 
         )];
     }
     vec![
-        format!("World · {} areas", map.layout.cards.len()),
-        "drag to arrange · scroll to zoom · Space drag to pan".to_owned(),
+        world_summary(atlas),
+        format!(
+            "drag to arrange · scroll to zoom · {} drag to pan",
+            EditorKey::Pan.name()
+        ),
     ]
 }
 
@@ -981,11 +1001,11 @@ fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], cat
 
 pub fn line_badge(painter: &Painter, at: Pos2, badge: &str, branch: bool) {
     let (fill, ink) = if branch {
-        (theme::DANGER, Color32::WHITE)
+        (theme::DANGER, ink::LIGHT)
     } else {
-        (theme::WARN, Color32::BLACK)
+        (theme::WARN, ink::LIGHT)
     };
-    painter.circle(at, 9.0, fill, Stroke::new(1.0, Color32::BLACK));
+    painter.circle(at, 9.0, fill, Stroke::new(1.0, ink::INK));
     painter.text(
         at,
         Align2::CENTER_CENTER,
@@ -1209,13 +1229,7 @@ fn minimap(
         rect.right_bottom() - Vec2::new(192.0, 132.0),
         Vec2::new(180.0, 120.0),
     );
-    painter.rect_filled(box_rect, 3.0, theme::alpha(Color32::BLACK, 170));
-    painter.rect_stroke(
-        box_rect,
-        3.0,
-        Stroke::new(1.0, theme::BORDER),
-        StrokeKind::Outside,
-    );
+    design_tokens::slip::paint(painter, box_rect);
     let scale = ((box_rect.width() - 8.0) / bounds.width().max(1.0))
         .min((box_rect.height() - 8.0) / bounds.height().max(1.0));
     let to_box = |p: Pos2| box_rect.center() + (p - bounds.center()) * scale;
@@ -1241,4 +1255,83 @@ fn topmost_card_at(cards: &[MapCard], p: Pos2) -> Option<AreaId> {
         .filter(|card| card.frame.contains(p))
         .min_by(|a, b| a.frame.area().total_cmp(&b.frame.area()))
         .map(|card| card.area)
+}
+
+fn world_summary(atlas: &WorldAtlas) -> String {
+    let one_way = atlas
+        .warps
+        .iter()
+        .filter(|warp| !atlas.both_ways(warp))
+        .count();
+    let warps = match one_way {
+        0 => format!("{} warps, each with a way back", atlas.warps.len()),
+        _ => format!("{} warps, {one_way} one way", atlas.warps.len()),
+    };
+    let unreached = atlas
+        .areas
+        .keys()
+        .filter(|area| !atlas.distances.contains_key(area))
+        .count();
+    let reach = match unreached {
+        0 => format!(
+            "every area at most {} warps from the initial spawn",
+            atlas.distances.values().copied().max().unwrap_or(0)
+        ),
+        _ => format!("{unreached} areas unreached from the initial spawn"),
+    };
+    let residents: usize = atlas.areas.values().map(|info| info.residents.len()).sum();
+    let populations: usize = atlas
+        .areas
+        .values()
+        .map(|info| info.populations.len())
+        .sum();
+    format!(
+        "World · {} areas · {warps} · {reach} · {residents} residents, {populations} populations",
+        atlas.areas.len()
+    )
+}
+
+fn tile_facts(map: &OpenWorldMap, hit: &MapTileHit) -> String {
+    let atlas = &map.atlas;
+    let Some(id) = atlas.id(&hit.area) else {
+        return String::new();
+    };
+    let info = &atlas.areas[&id];
+    let cell = hit.at.snap();
+    let loaded = area::load(&map.content, id);
+    let walkable = if loaded.grid.walkable(cell) {
+        "walkable"
+    } else {
+        "not walkable"
+    };
+    let safe = if loaded.safe_zones.iter().any(|zone| zone.contains(cell)) {
+        "in a safe zone"
+    } else {
+        "no safe zone"
+    };
+    let nearest_npc = info
+        .residents
+        .iter()
+        .chain(&info.populations)
+        .map(|npc| (npc.key.as_str(), npc.at.distance(cell).0))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map_or_else(
+            || "no npc placed".to_owned(),
+            |(npc, tiles)| format!("npc {npc} {} tiles away", tiles.round()),
+        );
+    let nearest_door = info
+        .doors
+        .iter()
+        .map(|door| {
+            (
+                atlas.owners[door.owner].name.as_str(),
+                door.at.distance(cell).0,
+            )
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map_or_else(
+            || "no door".to_owned(),
+            |(door, tiles)| format!("door {door} {} tiles away", tiles.round()),
+        );
+    format!("{walkable} · {safe} · {nearest_npc} · {nearest_door}")
 }

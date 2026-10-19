@@ -9,6 +9,7 @@ use super::select::start_paste;
 use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pins, shapes};
 use super::{pick, placement};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -129,7 +130,10 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         let character =
             play::current_character(editor).unwrap_or_else(|| "a test character".to_owned());
         if ui
-            .add(egui::Button::new(format!("▸ Play here as {character}")).shortcut_text("F6"))
+            .add(widgets::shortcut_button(
+                format!("Play here as {character}"),
+                EditorKey::PlayHere,
+            ))
             .clicked()
         {
             action = Some(MenuAction::PlayHere);
@@ -152,7 +156,10 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             }
         });
         if ui
-            .add(egui::Button::new("Play from its own start").shortcut_text("F5"))
+            .add(widgets::shortcut_button(
+                "Play from its own start",
+                EditorKey::PlayFromStart,
+            ))
             .clicked()
         {
             action = Some(MenuAction::PlayFromStart);
@@ -163,7 +170,10 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             action = Some(MenuAction::SetSpawn);
             ui.close();
         }
-        if ui.button("Listen here (Alt-click)").clicked() {
+        if ui
+            .button(format!("Listen here ({} click)", EditorKey::Listen.name()))
+            .clicked()
+        {
             action = Some(MenuAction::Listen);
             ui.close();
         }
@@ -194,15 +204,27 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         if !selected.is_empty() {
             ui.separator();
             ui.label(RichText::new(format!("{} selected", selected.len())).strong());
-            if ui.button("Copy (Ctrl C)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Copy", EditorKey::Copy))
+                .clicked()
+            {
                 action = Some(MenuAction::Area(AreaAction::Copy));
                 ui.close();
             }
-            if ui.button("Duplicate (Ctrl D)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
+                .clicked()
+            {
                 action = Some(MenuAction::Area(AreaAction::Duplicate));
                 ui.close();
             }
-            if ui.button("Make blueprint (Ctrl Alt B)").clicked() {
+            if ui
+                .add(widgets::shortcut_button(
+                    "Make blueprint",
+                    EditorKey::MakeBlueprint,
+                ))
+                .clicked()
+            {
                 action = Some(MenuAction::Area(AreaAction::MakeBlueprint));
                 ui.close();
             }
@@ -212,7 +234,13 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                 if let Some(index) = index {
                     let module = &frame.modules[index];
                     if module.is_module(AreaModuleKind::Blueprint) {
-                        if ui.button("Edit blueprint in place (Enter)").clicked() {
+                        if ui
+                            .add(widgets::shortcut_button(
+                                "Edit blueprint in place",
+                                EditorKey::Confirm,
+                            ))
+                            .clicked()
+                        {
                             action = Some(MenuAction::EditInPlace(index));
                             ui.close();
                         }
@@ -239,12 +267,19 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                     }
                 }
             }
-            if ui.button("Delete (Del)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Delete", EditorKey::Delete))
+                .clicked()
+            {
                 action = Some(MenuAction::Area(AreaAction::Delete));
                 ui.close();
             }
         }
-        if editor.clipboard.is_some() && ui.button("Paste here (Ctrl V)").clicked() {
+        if editor.clipboard.is_some()
+            && ui
+                .add(widgets::shortcut_button("Paste here", EditorKey::Paste))
+                .clicked()
+        {
             action = Some(MenuAction::Paste);
             ui.close();
         }

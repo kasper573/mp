@@ -2,8 +2,8 @@ use std::collections::VecDeque;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::family;
-use egui::{Align2, Color32, FontId, Mesh, RichText, Sense, UiBuilder, Vec2};
+use design_tokens::{Face, ink, slip};
+use egui::{Align2, Mesh, RichText, Sense, UiBuilder, Vec2};
 
 use crate::core::gui::{self, Band};
 use crate::core::time::{Hertz, Seconds};
@@ -27,13 +27,10 @@ const RUN: Seconds = Seconds(0.25);
 
 const MARGIN: f32 = 8.0;
 const SIZE: Vec2 = Vec2::new(160.0, 96.0);
-const TEXT_AT: Vec2 = Vec2::new(6.0, 4.0);
-const TEXT_SIZE: f32 = 18.0;
-const GRAPH_AT: Vec2 = Vec2::new(6.0, 30.0);
-const GRAPH_SIZE: Vec2 = Vec2::new(148.0, 60.0);
-const PANEL: Color32 = Color32::from_rgb(26, 26, 56);
-const GRAPH: Color32 = Color32::from_rgb(26, 49, 76);
-const INK: Color32 = Color32::from_rgb(26, 255, 255);
+const TEXT_AT: Vec2 = Vec2::new(8.0, 6.0);
+const TEXT_SIZE: f32 = 15.0;
+const GRAPH_AT: Vec2 = Vec2::new(8.0, 30.0);
+const GRAPH_SIZE: Vec2 = Vec2::new(144.0, 58.0);
 
 /// The frame rate of each run of frames over the last [`HISTORY`], oldest first.
 #[derive(Resource, Default)]
@@ -93,15 +90,15 @@ fn draw_meter(world: &mut World) {
         .interactable(false);
     gui::show_anchored(&gui, area, |ui| {
         let (panel, _) = ui.allocate_exact_size(SIZE, Sense::hover());
-        ui.painter().rect_filled(panel, 0.0, PANEL);
+        slip::paint(ui.painter(), panel);
         ui.scope_builder(
             UiBuilder::new().max_rect(egui::Rect::from_min_size(panel.min + TEXT_AT, SIZE)),
             |ui| {
                 ui.add(
                     egui::Label::new(
                         RichText::new(readout)
-                            .font(FontId::new(TEXT_SIZE, family::bold()))
-                            .color(INK),
+                            .font(Face::MonoBold.id(TEXT_SIZE))
+                            .color(ink::INK),
                     )
                     .extend()
                     .selectable(false),
@@ -109,7 +106,7 @@ fn draw_meter(world: &mut World) {
             },
         );
         let graph = egui::Rect::from_min_size(panel.min + GRAPH_AT, GRAPH_SIZE);
-        ui.painter().rect_filled(graph, 0.0, GRAPH);
+        ui.painter().rect_filled(graph, 0.0, ink::ink_wash(0.06));
         ui.painter().add(bars(graph, &rates.runs, high));
     });
 }
@@ -127,7 +124,7 @@ fn bars(graph: egui::Rect, runs: &VecDeque<Hertz>, high: Hertz) -> Mesh {
                 egui::pos2(right - width, graph.bottom() - height),
                 egui::pos2(right, graph.bottom()),
             ),
-            INK,
+            ink::INK2,
         );
     }
     mesh

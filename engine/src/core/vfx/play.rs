@@ -13,14 +13,6 @@ pub struct LayerTime {
     pub progress: f32,
 }
 
-/// Where a text layer has floated to: how far along its rise, easing out, and how much of it is
-/// still showing, fading over the last stretch.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TextFloat {
-    pub risen: f32,
-    pub alpha: f32,
-}
-
 impl VfxLayer {
     /// Where the layer is at `elapsed` seconds into its instance, or nothing while it waits for its
     /// delay or once it is over.
@@ -69,15 +61,6 @@ impl SpriteAnchor {
             SpriteAnchor::Center => center,
             SpriteAnchor::Feet => center - size / 2.0 + drawn / 2.0,
             SpriteAnchor::Head => center + size / 2.0 + drawn / 2.0,
-        }
-    }
-}
-
-impl TextFloat {
-    pub fn at(progress: f32) -> TextFloat {
-        TextFloat {
-            risen: 1.0 - (1.0 - progress) * (1.0 - progress),
-            alpha: 1.0 - ((progress - 0.6) / 0.4).clamp(0.0, 1.0),
         }
     }
 }

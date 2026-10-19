@@ -8,7 +8,7 @@ use driver::{ContentEdit, Pace, Player, Playtest, PlaytestSetup};
 use engine::systems::script::Place;
 
 use crate::chapters::Chapter;
-use crate::film::{Edge, Film};
+use crate::film::Film;
 
 // Every take of a chapter plays out alike, wherever and however often it's shot.
 const SEED: u64 = 1931;
@@ -94,13 +94,7 @@ impl Star {
     // it, but the next one waits until this one could be read.
     pub fn caption(&mut self, text: &str) {
         self.hold();
-        self.film.borrow_mut().caption(text, Edge::Bottom);
-    }
-
-    // Clear of whatever the game draws along the bottom edge.
-    pub fn caption_top(&mut self, text: &str) {
-        self.hold();
-        self.film.borrow_mut().caption(text, Edge::Top);
+        self.film.borrow_mut().caption(text);
     }
 
     // Lets the viewer finish reading the caption that's up, while what it describes stays on screen.

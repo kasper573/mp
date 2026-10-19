@@ -1,9 +1,0 @@
-{
-  "label": "Cycle the debug overlays",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "F1"
-    }
-  ]
-}

@@ -1,4 +1,5 @@
-use egui::{Color32, FontId, RichText, Stroke, Ui};
+use design_tokens::glyph::{self, Mark};
+use egui::{Color32, RichText, Stroke, Ui};
 use serde_json::Value;
 
 use crate::forms::{self, FormChange, FormCx};
@@ -193,7 +194,7 @@ fn block(
                     changed = FormChange::at(path);
                 }
             });
-            let response = chip(ui, "▾", theme::INPUT, theme::FAINT);
+            let response = glyph::button(ui, Mark::ChevronDown, 12.0, theme::FAINT, "Pick");
             changed |=
                 picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
@@ -206,7 +207,7 @@ fn block(
                     changed = FormChange::at(path);
                 }
             });
-            let response = chip(ui, "▾", theme::INPUT, theme::FAINT);
+            let response = glyph::button(ui, Mark::ChevronDown, 12.0, theme::FAINT, "Pick");
             changed |=
                 picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
@@ -384,11 +385,10 @@ fn list_block(
                             ui.id().with(path).with(("remove", index)),
                             egui::Sense::click(),
                         );
-                        ui.painter().text(
-                            at,
-                            egui::Align2::CENTER_CENTER,
-                            "✕",
-                            FontId::proportional(11.0),
+                        glyph::paint(
+                            ui.painter(),
+                            Mark::Cross,
+                            egui::Rect::from_center_size(at, egui::vec2(9.0, 9.0)),
                             theme::FAINT,
                         );
                         if cross.clicked() {

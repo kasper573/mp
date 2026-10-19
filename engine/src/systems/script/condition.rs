@@ -79,6 +79,19 @@ pub fn min_level(part: &Condition) -> Option<u32> {
     }
 }
 
+pub fn standing(world: &World, subject: Entity, condition: &Condition) -> Option<String> {
+    match condition {
+        Expr::AtLeast(a, _) | Expr::More(a, _) => match &**a {
+            Expr::Query(RiftQuery::Level { .. }) => Some(format!(
+                "you are level {}",
+                crate::systems::class::level(world, subject)
+            )),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 pub fn parts(condition: &Condition) -> Vec<&Condition> {
     match condition {
         Expr::All(parts) => parts.iter().collect(),

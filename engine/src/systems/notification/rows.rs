@@ -3,7 +3,8 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::{color, family};
+use design_tokens::ink::Ground;
+use design_tokens::{Face, dusk};
 use egui::emath::{TSTransform, easing};
 use egui::{
     Align, Align2, Color32, FontId, Id, Layout, Rect, RichText, Sense, Ui, UiBuilder, Vec2,
@@ -12,9 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{NotificationSent, window_visible};
 use crate::core::gui::{self, Band};
-use crate::core::text::{
-    self, KeyNames, MotionPreference, StyledLine, TextLook, TextPiece, TextShadow,
-};
+use crate::core::text::{self, KeyNames, StyledLine, TextLook, TextPiece, TextShadow};
 use crate::core::time::Seconds;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::screen::ClientScreen;
@@ -26,6 +25,7 @@ const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
 const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
 const AMBER_80: Color32 = Color32::from_rgb(246, 201, 96);
 const LABEL: f32 = 12.0;
+const CLOSE: f32 = 20.0;
 const CAPTION: f32 = 12.0;
 const BODY: f32 = 16.0;
 
@@ -133,19 +133,19 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
     let mut drawn: Vec<Rect> = Vec::new();
     let next = |drawn: &[Rect]| drawn.last().map_or(top, |last| last.bottom() + ROW_GAP);
     for line in lines {
-        let mut open = true;
-        let shown = egui::Window::new(label_text(&line.label, line.replaced))
-            .id(Id::new(("alert", line.key)))
+        let area = egui::Area::new(Id::new(("alert", line.key)))
             .order(Band::Notices.order())
-            .anchor(Align2::CENTER_TOP, Vec2::new(0.0, next(&drawn)))
-            .collapsible(false)
-            .resizable(false)
-            .min_width(width)
-            .max_width(width)
-            .open(&mut open)
-            .show(gui, |ui| {
-                text::show(ui, world, &line.text, look(BODY, color::TEXT), None);
-            });
+            .anchor(Align2::CENTER_TOP, Vec2::new(0.0, next(&drawn)));
+        let shown = area.show(gui, |ui| {
+            dusk::frame().show(ui, |ui| {
+                ui.set_width(width);
+                let closed = alert_title(ui, &label_text(&line.label, line.replaced));
+                text::show(ui, world, &line.text, look(BODY, dusk::TEXT), None);
+                closed
+            })
+        });
+        let open = !shown.inner.inner;
+        let shown = Some(shown);
         drawn.extend(shown.map(|shown| shown.response.rect));
         if !open {
             world
@@ -164,19 +164,15 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
 }
 
 pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = motion_time(world, gui);
+    let now = time(gui);
     let (lines, more) = lines_of::<Captions>(world);
     let mut placed = world.resource_mut::<PlacedRows<Captions>>();
-    let scrim = placed.scrim.sync(
-        now,
-        SCRIM_PRESENCE,
-        still,
-        (!lines.is_empty()).then_some((0, ())),
-    );
+    let scrim = placed
+        .scrim
+        .sync(now, SCRIM_PRESENCE, (!lines.is_empty()).then_some((0, ())));
     let rows = placed.fades.sync(
         now,
         CAPTION_PRESENCE,
-        still,
         lines.into_iter().map(|line| (line.key, line)),
     );
     let Some(&((), scrim)) = scrim.first() else {
@@ -240,12 +236,11 @@ pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) ->
 }
 
 pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = motion_time(world, gui);
+    let now = time(gui);
     let (lines, more) = lines_of::<Milestones>(world);
     let rows = world.resource_mut::<PlacedRows<Milestones>>().fades.sync(
         now,
         MILESTONE_PRESENCE,
-        still,
         lines.into_iter().map(|line| (line.key, line)),
     );
     if rows.is_empty() && more.is_none() {
@@ -365,27 +360,24 @@ impl Swell {
     }
 
     /// How far the toast is scaled now, easing back to its size.
-    pub(super) fn scale(self, now: f64, still: bool) -> f32 {
-        self.started.filter(|_| !still).map_or(1.0, |at| {
+    pub(super) fn scale(self, now: f64) -> f32 {
+        self.started.map_or(1.0, |at| {
             let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
             1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
         })
     }
 }
 
-pub(super) fn motion_time(world: &World, gui: &egui::Context) -> (f64, bool) {
-    (
-        gui.input(|input| input.time),
-        world.resource::<MotionPreference>().reduced,
-    )
+pub(super) fn time(gui: &egui::Context) -> f64 {
+    gui.input(|input| input.time)
 }
 
 pub(super) fn look(size: f32, color: Color32) -> TextLook {
-    TextLook { size, color }
+    TextLook::new(size, color).on(Ground::Dusk)
 }
 
 pub(super) fn label_font() -> FontId {
-    FontId::new(LABEL, family::prose_bold())
+    Face::BookBold.id(LABEL)
 }
 
 pub(super) fn column_area(gui: &egui::Context, id: &str, top: f32) -> egui::Area {
@@ -413,7 +405,6 @@ impl<T: Clone> Fades<T> {
         &mut self,
         now: f64,
         presence: Presence,
-        still: bool,
         current: impl IntoIterator<Item = (u64, T)>,
     ) -> Vec<(T, Look)> {
         let mut previous: Vec<Option<Fading<T>>> = std::mem::take(&mut self.items)
@@ -450,14 +441,14 @@ impl<T: Clone> Fades<T> {
                 fading.leaving = true;
                 fading.since = now;
             }
-            if !still && now - fading.since < presence.exit.seconds {
+            if now - fading.since < presence.exit.seconds {
                 items.insert(index.min(items.len()), fading);
             }
         }
         self.items = items;
         self.items
             .iter()
-            .map(|fading| (fading.item.clone(), fading.look(now, presence, still)))
+            .map(|fading| (fading.item.clone(), fading.look(now, presence)))
             .collect()
     }
 }
@@ -537,10 +528,7 @@ struct Fading<T> {
 }
 
 impl<T> Fading<T> {
-    fn look(&self, now: f64, presence: Presence, still: bool) -> Look {
-        if still {
-            return Look::default();
-        }
+    fn look(&self, now: f64, presence: Presence) -> Look {
         let (step, away) = if self.leaving {
             let t = ((now - self.since) / presence.exit.seconds).clamp(0.0, 1.0) as f32;
             (presence.exit, easing::cubic_in(t))
@@ -761,7 +749,7 @@ fn milestone_row(ui: &mut Ui, world: &World, line: &LabelledLine, row: Look) -> 
     let words = text::show_shadowed(
         ui,
         &words,
-        FontId::new(MILESTONE_SIZE, family::bold()),
+        Face::BookBold.id(MILESTONE_SIZE),
         AMBER_80,
         SHADOW,
         shift,
@@ -780,4 +768,42 @@ fn label_width(gui: &egui::Context, label: &str) -> f32 {
     gui.fonts_mut(|fonts| fonts.layout_no_wrap(label.to_owned(), label_font(), WHITE))
         .size()
         .x
+}
+
+/// The alert's label over a rule, with the cross that closes it; true once the cross is clicked.
+fn alert_title(ui: &mut Ui, label: &str) -> bool {
+    let closed = ui
+        .horizontal(|ui| {
+            ui.label(RichText::new(label).font(label_font()).color(dusk::TEXT));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let (rect, response) = ui.allocate_exact_size(Vec2::splat(CLOSE), Sense::click());
+                response.widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close")
+                });
+                if response.hovered() {
+                    ui.painter().rect_filled(rect, 4.0, dusk::HOVER);
+                }
+                let arm = Vec2::splat(CLOSE * 0.2);
+                let stroke = egui::Stroke::new(1.5, dusk::TEXT);
+                let centre = rect.center();
+                ui.painter()
+                    .line_segment([centre - arm, centre + arm], stroke);
+                ui.painter().line_segment(
+                    [
+                        centre + Vec2::new(-arm.x, arm.y),
+                        centre + Vec2::new(arm.x, -arm.y),
+                    ],
+                    stroke,
+                );
+                response.clicked()
+            })
+            .inner
+        })
+        .inner;
+    let rule = ui.available_rect_before_wrap().x_range();
+    let y = ui.cursor().top();
+    ui.painter()
+        .hline(rule, y, egui::Stroke::new(1.0, dusk::BORDER));
+    ui.add_space(6.0);
+    closed
 }

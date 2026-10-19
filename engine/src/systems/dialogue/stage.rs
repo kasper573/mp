@@ -4,10 +4,14 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::{CHIP_RADIUS, HAIRLINE, SHADOW, TextRole, WINDOW_RADIUS, color, widgets};
+use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::glyph::{self, Mark};
+use design_tokens::motion::SheetPose;
+use design_tokens::sheet::{self, Sheet};
+use design_tokens::{TextRole, ink, slip};
 use egui::{
-    Align, Align2, Color32, Id, Layout, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui,
-    UiBuilder, Vec2, WidgetInfo, WidgetType,
+    Align, Align2, Color32, Id, LayerId, Layout, Pos2, Rect, Sense, Ui, UiBuilder, Vec2,
+    WidgetInfo, WidgetType,
 };
 
 use super::{
@@ -17,14 +21,14 @@ use super::{
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
-use crate::core::content::{Content, Fixture};
-use crate::core::gui::{self, Band};
+use crate::core::content::Content;
+use crate::core::gui::{self, Afterimage, Band, Tier};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece, Typewriter};
 use crate::systems::actor::model::{BustFigure, Busts, Face, GenericExpression, ModelId};
 use crate::systems::actor::{ActorModel, Name};
 use crate::systems::hud;
 use crate::systems::input::map::{self, InputAction, InputMap};
-use crate::systems::interface::{InterfaceIcon, InterfaceSound};
+use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemId, card};
 use crate::systems::npc::Npc;
 use crate::systems::player;
@@ -42,16 +46,19 @@ const CHOICE_SHORTCUTS: [InputAction; 9] = [
     InputAction::Choice8,
     InputAction::Choice9,
 ];
-const BOX_WIDTH: f32 = 780.0;
-const BOX_MIN_HEIGHT: f32 = 150.0;
-const BOX_LIFT: f32 = 28.0;
-const BOX_PADDING: Vec2 = Vec2::new(28.0, 24.0);
-const PANEL_GAP: f32 = 16.0;
-const SCREEN_SHARE: f32 = 0.94;
+const SHEET_WIDTH: f32 = 800.0;
 const NAME_INSET: f32 = 40.0;
+const SHEET_LIFT: f32 = 14.0;
+const PANEL_GAP: f32 = 12.0;
+const SCREEN_SHARE: f32 = 0.94;
+const SCREEN_MARGIN: f32 = 8.0;
+const HINT_ROOM: f32 = 22.0;
+const CONTINUE_MARK: f32 = 12.0;
 const CHOICE_ICON: f32 = 18.0;
-const CHIP_ICON: f32 = 14.0;
-const SHAKE: Duration = Duration::from_millis(320);
+const PILL_ICON: f32 = 14.0;
+const REFUSED: Duration = Duration::from_millis(320);
+const DIALOGUE: &str = "stage";
+const DOCKED: &str = "docked";
 const BUST_TUCK: f32 = 50.0;
 const FRONT_HEIGHT: f32 = 0.64;
 const BACK_HEIGHT: f32 = 0.56;
@@ -67,6 +74,7 @@ impl Plugin for StagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Stage>()
             .init_resource::<StageDrawn>()
+            .init_resource::<StageSheets>()
             .add_systems(OnExit(ClientScreen::Area), forget_stage)
             .add_systems(
                 Update,
@@ -107,13 +115,17 @@ pub struct StageChoice {
 #[derive(Clone, Copy)]
 pub struct DockedPanel {
     pub head: fn(&World) -> Option<PanelHead>,
-    pub show: fn(&mut Ui, &mut World),
+    pub show: fn(&mut Ui, &mut World, f32, f32),
 }
 
 pub struct PanelHead {
-    pub title: String,
     pub width: f32,
-    pub fixed_height: Option<f32>,
+    pub chrome: PanelChrome,
+}
+
+pub enum PanelChrome {
+    Card,
+    Sheet { title: String, height: f32 },
 }
 
 pub fn dock(app: &mut App, panel: DockedPanel) {
@@ -175,8 +187,8 @@ pub fn leavable(world: &World) -> bool {
     world.resource::<Stage>().shown.is_some()
 }
 
-pub fn layer() -> egui::LayerId {
-    egui::LayerId::new(Band::Stage.order(), egui::Id::new("stage"))
+pub fn layer() -> LayerId {
+    sheet_layer(DIALOGUE)
 }
 
 pub fn leave(world: &mut World) -> bool {
@@ -219,11 +231,11 @@ struct Shown {
     typing: Option<Entity>,
     selected: usize,
     pointed: Option<usize>,
-    shaken: Option<(usize, Duration)>,
+    refused: Option<(usize, Duration)>,
     cast: Vec<CastMember>,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone)]
 struct StageDrawn {
     dialogue: Option<Rect>,
     panels: Vec<Rect>,
@@ -342,7 +354,7 @@ impl Shown {
             refusals_seen: now.refused.map_or(0, |refused| refused.nth),
             remark: None,
             typing: None,
-            shaken: None,
+            refused: None,
             cast: Vec::new(),
         }
     }
@@ -486,7 +498,7 @@ fn pick_at(world: &mut World, index: usize) {
             shown.selected = index;
         }
         if locked == Some(true) {
-            shown.shaken = Some((index, now));
+            shown.refused = Some((index, now));
         }
         locked
     }) else {
@@ -534,7 +546,7 @@ fn request_pick(world: &mut World, index: usize) -> bool {
     true
 }
 
-// A locked choice already shook when it was picked; one the server turned down shakes now.
+// A locked choice was already marked refused when it was picked; one the server turned down is now.
 fn refuse(world: &mut World, refused: RefusedPick) {
     let index = refused.choice as usize;
     let now = world.resource::<Time>().elapsed();
@@ -544,7 +556,7 @@ fn refuse(world: &mut World, refused: RefusedPick) {
             .get(index)
             .is_some_and(|choice| !choice.locked)
     {
-        shown.shaken = Some((index, now));
+        shown.refused = Some((index, now));
     }
 }
 
@@ -575,44 +587,81 @@ fn typing_line(world: &World) -> Option<Entity> {
 }
 
 fn draw_stage(world: &mut World) {
-    *world.resource_mut::<StageDrawn>() = StageDrawn::default();
+    let before = std::mem::take(&mut *world.resource_mut::<StageDrawn>());
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let panels = docked_heads(world);
-    if world.resource::<Stage>().shown.is_none() && panels.is_empty() {
-        return;
-    }
     let screen = gui.content_rect();
-    let area = egui::Area::new(Id::new("stage"))
-        .order(Band::Stage.order())
-        .anchor(Align2::CENTER_BOTTOM, Vec2::new(0.0, -BOX_LIFT));
-    let stage = gui::show_anchored(&gui, area, |ui| {
-        ui.vertical_centered(|ui| {
-            if !panels.is_empty() {
-                docked_panels(ui, world, panels, screen);
-                ui.add_space(PANEL_GAP);
-            }
-            world
-                .resource::<Stage>()
-                .shown
-                .is_some()
-                .then(|| dialogue_box(ui, world, screen))
-        })
-        .inner
+    let talking = world.resource::<Stage>().shown.is_some();
+    let dialogue = match hud::sheet_pose(world, &gui, DIALOGUE, talking) {
+        Some(pose) if talking => Some(dialogue_sheet(world, &gui, screen, pose, &before)),
+        Some(pose) => lift_off(world, &gui, DIALOGUE, pose),
+        None => None,
+    };
+    let panels = docked_heads(world);
+    let bottom = dialogue.map_or(screen.bottom() - SHEET_LIFT, |dialogue| {
+        dialogue.top() - PANEL_GAP
     });
-    let cast = egui::Area::new(Id::new("cast"))
+    match hud::sheet_pose(world, &gui, DOCKED, !panels.is_empty()) {
+        Some(pose) if !panels.is_empty() => {
+            docked_panels(world, &gui, panels, screen, bottom, pose)
+        }
+        Some(pose) => {
+            lift_off(world, &gui, DOCKED, pose);
+        }
+        None => {}
+    }
+    if talking && let Some(dialogue) = dialogue {
+        let cast = egui::Area::new(Id::new("cast"))
+            .order(Band::Stage.order())
+            .fixed_pos(Pos2::ZERO)
+            .interactable(false)
+            .show(&gui, |ui| busts(ui, world, dialogue, screen));
+        gui::stack(&gui, Tier::Back, cast.response.layer_id);
+    }
+    for key in [DIALOGUE, DOCKED] {
+        gui::stack(&gui, Tier::Front, sheet_layer(key));
+    }
+}
+
+/// What a stage sheet last drew and where, to lift off once what it showed has gone.
+#[derive(Resource, Default)]
+struct StageSheets {
+    dialogue_height: f32,
+    drawn: HashMap<&'static str, (Afterimage, Rect)>,
+}
+
+fn sheet_layer(key: &'static str) -> LayerId {
+    LayerId::new(Band::Stage.order(), Id::new(key))
+}
+
+fn keep_afterimage(world: &mut World, gui: &egui::Context, key: &'static str, rect: Rect) {
+    let image = Afterimage::of(gui, sheet_layer(key));
+    world
+        .resource_mut::<StageSheets>()
+        .drawn
+        .insert(key, (image, rect));
+}
+
+fn lift_off(
+    world: &World,
+    gui: &egui::Context,
+    key: &'static str,
+    pose: SheetPose,
+) -> Option<Rect> {
+    let (image, rect) = world.resource::<StageSheets>().drawn.get(key)?.clone();
+    gui.set_transform_layer(sheet_layer(key), pose.transform(gui, rect, rect.min));
+    egui::Area::new(Id::new(key))
         .order(Band::Stage.order())
-        .fixed_pos(Pos2::ZERO)
+        .fixed_pos(rect.min)
+        .constrain(false)
+        .fade_in(false)
         .interactable(false)
-        .show(&gui, |ui| {
-            if let Some(dialogue) = stage.inner {
-                busts(ui, world, dialogue, screen);
-            }
+        .show(gui, |ui| {
+            ui.multiply_opacity(pose.opacity);
+            image.paint(ui.painter());
         });
-    let cast_layer = cast.response.layer_id;
-    gui.move_to_top(cast_layer);
-    gui.set_sublayer(cast_layer, stage.response.layer_id);
+    Some(rect)
 }
 
 fn docked_heads(world: &World) -> Vec<(PanelHead, DockedPanel)> {
@@ -629,89 +678,182 @@ fn docked_heads(world: &World) -> Vec<(PanelHead, DockedPanel)> {
 }
 
 fn docked_panels(
-    ui: &mut Ui,
     world: &mut World,
+    gui: &egui::Context,
     panels: Vec<(PanelHead, DockedPanel)>,
     screen: Rect,
+    bottom: f32,
+    pose: SheetPose,
 ) {
-    let width_of = |head: &PanelHead| head.width.min(screen.width() * SCREEN_SHARE);
-    let gaps = panels.len().saturating_sub(1) as f32 * ui.spacing().item_spacing.x;
-    let row = panels.iter().map(|(head, _)| width_of(head)).sum::<f32>() + gaps;
-    let layout = Layout::left_to_right(Align::Max);
-    ui.allocate_ui_with_layout(Vec2::new(row, 0.0), layout, |ui| {
-        for (index, (head, panel)) in panels.into_iter().enumerate() {
-            let width = width_of(&head);
-            let most = screen.height() * SCREEN_SHARE;
-            let frame = egui::Frame::window(ui.style()).inner_margin(0.0);
-            let shown = ui.push_id(("docked", index), |ui| {
-                frame.show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        ui.set_width(width);
-                        match head.fixed_height {
-                            Some(height) => ui.set_height(height.min(most)),
-                            None => ui.set_max_height(most),
+    let most = (bottom - screen.top() - SCREEN_MARGIN).max(0.0);
+    let id = Id::new(DOCKED);
+    let rest = gui
+        .memory(|memory| memory.area_rect(id))
+        .unwrap_or(Rect::from_center_size(screen.center(), Vec2::ZERO));
+    gui.set_transform_layer(sheet_layer(DOCKED), pose.transform(gui, rest, rest.min));
+    let area = egui::Area::new(id)
+        .order(Band::Stage.order())
+        .pivot(Align2::CENTER_BOTTOM)
+        .fixed_pos(Pos2::new(screen.center().x, bottom))
+        .constrain(false)
+        .fade_in(false);
+    let shown = gui::show_anchored(gui, area, |ui| {
+        ui.multiply_opacity(pose.opacity);
+        ui.spacing_mut().item_spacing.x = PANEL_GAP;
+        ui.with_layout(Layout::left_to_right(Align::Max), |ui| {
+            for (index, (head, panel)) in panels.into_iter().enumerate() {
+                let width = head.width.min(screen.width() * SCREEN_SHARE);
+                let rect = ui
+                    .push_id(("docked", index), |ui| match head.chrome {
+                        PanelChrome::Card => {
+                            ui.vertical(|ui| (panel.show)(ui, world, width, most))
+                                .response
+                                .rect
                         }
-                        egui::Frame::new()
-                            .fill(color::BG)
-                            .inner_margin(egui::Margin::symmetric(10, 6))
-                            .show(ui, |ui| {
-                                ui.set_width(width - 20.0);
-                                ui.vertical_centered(|ui| {
-                                    ui.label(
-                                        RichText::new(&head.title)
-                                            .text_style(egui::TextStyle::Heading),
-                                    );
-                                });
-                            });
-                        (panel.show)(ui, world);
+                        PanelChrome::Sheet { title, height } => docked_sheet(
+                            ui,
+                            world,
+                            panel,
+                            &title,
+                            Vec2::new(width, height.min(most)),
+                            pose,
+                        ),
                     })
-                })
-            });
-            world
-                .resource_mut::<StageDrawn>()
-                .panels
-                .push(shown.response.rect);
-        }
+                    .inner;
+                world.resource_mut::<StageDrawn>().panels.push(rect);
+            }
+        });
     });
+    keep_afterimage(world, gui, DOCKED, shown.response.rect);
 }
 
-fn dialogue_box(ui: &mut Ui, world: &mut World, screen: Rect) -> Rect {
-    let width = BOX_WIDTH.min(screen.width() * SCREEN_SHARE);
-    let frame = egui::Frame::new()
-        .fill(color::OVERLAY)
-        .stroke(HAIRLINE)
-        .corner_radius(WINDOW_RADIUS)
-        .shadow(SHADOW)
-        .inner_margin(egui::Margin::symmetric(
-            BOX_PADDING.x as i8,
-            BOX_PADDING.y as i8,
-        ));
-    let held = ui.scope_builder(
-        UiBuilder::new().id_salt("dialogue").sense(Sense::click()),
-        |ui| {
-            frame
-                .show(ui, |ui| {
-                    ui.set_width(width - 2.0 * BOX_PADDING.x);
-                    ui.set_min_height(BOX_MIN_HEIGHT - 2.0 * BOX_PADDING.y);
-                    ui.with_layout(Layout::top_down(Align::Min), |ui| {
-                        ui.spacing_mut().item_spacing.y = 16.0;
-                        line(ui, world);
-                        choices(ui, world);
-                    });
-                })
-                .response
-                .rect
-        },
+fn docked_sheet(
+    ui: &mut Ui,
+    world: &mut World,
+    panel: DockedPanel,
+    title: &str,
+    size: Vec2,
+    pose: SheetPose,
+) -> Rect {
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    let sheet = Sheet {
+        title: Some(title),
+        closable: false,
+        curl: false,
+        depth: sheet::Depth::Front,
+    };
+    let parts = sheet.paint_at(ui.painter(), rect, pose.shadow, Color32::WHITE);
+    titled(ui, parts.band, title);
+    let body = parts.body;
+    ui.scope_builder(
+        UiBuilder::new()
+            .max_rect(body)
+            .layout(Layout::top_down(Align::Min)),
+        |ui| (panel.show)(ui, world, body.width(), body.height()),
     );
-    let dialogue = held.inner;
-    if map::clicked(world, InputAction::Advance, &held.response) {
-        press_advance(world);
-    }
-    name_tag(ui, world, dialogue);
-    continue_mark(ui, world, dialogue);
-    hint_bar(ui, world, dialogue);
-    world.resource_mut::<StageDrawn>().dialogue = Some(dialogue);
-    dialogue
+    rect
+}
+
+fn dialogue_sheet(
+    world: &mut World,
+    gui: &egui::Context,
+    screen: Rect,
+    pose: SheetPose,
+    before: &StageDrawn,
+) -> Rect {
+    let width = SHEET_WIDTH.min(screen.width() * SCREEN_SHARE);
+    let height = world.resource::<StageSheets>().dialogue_height;
+    let rect = Rect::from_min_size(
+        Pos2::new(
+            screen.center().x - width / 2.0,
+            screen.bottom() - SHEET_LIFT - height,
+        ),
+        Vec2::new(width, height),
+    );
+    let speaker = world
+        .resource::<Stage>()
+        .shown
+        .as_ref()
+        .and_then(Shown::current)
+        .and_then(|spoken| speaker_name(world, spoken.by));
+    gui.set_transform_layer(layer(), pose.transform(gui, rect, rect.min));
+    egui::Area::new(layer().id)
+        .order(Band::Stage.order())
+        .fixed_pos(rect.min)
+        .constrain(false)
+        .fade_in(false)
+        .show(gui, |ui| {
+            ui.multiply_opacity(pose.opacity);
+            let (outer, held) = ui.allocate_exact_size(rect.size(), Sense::click());
+            let sheet = Sheet {
+                title: None,
+                closable: false,
+                curl: false,
+                depth: sheet::Depth::Front,
+            };
+            let body = sheet
+                .paint_at(ui.painter(), outer, pose.shadow, Color32::WHITE)
+                .body;
+            let written = ui
+                .scope_builder(
+                    UiBuilder::new()
+                        .max_rect(Rect::from_min_size(
+                            body.min,
+                            Vec2::new(body.width(), f32::INFINITY),
+                        ))
+                        .layout(Layout::top_down(Align::Min)),
+                    |ui| {
+                        ui.spacing_mut().item_spacing.y = 12.0;
+                        line(ui, world);
+                        choices(ui, world, before);
+                    },
+                )
+                .response
+                .rect;
+            let needed =
+                written.bottom() - outer.top() + HINT_ROOM + outer.bottom() - body.bottom();
+            let mut sheets = world.resource_mut::<StageSheets>();
+            if (needed - sheets.dialogue_height).abs() > 0.5 {
+                sheets.dialogue_height = needed;
+                gui.request_discard("the conversation grew or shrank");
+            }
+            foot(ui, world, body);
+            if let Some(speaker) = &speaker {
+                name_tag(ui, outer, speaker);
+            }
+            if map::clicked(world, InputAction::Advance, &held) {
+                press_advance(world);
+            }
+        });
+    keep_afterimage(world, gui, DIALOGUE, rect);
+    world.resource_mut::<StageDrawn>().dialogue = Some(rect);
+    rect
+}
+
+fn titled(ui: &Ui, band: Rect, title: &str) {
+    ui.interact(band, ui.id().with(("title", title)), Sense::hover())
+        .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, title));
+}
+
+/// The speaker's name on a slip of its own over the sheet's top edge, so it takes no room from the
+/// line beneath.
+fn name_tag(ui: &Ui, sheet: Rect, name: &str) {
+    let galley = ui
+        .painter()
+        .layout_job(TextRole::Title.job(name, ink::RUBRIC));
+    let padding = Vec2::new(f32::from(slip::PADDING.left), f32::from(slip::PADDING.top));
+    let size = galley.size() + 2.0 * padding;
+    let rect = Rect::from_min_size(
+        Pos2::new(
+            sheet.right() - NAME_INSET - size.x,
+            sheet.top() - size.y / 2.0,
+        ),
+        size,
+    );
+    slip::paint(ui.painter(), rect);
+    ui.painter().galley(rect.min + padding, galley, ink::RUBRIC);
+    ui.interact(rect, ui.id().with(("speaker", name)), Sense::hover())
+        .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, name));
 }
 
 fn line(ui: &mut Ui, world: &mut World) {
@@ -730,73 +872,89 @@ fn line(ui: &mut Ui, world: &mut World) {
             ))
         })
         .unwrap_or_else(|| (spoken.text.styled(), None));
-    let look = TextLook {
-        size: TextRole::Line.size(),
-        color: color::TEXT,
-    };
-    text::show(ui, world, &styled, look, revealed);
+    text::show(
+        ui,
+        world,
+        &styled,
+        TextLook::role(TextRole::Line, ink::INK),
+        revealed,
+    );
 }
 
-fn choices(ui: &mut Ui, world: &mut World) {
+fn choices(ui: &mut Ui, world: &mut World, before: &StageDrawn) {
     let Some(shown) = world.resource::<Stage>().shown.as_ref() else {
         return;
     };
     if !shown.choosing() {
         return;
     }
-    let rows: Vec<(ChoiceView, f32)> = {
-        let now = world.resource::<Time>().elapsed();
-        shown
-            .choices
-            .iter()
-            .enumerate()
-            .map(|(index, choice)| {
-                let offset = shown
-                    .shaken
-                    .filter(|(shaken, _)| *shaken == index)
-                    .map_or(0.0, |(_, since)| shake_offset(now.saturating_sub(since)));
-                (choice.clone(), offset)
-            })
-            .collect()
-    };
+    let now = world.resource::<Time>().elapsed();
+    let rows: Vec<(ChoiceView, bool)> = shown
+        .choices
+        .iter()
+        .enumerate()
+        .map(|(index, choice)| {
+            let refused = shown.refused.is_some_and(|(refused, since)| {
+                refused == index && now.saturating_sub(since) < REFUSED
+            });
+            (choice.clone(), refused)
+        })
+        .collect();
     let moved = ui.input(|input| input.pointer.delta() != Vec2::ZERO);
-    let mut pointed = None;
-    let mut drawn = Vec::new();
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 2.0;
-        for (index, (choice, offset)) in rows.into_iter().enumerate() {
-            let row = ui
-                .push_id(("choice", index), |ui| {
-                    choice_row(ui, world, &choice, index, offset)
-                })
-                .inner;
-            if row.response.hovered() {
-                pointed = Some(index);
-            }
-            if map::clicked(world, InputAction::PickChoice, &row.response) {
-                pick_at(world, index);
-            }
-            if let Some(item) = row.chip_item
-                && map::clicked(world, InputAction::InspectItem, &row.response)
-            {
-                card::open(world, item);
-            }
-            world
-                .resource_mut::<StageDrawn>()
-                .choices
-                .insert(index, row.response.rect);
-            drawn.push(row);
-        }
-    });
-    point_at(world, pointed, moved);
+    point_at(world, pointed_choice(ui, before), moved);
     let selected = world
         .resource::<Stage>()
         .shown
         .as_ref()
         .map(|shown| shown.selected);
-    for (index, row) in drawn.iter().enumerate() {
-        highlight(ui, row, selected == Some(index));
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        for (index, (choice, refused)) in rows.into_iter().enumerate() {
+            let look = RowLook {
+                selected: selected == Some(index),
+                faint: choice.locked,
+                failed: refused,
+            };
+            let row = ui.push_id(("choice", index), |ui| {
+                controls::row(ui, look, |ui| choice_row(ui, world, &choice, index))
+            });
+            let (label, chip_item) = row.inner.inner;
+            let response = row.inner.response;
+            response.widget_info(|| {
+                WidgetInfo::selected(WidgetType::SelectableLabel, true, look.selected, &label)
+            });
+            if map::clicked(world, InputAction::PickChoice, &response) {
+                pick_at(world, index);
+            }
+            if let Some((item, chip)) = chip_item
+                && map::clicked(world, InputAction::InspectItem, &response)
+            {
+                card::open(world, item, Some(chip));
+            }
+            world
+                .resource_mut::<StageDrawn>()
+                .choices
+                .insert(index, response.rect);
+        }
+    });
+}
+
+/// Found where the rows stood the pass before, as egui finds what is hovered, so the selection it
+/// moves lights its row on the pass the pointer reaches it.
+fn pointed_choice(ui: &Ui, before: &StageDrawn) -> Option<usize> {
+    let pointer = ui.ctx().pointer_hover_pos()?;
+    if ui.ctx().layer_id_at(pointer) != Some(layer()) {
+        return None;
     }
+    let local = ui
+        .ctx()
+        .layer_transform_to_global(layer())
+        .map_or(pointer, |transform| transform.inverse() * pointer);
+    before
+        .choices
+        .iter()
+        .find(|(_, rect)| rect.contains(local))
+        .map(|(index, _)| *index)
 }
 
 /// The pointer takes the choice only by moving onto a row, so the keys keep it from a pointer at
@@ -815,140 +973,82 @@ fn point_at(world: &mut World, pointed: Option<usize>, moved: bool) {
     shown.pointed = pointed;
 }
 
-fn shake_offset(age: Duration) -> f32 {
-    if age >= SHAKE {
-        return 0.0;
-    }
-    let fade = 1.0 - age.as_secs_f32() / SHAKE.as_secs_f32();
-    (age.as_secs_f32() * 70.0).sin() * 6.0 * fade
-}
-
-struct ChoiceRow {
-    response: egui::Response,
-    label: String,
-    background: egui::layers::ShapeIdx,
-    chip_item: Option<ItemId>,
-}
-
+/// Hands back the item of the pill under the pointer, since the row takes every click.
 fn choice_row(
     ui: &mut Ui,
     world: &mut World,
     choice: &ChoiceView,
     index: usize,
-    offset: f32,
-) -> ChoiceRow {
+) -> (String, Option<(ItemId, Rect)>) {
     let keys = world.resource::<InputMap>();
     let shortcut = CHOICE_SHORTCUTS
         .get(index)
         .and_then(|&action| keys.name(action));
     let label = choice.label.words(keys);
-    let ink = if choice.locked {
-        color::TEXT.gamma_multiply(0.45)
-    } else {
-        color::TEXT
-    };
-    let room = Rect::from_min_size(
-        ui.cursor().min + Vec2::new(offset, 0.0),
-        Vec2::new(ui.available_width(), 0.0),
-    );
-    let background = ui.painter().add(egui::Shape::Noop);
+    let color = ui.visuals().override_text_color.unwrap_or(ink::INK);
     let mut chip_item = None;
-    let row = ui.scope_builder(
-        UiBuilder::new()
-            .max_rect(room.with_max_y(ui.max_rect().max.y))
-            .layout(Layout::top_down(Align::Min))
-            .sense(Sense::click()),
-        |ui| {
-            egui::Frame::new()
-                .inner_margin(egui::Margin::symmetric(8, 2))
-                .show(ui, |ui| {
-                    ui.set_width(room.width() - 16.0);
-                    ui.horizontal(|ui| {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            chip_item = chips(ui, world, choice);
-                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                                if let Some(shortcut) = &shortcut {
-                                    widgets::key_hint(ui, shortcut);
-                                }
-                                if let Some(icon) = &choice.icon
-                                    && let Some(image) = gui::image_file(world, icon)
-                                {
-                                    ui.add(image.widget(Vec2::splat(CHOICE_ICON)));
-                                }
-                                let look = TextLook {
-                                    size: TextRole::Line.size(),
-                                    color: ink,
-                                };
-                                text::show(ui, world, &choice.label.styled(), look, None);
-                            });
-                        });
-                    });
-                });
-        },
-    );
-    ChoiceRow {
-        response: row.response,
-        label,
-        background,
-        chip_item,
-    }
-}
-
-/// Painted once the pass has moved the selection, so a row lights up on the frame the pointer
-/// reaches it.
-fn highlight(ui: &Ui, row: &ChoiceRow, selected: bool) {
-    row.response.widget_info(|| {
-        WidgetInfo::selected(WidgetType::SelectableLabel, true, selected, &row.label)
+    ui.horizontal(|ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            chip_item = pills(ui, world, choice);
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                if let Some(shortcut) = &shortcut {
+                    controls::key_hint(ui, shortcut);
+                }
+                if let Some(icon) = &choice.icon
+                    && let Some(image) = gui::image_file(world, icon)
+                {
+                    ui.add(image.widget(Vec2::splat(CHOICE_ICON)));
+                }
+                let look = TextLook::new(TextRole::Body.size(), color);
+                text::show(ui, world, &choice.label.styled(), look, None);
+            });
+        });
     });
-    if !selected {
-        return;
-    }
-    let visuals = ui.style().interact_selectable(&row.response, selected);
-    ui.painter().set(
-        row.background,
-        egui::epaint::RectShape::new(
-            row.response.rect,
-            4.0,
-            visuals.weak_bg_fill,
-            visuals.bg_stroke,
-            StrokeKind::Inside,
-        ),
-    );
+    (label, chip_item)
 }
 
-/// The row takes every click, so it is handed the item of the chip under the pointer to inspect.
-fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<ItemId> {
+fn pills(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<(ItemId, Rect)> {
     let content = world.resource::<Content>().clone();
     let mut pointed = None;
     if let Some(warn) = &choice.warn {
-        chip(ui, world, None, warn, color::DANGER);
+        controls::pill(ui, warn, Pill::Rubric);
     }
     for shown in choice.chips.iter().rev() {
         match shown {
             ChoiceChip::Needs { what, met } => {
-                let (icon, ink) = if *met {
-                    (InterfaceIcon::Checked, color::OK)
+                let (mark, pill) = if *met {
+                    (Mark::Tick, Pill::Verdigris)
                 } else {
-                    (InterfaceIcon::Locked, color::DANGER)
+                    (Mark::Padlock, Pill::Rubric)
                 };
-                let icon = icon.get(&content).image.clone();
-                chip(ui, world, Some(&icon), what, ink);
+                controls::pill_with(ui, pill, |ui| {
+                    glyph::show(ui, mark, PILL_ICON, pill.color());
+                    ui.label(what.as_str());
+                });
             }
             ChoiceChip::Pays { item, count, have } => {
-                let ink = if have >= count {
-                    color::WARN
+                let pill = if have >= count {
+                    Pill::Gold
                 } else {
-                    color::DANGER
+                    Pill::Rubric
                 };
                 let icon = item.get(&content).icon.clone();
-                chip(ui, world, Some(&icon), &count.to_string(), ink);
+                controls::pill_with(ui, pill, |ui| {
+                    hud::icon(ui, world, &icon, PILL_ICON);
+                    ui.label(count.to_string());
+                });
             }
             ChoiceChip::Gets { item, count } => {
                 let icon = item.get(&content).icon.clone();
-                let response = chip(ui, world, Some(&icon), &format!("+{count}"), color::OK);
+                let response = controls::pill_with(ui, Pill::Verdigris, |ui| {
+                    hud::icon(ui, world, &icon, PILL_ICON);
+                    ui.label(format!("+{count}"));
+                })
+                .response
+                .interact(Sense::hover());
                 card::tooltip(world, &response, *item);
                 if response.contains_pointer() {
-                    pointed = Some(*item);
+                    pointed = Some((*item, response.rect));
                 }
             }
         }
@@ -956,109 +1056,26 @@ fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<ItemId> 
     pointed
 }
 
-fn chip(
-    ui: &mut Ui,
-    world: &mut World,
-    icon: Option<&AssetRef>,
-    label: &str,
-    ink: Color32,
-) -> egui::Response {
-    egui::Frame::new()
-        .fill(ink.gamma_multiply(0.12))
-        .stroke(Stroke::new(1.0, ink.gamma_multiply(0.6)))
-        .corner_radius(CHIP_RADIUS)
-        .inner_margin(egui::Margin::symmetric(6, 1))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 3.0;
-                if let Some(icon) = icon {
-                    hud::icon(ui, world, icon, CHIP_ICON);
-                }
-                ui.label(RichText::new(label).size(12.5).color(ink));
-            });
-        })
-        .response
-        .interact(Sense::hover())
-}
-
-fn name_tag(ui: &mut Ui, world: &World, dialogue: Rect) {
-    let Some(spoken) = world
-        .resource::<Stage>()
-        .shown
-        .as_ref()
-        .and_then(Shown::current)
-    else {
-        return;
-    };
-    let Some(name) = speaker_name(world, spoken.by) else {
-        return;
-    };
-    let text = RichText::new(name).text_style(egui::TextStyle::Heading);
-    let galley = egui::WidgetText::from(text.clone()).into_galley(
-        ui,
-        Some(egui::TextWrapMode::Extend),
-        f32::INFINITY,
-        egui::TextStyle::Heading,
+fn foot(ui: &mut Ui, world: &mut World, body: Rect) {
+    let room = Rect::from_min_max(Pos2::new(body.left(), body.bottom() - HINT_ROOM), body.max);
+    ui.scope_builder(
+        UiBuilder::new()
+            .max_rect(room)
+            .layout(Layout::left_to_right(Align::Max)),
+        |ui| {
+            let look = TextLook::new(TextRole::Small.size(), ink::INK3);
+            text::show(ui, world, &StyledLine::new(player_hint()), look, None);
+        },
     );
-    let size = galley.size() + Vec2::new(24.0, 8.0);
-    let x = match side_of(spoken.by) {
-        Side::Left => dialogue.left() + NAME_INSET,
-        Side::Right => dialogue.right() - NAME_INSET - size.x,
-    };
-    let rect = Rect::from_min_size(Pos2::new(x, dialogue.top() - size.y / 2.0), size);
-    ui.put(rect, |ui: &mut Ui| {
-        egui::Frame::new()
-            .fill(color::RAISED)
-            .stroke(HAIRLINE)
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(12, 4))
-            .show(ui, |ui| ui.add(egui::Label::new(text).extend()))
-            .response
-    });
-}
-
-fn continue_mark(ui: &Ui, world: &World, dialogue: Rect) {
     let waits = world
         .resource::<Stage>()
         .shown
         .as_ref()
         .is_some_and(|shown| shown.typed_since.is_some() && !shown.choosing());
     if waits {
-        ui.painter().text(
-            dialogue.right_bottom() - Vec2::new(BOX_PADDING.x, 12.0),
-            Align2::RIGHT_BOTTOM,
-            "↓",
-            egui::FontId::proportional(12.0),
-            color::MUTED,
-        );
+        let mark = Rect::from_min_max(body.max - Vec2::splat(CONTINUE_MARK), body.max);
+        glyph::paint(ui.painter(), Mark::ChevronDown, mark, ink::INK3);
     }
-}
-
-fn hint_bar(ui: &mut Ui, world: &mut World, dialogue: Rect) {
-    let hint = player_hint();
-    let room = Rect::from_min_size(
-        dialogue.left_bottom() + Vec2::new(16.0, -12.0),
-        Vec2::new(dialogue.width() - 32.0, 24.0),
-    );
-    ui.scope_builder(
-        UiBuilder::new()
-            .max_rect(room)
-            .layout(Layout::left_to_right(Align::Min)),
-        |ui| {
-            egui::Frame::new()
-                .fill(color::INPUT)
-                .stroke(HAIRLINE)
-                .corner_radius(4.0)
-                .inner_margin(egui::Margin::symmetric(8, 3))
-                .show(ui, |ui| {
-                    let look = TextLook {
-                        size: TextRole::Small.size(),
-                        color: color::MUTED,
-                    };
-                    text::show(ui, world, &StyledLine::new(hint), look, None);
-                });
-        },
-    );
 }
 
 fn player_hint() -> Vec<TextPiece> {

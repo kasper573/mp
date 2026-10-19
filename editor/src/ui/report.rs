@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Context, RichText, Ui};
 
 use super::{theme, widgets};
@@ -52,7 +54,7 @@ pub fn panel(ui: &mut Ui, folder: &str, text: &str, closable: bool) -> ReportAct
         {
             let _ = std::fs::write(path, text);
         }
-        if ui.button("⟳ Load again").clicked() {
+        if controls::marked(ui, Mark::Reload, "Load again").clicked() {
             action = ReportAction::LoadAgain;
         }
         if closable && ui.button("Close").clicked() {
@@ -92,15 +94,10 @@ pub fn not_loaded(editor: &mut Editor, ctx: &Context) {
                     ))
                     .layout(egui::Layout::top_down(egui::Align::Min)),
             );
-            egui::Frame::new()
-                .fill(theme::RAISED)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(8.0)
-                .inner_margin(egui::Margin::symmetric(20, 14))
-                .show(&mut column, |ui| {
+            design_tokens::sheet::note(&mut column, egui::Margin::symmetric(22, 16), |ui| {
                     ui.set_width(width - 40.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("⚠").color(theme::DANGER).size(16.0));
+                        glyph::show(ui, Mark::Warning, 16.0, theme::DANGER);
                         ui.label(
                             RichText::new("The folder no longer loads")
                                 .strong()

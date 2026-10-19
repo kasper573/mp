@@ -1,13 +1,68 @@
 use std::fmt::Display;
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{Face, TextRole, controls, ink, sheet};
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::theme;
+use crate::keymap::EditorKey;
 
-pub use design_tokens::widgets::{
-    card_frame, chip, chip_colored, combo_box, danger, key_hint, pill, primary, section,
-    section_heading, tab_strip, toggle,
-};
+pub use design_tokens::controls::{danger, key_hint, primary};
+pub use design_tokens::sheet::{section, section_with};
+
+pub fn section_heading(text: &str) -> RichText {
+    RichText::new(text)
+        .font(Face::SmallCapsBold.id(TextRole::Section.size()))
+        .color(ink::RUBRIC)
+}
+
+pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
+    sheet::tabs(ui, tabs, active);
+}
+
+pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
+    controls::combo(id_salt)
+}
+
+pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
+    controls::checkbox(ui, on, "")
+}
+
+pub fn chip(ui: &mut Ui, text: &str) -> Response {
+    chip_colored(ui, text, theme::RAISED, theme::TEXT)
+}
+
+pub fn chip_colored(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Response {
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(Stroke::new(1.0, theme::BORDER))
+        .corner_radius(3.0)
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.label(RichText::new(text).size(12.5).color(ink));
+        })
+        .response
+        .interact(Sense::click())
+}
+
+pub fn card_frame(selected: bool) -> egui::Frame {
+    egui::Frame::new()
+        .fill(if selected {
+            theme::ACCENT_SOFT
+        } else {
+            ink::ink_wash(0.03)
+        })
+        .stroke(Stroke::new(
+            1.0,
+            if selected {
+                theme::ACCENT
+            } else {
+                theme::BORDER
+            },
+        ))
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(10, 8))
+}
 
 pub fn section_count(ui: &mut Ui, text: &str, count: impl Display) {
     section(ui, &format!("{text} · {count}"));
@@ -25,11 +80,12 @@ pub fn kv(ui: &mut Ui, key: &str, value: impl FnOnce(&mut Ui)) {
 
 pub fn verdict(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(if ok { "✓" } else { "!" }).color(if ok {
-            theme::OK
+        let (mark, color) = if ok {
+            (Mark::Tick, theme::OK)
         } else {
-            theme::WARN
-        }));
+            (Mark::Warning, theme::WARN)
+        };
+        glyph::show(ui, mark, 13.0, color);
         ui.label(RichText::new(text).size(12.5));
     });
 }
@@ -46,18 +102,21 @@ pub fn kv_code(ui: &mut Ui, key: &str, value: impl Into<String>) {
     });
 }
 
-pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Response {
+pub fn keyed_button(ui: &mut Ui, label: &str, key: Option<EditorKey>, enabled: bool) -> Response {
+    let keys = key.map(|key| key.name());
     let label_width = ui
         .painter()
         .layout_no_wrap(label.to_owned(), FontId::proportional(14.0), theme::TEXT)
         .size()
         .x;
-    let keys_width = ui
-        .painter()
-        .layout_no_wrap(keys.to_owned(), FontId::monospace(11.0), theme::TEXT)
-        .size()
-        .x;
-    let size = Vec2::new(label_width + keys_width + 36.0, 26.0);
+    let keys_width = keys.as_ref().map_or(0.0, |keys| {
+        ui.painter()
+            .layout_no_wrap(keys.clone(), FontId::monospace(11.0), theme::TEXT)
+            .size()
+            .x
+            + 18.0
+    });
+    let size = Vec2::new(label_width + keys_width + 18.0, 26.0);
     let (rect, response) = ui.allocate_exact_size(
         size,
         if enabled {
@@ -87,25 +146,27 @@ pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Resp
         FontId::new(14.0, theme::medium()),
         ink,
     );
-    x += label_width + 8.0;
-    let cap = egui::Rect::from_min_size(
-        egui::pos2(x, rect.center().y - 9.0),
-        Vec2::new(keys_width + 10.0, 18.0),
-    );
-    ui.painter().rect(
-        cap,
-        3.0,
-        theme::INPUT,
-        Stroke::new(1.0, theme::BORDER),
-        egui::StrokeKind::Inside,
-    );
-    ui.painter().text(
-        cap.center(),
-        egui::Align2::CENTER_CENTER,
-        keys,
-        FontId::monospace(11.0),
-        if enabled { theme::MUTED } else { theme::FAINT },
-    );
+    if let Some(keys) = keys {
+        x += label_width + 8.0;
+        let cap = egui::Rect::from_min_size(
+            egui::pos2(x, rect.center().y - 9.0),
+            Vec2::new(keys_width - 8.0, 18.0),
+        );
+        ui.painter().rect(
+            cap,
+            3.0,
+            theme::INPUT,
+            Stroke::new(1.0, theme::BORDER),
+            egui::StrokeKind::Inside,
+        );
+        ui.painter().text(
+            cap.center(),
+            egui::Align2::CENTER_CENTER,
+            keys,
+            FontId::monospace(11.0),
+            if enabled { theme::MUTED } else { theme::FAINT },
+        );
+    }
     if enabled {
         response.on_hover_cursor(egui::CursorIcon::PointingHand)
     } else {
@@ -113,9 +174,17 @@ pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Resp
     }
 }
 
-pub fn key_hint_text(ui: &mut Ui, keys: &str, text: &str) {
+pub fn shortcut_button<'a>(label: impl Into<egui::WidgetText>, key: EditorKey) -> egui::Button<'a> {
+    egui::Button::new(label).shortcut_text(key.name())
+}
+
+pub fn key_chip(ui: &mut Ui, key: EditorKey) -> Response {
+    key_hint(ui, &key.name())
+}
+
+pub fn key_hint_text(ui: &mut Ui, key: EditorKey, text: &str) {
     ui.horizontal(|ui| {
-        key_hint(ui, keys);
+        key_chip(ui, key);
         ui.label(theme::muted(text));
     });
 }
@@ -131,13 +200,7 @@ pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.label(RichText::new(text).size(12.5).monospace());
-                if ui
-                    .add(
-                        egui::Label::new(RichText::new("✕").size(11.0).color(theme::MUTED))
-                            .sense(Sense::click()),
-                    )
-                    .clicked()
-                {
+                if glyph::button(ui, Mark::Cross, 11.0, theme::MUTED, "Remove").clicked() {
                     closed = true;
                 }
             });
@@ -158,7 +221,7 @@ pub fn badge(ui: &mut Ui, kind: &str) {
         egui::Align2::CENTER_CENTER,
         letter,
         FontId::monospace(11.0),
-        Color32::BLACK,
+        ink::CREAM,
     );
 }
 
@@ -172,11 +235,7 @@ pub fn card_header(
         .horizontal(|ui| {
             ui.label(theme::strong(title).monospace());
             if !subtitle.is_empty() {
-                ui.label(
-                    RichText::new(subtitle.to_uppercase())
-                        .size(11.0)
-                        .color(theme::MUTED),
-                );
+                ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.menu_button(theme::faint("…"), menu);
@@ -205,8 +264,9 @@ pub fn search_box(
     ui: &mut Ui,
     text: &mut String,
     placeholder: &str,
-    key: Option<&str>,
+    key: Option<EditorKey>,
 ) -> Response {
+    let key = key.map(|key| key.name());
     let mut inner = None;
     egui::Frame::new()
         .fill(theme::INPUT)
@@ -215,15 +275,16 @@ pub fn search_box(
         .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(theme::muted("🔍"));
-                let width = ui.available_width() - key.map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
+                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
+                let width = ui.available_width()
+                    - key.as_ref().map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
                 let response = ui.add(
                     egui::TextEdit::singleline(text)
                         .hint_text(placeholder)
                         .frame(egui::Frame::NONE)
                         .desired_width(width.max(40.0)),
                 );
-                if let Some(key) = key {
+                if let Some(key) = &key {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| key_hint(ui, key));
                 }
                 inner = Some(response);
@@ -247,9 +308,9 @@ pub fn toggle_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
 
 pub fn mode_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
     let (fill, ink) = if on {
-        (theme::ACCENT, Color32::WHITE)
+        (ink::LIGHT, ink::RUBRIC)
     } else {
-        (theme::RAISED, theme::TEXT)
+        (ink::ink_wash(0.05), ink::INK2)
     };
     chip_colored(ui, text, fill, ink)
 }
@@ -325,21 +386,6 @@ pub fn default_focus(ui: &Ui, response: &Response) {
     if ui.memory(|memory| memory.focused().is_none()) {
         response.request_focus();
     }
-}
-
-pub fn digit_pressed(ui: &Ui) -> Option<usize> {
-    const DIGITS: [egui::Key; 9] = [
-        egui::Key::Num1,
-        egui::Key::Num2,
-        egui::Key::Num3,
-        egui::Key::Num4,
-        egui::Key::Num5,
-        egui::Key::Num6,
-        egui::Key::Num7,
-        egui::Key::Num8,
-        egui::Key::Num9,
-    ];
-    ui.input(|i| DIGITS.iter().position(|key| i.key_pressed(*key)))
 }
 
 pub fn clip(text: &str, max: usize) -> String {

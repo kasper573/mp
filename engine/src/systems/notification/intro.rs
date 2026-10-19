@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::family;
+use design_tokens::Face;
 use egui::emath::TSTransform;
-use egui::{Align, Color32, FontId, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
+use egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};
 
 use super::rows::{self, Clock, Fades, Move, Presence};
@@ -80,13 +80,13 @@ pub fn shown(world: &World) -> Option<(String, String)> {
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = rows::motion_time(world, gui);
+    let now = rows::time(gui);
     let mut shown = world.resource_mut::<ShownIntro>();
     let current = shown
         .showing
         .as_ref()
         .map(|showing| (showing.key, (showing.key, showing.notification.clone())));
-    let intros = shown.fades.sync(now, PRESENCE, still, current);
+    let intros = shown.fades.sync(now, PRESENCE, current);
     let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
     for ((key, notification), look) in intros {
@@ -98,7 +98,7 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
         };
         let line = notification.text.styled();
         let tint = appearance.tint.map_or(Color32::WHITE, Color32::from);
-        let title_font = FontId::new(TITLE_SIZE, family::bold());
+        let title_font = Face::BookBold.id(TITLE_SIZE);
         let title_size = gui
             .fonts_mut(|fonts| fonts.layout_no_wrap(title.to_string(), title_font.clone(), tint))
             .size();
@@ -116,7 +116,7 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
             .emblem
             .as_ref()
             .map(|emblem| gui::image(world, emblem));
-        let shift = title_motion(appearance.motion, now, still);
+        let shift = title_motion(appearance.motion, now);
         let shown = rows::column_area(gui, &format!("intro-{key}"), top).show(gui, |ui| {
             ui.set_width(width);
             ui.vertical_centered(|ui| {
@@ -250,9 +250,9 @@ fn age(world: &mut World) {
     }
 }
 
-fn title_motion(motion: Option<Motion>, now: f64, still: bool) -> TSTransform {
+fn title_motion(motion: Option<Motion>, now: f64) -> TSTransform {
     let t = now as f32;
-    match motion.filter(|_| !still) {
+    match motion {
         None => TSTransform::IDENTITY,
         Some(Motion::Pulse) => TSTransform::from_scaling(1.0 + (t * 3.0).sin() * 0.04),
         Some(Motion::Wave) => TSTransform::from_translation(Vec2::new(0.0, (t * 4.0).sin() * 3.0)),

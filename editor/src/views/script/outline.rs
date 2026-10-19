@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::{HashMap, HashSet};
 
 use egui::{Align2, Color32, FontId, Sense, Ui};
@@ -224,17 +225,22 @@ fn draw(
     }
     let mono = FontId::monospace(13.0);
     let small = FontId::monospace(12.0);
-    let mut x = rect.left() + 14.0 + row.depth as f32 * INDENT;
+    let x = std::cell::Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
     let y = rect.center().y;
-    let mut put = |ui: &Ui, text: &str, font: &FontId, ink: Color32| {
+    let put = |ui: &Ui, text: &str, font: &FontId, ink: Color32| {
         let drawn = ui.painter().text(
-            egui::pos2(x, y),
+            egui::pos2(x.get(), y),
             Align2::LEFT_CENTER,
             text,
             font.clone(),
             ink,
         );
-        x = drawn.right();
+        x.set(drawn.right());
+    };
+    let put_mark = |ui: &Ui, mark: Mark, ink: Color32| {
+        let at = egui::Rect::from_min_size(egui::pos2(x.get(), y - 5.0), egui::vec2(10.0, 10.0));
+        glyph::paint(ui.painter(), mark, at, ink);
+        x.set(at.right() + 2.0);
     };
     if let Some(via) = row.via.as_deref() {
         put(ui, via, &mono, theme::CODE);
@@ -264,8 +270,8 @@ fn draw(
             put(ui, "↑ back to ", &mono, theme::FAINT);
             put(ui, &target.name, &mono, theme::CODE);
         } else if let Some(node) = doc.nodes().get(&target.name) {
-            let (glyph, color) = graph::kind_glyph(node);
-            put(ui, glyph, &FontId::proportional(12.0), color);
+            let (mark, color) = graph::kind_mark(node);
+            put_mark(ui, mark, color);
             put(ui, " ", &mono, theme::TEXT);
             put(
                 ui,
@@ -287,7 +293,7 @@ fn draw(
     if folded.contains(&line.key) {
         put(
             ui,
-            &format!("  ▸ {} more", line.hidden),
+            &format!("  + {} more", line.hidden),
             &small,
             theme::FAINT,
         );

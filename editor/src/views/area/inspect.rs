@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -21,34 +23,65 @@ use super::{brush, placement, resize, stamp};
 use crate::app::{Editor, ModalDialog, PlacePick};
 use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{patterns, row_form, theme, widgets};
+use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
 
-/// The area window's inspector: the selected modules, the blueprint parts edited in place, or
-/// else the card of the tool in hand.
+/// The area itself: its card, modules, palette, the spawn and the ways in.
+pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let view_key = super::area_view_key(key);
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
+        return;
+    };
+    let Some(area_id) = content.by_key::<area::AreaDef>(key) else {
+        return;
+    };
+    if !editor.views.area.views.contains_key(&view_key) {
+        return;
+    }
+    ui.label(theme::muted(format!("area/{key}")).monospace().size(13.0));
+    ui.add_space(4.0);
+    area_card(editor, ui, key, &content, area_id);
+    module_counts(editor, ui, &view_key, key);
+    palette_summary(ui, &content, area_id);
+    spawn_card(editor, ui, key, &content);
+    ways_in(editor, ui, key);
+}
+
+/// The area window's inspector: the selected modules, the blueprint parts edited in place, a paste
+/// or a pick under way, or else the card of the tool in hand.
 pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let selection = editor.selection.clone();
-    let of_this_area =
-        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
-    if of_this_area
-        && selection
-            .parts
-            .iter()
-            .any(|part| super::module_index(part).is_some())
-    {
-        show_parts(editor, ui, &selection);
-    } else if selection.table == "blueprint" && !selection.parts.is_empty() {
+    if selection.table == "blueprint" && !selection.parts.is_empty() {
         super::inspect_parts(editor, ui, &selection);
+    } else if selected_parts(editor, key) {
+        show_parts(editor, ui, &selection);
     } else {
-        show(editor, ui, key);
+        tool(editor, ui, key);
     }
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
+fn selected_parts(editor: &Editor, key: &str) -> bool {
+    let selection = &editor.selection;
+    let of_this_area =
+        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
+    (of_this_area
+        && selection
+            .parts
+            .iter()
+            .any(|part| super::module_index(part).is_some()))
+        || (selection.table == "blueprint" && !selection.parts.is_empty())
+}
+
+fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
     let Some(content) = editor
         .project
@@ -73,8 +106,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         pick_preview(editor, ui);
         return;
     }
-    ui.label(theme::muted(format!("area/{key}")).monospace().size(13.0));
-    ui.add_space(4.0);
     match tool {
         AreaTool::Paint if walk => {
             walk_card(editor, ui, &view_key);
@@ -82,23 +113,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
         AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper => {
             paint_card(editor, ui, &view_key, &content, area_id);
-            palette_summary(ui, &content, area_id);
         }
-        AreaTool::Terrain => {
-            terrain_card(editor, ui, &view_key, &content, area_id);
-        }
-        AreaTool::Stamp => {
-            stamp_card(editor, ui, &view_key, &content);
-        }
-        AreaTool::Module => {
-            area_card(editor, ui, key, &content, area_id);
-            module_counts(editor, ui, &view_key, key);
-        }
-        AreaTool::Select => {
-            area_card(editor, ui, key, &content, area_id);
-            spawn_card(editor, ui, key, &content);
-            ways_in(editor, ui, key);
-        }
+        AreaTool::Terrain => terrain_card(editor, ui, &view_key, &content, area_id),
+        AreaTool::Stamp => stamp_card(editor, ui, &view_key, &content),
+        AreaTool::Select | AreaTool::Module => sidebar::nothing_selected(
+            ui,
+            "Select modules on the map, or take a tool with settings, to inspect them here.",
+        ),
     }
 }
 
@@ -157,11 +178,11 @@ fn paint_card(
             );
         });
         widgets::kv(ui, "flip", |ui| {
-            if flip_chip(ui, "X", brush.flip_x) {
+            if flip_chip(ui, "X", EditorKey::FlipHorizontal, brush.flip_x) {
                 brush.flip_x = !brush.flip_x;
                 changed = true;
             }
-            if flip_chip(ui, "Y", brush.flip_y) {
+            if flip_chip(ui, "Y", EditorKey::FlipVertical, brush.flip_y) {
                 brush.flip_y = !brush.flip_y;
                 changed = true;
             }
@@ -172,25 +193,21 @@ fn paint_card(
     }
 }
 
-fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
-    let fill = if on { theme::ACCENT } else { theme::INPUT };
-    let ink = if on {
-        egui::Color32::WHITE
-    } else {
-        theme::TEXT
-    };
+fn flip_chip(ui: &mut Ui, axis: &str, key: EditorKey, on: bool) -> bool {
+    let fill = if on { theme::SELECTION } else { theme::INPUT };
+    let ink = theme::TEXT;
     let response = egui::Frame::new()
         .fill(fill)
         .stroke(egui::Stroke::new(
             1.0,
-            if on { theme::ACCENT } else { theme::BORDER },
+            if on { theme::TEXT } else { theme::BORDER },
         ))
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(7, 2))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(axis).color(ink).size(13.0));
-                widgets::key_hint(ui, axis);
+                widgets::key_chip(ui, key);
             });
         })
         .response
@@ -296,7 +313,7 @@ fn terrain_card(
     own.truncate(6);
     for set in own {
         ui.horizontal(|ui| {
-            ui.label(theme::faint("▣").size(12.0));
+            glyph::show(ui, Mark::Grid, 12.0, theme::FAINT);
             ui.label(theme::mono(&set.set).size(13.0));
             ui.label(theme::muted(set.terrains.join(" · ")).size(12.5));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -325,7 +342,7 @@ fn terrain_card(
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             if ui
-                .button(format!("▣ Repaint with {set}"))
+                .button(format!("Repaint with {set}"))
                 .on_hover_text("Re-picks a tile for every cell of this layer painted from the set, as the set is now")
                 .clicked()
             {
@@ -383,8 +400,12 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 if widgets::chip_colored(
                     ui,
                     label,
-                    if on { color } else { theme::INPUT },
-                    if on { egui::Color32::WHITE } else { color },
+                    if on {
+                        design_tokens::ink::wash(color, 0.2)
+                    } else {
+                        theme::INPUT
+                    },
+                    color,
                 )
                 .clicked()
                 {
@@ -397,7 +418,7 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         });
         widgets::kv(ui, "overlay", |ui| {
             widgets::toggle(ui, &mut view.walk_overlay);
-            widgets::key_hint_text(ui, "W", "toggles");
+            widgets::key_hint_text(ui, EditorKey::WalkOverlay, "toggles");
         });
     });
     if changed {
@@ -484,11 +505,11 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
         };
         let settings = editor.settings.stamps.entry(stamp.clone()).or_default();
         widgets::kv(ui, "flip", |ui| {
-            if flip_chip(ui, "X", settings.flip_x) {
+            if flip_chip(ui, "X", EditorKey::FlipHorizontal, settings.flip_x) {
                 settings.flip_x = !settings.flip_x;
                 save = true;
             }
-            if flip_chip(ui, "Y", settings.flip_y) {
+            if flip_chip(ui, "Y", EditorKey::FlipVertical, settings.flip_y) {
                 settings.flip_y = !settings.flip_y;
                 save = true;
             }
@@ -528,7 +549,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
         });
         widgets::kv(ui, "snap", |ui| {
             ui.label(theme::muted("whole tiles").size(12.5));
-            widgets::key_hint_text(ui, "Alt", "for 1/16");
+            widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
         });
         let variables = content
             .by_key::<area::blueprint::BlueprintDef>(&stamp)
@@ -614,7 +635,7 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
                 ui.close();
             }
             if ui
-                .add(egui::Button::new("Play here").shortcut_text("F6"))
+                .add(widgets::shortcut_button("Play here", EditorKey::PlayHere))
                 .clicked()
             {
                 menu_action = Some(AreaMenu::Play);
@@ -754,7 +775,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         widgets::kv(ui, "at", |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
-                    .button("⌖ pick")
+                    .add(egui::Button::new("pick"))
                     .on_hover_text("Click a walkable cell on the area")
                     .clicked()
                 {
@@ -789,7 +810,10 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
             pointer: INITIAL_SPAWN.to_owned(),
             area: Some(key.to_owned()),
         });
-        editor.toast("Click a walkable cell to put the spawn there (Alt-click for any point)");
+        editor.toast(format!(
+            "Click a walkable cell to put the spawn there ({} click for any point)",
+            EditorKey::Unsnapped.name()
+        ));
     }
     if go {
         super::open_area_at(editor, &spawn_area, Some(at), None);
@@ -888,7 +912,7 @@ fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(theme::strong("+ Add module"));
-                widgets::key_hint(ui, "M");
+                widgets::key_chip(ui, EditorKey::ModuleTool);
             });
         })
         .response
@@ -957,7 +981,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Remove all").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Remove all", EditorKey::Delete))
                         .clicked()
                     {
                         out.actions.push(super::AreaAction::Delete);
@@ -969,11 +993,15 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             });
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                if ui.button("⧉ Make blueprint…").clicked() {
+                if controls::marked(ui, Mark::Copy, "Make blueprint…").clicked() {
                     out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
-            widgets::key_hint_text(ui, "Ctrl Alt B", "makes a blueprint of the selection");
+            widgets::key_hint_text(
+                ui,
+                EditorKey::MakeBlueprint,
+                "makes a blueprint of the selection",
+            );
         }
     }
     if changed {
@@ -992,15 +1020,6 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     if editor.pick.is_some() {
         ui.add_space(6.0);
         pick_preview(editor, ui);
-    }
-    if editor
-        .views
-        .area
-        .views
-        .contains_key(&super::area_view_key(&area_key))
-    {
-        ui.add_space(8.0);
-        module_counts(editor, ui, &super::area_view_key(&area_key), &area_key);
     }
 }
 
@@ -1042,7 +1061,7 @@ fn module_inspector(
             }
             ui.separator();
             if ui
-                .add(egui::Button::new("Remove").shortcut_text("Del"))
+                .add(widgets::shortcut_button("Remove", EditorKey::Delete))
                 .clicked()
             {
                 out.actions.push(super::AreaAction::Delete);
@@ -1080,7 +1099,7 @@ fn module_inspector(
                         if widgets::toggle(ui, &mut shown).changed() {
                             preview.hidden = !shown;
                         }
-                        if ui.button("↻ Re-roll").clicked() {
+                        if controls::marked(ui, Mark::Reload, "Re-roll").clicked() {
                             preview.seed = preview.seed.wrapping_add(1);
                         }
                     });

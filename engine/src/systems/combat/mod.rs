@@ -188,7 +188,7 @@ pub fn defeats(world: &mut World) {
             .entity_mut(entity)
             .remove::<Attackers>()
             .insert(Dead { at: time });
-        vfx::fixture::play(world, VfxFixture::Defeated, VfxSite::Actor(entity), &[]);
+        vfx::fixture::play(world, VfxFixture::Defeated, VfxSite::Actor(entity));
         world.write_message(Died { entity });
     }
 }

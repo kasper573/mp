@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use design_tokens::{TextRole, ink, sheet};
 use egui::{Sense, Ui, Vec2};
 use strum::VariantArray;
 
@@ -12,6 +13,9 @@ use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::item::{ItemId, card};
 use crate::systems::player::session;
+
+const SLOT_GAP: f32 = 8.0;
+const NAMED_SLOT: f32 = 52.0;
 
 pub struct EquipmentWindow;
 
@@ -27,19 +31,27 @@ impl HudWindow for EquipmentWindow {
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let worn = worn(world);
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::splat(2.0);
-                ui.horizontal_wrapped(|ui| {
-                    for &(kind, item) in &worn {
-                        match item {
-                            Some(item) => worn_slot(ui, world, kind, item),
-                            None => empty_slot(ui, world, kind),
-                        }
-                    }
-                });
+        sheet::scroll(ui, egui::ScrollArea::vertical().auto_shrink(false), |ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(SLOT_GAP, 2.0);
+            ui.horizontal_wrapped(|ui| {
+                for &(kind, item) in &worn {
+                    ui.allocate_ui(Vec2::new(NAMED_SLOT, NAMED_SLOT), |ui| {
+                        ui.vertical_centered(|ui| {
+                            match item {
+                                Some(item) => worn_slot(ui, world, kind, item),
+                                None => empty_slot(ui, world, kind),
+                            }
+                            ui.add(
+                                egui::Label::new(
+                                    TextRole::Small.rich(kind.label()).color(ink::INK3),
+                                )
+                                .truncate(),
+                            );
+                        });
+                    });
+                }
             });
+        });
     }
 }
 
@@ -66,9 +78,7 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
     let def = item.get(&content);
     let look = SlotLook {
         icon: Some(&def.icon),
-        count: 1,
-        outline: None,
-        faded: false,
+        ..SlotLook::EMPTY
     };
     let response = slot(ui, world, look, Sense::click());
     response.widget_info(|| {
@@ -81,7 +91,7 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
     if map::clicked(world, InputAction::UseItem, &response) {
         world.write_message(UnequipRequest { slot: kind });
     } else if map::clicked(world, InputAction::InspectItem, &response) {
-        card::open(world, item);
+        card::open(world, item, Some(response.rect));
     }
     let hint = StyledLine::new(
         card::inspect_hint()

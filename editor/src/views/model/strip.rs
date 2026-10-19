@@ -11,11 +11,12 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
+use crate::stage;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 
-pub const PREVIEW: Vec2 = Vec2::new(170.0, 200.0);
 const CARD_H: f32 = 128.0;
 const LANE_LABEL: f32 = 56.0;
 const LANE_H: f32 = 22.0;
@@ -75,7 +76,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.add_space(6.0);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
-            ui.set_width(PREVIEW.x);
+            ui.set_width(stage::preview_width(ui.available_width() / 2.0));
             super::preview::draw(
                 editor,
                 ui,
@@ -109,7 +110,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .as_ref()
                     .is_some_and(|lengths| *lengths != super::lengths(&frames));
                 if ui
-                    .add_enabled(can_revert, egui::Button::new("↶ Revert to the import"))
+                    .add_enabled(can_revert, egui::Button::new("Revert to the import"))
                     .on_disabled_hover_text(if recorded.is_some() {
                         "The lengths are the import's"
                     } else {
@@ -159,10 +160,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         ));
     }
     editor.status.left.push(status);
-    editor
-        .status
-        .left
-        .push("drag an edge to retime · Space plays · , and . step".to_owned());
+    editor.status.left.push(format!(
+        "drag an edge to retime · {} plays · {} and {} step",
+        EditorKey::PlayPause.name(),
+        EditorKey::PreviousFrame.name(),
+        EditorKey::NextFrame.name()
+    ));
     editor
         .status
         .right
@@ -184,7 +187,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
             let on = direction == strip.direction;
             let marked = timing.out_of_step(direction);
             let text = if marked {
-                format!("{} ●", direction.as_ref())
+                format!("{} •", direction.as_ref())
             } else {
                 direction.as_ref().to_owned()
             };
@@ -371,7 +374,12 @@ fn interact(
     frames: &[StripFrame],
     strip: ModelStrip,
 ) {
-    let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.command));
+    let (extend, toggle) = ui.input(|i| {
+        (
+            EditorKey::ExtendSelection.held(i),
+            EditorKey::ToggleSelection.held(i),
+        )
+    });
     let edge_hover = response
         .hover_pos()
         .and_then(|pos| edge_at(&layout.frames, pos));
@@ -419,12 +427,12 @@ fn interact(
         let hit = layout.frame_at(pos.x);
         let view = editor.views.model.view_mut(key);
         match hit {
-            Some(index) if shift && !view.frames.is_empty() => {
+            Some(index) if extend && !view.frames.is_empty() => {
                 let anchor = view.frames[0];
                 let (from, to) = (anchor.min(index), anchor.max(index));
                 view.frames = (from..=to).collect();
             }
-            Some(index) if ctrl => {
+            Some(index) if toggle => {
                 if let Some(at) = view.frames.iter().position(|f| *f == index) {
                     view.frames.remove(at);
                 } else {
@@ -617,7 +625,7 @@ pub fn lanes(
                             }
                         }
                         let galley = painter.layout_no_wrap(
-                            format!("♫ {sound}"),
+                            sound.to_string(),
                             egui::FontId::monospace(11.0),
                             theme::TEXT,
                         );
@@ -892,11 +900,13 @@ pub fn keys(
         return;
     }
     let StripKeys {
-        left,
-        right,
-        alt,
-        shift,
-        ctrl,
+        shorter,
+        longer,
+        earlier,
+        later,
+        along,
+        fine,
+        extend,
         dup,
         del,
         insert,
@@ -927,12 +937,12 @@ pub fn keys(
         return;
     }
     let name = strip.name();
-    if alt && (left || right) && !selected.is_empty() {
-        let delta = if shift { 1 } else { NUDGE };
+    if (shorter || longer) && !selected.is_empty() {
+        let delta = if fine { 1 } else { NUDGE };
         let mut nudged = frames.to_vec();
         for index in &selected {
             if let Some(frame) = nudged.get_mut(*index) {
-                frame.ms = if right {
+                frame.ms = if longer {
                     (frame.ms + delta).min(MAX_FRAME_MS)
                 } else {
                     frame.ms.saturating_sub(delta).max(1)
@@ -943,9 +953,9 @@ pub fn keys(
         super::write_strip(editor, key, strip, &nudged, edit);
         return;
     }
-    if ctrl && (left || right) && selected.len() == 1 {
+    if (earlier || later) && selected.len() == 1 {
         let index = selected[0];
-        let target = if right {
+        let target = if later {
             index + 1
         } else {
             index.wrapping_sub(1)
@@ -967,15 +977,15 @@ pub fn keys(
         }
         return;
     }
-    if !ctrl && !alt && (left || right) {
+    if let Some(along) = along {
         let view = editor.views.model.view_mut(key);
         let current = view.frames.first().copied();
-        let next = match (current, right) {
+        let next = match (current, along > 0) {
             (None, _) => 0,
             (Some(index), true) => (index + 1).min(frames.len().saturating_sub(1)),
             (Some(index), false) => index.saturating_sub(1),
         };
-        if shift && let Some(anchor) = current {
+        if extend && let Some(anchor) = current {
             let (from, to) = (anchor.min(next), anchor.max(next));
             view.frames = (from..=to).collect();
         } else {
@@ -1075,11 +1085,13 @@ pub fn keys(
 }
 
 struct StripKeys {
-    left: bool,
-    right: bool,
-    alt: bool,
-    shift: bool,
-    ctrl: bool,
+    shorter: bool,
+    longer: bool,
+    earlier: bool,
+    later: bool,
+    along: Option<i32>,
+    fine: bool,
+    extend: bool,
     dup: bool,
     del: bool,
     insert: bool,
@@ -1091,20 +1103,24 @@ struct StripKeys {
 
 impl StripKeys {
     fn read(input: &egui::InputState) -> StripKeys {
-        let command = input.modifiers.command;
         StripKeys {
-            left: input.key_pressed(egui::Key::ArrowLeft),
-            right: input.key_pressed(egui::Key::ArrowRight),
-            alt: input.modifiers.alt,
-            shift: input.modifiers.shift,
-            ctrl: command,
-            dup: command && input.key_pressed(egui::Key::D),
-            del: input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace),
-            insert: input.key_pressed(egui::Key::Insert),
-            escape: input.key_pressed(egui::Key::Escape),
-            apex: input.key_pressed(egui::Key::A) && !command,
-            sound: input.key_pressed(egui::Key::S) && !command,
-            step: input.key_pressed(egui::Key::T) && !command,
+            shorter: EditorKey::FrameShorter.pressed(input),
+            longer: EditorKey::FrameLonger.pressed(input),
+            earlier: EditorKey::FrameEarlier.pressed(input),
+            later: EditorKey::FrameLater.pressed(input),
+            along: EditorKey::Move
+                .arrow(input)
+                .filter(|[_, y]| *y == 0)
+                .map(|[x, _]| x),
+            fine: EditorKey::FineStep.held(input),
+            extend: EditorKey::ExtendSelection.held(input),
+            dup: EditorKey::Duplicate.pressed(input),
+            del: EditorKey::Delete.pressed(input),
+            insert: EditorKey::InsertFrame.pressed(input),
+            escape: EditorKey::Cancel.pressed(input),
+            apex: EditorKey::ApexCue.pressed(input),
+            sound: EditorKey::SoundCue.pressed(input),
+            step: EditorKey::StepCue.pressed(input),
         }
     }
 }
@@ -1147,8 +1163,8 @@ pub fn confirm(
         .collect();
     let others = Direction::VARIANTS.len() - 1 - mismatched.len();
     let (title, noun) = match what {
-        StripConfirm::Timing => ("⑂ Apply timing to the other directions", "lengths"),
-        StripConfirm::Cues => ("⑂ Copy cues to the other directions", "cues"),
+        StripConfirm::Timing => ("Apply timing to the other directions", "lengths"),
+        StripConfirm::Cues => ("Copy cues to the other directions", "cues"),
     };
     let mut answer = None;
     dialogs::card(ctx, "model-confirm", 420.0, |ui| {

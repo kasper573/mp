@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use design_tokens::ink::Prose;
 use egui::Color32;
 
-pub use paint::{TextLook, TextShadow, measure, show, show_shadowed};
+pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
 
 const SLOW_PACE: f32 = 2.5;
 
@@ -20,16 +21,38 @@ pub struct StyledLine {
 pub enum TextPiece {
     Span(StyledSpan),
     Pause(Duration),
-    Key(InputRef),
+    Key(KeyCap),
+}
+
+/// A key drawn as a cap: an input named by its current binding, or a key named outright.
+#[derive(Clone, Debug, PartialEq)]
+pub enum KeyCap {
+    Input(InputRef),
+    Named(Cow<'static, str>),
+}
+
+impl KeyCap {
+    pub fn name<'a>(&'a self, keys: &'a KeyNames) -> &'a str {
+        match self {
+            KeyCap::Input(input) => keys.name(*input),
+            KeyCap::Named(name) => name,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyledSpan {
     pub text: Cow<'static, str>,
-    pub ink: Option<Color32>,
+    pub ink: Option<SpanInk>,
     pub voice: TextVoice,
     pub motion: Option<TextMotion>,
     pub slow: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpanInk {
+    Prose(Prose),
+    Fixed(Color32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -66,11 +89,6 @@ impl Default for TypewriterSpeed {
     fn default() -> TypewriterSpeed {
         TypewriterSpeed(Some(45.0))
     }
-}
-
-#[derive(Resource, Clone, Copy, Debug, PartialEq, Default)]
-pub struct MotionPreference {
-    pub reduced: bool,
 }
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]
@@ -119,7 +137,7 @@ impl StyledLine {
             .filter_map(|piece| match piece {
                 TextPiece::Span(span) => Some(span.text.as_ref()),
                 TextPiece::Pause(_) => None,
-                TextPiece::Key(input) => Some(keys.name(*input)),
+                TextPiece::Key(cap) => Some(cap.name(keys)),
             })
             .collect()
     }
@@ -128,6 +146,10 @@ impl StyledLine {
 impl TextPiece {
     pub fn text(text: impl Into<Cow<'static, str>>) -> TextPiece {
         TextPiece::Span(StyledSpan::plain(text))
+    }
+
+    pub fn key(name: impl Into<Cow<'static, str>>) -> TextPiece {
+        TextPiece::Key(KeyCap::Named(name.into()))
     }
 }
 
@@ -143,7 +165,12 @@ impl StyledSpan {
     }
 
     pub fn ink(mut self, ink: Color32) -> StyledSpan {
-        self.ink = Some(ink);
+        self.ink = Some(SpanInk::Fixed(ink));
+        self
+    }
+
+    pub fn prose(mut self, prose: Prose) -> StyledSpan {
+        self.ink = Some(SpanInk::Prose(prose));
         self
     }
 
@@ -224,7 +251,6 @@ impl Plugin for TextPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyNames>()
             .init_resource::<TypewriterSpeed>()
-            .init_resource::<MotionPreference>()
             .add_message::<TypewriterReveal>()
             .add_systems(Update, advance_typewriters);
     }

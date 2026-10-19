@@ -16,10 +16,13 @@ use std::mem;
 use std::path::Path;
 use std::time::Duration;
 
-use egui::{Align, Context, Key, Layout, Modifiers, RichText};
+use design_tokens::controls::{self, Pill};
+use design_tokens::{TextRole, face, ink, sheet, slip};
+use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
+use crate::keymap::EditorKey;
 use crate::project::{RowSelection, row_file};
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::ScriptKeys;
@@ -37,6 +40,7 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
             .layer_id(egui::LayerId::background())
             .max_rect(ctx.viewport_rect()),
     );
+    sheet::vellum(root.painter(), ctx.viewport_rect());
     top_bar(editor, &mut root);
     for tab in mem::take(&mut editor.open_tabs) {
         focus_tab(&mut editor.dock, tab);
@@ -145,12 +149,12 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     }
     let (save, undo, redo, search, quit, close) = ctx.input_mut(|i| {
         (
-            i.consume_key(Modifiers::COMMAND, Key::S),
-            i.consume_key(Modifiers::COMMAND, Key::Z),
-            i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z),
-            i.consume_key(Modifiers::COMMAND, Key::P),
-            i.consume_key(Modifiers::COMMAND, Key::Q),
-            i.consume_key(Modifiers::COMMAND, Key::W),
+            EditorKey::Save.consume(i),
+            EditorKey::Undo.consume(i),
+            EditorKey::Redo.consume(i),
+            EditorKey::Search.consume(i),
+            EditorKey::Quit.consume(i),
+            EditorKey::CloseTab.consume(i),
         )
     });
     if save {
@@ -177,7 +181,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
             .dock
             .remove_tab(egui_dock::TabPath::from((path, leaf.active)));
     }
-    if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F1))
+    if ctx.input_mut(|i| EditorKey::KeySheet.consume(i))
         && !editor
             .dialogs
             .iter()
@@ -185,25 +189,24 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     {
         editor.dialogs.push(ModalDialog::Keys);
     }
-    // egui ignores an extra Shift when it matches a key, so Shift+F5 is taken before F5 can claim it.
-    let (shift_f5, f5, f6, ctrl_t) = ctx.input_mut(|i| {
+    let (play_from_start, stop, play_here, played) = ctx.input_mut(|i| {
         (
-            i.consume_key(Modifiers::SHIFT, Key::F5),
-            i.consume_key(Modifiers::NONE, Key::F5),
-            i.consume_key(Modifiers::NONE, Key::F6),
-            i.consume_key(Modifiers::COMMAND, Key::T),
+            EditorKey::PlayFromStart.consume(i),
+            EditorKey::StopPlay.consume(i),
+            EditorKey::PlayHere.consume(i),
+            EditorKey::PlayedCharacter.consume(i),
         )
     });
-    if f5 {
+    if play_from_start {
         play::start(editor, None);
     }
-    if shift_f5 {
+    if stop {
         play::stop(editor);
     }
-    if f6 {
+    if play_here {
         views::play_here(editor);
     }
-    if ctrl_t && let Some(key) = play::current_character(editor) {
+    if played && let Some(key) = play::current_character(editor) {
         editor.select(RowSelection::row("test_character", &key));
         editor.open_tab(EditorTab::for_row("test_character", &key));
     }
@@ -234,20 +237,18 @@ pub fn finish_close(editor: &mut Editor, then: CloseThen) {
 }
 
 fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
-    egui::Panel::top("top")
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(10, 8)),
-        )
+    let bar = egui::Panel::top("top")
+        .exact_size(TOP_BAR_HEIGHT)
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(12, 0)))
         .show(root, |ui| {
-            ui.horizontal(|ui| {
-                ui.menu_button(RichText::new("File").strong().size(15.0), |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.menu_button(face::bold("File"), |ui| {
                     let has_project = editor.project.is_some();
                     if ui
                         .add_enabled(
                             has_project,
-                            egui::Button::new("Save").shortcut_text("Ctrl S"),
+                            widgets::shortcut_button("Save", EditorKey::Save),
                         )
                         .clicked()
                     {
@@ -267,14 +268,14 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Keys").shortcut_text("F1"))
+                        .add(widgets::shortcut_button("Keys", EditorKey::KeySheet))
                         .clicked()
                     {
                         editor.dialogs.push(ModalDialog::Keys);
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Quit").shortcut_text("Ctrl Q"))
+                        .add(widgets::shortcut_button("Quit", EditorKey::Quit))
                         .clicked()
                     {
                         request_close(editor, CloseThen::Quit);
@@ -282,11 +283,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     }
                 });
                 if let Some(project) = &editor.project {
-                    ui.label(
-                        theme::muted(pretty_path(&project.root))
-                            .monospace()
-                            .size(13.0),
-                    );
+                    ui.label(face::secondary(pretty_path(&project.root)));
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if editor.project.is_none() {
@@ -296,22 +293,23 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     if let Some(project) = &editor.project {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {
-                            widgets::pill(ui, "read-only", theme::WARN).on_hover_text(reason);
+                            controls::pill(ui, "read-only", Pill::Gold).on_hover_text(reason);
                         } else if project.loading() {
-                            widgets::pill(ui, "applying…", theme::MUTED);
+                            controls::pill(ui, "applying…", Pill::Ink);
                             ui.ctx().request_repaint_after(Duration::from_millis(50));
                         } else if let Some(report) = &project.report {
-                            widgets::pill(ui, "does not load", theme::DANGER)
+                            controls::pill(ui, "does not load", Pill::Rubric)
                                 .on_hover_text(report_summary(report));
                         } else if unsaved > 0 {
-                            widgets::pill(ui, &format!("{unsaved} unsaved"), theme::TEXT);
+                            controls::pill(ui, &format!("{unsaved} unsaved"), Pill::Ink);
                         } else {
-                            widgets::pill(ui, "✔ saved", theme::OK);
+                            controls::pill(ui, "saved", Pill::Verdigris);
                         }
                     }
                 });
             });
         });
+    divide(root, bar.response.rect, Edge::Bottom);
 }
 
 pub fn pretty_path(path: &Path) -> String {
@@ -329,11 +327,12 @@ pub fn pretty_path(path: &Path) -> String {
 
 fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
     status_bar(editor, root);
-    egui::Panel::left("content")
+    let content = egui::Panel::left("content")
         .resizable(true)
         .default_size(270.0)
         .size_range(200.0..=520.0)
-        .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(0.0))
+        .show_separator_line(false)
+        .frame(egui::Frame::new())
         .show(root, |ui| {
             let tabs = [
                 (LeftTab::Content, "Content".to_owned()),
@@ -349,6 +348,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                     });
             });
         });
+    divide(root, content.response.rect, Edge::Right);
     let bottom_tabs = views::bottom_tabs(editor);
     if !bottom_tabs
         .iter()
@@ -359,10 +359,14 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
             .map(|(tab, _)| *tab)
             .unwrap_or(BottomTab::History);
     }
-    egui::Panel::bottom("bottom")
+    let bottom = egui::Panel::bottom("bottom")
         .resizable(true)
         .default_size(200.0)
-        .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(0.0))
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin {
+            top: 6,
+            ..egui::Margin::ZERO
+        }))
         .show(root, |ui| {
             widgets::tab_strip(ui, &bottom_tabs, &mut editor.panels.bottom);
             panel_body(ui, |ui| {
@@ -378,28 +382,16 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                     });
             });
         });
+    divide(root, bottom.response.rect, Edge::Top);
     let mut dock = mem::replace(&mut editor.dock, DockState::new(Vec::new()));
     egui::CentralPanel::default()
-        .frame(egui::Frame::new().fill(theme::BG).inner_margin(0.0))
+        .frame(egui::Frame::new())
         .show(root, |ui| {
             if dock.iter_all_tabs().next().is_none() {
                 empty_centre(ui);
                 return;
             }
-            let mut style = egui_dock::Style::from_egui(ui.style());
-            style.tab_bar.fill_tab_bar = false;
-            style.tab_bar.height = 30.0;
-            style.tab_bar.bg_fill = theme::PANEL;
-            style.tab.active.bg_fill = theme::BG;
-            style.tab.active.text_color = theme::TEXT;
-            style.tab.inactive.bg_fill = theme::PANEL;
-            style.tab.inactive.text_color = theme::MUTED;
-            style.tab.hovered.bg_fill = theme::RAISED;
-            style.tab.focused.bg_fill = theme::BG;
-            style.tab.focused.text_color = theme::TEXT;
-            style.tab.tab_body.bg_fill = theme::BG;
-            style.tab.tab_body.inner_margin = egui::Margin::ZERO;
-            style.tab.tab_body.stroke = egui::Stroke::NONE;
+            let style = dock_style(ui.style());
             let mut viewer = Viewer { editor };
             DockArea::new(&mut dock)
                 .style(style)
@@ -435,12 +427,82 @@ fn close_tabs(dock: &mut DockState<EditorTab>, request: CloseTabs) {
 
 fn empty_centre(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
-        ui.add_space(ui.available_height() * 0.08);
-        ui.label(theme::muted("Ctrl P").size(20.0));
+        ui.add_space(ui.available_height() * 0.3);
+        ui.label(theme::muted("Nothing is open").size(20.0));
+        ui.add_space(8.0);
+        ui.label(theme::muted(
+            "Pick a row or a file on the left, or search them all",
+        ));
+        ui.add_space(8.0);
+        widgets::key_chip(ui, EditorKey::Search);
     });
 }
 
-const STATUS_HEIGHT: f32 = 28.0;
+const TOP_BAR_HEIGHT: f32 = 42.0;
+const STATUS_HEIGHT: f32 = 24.0;
+
+#[derive(Clone, Copy)]
+pub enum Edge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+pub fn divide(ui: &egui::Ui, panel: egui::Rect, edge: Edge) {
+    let stroke = egui::Stroke::new(1.0, ink::ink_wash(0.35));
+    let painter = ui.painter();
+    match edge {
+        Edge::Top => painter.hline(panel.x_range(), panel.top() + 0.5, stroke),
+        Edge::Bottom => painter.hline(panel.x_range(), panel.bottom() - 0.5, stroke),
+        Edge::Left => painter.vline(panel.left() + 0.5, panel.y_range(), stroke),
+        Edge::Right => painter.vline(panel.right() - 0.5, panel.y_range(), stroke),
+    };
+}
+
+fn dock_style(egui_style: &egui::Style) -> egui_dock::Style {
+    let mut style = egui_dock::Style::from_egui(egui_style);
+    let top = egui::CornerRadius {
+        nw: 4,
+        ne: 4,
+        sw: 0,
+        se: 0,
+    };
+    let tab = |fill, outline, text| egui_dock::TabInteractionStyle {
+        outline_color: outline,
+        corner_radius: top,
+        bg_fill: fill,
+        text_color: text,
+    };
+    let lifted = tab(ink::LIGHT, ink::ink_wash(0.5), ink::RUBRIC);
+    let lying = tab(ink::ink_wash(0.05), ink::ink_wash(0.35), ink::INK2);
+    style.main_surface_border_stroke = egui::Stroke::NONE;
+    style.tab_bar.fill_tab_bar = false;
+    style.tab_bar.height = 30.0;
+    style.tab_bar.bg_fill = egui::Color32::TRANSPARENT;
+    style.tab_bar.hline_color = ink::ink_wash(0.35);
+    style.tab_bar.corner_radius = egui::CornerRadius::ZERO;
+    style.tab.active = lifted.clone();
+    style.tab.focused = lifted.clone();
+    style.tab.active_with_kb_focus = lifted.clone();
+    style.tab.focused_with_kb_focus = lifted;
+    style.tab.inactive = lying.clone();
+    style.tab.inactive_with_kb_focus = lying;
+    style.tab.hovered = tab(ink::gold_wash(0.2), ink::ink_wash(0.35), ink::INK);
+    style.tab.hline_below_active_tab_name = false;
+    style.tab.spacing = 4.0;
+    style.tab.tab_body.bg_fill = egui::Color32::TRANSPARENT;
+    style.tab.tab_body.inner_margin = egui::Margin::ZERO;
+    style.tab.tab_body.stroke = egui::Stroke::NONE;
+    style.separator.width = 1.0;
+    style.separator.color_idle = ink::ink_wash(0.35);
+    style.separator.color_hovered = ink::INK;
+    style.separator.color_dragged = ink::INK;
+    style.buttons.close_tab_color = ink::INK3;
+    style.buttons.close_tab_active_color = ink::INK;
+    style.buttons.close_tab_bg_fill = ink::ink_wash(0.08);
+    style
+}
 
 fn report_summary(report: &engine::core::content::LoadReport) -> String {
     const SHOWN: usize = 8;
@@ -495,37 +557,25 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         }
     }
     let right = mem::take(&mut editor.status.right);
-    egui::Panel::bottom("status")
+    let status = egui::Panel::bottom("status")
         .exact_size(STATUS_HEIGHT)
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(10, 4)),
-        )
+        .show_separator_line(false)
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(12, 0)))
         .show(root, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 14.0;
                 for segment in &left {
-                    ui.label(
-                        RichText::new(segment)
-                            .monospace()
-                            .size(12.5)
-                            .color(theme::MUTED),
-                    );
+                    ui.label(face::small_faint(segment));
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 14.0;
                     for segment in right.iter().rev() {
-                        ui.label(
-                            RichText::new(segment)
-                                .monospace()
-                                .size(12.5)
-                                .color(theme::MUTED),
-                        );
+                        ui.label(face::small_faint(segment));
                     }
                 });
             });
         });
+    divide(root, status.response.rect, Edge::Top);
 }
 
 struct Viewer<'a> {
@@ -550,18 +600,9 @@ impl TabViewer for Viewer<'_> {
             .as_ref()
             .zip(tab.row())
             .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
-        let mut job = egui::text::LayoutJob::default();
-        job.append(
-            &title,
-            0.0,
-            egui::TextFormat::simple(egui::FontId::proportional(13.5), theme::TEXT),
-        );
+        let mut job = TextRole::Tab.job(&title, egui::Color32::PLACEHOLDER);
         if unsaved {
-            job.append(
-                " ●",
-                0.0,
-                egui::TextFormat::simple(egui::FontId::proportional(11.0), theme::WARN),
-            );
+            job.append(" \u{2022}", 0.0, TextRole::Tab.format(ink::OCHRE));
         }
         job.into()
     }
@@ -658,10 +699,8 @@ fn toast(editor: &mut Editor, ctx: &Context) {
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -40.0))
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .fill(theme::RAISED)
-                .show(ui, |ui| {
-                    ui.label(text);
-                });
+            slip::show(ui, |ui| {
+                ui.label(text);
+            });
         });
 }

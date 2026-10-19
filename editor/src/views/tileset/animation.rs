@@ -1,12 +1,14 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
 use engine::systems::area::tileset::TileFrame;
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;
 use crate::forms;
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::model::StripFrame;
@@ -14,8 +16,6 @@ use crate::views::model::preview;
 
 pub const MAX_FRAMES: usize = 256;
 const PREVIEW_W: f32 = 224.0;
-const TIMING_HINT: &str =
-    "Timing edits as a model's do: pick a frame, then Alt ← → or its length in the inspector.";
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum OffsetUnit {
@@ -295,7 +295,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         ui.add_space(6.0);
         let last = odd.frames.last().map_or(0, |frame| frame.offset);
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("⚠").color(theme::WARN));
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(
                 theme::muted(format!(
                     "Tile {} has {} frames, +0 to {}; the other {} have {}.",
@@ -420,7 +420,14 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         ui.vertical(|ui| {
             ui.set_width(200.0);
             ui.add_space(40.0);
-            ui.label(theme::muted(format!("{total} ms in all. {TIMING_HINT}")).size(12.5));
+            ui.label(
+                theme::muted(format!(
+                    "{total} ms in all. Timing edits as a model's do: pick a frame, then {} {} or its length in the inspector.",
+                    EditorKey::FrameShorter.name(),
+                    EditorKey::FrameLonger.name()
+                ))
+                .size(12.5),
+            );
         });
     });
     if let Some(index) = pick {
@@ -478,20 +485,19 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str, common: &CommonAnimation) {
     let Some(index) = common.frame(editor.views.tileset.view(key).frame) else {
         return;
     };
-    let (left, right, alt, shift, delete) = ui.input(|i| {
+    let (shorter, longer, fine, delete) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::ArrowLeft),
-            i.key_pressed(egui::Key::ArrowRight),
-            i.modifiers.alt,
-            i.modifiers.shift,
-            i.key_pressed(egui::Key::Delete),
+            EditorKey::FrameShorter.pressed(i),
+            EditorKey::FrameLonger.pressed(i),
+            EditorKey::FineStep.held(i),
+            EditorKey::Delete.pressed(i),
         )
     });
-    if alt && (left || right) {
-        let step = if shift { 1 } else { 10 };
+    if shorter || longer {
+        let step = if fine { 1 } else { 10 };
         let mut frames = common.frames.clone();
         let ms = &mut frames[index].ms;
-        *ms = if right {
+        *ms = if longer {
             (*ms + step).min(60_000)
         } else {
             ms.saturating_sub(step).max(1)
@@ -594,7 +600,12 @@ fn preview_block(
     painter.rect_filled(rect, 0.0, theme::CANVAS);
     draw_block(&painter, rect.min, shown, tileset, selection, index);
     ui.horizontal(|ui| {
-        if widgets::chip(ui, if view.preview.playing { "⏸" } else { "▶" }).clicked() {
+        let (mark, word) = if view.preview.playing {
+            (Mark::Pause, "Pause")
+        } else {
+            (Mark::Play, "Play")
+        };
+        if glyph::button(ui, mark, 14.0, theme::TEXT, word).clicked() {
             view.preview.playing = !view.preview.playing;
         }
         widgets::chip(ui, &format!("frame {} / {}", index + 1, frames.len()));
@@ -629,7 +640,7 @@ fn timeline_card(
         egui::Align2::CENTER_CENTER,
         format!("{} · {} ms", signed(frame.offset), frame.ms),
         egui::FontId::monospace(12.0),
-        if on { Color32::WHITE } else { theme::TEXT },
+        theme::TEXT,
     );
     response
 }

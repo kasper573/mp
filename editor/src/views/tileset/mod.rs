@@ -516,12 +516,28 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     ensure_view(editor, key);
     refresh_counts(editor);
     let ctx = ui.ctx().clone();
+    sidebar::row(ui, "tileset", |ui| {
+        row_form::show_row(editor, ui, TABLE, key)
+    });
     let Some(tileset) = OpenTileset::read(editor, &ctx, key) else {
         ui.label(theme::muted(unreadable(editor, key)));
         return;
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
-    sidebar::right(ui, "tileset", |ui| sidebar(editor, ui, key));
+    let selection = editor.selection.clone();
+    sidebar::inspector(ui, "tileset", |ui| {
+        if selection.table == TABLE
+            && selection.keys.first().is_some_and(|k| k == key)
+            && !selection.parts.is_empty()
+        {
+            inspect_parts(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(
+                ui,
+                "Select tiles, a terrain or an animation to inspect it here.",
+            );
+        }
+    });
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
@@ -542,20 +558,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         status(editor, &tileset);
     }
     dialogs(editor, &ctx, &tileset);
-}
-
-/// The tileset window's inspector: the selected tile, terrain, animation or surface, or else the
-/// tileset row itself.
-fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let selection = editor.selection.clone();
-    if selection.table == TABLE
-        && selection.keys.first().is_some_and(|k| k == key)
-        && !selection.parts.is_empty()
-    {
-        inspect_parts(editor, ui, &selection);
-    } else {
-        row_form::show_row(editor, ui, TABLE, key);
-    }
 }
 
 pub fn set_mode(editor: &mut Editor, key: &str, mode: TilesetMode) {
@@ -638,7 +640,7 @@ fn unreadable(editor: &Editor, key: &str) -> String {
     if editor.row(TABLE, key).is_none() {
         format!("tileset/{key} is gone")
     } else {
-        format!("tileset/{key} does not read as a tileset; the inspector shows why")
+        format!("tileset/{key} does not read as a tileset; its row on the left shows why")
     }
 }
 
@@ -664,7 +666,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         }
         if ui.available_width() > 120.0 {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.menu_button("🗋 Import ▾", |ui| {
+                ui.menu_button("Import", |ui| {
                     if ui.button("Onto this tileset…").clicked() {
                         import = Some(Reimport::Tiles);
                         ui.close();

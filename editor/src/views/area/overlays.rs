@@ -12,6 +12,7 @@ use super::population::NpcSprite;
 use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
+use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::Viewport;
@@ -304,7 +305,7 @@ pub(super) fn overlay_selected_scenery(
     if grab.drag_stopped()
         && let Some(pointer) = grab.interact_pointer_pos()
     {
-        let shift = ui.input(|i| i.modifiers.shift);
+        let shift = ui.input(|i| EditorKey::FineStep.held(i));
         let tile_y = canvas.to_tile(pointer).y - rect.min().y;
         let snapped = if shift {
             (tile_y * 16.0).round() / 16.0
@@ -327,10 +328,10 @@ pub(super) fn overlay_selected_scenery(
         module.text("tileset"),
         scenery::tile_count(module)
     ));
-    editor
-        .status
-        .left
-        .push("drag the sort line · ⇧ snaps to 1/16".to_owned());
+    editor.status.left.push(format!(
+        "drag the sort line · {} snaps to 1/16",
+        EditorKey::FineStep.name()
+    ));
 }
 
 pub(super) fn overlay_soundscape_reach(
@@ -368,7 +369,7 @@ pub(super) fn overlay_soundscape_reach(
         }
         frame.labels.chip(
             rect.left_bottom() + Vec2::new(0.0, 22.0),
-            format!("♪ reach {} tiles", forms::tiles(reach)),
+            format!("heard within {} tiles", forms::tiles(reach)),
             Color32::from_rgb(190, 150, 255),
         );
     }
@@ -501,13 +502,18 @@ impl AreaLabels {
         let mut placed: Vec<ERect> = Vec::new();
         for label in self.0.take() {
             let galley =
-                painter.layout_no_wrap(label.text, egui::FontId::monospace(11.5), label.color);
-            let size = galley.size() + Vec2::new(10.0, 6.0);
+                painter.layout_no_wrap(label.text, egui::FontId::monospace(11.5), theme::TEXT);
+            let size = galley.size() + Vec2::new(14.0, 6.0);
             let preferred = ERect::from_min_size(label.bottom_left - Vec2::new(0.0, size.y), size);
             let back = free_slot(preferred, &placed);
             placed.push(back);
-            painter.rect_filled(back, 4.0, Color32::from_rgba_unmultiplied(20, 22, 26, 225));
-            painter.galley(back.min + Vec2::new(5.0, 3.0), galley, label.color);
+            design_tokens::slip::paint(painter, back);
+            painter.rect_filled(
+                ERect::from_min_size(back.min, Vec2::new(3.0, back.height())),
+                0.0,
+                label.color,
+            );
+            painter.galley(back.min + Vec2::new(9.0, 3.0), galley, theme::TEXT);
         }
     }
 }

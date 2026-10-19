@@ -1,3 +1,5 @@
+use design_tokens::controls;
+use design_tokens::glyph::Mark;
 use egui::Ui;
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
@@ -10,6 +12,7 @@ use super::placement::warp_destinations;
 use super::stamp::object_names;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::widgets;
 use crate::value::RowValue;
@@ -77,7 +80,10 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
         .filter(|m| m.is_module(AreaModuleKind::Scenery))
         .collect();
     if sceneries.len() < 2 {
-        editor.toast("Select two or more sceneries of one tileset to join (Ctrl G)");
+        editor.toast(format!(
+            "Select two or more sceneries of one tileset to join ({})",
+            EditorKey::JoinScenery.name()
+        ));
         return;
     }
     let tileset = sceneries[0].text("tileset").to_owned();
@@ -359,7 +365,7 @@ pub(super) fn scenery_extras(
     if under > 0 {
         widgets::hint(ui, &format!("{under} cells under it are blocked"));
         if ui
-            .button(format!("⧉ Make the {under} blocked cells its own"))
+            .button(format!("Make the {under} blocked cells its own"))
             .clicked()
         {
             out.actions.push(super::AreaAction::AdoptBlocks(index));
@@ -368,7 +374,7 @@ pub(super) fn scenery_extras(
         widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
-        if ui.button("▣ Make blueprint…").clicked() {
+        if controls::marked(ui, Mark::Grid, "Make blueprint…").clicked() {
             out.actions.push(super::AreaAction::MakeBlueprint);
         }
         if ui.button("Split into tiles").clicked() {

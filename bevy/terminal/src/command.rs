@@ -1,8 +1,8 @@
 use bevy_ecs::prelude::*;
 use bevy_terminal_macros::command;
 
-use crate::reply;
 use crate::terminal::{TerminalAccess, TerminalInbox, TerminalKey};
+use crate::{reply, reply_failure};
 
 pub struct TerminalCommand {
     pub name: &'static str,
@@ -132,11 +132,10 @@ pub fn dispatch<K: TerminalKey>(world: &mut World) {
         };
         entry.consume();
         let (name, args) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
-        let outcome = match run(world, entry.conn, name, args) {
-            Ok(outcome) | Err(outcome) => outcome,
-        };
-        if !outcome.is_empty() {
-            reply(world, entry.conn, entry.terminal, outcome);
+        match run(world, entry.conn, name, args) {
+            Ok(outcome) if outcome.is_empty() => {}
+            Ok(outcome) => reply(world, entry.conn, entry.terminal, outcome),
+            Err(failure) => reply_failure(world, entry.conn, entry.terminal, failure),
         }
     }
 }

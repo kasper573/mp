@@ -13,14 +13,13 @@ use engine::core::content::Content;
 use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
-    Animator, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, dynamic_z, place_sprite,
+    Animator, GroundDepth, RowDepth, RowDepths, ToScreen, dynamic_z, place_sprite,
 };
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
 use engine::core::vfx::render::{self as vfx_render, Presentation, SiteFrame, SiteTexture};
 use engine::core::vfx::{
-    ShaderError, SiteKind, TextFloat, VfxDef, VfxLayer, VfxParams, VfxShaderDef, VfxSite,
-    shader_file,
+    ShaderError, SiteKind, VfxLayer, VfxParams, VfxShaderDef, VfxSite, shader_file,
 };
 use engine::systems::actor::plate::{self, PlateLabel};
 use engine::systems::actor::render::{ACTOR_ANCHOR, draw_actor_frame};
@@ -29,7 +28,7 @@ use engine::systems::area::{self, AreaId};
 use engine::systems::item::ItemId;
 use engine::systems::item::render::drop_sprite;
 
-use super::{Overlay, SIZE, ZOOM};
+use super::{SIZE, ZOOM};
 use crate::project::{ProjectFiles, hash, row_file};
 use crate::views::area::scene;
 use crate::views::vfx::SHADER_TABLE;
@@ -91,7 +90,6 @@ pub struct Frame<'a> {
 
 pub struct Stage {
     pub texture: egui::TextureId,
-    pub overlays: Vec<Overlay>,
     /// Plates to hang over the actors, by the world point each hangs from.
     pub plates: Vec<(Vec2, PlateLabel)>,
     pub problems: Vec<String>,
@@ -102,7 +100,7 @@ pub struct Stage {
     animator: Animator,
     actors: HashMap<Source, Staged>,
     items: Vec<Entity>,
-    pieces: HashMap<Source, (String, Vec<Option<Entity>>)>,
+    pieces: HashMap<Source, (String, Vec<Entity>)>,
     /// The last shader compiled for each shader key, by the hash of the text it was composed from.
     shaders: HashMap<String, (String, Result<Handle<Shader>, ShaderError>)>,
 }
@@ -135,7 +133,6 @@ impl Stage {
             .id();
         Stage {
             texture,
-            overlays: Vec::new(),
             plates: Vec::new(),
             problems: Vec::new(),
             index,
@@ -151,7 +148,7 @@ impl Stage {
     }
 
     /// Brings the picture up to the frame: sprites posed and placed as the game places them, vfx
-    /// presented over them, text layers and names kept as overlays for the window to letter.
+    /// presented over them, and names kept for the window to letter.
     pub fn render(&mut self, world: &mut World, scenes: &mut scene::AreaScenes, frame: &Frame) {
         let area = area::load(frame.content, frame.area);
         world.insert_resource(GroundDepth(area.sort_base()));
@@ -164,7 +161,6 @@ impl Stage {
             transform.translation.x = eye.x;
             transform.translation.y = eye.y;
         }
-        self.overlays.clear();
         self.problems.clear();
         self.plates = frame
             .actors
@@ -195,12 +191,7 @@ impl Stage {
         for item in self.items.drain(..) {
             world.despawn(item);
         }
-        for piece in self
-            .pieces
-            .drain()
-            .flat_map(|(_, (_, pieces))| pieces)
-            .flatten()
-        {
+        for piece in self.pieces.drain().flat_map(|(_, (_, pieces))| pieces) {
             world.despawn(piece);
         }
     }
@@ -329,7 +320,7 @@ impl Stage {
             .collect();
         for owner in gone {
             if let Some((_, pieces)) = self.pieces.remove(&owner) {
-                for piece in pieces.into_iter().flatten() {
+                for piece in pieces {
                     world.despawn(piece);
                 }
             }
@@ -342,7 +333,7 @@ impl Stage {
                 .get(&pose.owner)
                 .is_some_and(|(known, _)| *known != signature);
             if stale && let Some((_, pieces)) = self.pieces.remove(&pose.owner) {
-                for piece in pieces.into_iter().flatten() {
+                for piece in pieces {
                     world.despawn(piece);
                 }
             }
@@ -351,7 +342,7 @@ impl Stage {
                 let pieces = vfx_render::pieces_for(world, &pose.layers, &mut |world, sheet| {
                     scene::image_handle(scenes, files, sheet.as_str(), world)
                 });
-                for piece in pieces.iter().flatten() {
+                for piece in &pieces {
                     world.entity_mut(*piece).insert(self.layer.clone());
                 }
                 self.pieces.insert(pose.owner, (signature, pieces));
@@ -385,32 +376,6 @@ impl Stage {
                 &|shader| compiled.get(shader.key(content)).cloned(),
                 &mut overdrawn,
             );
-            if let Some(site) = &site {
-                for layer in &pose.layers {
-                    let VfxLayer::Text {
-                        template,
-                        color,
-                        size,
-                        rise,
-                        ..
-                    } = layer
-                    else {
-                        continue;
-                    };
-                    let Some(time) = layer.at(pose.elapsed) else {
-                        continue;
-                    };
-                    let float = TextFloat::at(time.progress);
-                    let risen = site.head().y + rise.0 * TILE.0 * float.risen;
-                    self.overlays.push(Overlay {
-                        text: VfxDef::fill(template, &pose.params),
-                        color: *color,
-                        size: *size,
-                        at: Vec2::new(site.center.x, risen),
-                        alpha: float.alpha,
-                    });
-                }
-            }
         }
         vfx_render::settle_overdrawn(world, &overdrawn);
     }
@@ -502,7 +467,6 @@ fn layers_signature(layers: &[VfxLayer]) -> String {
         .iter()
         .map(|layer| match layer {
             VfxLayer::Sprite { sheet, .. } => format!("sprite:{}", sheet.as_str()),
-            VfxLayer::Text { .. } => "text".to_owned(),
             VfxLayer::Shader { shader, .. } => format!("shader:{}", shader.index()),
         })
         .collect::<Vec<_>>()

@@ -1,18 +1,22 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, color, family};
-use egui::{Align, Color32, Label, Layout, Pos2, Rect, RichText, Ui};
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{TextRole, face, ink, sheet, slip};
+use egui::{Align, Color32, Label, Layout, Pos2, Rect, Ui};
 
 use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::systems::hud::{self, HudWidget};
-use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session;
 
-const WIDTH: f32 = 230.0;
+const WIDTH: f32 = 244.0;
 const MARK: f32 = 16.0;
+const FLAG: f32 = 12.0;
+const FOLD: f32 = 16.0;
+const INDENT: f32 = 18.0;
+const GAP_TO_LAUNCHERS: f32 = 10.0;
 
 pub struct QuestTrackerPlugin;
 
@@ -27,7 +31,7 @@ pub struct QuestTrackerWidget;
 impl HudWidget for QuestTrackerWidget {
     fn fallback(&self, screen: Rect) -> Pos2 {
         Pos2::new(
-            screen.right() - hud::WIDGET.0 - WIDTH - 24.0,
+            screen.right() - hud::launchers_width() - WIDTH - GAP_TO_LAUNCHERS,
             screen.top() + 8.0,
         )
     }
@@ -40,9 +44,9 @@ impl HudWidget for QuestTrackerWidget {
             .and_then(|seen| world.get::<QuestLog>(seen))
             .cloned()
             .unwrap_or_default();
-        hud::panel().show(ui, |ui| {
-            ui.set_width(WIDTH);
-            ui.spacing_mut().item_spacing.y = 4.0;
+        slip::show(ui, |ui| {
+            ui.set_width(WIDTH - slip::PADDING.sum().x);
+            ui.spacing_mut().item_spacing.y = 3.0;
             let folded = world.resource::<Folded>().0;
             header(ui, world, entries.len(), folded);
             if folded {
@@ -84,29 +88,28 @@ enum Count {
 impl Tone {
     fn color(self) -> Color32 {
         match self {
-            Tone::Plain => color::TEXT.gamma_multiply(0.75),
-            Tone::Done => color::OK.gamma_multiply(0.7),
-            Tone::Next => color::WARN,
-            Tone::Bad => color::DANGER,
+            Tone::Plain | Tone::Next => ink::INK2,
+            Tone::Done => ink::VERDIGRIS,
+            Tone::Bad => ink::RUBRIC,
         }
     }
 }
 
 fn header(ui: &mut Ui, world: &mut World, count: usize, folded: bool) {
-    let (title, toggle) = if folded {
-        (format!("QUESTS ({count})"), "+")
+    let title = if folded {
+        format!("quests ({count})")
     } else {
-        ("QUESTS".to_owned(), "–")
+        "quests".to_owned()
     };
     ui.horizontal(|ui| {
-        ui.label(
-            RichText::new(title)
-                .size(TextRole::Small.size())
-                .family(family::medium())
-                .color(color::MUTED),
-        );
+        sheet::label(ui, TextRole::Section, &title, ink::RUBRIC);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if ui.small_button(toggle).clicked() {
+            let (mark, label) = if folded {
+                (Mark::Plus, "Show tracked quests")
+            } else {
+                (Mark::Minus, "Hide tracked quests")
+            };
+            if glyph::button(ui, mark, FOLD, ink::INK2, label).clicked() {
                 world.resource_mut::<Folded>().0 = !folded;
             }
         });
@@ -122,21 +125,15 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
                 let left = Countdown::Left
                     .label(log, entry.quest, super::card::clock_now(world))
                     .unwrap_or_default();
-                ui.label(RichText::new(left).size(small).color(color::WARN));
-                hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 12.0);
+                ui.label(TextRole::Small.rich(left).color(ink::INK3));
             }
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                glyph::show(ui, Mark::Flag, FLAG, ink::AZURE);
                 if let Some(mark) = &entry.mark {
                     hud::icon(ui, world, mark, MARK);
                 }
-                ui.add(
-                    Label::new(
-                        RichText::new(entry.quest.get(&content).title.as_str())
-                            .family(family::medium())
-                            .color(color::TEXT),
-                    )
-                    .truncate(),
-                );
+                ui.add(Label::new(face::bold(entry.quest.get(&content).title.as_str())).truncate());
             });
         });
     });
@@ -150,15 +147,13 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
                 .unwrap_or_default(),
         };
         ui.horizontal(|ui| {
-            ui.add_space(8.0);
+            ui.add_space(INDENT);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if !count.is_empty() {
-                    ui.label(RichText::new(count).size(small).color(color));
+                    ui.label(TextRole::Small.rich(count).color(color).size(small));
                 }
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                    ui.add(
-                        Label::new(RichText::new(label.as_str()).size(small).color(color)).wrap(),
-                    );
+                    ui.add(Label::new(TextRole::Small.rich(label.as_str()).color(color)).wrap());
                 });
             });
         });

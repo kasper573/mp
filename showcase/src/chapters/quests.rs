@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use driver::{
-    Player, UiTarget, WaitBudget, content, erred, finished, holding, marked, noticed, on_quest,
-    told_by,
+    Player, UiTarget, WaitBudget, content, erred, finished, holding, input_name, marked, noticed,
+    on_quest, told_by,
 };
 use engine::systems::attention::AttentionMark;
 use engine::systems::input::map::InputAction;
@@ -30,12 +30,12 @@ fn play(shoot: &mut Shoot) {
         marked(snapshot, "tobb", AttentionMark::QuestOffered)
     });
     let heard_news = talk_past_news(&mut me);
-    me.caption_top("Quests join the conversation as topics");
+    me.caption("Quests join the conversation as topics");
     me.hold();
     me.pick("A Letter for the Captain");
     me.on_stage("letter_offer");
-    me.caption_top(
-        "A panel above the conversation lays out objectives and rewards. Accept or decline below",
+    me.caption(
+        "A quest card docks above the conversation with its objectives and rewards. Accept or decline below",
     );
     me.read_to_choices();
     me.hold();
@@ -46,14 +46,14 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the accepted quest in the feed", |snapshot| {
         noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
-    me.caption_top(
-        "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
+    me.caption(
+        "Accepted: a line over your head says so, the letter is in your bag, the quest on your tracker",
     );
     if !heard_news {
         hear_out_tobb(&mut me, Duration::from_secs(12));
     }
 
-    me.caption_top(
+    me.caption(
         "Quest items are marked: they can't be sold or dropped, and abandoning takes them back",
     );
     me.act(InputAction::ToggleInventory);
@@ -70,13 +70,20 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("Low Tide's clock", |snapshot| {
         on_quest(snapshot, "low_tide").is_some_and(|quest| quest.left.is_some())
     });
-    me.caption_top("The tracker counts it down");
+    me.caption("The tracker counts it down");
 
-    me.caption_top("L opens the quest log, grouped by category");
+    me.caption(
+        "L opens the quest log, grouped by category; the chosen quest lies on the page as a card",
+    );
     me.act(InputAction::ToggleQuestLog);
     me.find_ui("Active quests");
     me.click_ui(UiTarget::button("Low Tide"));
-    me.caption_top("Right-click a reward for its item card");
+    me.caption("A long card scrolls its plate under the name band, down to the rewards");
+    me.scroll_until("objectives", UiTarget::image(BAIT));
+    me.caption(&format!(
+        "{} a reward for its item card",
+        input_name(InputAction::InspectItem)
+    ));
     me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
     me.wait_until("the bait's card", |snapshot| {
         snapshot
@@ -88,11 +95,14 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the item card to close", |snapshot| {
         snapshot.item_card.is_none()
     });
-    me.caption_top("A quest can keep its rewards to itself: the letter's entry has none to show");
+    me.caption("A quest can keep its rewards to itself: the letter's entry has none to show");
     me.click_ui(UiTarget::button("A Letter for the Captain"));
     me.hold();
     me.click_ui(UiTarget::button("Low Tide"));
-    me.caption_top("Abandoning always asks, and Keep quest is the default — Enter keeps it");
+    me.caption(&format!(
+        "Abandoning always asks, and Keep quest is the default — {} keeps it",
+        input_name(InputAction::TakeDefault)
+    ));
     me.click_ui("Abandon");
     me.find_ui("Abandon Low Tide?");
     me.hold();
@@ -107,7 +117,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.act(InputAction::Dismiss);
 
-    me.caption_top("Bram's next errand stays out of sight until you're ready for it");
+    me.caption("Bram's next errand stays out of sight until you're ready for it");
     me.hold();
     me.talk_to("bram");
     me.read_to_choices();
@@ -122,7 +132,7 @@ fn play(shoot: &mut Shoot) {
     me.talk_to("bram");
     me.read_to_choices();
     me.pick("A Letter for the Captain");
-    me.caption_top("Nobody named Bram's pay, so the choice keeps it to itself");
+    me.caption("Nobody named Bram's pay, so the choice keeps it to itself");
     me.hold();
     me.pick("Tobb asked me to bring you this.");
     me.on_stage("letter_thanks");
@@ -132,18 +142,18 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the pay in the feed", |snapshot| {
         noticed(snapshot, "+10 Gold")
     });
-    me.caption_top(
-        "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
+    me.caption(
+        "Delivered: the letter goes and the pay arrives over your head, the finished quest lands in the middle",
     );
     me.wait_until("the finished quest", |snapshot| {
         told_by(snapshot, "Quest complete")
     });
-    me.caption_top("The XP brought a new level, which joins it right below");
+    me.caption("The XP brought a new level, which joins it right below");
     me.wait_until("the level up", |snapshot| told_by(snapshot, "Level up"));
     me.hold();
     me.pick("Never mind.");
     me.conversation_over();
-    me.caption_top("Now at level 3, he has work for you");
+    me.caption("Now at level 3, he has work for you");
     me.wait_until("! over Bram", |snapshot| {
         marked(snapshot, "bram", AttentionMark::QuestOffered)
     });
@@ -164,11 +174,14 @@ fn play(shoot: &mut Shoot) {
     me.talk_to("mara");
     me.read_to_choices();
     me.pick("Tusks for the Chief");
-    me.caption_top("Rewards can include a pick, chosen when you hand in");
-    me.caption_top("Rest the pointer on a reward to see what it is");
+    me.caption("Rewards can include a pick, chosen when you hand in");
+    me.caption("Rest the pointer on a reward to see what it is");
     me.hover_ui(reward_on("I'll take the Bone Shield."));
     me.hold();
-    me.caption_top("Right-click it for its card");
+    me.caption(&format!(
+        "{} it for its card",
+        input_name(InputAction::InspectItem)
+    ));
     me.act_on_ui(
         InputAction::InspectItem,
         reward_on("I'll take the Bone Shield."),
@@ -181,7 +194,7 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.act(InputAction::Dismiss);
     me.wait_until("the card to close", |snapshot| snapshot.item_card.is_none());
-    me.caption_top(
+    me.caption(
         "With a full bag the pick is refused with an error — space is counted after the tusks are handed in",
     );
     me.pick("I'll take the Bone Shield.");
@@ -192,7 +205,10 @@ fn play(shoot: &mut Shoot) {
     me.pick("Not yet.");
     me.conversation_over();
 
-    me.caption_top("Make some room: Ctrl-click drops");
+    me.caption(&format!(
+        "Make some room: {} drops",
+        input_name(InputAction::DropItem)
+    ));
     me.act(InputAction::ToggleInventory);
     for _ in 0..2 {
         let before = holding(&me.snapshot(), "rusty_sword");
@@ -206,14 +222,14 @@ fn play(shoot: &mut Shoot) {
     me.talk_to("mara");
     me.read_to_choices();
     me.pick("Tusks for the Chief");
-    me.caption_top("Now there's room for the pick");
+    me.caption("Now there's room for the pick");
     me.pick("I'll take the Bone Shield.");
     me.on_stage("tusks_thanks");
     me.wait_until("the tusks handed in", |snapshot| {
         finished(snapshot, "tusks_for_the_chief") == Some(QuestResult::Completed)
     });
 
-    me.caption_top("Finished quests move to Completed in the log");
+    me.caption("Finished quests move to Completed in the log");
     me.act(InputAction::ToggleQuestLog);
     me.click_ui("Completed");
     me.hold();

@@ -1,3 +1,4 @@
+use design_tokens::glyph::Mark;
 use std::convert::Infallible;
 
 use egui::Ui;
@@ -82,8 +83,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             node.drag = Some(Dragged::Asset(path.to_owned()));
             node.icon = match kind(path)? {
                 AssetKind::Image => TreeIcon::Thumb(path.to_owned()),
-                AssetKind::Audio => TreeIcon::Glyph("♪"),
-                AssetKind::Font => TreeIcon::Glyph("A"),
+                AssetKind::Audio => TreeIcon::Mark(Mark::Note),
+                AssetKind::Font => TreeIcon::Mark(Mark::Page),
             };
             Some(node)
         },

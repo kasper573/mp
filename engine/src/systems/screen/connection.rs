@@ -3,6 +3,7 @@ use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_replicon::prelude::RepliconChannels;
 use bevy_replicon_renet2::RenetChannelsExt;
+use design_tokens::ink;
 use renet2::{ConnectionConfig, RenetClient};
 
 use super::sign_in::SignInFailure;
@@ -17,8 +18,6 @@ use crate::core::net::transport::ClientSocket;
 use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
-
-pub(super) const OVERLAY_BG: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
 
 pub struct ConnectionPlugin;
 
@@ -185,5 +184,5 @@ fn retry_when_due(
 }
 
 fn overlay(phase: ScreenTransitionPhase) -> Option<egui::Color32> {
-    (phase == ScreenTransitionPhase::Idle).then_some(OVERLAY_BG)
+    (phase == ScreenTransitionPhase::Idle).then_some(ink::VEIL)
 }

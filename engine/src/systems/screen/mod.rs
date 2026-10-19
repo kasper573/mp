@@ -7,8 +7,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
-use design_tokens::{TextRole, color};
-use egui::{RichText, TextStyle, Ui};
+use design_tokens::sheet;
+use design_tokens::{TextRole, controls, face, ink};
+use egui::{TextStyle, Ui};
 use renet2::RenetClient;
 
 use crate::core::gui::{self, Band};
@@ -18,7 +19,8 @@ use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use connection::{Announce, PendingSession};
 
-const NOTICE_WIDTH: f32 = 320.0;
+const NOTICE_WIDTH: f32 = 356.0;
+const NOTE_PADDING: i8 = 22;
 // The most lines a load shows on its way, so the notice keeps one height as the screens and their
 // lines come and go. Notes and a failure are rare, and grow it instead.
 const NOTICE_LINES: usize = 4;
@@ -169,29 +171,22 @@ pub(crate) fn system_screen<R>(
     shown
 }
 
-/// The panel every screen between screens speaks in, under its `title`.
 pub(crate) fn panel<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
-    egui::Frame::popup(ui.style())
-        .inner_margin(egui::Margin::symmetric(24, 18))
-        .show(ui, |ui| {
-            ui.set_width(NOTICE_WIDTH);
-            ui.set_min_height(notice_height(ui));
-            ui.vertical_centered(|ui| {
-                ui.spacing_mut().item_spacing.y = LINE_GAP;
-                ui.heading(title);
-                add(ui)
-            })
-            .inner
+    sheet::note(ui, egui::Margin::same(NOTE_PADDING), |ui| {
+        ui.set_width(NOTICE_WIDTH);
+        ui.set_min_height(notice_height(ui));
+        ui.vertical_centered(|ui| {
+            ui.spacing_mut().item_spacing.y = LINE_GAP;
+            ui.label(TextRole::NoteTitle.rich(title).color(ink::INK));
+            add(ui)
         })
         .inner
+    })
+    .inner
 }
 
 pub(crate) fn note(ui: &mut Ui, text: &str) {
-    ui.label(
-        RichText::new(text)
-            .size(TextRole::Small.size())
-            .color(color::MUTED),
-    );
+    ui.label(face::small_faint(text));
 }
 
 /// A screen that waits needs only a few frames a second, and every frame beyond those is time the
@@ -226,7 +221,7 @@ fn notice_panel(ui: &mut Ui, notice: Notice) -> bool {
         }
         notice
             .action
-            .is_some_and(|action| ui.button(action).clicked())
+            .is_some_and(|action| controls::primary(ui, action).clicked())
     })
 }
 

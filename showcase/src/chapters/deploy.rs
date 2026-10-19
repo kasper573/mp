@@ -46,7 +46,7 @@ fn play(shoot: &mut Shoot) {
             me.wait_within("the client to lose the server", REJOINING, |snapshot| {
                 UiTarget::text("Reconnecting…").find(snapshot).map(|_| ())
             });
-            me.caption_top(
+            me.caption(
                 "The world freezes under a veil while the client reconnects, with backoff so a crowd doesn't dogpile the server",
             );
             me.hold();
@@ -55,7 +55,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_within("the new edition to load", REJOINING, |snapshot| {
         UiTarget::text(EDITION).find(snapshot).map(|_| ())
     });
-    me.caption_top(&format!(
+    me.caption(&format!(
         "The new manifest differs, so only the {changed} changed rows download; every other file is still on the device"
     ));
     me.wait_within("a new character in the world", REJOINING, |snapshot| {

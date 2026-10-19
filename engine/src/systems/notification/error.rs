@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use design_tokens::dusk;
 use egui::emath::TSTransform;
 use egui::{Rect, Vec2};
 
@@ -55,15 +56,15 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = rows::motion_time(world, gui);
+    let now = rows::time(gui);
     let mut errors = world.resource_mut::<Errors>();
     errors.swell.start_if_bumped(now);
-    let bump = errors.swell.scale(now, still);
+    let bump = errors.swell.scale(now);
     let current = errors
         .shown
         .as_ref()
         .map(|shown| (shown.key, (shown.key, shown.notification.clone())));
-    let toasts = errors.fades.sync(now, PRESENCE, still, current);
+    let toasts = errors.fades.sync(now, PRESENCE, current);
     let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
     for ((key, notification), look) in toasts {
@@ -71,16 +72,14 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
             ui.set_width(width);
             ui.vertical_centered(|ui| {
                 ui.multiply_opacity(look.opacity);
-                let style = ui.style().clone();
-                egui::Frame::popup(&style)
+                dusk::frame()
                     .show(ui, |ui| {
                         ui.set_max_width(WIDEST);
-                        let ink = ui.visuals().error_fg_color;
                         text::show(
                             ui,
                             world,
                             &notification.text.styled(),
-                            rows::look(SIZE, ink),
+                            rows::look(SIZE, dusk::DANGER),
                             None,
                         );
                     })

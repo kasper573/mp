@@ -8,6 +8,7 @@ use strum::VariantArray;
 
 use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 use crate::views::tileset::terrain::MixCompleteness;
 use crate::views::tileset::terrain::TileCorner;
@@ -188,9 +189,9 @@ fn tile_sheet(
             if let Some(p) = response.interact_pointer_pos() {
                 let cell = layout.clamped_cell(&sheet, p);
                 let tile = cell.y * columns + cell.x;
-                let ctrl = ui.input(|i| i.modifiers.ctrl);
+                let toggle = ui.input(|i| EditorKey::ToggleSelection.held(i));
                 if response.drag_started() || response.clicked() {
-                    if random || ctrl {
+                    if random || toggle {
                         if let Some(at) = view.pick.random.iter().position(|t| *t == tile) {
                             view.pick.random.remove(at);
                         } else {
@@ -204,7 +205,7 @@ fn tile_sheet(
                     }
                 } else if response.dragged()
                     && !random
-                    && !ctrl
+                    && !toggle
                     && let Some(anchor) = view.pick.anchor
                 {
                     view.pick.block = SheetRect::spanning(anchor, cell).rows(columns);
@@ -434,8 +435,8 @@ fn terrain_sheet(
                             theme::muted(terrain)
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if index < 9 {
-                                widgets::key_hint(ui, &(index + 1).to_string());
+                            if let Some(digit) = EditorKey::digit_name(index) {
+                                widgets::key_hint(ui, digit);
                             }
                         });
                     })

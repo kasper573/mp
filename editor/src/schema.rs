@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use engine::core::content::fixture::FixtureLock;
 use engine::core::script::VariableType;
 use serde_json::{Map, Value, json};
 
@@ -14,6 +15,10 @@ pub struct SchemaShapes {
 pub struct TableShape {
     pub shape: Value,
     pub fixtures: Vec<String>,
+    /// What each fixture's row keeps as the engine reads it, by key.
+    pub locks: BTreeMap<String, Vec<FixtureLock>>,
+    /// Whether the table holds its fixtures and nothing else.
+    pub closed: bool,
     pub folders: bool,
 }
 
@@ -41,6 +46,8 @@ impl SchemaShapes {
                         .flatten()
                         .filter_map(|key| key.as_str().map(str::to_owned))
                         .collect(),
+                    locks: serde_json::from_value(table["locks"].clone()).unwrap_or_default(),
+                    closed: table["closed"].as_bool().unwrap_or(false),
                     folders: table["folders"].as_bool().unwrap_or(false),
                 },
             );
@@ -67,10 +74,15 @@ impl SchemaShapes {
             .is_some_and(|shape| shape.fixtures.iter().any(|fixture| fixture == key))
     }
 
-    pub fn has_fixtures(&self, table: &str) -> bool {
+    pub fn is_closed(&self, table: &str) -> bool {
+        self.tables.get(table).is_some_and(|shape| shape.closed)
+    }
+
+    pub fn locks(&self, table: &str, key: &str) -> &[FixtureLock] {
         self.tables
             .get(table)
-            .is_some_and(|shape| !shape.fixtures.is_empty())
+            .and_then(|shape| shape.locks.get(key))
+            .map_or(&[], Vec::as_slice)
     }
 
     pub fn modules_of(&self, table: &str) -> Option<&Value> {
@@ -171,18 +183,22 @@ pub fn settle<'a>(root: &'a Value, schema: &'a Value, value: &Value) -> &'a Valu
     }
 }
 
+/// What an optional schema holds when it holds something: the one alternative beside null, its
+/// own nesting left whole.
 pub fn non_null<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
     let schema = resolve(root, schema);
-    match kind(root, schema) {
-        SchemaKind::Choice(alternatives) if is_optional(schema) => {
-            let mut taken = alternatives
-                .into_iter()
-                .filter(|alternative| type_names(alternative) != ["null"]);
-            match (taken.next(), taken.next()) {
-                (Some(only), None) => resolve(root, only),
-                _ => schema,
-            }
-        }
+    let Some(alternatives) = schema
+        .get("anyOf")
+        .or_else(|| schema.get("oneOf"))
+        .and_then(Value::as_array)
+    else {
+        return schema;
+    };
+    let mut taken = alternatives
+        .iter()
+        .filter(|alternative| type_names(resolve(root, alternative)) != ["null"]);
+    match (taken.next(), taken.next()) {
+        (Some(only), None) if alternatives.len() > 1 => resolve(root, only),
         _ => schema,
     }
 }

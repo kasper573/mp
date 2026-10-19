@@ -7,11 +7,10 @@ use bevy_egui::{
     EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui::load::SizedTexture;
-use egui::{FontDefinitions, LayerId, Order};
+use egui::{LayerId, Order};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::asset_of;
-use crate::core::text::MotionPreference;
 
 /// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,6 +39,29 @@ impl Band {
     }
 }
 
+/// The background stacks in tiers over what floats over the world: whatever a tier holds lies over
+/// everything in the tiers before it, however recently either was drawn or clicked. egui would
+/// otherwise stack the background by whichever layer it saw first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Tier {
+    Back,
+    Mid,
+    Front,
+}
+
+impl Tier {
+    const ALL: [Tier; 3] = [Tier::Back, Tier::Mid, Tier::Front];
+
+    fn anchor(self) -> LayerId {
+        LayerId::new(Order::Background, egui::Id::new(("tier", self)))
+    }
+}
+
+/// Puts a background layer in its tier for this pass.
+pub fn stack(gui: &egui::Context, tier: Tier, layer: LayerId) {
+    gui.set_sublayer(tier.anchor(), layer);
+}
+
 #[derive(Resource, Clone)]
 pub struct GuiContext(pub egui::Context);
 
@@ -51,9 +73,6 @@ impl WorldLayers {
         self.0.contains(&layer)
     }
 }
-
-#[derive(Resource, Clone)]
-pub struct GuiFonts(pub FontDefinitions);
 
 /// Where each named interface widget was drawn this pass, for what plays over a widget.
 #[derive(Resource, Default)]
@@ -101,10 +120,9 @@ impl Plugin for GuiPlugin {
                     .chain(),
             )
             .add_systems(PreUpdate, adopt_context)
-            .add_systems(Update, apply_look.run_if(look_changed))
             .add_systems(
                 EguiPrimaryContextPass,
-                forget_world_layers.before(Band::Stage),
+                (forget_world_layers, raise_tiers).before(Band::Stage),
             )
             .add_systems(
                 PostUpdate,
@@ -144,13 +162,37 @@ pub fn show_anchored<R>(
     shown
 }
 
+/// What a layer drew in its last pass, kept to be drawn again after what it showed is gone, so a
+/// sheet whose content has ended can still lift off the table.
+#[derive(Clone, Default)]
+pub struct Afterimage(Vec<egui::epaint::ClippedShape>);
+
+impl Afterimage {
+    pub fn of(gui: &egui::Context, layer: LayerId) -> Afterimage {
+        Afterimage(gui.graphics(|graphics| {
+            graphics
+                .get(layer)
+                .map(|list| list.all_entries().cloned().collect())
+                .unwrap_or_default()
+        }))
+    }
+
+    pub fn paint(&self, painter: &egui::Painter) {
+        for shape in &self.0 {
+            painter
+                .with_clip_rect(shape.clip_rect)
+                .add(shape.shape.clone());
+        }
+    }
+}
+
 /// A widget's tooltip opens once the pointer has been on it a moment, however the pointer moves or
 /// clicks there, and at once while another has only just closed. egui's own waits for the pointer to
 /// rest, and after a click to move again, so it never opened on a widget the player clicks.
 pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
     let gui = &response.ctx;
     let key = response.id.with("tooltip");
-    if !response.contains_pointer() || gui.dragged_id().is_some() {
+    if !response.contains_pointer() || gui.dragged_id().is_some() || egui::Popup::is_any_open(gui) {
         gui.data_mut(|data| data.remove::<Pointed>(key));
         return;
     }
@@ -174,6 +216,26 @@ pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
     if follows_another || now - since >= f64::from(delay) {
         egui::Tooltip::for_widget(response).show(add);
     }
+}
+
+/// A menu at the pointer, laid out as a right-click menu is, but opened whenever `open` says.
+pub fn pointer_menu<R>(
+    response: &egui::Response,
+    open: bool,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> Option<R> {
+    let command = if open {
+        Some(egui::SetOpenCommand::Bool(true))
+    } else if response.clicked() {
+        Some(egui::SetOpenCommand::Bool(false))
+    } else {
+        None
+    };
+    egui::Popup::menu(response)
+        .open_memory(command)
+        .at_pointer_fixed()
+        .show(add)
+        .map(|shown| shown.inner)
 }
 
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.
@@ -292,36 +354,18 @@ fn adopt_context(
     commands.insert_resource(GuiContext(gui));
 }
 
-fn look_changed(
-    gui: Option<Res<GuiContext>>,
-    fonts: Option<Res<GuiFonts>>,
-    motion: Option<Res<MotionPreference>>,
-) -> bool {
-    gui.is_some_and(|gui| {
-        gui.is_changed()
-            || fonts.is_some_and(|fonts| fonts.is_changed())
-            || motion.is_some_and(|motion| motion.is_changed())
-    })
-}
-
-fn apply_look(gui: Res<GuiContext>, fonts: Option<Res<GuiFonts>>, motion: Res<MotionPreference>) {
-    gui.0
-        .set_fonts(fonts.map_or_else(design_tokens::builtin_fonts, |fonts| fonts.0.clone()));
-    set_motion(&gui.0, *motion);
-}
-
-fn set_motion(gui: &egui::Context, motion: MotionPreference) {
-    let seconds = if motion.reduced {
-        0.0
-    } else {
-        egui::Style::default().animation_time
-    };
-    gui.all_styles_mut(|style| style.animation_time = seconds);
-}
-
 fn forget_world_layers(mut layers: ResMut<WorldLayers>, mut widgets: ResMut<WidgetRects>) {
     layers.0.clear();
     widgets.0.clear();
+}
+
+fn raise_tiers(gui: Option<Res<GuiContext>>) {
+    let Some(gui) = gui else {
+        return;
+    };
+    for tier in Tier::ALL {
+        gui.0.move_to_top(tier.anchor());
+    }
 }
 
 /// bevy_egui blends every texture as premultiplied but samples a Bevy image as stored, which would

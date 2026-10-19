@@ -1,4 +1,4 @@
-use driver::{Player, UiTarget, content, fixture, holding, resident_home, townsperson};
+use driver::{Player, UiTarget, content, fixture, holding, input_name, resident_home, townsperson};
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::systems::input::gestures::ClickClaim;
@@ -20,9 +20,12 @@ const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("swordsman", Some(resident_home("island", "mara")));
     let mut me = shoot.roll(player);
-    me.caption("Loot at a townsperson's feet? A click picks it up before it talks");
+    me.caption(&format!(
+        "Loot at a townsperson's feet? {} picks it up before it talks",
+        input_name(InputAction::Interact)
+    ));
     let host = me.wait_for("Mara", |snapshot| townsperson(snapshot, "mara").cloned());
-    me.caption_top(&format!(
+    me.caption(&format!(
         "You arrived right where {} stands: drop a sword at her feet",
         host.name
     ));

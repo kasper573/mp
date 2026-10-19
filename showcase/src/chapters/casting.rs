@@ -1,5 +1,5 @@
 use driver::{
-    Player, UiTarget, aiming, beside_other_player, east_of, npc_is, other_player,
+    Player, UiTarget, aiming, beside_other_player, east_of, input_name, npc_is, other_player,
     other_player_within, pack_ground, played, played_on, status_on_me,
 };
 use engine::core::math::Pos;
@@ -28,15 +28,16 @@ fn play(shoot: &mut Shoot) {
     friend.in_world();
     let mut me = shoot.roll(player);
     stand_beside(&mut friend);
-    me.caption_top(
+    me.caption(
         "Every skill has one targeting kind. On yourself: Ward fires the moment its key is pressed",
     );
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
     me.hold();
-    me.caption_top(
-        "One ally: Mend arms, and the click must land on a friend. Allies are the other players",
-    );
+    me.caption(&format!(
+        "One ally: Mend arms, and {} must land on a friend. Allies are the other players",
+        input_name(InputAction::Interact)
+    ));
     me.act(InputAction::Hotbar4);
     me.wait_until("Mend armed", aiming);
     let ally = other_player(&me.snapshot())
@@ -49,27 +50,28 @@ fn play(shoot: &mut Shoot) {
         played_on(snapshot, "mend_glow", ally.id)
     });
     me.hold();
-    me.caption_top(
-        "One enemy: a click on a monster uses the basic attack, Spark; any other single-target skill is aimed the same way",
-    );
+    me.caption(&format!(
+        "One enemy: {} on a monster uses the basic attack, Spark; any other single-target skill is aimed the same way",
+        input_name(InputAction::Interact)
+    ));
     me.fight(
         |_, actor| npc_is(actor, PREY),
         |snapshot| !played(snapshot, "spark_hit").is_empty(),
     );
     me.hold();
-    me.caption_top(
+    me.caption(
         "An area of enemies, a circle: Fireball lands on the point you aim at, walking into range first if it must",
     );
     aim_then_cast(&mut me, InputAction::Hotbar1, ring, |snapshot| {
         !played(snapshot, "fireball_blast").is_empty()
     });
     me.hold();
-    me.caption_top(
+    me.caption(
         "Chain Lightning's circle picks out everything hostile inside it, and the bolt runs through each one",
     );
     aim_then_cast(&mut me, InputAction::Hotbar3, ring, chained_through_several);
     me.hold();
-    me.caption_top(
+    me.caption(
         "An area of allies, a rectangle: Sanctuary blesses everyone standing in it, the caster included",
     );
     friend.walk_toward(beside_other_player);
@@ -80,7 +82,7 @@ fn play(shoot: &mut Shoot) {
         played_on(snapshot, "holy_motes", ally.id)
     });
     me.hold();
-    me.caption_top("And a cone: the armsman's Cleave sweeps the arc in front of him");
+    me.caption("And a cone: the armsman's Cleave sweeps the arc in front of him");
     friend.act(InputAction::Hotbar1);
     friend.wait_until("Cleave armed", aiming);
     friend.point_at_tile(ring);
@@ -89,9 +91,7 @@ fn play(shoot: &mut Shoot) {
         !played(snapshot, "cleave_swoosh").is_empty()
     });
     me.hold();
-    me.caption_top(
-        "A passive, Arcane Mind, is aimed at nobody: it holds for as long as it is known",
-    );
+    me.caption("A passive, Arcane Mind, is aimed at nobody: it holds for as long as it is known");
     me.act(InputAction::ToggleSkills);
     me.hover_ui(UiTarget::starting("Arcane Mind node"));
     me.hold();

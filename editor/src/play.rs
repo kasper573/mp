@@ -1,3 +1,5 @@
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Mark};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -20,6 +22,7 @@ use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
+use crate::keymap::EditorKey;
 use crate::project::{RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
@@ -363,10 +366,12 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let (play, arrow) = ui
         .scope(|ui| {
             ui.spacing_mut().item_spacing.x = 1.0;
-            let arrow = widgets::primary(ui, "▾").on_hover_text("Pick the test character");
-            let play = widgets::primary(ui, "▸ Play").on_hover_text(
-                "Save, then play as the picked test character from its own start (F5)",
-            );
+            let arrow = glyph::button(ui, Mark::ChevronDown, 14.0, theme::TEXT, "Test character")
+                .on_hover_text("Pick the test character");
+            let play = controls::marked_primary(ui, Mark::Play, "Play").on_hover_text(format!(
+                "Save, then play as the picked test character from its own start ({})",
+                EditorKey::PlayFromStart.name()
+            ));
             (play, arrow)
         })
         .inner;
@@ -382,15 +387,9 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         for character in &characters {
             let picked = current.as_deref() == Some(character.key.as_str());
             let response = ui.add(
-                egui::Button::new(
-                    RichText::new(format!(
-                        "{}{}",
-                        if picked { "✓ " } else { "" },
-                        character.key
-                    ))
-                    .size(13.0),
-                )
-                .frame(false),
+                egui::Button::new(RichText::new(&character.key).size(13.0))
+                    .selected(picked)
+                    .frame(false),
             );
             ui.label(
                 theme::faint(format!("level {} · {}", character.level, character.area)).size(11.5),
@@ -406,8 +405,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         ui.separator();
         if ui
             .add(
-                egui::Button::new("Edit test characters…")
-                    .shortcut_text("Ctrl T")
+                widgets::shortcut_button("Edit test characters…", EditorKey::PlayedCharacter)
                     .frame(false),
             )
             .clicked()
@@ -417,7 +415,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         if ui
             .add_enabled(
                 editor.play.running.is_some(),
-                egui::Button::new("Stop").shortcut_text("⇧ F5").frame(false),
+                widgets::shortcut_button("Stop", EditorKey::StopPlay).frame(false),
             )
             .clicked()
         {
@@ -447,13 +445,10 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let playing = running.playing();
     let stopping = running.phase == Phase::Stopping;
     let mut restart_now = false;
-    if ui
-        .add(egui::Button::new(RichText::new("■ Stop").color(theme::DANGER)).corner_radius(5.0))
-        .clicked()
-    {
+    if controls::marked_danger(ui, Mark::Stop, "Stop").clicked() {
         stop_now = true;
     }
-    if widgets::keyed_button(ui, "↻ Restart", "", !stopping)
+    if widgets::keyed_button(ui, "Restart", None, !stopping)
         .on_hover_text("Save, then start both again as the same character")
         .clicked()
     {
@@ -466,16 +461,16 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
             crate::ui::widgets::plural(changes)
         ),
     );
-    widgets::pill(
+    controls::pill(
         ui,
         if stopping {
-            "● stopping"
+            "stopping"
         } else if playing {
-            "● playing"
+            "playing"
         } else {
-            "● starting"
+            "starting"
         },
-        if playing { theme::OK } else { theme::WARN },
+        if playing { Pill::Verdigris } else { Pill::Gold },
     );
     if stop_now {
         stop(editor);
@@ -498,38 +493,32 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
         .order(egui::Order::Foreground)
         .fixed_pos(ui.max_rect().left_top() + egui::vec2(12.0, 12.0))
         .show(ui.ctx(), |ui| {
-            egui::Frame::new()
-                .fill(egui::Color32::from_rgb(30, 30, 36))
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(6.0)
-                .inner_margin(12.0)
-                .show(ui, |ui| {
-                    ui.set_max_width(700.0);
-                    ui.horizontal_top(|ui| {
-                        ui.label(RichText::new("⚠").color(theme::DANGER).size(15.0));
-                        ui.label(RichText::new("The play-test stopped.").strong().size(14.0));
-                        ui.add(egui::Label::new(theme::muted(&reason).size(13.0)).wrap());
-                    });
-                    ui.add_space(6.0);
-                    ui.horizontal(|ui| {
-                        if widgets::primary(ui, "Copy output").clicked() {
-                            copy = true;
-                        }
-                        if ui.button("Save to file…").clicked() {
-                            save = true;
-                        }
-                        if ui.button("▸ Play again").clicked() {
-                            again = true;
-                        }
-                        if ui
-                            .add(egui::Button::new(theme::faint("✕")).frame(false))
-                            .on_hover_text("Hide")
-                            .clicked()
-                        {
-                            dismiss = true;
-                        }
-                    });
+            design_tokens::slip::show(ui, |ui| {
+                ui.set_max_width(700.0);
+                ui.horizontal_top(|ui| {
+                    glyph::show(ui, Mark::Warning, 15.0, theme::DANGER);
+                    ui.label(RichText::new("The play-test stopped.").strong().size(14.0));
+                    ui.add(egui::Label::new(theme::muted(&reason).size(13.0)).wrap());
                 });
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if widgets::primary(ui, "Copy output").clicked() {
+                        copy = true;
+                    }
+                    if ui.button("Save to file…").clicked() {
+                        save = true;
+                    }
+                    if controls::marked(ui, Mark::Play, "Play again").clicked() {
+                        again = true;
+                    }
+                    if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
+                        .on_hover_text("Hide")
+                        .clicked()
+                    {
+                        dismiss = true;
+                    }
+                });
+            });
         });
     if copy {
         let text = editor.output.text();
@@ -714,15 +703,14 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let mut close = false;
     let mut pick = false;
     let mut next_to = false;
-    ui.label(
-        RichText::new(if ok {
-            "⚙ Game binaries"
+    ui.horizontal(|ui| {
+        if ok {
+            glyph::show(ui, Mark::Gear, 18.0, theme::TEXT);
         } else {
-            "⚠ Game binaries"
-        })
-        .strong()
-        .size(18.0),
-    );
+            glyph::show(ui, Mark::Warning, 18.0, theme::WARN);
+        }
+        ui.label(RichText::new("Game binaries").strong().size(18.0));
+    });
     ui.add_space(8.0);
     widgets::kv(ui, "folder", |ui| {
         let response = forms::boxed_input(ui, Some("pick…"), |ui| {
@@ -755,10 +743,10 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
                 egui::Layout::right_to_left(egui::Align::Center),
                 |ui| match state {
                     Some(true) => {
-                        ui.label(RichText::new("✓").color(theme::OK));
+                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
                     }
                     Some(false) => {
-                        ui.label(RichText::new("✕").color(theme::DANGER));
+                        glyph::show(ui, Mark::Cross, 14.0, theme::DANGER);
                     }
                     None => {}
                 },
@@ -807,7 +795,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     if let Some(binaries) = checked.as_ref().filter(|_| !ok) {
         let culprit = culprit(binaries, content_version);
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("⚠").color(theme::DANGER));
+            glyph::show(ui, Mark::Warning, 14.0, theme::DANGER);
             ui.label(RichText::new(culprit).color(theme::DANGER).size(13.0));
         });
     }

@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Ui, Vec2};
 use engine::core::content::ContentRow;
 use engine::systems::item::ItemDef;
@@ -8,6 +9,7 @@ use engine::systems::shop::ShopDef;
 use super::filters::{ColorBy, ColorField, MapLens};
 use super::{MapPart, OpenWorldMap, select};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 const SEARCH_WIDTH: f32 = 300.0;
@@ -26,11 +28,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                 if !editor.views.world.search.trim().is_empty() {
                     pick = results(editor, ui, map, &search);
                 }
-                ui.menu_button(RichText::new("Layers ▾").size(12.5), |ui| {
+                ui.menu_button(RichText::new("Layers").size(12.5), |ui| {
                     ui.set_width(220.0);
                     layer_rows(editor, ui, map);
                 });
-                ui.menu_button(RichText::new("Color by ▾").size(12.5), |ui| {
+                ui.menu_button(RichText::new("Color by").size(12.5), |ui| {
                     ui.set_width(260.0);
                     if let Some(color) = color_menu(editor, ui) {
                         pick = Some(Pick::Color(color));
@@ -134,7 +136,7 @@ fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> eg
             ui.set_min_width(SEARCH_WIDTH);
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                ui.label(theme::muted("🔍"));
+                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
                 let view = &mut editor.views.world;
                 let mut chip = |ui: &mut Ui, text: &str, which: Chip| {
                     if widgets::chip_closable(ui, text).1 {
@@ -249,37 +251,42 @@ fn results(
         pick: Pick::Lens(MapLens::Text(text.clone())),
     });
     let mut picked: Option<Pick> = None;
-    if search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+    if search.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i)) {
         picked = rows.first().map(|row| row.pick.clone());
     }
     egui::Area::new(ui.id().with("world-search-results"))
         .fixed_pos(search.rect.left_bottom() + Vec2::new(-8.0, 8.0))
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
-            egui::Frame::popup(ui.style())
-                .fill(theme::RAISED)
-                .show(ui, |ui| {
-                    ui.set_width(SEARCH_WIDTH + 40.0);
-                    let mut last_kind = "";
-                    for row in rows.iter().take(RESULTS_SHOWN) {
-                        if row.kind != last_kind {
-                            widgets::section(ui, row.kind);
-                            last_kind = row.kind;
-                        }
-                        let response = ui.add(
-                            egui::Button::new(theme::mono(&row.label).size(12.5))
-                                .frame(false)
-                                .min_size(Vec2::new(ui.available_width(), 20.0)),
-                        );
-                        if response.clicked() {
-                            picked = Some(row.pick.clone());
-                        }
+            design_tokens::slip::frame().show(ui, |ui| {
+                ui.set_width(SEARCH_WIDTH + 40.0);
+                let mut last_kind = "";
+                for row in rows.iter().take(RESULTS_SHOWN) {
+                    if row.kind != last_kind {
+                        widgets::section(ui, row.kind);
+                        last_kind = row.kind;
                     }
-                    ui.add_space(4.0);
-                    ui.label(theme::faint("Enter takes the first · Esc clears").size(11.0));
-                });
+                    let response = ui.add(
+                        egui::Button::new(theme::mono(&row.label).size(12.5))
+                            .frame(false)
+                            .min_size(Vec2::new(ui.available_width(), 20.0)),
+                    );
+                    if response.clicked() {
+                        picked = Some(row.pick.clone());
+                    }
+                }
+                ui.add_space(4.0);
+                ui.label(
+                    theme::faint(format!(
+                        "{} takes the first · {} clears",
+                        EditorKey::Confirm.name(),
+                        EditorKey::Cancel.name()
+                    ))
+                    .size(11.0),
+                );
+            });
         });
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if ui.input(|i| EditorKey::Cancel.pressed(i)) {
         editor.views.world.search.clear();
     }
     picked

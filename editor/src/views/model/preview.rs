@@ -1,11 +1,13 @@
+use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::time::Millis;
 use engine::systems::actor::{Action, ModelDef};
 
 use super::{ModelStrip, StripFrame};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::stage::{self, Posed, PosedActor, Scene};
-use crate::ui::widgets;
+use crate::ui::{theme, widgets};
 
 pub struct StripPreview {
     pub playing: bool,
@@ -172,13 +174,24 @@ pub fn controls(
     with_speed: bool,
 ) {
     ui.horizontal(|ui| {
-        let play = if preview.playing { "⏸" } else { "▶" };
-        if widgets::chip(ui, play).on_hover_text("Space").clicked() {
+        let (mark, word) = if preview.playing {
+            (Mark::Pause, "Pause")
+        } else {
+            (Mark::Play, "Play")
+        };
+        if glyph::button(ui, mark, 14.0, theme::TEXT, word)
+            .on_hover_text(EditorKey::PlayPause.name())
+            .clicked()
+        {
             preview.playing = !preview.playing;
         }
-        let sound = if preview.muted { "🔇" } else { "🔊" };
-        if widgets::chip(ui, sound)
-            .on_hover_text("M mutes the preview")
+        let (mark, word) = if preview.muted {
+            (Mark::Mute, "Unmute")
+        } else {
+            (Mark::Speaker, "Mute")
+        };
+        if glyph::button(ui, mark, 14.0, theme::TEXT, word)
+            .on_hover_text(format!("{} mutes the preview", EditorKey::Mute.name()))
             .clicked()
         {
             preview.muted = !preview.muted;
@@ -201,10 +214,10 @@ pub fn keys(ui: &Ui, preview: &mut StripPreview, frames: &[StripFrame]) {
     }
     let (space, comma, period, mute) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::Space),
-            i.key_pressed(egui::Key::Comma),
-            i.key_pressed(egui::Key::Period),
-            i.key_pressed(egui::Key::M),
+            EditorKey::PlayPause.pressed(i),
+            EditorKey::PreviousFrame.pressed(i),
+            EditorKey::NextFrame.pressed(i),
+            EditorKey::Mute.pressed(i),
         )
     });
     if space {

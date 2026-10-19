@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
-use egui::{Color32, Key, Sense, Ui, Vec2};
+use egui::{Color32, Sense, Ui, Vec2};
 use engine::core::content::ContentRow;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{self, FormCx, FormState};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;
@@ -521,14 +522,18 @@ fn columns_cached(
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let selection = editor.selection.clone();
-    if selection.table == table
-        && selection
-            .parts
-            .first()
-            .is_some_and(|part| part.starts_with("#sheet/"))
-    {
-        sidebar::right(ui, "sheet-column", |ui| inspect(editor, ui, &selection));
-    }
+    sidebar::inspector(ui, "sheet-column", |ui| {
+        if selection.table == table
+            && selection
+                .parts
+                .first()
+                .is_some_and(|part| part.starts_with("#sheet/"))
+        {
+            inspect(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(ui, "Select a column to inspect it here.");
+        }
+    });
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)
         .show(ui, |ui| {
@@ -617,7 +622,7 @@ fn toolbar(
                     .hint_text("column > value"),
             );
             if response.lost_focus()
-                && ui.input(|i| i.key_pressed(Key::Enter))
+                && ui.input(|i| EditorKey::Confirm.pressed(i))
                 && !text.trim().is_empty()
             {
                 filters.push(text.trim().to_owned());
@@ -629,7 +634,7 @@ fn toolbar(
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(theme::muted(format!("{shown} of {total} rows")));
-            ui.menu_button("columns ▾", |ui| {
+            ui.menu_button("columns", |ui| {
                 ui.set_min_width(220.0);
                 egui::ScrollArea::vertical()
                     .max_height(400.0)
@@ -670,7 +675,7 @@ struct CellCommit {
 struct Hit {
     key: String,
     column: String,
-    shift: bool,
+    extend: bool,
     double: bool,
 }
 
@@ -715,8 +720,8 @@ fn table_body(
             let painter = ui.painter();
             let sorted = view.sort.as_ref().filter(|(id, _)| *id == column.id);
             let title = match sorted {
-                Some((_, true)) => format!("{} ▾", column.title.to_uppercase()),
-                Some((_, false)) => format!("{} ▴", column.title.to_uppercase()),
+                Some((_, true)) => format!("{} ↓", column.title.to_uppercase()),
+                Some((_, false)) => format!("{} ↑", column.title.to_uppercase()),
                 None => column.title.to_uppercase(),
             };
             let align = if column.numeric {
@@ -840,7 +845,7 @@ fn table_body(
                         hit = Some(Hit {
                             key: row.key.clone(),
                             column: column.id.clone(),
-                            shift: ui.input(|i| i.modifiers.shift),
+                            extend: ui.input(|i| EditorKey::ExtendSelection.held(i)),
                             double: response.double_clicked(),
                         });
                     }
@@ -929,7 +934,7 @@ fn table_body(
     if let Some(hit) = hit {
         let state = editor.views.spreadsheet.state_mut(table);
         let same = state.selected.as_ref() == Some(&(hit.key.clone(), hit.column.clone()));
-        if hit.shift && state.selected.is_some() {
+        if hit.extend && state.selected.is_some() {
             state.anchor = Some((hit.key.clone(), hit.column.clone()));
         } else {
             state.anchor = None;
@@ -1002,7 +1007,7 @@ fn edit_cell(
     row: &SpreadsheetRow,
     column: &SpreadsheetColumn,
 ) -> CellEdit {
-    if ui.input(|i| i.key_pressed(Key::Escape)) {
+    if ui.input(|i| EditorKey::Cancel.pressed(i)) {
         return CellEdit::Cancelled;
     }
     let shapes = editor.shapes.clone();
@@ -1143,15 +1148,15 @@ fn keys(
         copy,
         paste,
     } = ui.input(|i| Pressed {
-        up: !editing && i.key_pressed(Key::ArrowUp),
-        down: !editing && i.key_pressed(Key::ArrowDown),
-        left: !editing && i.key_pressed(Key::ArrowLeft),
-        right: !editing && i.key_pressed(Key::ArrowRight),
-        enter: !editing && i.key_pressed(Key::Enter),
-        tab: i.key_pressed(Key::Tab),
-        fill: i.modifiers.command && i.key_pressed(Key::D),
-        escape: editing && i.key_pressed(Key::Escape),
-        copy: !editing && i.modifiers.command && i.key_pressed(Key::C),
+        up: !editing && EditorKey::Move.arrow(i) == Some([0, -1]),
+        down: !editing && EditorKey::Move.arrow(i) == Some([0, 1]),
+        left: !editing && EditorKey::Move.arrow(i) == Some([-1, 0]),
+        right: !editing && EditorKey::Move.arrow(i) == Some([1, 0]),
+        enter: !editing && EditorKey::Confirm.pressed(i),
+        tab: EditorKey::NextCell.pressed(i),
+        fill: EditorKey::FillDown.pressed(i),
+        escape: editing && EditorKey::Cancel.pressed(i),
+        copy: !editing && EditorKey::Copy.pressed(i),
         paste: (!editing)
             .then(|| {
                 i.events.iter().find_map(|event| match event {
@@ -1356,7 +1361,13 @@ fn status(
     } else {
         left.push(format!("{table} · {} rows", rows.len()));
     }
-    left.push("arrows move · Enter edits · Tab next · Ctrl D fills down".to_owned());
+    left.push(format!(
+        "{} move · {} edits · {} next · {} fills down",
+        EditorKey::Move.name(),
+        EditorKey::Confirm.name(),
+        EditorKey::NextCell.name(),
+        EditorKey::FillDown.name()
+    ));
     editor.status.left = left;
     if let Some((id, descending)) = &view.sort
         && let Some(column) = shown.iter().find(|c| c.id == *id)

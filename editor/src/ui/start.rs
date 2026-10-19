@@ -6,6 +6,7 @@ use engine::core::content::version;
 use super::report::{self, ReportAction};
 use super::{theme, widgets};
 use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, content_version};
+use crate::keymap::EditorKey;
 use crate::project::journal::RecoveryJournal;
 use crate::project::{GAME_FILE, row_of};
 use crate::ui::dialogs;
@@ -15,11 +16,7 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     let ctx = root.ctx().clone();
     let ctx = &ctx;
     egui::CentralPanel::default()
-        .frame(
-            egui::Frame::new()
-                .fill(theme::BG)
-                .inner_margin(egui::Margin::symmetric(60, 40)),
-        )
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(60, 40)))
         .show(root, |ui| {
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
@@ -121,11 +118,19 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
             })
             .response;
         if response.hovered() {
-            ui.painter().rect_filled(
-                response.rect,
-                4.0,
-                egui::Color32::from_rgba_unmultiplied(255, 255, 255, 6),
-            );
+            ui.painter()
+                .rect_filled(response.rect, 0.0, design_tokens::ink::gold_wash(0.2));
+            ui.input_mut(|i| {
+                if EditorKey::Confirm.consume(i) {
+                    picks.open = Some(folder.clone());
+                }
+                if EditorKey::Duplicate.consume(i) {
+                    picks.copy = Some(folder.clone());
+                }
+                if EditorKey::Delete.consume(i) {
+                    picks.forget = Some(folder.clone());
+                }
+            });
         }
         if response.double_clicked() {
             picks.open = Some(folder.clone());
@@ -172,7 +177,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
         ui.label(
-            egui::RichText::new("⟲ Recover unsaved work?")
+            egui::RichText::new("Recover unsaved work?")
                 .strong()
                 .size(18.0),
         );
@@ -330,14 +335,17 @@ struct FolderPicks {
 
 fn folder_menu(ui: &mut Ui, folder: &Path, picks: &mut FolderPicks) {
     if ui
-        .add(egui::Button::new("Open").shortcut_text("Enter"))
+        .add(widgets::shortcut_button("Open", EditorKey::Confirm))
         .clicked()
     {
         picks.open = Some(folder.to_path_buf());
         ui.close();
     }
     if ui
-        .add(egui::Button::new("+ New game from this…").shortcut_text("Ctrl D"))
+        .add(widgets::shortcut_button(
+            "+ New game from this…",
+            EditorKey::Duplicate,
+        ))
         .clicked()
     {
         picks.copy = Some(folder.to_path_buf());
@@ -349,7 +357,10 @@ fn folder_menu(ui: &mut Ui, folder: &Path, picks: &mut FolderPicks) {
     }
     ui.separator();
     if ui
-        .add(egui::Button::new("Remove from list").shortcut_text("Del"))
+        .add(widgets::shortcut_button(
+            "Remove from list",
+            EditorKey::Delete,
+        ))
         .clicked()
     {
         picks.forget = Some(folder.to_path_buf());

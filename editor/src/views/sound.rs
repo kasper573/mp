@@ -14,6 +14,7 @@ use engine::core::tiling::Tiles;
 use engine::systems::area::{self, AreaId};
 
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::theme;
 
 pub const BABBLE_SAMPLE: &str = "The quick brown fox jumps over the lazy dog";
@@ -209,8 +210,11 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
         return;
     };
     ui.label(theme::muted(format!(
-        "Listening at {:.1}, {:.1} in {} · what a player there hears at the default settings · Alt-click moves the listener",
-        listening.at.0, listening.at.1, listening.area
+        "Listening at {:.1}, {:.1} in {} · what a player there hears at the default settings · {} click moves the listener",
+        listening.at.0,
+        listening.at.1,
+        listening.area,
+        EditorKey::Listen.name()
     )));
     ui.add_space(6.0);
     if listening.heard.is_empty() {

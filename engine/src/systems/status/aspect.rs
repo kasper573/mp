@@ -15,7 +15,7 @@ use crate::systems::script::{
     EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, RiftInstances, RiftScripts,
 };
 use crate::systems::skill::{self, Learned, Rank, SkillId, SkillKind};
-use crate::systems::vfx;
+use crate::systems::vfx::{self, VfxShaderFixture};
 
 /// How often a status's `during` sound repeats when no `during` vfx sets the pace.
 const DURING_SOUND_PERIOD: Seconds = Seconds(2.0);
@@ -228,6 +228,8 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
         if let Some(heard) = def.sfx.on_activate {
             sound(world, actor, heard);
         }
+        let shown = def.name.clone();
+        notification::pop_as(world, actor, shown, VfxShaderFixture::StatusPop);
         play_during(world, actor, source, now);
     }
     world.resource_mut::<RiftInstances>().raise(

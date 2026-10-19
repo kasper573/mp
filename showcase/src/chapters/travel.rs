@@ -45,11 +45,9 @@ fn play(shoot: &mut Shoot) {
     let road = driver::portal(&seen, "forest-road").clone();
     me.walk_to(road.at);
     me.on_stage("halt");
-    me.caption_top(
-        "The forest road is locked without a pass: stand on it, and its warden stops you",
-    );
+    me.caption("The forest road is locked without a pass: stand on it, and its warden stops you");
     me.read_to_choices();
-    me.caption_top("Twenty Gold buys a pass");
+    me.caption("Twenty Gold buys a pass");
     me.hover_choice("Here, for your trouble.");
     me.hold();
     me.pick("Here, for your trouble.");
@@ -70,7 +68,7 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.hide_mixer();
 
-    me.caption_top("Settings choose how a crossing looks");
+    me.caption("Settings choose how a crossing looks");
     let home = seen.area.expect("the island");
     // Each is picked in town on the island: forest monsters don't wait while settings are open.
     cross_into(&mut me, home);

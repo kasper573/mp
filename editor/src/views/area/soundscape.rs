@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::audio;
 use serde_json::Value;
@@ -70,8 +71,7 @@ pub(super) fn soundscape_extras(
                     changed = true;
                 }
             });
-            if ui
-                .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(Sense::click()))
+            if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                 .on_hover_text("Remove the channel")
                 .clicked()
             {

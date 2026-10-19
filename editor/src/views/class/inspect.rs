@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
 use engine::core::content::Content;
 use engine::systems::class::{NodeKey, SkillTree};
@@ -117,8 +118,7 @@ fn requirements(
                 widgets::badge(ui, &kind);
                 ui.label(theme::strong(schema::title(&kind)));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(Sense::click()))
+                    if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                         .on_hover_text("Remove this requirement")
                         .clicked()
                     {

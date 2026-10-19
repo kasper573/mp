@@ -41,6 +41,13 @@ pub struct TerminalInput<K> {
 pub struct TerminalLine<K> {
     pub terminal: K,
     pub text: String,
+    pub tone: LineTone,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineTone {
+    Said,
+    Failed,
 }
 
 #[derive(Debug)]
@@ -87,7 +94,7 @@ pub fn register<K: TerminalKey>(
 }
 
 pub fn broadcast<K: TerminalKey>(world: &mut World, terminal: K, text: impl Into<String>) {
-    send(world, None, terminal, &text.into());
+    send(world, None, terminal, &text.into(), LineTone::Said);
 }
 
 pub fn reply<K: TerminalKey>(
@@ -96,7 +103,16 @@ pub fn reply<K: TerminalKey>(
     terminal: K,
     text: impl Into<String>,
 ) {
-    send(world, Some(conn), terminal, &text.into());
+    send(world, Some(conn), terminal, &text.into(), LineTone::Said);
+}
+
+pub fn reply_failure<K: TerminalKey>(
+    world: &mut World,
+    conn: Entity,
+    terminal: K,
+    text: impl Into<String>,
+) {
+    send(world, Some(conn), terminal, &text.into(), LineTone::Failed);
 }
 
 pub fn ingest<K: TerminalKey>(world: &mut World) {
@@ -181,7 +197,13 @@ fn open<K: TerminalKey>(world: &World, terminal: K, conn: Entity) -> bool {
         .is_some_and(|(_, terminal)| terminal.access.is_none_or(|access| access(world, conn)))
 }
 
-fn send<K: TerminalKey>(world: &mut World, only: Option<Entity>, terminal: K, text: &str) {
+fn send<K: TerminalKey>(
+    world: &mut World,
+    only: Option<Entity>,
+    terminal: K,
+    text: &str,
+    tone: LineTone,
+) {
     let mut conns = world.query_filtered::<Entity, With<ConnectedClient>>();
     let shared: &World = world;
     let recipients: Vec<Entity> = conns
@@ -195,6 +217,7 @@ fn send<K: TerminalKey>(world: &mut World, only: Option<Entity>, terminal: K, te
                 message: TerminalLine {
                     terminal,
                     text: line.to_owned(),
+                    tone,
                 },
             });
         }

@@ -20,13 +20,6 @@ pub struct Film {
     insets: Vec<Inset>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Edge {
-    Bottom,
-    // Clear of whatever the game draws along the bottom edge.
-    Top,
-}
-
 impl Film {
     pub fn roll(title: &str, summary: &str) -> Film {
         let rolled = SystemTime::now();
@@ -49,11 +42,10 @@ impl Film {
         self.read_until
     }
 
-    pub fn caption(&mut self, text: &str, edge: Edge) {
+    pub fn caption(&mut self, text: &str) {
         let now = SystemTime::now();
         self.captions.push(Caption {
             text: text.to_owned(),
-            edge,
             from: now,
         });
         self.read_until = now + reading(text);
@@ -116,6 +108,7 @@ impl Film {
                     footage: inset.footage,
                 })
                 .collect(),
+            below: STRIP,
         };
         footage.render(out, Some(&overlay));
         for inset in &overlay.insets {
@@ -133,24 +126,29 @@ impl Film {
     fn subtitles(&self) -> String {
         let at = |time: SystemTime| ass_time(seconds(time, self.rolled));
         let card_until = at(self.card_until);
-        let mut script = String::from(SCRIPT_HEAD);
+        let mut script = script_head();
         let mut event = |layer: u32, from: &str, until: &str, style: &str, text: &str| {
             script += &format!("Dialogue: {layer},{from},{until},{style},,0,0,0,,{text}\n");
         };
         let start = ass_time(Seconds(0.0));
-        event(0, &start, &card_until, "Veil", VEIL);
+        let (width, height) = (PICTURE.0, PICTURE.1 + STRIP);
+        let veil = format!("{{\\p1}}m 0 0 l {width} 0 {width} {height} 0 {height}{{\\p0}}");
+        event(0, &start, &card_until, "Veil", &veil);
         let title = format!("{{\\pos(640,330)}}{}", escape(&self.title));
         let summary = format!("{{\\pos(640,400)}}{}", escape(&self.summary));
         event(1, &start, &card_until, "Title", &title);
         event(1, &start, &card_until, "Summary", &summary);
         for (index, caption) in self.captions.iter().enumerate() {
-            let until = self
-                .captions
-                .get(index + 1)
-                .map_or(END.to_owned(), |next| at(next.from));
-            let style = match caption.edge {
-                Edge::Bottom => "Caption",
-                Edge::Top => "CaptionTop",
+            let next = self.captions.get(index + 1).map(|next| next.from);
+            let until = next.map_or(END.to_owned(), at);
+            let beside_panel = self.panels.iter().any(|panel| {
+                next.is_none_or(|next| panel.from < next)
+                    && panel.until.is_none_or(|until| until > caption.from)
+            });
+            let style = if beside_panel {
+                "CaptionBeside"
+            } else {
+                "Caption"
             };
             event(0, &at(caption.from), &until, style, &escape(&caption.text));
         }
@@ -173,7 +171,6 @@ impl Film {
 
 struct Caption {
     text: String,
-    edge: Edge,
     from: SystemTime,
 }
 
@@ -196,29 +193,41 @@ const INSET_SIZE: (u32, u32) = (416, 234);
 const END: &str = "9:59:59.00";
 const METER_CELLS: usize = 12;
 const METER_RANGE_DB: f32 = 48.0;
-const VEIL: &str = "{\\p1}m 0 0 l 1280 0 1280 720 0 720{\\p0}";
+// Captions and panels sit in a strip under the game's picture, so none covers what it tells about.
+const STRIP: u32 = 150;
+const STRIP_PADDING: u32 = 16;
+// What a caption leaves to the right for a panel beside it.
+const PANEL_ROOM: u32 = 460;
+const PICTURE: (u32, u32) = (1280, 720);
 
 // ASS colors are &HAABBGGRR, with 00 opaque.
-const SCRIPT_HEAD: &str = "[Script Info]
+fn script_head() -> String {
+    let (width, height) = (PICTURE.0, PICTURE.1 + STRIP);
+    let strip_top = PICTURE.1 + STRIP_PADDING;
+    let beside = PANEL_ROOM;
+    format!(
+        "[Script Info]
 ScriptType: v4.00+
-PlayResX: 1280
-PlayResY: 720
+PlayResX: {width}
+PlayResY: {height}
 WrapStyle: 0
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H48000000,&H48000000,0,0,0,0,100,100,0,0,3,10,0,2,190,190,48,1
-Style: CaptionTop,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H48000000,&H48000000,0,0,0,0,100,100,0,0,3,10,0,8,190,190,48,1
+Style: Caption,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,8,40,40,{strip_top},1
+Style: CaptionBeside,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,8,40,{beside},{strip_top},1
 Style: Veil,DejaVu Sans,20,&H66100A08,&H66100A08,&H66100A08,&H66100A08,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 Style: Title,DejaVu Sans,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
 Style: Summary,DejaVu Sans,26,&H00E1D5CB,&H00E1D5CB,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
-Style: Panel,DejaVu Sans Mono,15,&H00FFFFFF,&H00FFFFFF,&H48000000,&H48000000,0,0,0,0,100,100,0,0,3,10,0,9,0,72,40,1
+Style: Panel,DejaVu Sans Mono,15,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,9,0,40,{strip_top},1
 Style: Label,DejaVu Sans,16,&H00FFFFFF,&H00FFFFFF,&H48000000,&H48000000,-1,0,0,0,100,100,0,0,3,5,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-";
+"
+    )
+}
 
 fn mixer_panel(voices: &[ProbeVoice]) -> String {
     let mut voices: Vec<&ProbeVoice> = voices.iter().collect();

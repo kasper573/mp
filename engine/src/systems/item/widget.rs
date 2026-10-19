@@ -1,14 +1,11 @@
 use bevy::prelude::*;
-use design_tokens::{HAIRLINE, WIDGET_RADIUS, color};
-use egui::{
-    Align, Color32, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
-    Vec2,
-};
+use design_tokens::{TextRole, controls, ink, sheet};
+use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::gui;
-use crate::core::text::{StyledLine, TextPiece};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
@@ -18,9 +15,9 @@ use crate::systems::item::{
 };
 use crate::systems::player::session;
 
-pub(crate) const SLOT: f32 = 36.0;
-const SLOT_ICON: f32 = 32.0;
-const SLOT_GAP: f32 = 2.0;
+pub(crate) const SLOT: f32 = controls::SLOT;
+const SLOT_GAP: f32 = 4.0;
+const GHOST: f32 = 0.35;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SlotVerdict {
@@ -75,74 +72,81 @@ impl HudWindow for InventoryWindow {
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let cells = inventory_cells(world);
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::splat(SLOT_GAP);
-                ui.horizontal_wrapped(|ui| {
-                    for cell in &cells {
-                        bag_slot(ui, world, cell);
-                    }
-                });
+        sheet::scroll(ui, egui::ScrollArea::vertical().auto_shrink(false), |ui| {
+            ui.spacing_mut().item_spacing = Vec2::splat(SLOT_GAP);
+            ui.horizontal_wrapped(|ui| {
+                for cell in &cells {
+                    bag_slot(ui, world, cell);
+                }
             });
+            ui.add_space(6.0);
+            let hint = StyledLine::new(hint_pieces(&[
+                (InputAction::InspectItem, " for more information".to_owned()),
+                (InputAction::UseItem, " to use or wear".to_owned()),
+                (InputAction::CarryItem, " to carry".to_owned()),
+            ]));
+            let look = TextLook::new(TextRole::Small.size(), ink::INK3);
+            text::show(ui, world, &hint, look, None);
+        });
     }
 }
 
 pub(crate) struct SlotLook<'a> {
     pub icon: Option<&'a AssetRef>,
     pub count: u32,
-    pub outline: Option<Color32>,
+    pub wanted: bool,
     pub faded: bool,
+    pub quest: bool,
 }
 
 impl SlotLook<'_> {
     pub(crate) const EMPTY: SlotLook<'static> = SlotLook {
         icon: None,
         count: 0,
-        outline: None,
+        wanted: false,
         faded: false,
+        quest: false,
     };
 }
 
 pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
-    let stroke = match look.outline {
-        Some(outline) => Stroke::new(1.5, outline),
-        None if response.hovered() && sense != Sense::hover() => {
-            Stroke::new(1.0, color::HOVER_LINE)
-        }
-        None => HAIRLINE,
-    };
-    ui.painter().rect(
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+    let hovered = response.hovered() && sense != Sense::hover();
+    controls::slot_frame(
+        ui.painter(),
         rect,
-        WIDGET_RADIUS,
-        color::INPUT,
-        stroke,
-        StrokeKind::Inside,
+        controls::SlotLook {
+            filled: look.icon.is_some(),
+            hovered,
+            refused: false,
+        },
     );
+    if look.wanted {
+        ui.painter()
+            .rect_stroke(rect, 3.0, Stroke::new(1.5, ink::OCHRE), StrokeKind::Inside);
+    }
     if let Some(image) = look.icon.and_then(|icon| gui::image(world, icon)) {
         let tint = if look.faded {
-            Color32::from_white_alpha(77)
+            Color32::from_white_alpha((GHOST * 255.0) as u8)
         } else {
             Color32::WHITE
         };
         ui.place(
-            Rect::from_center_size(rect.center(), Vec2::splat(SLOT_ICON)),
-            image.widget(Vec2::splat(SLOT_ICON)).tint(tint),
+            Rect::from_center_size(rect.center(), Vec2::splat(controls::SLOT_ICON)),
+            image.widget(Vec2::splat(controls::SLOT_ICON)).tint(tint),
         );
     }
     if look.count > 1 {
-        let corner = Rect::from_min_max(rect.center(), rect.max - Vec2::new(3.0, 0.0));
-        ui.new_child(
-            UiBuilder::new()
-                .max_rect(corner)
-                .layout(Layout::bottom_up(Align::Max)),
-        )
-        .label(
-            RichText::new(look.count.to_string())
-                .size(11.0)
-                .color(color::TEXT),
-        );
+        controls::slot_count(ui.painter(), rect, look.count);
+    }
+    if look.quest {
+        controls::slot_lozenge(ui.painter(), rect);
+    }
+    if response.has_focus() {
+        controls::focus_ring(ui.painter(), rect, 3.0);
     }
     response
 }
@@ -181,16 +185,18 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
     };
     let content = world.resource::<Content>().clone();
     let def = filled.stack.item.get(&content);
-    let (outline, faded, verdict) = match &filled.verdict {
-        None => (None, false, None),
-        Some(SlotVerdict::Wanted(note)) => (Some(color::WARN), false, Some(note.clone())),
-        Some(SlotVerdict::Refused(reason)) => (None, true, Some(reason.clone())),
+    let (wanted, refused, verdict) = match &filled.verdict {
+        None => (false, false, None),
+        Some(SlotVerdict::Wanted(note)) => (true, false, Some(note.clone())),
+        Some(SlotVerdict::Refused(reason)) => (false, true, Some(reason.clone())),
     };
+    let carried = hud::carried(ui.ctx()) == Some(Carried::BagSlot(cell.slot));
     let look = SlotLook {
         icon: Some(&def.icon),
         count: filled.stack.count,
-        outline,
-        faded,
+        wanted,
+        faded: refused || carried,
+        quest: def.has(ItemFlag::Quest),
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
     let candidates: Vec<InputAction> = world
@@ -204,7 +210,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         .filter(|action| map::clicked(world, *action, &response))
         .collect();
     if !matched.is_empty() {
-        act(world, cell.slot, filled.stack.item, &matched);
+        act(world, cell.slot, filled.stack.item, &matched, response.rect);
     }
     if map::drag_started(world, InputAction::CarryItem, &response) {
         hud::carry(ui.ctx(), Carried::BagSlot(cell.slot));
@@ -257,7 +263,7 @@ fn bound_note(def: &ItemDef) -> Option<String> {
         .then(|| "bound · can't be sold or dropped".to_owned())
 }
 
-fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction]) {
+fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction], at: Rect) {
     let takeover = active_slot_actions(world)
         .into_iter()
         .find(|takeover| matched.contains(&takeover.action));
@@ -272,7 +278,7 @@ fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction]) {
         Some(InputAction::UseItem) => {
             world.write_message(UseItemRequest { slot });
         }
-        Some(InputAction::InspectItem) => card::open(world, item),
+        Some(InputAction::InspectItem) => card::open(world, item, Some(at)),
         _ => {}
     }
 }

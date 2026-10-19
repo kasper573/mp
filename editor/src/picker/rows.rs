@@ -167,7 +167,7 @@ impl PickSource for RowSource {
     }
 
     fn creates(&self, cx: &FormCx) -> Option<(String, FormAction)> {
-        if self.several() || cx.shapes.has_fixtures(&self.tables[0]) {
+        if self.several() || cx.shapes.is_closed(&self.tables[0]) {
             return None;
         }
         let table = &self.tables[0];

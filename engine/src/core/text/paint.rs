@@ -2,7 +2,8 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bevy::prelude::World;
-use design_tokens::family;
+use design_tokens::ink::Ground;
+use design_tokens::{Face, TextRole};
 use egui::emath::TSTransform;
 use egui::epaint::TextShape;
 use egui::text::{LayoutJob, TextFormat};
@@ -11,7 +12,7 @@ use egui::{
     WidgetInfo, WidgetType,
 };
 
-use super::{KeyNames, MotionPreference, StyledLine, TextMotion, TextPiece, TextVoice};
+use super::{KeyNames, SpanInk, StyledLine, TextMotion, TextPiece, TextVoice};
 
 const WHISPER_SCALE: f32 = 0.9;
 const WHISPER_ALPHA: f32 = 0.7;
@@ -23,6 +24,64 @@ const CAP_PAD_EM: f32 = 0.3;
 pub struct TextLook {
     pub size: f32,
     pub color: Color32,
+    pub hand: Hand,
+    pub line_height: Option<f32>,
+    pub ground: Ground,
+    /// A soft ring of this color around every letter, for text set straight over the world.
+    pub halo: Option<Color32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hand {
+    Book,
+    /// The book face set heavy, for a line that stands over the world rather than on a page.
+    Bold,
+    Quill,
+}
+
+impl TextLook {
+    pub const fn new(size: f32, color: Color32) -> TextLook {
+        TextLook {
+            size,
+            color,
+            hand: Hand::Book,
+            line_height: None,
+            ground: Ground::Paper,
+            halo: None,
+        }
+    }
+
+    pub fn role(role: TextRole, color: Color32) -> TextLook {
+        TextLook {
+            line_height: role.line_height(),
+            ..TextLook::new(role.size(), color)
+        }
+    }
+
+    pub const fn on(self, ground: Ground) -> TextLook {
+        TextLook { ground, ..self }
+    }
+
+    pub const fn haloed(self, halo: Color32) -> TextLook {
+        TextLook {
+            halo: Some(halo),
+            ..self
+        }
+    }
+
+    pub const fn bold(self) -> TextLook {
+        TextLook {
+            hand: Hand::Bold,
+            ..self
+        }
+    }
+
+    pub const fn quill(self) -> TextLook {
+        TextLook {
+            hand: Hand::Quill,
+            ..self
+        }
+    }
 }
 
 /// The line is laid out whole, so revealing letters never reflows it.
@@ -34,7 +93,6 @@ pub fn show(
     shown: Option<usize>,
 ) -> Response {
     let keys = world.resource::<KeyNames>();
-    let still = world.resource::<MotionPreference>().reduced;
     let plan = Plan::new(line, keys, look);
     let galley = ui.painter().layout_job(plan.job(ui.available_width()));
     let pad = plan.pad;
@@ -47,11 +105,7 @@ pub fn show(
     let origin = rect.min - galley.rect.min.to_vec2();
     let placed = place(&galley, &plan, origin);
     let shown = shown.unwrap_or(plan.units);
-    let time = if still {
-        0.0
-    } else {
-        ui.input(|input| input.time) as f32
-    };
+    let time = ui.input(|input| input.time) as f32;
     for cap in plan.caps.iter().filter(|cap| cap.letter < shown) {
         paint_cap(ui, &placed, cap, pad);
     }
@@ -69,8 +123,7 @@ pub fn show(
         let Some(at) = placed[word.letters.start] else {
             continue;
         };
-        let motion = word.motion.filter(|_| !still);
-        paint_word(ui, &plan, visible, at, motion, index as f32, time);
+        paint_word(ui, &plan, visible, at, word.motion, index as f32, time);
     }
     response
 }
@@ -86,6 +139,9 @@ pub fn measure(
     let galley = gui.fonts_mut(|fonts| fonts.layout_job(plan.job(wrap)));
     plan.footprint(&galley)
 }
+
+const HALO_STEPS: usize = 8;
+const HALO_REACH: f32 = 1.5;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextShadow {
@@ -128,6 +184,7 @@ struct Plan {
     caps: Vec<Cap>,
     units: usize,
     pad: f32,
+    halo: Option<Color32>,
 }
 
 struct Letter {
@@ -165,6 +222,7 @@ impl Plan {
             caps: Vec::new(),
             units: 0,
             pad,
+            halo: look.halo,
         };
         let mut letter = 0;
         let mut owed = 0.0;
@@ -172,13 +230,13 @@ impl Plan {
         for piece in &line.pieces {
             match piece {
                 TextPiece::Pause(_) => {}
-                TextPiece::Key(input) => {
-                    let format = TextFormat::simple(
-                        FontId::new(look.size * CAP_SCALE, family::medium()),
-                        look.color,
-                    );
+                TextPiece::Key(cap) => {
+                    let format = TextFormat {
+                        line_height: look.line_height,
+                        ..TextFormat::simple(Face::Mono.id(look.size * CAP_SCALE), look.color)
+                    };
                     let start = plan.letters.len();
-                    for (at, ch) in keys.name(*input).chars().enumerate() {
+                    for (at, ch) in cap.name(keys).chars().enumerate() {
                         let leading = if at == 0 { owed + pad } else { 0.0 };
                         plan.letters.push(Letter {
                             ch,
@@ -202,7 +260,7 @@ impl Plan {
                     letter += 1;
                 }
                 TextPiece::Span(span) => {
-                    let format = span_format(span.voice, span.ink.unwrap_or(look.color), look);
+                    let format = span_format(span.voice, ink_of(span.ink, look), look);
                     for ch in span.text.chars() {
                         let leading = std::mem::take(&mut owed);
                         plan.letters.push(Letter {
@@ -257,16 +315,22 @@ impl Plan {
 }
 
 fn span_format(voice: TextVoice, color: Color32, look: TextLook) -> TextFormat {
-    match voice {
-        TextVoice::Normal => TextFormat::simple(FontId::new(look.size, family::prose()), color),
+    let (normal, whisper, shout) = match look.hand {
+        Hand::Book => (Face::Book, Face::BookItalic, Face::BookBold),
+        Hand::Bold => (Face::BookBold, Face::BookItalic, Face::BookBold),
+        Hand::Quill => (Face::Quill, Face::Quill, Face::Quill),
+    };
+    let format = match voice {
+        TextVoice::Normal => TextFormat::simple(normal.id(look.size), color),
         TextVoice::Whisper => TextFormat::simple(
-            FontId::new(look.size * WHISPER_SCALE, family::prose_italic()),
+            whisper.id(look.size * WHISPER_SCALE),
             color.gamma_multiply(WHISPER_ALPHA),
         ),
-        TextVoice::Shout => TextFormat::simple(
-            FontId::new(look.size * SHOUT_SCALE, family::prose_bold()),
-            color,
-        ),
+        TextVoice::Shout => TextFormat::simple(shout.id(look.size * SHOUT_SCALE), color),
+    };
+    TextFormat {
+        line_height: look.line_height,
+        ..format
     }
 }
 
@@ -356,5 +420,22 @@ fn paint_word(
             shape.transform(TSTransform::new(center * (1.0 - scale), scale));
         }
     }
+    if let Some(halo) = plan.halo {
+        for step in 0..HALO_STEPS {
+            let turn = step as f32 / HALO_STEPS as f32 * std::f32::consts::TAU;
+            let mut ring = shape.clone();
+            ring.pos += Vec2::angled(turn) * HALO_REACH;
+            ring.override_text_color = Some(halo);
+            ui.painter().add(Shape::Text(ring));
+        }
+    }
     ui.painter().add(Shape::Text(shape));
+}
+
+fn ink_of(ink: Option<SpanInk>, look: TextLook) -> Color32 {
+    match ink {
+        Some(SpanInk::Prose(prose)) => prose.on(look.ground),
+        Some(SpanInk::Fixed(color)) => color,
+        None => look.color,
+    }
 }

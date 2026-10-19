@@ -1,0 +1,53 @@
+use std::sync::Arc;
+
+use egui::{FontData, FontDefinitions, FontTweak};
+
+use crate::face::Face;
+
+/// The five families, every face its own and none falling back on another: a glyph a face lacks
+/// is not drawn as text at all.
+pub(crate) fn definitions() -> FontDefinitions {
+    let mut fonts = FontDefinitions::empty();
+    for face in Face::ALL {
+        let data = FontData::from_static(bytes(face)).tweak(tweak(face));
+        fonts
+            .font_data
+            .insert(face.key().to_owned(), Arc::new(data));
+        fonts
+            .families
+            .insert(face.family(), vec![face.key().to_owned()]);
+    }
+    fonts
+}
+
+pub(crate) fn bytes(face: Face) -> &'static [u8] {
+    match face {
+        Face::Book => include_bytes!("../fonts/Alegreya-Regular.ttf"),
+        Face::BookMedium => include_bytes!("../fonts/Alegreya-Medium.ttf"),
+        Face::BookBold => include_bytes!("../fonts/Alegreya-Bold.ttf"),
+        Face::BookItalic => include_bytes!("../fonts/Alegreya-Italic.ttf"),
+        Face::SmallCaps => include_bytes!("../fonts/AlegreyaSC-Medium.ttf"),
+        Face::SmallCapsBold => include_bytes!("../fonts/AlegreyaSC-Bold.ttf"),
+        Face::Quill => include_bytes!("../fonts/IMFellEnglish-Italic.ttf"),
+        Face::Numerals => include_bytes!("../fonts/Cinzel-Regular.ttf"),
+        Face::Mono => include_bytes!("../fonts/JetBrainsMono-Regular.ttf"),
+        Face::MonoBold => include_bytes!("../fonts/JetBrainsMono-Bold.ttf"),
+    }
+}
+
+// Alegreya's ascender reaches well above its capitals, so its text rides high in a row centred on
+// the font's metrics; nudging it down puts the x-height on the row's middle, where the marks drawn
+// beside it sit.
+fn tweak(face: Face) -> FontTweak {
+    match face {
+        Face::Book | Face::BookMedium | Face::BookBold | Face::BookItalic => FontTweak {
+            y_offset_factor: 0.06,
+            ..FontTweak::default()
+        },
+        Face::SmallCaps | Face::SmallCapsBold => FontTweak {
+            y_offset_factor: 0.08,
+            ..FontTweak::default()
+        },
+        _ => FontTweak::default(),
+    }
+}

@@ -11,32 +11,27 @@ use super::inspect::hidden_fields;
 use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema};
 
-pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
+/// The blueprint itself: its parts to pick from, where it is placed, its variables and modules.
+pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
     let Some(mut row) = editor.row_value("blueprint", key) else {
         return;
     };
     let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
-    let crumb = match selected {
-        [one] => format!(
-            "blueprint/{key} › {}",
-            parts
-                .get(*one)
-                .map(super::shapes::label)
-                .unwrap_or_default()
-        ),
-        [] => format!("blueprint/{key}"),
-        many => format!("blueprint/{key} › {} parts", many.len()),
-    };
-    ui.label(theme::muted(crumb).monospace().size(13.0));
+    ui.label(
+        theme::muted(format!("blueprint/{key}"))
+            .monospace()
+            .size(13.0),
+    );
     ui.add_space(4.0);
     widgets::section_count(ui, "Parts", parts.len());
     let mut pick: Option<Vec<usize>> = None;
-    let shift = ui.input(|i| i.modifiers.shift);
+    let extend = ui.input(|i| EditorKey::ExtendSelection.held(i));
     for (index, part) in parts.iter().enumerate() {
         let kind = part.kind_or("part");
         let at = super::shapes::bounds(part, None)
@@ -46,15 +41,11 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
         let full = ui.available_rect_before_wrap();
         let (rect, response) =
             ui.allocate_exact_size(Vec2::new(full.width(), 22.0), Sense::click());
-        if on {
-            ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
-        } else if response.hovered() {
-            ui.painter().rect_filled(
-                rect,
-                3.0,
-                egui::Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-            );
-        }
+        ui.painter().add(design_tokens::controls::row_marks(
+            rect,
+            response.hovered(),
+            on,
+        ));
         let mut child = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(rect.shrink2(Vec2::new(6.0, 0.0)))
@@ -70,7 +61,11 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
             ui.label(theme::muted(at).monospace().size(12.0));
         });
         if response.clicked() {
-            let mut next: Vec<usize> = if shift { selected.to_vec() } else { Vec::new() };
+            let mut next: Vec<usize> = if extend {
+                selected.to_vec()
+            } else {
+                Vec::new()
+            };
             if let Some(at) = next.iter().position(|i| *i == index) {
                 next.remove(at);
             } else {
@@ -116,13 +111,30 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
         }
         return;
     }
-    if !selected.is_empty() {
-        ui.add_space(6.0);
-        part_cards(editor, ui, key, &mut row, selected);
-    }
     placed_list(editor, ui, key);
     variables_section(editor, ui, key, &row);
     blueprint_modules(editor, ui, key, &mut row);
+}
+
+/// The blueprint window's inspector: the cards of the selected parts.
+pub fn selected_parts(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
+    let Some(mut row) = editor.row_value("blueprint", key) else {
+        return;
+    };
+    let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
+    let crumb = match selected {
+        [one] => format!(
+            "blueprint/{key} › {}",
+            parts
+                .get(*one)
+                .map(super::shapes::label)
+                .unwrap_or_default()
+        ),
+        many => format!("blueprint/{key} › {} parts", many.len()),
+    };
+    ui.label(theme::muted(crumb).monospace().size(13.0));
+    ui.add_space(4.0);
+    part_cards(editor, ui, key, &mut row, selected);
 }
 
 pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
@@ -232,7 +244,7 @@ pub(super) fn part_cards(
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Remove").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Remove", EditorKey::Delete))
                         .clicked()
                     {
                         remove = Some(index);

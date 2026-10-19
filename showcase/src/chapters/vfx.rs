@@ -1,10 +1,13 @@
 use driver::{
-    BUDGET, LONG, Player, aiming, beside_other_player, east_of, npc_is, other_player_within,
-    pack_ground, played, played_on, playing, status_on_me,
+    BUDGET, LONG, Player, aiming, beside_other_player, ground_near, id, npc_is,
+    other_player_within, pack_ground, played, played_on, playing, status_on_me,
 };
+use engine::core::math::Pos;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::core::vfx::VfxSite;
 use engine::systems::input::map::InputAction;
-use engine::systems::probe::ProbeBody;
+use engine::systems::probe::{ProbeBody, ProbeSnapshot};
+use engine::systems::script::Place;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -16,37 +19,46 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const AREA: &str = "glimmercap";
-const PREY: &str = "myconid";
+const AREA: &str = "gloomhollow";
+const PREY: &str = "ghoul";
 
 fn play(shoot: &mut Shoot) {
     let ring = pack_ground(AREA, PREY);
-    let player = shoot.join_as("arcanist", Some(east_of(AREA, ring, 5.0)));
-    let mut friend = shoot.join_as("armsman", Some(east_of(AREA, ring, 6.0)));
+    // Beside the pack rather than above or below it, so the pack stays in the wider half of the view.
+    let ground: Vec<_> = ground_near(AREA, ring, Tiles(4.0)..=Tiles(6.5))
+        .into_iter()
+        .filter(|tile| (tile.y - ring.y).abs() <= 1.5)
+        .collect();
+    let mine = *ground.first().expect("ground beside the pack");
+    let theirs = *ground
+        .iter()
+        .find(|tile| tile.distance(mine) >= Tiles(1.0))
+        .expect("room for two beside the pack");
+    let player = shoot.join_as("arcanist", Some(place(mine)));
+    let mut friend = shoot.join_as("armsman", Some(place(theirs)));
     friend.in_world();
     let mut me = shoot.roll(player);
     friend.walk_toward(beside_other_player);
-    me.caption_top(
-        "Every effect is a vfx row: layers of sprite sheets, floating text and shaders, played on a site",
-    );
-    me.caption_top(
+    me.caption("Every effect is a vfx row: layers of sprite sheets and shaders, played on a site");
+    me.caption(
         "A path site threads the targets: Chain Lightning arcs from you through each one it hit, nearest first",
     );
-    me.cast_at(InputAction::Hotbar3, ring, |snapshot| {
+    let pack = me.wait_for("the pack closing in", closing_pack);
+    me.cast_at(InputAction::Hotbar3, pack, |snapshot| {
         played(snapshot, "chain_lightning")
             .iter()
             .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
     });
     me.hold();
-    me.caption_top(
-        "A shader on an area reads its geometry: Fireball's flames fill the circle exactly, whatever its radius.",
+    me.caption(
+        "A shader on an area reads its geometry: Fireball's flames fill the circle exactly, and whoever stands in it burns bright inside the fire",
     );
     let here = me.snapshot().me.expect("the player").at;
     me.cast_at(InputAction::Hotbar1, here, |snapshot| {
         !played(snapshot, "fireball_blast").is_empty()
     });
     me.hold();
-    me.caption_top(
+    me.caption(
         "The Burning it leaves is a status with effects of its own: embers rise from whoever it holds",
     );
     me.wait_until("embers on the pack", |snapshot| {
@@ -55,11 +67,11 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
-    me.caption_top(
+    me.caption(
         "A site can be an actor: Ward is a shader working on the character's own sprite, an outline and a sheen",
     );
     me.hold();
-    me.caption_top(
+    me.caption(
         "A rectangle: Sanctuary's light stands in its square, and the blessing it leaves carries motes of its own",
     );
     friend.walk_toward(beside_other_player);
@@ -70,7 +82,7 @@ fn play(shoot: &mut Shoot) {
         played_on(snapshot, "holy_motes", ally.id)
     });
     me.hold();
-    me.caption_top(
+    me.caption(
         "Generic shaders take parameters. One swoosh is Cleave's white arc wiping across its cone…",
     );
     friend.act(InputAction::Hotbar1);
@@ -81,7 +93,7 @@ fn play(shoot: &mut Shoot) {
         !played(snapshot, "cleave_swoosh").is_empty()
     });
     me.hold();
-    me.caption_top(
+    me.caption(
         "…and, in red, thinner and at an angle, Sunder's slash across its target's own sprite",
     );
     sunder_nearest(&mut friend);
@@ -89,7 +101,7 @@ fn play(shoot: &mut Shoot) {
         !played(snapshot, "sunder_slash").is_empty()
     });
     me.hold();
-    me.caption_top(
+    me.caption(
         "A status ending is an effect too: the moment the ward's time runs out, it shatters",
     );
     me.wait_within("the ward broken", LONG, |snapshot| {
@@ -106,6 +118,26 @@ fn play(shoot: &mut Shoot) {
         });
     }
     me.hold();
+}
+
+// Where the pack is converging on the player, once two or more have come close, so the chain's
+// circle still holds them when they arrive.
+fn closing_pack(snapshot: &ProbeSnapshot) -> Option<Pos<Tiles>> {
+    let me = snapshot.me.as_ref()?.at;
+    let close: Vec<_> = snapshot
+        .actors
+        .iter()
+        .filter(|actor| npc_is(actor, PREY) && actor.health > 0.0)
+        .filter(|actor| actor.at.distance_to(me) <= 4.0)
+        .map(|actor| actor.at)
+        .collect();
+    let count = close.len() as f32;
+    (count >= 2.0).then(|| {
+        let sum = close
+            .iter()
+            .fold(Pos::zero(), |sum, at| sum + at.to_vector());
+        Pos::new(sum.x / count, sum.y / count)
+    })
 }
 
 // The friend arms Sunder and lands it on the nearest monster standing clear of the crowd on him,
@@ -132,4 +164,8 @@ fn sunder_nearest(friend: &mut Player) {
         },
         |snapshot| !played(snapshot, "sunder_slash").is_empty(),
     );
+}
+
+fn place(at: Pos<Tiles>) -> Place {
+    Place { area: id(AREA), at }
 }

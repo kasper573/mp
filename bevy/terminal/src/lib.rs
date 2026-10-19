@@ -8,8 +8,8 @@ pub use command::{
     require_arg,
 };
 pub use terminal::{
-    AvailableTerminals, Terminal, TerminalAccess, TerminalEntry, TerminalInbox, TerminalInput,
-    TerminalKey, TerminalLine, broadcast, ingest, register, reply,
+    AvailableTerminals, LineTone, Terminal, TerminalAccess, TerminalEntry, TerminalInbox,
+    TerminalInput, TerminalKey, TerminalLine, broadcast, ingest, register, reply, reply_failure,
 };
 
 pub use bevy_terminal_macros::command;

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use design_tokens::paint;
-use egui::{Color32, CursorIcon, Key, Modifiers, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use design_tokens::{glyph, ink};
+use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use engine::core::content::Content;
 use engine::systems::class::{
     AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NodeKey, SkillNode, SkillTree,
@@ -13,6 +13,7 @@ use strum::VariantArray;
 
 use super::{TABLE, node_of, select_node, write};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
@@ -221,7 +222,7 @@ fn backdrop_bar(
                 picker::asset_of(ui, cx, &[AssetKind::Image], &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
-                design_tokens::widgets::combo_box(ui.id().with("backdrop-fit"))
+                widgets::combo_box(ui.id().with("backdrop-fit"))
                     .selected_text(<&str>::from(fit))
                     .show_ui(ui, |ui| {
                         for &option in BackdropFit::VARIANTS {
@@ -398,13 +399,13 @@ fn canvas(
                             let color = if on_cycle {
                                 theme::DANGER
                             } else {
-                                theme::MUTED
+                                ink::wash(ink::LIGHT, 0.7)
                             };
                             node_arrow(&painter, to_screen(at), head, color, false);
                         }
                         None => {
                             let ghost = head + GHOST_OFFSET + Vec2::new(0.0, index as f32 * 30.0);
-                            paint::dashed_circle(
+                            glyph::dashed_circle(
                                 &painter,
                                 ghost,
                                 NODE_RADIUS * 0.6,
@@ -452,19 +453,24 @@ fn canvas(
                 let skill = node.skill.get(content);
                 let icon = editor.thumb_icon(ui.ctx(), skill.icon.as_str());
                 draw_node(&painter, center, look, icon.as_ref());
-                painter.text(
+                glyph::haloed(
+                    &painter,
                     center + Vec2::new(0.0, NODE_RADIUS + 4.0),
                     egui::Align2::CENTER_TOP,
                     &skill.name,
                     egui::FontId::proportional(11.5),
                     if look.selected {
-                        theme::TEXT
+                        ink::LIGHT
                     } else {
-                        theme::MUTED
+                        ink::wash(ink::LIGHT, 0.8)
+                    },
+                    glyph::Halo {
+                        color: ink::INK,
+                        width: 1.0,
                     },
                 );
                 if look.lifted && snap {
-                    paint::dashed_circle(
+                    glyph::dashed_circle(
                         &painter,
                         to_screen(snapped(at)),
                         NODE_RADIUS,
@@ -563,7 +569,7 @@ fn canvas(
     }
     if hovering_canvas
         && let Some(node) = selected.clone()
-        && ui.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Delete))
+        && ui.input_mut(|input| EditorKey::Delete.consume(input))
     {
         removed = Some(node);
     }
@@ -679,11 +685,7 @@ fn draw_node(
     painter.circle_filled(center, NODE_RADIUS, fill);
     painter.circle_stroke(center, NODE_RADIUS, stroke);
     if look.hovered {
-        painter.circle_stroke(
-            center,
-            NODE_RADIUS + 2.0,
-            Stroke::new(1.0, design_tokens::color::HOVER_LINE),
-        );
+        painter.circle_stroke(center, NODE_RADIUS + 2.0, Stroke::new(1.0, ink::GOLD));
     }
     match icon {
         Some(icon) => {
@@ -713,7 +715,7 @@ fn node_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32, das
         return;
     }
     let dir = span.normalized();
-    paint::arrow(
+    glyph::arrow(
         painter,
         from + dir * (NODE_RADIUS + 4.0),
         to - dir * (NODE_RADIUS + 6.0),
@@ -782,7 +784,7 @@ fn frame_json(rect: Rect) -> Value {
 }
 
 fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {
-    let color = Color32::from_rgba_unmultiplied(255, 255, 255, 14);
+    let color = design_tokens::ink::ink_wash(0.25);
     let mut x = origin.x - ((origin.x - rect.min.x) / GRID).floor() * GRID;
     while x <= rect.max.x {
         let mut y = origin.y - ((origin.y - rect.min.y) / GRID).floor() * GRID;

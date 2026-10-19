@@ -1,3 +1,4 @@
+use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui, Vec2};
@@ -10,6 +11,7 @@ use serde_json::Value;
 use super::placement;
 use super::{AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, REFUSED};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
@@ -205,7 +207,7 @@ pub fn make_blueprint_dialog(
     dialogs::card(ctx, "make-blueprint", 560.0, |ui| {
         let pressed = dialogs::keys(ui);
         ui.horizontal(|ui| {
-            ui.label(RichText::new("▣").color(theme::WARN).size(16.0));
+            glyph::show(ui, Mark::Grid, 16.0, theme::WARN);
             ui.label(
                 RichText::new(format!(
                     "Make blueprint from {} placement{}",
@@ -216,7 +218,7 @@ pub fn make_blueprint_dialog(
                 .size(18.0),
             );
         });
-        widgets::key_hint(ui, "Ctrl Alt B");
+        widgets::key_chip(ui, EditorKey::MakeBlueprint);
         ui.add_space(8.0);
         widgets::kv(ui, "name", |ui| {
             let response = forms::boxed_input(ui, None, |ui| {
@@ -255,7 +257,7 @@ pub fn make_blueprint_dialog(
         ui.horizontal(|ui| {
             if widgets::primary(
                 ui,
-                &format!(
+                format!(
                     "Make blueprint · {placements} placement{}",
                     widgets::plural(placements)
                 ),

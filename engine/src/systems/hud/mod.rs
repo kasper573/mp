@@ -6,8 +6,9 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::{HAIRLINE, SHADOW, TextRole, WINDOW_RADIUS, color, paint, widgets};
-use egui::{Align2, Id, LayerId, Pos2, Rect, Ui, Vec2};
+use design_tokens::sheet;
+use design_tokens::{TextRole, controls, face, ink, slip};
+use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
@@ -19,22 +20,27 @@ use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
-use crate::systems::settings;
+use crate::systems::settings::{self, UserSettings};
 use crate::systems::skill::{HotbarEntry, HotbarSlot, SkillId};
 use crate::systems::{equipment, history, item, player, quest, skill, stat, terminal};
 
 pub(crate) use card::{
     Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
 };
-pub(crate) use panel::{GripCorner, Sizing, WindowFrame, corner_grip, widget, window};
+pub(crate) use panel::{GripCorner, WindowFrame, sheet_pose, slip_grip, widget, window};
 
-pub(crate) const WIDGET: WindowPx = WindowPx(48.0);
+pub(crate) const WIDGET: WindowPx = WindowPx(46.0);
 pub(crate) const TOOLTIP_WIDTH: f32 = 260.0;
-const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 200.0);
+const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 230.0);
 const LAUNCHER_ICON: f32 = 32.0;
+const LAUNCHER_RIGHT: f32 = 10.0;
+const LAUNCHER_TOP: f32 = 9.0;
+const LAUNCHER_PITCH: f32 = 55.0;
 const MARGIN: f32 = 8.0;
 const CARRIED: f32 = 40.0;
 const CONFIRM: &str = "confirm";
+const NOTE: Vec2 = Vec2::new(400.0, 170.0);
+const NOTE_PADDING: f32 = 22.0;
 
 pub struct HudPlugin;
 
@@ -43,8 +49,10 @@ impl Plugin for HudPlugin {
         settings::plugin(app);
         app.init_resource::<Open>()
             .init_resource::<panel::Arranging>()
+            .init_resource::<panel::SheetClocks>()
             .init_resource::<WindowsDrawn>()
             .init_resource::<Confirming>()
+            .init_resource::<Lifting>()
             .add_systems(
                 Update,
                 toggle_keys
@@ -126,15 +134,6 @@ pub(crate) fn dropped(response: &egui::Response) -> Option<Carried> {
     Some(carried)
 }
 
-pub(crate) fn panel() -> egui::Frame {
-    egui::Frame::new()
-        .fill(color::PANEL)
-        .stroke(HAIRLINE)
-        .corner_radius(WINDOW_RADIUS)
-        .shadow(SHADOW)
-        .inner_margin(MARGIN)
-}
-
 pub(crate) fn icon(ui: &mut Ui, world: &mut World, asset: &AssetRef, size: f32) -> egui::Response {
     sized(ui, gui::image(world, asset), size)
 }
@@ -184,6 +183,10 @@ pub(crate) fn confirm_layer() -> LayerId {
     LayerId::new(Band::Modal.order(), Id::new(CONFIRM))
 }
 
+pub(crate) fn launchers_width() -> f32 {
+    LAUNCHER_RIGHT + WIDGET.0
+}
+
 /// Where every widget and window of the interface stood when last drawn.
 pub(crate) fn pieces(world: &World) -> Vec<Rect> {
     world
@@ -203,23 +206,17 @@ pub(crate) fn tooltip(
 ) {
     gui::tooltip(response, |ui| {
         ui.set_max_width(TOOLTIP_WIDTH);
-        ui.label(
-            egui::RichText::new(title)
-                .family(design_tokens::family::medium())
-                .color(color::TEXT),
-        );
+        ui.spacing_mut().item_spacing.y = 2.0;
+        ui.label(face::bold(title).size(TextRole::Tooltip.size()));
         for line in lines {
             ui.label(
                 egui::RichText::new(line)
-                    .size(TextRole::Small.size())
-                    .color(color::TEXT.gamma_multiply(0.85)),
+                    .size(TextRole::Tooltip.size())
+                    .color(ink::INK2),
             );
         }
         if let Some(hint) = hint {
-            let look = TextLook {
-                size: TextRole::Small.size(),
-                color: color::MUTED,
-            };
+            let look = TextLook::new(TextRole::Small.size(), ink::INK3);
             text::show(ui, world, hint, look, None);
         }
     });
@@ -241,14 +238,13 @@ pub(crate) fn window_rect(world: &World, window: &dyn HudWindow) -> Option<Rect>
 /// The most a window may be given, when its content bounds it.
 pub(crate) fn window_limit(world: &World, window: &dyn HudWindow) -> Option<Vec2> {
     let body = window.body_limit(world)?;
-    Some(body + panel::chrome(&gui::context(world)?))
+    Some(body + panel::chrome())
 }
 
 static WIDGETS: &[(&str, &dyn HudWidget)] = &[
     ("character", &player::widget::CharacterWidget),
     ("quests", &quest::tracker::QuestTrackerWidget),
     (skill::bar::HOTBAR, &skill::bar::HotbarWidget),
-    (skill::bar::BASIC_ATTACK, &skill::bar::BasicAttackWidget),
 ];
 
 // Their launchers line up in this order.
@@ -275,6 +271,29 @@ struct WindowsDrawn {
 #[derive(Resource, Default)]
 struct Confirming(Option<Pending>);
 
+/// What the confirm note says, kept while the note lifts off after it is answered.
+#[derive(Resource, Default)]
+struct Lifting(Option<NoteText>);
+
+#[derive(Clone)]
+struct NoteText {
+    title: String,
+    body: Vec<String>,
+    confirm: String,
+    cancel: String,
+}
+
+impl NoteText {
+    fn of(confirm: &Confirm) -> NoteText {
+        NoteText {
+            title: confirm.title.clone(),
+            body: confirm.body.clone(),
+            confirm: confirm.confirm.clone(),
+            cancel: confirm.cancel.clone(),
+        }
+    }
+}
+
 struct Pending {
     confirm: Confirm,
     focused: bool,
@@ -295,12 +314,14 @@ fn draw_hud(world: &mut World) {
             shown.show(ui, world);
         });
     }
-    for (slot, &shown) in WINDOWS.iter().enumerate() {
+    let spots = launcher_spots(world, screen);
+    for (&shown, spot) in WINDOWS.iter().zip(spots) {
         let title = shown.title();
-        if !window_open(world, title) {
-            launcher(world, &gui, shown, launcher_pos(slot, screen));
+        let is_open = window_open(world, title);
+        launcher(world, &gui, shown, spot, is_open);
+        let Some(pose) = panel::sheet_pose(world, &gui, title, is_open) else {
             continue;
-        }
+        };
         let size = shown.size();
         let centered = Rect::from_min_size(
             (screen.center() - size / 2.0).max(Pos2::new(MARGIN, MARGIN)),
@@ -310,20 +331,28 @@ fn draw_hud(world: &mut World) {
             key: title,
             title: Some(title),
             start: centered,
-            sizing: Sizing::Resizable,
             body_limit: shown.body_limit(world),
         };
-        let mut open = true;
-        window(world, &gui, frame, &mut open, |ui, world| {
+        let mut open = is_open;
+        window(world, &gui, frame, pose, &mut open, |ui, world| {
+            if !is_open {
+                ui.disable();
+            }
             shown.show(ui, world)
         });
-        if !open {
+        if is_open && !open {
             close_window(world, title);
         }
     }
 }
 
-fn launcher(world: &mut World, gui: &egui::Context, opens: &'static dyn HudWindow, at: Pos2) {
+fn launcher(
+    world: &mut World,
+    gui: &egui::Context,
+    opens: &'static dyn HudWindow,
+    at: Pos2,
+    is_open: bool,
+) {
     let title = opens.title();
     let image = opens.icon().get(world.resource::<Content>()).image.clone();
     let key = world
@@ -331,20 +360,57 @@ fn launcher(world: &mut World, gui: &egui::Context, opens: &'static dyn HudWindo
         .name(opens.toggle())
         .unwrap_or_default();
     let button = widget(world, gui, title, at, |ui, world| {
-        let response = ui.add(egui::Button::new("").min_size(Vec2::splat(WIDGET.0)));
+        let (rect, response) = ui.allocate_exact_size(Vec2::splat(WIDGET.0), Sense::click());
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, ""));
+        let painter = ui.painter();
+        painter.add(slip::SHADOW.as_shape(rect, 3.0));
+        sheet::radial(painter, rect);
+        let hovered = response.hovered();
+        painter.rect(
+            rect,
+            3.0,
+            if hovered {
+                ink::gold_wash(0.2)
+            } else {
+                Color32::TRANSPARENT
+            },
+            Stroke::new(
+                1.0,
+                if hovered {
+                    ink::OCHRE
+                } else {
+                    ink::ink_wash(0.55)
+                },
+            ),
+            StrokeKind::Inside,
+        );
+        painter.line_segment(
+            [
+                rect.left_top() + Vec2::new(1.0, 1.5),
+                rect.right_top() + Vec2::new(-1.0, 1.5),
+            ],
+            Stroke::new(1.0, ink::ink_wash(0.15)),
+        );
         if let Some(icon) = gui::image(world, &image) {
-            let at = Rect::from_center_size(response.rect.center(), Vec2::splat(LAUNCHER_ICON));
+            let at = Rect::from_center_size(rect.center(), Vec2::splat(LAUNCHER_ICON));
             ui.put(at, icon.widget(Vec2::splat(LAUNCHER_ICON)));
         }
-        paint::badge(
-            ui.painter(),
-            response.rect.right_bottom() - Vec2::splat(2.0),
+        let painter = ui.painter();
+        painter.text(
+            rect.right_bottom() - Vec2::new(4.0, 2.0),
             Align2::RIGHT_BOTTOM,
             &key,
-            color::MUTED,
+            TextRole::Launcher.font_id(),
+            ink::INK,
         );
+        if is_open {
+            painter.rect_filled(rect, 3.0, ink::wash(ink::CREAM, 0.55));
+        }
+        if response.has_focus() {
+            controls::focus_ring(painter, rect, 3.0);
+        }
         gui::tooltip(&response, |ui| {
-            ui.label(title);
+            ui.label(face::bold(title).size(TextRole::Tooltip.size()));
         });
         response
     });
@@ -357,39 +423,80 @@ fn draw_confirm(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let Some(mut pending) = world.resource_mut::<Confirming>().0.take() else {
+    let pending = world.resource_mut::<Confirming>().0.take();
+    let shown_text = pending
+        .as_ref()
+        .map(|pending| NoteText::of(&pending.confirm));
+    if let Some(text) = &shown_text {
+        world.resource_mut::<Lifting>().0 = Some(text.clone());
+    }
+    let Some(pose) = panel::sheet_pose(world, &gui, CONFIRM, pending.is_some()) else {
+        world.resource_mut::<Lifting>().0 = None;
+        return;
+    };
+    let Some(text) = shown_text.or_else(|| world.resource::<Lifting>().0.clone()) else {
         return;
     };
     let keep_key = world
         .resource::<InputMap>()
         .shortcut(InputAction::TakeDefault);
+    let mut pending = pending;
     let mut decided = None;
-    let modal = egui::Modal::new(Id::new(CONFIRM)).show(&gui, |ui| {
-        ui.set_max_width(360.0);
-        ui.heading(&pending.confirm.title);
-        ui.add_space(4.0);
-        for line in &pending.confirm.body {
-            ui.label(line);
-        }
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let keep = ui.button(&pending.confirm.cancel);
-                if !pending.focused {
-                    keep.request_focus();
-                    pending.focused = true;
-                }
-                if widgets::danger(ui, &pending.confirm.confirm).clicked() {
-                    decided = Some(true);
-                }
-                let keep_pressed =
-                    keep_key.is_some_and(|key| ui.input_mut(|i| i.consume_shortcut(&key)));
-                if keep.clicked() || keep_pressed {
-                    decided = Some(false);
-                }
-            });
+    let screen = gui.content_rect();
+    let rest = Rect::from_center_size(screen.center(), NOTE);
+    gui.set_transform_layer(confirm_layer(), pose.transform(&gui, rest, rest.min));
+    let modal = egui::Modal::new(Id::new(CONFIRM))
+        .backdrop_color(ink::ink_wash(0.3 * pose.opacity))
+        .frame(egui::Frame::NONE)
+        .show(&gui, |ui| {
+            ui.multiply_opacity(pose.opacity);
+            if pending.is_none() {
+                ui.disable();
+            }
+            let under = ui.painter().add(Shape::Noop);
+            let framed = egui::Frame::new()
+                .inner_margin(NOTE_PADDING)
+                .show(ui, |ui| {
+                    ui.set_width(NOTE.x - 2.0 * NOTE_PADDING);
+                    ui.set_min_height(NOTE.y - 2.0 * NOTE_PADDING);
+                    ui.add(
+                        egui::Label::new(TextRole::NoteTitle.rich(&text.title).color(ink::INK))
+                            .wrap(),
+                    );
+                    ui.add_space(6.0);
+                    for line in &text.body {
+                        ui.add(egui::Label::new(face::body(line)).wrap());
+                    }
+                    ui.add_space(12.0);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
+                        let keep = controls::primary(ui, text.cancel.as_str());
+                        if let Some(pending) = pending.as_mut()
+                            && !pending.focused
+                        {
+                            keep.request_focus();
+                            pending.focused = true;
+                        }
+                        if controls::danger(ui, text.confirm.as_str()).clicked() {
+                            decided = Some(true);
+                        }
+                        let keep_pressed =
+                            keep_key.is_some_and(|key| ui.input_mut(|i| i.consume_shortcut(&key)));
+                        if keep.clicked() || keep_pressed {
+                            decided = Some(false);
+                        }
+                    });
+                });
+            let note = framed.response.rect;
+            let shapes = vec![
+                Shape::Rect(pose.shadow.as_shape(note, 0.0)),
+                sheet::vellum_shape(ui.ctx(), note),
+            ];
+            ui.painter().set(under, Shape::Vec(shapes));
+            sheet::rule(ui.painter(), note, sheet::RULE_INSET);
         });
-    });
+    let Some(pending) = pending else {
+        return;
+    };
     if modal.should_close() && decided.is_none() {
         decided = Some(false);
     }
@@ -437,10 +544,42 @@ fn draw_carried(world: &mut World) {
     );
 }
 
+/// Where each launcher rests when the player never moved it: its own slot down the column, or
+/// the next one no other launcher already stands on, since spots kept from an older column can
+/// cover a launcher that was added since.
+fn launcher_spots(world: &World, screen: Rect) -> Vec<Pos2> {
+    let settings = world.resource::<UserSettings>();
+    let saved = |window: &dyn HudWindow| {
+        settings
+            .widget_pos(window.title())
+            .map(|pos| Pos2::new(pos.x, pos.y))
+    };
+    let mut taken: Vec<Pos2> = WINDOWS.iter().filter_map(|window| saved(*window)).collect();
+    let covered = |at: Pos2, taken: &[Pos2]| {
+        let rect = Rect::from_min_size(at, Vec2::splat(WIDGET.0));
+        taken
+            .iter()
+            .any(|other| rect.intersects(Rect::from_min_size(*other, Vec2::splat(WIDGET.0))))
+    };
+    let mut spots = Vec::with_capacity(WINDOWS.len());
+    for (slot, window) in WINDOWS.iter().enumerate() {
+        let spot = saved(*window).unwrap_or_else(|| {
+            let free = (slot..)
+                .map(|slot| launcher_pos(slot, screen))
+                .find(|at| !covered(*at, &taken))
+                .expect("the column runs on");
+            taken.push(free);
+            free
+        });
+        spots.push(spot);
+    }
+    spots
+}
+
 fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {
     Pos2::new(
-        screen.right() - MARGIN - WIDGET.0,
-        screen.top() + MARGIN + slot as f32 * (WIDGET.0 + MARGIN),
+        screen.right() - LAUNCHER_RIGHT - WIDGET.0,
+        screen.top() + LAUNCHER_TOP + slot as f32 * LAUNCHER_PITCH,
     )
 }
 

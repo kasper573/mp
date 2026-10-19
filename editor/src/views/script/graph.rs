@@ -1,10 +1,13 @@
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::emath::TSTransform;
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
 use egui_snarl::ui::{
-    AnyPins, NodeLayout, PinInfo, SnarlPin, SnarlStyle, SnarlViewer, SnarlWidget, WireStyle,
+    AnyPins, NodeLayout, PinInfo, PinPlacement, SnarlPin, SnarlStyle, SnarlViewer, SnarlWidget,
+    WireStyle,
 };
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 use serde::{Deserialize, Serialize};
@@ -14,6 +17,7 @@ use super::ScriptDoc;
 use super::nodes::{
     self, FlowKind, LineSpeaker, NodeCatalogue, NodePort, SummaryPiece, SummaryTone,
 };
+use crate::keymap::EditorKey;
 use crate::spans;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -21,6 +25,13 @@ use crate::value::RowValue;
 const COLUMN: f32 = 240.0;
 pub const CARD: f32 = 176.0;
 const FACE: f32 = 20.0;
+const PAD: f32 = 10.0;
+const ROUNDING: f32 = 6.0;
+const MIN_ZOOM: f32 = 0.3;
+const MAX_ZOOM: f32 = 2.0;
+// The graph is drawn this many times its size and shown scaled down, so its text is rasterised
+// sharp up to the largest zoom.
+const MAGNIFIED: f32 = MAX_ZOOM;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -63,7 +74,7 @@ impl ScriptGraph {
         let mut snarl = Snarl::new();
         for (name, at) in &layout.nodes {
             snarl.insert_node(
-                Pos2::new(at[0], at[1]),
+                magnified(Pos2::new(at[0], at[1])),
                 ScriptGraphNode { name: name.clone() },
             );
         }
@@ -98,12 +109,12 @@ impl ScriptGraph {
         match self.id_of(name) {
             Some(id) => {
                 if let Some(info) = self.snarl.get_node_info_mut(id) {
-                    info.pos = at;
+                    info.pos = magnified(at);
                 }
             }
             None => {
                 self.snarl.insert_node(
-                    at,
+                    magnified(at),
                     ScriptGraphNode {
                         name: name.to_owned(),
                     },
@@ -121,7 +132,7 @@ impl ScriptGraph {
     pub fn positions(&self) -> BTreeMap<String, Pos2> {
         self.snarl
             .nodes_pos_ids()
-            .map(|(_, pos, node)| (node.name.clone(), pos))
+            .map(|(_, pos, node)| (node.name.clone(), unmagnified(pos)))
             .collect()
     }
 
@@ -271,7 +282,7 @@ impl ScriptGraphViewer<'_> {
     fn open_palette(&mut self, at: Pos2, link: Option<(String, String)>) {
         self.actions
             .push(ScriptGraphAction::Palette(NodePaletteOpen {
-                at: self.to_global * at,
+                at: self.to_global * unmagnified(at),
                 placed: true,
                 link,
             }));
@@ -282,7 +293,9 @@ impl ScriptGraphViewer<'_> {
         if response.clicked() {
             self.clicks.push(NodeClick {
                 name: name.to_owned(),
-                extend: ui.input(|i| i.modifiers.shift || i.modifiers.command),
+                extend: ui.input(|i| {
+                    EditorKey::ExtendSelection.held(i) || EditorKey::ToggleSelection.held(i)
+                }),
             });
         }
     }
@@ -297,9 +310,9 @@ impl ScriptGraphViewer<'_> {
         };
         for (index, line) in lines.iter().take(shown).enumerate() {
             ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.spacing_mut().item_spacing.x = big(6.0);
                 self.face(ui, &line["by"]);
-                let width = CARD - FACE - 6.0;
+                let width = big(CARD - FACE - 6.0);
                 ui.allocate_ui_with_layout(
                     Vec2::new(width, 0.0),
                     egui::Layout::top_down(egui::Align::LEFT),
@@ -307,8 +320,13 @@ impl ScriptGraphViewer<'_> {
                         ui.set_width(width);
                         if editing {
                             let id = ui.id().with(("line", name, index));
-                            let edit =
-                                spans::line(ui, &line["text"], id, FontId::proportional(12.5), "…");
+                            let edit = spans::line(
+                                ui,
+                                &line["text"],
+                                id,
+                                FontId::proportional(big(12.5)),
+                                "…",
+                            );
                             if let Some(text) = edit.spans {
                                 self.actions.push(ScriptGraphAction::EditLine {
                                     name: name.to_owned(),
@@ -324,7 +342,7 @@ impl ScriptGraphViewer<'_> {
                             let text = widgets::clip(&spans::plain(&line["text"]), 64);
                             let job = spans::layout_job(
                                 &Value::Array(vec![Value::String(text)]),
-                                FontId::proportional(12.5),
+                                FontId::proportional(big(12.5)),
                                 theme::TEXT,
                                 width,
                             );
@@ -335,21 +353,25 @@ impl ScriptGraphViewer<'_> {
             });
         }
         if lines.len() > shown {
-            ui.label(theme::faint(format!("… {} more lines", lines.len() - shown)).size(11.5));
+            ui.label(theme::faint(format!("… {} more lines", lines.len() - shown)).size(big(11.5)));
         }
         if editing {
-            ui.add_space(2.0);
+            ui.add_space(big(2.0));
             ui.label(
-                theme::faint("Enter new line · Ctrl Enter new choice")
-                    .size(11.0)
-                    .monospace(),
+                theme::faint(format!(
+                    "{} new line · {} new choice",
+                    EditorKey::Confirm.name(),
+                    EditorKey::AddChoice.name()
+                ))
+                .size(big(11.0))
+                .monospace(),
             );
         }
     }
 
     fn face(&self, ui: &mut Ui, by: &Value) {
-        let (rect, _) = ui.allocate_exact_size(Vec2::splat(FACE), egui::Sense::hover());
-        let rect = rect.translate(Vec2::new(0.0, 1.0));
+        let (rect, _) = ui.allocate_exact_size(Vec2::splat(big(FACE)), egui::Sense::hover());
+        let rect = rect.translate(Vec2::new(0.0, big(1.0)));
         let speaker = LineSpeaker::of(by);
         let image = speaker.as_ref().and_then(|speaker| {
             self.faces
@@ -366,8 +388,8 @@ impl ScriptGraphViewer<'_> {
                 ));
                 ui.painter().rect_stroke(
                     rect,
-                    4.0,
-                    Stroke::new(1.0, theme::BORDER),
+                    big(4.0),
+                    Stroke::new(big(1.0), theme::BORDER),
                     egui::StrokeKind::Inside,
                 );
             }
@@ -383,13 +405,13 @@ impl ScriptGraphViewer<'_> {
     }
 }
 
-pub fn face_placeholder(painter: &egui::Painter, rect: Rect, glyph: &str) {
-    painter.rect_filled(rect, 4.0, theme::RAISED);
+fn face_placeholder(painter: &egui::Painter, rect: Rect, glyph: &str) {
+    painter.rect_filled(rect, big(4.0), theme::RAISED);
     painter.text(
         rect.center(),
         Align2::CENTER_CENTER,
         glyph,
-        FontId::monospace(11.0),
+        FontId::monospace(big(11.0)),
         theme::MUTED,
     );
 }
@@ -400,13 +422,15 @@ pub fn style() -> SnarlStyle {
     style.wire_width = Some(1.6);
     style.collapsible = Some(false);
     style.pin_size = Some(8.0);
+    style.pin_placement = Some(PinPlacement::Edge);
     style.node_layout = Some(NodeLayout::sandwich());
     style.header_drag_space = Some(Vec2::new(0.0, 0.0));
     style.bg_pattern = Some(egui_snarl::ui::BackgroundPattern::NoPattern);
     style.select_stoke = Some(Stroke::new(1.0, theme::ACCENT));
     style.select_fill = Some(theme::alpha(theme::ACCENT, 20));
-    style.min_scale = Some(0.3);
-    style.max_scale = Some(2.5);
+    style.min_scale = Some(MIN_ZOOM);
+    style.max_scale = Some(MAX_ZOOM);
+    style.crisp_magnified_text = Some(true);
     style
 }
 
@@ -431,22 +455,17 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let Some(node) = self.node(&name).cloned() else {
             return;
         };
-        ui.set_width(CARD);
+        ui.set_width(big(CARD));
         self.click_to_select(ui, &name);
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let (glyph, color) = kind_glyph(&node);
-            let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), egui::Sense::hover());
-            ui.painter().rect_filled(rect, 3.0, theme::alpha(color, 70));
-            ui.painter().text(
-                rect.center(),
-                Align2::CENTER_CENTER,
-                glyph,
-                FontId::proportional(10.0),
-                color,
-            );
+            ui.spacing_mut().item_spacing.x = big(6.0);
+            let (mark, color) = kind_mark(&node);
+            let (rect, _) = ui.allocate_exact_size(Vec2::splat(big(14.0)), egui::Sense::hover());
+            ui.painter()
+                .rect_filled(rect, big(3.0), theme::alpha(color, 70));
+            glyph::paint(ui.painter(), mark, rect.shrink(big(3.0)), color);
             let title = card_title(&name, &node);
-            ui.add(egui::Label::new(theme::strong(title).monospace().size(12.5)).truncate());
+            ui.add(egui::Label::new(theme::strong(title).monospace().size(big(12.5))).truncate());
         });
     }
 
@@ -466,7 +485,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     ) -> impl SnarlPin + 'static {
         let name = &snarl[pin.id.node].name;
         let lit = self.lit.contains(name);
-        ui.allocate_exact_size(Vec2::new(1.0, 1.0), egui::Sense::hover());
+        ui.allocate_exact_size(Vec2::splat(1.0), egui::Sense::hover());
         let fill = if lit {
             LIT
         } else if pin.remotes.is_empty() {
@@ -502,13 +521,13 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             job.append(
                 &label,
                 0.0,
-                TextFormat::simple(FontId::monospace(11.0), theme::MUTED),
+                TextFormat::simple(FontId::monospace(big(11.0)), theme::MUTED),
             );
             if !connected {
                 job.append(
                     " · end",
                     0.0,
-                    TextFormat::simple(FontId::monospace(10.5), theme::FAINT),
+                    TextFormat::simple(FontId::monospace(big(10.5)), theme::FAINT),
                 );
             }
             ui.add(egui::Label::new(job).truncate());
@@ -550,20 +569,20 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         let name = snarl[id].name.clone();
-        ui.set_width(CARD);
+        ui.set_width(big(CARD));
         self.click_to_select(ui, &name);
         let Some(node) = self.node(&name).cloned() else {
             return;
         };
         ui.vertical(|ui| {
-            ui.set_width(CARD);
-            ui.spacing_mut().item_spacing.y = 3.0;
+            ui.set_width(big(CARD));
+            ui.spacing_mut().item_spacing.y = big(3.0);
             if nodes::is_dialogue(&node) {
                 self.dialogue_body(ui, &name, &node);
                 return;
             }
             for line in nodes::pieces(&node, self.catalogue) {
-                ui.add(egui::Label::new(pieces_job(&line, CARD)).wrap());
+                ui.add(egui::Label::new(pieces_job(&line, big(CARD))).wrap());
             }
         });
     }
@@ -579,16 +598,17 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let name = &snarl[id].name;
         let mut frame = default;
         frame.fill = CARD_FILL;
-        frame.corner_radius = CornerRadius::same(6);
-        frame.inner_margin = egui::Margin::symmetric(0, 0);
+        frame.shadow = magnified_shadow(design_tokens::slip::SHADOW);
+        frame.corner_radius = CornerRadius::same(big(ROUNDING) as u8);
+        frame.inner_margin = card_margin();
         frame.stroke = if self.current == Some(name.as_str()) {
-            Stroke::new(2.0, CURRENT)
+            Stroke::new(big(2.0), CURRENT)
         } else if self.lit.contains(name) {
-            Stroke::new(1.5, LIT)
+            Stroke::new(big(1.5), LIT)
         } else if self.selected.contains(name) {
-            Stroke::new(1.5, theme::ACCENT)
+            Stroke::new(big(1.5), theme::ACCENT)
         } else {
-            Stroke::new(1.0, theme::BORDER)
+            Stroke::new(big(1.0), theme::BORDER)
         };
         frame
     }
@@ -605,13 +625,18 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let mut frame = default;
         frame.fill = self.node(name).map_or(EFFECT_FILL, kind_fill);
         frame.stroke = Stroke::NONE;
+        frame.shadow = egui::Shadow::NONE;
+        let inner = big(ROUNDING - 1.0) as u8;
         frame.corner_radius = CornerRadius {
-            nw: 6,
-            ne: 6,
+            nw: inner,
+            ne: inner,
             sw: 0,
             se: 0,
         };
-        frame.inner_margin = egui::Margin::symmetric(8, 5);
+        frame.inner_margin = egui::Margin {
+            bottom: big(6.0) as i8,
+            ..card_margin()
+        };
         frame
     }
 
@@ -623,7 +648,10 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         if let Some(graph_node) = snarl.get_node(node) {
-            self.rects.insert(graph_node.name.clone(), rect);
+            self.rects.insert(
+                graph_node.name.clone(),
+                TSTransform::from_scaling(MAGNIFIED.recip()) * rect,
+            );
         }
     }
 
@@ -636,14 +664,14 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         painter: &egui::Painter,
         _snarl: &Snarl<ScriptGraphNode>,
     ) {
-        let step = 24.0;
+        let step = big(24.0);
         let x0 = (viewport.min.x / step).floor() * step;
         let y0 = (viewport.min.y / step).floor() * step;
         let mut x = x0;
         while x < viewport.max.x {
             let mut y = y0;
             while y < viewport.max.y {
-                painter.circle_filled(Pos2::new(x, y), 0.9, DOT);
+                painter.circle_filled(Pos2::new(x, y), big(0.9), DOT);
                 y += step;
             }
             x += step;
@@ -686,7 +714,10 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     }
 
     fn show_graph_menu(&mut self, pos: Pos2, ui: &mut Ui, _snarl: &mut Snarl<ScriptGraphNode>) {
-        if ui.button("Add node…  (Tab)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Add node…", EditorKey::Palette))
+            .clicked()
+        {
             self.open_palette(pos, None);
             ui.close();
         }
@@ -732,27 +763,42 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     ) {
         let name = snarl[id].name.clone();
         if self.node(&name).is_some_and(nodes::is_dialogue) {
-            if ui.button("Add line  (Enter)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Add line", EditorKey::Confirm))
+                .clicked()
+            {
                 self.actions.push(ScriptGraphAction::AddLine(name.clone()));
                 ui.close();
             }
-            if ui.button("Add choice  (Ctrl Enter)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Add choice", EditorKey::AddChoice))
+                .clicked()
+            {
                 self.actions
                     .push(ScriptGraphAction::AddChoice(name.clone()));
                 ui.close();
             }
             ui.separator();
         }
-        if ui.button("Rename…  (F2)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Rename…", EditorKey::Rename))
+            .clicked()
+        {
             self.actions.push(ScriptGraphAction::Rename(name.clone()));
             ui.close();
         }
-        if ui.button("Duplicate  (Ctrl D)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
+            .clicked()
+        {
             self.actions
                 .push(ScriptGraphAction::Duplicate(name.clone()));
             ui.close();
         }
-        if ui.button("Delete  (Del)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Delete", EditorKey::Delete))
+            .clicked()
+        {
             self.actions.push(ScriptGraphAction::Delete(name));
             ui.close();
         }
@@ -764,74 +810,74 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         _snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         if let Some((graph, canvas)) = self.fit.take() {
-            let scale = ((canvas.width() - 48.0) / graph.width())
+            let zoom = ((canvas.width() - 48.0) / graph.width())
                 .min((canvas.height() - 48.0) / graph.height())
-                .clamp(0.3, 1.0);
+                .clamp(MIN_ZOOM, 1.0);
             let translation =
-                canvas.min.to_vec2() + Vec2::new(24.0, 40.0) - graph.min.to_vec2() * scale;
-            *to_global = TSTransform::new(translation, scale);
+                canvas.min.to_vec2() + Vec2::new(24.0, 40.0) - graph.min.to_vec2() * zoom;
+            *to_global = TSTransform::new(translation, zoom / MAGNIFIED);
         }
-        self.to_global = *to_global;
+        self.to_global = *to_global * TSTransform::from_scaling(MAGNIFIED);
     }
 }
 
 fn choice_output(ui: &mut Ui, label: &str, connected: bool) {
     ui.allocate_ui_with_layout(
-        Vec2::new(CARD - 14.0, 16.0),
+        Vec2::new(big(CARD), big(16.0)),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
-            ui.set_width(CARD - 14.0);
-            let y = ui.max_rect().min.y - 1.5;
+            ui.set_width(big(CARD));
+            let y = ui.max_rect().min.y - big(1.5);
             ui.painter().line_segment(
                 [
-                    egui::pos2(ui.max_rect().min.x, y),
-                    egui::pos2(ui.max_rect().max.x + 10.0, y),
+                    egui::pos2(ui.max_rect().min.x - big(PAD), y),
+                    egui::pos2(ui.max_rect().max.x + big(PAD), y),
                 ],
-                Stroke::new(1.0, theme::BORDER),
+                Stroke::new(big(1.0), theme::BORDER),
             );
             let mut job = LayoutJob::default();
             job.append(
                 label,
                 0.0,
-                TextFormat::simple(FontId::proportional(12.0), theme::TEXT),
+                TextFormat::simple(FontId::proportional(big(12.0)), theme::TEXT),
             );
             ui.add(egui::Label::new(job).truncate());
             if !connected {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(theme::faint("end").monospace().size(10.5));
+                    ui.label(theme::faint("end").monospace().size(big(10.5)));
                 });
             }
         },
     );
 }
 
-const CARD_FILL: Color32 = Color32::from_rgb(30, 31, 38);
-const DOT: Color32 = Color32::from_rgb(44, 45, 54);
-const WIRE: Color32 = Color32::from_rgb(120, 160, 240);
-const DIALOGUE: Color32 = Color32::from_rgb(176, 140, 230);
-const REFUSED: Color32 = Color32::from_rgb(150, 150, 164);
-const LIT: Color32 = Color32::from_rgb(250, 200, 80);
-const CURRENT: Color32 = Color32::from_rgb(255, 240, 140);
-const RUN: Color32 = Color32::from_rgb(240, 150, 70);
-const EFFECT_FILL: Color32 = Color32::from_rgb(30, 54, 42);
+const CARD_FILL: Color32 = ink::LIGHT;
+const DOT: Color32 = ink::INK3;
+const WIRE: Color32 = ink::AZURE;
+const DIALOGUE: Color32 = ink::TYRIAN;
+const REFUSED: Color32 = ink::INK3;
+const LIT: Color32 = ink::GOLD;
+const CURRENT: Color32 = ink::GOLD2;
+const RUN: Color32 = ink::RUBRIC;
+const EFFECT_FILL: Color32 = Color32::from_rgb(221, 219, 194);
 
 fn kind_fill(node: &Value) -> Color32 {
     match FlowKind::of(node) {
-        Some(FlowKind::On) => Color32::from_rgb(58, 50, 26),
-        Some(FlowKind::Run) => Color32::from_rgb(64, 44, 30),
-        Some(FlowKind::Dialogue) => Color32::from_rgb(54, 42, 74),
-        Some(_) => Color32::from_rgb(38, 44, 62),
+        Some(FlowKind::On) => Color32::from_rgb(225, 211, 180),
+        Some(FlowKind::Run) => Color32::from_rgb(233, 211, 188),
+        Some(FlowKind::Dialogue) => Color32::from_rgb(226, 210, 199),
+        Some(_) => Color32::from_rgb(221, 216, 202),
         None => EFFECT_FILL,
     }
 }
 
-pub fn kind_glyph(node: &Value) -> (&'static str, Color32) {
+pub fn kind_mark(node: &Value) -> (Mark, Color32) {
     match FlowKind::of(node) {
-        Some(FlowKind::On) => ("▶", theme::WARN),
-        Some(FlowKind::Run) => ("▸", RUN),
-        Some(FlowKind::Dialogue) => ("●", DIALOGUE),
-        Some(_) => ("◆", WIRE),
-        None => ("!", theme::OK),
+        Some(FlowKind::On) => (Mark::Play, theme::WARN),
+        Some(FlowKind::Run) => (Mark::ChevronRight, RUN),
+        Some(FlowKind::Dialogue) => (Mark::Dot, DIALOGUE),
+        Some(_) => (Mark::Asterisk, WIRE),
+        None => (Mark::Warning, theme::OK),
     }
 }
 
@@ -843,17 +889,17 @@ pub fn card_title(name: &str, node: &Value) -> String {
     }
 }
 
-pub fn pieces_job(pieces: &[SummaryPiece], width: f32) -> LayoutJob {
+fn pieces_job(pieces: &[SummaryPiece], width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = width;
     for piece in pieces {
         let format = match piece.tone {
-            SummaryTone::Muted => TextFormat::simple(FontId::proportional(12.0), theme::MUTED),
+            SummaryTone::Muted => TextFormat::simple(FontId::proportional(big(12.0)), theme::MUTED),
             SummaryTone::Strong => {
-                TextFormat::simple(FontId::new(12.0, theme::medium()), theme::TEXT)
+                TextFormat::simple(FontId::new(big(12.0), theme::medium()), theme::TEXT)
             }
             SummaryTone::Var => {
-                let mut format = TextFormat::simple(FontId::monospace(11.0), DIALOGUE);
+                let mut format = TextFormat::simple(FontId::monospace(big(11.0)), DIALOGUE);
                 format.background = theme::alpha(DIALOGUE, 30);
                 format
             }
@@ -867,9 +913,43 @@ fn estimated_height(node: &Value, catalogue: &NodeCatalogue) -> f32 {
     let outputs = nodes::ports(node, catalogue).len() as f32;
     if nodes::is_dialogue(node) {
         let lines = node["lines"].as_array().map_or(0, Vec::len).min(3) as f32;
-        44.0 + lines * 30.0 + outputs * 17.0
+        60.0 + lines * 44.0 + outputs * 20.0
     } else {
         let lines = nodes::pieces(node, catalogue).len() as f32;
-        44.0 + lines * 16.0 + outputs * 15.0
+        60.0 + lines * 18.0 + outputs * 20.0
+    }
+}
+
+fn big(size: f32) -> f32 {
+    size * MAGNIFIED
+}
+
+fn magnified(at: Pos2) -> Pos2 {
+    (at.to_vec2() * MAGNIFIED).to_pos2()
+}
+
+fn unmagnified(at: Pos2) -> Pos2 {
+    (at.to_vec2() / MAGNIFIED).to_pos2()
+}
+
+fn magnified_shadow(shadow: egui::Shadow) -> egui::Shadow {
+    let scaled = |value: f32| big(value).min(f32::from(u8::MAX)) as u8;
+    egui::Shadow {
+        offset: [
+            big(f32::from(shadow.offset[0])) as i8,
+            big(f32::from(shadow.offset[1])) as i8,
+        ],
+        blur: scaled(f32::from(shadow.blur)),
+        spread: scaled(f32::from(shadow.spread)),
+        color: shadow.color,
+    }
+}
+
+fn card_margin() -> egui::Margin {
+    egui::Margin {
+        left: big(PAD) as i8,
+        right: big(PAD) as i8,
+        top: big(5.0) as i8,
+        bottom: big(8.0) as i8,
     }
 }

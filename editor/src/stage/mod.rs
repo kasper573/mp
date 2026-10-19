@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use egui::{Color32, FontId, Pos2, Ui, Vec2 as EVec2};
+use egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 use engine::core::content::Content;
 use engine::core::geometry::{Footprint, Radians};
 use engine::core::math::{Direction, Pos, Rgba};
@@ -34,6 +34,7 @@ use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
+pub const NARROWEST: f32 = 240.0;
 const SPREAD_CANDIDATES: usize = 4096;
 const SPREAD_ROUNDS: usize = 12;
 
@@ -106,15 +107,6 @@ pub enum Scenario {
     },
 }
 
-/// A text the stage letters over its picture, in world pixels.
-pub struct Overlay {
-    pub text: String,
-    pub color: Rgba,
-    pub size: f32,
-    pub at: Vec2,
-    pub alpha: f32,
-}
-
 /// Where a stage was drawn, for a window to draw over it.
 pub struct Shown {
     pub rect: egui::Rect,
@@ -156,6 +148,12 @@ impl PosedActor {
 /// Where the stage stands: the game's initial spawn, which every scene is laid out around.
 pub fn center(content: &Content) -> Pos<Tiles> {
     content.built::<GameSettings>().initial_spawn.at
+}
+
+/// The width every view gives its preview out of `room`: the stage's own width, narrowing only as
+/// far as the stage stays readable, so previews look alike across views.
+pub fn preview_width(room: f32) -> f32 {
+    room.clamp(NARROWEST, SIZE[0] as f32)
 }
 
 /// Draws the stage for `key` as wide as the window allows, with the game's starting area behind
@@ -225,15 +223,6 @@ pub fn show(
             egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
             Color32::WHITE,
         );
-        for overlay in &stage.overlays {
-            painter.text(
-                shown.screen(overlay.at),
-                egui::Align2::CENTER_BOTTOM,
-                &overlay.text,
-                FontId::proportional(overlay.size),
-                Color32::from(overlay.color).gamma_multiply(overlay.alpha),
-            );
-        }
         for (top, label) in &stage.plates {
             plate::draw_label(ui, shown.screen(*top), label);
         }

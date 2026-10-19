@@ -5,8 +5,7 @@ use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice
 use crate::core::time::{Millis, Seconds};
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::script::RiftScripting;
-use design_tokens::ink;
-use egui::Color32;
+use design_tokens::ink::Prose;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
@@ -300,7 +299,7 @@ impl SpanText {
         let mut pause = None;
         for fx in fx {
             match *fx {
-                Fx::Ink(ink) => span = span.ink(ink.color()),
+                Fx::Ink(ink) => span = span.prose(ink.prose()),
                 Fx::Voice(Voice::Whisper) => span = span.voice(TextVoice::Whisper),
                 Fx::Voice(Voice::Shout) => span = span.voice(TextVoice::Shout),
                 Fx::Motion(motion) => span = span.motion(motion.text_motion()),
@@ -325,13 +324,13 @@ impl Motion {
 }
 
 impl Ink {
-    pub fn color(self) -> Color32 {
+    pub fn prose(self) -> Prose {
         match self {
-            Ink::Danger => ink::DANGER,
-            Ink::Item => ink::ITEM,
-            Ink::Place => ink::PLACE,
-            Ink::Name => ink::NAME,
-            Ink::Magic => ink::MAGIC,
+            Ink::Danger => Prose::Danger,
+            Ink::Item => Prose::Item,
+            Ink::Place => Prose::Place,
+            Ink::Name => Prose::Name,
+            Ink::Magic => Prose::Magic,
         }
     }
 }

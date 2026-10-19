@@ -1,8 +1,10 @@
+use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 
 use super::{Candidate, Category, Dragged, Pick, PickSource};
 use crate::forms::FormCx;
 use crate::ui::assets::{self, AssetKind};
+use crate::ui::theme;
 
 /// Files under `assets/` of the given kinds; several kinds become the popover's category chips.
 pub struct AssetSource {
@@ -100,7 +102,7 @@ impl PickSource for AssetSource {
                 }
             }
             Some(AssetKind::Audio) => {
-                ui.label(crate::ui::theme::muted("♪"));
+                glyph::show(ui, Mark::Note, 13.0, theme::MUTED);
             }
             Some(AssetKind::Font) => {
                 ui.label(crate::ui::theme::muted("A"));

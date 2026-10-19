@@ -1,6 +1,8 @@
 //! The parameters a vfx or shader row declares, and the one set of controls that fills them: the
 //! preview's knobs, a shader layer's fills, and a script's values for a vfx.
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Ui};
 use engine::core::math::Rgba;
 use engine::core::vfx::{ParamFill, ParamKind, ParamValue, ShaderParam, VfxParam};
@@ -86,10 +88,7 @@ pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> b
                 _ => 1.0,
             };
             let moved = match spec.range {
-                Some((min, max)) => {
-                    design_tokens::widgets::slider(ui, egui::Slider::new(&mut amount, min..=max))
-                        .changed()
-                }
+                Some((min, max)) => controls::slider(ui, &mut amount, min..=max).changed(),
                 None => ui
                     .add(egui::DragValue::new(&mut amount).speed(0.01))
                     .changed(),
@@ -196,8 +195,7 @@ pub fn param_fill(
                 });
         }
         if fill.is_some()
-            && ui
-                .add(egui::Label::new(theme::faint("↺").size(12.0)).sense(egui::Sense::click()))
+            && glyph::button(ui, Mark::Undo, 12.0, theme::FAINT, "Default")
                 .on_hover_text("Back to the shader's default")
                 .clicked()
         {
@@ -222,27 +220,32 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
         let path = format!("/params/{index}");
         let param = &mut value["params"][index];
         let kind = param["kind"].as_str().unwrap_or("number").to_owned();
+        let kept = cx.locks.iter().any(|lock| lock.keeps("/params", param));
         ui.horizontal(|ui| {
-            if ui
+            if kept {
+                ui.label(theme::faint("·")).on_hover_text(forms::KEPT_TIP);
+            } else if ui
                 .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
                 .on_hover_text("Remove")
                 .clicked()
             {
                 remove = Some(index);
             }
-            ui.scope(|ui| {
-                ui.set_width(120.0);
-                changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
-            });
             let mut picked = kind.clone();
-            widgets::combo_box(("param-kind", index))
-                .width(90.0)
-                .selected_text(theme::mono(&kind).size(13.0))
-                .show_ui(ui, |ui| {
-                    for kind in ["number", "bool", "color"] {
-                        ui.selectable_value(&mut picked, kind.to_owned(), kind);
-                    }
+            ui.add_enabled_ui(!kept, |ui| {
+                ui.scope(|ui| {
+                    ui.set_width(120.0);
+                    changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
                 });
+                widgets::combo_box(("param-kind", index))
+                    .width(90.0)
+                    .selected_text(theme::mono(&kind).size(13.0))
+                    .show_ui(ui, |ui| {
+                        for kind in ["number", "bool", "color"] {
+                            ui.selectable_value(&mut picked, kind.to_owned(), kind);
+                        }
+                    });
+            });
             if picked != kind {
                 param["kind"] = Value::String(picked.clone());
                 let fields = param.as_object_mut().expect("object");
@@ -341,11 +344,13 @@ fn number_param_fields(ui: &mut Ui, cx: &mut FormCx, param: &mut Value, path: &s
             .filter(|(min, max)| min < max);
         let mut amount = param["default"].as_f64().unwrap_or_default();
         let moved = match range {
-            Some((min, max)) => design_tokens::widgets::slider(
-                ui,
-                egui::Slider::new(&mut amount, min..=max).show_value(true),
-            )
-            .changed(),
+            Some((min, max)) => {
+                let mut shown = amount as f32;
+                let moved = controls::slider(ui, &mut shown, min as f32..=max as f32).changed();
+                ui.label(theme::faint(format!("{:.2}", tidy(f64::from(shown)))).size(12.0));
+                amount = f64::from(shown);
+                moved
+            }
             None => ui
                 .add(egui::DragValue::new(&mut amount).speed(0.01))
                 .changed(),

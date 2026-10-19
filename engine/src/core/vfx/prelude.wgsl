@@ -32,7 +32,7 @@ const HALF_PI: f32 = 1.5707964;
 @group(2) @binding(3) var<uniform> params: Params;
 
 // Every world site is drawn on a quad with a margin on each side, site_margin() wide; the screen
-// as is.
+// and text as they are.
 // `site_uv` runs 0..1 over the site itself and past that range on the margin. The margin is for
 // what the effect sheds, drifting clear of the body and dissolving: smoke, sparks, mist, the
 // outer wash of a glow. The effect proper keeps to the body the data describes.
@@ -182,7 +182,7 @@ fn site_reach(uv: vec2<f32>) -> f32 {
 // How much of the site's body a site uv covers, 1 inside and 0 out, softened over a tenth of a
 // tile at the edge: a sprite's or the screen's is its image's own alpha.
 fn site_cover(uv: vec2<f32>) -> f32 {
-    if site.kind == SITE_ACTOR || site.kind == SITE_OBJECT || site.kind == SITE_SCREEN {
+    if site_has_image() {
         return sample(uv).a;
     }
     return 1.0 - smoothstep(-0.05, 0.05, site_distance(uv));
@@ -191,10 +191,17 @@ fn site_cover(uv: vec2<f32>) -> f32 {
 // The site's image at a site uv, or, on a site that has none, a white sheet of its body for a
 // shader that reshapes or recolors what it is given to work on.
 fn sheet(at: vec2<f32>) -> vec4<f32> {
-    if site.kind == SITE_ACTOR || site.kind == SITE_OBJECT || site.kind == SITE_SCREEN {
+    if site_has_image() {
         return sample(at);
     }
     return vec4<f32>(1.0, 1.0, 1.0, site_cover(at) * 0.6);
+}
+
+// Whether the site is an image: a sprite, the screen, or a line of text drawn white in its glyphs'
+// coverage.
+fn site_has_image() -> bool {
+    return site.kind == SITE_ACTOR || site.kind == SITE_OBJECT || site.kind == SITE_SCREEN
+        || site.kind == SITE_TEXT;
 }
 
 // `effect` drawn over `image`: what a shader returns to show through to the sprite it is on.
@@ -279,9 +286,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 // Nothing may stop hard at the edge of the quad a site is drawn on: whatever a shader paints fades
-// out over the outer half tile of the margin. The screen is drawn without a margin.
+// out over the outer half tile of the margin. The screen and text are drawn without one.
 fn quad_guard(uv: vec2<f32>) -> f32 {
-    if site.kind == SITE_SCREEN {
+    if site.kind == SITE_SCREEN || site.kind == SITE_TEXT {
         return 1.0;
     }
     let quad = site.tiles * site.overscan;

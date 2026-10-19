@@ -1,4 +1,4 @@
-use driver::{UiTarget, finished, holding, noticed, on_quest};
+use driver::{UiTarget, finished, holding, input_name, noticed, on_quest};
 use engine::core::tiling::Tiles;
 use engine::systems::input::map::InputAction;
 use engine::systems::quest::QuestResult;
@@ -28,13 +28,16 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "tattered_map") == 1
     });
 
-    me.caption_top("The map begins a quest — double-click it in your bag to use it");
+    me.caption(&format!(
+        "The map begins a quest — {} it in your bag to use it",
+        input_name(InputAction::UseItem)
+    ));
     me.act(InputAction::ToggleInventory);
     me.hover_ui(UiTarget::image(MAP));
     me.hold();
     me.act_on_ui(InputAction::UseItem, UiTarget::image(MAP));
     me.on_stage("offer");
-    me.caption_top("No one to talk to: just you, and the map");
+    me.caption("No one to talk to: just you, and the map");
     me.read_to_choices();
     me.hold();
     me.pick("Accept");
@@ -53,7 +56,7 @@ fn play(shoot: &mut Shoot) {
         on_quest(snapshot, "x_marks_the_spot").is_some_and(|quest| quest.ready)
     });
     me.on_stage("matches");
-    me.caption_top("A map object takes the hand-in, like any townsperson");
+    me.caption("A map object takes the hand-in, like any townsperson");
     me.read_to_choices();
     me.hold();
     me.pick("Dig where the cross says.");
@@ -70,7 +73,7 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("I'm listening.");
     me.on_stage("plea_answer");
-    me.caption_top(
+    me.caption(
         "Both answers are permanent, so this one shows everything: what it needs, what it costs, and a warning",
     );
     me.read_to_choices();
@@ -84,7 +87,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the failed quest in the feed", |snapshot| {
         noticed(snapshot, "Quest failed · Tusks for the Chief")
     });
-    me.caption_top("Mara's quest fails, in red in the corner, and the choice is remembered");
+    me.caption("Mara's quest fails, in red over your head, and the choice is remembered");
     me.read_to_choices();
     me.pick("Rest easy, Ugra.");
     me.conversation_over();

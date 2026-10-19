@@ -81,7 +81,7 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
         return;
     };
     let body = notification_sent
-        .speaker
+        .actor
         .filter(|&body| world.get_entity(body).is_ok());
     let mut bubbles = world.resource_mut::<Bubbles>();
     let line = SpokenLine {
@@ -372,7 +372,7 @@ fn place(world: &mut World) {
     let Some(window) = window_size(world) else {
         return;
     };
-    let (now, still) = rows::motion_time(world, &gui);
+    let now = rows::time(&gui);
     let content = world.resource::<Content>().clone();
     let mut room = Room::of(world, window);
     let viewer = session::me(world).and_then(|seen| body_at(world, seen));
@@ -482,7 +482,7 @@ fn place(world: &mut World) {
         draw.rect = egui_rect(perch.rect(size));
         draws.push((draw.key, draw));
     }
-    let shown = bubbles.fades.sync(now, PRESENCE, still, draws);
+    let shown = bubbles.fades.sync(now, PRESENCE, draws);
     *world.resource_mut::<Bubbles>() = bubbles;
     for (draw, look) in shown {
         paint(world, &gui, &draw, look);

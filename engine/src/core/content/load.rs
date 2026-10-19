@@ -14,7 +14,7 @@ use serde::de::DeserializeOwned;
 
 use super::GAME_FILE;
 use super::check::RowCheck;
-use super::fixture::Fixture;
+use super::fixture::{Fixture, FixtureLock};
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE};
@@ -34,18 +34,18 @@ pub enum LoadStep {
     Assemble,
     // Checks across tables.
     Across,
+    // Checks of the game's settings, once they parsed.
     Settings,
     // Only once everything else loaded without an error.
     Compile,
 }
 
 type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
-type FixtureCheck = Box<dyn Fn(&Content) -> Vec<&'static str> + Send + Sync>;
-
 struct FixtureEntry {
     table: &'static str,
-    keys: Vec<&'static str>,
-    check: FixtureCheck,
+    whole_table: bool,
+    keys: Vec<(&'static str, Vec<FixtureLock>)>,
+    check: Hook,
 }
 
 pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> + Send + Sync>;
@@ -126,8 +126,12 @@ impl ContentRegistry {
     pub fn fixture<F: Fixture>(&mut self) -> &mut ContentRegistry {
         self.fixtures.push(FixtureEntry {
             table: F::Row::TABLE,
-            keys: F::VARIANTS.iter().map(|fixture| fixture.key()).collect(),
-            check: Box::new(F::missing),
+            whole_table: F::WHOLE_TABLE,
+            keys: F::VARIANTS
+                .iter()
+                .map(|fixture| (fixture.key(), fixture.locks()))
+                .collect(),
+            check: Box::new(check_fixture::<F>),
         });
         self
     }
@@ -167,17 +171,28 @@ impl ContentRegistry {
             .rows
             .iter()
             .map(|row| {
-                let fixtures: Vec<&str> = self
+                let fixtures = || {
+                    self.fixtures
+                        .iter()
+                        .filter(|fixture| fixture.table == row.name())
+                        .flat_map(|fixture| fixture.keys.iter())
+                };
+                let keys: Vec<&str> = fixtures().map(|(key, _)| *key).collect();
+                let locks: serde_json::Map<String, serde_json::Value> = fixtures()
+                    .filter(|(_, locks)| !locks.is_empty())
+                    .map(|(key, locks)| ((*key).to_owned(), serde_json::json!(locks)))
+                    .collect();
+                let closed = self
                     .fixtures
                     .iter()
-                    .filter(|fixture| fixture.table == row.name())
-                    .flat_map(|fixture| fixture.keys.iter().copied())
-                    .collect();
+                    .any(|fixture| fixture.table == row.name() && fixture.whole_table);
                 serde_json::json!({
                     "table": row.name(),
                     "folders": row.folders(),
                     "shape": row.shape(settings),
-                    "fixtures": fixtures,
+                    "fixtures": keys,
+                    "locks": locks,
+                    "closed": closed,
                 })
             })
             .collect();
@@ -363,7 +378,9 @@ pub fn load(
     loading.run_hooks(registry, LoadStep::Assemble);
     loading.run_hooks(registry, LoadStep::Across);
     loading.check_fixtures(registry);
-    loading.run_hooks(registry, LoadStep::Settings);
+    if loading.has_settings(registry) {
+        loading.run_hooks(registry, LoadStep::Settings);
+    }
     loading.check_version(registry, &version);
     loading.built(version.clone());
     if loading.errors.is_empty() {
@@ -679,6 +696,12 @@ impl Loading {
         self.built(FileHashes(hashes));
     }
 
+    fn has_settings(&mut self, registry: &ContentRegistry) -> bool {
+        registry
+            .settings_loader()
+            .is_some_and(|loader| loader.built(&self.content()))
+    }
+
     fn run_hooks(&mut self, registry: &ContentRegistry, step: LoadStep) {
         for (_, hook) in registry.hooks.iter().filter(|(at, _)| *at == step) {
             hook(self);
@@ -686,20 +709,8 @@ impl Loading {
     }
 
     fn check_fixtures(&mut self, registry: &ContentRegistry) {
-        let content = self.content();
         for fixture in &registry.fixtures {
-            let table = fixture.table;
-            for key in (fixture.check)(&content) {
-                self.file_error(
-                    super::row_file(table, key),
-                    ErrorPlace::WholeFile,
-                    ContentProblem::new(
-                        "missing fixture",
-                        "no such file",
-                        format!("one row for every {table} fixture the engine requires"),
-                    ),
-                );
-            }
+            (fixture.check)(self);
         }
     }
 
@@ -1137,6 +1148,7 @@ pub(super) trait SettingsLoader: Send + Sync {
     fn parse(&self, text: &str) -> ParseResult;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn store(&self, settings: Box<dyn Any + Send + Sync>, builder: &mut ContentBuilder);
+    fn built(&self, content: &Content) -> bool;
     fn version<'a>(&self, content: &'a Content) -> Option<&'a ContentVersion>;
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()>;
 }
@@ -1159,14 +1171,17 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
         builder.built(settings);
     }
 
+    fn built(&self, content: &Content) -> bool {
+        content.has_built::<G>()
+    }
+
     fn version<'a>(&self, content: &'a Content) -> Option<&'a ContentVersion> {
-        content
-            .has_built::<G>()
+        self.built(content)
             .then(|| content.built::<G>().content_version())
     }
 
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
-        if content.has_built::<G>() {
+        if self.built(content) {
             writer.json(GAME_FILE, content.built::<G>())?;
         }
         Ok(())
@@ -1490,4 +1505,50 @@ pub fn write(registry: &ContentRegistry, content: Content, root: &Path) -> io::R
     })
     .0;
     result.map(|()| writer)
+}
+
+/// Every fixture of `F` has its row, and every row keeps what the engine reads from it.
+fn check_fixture<F: Fixture>(loading: &mut Loading) {
+    let content = loading.content();
+    let table = F::Row::TABLE;
+    for fixture in F::VARIANTS {
+        let Some(id) = content.table::<F::Row>().id_of(fixture.key()) else {
+            loading.file_error(
+                super::row_file(table, fixture.key()),
+                ErrorPlace::WholeFile,
+                ContentProblem::new(
+                    "missing fixture",
+                    "no such file",
+                    format!("one row for every {table} fixture the engine requires"),
+                ),
+            );
+            continue;
+        };
+        let Ok(row) = serde_json::to_value(id.get(&content)) else {
+            continue;
+        };
+        let mut check = RowCheck::default();
+        for lock in fixture.locks() {
+            lock.check(&row, &mut check);
+        }
+        loading.row_errors(id, check);
+    }
+    if !F::WHOLE_TABLE {
+        return;
+    }
+    let fixed: Vec<&str> = F::VARIANTS.iter().map(|fixture| fixture.key()).collect();
+    for (id, _) in content.table::<F::Row>().iter() {
+        let key = id.key(&content);
+        if !fixed.contains(&key) {
+            loading.file_error(
+                super::row_file(table, key),
+                ErrorPlace::WholeFile,
+                ContentProblem::new(
+                    "row the engine never reads",
+                    key,
+                    format!("one of the {table} fixtures the engine requires"),
+                ),
+            );
+        }
+    }
 }
