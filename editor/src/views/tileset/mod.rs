@@ -525,12 +525,19 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
     let selection = editor.selection.clone();
-    if selection.table == TABLE
-        && selection.keys.first().is_some_and(|k| k == key)
-        && !selection.parts.is_empty()
-    {
-        sidebar::inspector(ui, "tileset", |ui| inspect_parts(editor, ui, &selection));
-    }
+    sidebar::inspector(ui, "tileset", |ui| {
+        if selection.table == TABLE
+            && selection.keys.first().is_some_and(|k| k == key)
+            && !selection.parts.is_empty()
+        {
+            inspect_parts(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(
+                ui,
+                "Select tiles, a terrain or an animation to inspect it here.",
+            );
+        }
+    });
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {

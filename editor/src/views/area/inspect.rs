@@ -26,7 +26,7 @@ use crate::forms::FormCx;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{patterns, row_form, theme, widgets};
+use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
@@ -54,19 +54,6 @@ pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     palette_summary(ui, &content, area_id);
     spawn_card(editor, ui, key, &content);
     ways_in(editor, ui, key);
-}
-
-/// Whether anything inside the area wants the inspector: selected modules or blueprint parts, a
-/// paste or a pick under way, or a tool with settings of its own.
-pub fn has_inspector(editor: &Editor, key: &str) -> bool {
-    let view_key = super::area_view_key(key);
-    let Some(view) = editor.views.area.views.get(&view_key) else {
-        return false;
-    };
-    selected_parts(editor, key)
-        || view.paste.is_some()
-        || editor.pick.is_some()
-        || !matches!(view.tool, AreaTool::Select | AreaTool::Module)
 }
 
 /// The area window's inspector: the selected modules, the blueprint parts edited in place, a paste
@@ -129,7 +116,10 @@ fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
         AreaTool::Terrain => terrain_card(editor, ui, &view_key, &content, area_id),
         AreaTool::Stamp => stamp_card(editor, ui, &view_key, &content),
-        AreaTool::Select | AreaTool::Module => {}
+        AreaTool::Select | AreaTool::Module => sidebar::nothing_selected(
+            ui,
+            "Select modules on the map, or take a tool with settings, to inspect them here.",
+        ),
     }
 }
 

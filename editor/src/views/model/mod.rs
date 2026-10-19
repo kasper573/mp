@@ -243,12 +243,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let page = editor.views.model.view(key).page;
     sidebar::row(ui, "model", |ui| row_form::show_row(editor, ui, TABLE, key));
     let selection = editor.selection.clone();
-    if selection.table == TABLE
-        && selection.keys.first().is_some_and(|k| k == key)
-        && !selection.parts.is_empty()
-    {
-        sidebar::inspector(ui, "model", |ui| inspect_parts(editor, ui, &selection));
-    }
+    sidebar::inspector(ui, "model", |ui| {
+        if selection.table == TABLE
+            && selection.keys.first().is_some_and(|k| k == key)
+            && !selection.parts.is_empty()
+        {
+            inspect_parts(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(ui, "Select a strip, frame or face to inspect it here.");
+        }
+    });
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {

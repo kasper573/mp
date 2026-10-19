@@ -1,11 +1,19 @@
 use egui::Ui;
 
-use super::{Edge, divide, panel_body};
+use super::{Edge, divide, panel_body, theme};
 
 /// A view's inspector of what is selected inside it: a resizable column on the right of its
 /// window, scrolled as a whole.
 pub fn inspector(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
     column(ui, ("inspector", id), Side::Right, body);
+}
+
+/// What an inspector says while nothing inside its view is picked: how to pick something.
+pub fn nothing_selected(ui: &mut Ui, call_to_action: &str) {
+    ui.add_space(24.0);
+    ui.vertical_centered(|ui| {
+        ui.label(theme::muted(call_to_action).size(13.0));
+    });
 }
 
 /// The row a view works on, laid out on the left of its window.

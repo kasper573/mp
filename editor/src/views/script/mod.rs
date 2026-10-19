@@ -631,11 +631,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     } else {
         RowSelection::row(&table, &key)
     };
-    if inspect::has_inspector(editor, &doc, &selection) {
-        sidebar::inspector(ui, "script", |ui| {
-            inspect::show(editor, ui, &doc, &selection)
-        });
-    }
+    sidebar::inspector(ui, "script", |ui| {
+        inspect::show(editor, ui, &doc, &selection)
+    });
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)
         .show(ui, |ui| {

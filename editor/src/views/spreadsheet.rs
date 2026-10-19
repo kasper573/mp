@@ -522,14 +522,18 @@ fn columns_cached(
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let selection = editor.selection.clone();
-    if selection.table == table
-        && selection
-            .parts
-            .first()
-            .is_some_and(|part| part.starts_with("#sheet/"))
-    {
-        sidebar::inspector(ui, "sheet-column", |ui| inspect(editor, ui, &selection));
-    }
+    sidebar::inspector(ui, "sheet-column", |ui| {
+        if selection.table == table
+            && selection
+                .parts
+                .first()
+                .is_some_and(|part| part.starts_with("#sheet/"))
+        {
+            inspect(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(ui, "Select a column to inspect it here.");
+        }
+    });
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)
         .show(ui, |ui| {

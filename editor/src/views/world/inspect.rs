@@ -19,7 +19,7 @@ use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
-use crate::ui::{theme, widgets};
+use crate::ui::{sidebar, theme, widgets};
 use crate::value;
 use crate::views::area as area_view;
 
@@ -36,18 +36,12 @@ fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
         color_panel(editor, ui, &map.atlas);
     } else if !view.lenses.is_empty() {
         lens_panel(editor, ui, &map.atlas);
+    } else {
+        sidebar::nothing_selected(
+            ui,
+            "Select cards, a warp, a region or a note, or lay a route, colouring or filter over the map, to inspect it here.",
+        );
     }
-}
-
-/// Whether the world window has anything to inspect: map parts selected, or a route, quest line,
-/// colouring or lens laid over the map.
-pub fn has_inspector(editor: &Editor) -> bool {
-    let view = &editor.views.world;
-    !super::selected(editor).is_empty()
-        || view.route.is_some()
-        || view.quest_line.is_some()
-        || view.color.is_some()
-        || !view.lenses.is_empty()
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {

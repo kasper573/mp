@@ -271,16 +271,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
-    if inspect::has_inspector(editor) {
-        sidebar::inspector(ui, "world", |ui| {
-            let selection = if editor.selection.table == WorldMapDef::TABLE {
-                editor.selection.clone()
-            } else {
-                RowSelection::row(WorldMapDef::TABLE, WorldMap::World.key())
-            };
-            inspect::inspect_parts(editor, ui, &selection);
-        });
-    }
+    sidebar::inspector(ui, "world", |ui| {
+        let selection = if editor.selection.table == WorldMapDef::TABLE {
+            editor.selection.clone()
+        } else {
+            RowSelection::row(WorldMapDef::TABLE, WorldMap::World.key())
+        };
+        inspect::inspect_parts(editor, ui, &selection);
+    });
     toolbar::show(editor, ui, &map);
     canvas::show(editor, ui, &map);
 }

@@ -446,9 +446,7 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
     sidebar::row(ui, "area", |ui| inspect::row(editor, ui, key));
-    if inspect::has_inspector(editor, key) {
-        sidebar::inspector(ui, "area", |ui| inspect::sidebar(editor, ui, key));
-    }
+    sidebar::inspector(ui, "area", |ui| inspect::sidebar(editor, ui, key));
     show_canvas(editor, ui, &view_key, key, None);
     play::banner(editor, ui);
 }
@@ -515,11 +513,13 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
     sidebar::row(ui, "blueprint", |ui| {
         parts::blueprint_row(editor, ui, key, &indices)
     });
-    if !indices.is_empty() {
-        sidebar::inspector(ui, "blueprint", |ui| {
-            parts::selected_parts(editor, ui, key, &indices)
-        });
-    }
+    sidebar::inspector(ui, "blueprint", |ui| {
+        if indices.is_empty() {
+            sidebar::nothing_selected(ui, "Select a part to inspect it here.");
+        } else {
+            parts::selected_parts(editor, ui, key, &indices);
+        }
+    });
     show_canvas(editor, ui, &view_key, &preview, Some(key));
 }
 

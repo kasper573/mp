@@ -16,15 +16,10 @@ use crate::forms::{FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
-use crate::ui::{dialogs, row_form, theme, widgets};
+use crate::ui::{dialogs, row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
-
-/// Whether anything inside the script wants the inspector: selected nodes, or a run in progress.
-pub fn has_inspector(editor: &Editor, doc: &ScriptDoc, selection: &RowSelection) -> bool {
-    !selected_nodes(doc, selection).is_empty() || editor.views.script.run_of(&doc.owner).is_some()
-}
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
     let owner = doc.owner.clone();
@@ -40,7 +35,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
         .id_salt(("script-inspector", owner.slug()))
         .show(ui, |ui| match names.as_slice() {
             [] => {
-                super::run::inspector(editor, ui, doc);
+                if !super::run::inspector(editor, ui, doc) {
+                    sidebar::nothing_selected(ui, "Select a node to inspect it here.");
+                }
             }
             [name] => {
                 let name = name.clone();
