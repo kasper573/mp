@@ -3,7 +3,7 @@ use bevy_terminal::TerminalInbox;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Name as ActorName;
 use crate::systems::area::AreaTag;
@@ -12,13 +12,11 @@ use crate::systems::movement::position;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Players};
-use crate::systems::script::effect::{Arrow, Link};
+use crate::systems::script::event::OBJECT_OR_NPC;
 use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::terminal::TerminalKind;
 use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility::{self, VIEW_DISTANCE};
-
-const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
 
 pub fn rebroadcast(world: &mut World) {
     let entries = world.resource::<TerminalInbox<TerminalKind>>().0.clone();
@@ -44,7 +42,7 @@ pub struct Say {
     pub text: Vec<Span>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub within: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -55,8 +53,8 @@ impl EffectDef<RiftScripting> for Say {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

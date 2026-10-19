@@ -20,7 +20,12 @@ struct Cut {
 
 @group(2) @binding(0) var world_texture: texture_2d<f32>;
 @group(2) @binding(1) var world_sampler: sampler;
-@group(2) @binding(2) var<uniform> tint: vec4<f32>;
+struct Grade {
+    scale: vec3<f32>,
+    offset: vec3<f32>,
+}
+
+@group(2) @binding(2) var<uniform> grade: Grade;
 @group(2) @binding(3) var snapshot_texture: texture_2d<f32>;
 @group(2) @binding(4) var<uniform> cut: Cut;
 
@@ -36,9 +41,6 @@ const VOID: vec3<f32> = vec3<f32>(0.0030, 0.0034, 0.0052);
 var<private> size: vec2<f32>;
 var<private> per_pixel: vec2<f32>;
 
-// pixel upscaling, the screen transitions, and screen tint (e.g. the death wash; what triggers
-// either lives in the game systems)
-
 @fragment
 fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     size = vec2<f32>(textureDimensions(world_texture));
@@ -48,10 +50,7 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     if cut.in_progress < 1.0 {
         color = vec4<f32>(transition(texel), 1.0);
     }
-    if tint.x > 0.5 {
-        color = vec4<f32>(min(color.r + 160.0 / 255.0, 1.0), color.g / 3.0, color.b / 3.0, color.a);
-    }
-    return color;
+    return vec4<f32>(min(color.rgb * grade.scale + grade.offset, vec3<f32>(1.0)), color.a);
 }
 
 fn crisp(texel: vec2<f32>) -> vec2<f32> {

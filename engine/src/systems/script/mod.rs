@@ -16,7 +16,9 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentProblem, ContentRow, Loading, ModuleSet, row_file};
+use crate::core::content::{
+    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleSet, row_file,
+};
 use crate::core::math::Pos;
 use crate::core::script::{
     self, BoxEnding, DialogueView, Expr, Instances, LineDef, OwnerKindDef, ScriptError, Scripts,
@@ -365,6 +367,32 @@ pub trait ScriptedRow: ModuleSet {
     fn script(module: &Self::Module) -> Option<&ScriptModule>;
 }
 
+impl OwnerRow {
+    pub fn of_row<Row: ScriptedRow>(id: ContentId<Row>) -> OwnerRow {
+        OwnerRow {
+            kind: Row::OWNER,
+            row: id.raw(),
+            object: None,
+        }
+    }
+
+    pub fn of_object(area: AreaId, index: u32) -> OwnerRow {
+        OwnerRow {
+            kind: OwnerKind::Object,
+            row: area.raw(),
+            object: Some(index),
+        }
+    }
+
+    pub fn of_placement(area: AreaId, ordinal: u32) -> OwnerRow {
+        OwnerRow {
+            kind: OwnerKind::Blueprint,
+            row: area.raw(),
+            object: Some(ordinal),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScriptSite {
     pub file: String,
@@ -423,11 +451,7 @@ pub fn build_all(loading: &mut Loading) {
                 })
                 .collect();
             bind(
-                OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: id.raw(),
-                    object: Some(index),
-                },
+                OwnerRow::of_object(id, index),
                 owner_label(OwnerKind::Object, key, Some(name)),
                 modules,
             );
@@ -449,11 +473,7 @@ pub fn build_all(loading: &mut Loading) {
                 })
                 .collect();
             bind(
-                OwnerRow {
-                    kind: OwnerKind::Blueprint,
-                    row: id.raw(),
-                    object: Some(ordinal as u32),
-                },
+                OwnerRow::of_placement(id, ordinal as u32),
                 owner_label(
                     OwnerKind::Blueprint,
                     blueprint,
@@ -504,12 +524,11 @@ fn bind_table<Row: ScriptedRow>(
                 Some((site, Row::script(module)?))
             })
             .collect();
-        let row = OwnerRow {
-            kind: Row::OWNER,
-            row: id.raw(),
-            object: None,
-        };
-        bind(row, owner_label(Row::OWNER, key, None), modules);
+        bind(
+            OwnerRow::of_row(id),
+            owner_label(Row::OWNER, key, None),
+            modules,
+        );
     }
 }
 
@@ -698,11 +717,7 @@ pub fn check_all(loading: &mut Loading) {
     for (id, def) in loading.rows::<ItemDef>(&content) {
         let usable = matches!(def.kind, ItemKind::Usable);
         let answers = scripts
-            .may_do(OwnerRow {
-                kind: OwnerKind::Item,
-                row: id.raw(),
-                object: None,
-            })
+            .may_do(OwnerRow::of_row(id))
             .answers(EventKind::Used);
         if usable && !answers {
             loading.row_error(

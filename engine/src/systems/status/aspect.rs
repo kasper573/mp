@@ -12,7 +12,7 @@ use crate::systems::notification;
 use crate::systems::script::effect::Audience;
 use crate::systems::script::event::RiftEvent;
 use crate::systems::script::{
-    EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, RiftInstances, RiftScripts,
+    EventKind, Owner as ScriptOwner, OwnerRow, RiftInstances, RiftScripts,
 };
 use crate::systems::skill::{self, Learned, Rank, SkillId, SkillKind};
 use crate::systems::vfx::{self, VfxShaderFixture};
@@ -36,15 +36,10 @@ impl AspectSource {
     }
 
     pub fn row(self) -> OwnerRow {
-        let (kind, row) = match self {
-            AspectSource::Status(id) => (OwnerKind::StatusEffect, id.raw()),
-            AspectSource::Item(id) => (OwnerKind::Item, id.raw()),
-            AspectSource::Skill(id) => (OwnerKind::Skill, id.raw()),
-        };
-        OwnerRow {
-            kind,
-            row,
-            object: None,
+        match self {
+            AspectSource::Status(id) => OwnerRow::of_row(id),
+            AspectSource::Item(id) => OwnerRow::of_row(id),
+            AspectSource::Skill(id) => OwnerRow::of_row(id),
         }
     }
 }

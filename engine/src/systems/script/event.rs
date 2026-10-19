@@ -5,7 +5,7 @@ use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use crate::core::content::serial;
 use crate::core::math::Pos;
-use crate::core::script::{EventDef, Name, ScriptFault, Value, ValueType};
+use crate::core::script::{EventDef, ScriptFault, Value, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::attention::AttentionId;
@@ -84,29 +84,30 @@ pub enum RiftEvent {
     },
 }
 
-const PLACED: &[OwnerKind] = &[
+pub(crate) const PLACED: &[OwnerKind] = &[
     OwnerKind::Object,
     OwnerKind::Npc,
     OwnerKind::Area,
     OwnerKind::Blueprint,
 ];
-const OBJECT_OR_AREA: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Area];
-const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
-const AREA: &[OwnerKind] = &[OwnerKind::Area];
-const NPC: &[OwnerKind] = &[OwnerKind::Npc];
-const ITEM: &[OwnerKind] = &[OwnerKind::Item];
-const ITEM_OR_SKILL: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill];
-const ASPECT: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill, OwnerKind::StatusEffect];
-const QUEST: &[OwnerKind] = &[OwnerKind::Quest];
-const SHOP: &[OwnerKind] = &[OwnerKind::Shop];
-const ANY: &[OwnerKind] = &[OwnerKind::Any];
+pub(crate) const OBJECT_OR_AREA: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Area];
+pub(crate) const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
+pub(crate) const AREA: &[OwnerKind] = &[OwnerKind::Area];
+pub(crate) const NPC: &[OwnerKind] = &[OwnerKind::Npc];
+pub(crate) const ITEM: &[OwnerKind] = &[OwnerKind::Item];
+pub(crate) const ITEM_OR_SKILL: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill];
+pub(crate) const ASPECT: &[OwnerKind] =
+    &[OwnerKind::Item, OwnerKind::Skill, OwnerKind::StatusEffect];
+pub(crate) const QUEST: &[OwnerKind] = &[OwnerKind::Quest];
+pub(crate) const SHOP: &[OwnerKind] = &[OwnerKind::Shop];
+pub(crate) const ANY: &[OwnerKind] = &[OwnerKind::Any];
 
-const TRADE_FIELDS: &[(Name, ValueType)] =
+const TRADE_FIELDS: &[(&str, ValueType)] =
     &[("item", ValueType::Integer), ("count", ValueType::Integer)];
 
 /// What a use hands its script: the aimed actor, the aimed point and the rank used at. An item
 /// raises it with none of them.
-pub const USED_FIELDS: &[(Name, ValueType)] = &[
+pub const USED_FIELDS: &[(&str, ValueType)] = &[
     ("target", ValueType::Actor),
     ("point", ValueType::Point),
     ("rank", ValueType::Integer),
@@ -156,7 +157,7 @@ impl EventDef<RiftScripting> for RiftEvent {
         matches!(self, RiftEvent::Run)
     }
 
-    fn fields(&self) -> &'static [(Name, ValueType)] {
+    fn fields(&self) -> &'static [(&'static str, ValueType)] {
         match self {
             RiftEvent::Bought { .. } | RiftEvent::Sold { .. } => TRADE_FIELDS,
             RiftEvent::Used => USED_FIELDS,

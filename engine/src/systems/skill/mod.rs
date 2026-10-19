@@ -533,11 +533,7 @@ impl SkillDef {
 
     pub fn answers_used(&self, scripts: &RiftScripts, id: SkillId) -> bool {
         scripts
-            .may_do(OwnerRow {
-                kind: OwnerKind::Skill,
-                row: id.raw(),
-                object: None,
-            })
+            .may_do(OwnerRow::of_row(id))
             .answers(EventKind::Used)
     }
 }
@@ -738,11 +734,7 @@ pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
     let scripts = content.built::<RiftScripts>();
     for (id, def) in loading.rows::<SkillDef>(&content) {
-        let may_do = scripts.may_do(OwnerRow {
-            kind: OwnerKind::Skill,
-            row: id.raw(),
-            object: None,
-        });
+        let may_do = scripts.may_do(OwnerRow::of_row(id));
         let aspect_events = [
             EventKind::Activated,
             EventKind::Deactivated,

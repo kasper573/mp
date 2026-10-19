@@ -7,7 +7,7 @@ use super::{Cooldowns, Rank, SkillId, SkillKind, Targeting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, NEXT, Name, ScriptFault, Value, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, NEXT, REFUSED, ScriptFault, Value, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::WallClock;
@@ -17,7 +17,7 @@ use crate::systems::item::Inventory;
 use crate::systems::notification;
 use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
+use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::event;
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Owner as ScriptOwner, OwnerKind, Reach, RiftInstances,
@@ -46,13 +46,13 @@ pub enum CastAim {
 #[schemars(extend("x-system" = "skill"))]
 pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub skill: SkillId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -241,17 +241,12 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
     );
 }
 
-const REFUSED: Name = "refused";
-
 impl EffectDef<RiftScripting> for UseSkill {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            (NEXT, self.next.as_deref()),
-            (REFUSED, self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,

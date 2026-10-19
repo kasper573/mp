@@ -92,7 +92,7 @@ impl Plugin for RenderPlugin {
         bevy::asset::embedded_asset!(app, "present.wesl");
         app.add_plugins(Material2dPlugin::<present::Present>::default())
             .init_resource::<Animator>()
-            .init_resource::<present::ScreenTint>()
+            .init_resource::<present::ScreenGrade>()
             .init_resource::<present::Viewport>()
             .init_resource::<GroundDepth>()
             .init_resource::<RowDepths>()

@@ -6,7 +6,7 @@ use super::{DroppedItem, Inventory, ItemId, ItemStack};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, REFUSED, ScriptFault, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
@@ -14,7 +14,7 @@ use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::effect as effects;
 use crate::systems::script::{Condition, EffectCall, Place, Reach, RiftScripting};
 use crate::systems::visibility::Presence;
 
@@ -23,14 +23,14 @@ use crate::systems::visibility::Presence;
 #[schemars(extend("x-system" = "item"))]
 pub struct Items {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub take: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub give: Vec<ItemStack>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -39,11 +39,11 @@ pub struct Items {
 #[schemars(extend("x-system" = "item"))]
 pub struct UseItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub item: ItemId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub used: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -52,11 +52,11 @@ pub struct UseItem {
 #[schemars(extend("x-system" = "item"))]
 pub struct Equip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub item: ItemId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -65,11 +65,11 @@ pub struct Equip {
 #[schemars(extend("x-system" = "item"))]
 pub struct Unequip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub slot: EquipmentSlot,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -78,13 +78,13 @@ pub struct Unequip {
 #[schemars(extend("x-system" = "item"))]
 pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub item: ItemId,
     #[schemars(extend("x-count" = true))]
     pub count: Condition,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -100,7 +100,7 @@ pub struct SpawnGroundItems {
     pub for_whom: GroundItemsFor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -111,7 +111,7 @@ pub struct ClearGroundItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
     pub within: Condition,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -123,9 +123,9 @@ pub struct MoveItems {
     pub to: Condition,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub items: Vec<ItemStack>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -147,11 +147,8 @@ impl EffectDef<RiftScripting> for Items {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -161,10 +158,10 @@ impl EffectDef<RiftScripting> for Items {
         let (take, give, refused) = (self.take.clone(), self.give.clone(), self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to trade with");
+                return effects::refuse(world, cx, &refused, "Nobody to trade with");
             };
             let outcome = exchange(world, actor, &take, &give);
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -180,11 +177,8 @@ impl EffectDef<RiftScripting> for UseItem {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("used", self.used.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("used", &self.used), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -194,10 +188,10 @@ impl EffectDef<RiftScripting> for UseItem {
         let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to use it");
+                return effects::refuse(world, cx, &refused, "Nobody to use it");
             };
             let outcome = super::use_held(world, actor, item);
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -209,11 +203,8 @@ impl EffectDef<RiftScripting> for Equip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -223,10 +214,10 @@ impl EffectDef<RiftScripting> for Equip {
         let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to equip");
+                return effects::refuse(world, cx, &refused, "Nobody to equip");
             };
             let outcome = equipment::equip_held(world, actor, item);
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -238,11 +229,8 @@ impl EffectDef<RiftScripting> for Unequip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -252,10 +240,10 @@ impl EffectDef<RiftScripting> for Unequip {
         let (slot, refused) = (self.slot, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to unequip");
+                return effects::refuse(world, cx, &refused, "Nobody to unequip");
             };
             let outcome = equipment::unequip_slot(world, actor, slot);
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -267,11 +255,8 @@ impl EffectDef<RiftScripting> for DropItems {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -282,11 +267,11 @@ impl EffectDef<RiftScripting> for DropItems {
         let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to drop them");
+                return effects::refuse(world, cx, &refused, "Nobody to drop them");
             };
             let count = count(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
             let outcome = drop_held(world, actor, ItemStack::new(item, count));
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -298,8 +283,8 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
     fn needs_subject(&self) -> bool {
         self.for_whom == GroundItemsFor::Subject || self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -341,8 +326,8 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
     fn needs_subject(&self) -> bool {
         self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -381,11 +366,8 @@ impl EffectDef<RiftScripting> for MoveItems {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -399,10 +381,10 @@ impl EffectDef<RiftScripting> for MoveItems {
                 effects::aimed_character(world, cx, &from),
                 effects::aimed_character(world, cx, &to),
             ) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to trade between");
+                return effects::refuse(world, cx, &refused, "Nobody to trade between");
             };
             let outcome = move_between(world, from, to, &items);
-            effects::settle(world, cx, refused.as_deref(), outcome)
+            effects::settle(world, cx, &refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {

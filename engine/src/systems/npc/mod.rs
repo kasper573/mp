@@ -67,11 +67,7 @@ pub fn check_all(loading: &mut Loading) {
 
 pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
     scripts
-        .may_do(OwnerRow {
-            kind: OwnerKind::Npc,
-            row: npc.raw(),
-            object: None,
-        })
+        .may_do(OwnerRow::of_row(npc))
         .reaches
         .contains(&Reach::Hostile)
 }
@@ -518,11 +514,7 @@ fn actor_bundle(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -
 fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
     let procedures = world
         .resource::<RiftScripts>()
-        .of(OwnerRow {
-            kind: OwnerKind::Npc,
-            row: def.raw(),
-            object: None,
-        })
+        .of(OwnerRow::of_row(def))
         .to_vec();
     let owner = Owner::Entity(OwnerKind::Npc, entity);
     let interactive = procedures

@@ -5,12 +5,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{Cooldowns, Learned};
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::core::script::Arrow;
+use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, ScriptFault};
 use crate::systems::class::{self, SkillPoints};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::notification::{self, Notification};
 use crate::systems::player::{self, player_requests};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::Condition;
+use crate::systems::script::effect as effects;
 use crate::systems::script::{EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
 use crate::systems::stat;
 use crate::systems::text::counted;
@@ -21,10 +23,10 @@ use crate::systems::text::counted;
 #[schemars(extend("x-system" = "skill"))]
 pub struct ResetSkills {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub accepted: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub declined: Arrow,
 }
 
@@ -44,18 +46,15 @@ pub struct ResetAnswerRequest {
 #[derive(Resource, Default)]
 pub struct PendingResets(HashMap<Entity, FlowKey>);
 
-const ACCEPTED: Name = "accepted";
-const DECLINED: Name = "declined";
+const ACCEPTED: &str = "accepted";
+const DECLINED: &str = "declined";
 
 impl EffectDef<RiftScripting> for ResetSkills {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            (ACCEPTED, self.accepted.as_deref()),
-            (DECLINED, self.declined.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(ACCEPTED, &self.accepted), (DECLINED, &self.declined)]
     }
     fn pauses(&self) -> bool {
         true
@@ -164,7 +163,7 @@ impl ResetPrompt {
     }
 }
 
-fn answer(world: &mut World, flow: FlowKey, output: Name) {
+fn answer(world: &mut World, flow: FlowKey, output: &'static str) {
     world
         .resource_mut::<RiftInstances>()
         .answer(flow, Answer::Output(output));

@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
 };
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault, Value};
+use crate::core::script::Arrow;
+use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention::AttentionId;
 use crate::systems::dialogue;
@@ -18,7 +19,7 @@ use crate::systems::drain_requests;
 use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemId, ItemStack};
 use crate::systems::notification;
 use crate::systems::player::sender_player;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::effect as effects;
 use crate::systems::script::{
     self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
     RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
@@ -193,9 +194,9 @@ pub struct ShopReactions {
 #[schemars(extend("x-system" = "shop"))]
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub shop: ShopId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub closed: Arrow,
 }
 
@@ -203,8 +204,8 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("closed", self.closed.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("closed", &self.closed)]
     }
     fn pauses(&self) -> bool {
         true

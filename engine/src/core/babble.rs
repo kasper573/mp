@@ -15,7 +15,7 @@ use crate::core::content::{
 };
 use crate::core::math::Rng;
 use crate::core::text::{
-    StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal, TypewriterSpeed,
+    LettersPerSecond, StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal,
     advance_typewriters, reveal_times,
 };
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
@@ -182,7 +182,7 @@ fn babble(
     content: Res<Content>,
     mut revealed: MessageReader<TypewriterReveal>,
     typing: Query<(Entity, &Babbling, &Typewriter, &StyledLine)>,
-    speed: Res<TypewriterSpeed>,
+    speed: Res<LettersPerSecond>,
     time: Res<Time>,
     mut mouth: Local<Mouth>,
     mut voice: Voice,
@@ -274,7 +274,7 @@ struct Syllable {
 #[derive(Clone, Copy)]
 struct Spoken {
     glyph: Glyph,
-    voice: TextVoice,
+    voice: Option<TextVoice>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -331,15 +331,15 @@ impl Syllable {
             _ => 1.0,
         };
         match here.voice {
-            TextVoice::Shout => {
+            Some(TextVoice::Shout) => {
                 intonation = intonation + SHOUT_LIFT;
                 loudness *= SHOUT_LOUDNESS;
             }
-            TextVoice::Whisper => {
+            Some(TextVoice::Whisper) => {
                 intonation = intonation + WHISPER_DROP;
                 loudness *= WHISPER_LOUDNESS;
             }
-            TextVoice::Normal => {}
+            None => {}
         }
         let letter = letter_of(here.glyph);
         Some(Syllable {
@@ -366,7 +366,7 @@ fn spoken(text: &StyledLine) -> Vec<Spoken> {
                 .collect(),
             TextPiece::Key(_) => vec![Spoken {
                 glyph: Glyph::Input,
-                voice: TextVoice::Normal,
+                voice: None,
             }],
             TextPiece::Pause(_) => Vec::new(),
         })

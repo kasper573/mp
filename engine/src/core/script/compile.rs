@@ -13,9 +13,8 @@ use super::node::{
 use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKindDef, QueryDef,
-    ScriptError, ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType,
-    Vocabulary,
+    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, OwnerKindDef, QueryDef, ScriptError,
+    ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::{Content, ContentId, ContentRow};
 
@@ -26,7 +25,7 @@ pub type EffectCall<V> =
 pub enum EffectStep {
     /// Along the effect's first output: its way on when all went as planned.
     Done,
-    Output(Name),
+    Output(&'static str),
     Pause,
 }
 
@@ -136,7 +135,7 @@ pub enum Step<V: Vocabulary> {
     Effect {
         def: V::Effect,
         call: EffectCall<V>,
-        outputs: Vec<(Name, Option<StepIndex>)>,
+        outputs: Vec<(&'static str, Option<StepIndex>)>,
         pauses: bool,
         keeps_box: bool,
     },
@@ -521,7 +520,7 @@ fn compile_source<'c, V: Vocabulary>(
     }
     let index_of = |name: &str| names.iter().position(|known| *known == name).map(StepIndex);
     let arrow = |arrow: &'c Arrow, at: &'c str| -> Result<Option<StepIndex>, ScriptError> {
-        match arrow.as_deref() {
+        match arrow.to() {
             None => Ok(None),
             Some(name) => index_of(name).map(Some).ok_or_else(|| {
                 fail(
@@ -787,7 +786,7 @@ fn compile_source<'c, V: Vocabulary>(
                         format!("at most {MAX_CHOICES} choices"),
                     ));
                 }
-                if dialogue.next.is_some() && !dialogue.choices.is_empty() {
+                if dialogue.next.to().is_some() && !dialogue.choices.is_empty() {
                     return Err(node_fail(
                         "wrong type",
                         "next only without choices".to_owned(),
@@ -867,7 +866,7 @@ fn compile_source<'c, V: Vocabulary>(
                 let outputs = effect
                     .outputs()
                     .into_iter()
-                    .map(|(output, to)| match to {
+                    .map(|(output, to)| match to.to() {
                         None => Ok((output, None)),
                         Some(to) => index_of(to).map(|to| (output, Some(to))).ok_or_else(|| {
                             node_fail(
@@ -989,8 +988,8 @@ fn owned_slots(slots: &[(&str, ValueType)]) -> Vec<(String, ValueType)> {
 /// of the entry that started it.
 fn event_fields_by_node<V: Vocabulary>(
     nodes: &BTreeMap<String, Node<V>>,
-) -> HashMap<&str, &'static [(Name, ValueType)]> {
-    let mut fields: HashMap<&str, Option<&'static [(Name, ValueType)]>> = HashMap::new();
+) -> HashMap<&str, &'static [(&'static str, ValueType)]> {
+    let mut fields: HashMap<&str, Option<&'static [(&'static str, ValueType)]>> = HashMap::new();
     for (entry, node) in nodes {
         let Node::On { event, .. } = node else {
             continue;
@@ -1037,11 +1036,11 @@ fn node_arrows<V: Vocabulary>(node: &Node<V>) -> Vec<&str> {
             return effect
                 .outputs()
                 .into_iter()
-                .filter_map(|(_, to)| to)
+                .filter_map(|(_, to)| to.to())
                 .collect();
         }
     };
-    arrows.into_iter().filter_map(Option::as_deref).collect()
+    arrows.into_iter().filter_map(Arrow::to).collect()
 }
 
 fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
@@ -1192,7 +1191,7 @@ pub struct Compiler<'c, V: Vocabulary> {
     read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
     subject_read: bool,
-    event_fields: &'static [(Name, ValueType)],
+    event_fields: &'static [(&'static str, ValueType)],
 }
 
 type Arithmetic = (fn(i64, i64) -> i64, fn(f64, f64) -> f64);

@@ -22,14 +22,14 @@ pub enum Node<V: Vocabulary> {
     On {
         #[serde(flatten)]
         event: V::Event,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         next: Arrow,
     },
     If {
         test: Expr<V>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         yes: Arrow,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         no: Arrow,
     },
     Random {
@@ -40,20 +40,20 @@ pub enum Node<V: Vocabulary> {
         #[schemars(extend("x-count" = true))]
         times: Expr<V>,
         at_most: u32,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         each: Arrow,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         then: Arrow,
     },
     Wait {
         seconds: Expr<V>,
         at_most: f32,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         next: Arrow,
     },
     Set {
         values: Vec<Assignment<V>>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         next: Arrow,
     },
     Run {
@@ -62,7 +62,7 @@ pub enum Node<V: Vocabulary> {
         values: BTreeMap<String, VarValue<V>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         into: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Arrow::is_none")]
         next: Arrow,
     },
     Return {

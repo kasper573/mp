@@ -11,7 +11,7 @@ use crate::core::audio::mix::{AudioCategory, AudioFader, AudioMix, AudioVolume};
 use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
-use crate::core::text::TypewriterSpeed;
+use crate::core::text::LettersPerSecond;
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{InputAction, KeyGesture};
 use crate::systems::interface::InterfaceIcon;
@@ -47,9 +47,6 @@ pub(crate) struct Placement {
     pub pos: Pos<WindowPx>,
     pub size: Size<WindowPx>,
 }
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub(crate) struct LettersPerSecond(pub f32);
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct HotbarShape {
@@ -314,21 +311,6 @@ impl UserSettings {
     }
 }
 
-impl LettersPerSecond {
-    pub(crate) const SLOWEST: LettersPerSecond = LettersPerSecond(15.0);
-    pub(crate) const FASTEST: LettersPerSecond = LettersPerSecond(120.0);
-
-    fn clamped(self) -> LettersPerSecond {
-        LettersPerSecond(self.0.clamp(Self::SLOWEST.0, Self::FASTEST.0))
-    }
-}
-
-impl Default for LettersPerSecond {
-    fn default() -> LettersPerSecond {
-        LettersPerSecond(45.0)
-    }
-}
-
 const KEY: &str = "rift.user_settings";
 pub const DEFAULT_SNAP: WindowPx = WindowPx(16.0);
 
@@ -398,14 +380,14 @@ fn persist(settings: Res<UserSettings>, platform: Res<ClientPlatform>) {
 
 fn apply(
     settings: Res<UserSettings>,
-    mut speed: ResMut<TypewriterSpeed>,
+    mut speed: ResMut<LettersPerSecond>,
     mut audio_mix: ResMut<AudioMix>,
     mut transition: ResMut<ScreenTransitionPreference>,
 ) {
     if !settings.is_changed() {
         return;
     }
-    *speed = TypewriterSpeed(Some(settings.text.letters_per_second.0));
+    *speed = settings.text.letters_per_second;
     *audio_mix = settings.sound;
     transition.0 = settings.screen.transition;
 }

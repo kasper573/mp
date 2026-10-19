@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use super::{AspectSource, StatusCategory, StatusEffectId, boost};
 use crate::core::content::Content;
-use crate::core::script::{Compiler, EffectDef, EffectStep, Expr, Name, ScriptFault, ValueType};
+use crate::core::script::{
+    Arrow, Compiler, EffectDef, EffectStep, Expr, NEXT, ScriptFault, ValueType,
+};
 use crate::core::time::Seconds;
 use crate::systems::item::ItemId;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::effect as effects;
 use crate::systems::script::{
     Condition, EffectCall, OwnerKind, OwnerRow, Reach, RiftScripting, RiftScripts,
 };
@@ -19,13 +21,13 @@ use crate::systems::stat::{Stat, StatKind};
 #[schemars(extend("x-system" = "status"))]
 pub struct ApplyStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub effect: StatusEffectId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub power: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -34,12 +36,12 @@ pub struct ApplyStatus {
 #[schemars(extend("x-system" = "status"))]
 pub struct RemoveStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect: Option<StatusEffectId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category: Option<StatusCategory>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -50,18 +52,16 @@ pub struct RemoveStatus {
 pub struct Boost {
     pub stat: StatKind,
     pub by: Condition,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
-
-const NEXT: Name = "next";
 
 impl EffectDef<RiftScripting> for ApplyStatus {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -93,8 +93,8 @@ impl EffectDef<RiftScripting> for RemoveStatus {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -125,8 +125,8 @@ impl EffectDef<RiftScripting> for Boost {
     fn needs_subject(&self) -> bool {
         true
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -153,11 +153,7 @@ impl EffectDef<RiftScripting> for Boost {
 pub fn boosts_of(content: &Content, item: ItemId) -> Vec<(StatKind, Option<f32>)> {
     content
         .built::<RiftScripts>()
-        .may_do(OwnerRow {
-            kind: OwnerKind::Item,
-            row: item.raw(),
-            object: None,
-        })
+        .may_do(OwnerRow::of_row(item))
         .reaches
         .iter()
         .filter_map(|reach| match reach {

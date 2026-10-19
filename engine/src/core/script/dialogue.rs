@@ -15,9 +15,9 @@ pub struct DialogueNode<V: Vocabulary> {
     pub lines: Vec<V::Line>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice<V>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub left: Arrow,
 }
 
@@ -32,7 +32,7 @@ pub struct Choice<V: Vocabulary> {
     pub reveal: Vec<V::Reveal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warn: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub to: Arrow,
 }
 

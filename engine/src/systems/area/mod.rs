@@ -588,11 +588,7 @@ pub fn warp_objects(content: &Content, area: AreaId) -> Vec<(u32, &ObjectDef)> {
     objects(placed(content, area))
         .filter(|(index, _)| {
             scripts
-                .may_do(OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: area.raw(),
-                    object: Some(*index),
-                })
+                .may_do(OwnerRow::of_object(area, *index))
                 .reaches
                 .iter()
                 .any(|reach| matches!(reach, Reach::Warp(_)))

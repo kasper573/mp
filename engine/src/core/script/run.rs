@@ -12,7 +12,7 @@ use super::dialogue::{ChoiceOffer, DialogueView};
 use super::may_do::MayDo;
 use super::node::MAX_LIVE_FLOWS;
 use super::value::Value;
-use super::{EventDef, Name, RevealDef, Vocabulary};
+use super::{EventDef, RevealDef, Vocabulary};
 use crate::core::math::Rng;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -56,7 +56,7 @@ pub enum Pause {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Answer {
-    Output(Name),
+    Output(&'static str),
     Pick(usize),
     Left,
 }

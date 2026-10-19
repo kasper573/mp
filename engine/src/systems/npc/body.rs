@@ -5,8 +5,9 @@ use strum::IntoStaticStr;
 
 use crate::core::content::Content;
 use crate::core::math::{Pos, Rng};
+use crate::core::script::Arrow;
 use crate::core::script::{
-    Answer, Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, Value, ValueType,
+    Answer, Compiler, EffectDef, EffectStep, Eval, FlowCx, ScriptFault, Value, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
@@ -15,7 +16,7 @@ use crate::systems::dialogue;
 use crate::systems::movement::{self, Approach};
 use crate::systems::npc::{Home, Npc, Roams};
 use crate::systems::reach;
-use crate::systems::script::effect::{Aim, Arrow, Link};
+use crate::systems::script::event::NPC;
 use crate::systems::script::{
     Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
 };
@@ -58,7 +59,7 @@ pub enum Outcome {
 }
 
 impl Outcome {
-    pub fn name(self) -> Name {
+    pub fn name(self) -> &'static str {
         self.into()
     }
 }
@@ -326,7 +327,7 @@ pub struct Wander {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leash: Option<Condition>,
     pub priority: u8,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -337,11 +338,11 @@ pub struct WalkTo {
     pub to: WalkTarget,
     pub within: Condition,
     pub priority: u8,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub arrived: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub blocked: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }
 
@@ -360,11 +361,11 @@ pub struct Attack {
     pub target: Condition,
     pub within: Condition,
     pub priority: u8,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub defeated: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub lost: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }
 
@@ -373,7 +374,7 @@ pub struct Attack {
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Stop {
     pub priority: u8,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -383,9 +384,9 @@ pub struct Stop {
 #[schemars(extend("x-system" = "actor"))]
 pub struct FaceToward {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub toward: FaceTarget,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -398,8 +399,6 @@ pub enum FaceTarget {
 
 type Aimed<T> = Box<dyn Fn(&World, &FlowCx) -> Option<T> + Send + Sync>;
 
-const NPC: &[OwnerKind] = &[OwnerKind::Npc];
-
 impl EffectDef<RiftScripting> for Wander {
     fn owners(&self) -> &'static [OwnerKind] {
         NPC
@@ -407,8 +406,8 @@ impl EffectDef<RiftScripting> for Wander {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(Outcome::Next.name(), self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(Outcome::Next.name(), &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -438,11 +437,11 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
         vec![
-            (Outcome::Arrived.name(), self.arrived.as_deref()),
-            (Outcome::Blocked.name(), self.blocked.as_deref()),
-            (Outcome::Interrupted.name(), self.interrupted.as_deref()),
+            (Outcome::Arrived.name(), &self.arrived),
+            (Outcome::Blocked.name(), &self.blocked),
+            (Outcome::Interrupted.name(), &self.interrupted),
         ]
     }
     fn pauses(&self) -> bool {
@@ -495,11 +494,11 @@ impl EffectDef<RiftScripting> for Attack {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
         vec![
-            (Outcome::Defeated.name(), self.defeated.as_deref()),
-            (Outcome::Lost.name(), self.lost.as_deref()),
-            (Outcome::Interrupted.name(), self.interrupted.as_deref()),
+            (Outcome::Defeated.name(), &self.defeated),
+            (Outcome::Lost.name(), &self.lost),
+            (Outcome::Interrupted.name(), &self.interrupted),
         ]
     }
     fn pauses(&self) -> bool {
@@ -542,8 +541,8 @@ impl EffectDef<RiftScripting> for Stop {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(Outcome::Next.name(), self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(Outcome::Next.name(), &self.next)]
     }
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
@@ -563,8 +562,8 @@ impl EffectDef<RiftScripting> for FaceToward {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(Outcome::Next.name(), self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(Outcome::Next.name(), &self.next)]
     }
     fn compile<'c>(
         &'c self,

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use engine::core::text::{
-    InputRef, KeyCap, StyledSpan, TextPiece, TypewriterSpeed, reveal_duration, revealed,
+    InputRef, KeyCap, LettersPerSecond, StyledSpan, TextPiece, reveal_duration, revealed,
 };
 
-const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
+const TEN_PER_SECOND: LettersPerSecond = LettersPerSecond(10.0);
 
 #[test]
 fn characters_appear_at_the_typing_speed() {
@@ -27,14 +27,6 @@ fn slow_spans_take_longer_than_plain_ones() {
     let plain = [span("abcd")];
     let slow = [StyledSpan::plain("abcd").slow().into()];
     assert!(reveal_duration(&slow, TEN_PER_SECOND) > reveal_duration(&plain, TEN_PER_SECOND));
-}
-
-#[test]
-fn instant_speed_shows_everything_at_once() {
-    let line = [span("ab"), TextPiece::Pause(ms(500)), span("cd")];
-    let instant = TypewriterSpeed(None);
-    assert_eq!(revealed(&line, instant, ms(0)), 4);
-    assert_eq!(reveal_duration(&line, instant), ms(0));
 }
 
 #[test]

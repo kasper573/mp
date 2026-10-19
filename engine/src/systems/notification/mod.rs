@@ -26,7 +26,8 @@ use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, Row
 use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
 use crate::core::math::Rgba;
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
+use crate::core::text::TextMotion;
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::{VfxParams, VfxShaderId};
@@ -35,9 +36,10 @@ use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::screen::ClientScreen;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
+use crate::systems::script::Condition;
+use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
-use crate::systems::text::{self, LineText, Motion, Span};
+use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility;
 
 pub type NotificationId = ContentId<NotificationDef>;
@@ -323,7 +325,7 @@ pub enum NotificationDefKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tint: Option<Rgba>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        motion: Option<Motion>,
+        motion: Option<TextMotion>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         emblem: Option<AssetRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -386,9 +388,9 @@ impl From<&NotificationDefKind> for NotificationKind {
 #[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub notification: NotificationId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -396,8 +398,8 @@ impl EffectDef<RiftScripting> for Notify {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

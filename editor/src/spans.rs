@@ -1,7 +1,8 @@
 use design_tokens::ink;
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
-use engine::systems::text::{Ink, Motion, Voice};
+use engine::core::text::{TextMotion, TextVoice};
+use engine::systems::text::Ink;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
@@ -304,8 +305,8 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                 ui.spacing_mut().item_spacing.x = 4.0;
                 for (field, options) in [
                     ("ink", names::<Ink>()),
-                    ("voice", names::<Voice>()),
-                    ("motion", names::<Motion>()),
+                    ("voice", names::<TextVoice>()),
+                    ("motion", names::<TextMotion>()),
                 ] {
                     ui.menu_button(RichText::new(field).size(12.0), |ui| {
                         for option in options {
@@ -484,8 +485,8 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
         ui.horizontal_wrapped(|ui| {
             for (field, options) in [
                 ("ink", names::<Ink>()),
-                ("voice", names::<Voice>()),
-                ("motion", names::<Motion>()),
+                ("voice", names::<TextVoice>()),
+                ("motion", names::<TextMotion>()),
             ] {
                 let current = object
                     .get(field)

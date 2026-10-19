@@ -30,11 +30,26 @@ pub use value::{Value, ValueType};
 
 use crate::core::content::{Content, ContentId, ContentRow};
 
-pub type Name = &'static str;
 /// The output an effect takes when nothing else is said.
-pub const NEXT: Name = "next";
-pub type Arrow = Option<String>;
-pub type Link<'a> = Option<&'a str>;
+pub const NEXT: &str = "next";
+/// The output an effect takes when it would not do what it was asked.
+pub const REFUSED: &str = "refused";
+
+/// The node a flow goes on to, if any.
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(transparent)]
+#[schemars(extend("x-arrow" = true))]
+pub struct Arrow(Option<String>);
+
+impl Arrow {
+    pub fn to(&self) -> Option<&str> {
+        self.0.as_deref()
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.0.is_none()
+    }
+}
 
 /// What kind of thing owns a script, which decides the events raised for it and the effects it
 /// may use.
@@ -127,7 +142,7 @@ pub trait EventDef<V: Vocabulary>: Clone {
     fn owners(&self) -> &'static [V::OwnerKind];
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
-    fn fields(&self) -> &'static [(Name, ValueType)];
+    fn fields(&self) -> &'static [(&'static str, ValueType)];
     /// The rules the event's own values keep, beyond what the schema says.
     fn check(&self) -> Result<(), ScriptFault> {
         Ok(())
@@ -159,7 +174,7 @@ pub trait EffectDef<V: Vocabulary> {
         V::OwnerKind::VARIANTS
     }
     fn needs_subject(&self) -> bool;
-    fn outputs(&self) -> Vec<(Name, Link<'_>)>;
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)>;
     fn pauses(&self) -> bool {
         false
     }

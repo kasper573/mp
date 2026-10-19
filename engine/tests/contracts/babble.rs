@@ -9,11 +9,11 @@ use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{HushVoice, PlayClip, SfxPlace};
 use engine::core::babble::{BabbleId, BabblePlugin, BabbleRank, Babbling};
 use engine::core::content::Content;
-use engine::core::text::{StyledLine, TextPlugin, Typewriter, TypewriterSpeed};
+use engine::core::text::{LettersPerSecond, StyledLine, TextPlugin, Typewriter};
 use testkit::Game;
 
 const FRAME: Duration = Duration::from_millis(50);
-const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
+const TEN_PER_SECOND: LettersPerSecond = LettersPerSecond(10.0);
 
 #[test]
 fn a_babbling_line_speaks_a_clip_per_letter_as_it_types() {
@@ -107,7 +107,7 @@ fn a_line_cut_short_is_hushed_and_a_line_spoken_out_is_not() {
 fn spoken_at(frame: Duration, line: &str) -> Vec<(String, u32, u32)> {
     let mut app = voice_app();
     app.insert_resource(TimeUpdateStrategy::ManualDuration(frame))
-        .insert_resource(TypewriterSpeed(Some(45.0)))
+        .insert_resource(LettersPerSecond::default())
         .init_resource::<Spoken>()
         .add_systems(Last, note_clips);
     let babble = bram(&app);

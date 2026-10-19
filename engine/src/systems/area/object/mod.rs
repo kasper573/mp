@@ -218,11 +218,7 @@ pub fn spawn_all(world: &mut World) {
     let scripts = world.resource::<script::RiftScripts>().clone();
     for (index, object) in area::objects(area::placed(&content, zone)) {
         let index = index as usize;
-        let owner_row = OwnerRow {
-            kind: OwnerKind::Object,
-            row: zone.raw(),
-            object: Some(index as u32),
-        };
+        let owner_row = OwnerRow::of_object(zone, index as u32);
         let procedures = scripts.of(owner_row).to_vec();
         let may_do = scripts.may_do(owner_row);
         let interactive = procedures

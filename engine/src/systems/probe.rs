@@ -38,7 +38,7 @@ use crate::systems::notification::{self, NotificationRows, bubble, error, feed, 
 use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
-use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
+use crate::systems::script::{OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
 use crate::systems::skill::{self, Rank, SkillId, bar::SlotReport};
 use crate::systems::stat::{StatKind, Stats};
@@ -930,11 +930,7 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
     let scripts = world.resource::<RiftScripts>();
     let mut exits: Vec<ProbeExit> = area::objects(area::placed(content, area))
         .filter_map(|(index, object)| {
-            let owner = OwnerRow {
-                kind: OwnerKind::Object,
-                row: area.raw(),
-                object: Some(index),
-            };
+            let owner = OwnerRow::of_object(area, index);
             let warp = scripts
                 .may_do(owner)
                 .reaches

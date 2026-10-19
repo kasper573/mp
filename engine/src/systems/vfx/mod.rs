@@ -13,8 +13,9 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape, facing_from};
 use crate::core::math::Pos;
+use crate::core::script::Arrow;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, Name, ScriptFault, ValueType,
+    Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, ScriptFault, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, WallClock};
@@ -23,7 +24,6 @@ use crate::systems::WorldArea;
 use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
-use crate::systems::script::effect::{Arrow, Link};
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::skill::{self, SkillDef};
@@ -152,7 +152,7 @@ pub struct PlayVfx {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(extend("x-params-of" = "vfx"))]
     pub params: BTreeMap<String, Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -172,8 +172,8 @@ impl EffectDef<RiftScripting> for PlayVfx {
     fn needs_subject(&self) -> bool {
         self.on.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

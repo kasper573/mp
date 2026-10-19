@@ -5,9 +5,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, ContentId, ContentRow};
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, Value, ValueType};
+use crate::core::script::{
+    Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
+};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::effect as effects;
 use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
 
 pub type MemoryId = ContentId<MemoryDef>;
@@ -137,11 +139,11 @@ pub fn forget(world: &mut World, player: Entity, key: MemoryId) {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Remember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub memory: MemoryId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -150,10 +152,10 @@ pub struct Remember {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Forget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub memories: Vec<MemoryId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -161,8 +163,8 @@ impl EffectDef<RiftScripting> for Remember {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -192,8 +194,8 @@ impl EffectDef<RiftScripting> for Forget {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
