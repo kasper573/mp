@@ -25,7 +25,7 @@ use design_tokens::{ink, sheet, slip};
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
-use engine::core::content::{ContentRow, LoadReport, row_file};
+use engine::core::content::{ContentRow, LoadReport, RowName, row_file};
 use engine::core::vfx::{VfxDef, VfxShaderDef};
 use engine::systems::class::ClassDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
@@ -560,6 +560,10 @@ impl TabViewer for Viewer<'_> {
             | EditorTab::Rows { .. }
             | EditorTab::Game
             | EditorTab::Asset { .. } => {
+                if let EditorTab::Row { table, key } = tab {
+                    let row = RowName::new(table.as_str(), key.as_str());
+                    sidebar::local_content(self.editor, ui, "row", row);
+                }
                 egui::Frame::new()
                     .inner_margin(CONTENT_PADDING)
                     .show(ui, |ui| {

@@ -33,7 +33,7 @@ use std::ops::Deref;
 use bevy::prelude::World;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentRow, RowName, row_file};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
@@ -422,7 +422,10 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
     sidebar::row(ui, "area", |ui| inspect::row(editor, ui, key));
-    sidebar::inspector(ui, "area", |ui| inspect::sidebar(editor, ui, key));
+    let row = RowName::new(AreaDef::TABLE, key);
+    sidebar::inspector(editor, ui, "area", Some(row), |editor, ui| {
+        inspect::sidebar(editor, ui, key)
+    });
     show_canvas(editor, ui, &view_key, key, None);
     play::banner(editor, ui);
 }
@@ -490,7 +493,8 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
     sidebar::row(ui, "blueprint", |ui| {
         parts::blueprint_row(editor, ui, key, &indices)
     });
-    sidebar::inspector(ui, "blueprint", |ui| {
+    let row = RowName::new(BlueprintDef::TABLE, key);
+    sidebar::inspector(editor, ui, "blueprint", Some(row), |editor, ui| {
         if indices.is_empty() {
             sidebar::nothing_selected(ui, "Select a part to inspect it here.");
         } else {

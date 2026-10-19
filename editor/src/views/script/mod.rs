@@ -503,7 +503,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
     } else {
         RowSelection::row(&table, &key)
     };
-    sidebar::inspector(ui, "script", |ui| {
+    let row = RowName::new(ScriptDef::TABLE, &at.key);
+    sidebar::inspector(editor, ui, "script", Some(row), |editor, ui| {
         inspect::show(editor, ui, &doc, &selection)
     });
     egui::CentralPanel::default()

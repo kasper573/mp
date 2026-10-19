@@ -13,7 +13,7 @@ use std::ops::Not;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use engine::core::content::{ContentRow, row_file, row_of};
+use engine::core::content::{ContentRow, RowName, row_file, row_of};
 use engine::core::math::{Direction, FrameSize};
 use engine::systems::actor::{Action, ModelDef};
 use engine::systems::npc::NpcDef;
@@ -270,7 +270,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         row_form::show_row(editor, ui, ModelDef::TABLE, key)
     });
     let selection = editor.selection.clone();
-    sidebar::inspector(ui, "model", |ui| {
+    let name = RowName::new(ModelDef::TABLE, key);
+    sidebar::inspector(editor, ui, "model", Some(name), |editor, ui| {
         if selection.table == ModelDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()

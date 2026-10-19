@@ -4,7 +4,7 @@ pub mod tree;
 use std::collections::HashMap;
 
 use egui::Ui;
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentRow, RowName, row_file};
 use engine::systems::class::ClassDef;
 use engine::systems::stat::StatKind;
 use serde_json::Value;
@@ -71,14 +71,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     let page = editor.views.class.page(key);
     let selection = editor.selection.clone();
-    if page == ClassPage::Tree {
-        sidebar::inspector(ui, "class-node", |ui| {
+    let row = RowName::new(ClassDef::TABLE, key);
+    match page {
+        ClassPage::Tree => sidebar::inspector(editor, ui, "class", Some(row), |editor, ui| {
             if selection.keys.first().is_some_and(|k| k == key) && node_of(&selection).is_some() {
                 inspect::show(editor, ui, &selection);
             } else {
                 sidebar::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
             }
-        });
+        }),
+        ClassPage::Levels => sidebar::local_content(editor, ui, "class", row),
     }
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)

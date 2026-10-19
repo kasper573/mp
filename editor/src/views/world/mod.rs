@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use atlas::WorldAtlas;
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, Fixture, row_file};
+use engine::core::content::{Content, ContentRow, Fixture, RowName, row_file};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
@@ -273,7 +273,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
-    sidebar::inspector(ui, "world", |ui| {
+    let row = RowName::new(WorldMapDef::TABLE, WorldMap::World.key());
+    sidebar::inspector(editor, ui, "world", Some(row), |editor, ui| {
         let selection = if editor.selection.table == WorldMapDef::TABLE {
             editor.selection.clone()
         } else {

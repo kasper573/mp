@@ -26,6 +26,7 @@ use crate::ui::assets::AssetsState;
 use crate::ui::content_list::ContentLists;
 use crate::ui::row_form::preview::RowPreviewState;
 use crate::ui::row_form::usages;
+use crate::ui::sidebar::RightPanels;
 use crate::ui::{self, theme};
 
 #[derive(Component)]
@@ -34,6 +35,7 @@ pub struct EditorCamera;
 #[derive(Default)]
 pub struct EditorViews {
     pub content: ContentLists,
+    pub right: RightPanels,
     pub area: area::AreaViews,
     pub world: world::WorldView,
     pub script: script::ScriptViews,

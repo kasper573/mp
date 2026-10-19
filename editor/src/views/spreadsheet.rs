@@ -513,7 +513,7 @@ fn columns_cached(
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let selection = editor.selection.clone();
-    sidebar::inspector(ui, "sheet-column", |ui| {
+    sidebar::inspector(editor, ui, "sheet-column", None, |editor, ui| {
         if selection.table == table
             && selection
                 .parts

@@ -8,7 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use animation::OffsetUnit;
 use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentRow, RowName, row_file};
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
 use serde_json::Value;
@@ -523,7 +523,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
     let selection = editor.selection.clone();
-    sidebar::inspector(ui, "tileset", |ui| {
+    let row = RowName::new(TilesetDef::TABLE, key);
+    sidebar::inspector(editor, ui, "tileset", Some(row), |editor, ui| {
         if selection.table == TilesetDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()

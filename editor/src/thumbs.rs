@@ -22,6 +22,7 @@ enum Entry {
 #[derive(Clone)]
 pub struct Thumbnail {
     pub texture: TextureHandle,
+    /// The picture's own size in pixels, which a texture too big for the GPU is drawn down from.
     pub size: [usize; 2],
     pub hash: String,
 }
@@ -104,9 +105,11 @@ impl Thumbnails {
             return None;
         }
         *budget -= 1;
+        let max_side = ctx.input(|i| i.max_texture_side) as u32;
         let thumb = decode(bytes).map(|image| {
-            let image = to_color_image(prepare(image));
-            let size = image.size;
+            let image = prepare(image);
+            let size = [image.width() as usize, image.height() as usize];
+            let image = to_color_image(shrink(image, max_side));
             Thumbnail {
                 texture: ctx.load_texture(key.clone(), image, TextureOptions::NEAREST),
                 size,
