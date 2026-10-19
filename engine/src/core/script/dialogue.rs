@@ -18,6 +18,7 @@ pub struct DialogueNode<V: Vocabulary> {
     pub choices: Vec<Choice<V>>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub left: Arrow,
 }

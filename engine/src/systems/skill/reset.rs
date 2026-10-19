@@ -25,6 +25,7 @@ pub struct ResetSkills {
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub accepted: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub declined: Arrow,
 }

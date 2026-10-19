@@ -182,6 +182,8 @@ pub struct NodeOutput {
     pub name: String,
     /// When the node takes the output, as its definition says.
     pub meaning: Option<String>,
+    /// Whether the node takes the output when what it does fails.
+    pub fails: bool,
 }
 
 impl NodeEntry {
@@ -256,6 +258,7 @@ impl NodeCatalogue {
                         .map(|(name, field)| NodeOutput {
                             name: name.clone(),
                             meaning: schema::description(field).map(first_sentence),
+                            fails: field["x-fails"] == true,
                         })
                         .collect(),
                     fields: fields

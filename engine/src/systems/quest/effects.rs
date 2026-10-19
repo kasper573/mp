@@ -27,8 +27,10 @@ pub struct OfferQuest {
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub accepted: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub declined: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -42,6 +44,7 @@ pub struct AcceptQuest {
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -55,9 +58,11 @@ pub struct TurnIn {
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
     /// Taken when the card is closed without handing in.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub cancelled: Arrow,
 }

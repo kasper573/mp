@@ -60,6 +60,7 @@ pub struct Animate {
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
     /// Taken when the action can't play or is cut short.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }

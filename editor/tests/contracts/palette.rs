@@ -23,3 +23,26 @@ fn every_node_names_its_system_and_says_what_it_does() {
         );
     }
 }
+
+#[test]
+fn outputs_taken_on_failure_say_so_and_the_ways_on_do_not() {
+    let shapes = SchemaShapes::load();
+    let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE));
+    let outputs: Vec<_> = catalogue
+        .entries
+        .iter()
+        .flat_map(|entry| &entry.outputs)
+        .collect();
+    assert!(
+        outputs
+            .iter()
+            .filter(|output| output.name == "refused")
+            .all(|output| output.fails)
+    );
+    assert!(
+        outputs
+            .iter()
+            .filter(|output| output.name == "next" || output.name == "done")
+            .all(|output| !output.fails)
+    );
+}

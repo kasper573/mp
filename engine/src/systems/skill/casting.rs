@@ -51,6 +51,7 @@ pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
     /// Taken when the skill can't be cast, without telling anyone why.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }

@@ -31,6 +31,7 @@ pub struct Items {
     pub give: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -44,6 +45,7 @@ pub struct UseItem {
     pub item: ItemId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub used: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -57,6 +59,7 @@ pub struct Equip {
     pub item: ItemId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -70,6 +73,7 @@ pub struct Unequip {
     pub slot: EquipmentSlot,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -85,6 +89,7 @@ pub struct DropItems {
     pub count: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
@@ -126,6 +131,7 @@ pub struct MoveItems {
     pub items: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }

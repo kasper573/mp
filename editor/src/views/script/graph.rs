@@ -537,11 +537,14 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             match kind {
                 Some(NodeKind::On) => theme::WARN,
                 Some(NodeKind::Dialogue) => DIALOGUE,
-                Some(NodeKind::Effect) | None => match label.as_str() {
-                    "refused" | "blocked" | "lost" | "declined" | "cancelled" | "left"
-                    | "interrupted" => REFUSED,
-                    _ => theme::OK,
-                },
+                Some(NodeKind::Effect) | None => {
+                    let fails = self
+                        .node(&name)
+                        .and_then(|node| self.catalogue.entry(node.kind()))
+                        .and_then(|entry| entry.outputs.iter().find(|output| output.name == label))
+                        .is_some_and(|output| output.fails);
+                    if fails { REFUSED } else { theme::OK }
+                }
                 Some(_) => WIRE,
             }
         };

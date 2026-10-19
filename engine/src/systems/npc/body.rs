@@ -338,9 +338,11 @@ pub struct WalkTo {
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub arrived: Arrow,
     /// Taken when no way leads there.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub blocked: Arrow,
     /// Taken when another act of at least its priority takes the body.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }
@@ -362,9 +364,11 @@ pub struct Attack {
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub defeated: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub lost: Arrow,
     /// Taken when another act of at least its priority takes the body.
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }

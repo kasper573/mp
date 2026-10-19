@@ -66,6 +66,7 @@ pub struct Despawn {
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
+    #[schemars(extend("x-fails" = true))]
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
