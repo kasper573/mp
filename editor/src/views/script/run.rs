@@ -38,6 +38,7 @@ use engine::systems::script::{
     TraceStep,
 };
 use engine::systems::{self, GameSettings, TICK_HZ, memory, npc};
+use strum::VariantArray;
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
@@ -877,7 +878,7 @@ fn quests_card(
                 widgets::combo_box(("run-quest", key))
                     .selected_text(theme::mono(run_label(standing)))
                     .show_ui(ui, |ui| {
-                        for option in Standing::ALL {
+                        for &option in Standing::VARIANTS {
                             ui.selectable_value(&mut picked, option, run_label(option));
                         }
                     });

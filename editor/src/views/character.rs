@@ -5,20 +5,19 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
-use engine::systems::area::{self, AreaDef, AreaModule};
+use engine::systems::area::{self, AreaDef};
 use engine::systems::class::{ClassDef, SkillTree};
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
-use engine::systems::npc::NpcId;
-use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::player::snapshot::{CharacterSnapshot, QuestState};
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
 use engine::systems::skill::{HOTBAR_SLOTS, Rank, SkillDef};
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use strum::{AsRefStr, VariantArray};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use crate::app::{Editor, PlacePick};
@@ -44,11 +43,12 @@ pub struct CharacterView {
     pub more_memories: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize, VariantArray, AsRefStr)]
 #[serde(rename_all = "snake_case")]
 pub enum CharacterSection {
     #[default]
     Identity,
+    #[strum(serialize = "Stats and effects")]
     Stats,
     Bag,
     Equipment,
@@ -56,32 +56,18 @@ pub enum CharacterSection {
     Hotbar,
     Start,
     #[serde(rename = "areas")]
+    #[strum(serialize = "Areas known")]
     AreasKnown,
     Quests,
     Memories,
     #[serde(rename = "lines")]
+    #[strum(serialize = "Lines heard")]
     LinesHeard,
     Shops,
     History,
 }
 
 impl CharacterSection {
-    const ALL: [CharacterSection; 13] = [
-        CharacterSection::Identity,
-        CharacterSection::Stats,
-        CharacterSection::Bag,
-        CharacterSection::Equipment,
-        CharacterSection::Skills,
-        CharacterSection::Hotbar,
-        CharacterSection::Start,
-        CharacterSection::AreasKnown,
-        CharacterSection::Quests,
-        CharacterSection::Memories,
-        CharacterSection::LinesHeard,
-        CharacterSection::Shops,
-        CharacterSection::History,
-    ];
-
     fn page(self) -> (&'static [CharacterSection], &'static [CharacterSection]) {
         match self {
             CharacterSection::Identity
@@ -104,24 +90,6 @@ impl CharacterSection {
                 &[CharacterSection::LinesHeard, CharacterSection::Shops],
                 &[CharacterSection::History],
             ),
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            CharacterSection::Identity => "Identity",
-            CharacterSection::Stats => "Stats and effects",
-            CharacterSection::Bag => "Bag",
-            CharacterSection::Equipment => "Equipment",
-            CharacterSection::Skills => "Skills",
-            CharacterSection::Hotbar => "Hotbar",
-            CharacterSection::Start => "Start",
-            CharacterSection::AreasKnown => "Areas known",
-            CharacterSection::Quests => "Quests",
-            CharacterSection::Memories => "Memories",
-            CharacterSection::LinesHeard => "Lines heard",
-            CharacterSection::Shops => "Shops",
-            CharacterSection::History => "History",
         }
     }
 }
@@ -170,7 +138,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             });
             ui.add_space(6.0);
-            for candidate in CharacterSection::ALL {
+            for &candidate in CharacterSection::VARIANTS {
                 let selected = candidate == section;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
@@ -182,7 +150,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui.painter().text(
                     rect.left_center() + egui::vec2(10.0, 0.0),
                     egui::Align2::LEFT_CENTER,
-                    candidate.label(),
+                    candidate.as_ref(),
                     egui::FontId::proportional(13.5),
                     if selected { theme::TEXT } else { theme::MUTED },
                 );
@@ -288,7 +256,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     });
     editor.status.left.push(format!(
         "test character {key} › {}",
-        section.label().to_lowercase()
+        section.as_ref().to_lowercase()
     ));
     editor.status.left.push(match section {
         CharacterSection::Quests => {
@@ -946,7 +914,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     changed
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, VariantArray)]
 pub enum Standing {
     NotTaken,
     Active,
@@ -955,13 +923,6 @@ pub enum Standing {
 }
 
 impl Standing {
-    pub const ALL: [Standing; 4] = [
-        Standing::NotTaken,
-        Standing::Active,
-        Standing::Completed,
-        Standing::Failed,
-    ];
-
     pub fn label(self) -> &'static str {
         match self {
             Standing::NotTaken => "not taken",
@@ -982,21 +943,21 @@ impl Standing {
         }
     }
 
-    fn of(state: Option<&str>) -> Standing {
-        match state {
-            Some("active") => Standing::Active,
-            Some("completed") => Standing::Completed,
-            Some("failed") => Standing::Failed,
-            _ => Standing::NotTaken,
+    fn of(state: &Value) -> Standing {
+        match QuestState::deserialize(state) {
+            Ok(QuestState::Active) => Standing::Active,
+            Ok(QuestState::Completed) => Standing::Completed,
+            Ok(QuestState::Failed) => Standing::Failed,
+            Err(_) => Standing::NotTaken,
         }
     }
 
-    fn state(self) -> Option<&'static str> {
+    fn state(self) -> Option<QuestState> {
         match self {
             Standing::NotTaken => None,
-            Standing::Active => Some("active"),
-            Standing::Completed => Some("completed"),
-            Standing::Failed => Some("failed"),
+            Standing::Active => Some(QuestState::Active),
+            Standing::Completed => Some(QuestState::Completed),
+            Standing::Failed => Some(QuestState::Failed),
         }
     }
 }
@@ -1100,8 +1061,9 @@ fn quests(
                 let entry_index = value["quests"]
                     .as_array()
                     .and_then(|list| list.iter().position(|q| q["quest"].as_str() == Some(quest)));
-                let standing =
-                    Standing::of(entry_index.and_then(|i| value["quests"][i]["state"].as_str()));
+                let standing = Standing::of(
+                    entry_index.map_or(&Value::Null, |i| &value["quests"][i]["state"]),
+                );
                 let giver =
                     cx.content
                         .as_ref()
@@ -1146,7 +1108,7 @@ fn quests(
                             widgets::combo_box(("quest-state", quest))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
-                                    for option in Standing::ALL {
+                                    for &option in Standing::VARIANTS {
                                         ui.selectable_value(&mut picked, option, option.label());
                                     }
                                 });
@@ -1371,7 +1333,10 @@ fn apply_moment(
     parties: Option<&Parties>,
 ) {
     let objectives = objectives_of(cx, quest);
-    let giver_place = giver_of(cx, parties, quest).and_then(|party| npc_place(cx, party.npc?));
+    let giver_place = cx.content.as_ref().and_then(|content| {
+        let home = area::residence(content, giver_of(cx, parties, quest)?.npc?)?;
+        Some((home.area.key(content).to_owned(), home.at))
+    });
     match &moment {
         Moment::JustOffered => set_standing(value, quest, Standing::NotTaken),
         Moment::ObjectivesMet | Moment::ReadyToHandIn | Moment::Decided(_) => {
@@ -1419,20 +1384,6 @@ fn give(value: &mut Value, item: &str, count: u32) {
         }
         None => list.push(serde_json::json!({ "item": item, "count": count })),
     }
-}
-
-fn npc_place(cx: &FormCx, npc: NpcId) -> Option<(String, Pos<Tiles>)> {
-    let content = cx.content.clone()?;
-    content.ids::<AreaDef>().find_map(|area| {
-        area::placed(&content, area)
-            .iter()
-            .find_map(|placed| match &placed.module {
-                AreaModule::Resident(resident) if resident.npc == npc => {
-                    Some((area.key(&content).to_owned(), resident.at))
-                }
-                _ => None,
-            })
-    })
 }
 
 fn memories(
