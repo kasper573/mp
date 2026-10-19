@@ -15,7 +15,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
     ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck, serial,
@@ -71,7 +71,7 @@ pub struct VfxParam {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum VfxLayer {
     Sprite {
-        sheet: AssetRef,
+        sheet: ImageRef,
         frame: FrameSize,
         frames: u32,
         fps: Hertz,

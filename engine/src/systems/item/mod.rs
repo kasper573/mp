@@ -17,7 +17,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
@@ -328,7 +328,7 @@ pub type ItemId = ContentId<ItemDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ItemDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     pub sfx: ItemSfx,
     pub kind: ItemKind,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

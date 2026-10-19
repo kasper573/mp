@@ -1,23 +1,22 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::Direction;
-use engine::systems::actor::Action;
+use engine::core::time::Millis;
+use engine::systems::actor::{Action, ModelDef};
 use serde_json::Value;
 use strum::VariantArray;
 
 use super::{
     ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, starts_at, strip_of,
 };
-use engine::core::time::Millis;
-
 use crate::app::Editor;
-use crate::import;
 use crate::keymap::EditorKey;
-use crate::stage;
 use crate::ui::{theme, widgets};
+use crate::{import, stage};
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
@@ -122,9 +121,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     }
                 });
             });
-            if let Some(record) = editor.imports.record_for(super::TABLE, key).cloned() {
+            if let Some(record) = editor.imports.record_for(ModelDef::TABLE, key)
+                && let Some(file) = record.files.first()
+            {
                 ui.horizontal(|ui| {
-                    let export = import::show_path(editor, &record.export);
+                    let export = import::show_path(editor, file);
                     if record.missing() {
                         glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted(format!(

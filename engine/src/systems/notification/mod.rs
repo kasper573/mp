@@ -20,7 +20,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
@@ -322,7 +322,7 @@ pub enum NotificationDefKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         motion: Option<TextMotion>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        emblem: Option<AssetRef>,
+        emblem: Option<ImageRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sfx: Option<SfxId>,
     },

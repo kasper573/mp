@@ -24,7 +24,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck,
@@ -79,7 +79,7 @@ pub type SkillId = ContentId<SkillDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SkillDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     #[serde(default, skip_serializing_if = "SkillKind::is_active")]
     pub kind: SkillKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]

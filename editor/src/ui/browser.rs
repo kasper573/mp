@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui};
+use engine::core::assets::AssetKind;
 use engine::core::content::{ContentRow, GAME_FILE, row_of};
 use engine::systems::area::world_map::WorldMapDef;
 
@@ -270,12 +271,12 @@ pub fn row_icon(
 ) -> Option<IconImage> {
     let picture = picker::picture_of(&project.files, table, key)?;
     match picture.frame {
-        PictureFrame::Sprite(model) => {
+        PictureFrame::Sprite { size, frame } => {
             let thumb = form
                 .thumbnails
                 .image_within(ctx, &project.files, &picture.path, budget)?;
-            let frame = thumbs::model_frame(&model, &thumb);
-            let scale = 18.0 / frame.size.y.max(1.0);
+            let frame = thumbs::sprite_frame(size, frame, &thumb);
+            let scale = 18.0 / frame.size.y;
             Some(IconImage {
                 texture: thumb.texture.id(),
                 uv: frame.uv,
@@ -520,7 +521,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         let mut folders: BTreeSet<String> = std::collections::BTreeSet::new();
         for path in project.files.paths_under("assets/") {
             let relative = path.trim_start_matches("assets/");
-            if super::assets::kind(relative).is_none() {
+            if AssetKind::of(relative).is_none() {
                 continue;
             }
             if let Some((folder, _)) = relative.rsplit_once('/')

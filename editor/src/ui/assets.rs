@@ -1,7 +1,9 @@
-use design_tokens::glyph::Mark;
 use std::convert::Infallible;
 
+use design_tokens::glyph::Mark;
 use egui::Ui;
+use engine::core::assets::AssetKind;
+use engine::core::content::{ASSETS_DIR, asset_file, asset_of};
 
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
@@ -17,42 +19,6 @@ pub struct AssetsState {
     pub tree: TreeState,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AssetKind {
-    Image,
-    Audio,
-    Font,
-}
-
-impl AssetKind {
-    pub const ALL: &[AssetKind] = &[AssetKind::Image, AssetKind::Audio, AssetKind::Font];
-
-    pub fn id(self) -> &'static str {
-        match self {
-            AssetKind::Image => "image",
-            AssetKind::Audio => "audio",
-            AssetKind::Font => "font",
-        }
-    }
-
-    pub fn named(id: &str) -> Option<AssetKind> {
-        AssetKind::ALL.iter().copied().find(|kind| kind.id() == id)
-    }
-}
-
-pub fn kind(path: &str) -> Option<AssetKind> {
-    match path
-        .rsplit_once('.')
-        .map(|(_, ext)| ext.to_lowercase())
-        .as_deref()
-    {
-        Some("png") => Some(AssetKind::Image),
-        Some("wav") | Some("flac") | Some("ogg") => Some(AssetKind::Audio),
-        Some("ttf") | Some("otf") => Some(AssetKind::Font),
-        _ => None,
-    }
-}
-
 pub const ICON_DECODES_PER_FRAME: u32 = 4;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
@@ -64,9 +30,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let needle = state.search.to_lowercase();
     let paths: Vec<&str> = project
         .files
-        .paths_under("assets/")
-        .map(|path| path.trim_start_matches("assets/"))
-        .filter(|path| kind(path).is_some())
+        .paths_under(&format!("{ASSETS_DIR}/"))
+        .map(|file| asset_of(file))
+        .filter(|path| AssetKind::of(path).is_some())
         .filter(|path| needle.is_empty() || path.to_lowercase().contains(&needle))
         .collect();
     let total = paths.len();
@@ -79,9 +45,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             let name = path.rsplit('/').next().unwrap_or(path);
             let mut node = TreeNode::leaf(path, name);
             node.selected = selected.as_deref() == Some(path);
-            node.unsaved = project.is_unsaved(&format!("assets/{path}"));
+            node.unsaved = project.is_unsaved(&asset_file(path));
             node.drag = Some(Dragged::Asset(path.to_owned()));
-            node.icon = match kind(path)? {
+            node.icon = match AssetKind::of(path)? {
                 AssetKind::Image => TreeIcon::Thumb(path.to_owned()),
                 AssetKind::Audio => TreeIcon::Mark(Mark::Note),
                 AssetKind::Font => TreeIcon::Mark(Mark::Page),
@@ -136,7 +102,7 @@ pub fn icon_image(thumb: &thumbs::Thumbnail) -> IconImage {
     let scale = (16.0 / h.max(1) as f32).min(16.0 / w.max(1) as f32);
     IconImage {
         texture: thumb.texture.id(),
-        uv: egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        uv: thumbs::FULL_UV,
         size: egui::vec2(w as f32 * scale, h as f32 * scale),
     }
 }

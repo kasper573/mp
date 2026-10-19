@@ -1,21 +1,22 @@
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::Direction;
+use engine::core::time::Millis;
+use engine::systems::actor::ModelDef;
+use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES};
 use serde_json::Value;
 use strum::VariantArray;
 
 use super::{
-    FrameCueKind, MAX_FRAME_MS, MAX_FRAMES, ModelPage, ModelStrip, StripFrame, action_timing,
-    play_rule, starts_at, strip_of, total_ms,
+    FrameCueKind, ModelPage, ModelStrip, StripFrame, action_timing, play_rule, starts_at, strip_of,
+    total_ms,
 };
-use engine::core::time::Millis;
-
 use crate::app::Editor;
-use crate::import;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
-use crate::stage;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
+use crate::{import, stage};
 
 const CARD_H: f32 = 128.0;
 const LANE_LABEL: f32 = 56.0;
@@ -59,7 +60,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     header(editor, ui, key, row, strip);
     keys(editor, ui, key, &frames, &sheet);
     let frames = strip_of(
-        &editor.row_value(super::TABLE, key).unwrap_or(row.clone()),
+        &editor
+            .row_value(ModelDef::TABLE, key)
+            .unwrap_or(row.clone()),
         strip,
     );
     let dt = ui.input(|i| i.stable_dt).min(0.1);
@@ -496,8 +499,8 @@ pub fn insert_frame(
     at: usize,
     sheet_frame: u32,
 ) {
-    if frames.len() >= MAX_FRAMES {
-        editor.toast(format!("A strip holds at most {MAX_FRAMES} frames"));
+    if frames.len() >= MAX_STRIP_FRAMES {
+        editor.toast(format!("A strip holds at most {MAX_STRIP_FRAMES} frames"));
         return;
     }
     let mut added = frames.to_vec();
@@ -996,8 +999,8 @@ pub fn keys(
         return;
     }
     if dup && !selected.is_empty() {
-        if frames.len() + selected.len() > MAX_FRAMES {
-            editor.toast(format!("A strip holds at most {MAX_FRAMES} frames"));
+        if frames.len() + selected.len() > MAX_STRIP_FRAMES {
+            editor.toast(format!("A strip holds at most {MAX_STRIP_FRAMES} frames"));
             return;
         }
         let mut sorted = selected.clone();

@@ -15,7 +15,7 @@ use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, ModuleRule, row_file};
 use engine::core::script::ScriptModuleKind;
 use engine::core::vfx::VfxShaderDef;
-use engine::systems::actor::model::ModelDef;
+use engine::systems::actor::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::class::ClassDef;

@@ -7,7 +7,7 @@ use bevy_ecs::prelude::*;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
@@ -39,7 +39,7 @@ pub struct ObjectDef {
     pub label: Option<String>,
     pub shape: ObjectShape,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub look: Option<AssetRef>,
+    pub look: Option<ImageRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shown: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

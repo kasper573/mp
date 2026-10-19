@@ -9,7 +9,7 @@ use bevy_egui::{
 use egui::load::SizedTexture;
 use egui::{LayerId, Order};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::asset_of;
 
 /// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
@@ -240,7 +240,7 @@ pub fn pointer_menu<R>(
 }
 
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.
-pub fn image(world: &mut World, asset: &AssetRef) -> Option<GuiImage> {
+pub fn image(world: &mut World, asset: &ImageRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
 }
 

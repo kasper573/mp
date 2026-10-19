@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
+use engine::core::assets::AssetKind;
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::{Content, ContentRow, LoadReport, row_file};
 use engine::core::script::VariableType;
@@ -13,7 +14,6 @@ use serde_json::{Map, Value};
 use crate::keymap::EditorKey;
 use crate::project::{Project, ProjectFiles};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
-use crate::ui::assets::AssetKind;
 use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
@@ -1494,12 +1494,14 @@ fn asset(
     value: &mut Value,
     path: &str,
 ) -> FormChange {
-    let kinds: Vec<AssetKind> = schema["x-asset"]
+    let Some(kind) = schema["x-asset"]
         .as_str()
-        .and_then(AssetKind::named)
-        .map_or_else(|| AssetKind::ALL.to_vec(), |kind| vec![kind]);
+        .and_then(|kind| kind.parse::<AssetKind>().ok())
+    else {
+        return FormChange::default();
+    };
     let mut file = value.as_str().unwrap_or_default().to_owned();
-    if picker::asset_of(ui, cx, &kinds, &mut file, path) {
+    if picker::asset_of(ui, cx, kind, &mut file, path) {
         *value = Value::String(file);
         return FormChange::at(path);
     }

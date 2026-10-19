@@ -13,7 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Fixture, Loading, ModuleRule, ModuleSet,
@@ -326,7 +326,7 @@ impl QuestDef {
         )
     }
 
-    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a ImageRef {
         if self.daily() {
             return &AttentionMark::RepeatableOffered.get(content).icon;
         }
@@ -411,7 +411,7 @@ impl ObjectiveKind {
 }
 
 impl Objective {
-    pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a AssetRef> {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a ImageRef> {
         match self {
             Objective::Hold(stack) => Some(&stack.item.get(content).icon),
             Objective::Deliver { item } => Some(&item.get(content).icon),
@@ -908,7 +908,7 @@ fn tell(
     world: &mut World,
     player: Entity,
     text: String,
-    icon: Option<&AssetRef>,
+    icon: Option<&ImageRef>,
     sfx: Option<SfxId>,
 ) {
     let mut told = Notification::feed(HistoryTopic::Quest, text);
@@ -1200,7 +1200,7 @@ fn announce(world: &mut World, player: Entity, clock: WallClock) {
     let Some(mut log) = log_of(world, player).cloned() else {
         return;
     };
-    let mut told: Vec<(String, &AssetRef, Option<SfxId>)> = Vec::new();
+    let mut told: Vec<(String, &ImageRef, Option<SfxId>)> = Vec::new();
     let ready: Vec<QuestId> = log
         .active
         .iter()

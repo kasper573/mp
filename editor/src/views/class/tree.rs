@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use design_tokens::{glyph, ink};
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use engine::core::assets::AssetKind;
 use engine::core::content::{Content, ContentRow};
 use engine::systems::class::{
     AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, NodeKey, SkillNode,
@@ -14,7 +15,6 @@ use strum::VariantArray;
 use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
 use crate::{picker, rows, thumbs};
@@ -224,7 +224,7 @@ fn backdrop_bar(
             ui.label(theme::muted("backdrop").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(260.0);
-                picker::asset_of(ui, cx, &[AssetKind::Image], &mut image, "/backdrop/image");
+                picker::asset_of(ui, cx, AssetKind::Image, &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
                 widgets::combo_box(ui.id().with("backdrop-fit"))

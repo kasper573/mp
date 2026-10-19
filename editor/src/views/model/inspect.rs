@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
-use engine::systems::actor::Action;
+use engine::core::assets::AssetKind;
+use engine::core::audio::playback::SfxDef;
+use engine::core::content::{ContentRow, row_of};
+use engine::systems::actor::model::MAX_FRAME_MS;
+use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
 use serde_json::Value;
 
-use super::{FrameCueKind, MAX_FRAME_MS, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
+use super::{FrameCueKind, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
 use crate::app::Editor;
-use crate::forms::FormChange;
+use crate::forms::{self, FormChange};
 use crate::keymap::EditorKey;
+use crate::picker;
 use crate::project::{ContentEdit, RowSelection};
-use crate::tabs::EditorTab;
-use crate::ui::assets::AssetKind;
 use crate::ui::{dialogs, row_form, theme, widgets};
-use crate::{forms, picker};
-use engine::core::content::row_of;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {
@@ -23,7 +24,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(part) = selection.parts.first().cloned() else {
         return;
     };
-    let Some(row) = editor.row_value(super::TABLE, &key) else {
+    let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
         return;
     };
     super::ensure_view(editor, &key);
@@ -640,8 +641,8 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::row(ui, cx, "sfx", sound, path)
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
+        picker::row(ui, cx, SfxDef::TABLE, sound, path)
     })
 }
 
@@ -652,8 +653,8 @@ fn asset_picker(
     file: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
+        picker::asset_of(ui, cx, AssetKind::Image, file, path)
     })
 }
 
@@ -774,8 +775,7 @@ fn face_card(
         widgets::hint(ui, "no line asks for an own face yet");
     }
     if let Some((table, row_key)) = open {
-        editor.select(RowSelection::row(&table, &row_key));
-        editor.open_tab(EditorTab::for_row(&table, &row_key));
+        editor.open_row(&table, &row_key);
     }
     if let Some(wanted) = rename_to
         && super::busts::rename(editor, key, face, &wanted)
@@ -835,7 +835,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         return;
     };
     let faces = editor
-        .row_value(super::TABLE, key)
+        .row_value(ModelDef::TABLE, key)
         .map(|row| super::busts::faces(&row))
         .unwrap_or_default();
     let mut decision = None;
@@ -889,7 +889,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     if apply && super::busts::remove(editor, key, &removing.face, &replacement) {
         let view = editor.views.model.view_mut(key);
         view.face = None;
-        editor.select(RowSelection::row(super::TABLE, key));
+        editor.select(RowSelection::row(ModelDef::TABLE, key));
     }
 }
 
@@ -933,7 +933,7 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/sprites/image") {
+        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
             changed = FormChange::at("/sprites/image");
         }

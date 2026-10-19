@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{ContentId, ContentRow, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
@@ -26,7 +26,7 @@ pub type AttentionId = ContentId<AttentionDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct AttentionDef {
-    pub icon: AssetRef,
+    pub icon: ImageRef,
 }
 
 impl ContentRow for AttentionDef {

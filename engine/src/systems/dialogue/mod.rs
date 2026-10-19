@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::IntoStaticStr;
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::script::{
     self, Answer, BoxEnding, ChoiceOffer, ChoiceState, DialogueView, RevealDef, ScriptFault,
@@ -128,7 +128,7 @@ pub type CardPick = Arc<dyn Fn(&mut World, Entity) -> Result<Answer, String> + S
 pub struct CardOffer {
     pub label: LineText,
     pub tag: ChoiceTag,
-    pub icon: Option<AssetRef>,
+    pub icon: Option<ImageRef>,
     pub chips: Vec<ChoiceChip>,
     pub locked: bool,
     pub warn: Option<String>,

@@ -1,12 +1,13 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::audio::playback::{SfxRoleDef, SfxScalar};
-use engine::core::content::ContentRow;
+use engine::core::audio::playback::{SfxDef, SfxRoleDef, SfxScalar};
+use engine::core::content::{ContentRow, row_file};
+use engine::systems::actor::ModelDef;
+use engine::systems::area::tileset::SurfaceDef;
 
 use crate::app::Editor;
 use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
 use crate::project::ContentEdit;
 use crate::ui::{theme, widgets};
-use engine::core::content::row_file;
 
 pub const PEAK_CEILING_DBFS: f64 = -12.0;
 
@@ -19,7 +20,7 @@ pub fn wave_of_sfx(editor: &mut Editor, sfx: &str) -> Option<Waveform> {
 
 pub fn sfx_file(editor: &Editor, sfx: &str) -> Option<String> {
     editor
-        .row_value("sfx", sfx)
+        .row_value(SfxDef::TABLE, sfx)
         .and_then(|row| row["file"].as_str().map(str::to_owned))
 }
 
@@ -63,7 +64,7 @@ pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
 }
 
 pub fn role_of_sfx(editor: &Editor, sfx: &str) -> Option<SfxRole> {
-    let row = editor.row_value("sfx", sfx)?;
+    let row = editor.row_value(SfxDef::TABLE, sfx)?;
     sfx_role(editor, row["role"].as_str()?)
 }
 
@@ -125,7 +126,11 @@ pub fn sfx_keys(editor: &Editor) -> Vec<String> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let mut keys: Vec<String> = project.files.keys_of("sfx").map(str::to_owned).collect();
+    let mut keys: Vec<String> = project
+        .files
+        .keys_of(SfxDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     keys.sort();
     keys
 }
@@ -140,11 +145,11 @@ pub fn surfaces(editor: &Editor) -> Vec<FootstepSurface> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let mut keys: Vec<&str> = project.files.keys_of("surface").collect();
+    let mut keys: Vec<&str> = project.files.keys_of(SurfaceDef::TABLE).collect();
     keys.sort_unstable();
     keys.into_iter()
         .filter_map(|key| {
-            let row = project.files.json(&row_file("surface", key))?;
+            let row = project.files.json(&row_file(SurfaceDef::TABLE, key))?;
             Some(FootstepSurface {
                 key: key.to_owned(),
                 name: row["name"].as_str().unwrap_or(key).to_owned(),
@@ -209,7 +214,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let current_sound = selected_cue
         .filter(|(_, kind)| *kind == super::FrameCueKind::Sound)
         .and_then(|(index, _)| {
-            let row = editor.row_value(super::TABLE, key)?;
+            let row = editor.row_value(ModelDef::TABLE, key)?;
             super::strip_of(&row, strip).get(index)?.sound.clone()
         });
     let mut play = None;
@@ -250,7 +255,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let view = editor.views.model.view_mut(key);
         view.last_sound = Some(sfx.clone());
         if let Some((index, super::FrameCueKind::Sound)) = selected_cue
-            && let Some(row) = editor.row_value(super::TABLE, key)
+            && let Some(row) = editor.row_value(ModelDef::TABLE, key)
         {
             let mut frames = super::strip_of(&row, strip);
             if let Some(frame) = frames.get_mut(index) {
@@ -337,7 +342,7 @@ pub fn pitch_of(editor: &Editor, sfx: &str) -> String {
 
 fn scalar_of(editor: &Editor, sfx: &str, field: &str) -> SfxScalar {
     editor
-        .row_value("sfx", sfx)
+        .row_value(SfxDef::TABLE, sfx)
         .and_then(|row| serde_json::from_value(row[field].clone()).ok())
         .unwrap_or_default()
 }

@@ -10,7 +10,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
@@ -34,7 +34,7 @@ pub type ClassId = ContentId<ClassDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ClassDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub flavour: String,
     pub levels: Vec<ClassLevel>,

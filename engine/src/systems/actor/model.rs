@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::Action;
-use crate::core::assets::{AssetRef, FileBytes};
+use crate::core::assets::{FileBytes, ImageRef};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
@@ -91,7 +91,7 @@ impl HitboxSize {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Sheet {
-    pub image: AssetRef,
+    pub image: ImageRef,
     pub frame_size: FrameSize,
     pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
 }
@@ -157,17 +157,17 @@ pub struct Busts {
 #[serde(deny_unknown_fields)]
 pub struct OwnBust {
     pub name: String,
-    pub file: AssetRef,
+    pub file: ImageRef,
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct GenericBusts {
-    pub neutral: AssetRef,
-    pub happy: AssetRef,
-    pub sad: AssetRef,
-    pub angry: AssetRef,
-    pub surprised: AssetRef,
-    pub thinking: AssetRef,
+    pub neutral: ImageRef,
+    pub happy: ImageRef,
+    pub sad: ImageRef,
+    pub angry: ImageRef,
+    pub surprised: ImageRef,
+    pub thinking: ImageRef,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -239,14 +239,14 @@ pub enum GenericExpression {
 }
 
 impl Busts {
-    pub fn all(&self) -> impl Iterator<Item = &AssetRef> {
+    pub fn all(&self) -> impl Iterator<Item = &ImageRef> {
         GenericExpression::VARIANTS
             .iter()
             .map(|&expression| self.generic.of(expression))
             .chain(self.own.iter().map(|own| &own.file))
     }
 
-    pub fn face(&self, face: &Face) -> Option<&AssetRef> {
+    pub fn face(&self, face: &Face) -> Option<&ImageRef> {
         match face {
             Face::Generic(expression) => Some(self.generic.of(*expression)),
             Face::Own(name) => self
@@ -259,7 +259,7 @@ impl Busts {
 }
 
 impl GenericBusts {
-    pub fn of(&self, expression: GenericExpression) -> &AssetRef {
+    pub fn of(&self, expression: GenericExpression) -> &ImageRef {
         match expression {
             GenericExpression::Neutral => &self.neutral,
             GenericExpression::Happy => &self.happy,
@@ -489,7 +489,7 @@ impl ActorModel {
         self.def.hitbox.tiles()
     }
 
-    pub fn sheet(&self) -> &AssetRef {
+    pub fn sheet(&self) -> &ImageRef {
         &self.def.sprites.image
     }
 

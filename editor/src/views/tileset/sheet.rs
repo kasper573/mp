@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
@@ -20,7 +20,6 @@ use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, rows, value};
-use engine::core::content::row_file;
 
 const WALKABLE: Color32 = Color32::from_rgb(110, 200, 110);
 const BLOCKS: Color32 = Color32::from_rgb(230, 90, 90);
@@ -363,7 +362,7 @@ fn make_blueprint(
     name: &str,
 ) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = rows::key_problem(&project.files, "blueprint", name) {
+    if let Some(problem) = rows::key_problem(&project.files, BlueprintDef::TABLE, name) {
         return Err(problem);
     }
     let id = tileset
@@ -403,10 +402,10 @@ fn make_blueprint(
         selection.count(),
         tileset.key
     ));
-    edit.write_row(row_file("blueprint", name), &blueprint);
+    edit.write_row(row_file(BlueprintDef::TABLE, name), &blueprint);
     editor.try_apply(edit)?;
     editor.toast(format!("blueprint/{name} is ready to stamp"));
-    editor.select(RowSelection::row("blueprint", name));
+    editor.select(RowSelection::row(BlueprintDef::TABLE, name));
     Ok(())
 }
 
