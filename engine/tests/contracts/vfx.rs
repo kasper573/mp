@@ -11,7 +11,7 @@ use engine::systems::class::{self, NodeKey};
 use engine::systems::combat::{self, Attitude};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
-use engine::systems::player::Owner;
+use engine::systems::player::PlayedBy;
 use engine::systems::skill::{self, CastAim, Rank, SkillDef, UseSkillRequest};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
@@ -55,7 +55,7 @@ fn healing_shows_but_regeneration_does_not() {
 #[test]
 fn a_level_reached_plays_on_the_actor_for_everyone_and_on_the_screen_for_the_player_alone() {
     let (mut sim, player) = arena();
-    let client = sim.world.get::<Owner>(player).expect("owner").client;
+    let client = sim.world.get::<PlayedBy>(player).expect("owner").client;
 
     class::grant_xp(&mut sim.world, player, 30);
     sim.tick();

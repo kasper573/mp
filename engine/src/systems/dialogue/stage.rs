@@ -25,7 +25,7 @@ use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
 use crate::core::gui::{self, Afterimage, Band, Tier};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece, Typewriter};
-use crate::systems::actor::model::{BustFigure, Busts, Face, GenericExpression, ModelId};
+use crate::systems::actor::model::{BustFigure, Busts, Expression, GenericExpression, ModelId};
 use crate::systems::actor::{ActorModel, Name};
 use crate::systems::hud;
 use crate::systems::input::map::{self, InputAction, InputMap};
@@ -221,7 +221,7 @@ struct Shown {
     choices: Vec<ChoiceView>,
     picked: bool,
     typed_since: Option<Duration>,
-    faces: HashMap<Speaker, Face>,
+    faces: HashMap<Speaker, Expression>,
     remark: Option<SpokenLine>,
     remarks_seen: u32,
     refusals_seen: u32,
@@ -334,7 +334,7 @@ fn follow_conversation(world: &mut World) {
 }
 
 impl Shown {
-    fn of(now: Conversation, faces: HashMap<Speaker, Face>) -> Shown {
+    fn of(now: Conversation, faces: HashMap<Speaker, Expression>) -> Shown {
         Shown {
             step: now.step,
             node: now.node,
@@ -1208,7 +1208,7 @@ fn cast_members(world: &World, now: Duration, before: &[CastMember]) -> Vec<Cast
                 .faces
                 .get(&who)
                 .cloned()
-                .unwrap_or(Face::Generic(GenericExpression::Neutral));
+                .unwrap_or(Expression::Generic(GenericExpression::Neutral));
             let bust = busts
                 .face(&face)
                 .unwrap_or_else(|| busts.generic.of(GenericExpression::Neutral));

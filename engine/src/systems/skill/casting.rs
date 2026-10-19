@@ -18,8 +18,8 @@ use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::{
-    Condition, EffectCall, EventKind, Owner as ScriptOwner, OwnerKind, Reach, RiftInstances,
-    RiftScripting, condition, event,
+    Condition, EffectCall, EventKind, Owner, OwnerKind, Reach, RiftInstances, RiftScripting,
+    condition, event,
 };
 use crate::systems::{notification, stat};
 
@@ -180,7 +180,7 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
             continue;
         }
         if let Err(reason) = ready(world, caster, skill) {
-            if world.get::<player::Owner>(caster).is_some() {
+            if world.get::<player::PlayedBy>(caster).is_some() {
                 notification::error(world, caster, reason);
             }
             reach::forget(world, caster);
@@ -230,7 +230,7 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
         notification::play_sound(world, Some(caster), Some(caster), sfx, Audience::Everyone);
     }
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Skill, skill.raw()),
+        Owner::Row(OwnerKind::Skill, skill.raw()),
         EventKind::Used,
         Some(caster),
         event::used_payload(target.actor(), target.point(), i64::from(rank.0)),

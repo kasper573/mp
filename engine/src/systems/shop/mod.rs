@@ -18,9 +18,8 @@ use crate::systems::item::{
 };
 use crate::systems::player::sender_player;
 use crate::systems::script::{
-    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
-    RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
-    effect as effects,
+    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, OwnerKind, Reach, RiftEvent,
+    RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition, effect as effects,
 };
 use crate::systems::{dialogue, drain_requests, notification};
 
@@ -517,7 +516,7 @@ pub(crate) fn marks(
 
 fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Shop, shop.raw()),
+        Owner::Row(OwnerKind::Shop, shop.raw()),
         kind,
         Some(player),
         vec![

@@ -19,7 +19,7 @@ use crate::systems::item::{DroppedItem, Inventory, ItemId};
 use crate::systems::memory::{self, MemoryId};
 use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, NpcId, Pack, body};
-use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
+use crate::systems::player::{ArrivalHold, PlayedBy};
 use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::script::OwnerKind;
 use crate::systems::skill::{self, SkillDef, SkillId, SkillStat};
@@ -112,11 +112,11 @@ type RosterQuery = QueryState<
         &'static AreaTag,
         Option<&'static Npc>,
         Option<&'static Stats>,
-        Has<PlayerOwner>,
+        Has<PlayedBy>,
         Has<ArrivalHold>,
         Has<Presence>,
     ),
-    Or<(With<PlayerOwner>, With<Npc>)>,
+    Or<(With<PlayedBy>, With<Npc>)>,
 >;
 
 pub fn take_tick_roster(world: &mut World, query: &mut RosterQuery) {
@@ -822,7 +822,7 @@ pub fn character(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
 }
 
 pub fn is_character(world: &World, who: Entity) -> bool {
-    world.get::<PlayerOwner>(who).is_some()
+    world.get::<PlayedBy>(who).is_some()
 }
 
 fn distance(world: &World, from: Entity, to: Entity) -> Option<Tiles> {

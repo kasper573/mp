@@ -12,9 +12,7 @@ use crate::systems::item::{Inventory, ItemId, ItemKind};
 use crate::systems::notification;
 use crate::systems::script::effect::Audience;
 use crate::systems::script::event::RiftEvent;
-use crate::systems::script::{
-    EventKind, Owner as ScriptOwner, OwnerRow, RiftInstances, RiftScripts,
-};
+use crate::systems::script::{EventKind, Owner, OwnerRow, RiftInstances, RiftScripts};
 use crate::systems::skill::{self, Learned, Rank, SkillId, SkillKind};
 use crate::systems::vfx::{self, VfxShaderFixture};
 
@@ -31,9 +29,9 @@ pub enum AspectSource {
 }
 
 impl AspectSource {
-    pub fn owner(self) -> ScriptOwner {
+    pub fn owner(self) -> Owner {
         let row = self.row();
-        ScriptOwner::Row(row.kind, row.row)
+        Owner::Row(row.kind, row.row)
     }
 
     pub fn row(self) -> OwnerRow {

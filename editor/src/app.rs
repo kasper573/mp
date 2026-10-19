@@ -29,7 +29,7 @@ use crate::project::{
     AppliedStep, ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
 };
 use crate::rows;
-use crate::scenes::{self, Step};
+use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
@@ -44,7 +44,7 @@ use crate::views::{self, EditorCamera, EditorViews};
 #[derive(Clone, Debug)]
 pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
-    pub scene: Option<Vec<Step>>,
+    pub scene: Option<Vec<SceneStep>>,
     pub user: Option<PathBuf>,
     pub frame_log: Option<PathBuf>,
 }
@@ -125,7 +125,7 @@ pub struct Editor {
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
     pub close_tabs: Option<CloseTabs>,
-    pub scene: Option<Vec<Step>>,
+    pub scene: Option<Vec<SceneStep>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
     pub play: play::PlayTest,

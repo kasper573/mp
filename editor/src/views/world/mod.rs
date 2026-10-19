@@ -20,7 +20,9 @@ use engine::core::content::{Content, ContentRow, Fixture, row_file};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
-use engine::systems::area::world_map::{Card, Note, Region, RegionColor, WorldMap, WorldMapDef};
+use engine::systems::area::world_map::{
+    AreaCard, Note, Region, RegionColor, WorldMap, WorldMapDef,
+};
 use engine::systems::area::{self, AreaDef, AreaId};
 use serde::Deserialize;
 
@@ -168,11 +170,11 @@ impl OpenWorldMap {
         })
     }
 
-    pub fn card_rect(&self, area: AreaId, card: &Card) -> Rect {
+    pub fn card_rect(&self, area: AreaId, card: &AreaCard) -> Rect {
         card_rect(self.atlas.size(area), card)
     }
 
-    pub fn art_rect(&self, area: AreaId, card: &Card) -> Rect {
+    pub fn art_rect(&self, area: AreaId, card: &AreaCard) -> Rect {
         art_rect(self.atlas.size(area), card)
     }
 
@@ -319,7 +321,7 @@ pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, co
     let Some(mut row) = project.files.json_owned(&file) else {
         return;
     };
-    let Ok(beside) = value::json(&Card {
+    let Ok(beside) = value::json(&AreaCard {
         size: card.size,
         ..new_card(at)
     }) else {
@@ -368,15 +370,15 @@ fn shows_areas(zoom: f32) -> bool {
     zoom * TILE.0 > AREA_PX_PER_TILE
 }
 
-fn card_at(card: &Card) -> Pos2 {
+fn card_at(card: &AreaCard) -> Pos2 {
     Pos2::new(card.at.x, card.at.y)
 }
 
-fn card_rect(size: Size<Tiles>, card: &Card) -> Rect {
+fn card_rect(size: Size<Tiles>, card: &AreaCard) -> Rect {
     Rect::from_center_size(card_at(card), footprint(size, card.size))
 }
 
-fn art_rect(size: Size<Tiles>, card: &Card) -> Rect {
+fn art_rect(size: Size<Tiles>, card: &AreaCard) -> Rect {
     Rect::from_center_size(card_at(card), art_size(size, card.size))
 }
 
@@ -392,8 +394,8 @@ fn right_of(rect: Rect, size: Vec2) -> Pos2 {
     Pos2::new(rect.max.x + GAP + size.x / 2.0, rect.center().y)
 }
 
-fn new_card(at: Pos2) -> Card {
-    let mut card = Card {
+fn new_card(at: Pos2) -> AreaCard {
+    let mut card = AreaCard {
         at: Pos::origin(),
         size: NEW_CARD_SIZE,
         pinned: false,
@@ -402,7 +404,7 @@ fn new_card(at: Pos2) -> Card {
     card
 }
 
-fn move_card(card: &mut Card, at: Pos2) {
+fn move_card(card: &mut AreaCard, at: Pos2) {
     card.at = Pos::new(hundredths(at.x), hundredths(at.y));
 }
 

@@ -160,7 +160,7 @@ pub struct AreaViewState {
     pub overlay_modules: bool,
     pub overlay_surfaces: bool,
     pub overlay_sort_lines: bool,
-    pub gesture: Option<Gesture>,
+    pub gesture: Option<AreaGesture>,
     pub pick: brush::TilePick,
     pub terrain: brush::TerrainPick,
     pub stamp: Option<String>,
@@ -206,20 +206,20 @@ impl AreaViewState {
 
     pub fn drag(&self) -> Option<&AreaDrag> {
         match &self.gesture {
-            Some(Gesture::Drag(drag)) => Some(drag),
+            Some(AreaGesture::Drag(drag)) => Some(drag),
             _ => None,
         }
     }
 
     pub fn drag_mut(&mut self) -> Option<&mut AreaDrag> {
         match &mut self.gesture {
-            Some(Gesture::Drag(drag)) => Some(drag),
+            Some(AreaGesture::Drag(drag)) => Some(drag),
             _ => None,
         }
     }
 
     pub fn set_drag(&mut self, drag: AreaDrag) {
-        self.gesture = Some(Gesture::Drag(drag));
+        self.gesture = Some(AreaGesture::Drag(drag));
     }
 
     pub fn set_tool(&mut self, tool: AreaTool) {
@@ -233,7 +233,7 @@ impl AreaViewState {
 
     pub fn take_drag(&mut self) -> Option<AreaDrag> {
         match self.gesture.take() {
-            Some(Gesture::Drag(drag)) => Some(drag),
+            Some(AreaGesture::Drag(drag)) => Some(drag),
             other => {
                 self.gesture = other;
                 None
@@ -243,25 +243,25 @@ impl AreaViewState {
 
     pub fn stroke(&self) -> Option<&brush::BrushStroke> {
         match &self.gesture {
-            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            Some(AreaGesture::Stroke(stroke)) => Some(stroke),
             _ => None,
         }
     }
 
     pub fn stroke_mut(&mut self) -> Option<&mut brush::BrushStroke> {
         match &mut self.gesture {
-            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            Some(AreaGesture::Stroke(stroke)) => Some(stroke),
             _ => None,
         }
     }
 
     pub fn set_stroke(&mut self, stroke: brush::BrushStroke) {
-        self.gesture = Some(Gesture::Stroke(stroke));
+        self.gesture = Some(AreaGesture::Stroke(stroke));
     }
 
     pub fn take_stroke(&mut self) -> Option<brush::BrushStroke> {
         match self.gesture.take() {
-            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            Some(AreaGesture::Stroke(stroke)) => Some(stroke),
             other => {
                 self.gesture = other;
                 None
@@ -276,7 +276,7 @@ pub struct PopulationPreview {
     pub seed: u64,
 }
 
-pub enum Gesture {
+pub enum AreaGesture {
     Drag(AreaDrag),
     Stroke(brush::BrushStroke),
 }
@@ -345,7 +345,7 @@ impl AreaViews {
 
     pub fn content_changed(&mut self) {
         for view in self.views.values_mut() {
-            if matches!(view.gesture, Some(Gesture::Stroke(_))) {
+            if matches!(view.gesture, Some(AreaGesture::Stroke(_))) {
                 view.gesture = None;
             }
         }
@@ -586,7 +586,7 @@ fn resolve_in_place(
     content: &Content,
     view_key: &str,
     area_key: &str,
-) -> Vec<placement::Placement> {
+) -> Vec<placement::AreaPlacement> {
     let path = editor.views.area.view(view_key).in_place.clone();
     if path.is_empty() {
         return Vec::new();
@@ -607,7 +607,7 @@ fn banners(
     view_key: &str,
     content: &Content,
     canvas_rect: ERect,
-    in_place: &[placement::Placement],
+    in_place: &[placement::AreaPlacement],
 ) {
     let (blueprint, area_key, preview_area) = {
         let view = editor.views.area.view(view_key);
@@ -701,7 +701,7 @@ fn canvas(
     content: &Content,
     area_id: AreaId,
     generation: u64,
-    in_place: Vec<placement::Placement>,
+    in_place: Vec<placement::AreaPlacement>,
 ) {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let painter = ui.painter_at(rect);
@@ -829,7 +829,7 @@ pub struct AreaSnapshot {
     pub area_id: AreaId,
     pub area_key: String,
     pub modules: Vec<Value>,
-    pub in_place: Vec<placement::Placement>,
+    pub in_place: Vec<placement::AreaPlacement>,
     pub placement_bounds: HashMap<usize, Rect<Tiles>>,
 }
 
@@ -856,7 +856,7 @@ impl AreaSnapshot {
         content: &Content,
         area_id: AreaId,
         area_key: &str,
-        in_place: Vec<placement::Placement>,
+        in_place: Vec<placement::AreaPlacement>,
     ) -> Self {
         let own = editor
             .row_value(AreaDef::TABLE, area_key)
@@ -942,7 +942,10 @@ fn is_selectable(module: &Value) -> bool {
     !(module.is_module(AreaModuleKind::Population) && module["roams"].is_null())
 }
 
-fn origin_of(center: Pos<Tiles>, in_place: &[placement::Placement]) -> (Pos<Tiles>, area::Flip) {
+fn origin_of(
+    center: Pos<Tiles>,
+    in_place: &[placement::AreaPlacement],
+) -> (Pos<Tiles>, area::Flip) {
     match in_place.last() {
         Some(place) => (place.at, place.flip),
         None => (

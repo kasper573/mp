@@ -17,7 +17,7 @@ use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::interact::Interactive;
 use crate::systems::movement::Position;
 use crate::systems::npc::Npc;
-use crate::systems::player::Owner as PlayerOwner;
+use crate::systems::player::PlayedBy;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
     self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Place, RiftEvent, RiftInstances,
@@ -295,7 +295,7 @@ pub fn shape_of(world: &World, object: Entity) -> Option<ObjectShape> {
 }
 
 type Actors =
-    QueryState<(Entity, &'static Position, &'static AreaTag), Or<(With<PlayerOwner>, With<Npc>)>>;
+    QueryState<(Entity, &'static Position, &'static AreaTag), Or<(With<PlayedBy>, With<Npc>)>>;
 
 pub fn track(
     world: &mut World,

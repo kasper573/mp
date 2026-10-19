@@ -13,7 +13,7 @@ use crate::core::time::Seconds;
 use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::movement::{Position, position};
-use crate::systems::player::Owner;
+use crate::systems::player::PlayedBy;
 use crate::systems::script::{
     Condition, EffectCall, Place, Reach, RiftScripting, effect as effects,
 };
@@ -310,7 +310,7 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
             let client = cx
                 .subject
                 .filter(|_| for_whom == GroundItemsFor::Subject)
-                .and_then(|subject| world.get::<Owner>(subject))
+                .and_then(|subject| world.get::<PlayedBy>(subject))
                 .map(|owner| owner.client);
             let presence = client.map(Presence::For);
             let drops: Vec<(ItemId, u32)> = items

@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::systems::player::{ClientId, Owner, Players};
+use crate::systems::player::{ClientId, PlayedBy, Players};
 use crate::systems::text::LineText;
 use crate::systems::visibility;
 
@@ -194,7 +194,7 @@ impl History {
 
 pub fn record(world: &mut World, player: Entity, entry: HistoryEntry) {
     let now = world.resource::<WallClock>().now;
-    let Some(subject) = world.get::<Owner>(player).map(|owner| owner.client) else {
+    let Some(subject) = world.get::<PlayedBy>(player).map(|owner| owner.client) else {
         return;
     };
     let Ok(mut entity) = world.get_entity_mut(player) else {
@@ -229,7 +229,7 @@ pub fn backfill(
         );
     }
     for (conn, player) in sends {
-        let Some(subject) = world.get::<Owner>(player).map(|owner| owner.client) else {
+        let Some(subject) = world.get::<PlayedBy>(player).map(|owner| owner.client) else {
             continue;
         };
         let records = world

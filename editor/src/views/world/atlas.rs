@@ -46,7 +46,7 @@ pub struct AtlasArea {
     pub residents: Vec<PlacedNpc>,
     pub populations: Vec<PlacedNpc>,
     pub doors: Vec<AtlasDoor>,
-    found: HashMap<RowName, Vec<RowSource>>,
+    found: HashMap<RowName, Vec<AtlasSource>>,
 }
 
 #[derive(Clone)]
@@ -87,14 +87,14 @@ pub enum OpenTarget {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RowSource {
-    pub kind: RowSourceKind,
+pub struct AtlasSource {
+    pub kind: AtlasSourceKind,
     pub name: String,
     pub opens: OpenTarget,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum RowSourceKind {
+pub enum AtlasSourceKind {
     Area,
     Warp,
     Placed,
@@ -117,28 +117,28 @@ pub enum RowSourceKind {
     Mention,
 }
 
-impl RowSourceKind {
+impl AtlasSourceKind {
     pub fn tag(self, count: usize) -> String {
         let (one, many) = match self {
-            RowSourceKind::Area => ("this area", "this area"),
-            RowSourceKind::Warp => ("warp", "warps"),
-            RowSourceKind::Placed => ("placed", "placed"),
-            RowSourceKind::Spawns => ("spawn", "spawns"),
-            RowSourceKind::Drop => ("drop", "drops"),
-            RowSourceKind::Gives => ("gift", "gifts"),
-            RowSourceKind::Sells | RowSourceKind::Opens => ("shop", "shops"),
-            RowSourceKind::Quest => ("quest", "quests"),
-            RowSourceKind::Offers => ("offer", "offers"),
-            RowSourceKind::Accepts => ("start", "starts"),
-            RowSourceKind::TurnsIn => ("turn-in", "turn-ins"),
-            RowSourceKind::Fails => ("failure", "failures"),
-            RowSourceKind::Completes => ("task", "tasks"),
-            RowSourceKind::Decides => ("decision", "decisions"),
-            RowSourceKind::Remembers => ("remembered", "remembered"),
-            RowSourceKind::Runs => ("script", "scripts"),
-            RowSourceKind::Named => ("named", "named"),
-            RowSourceKind::Module => ("module", "modules"),
-            RowSourceKind::Mention => ("mention", "mentions"),
+            AtlasSourceKind::Area => ("this area", "this area"),
+            AtlasSourceKind::Warp => ("warp", "warps"),
+            AtlasSourceKind::Placed => ("placed", "placed"),
+            AtlasSourceKind::Spawns => ("spawn", "spawns"),
+            AtlasSourceKind::Drop => ("drop", "drops"),
+            AtlasSourceKind::Gives => ("gift", "gifts"),
+            AtlasSourceKind::Sells | AtlasSourceKind::Opens => ("shop", "shops"),
+            AtlasSourceKind::Quest => ("quest", "quests"),
+            AtlasSourceKind::Offers => ("offer", "offers"),
+            AtlasSourceKind::Accepts => ("start", "starts"),
+            AtlasSourceKind::TurnsIn => ("turn-in", "turn-ins"),
+            AtlasSourceKind::Fails => ("failure", "failures"),
+            AtlasSourceKind::Completes => ("task", "tasks"),
+            AtlasSourceKind::Decides => ("decision", "decisions"),
+            AtlasSourceKind::Remembers => ("remembered", "remembered"),
+            AtlasSourceKind::Runs => ("script", "scripts"),
+            AtlasSourceKind::Named => ("named", "named"),
+            AtlasSourceKind::Module => ("module", "modules"),
+            AtlasSourceKind::Mention => ("mention", "mentions"),
         };
         match count {
             1 => one.to_owned(),
@@ -148,35 +148,35 @@ impl RowSourceKind {
 
     pub fn title(self) -> &'static str {
         match self {
-            RowSourceKind::Area => "The area itself",
-            RowSourceKind::Warp => "Warped to from",
-            RowSourceKind::Placed => "Placed in",
-            RowSourceKind::Spawns => "Spawned by",
-            RowSourceKind::Drop => "Dropped by",
-            RowSourceKind::Gives => "Given by",
-            RowSourceKind::Sells => "Sold in",
-            RowSourceKind::Quest => "Rewarded by",
-            RowSourceKind::Offers => "Offered by",
-            RowSourceKind::Accepts => "Started by",
-            RowSourceKind::TurnsIn => "Turned in at",
-            RowSourceKind::Fails => "Failed by",
-            RowSourceKind::Completes => "Tasks done at",
-            RowSourceKind::Decides => "Decided at",
-            RowSourceKind::Opens => "Opened by",
-            RowSourceKind::Remembers => "Remembered by",
-            RowSourceKind::Runs => "Run by",
-            RowSourceKind::Named => "Named in",
-            RowSourceKind::Module => "Has the module",
-            RowSourceKind::Mention => "Mentioned in",
+            AtlasSourceKind::Area => "The area itself",
+            AtlasSourceKind::Warp => "Warped to from",
+            AtlasSourceKind::Placed => "Placed in",
+            AtlasSourceKind::Spawns => "Spawned by",
+            AtlasSourceKind::Drop => "Dropped by",
+            AtlasSourceKind::Gives => "Given by",
+            AtlasSourceKind::Sells => "Sold in",
+            AtlasSourceKind::Quest => "Rewarded by",
+            AtlasSourceKind::Offers => "Offered by",
+            AtlasSourceKind::Accepts => "Started by",
+            AtlasSourceKind::TurnsIn => "Turned in at",
+            AtlasSourceKind::Fails => "Failed by",
+            AtlasSourceKind::Completes => "Tasks done at",
+            AtlasSourceKind::Decides => "Decided at",
+            AtlasSourceKind::Opens => "Opened by",
+            AtlasSourceKind::Remembers => "Remembered by",
+            AtlasSourceKind::Runs => "Run by",
+            AtlasSourceKind::Named => "Named in",
+            AtlasSourceKind::Module => "Has the module",
+            AtlasSourceKind::Mention => "Mentioned in",
         }
     }
 
     pub fn noun(self) -> &'static str {
         match self {
             _ if self.per_area() => "area",
-            RowSourceKind::Drop | RowSourceKind::Runs => "npc",
-            RowSourceKind::Sells => "shop",
-            RowSourceKind::Quest => "quest",
+            AtlasSourceKind::Drop | AtlasSourceKind::Runs => "npc",
+            AtlasSourceKind::Sells => "shop",
+            AtlasSourceKind::Quest => "quest",
             _ => "owner",
         }
     }
@@ -184,11 +184,11 @@ impl RowSourceKind {
     pub fn per_area(self) -> bool {
         matches!(
             self,
-            RowSourceKind::Area
-                | RowSourceKind::Placed
-                | RowSourceKind::Named
-                | RowSourceKind::Module
-                | RowSourceKind::Mention
+            AtlasSourceKind::Area
+                | AtlasSourceKind::Placed
+                | AtlasSourceKind::Named
+                | AtlasSourceKind::Module
+                | AtlasSourceKind::Mention
         )
     }
 }
@@ -382,7 +382,7 @@ impl WorldAtlas {
         })
     }
 
-    pub fn sources(&self, area: AreaId, table: &str, key: &str) -> &[RowSource] {
+    pub fn sources(&self, area: AreaId, table: &str, key: &str) -> &[AtlasSource] {
         self.areas
             .get(&area)
             .and_then(|info| info.found.get(&(table.to_owned(), key.to_owned())))
@@ -604,7 +604,7 @@ impl WorldAtlas {
     }
 
     fn find_sources(&mut self, content: &Content, usages: &ContentUsages, id: AreaId) {
-        let mut found: Vec<(&'static str, String, RowSource)> = Vec::new();
+        let mut found: Vec<(&'static str, String, AtlasSource)> = Vec::new();
         let Some(info) = self.areas.get(&id) else {
             return;
         };
@@ -612,7 +612,7 @@ impl WorldAtlas {
             key: info.key.clone(),
             module: None,
         };
-        let source = |kind: RowSourceKind, name: &str, opens: &OpenTarget| RowSource {
+        let source = |kind: AtlasSourceKind, name: &str, opens: &OpenTarget| AtlasSource {
             kind,
             name: name.to_owned(),
             opens: opens.clone(),
@@ -620,7 +620,7 @@ impl WorldAtlas {
         found.push((
             AreaDef::TABLE,
             info.key.clone(),
-            source(RowSourceKind::Area, &info.key, &here),
+            source(AtlasSourceKind::Area, &info.key, &here),
         ));
         let mut placed: BTreeMap<NpcId, (String, u32)> = BTreeMap::new();
         for npc in info.residents.iter().chain(&info.populations) {
@@ -634,7 +634,7 @@ impl WorldAtlas {
             found.push((
                 NpcDef::TABLE,
                 key.clone(),
-                source(RowSourceKind::Placed, &format!("×{count}"), &here),
+                source(AtlasSourceKind::Placed, &format!("×{count}"), &here),
             ));
             for loot in npc
                 .get(content)
@@ -645,7 +645,7 @@ impl WorldAtlas {
                 found.push((
                     ItemDef::TABLE,
                     loot.item.key(content).to_owned(),
-                    source(RowSourceKind::Drop, key, &opens),
+                    source(AtlasSourceKind::Drop, key, &opens),
                 ));
             }
             for quest in content.ids::<QuestDef>() {
@@ -653,7 +653,7 @@ impl WorldAtlas {
                     found.push((
                         ItemDef::TABLE,
                         drop.item.key(content).to_owned(),
-                        source(RowSourceKind::Drop, key, &opens),
+                        source(AtlasSourceKind::Drop, key, &opens),
                     ));
                 }
             }
@@ -662,29 +662,29 @@ impl WorldAtlas {
                     found.push((
                         ScriptDef::TABLE,
                         usage.value.clone(),
-                        source(RowSourceKind::Runs, key, &opens),
+                        source(AtlasSourceKind::Runs, key, &opens),
                     ));
                 }
             }
         }
         for owner in self.owners.iter().filter(|owner| owner.area == id) {
-            let by = |kind: RowSourceKind| source(kind, &owner.name, &owner.opens);
+            let by = |kind: AtlasSourceKind| source(kind, &owner.name, &owner.opens);
             for reach in &owner.reaches {
                 match reach {
                     Reach::Warp(place) => found.push((
                         AreaDef::TABLE,
                         place.area.key(content).to_owned(),
-                        by(RowSourceKind::Warp),
+                        by(AtlasSourceKind::Warp),
                     )),
                     Reach::Spawns(npc) => found.push((
                         NpcDef::TABLE,
                         npc.key(content).to_owned(),
-                        by(RowSourceKind::Spawns),
+                        by(AtlasSourceKind::Spawns),
                     )),
                     Reach::Gives(item) | Reach::Drops(item) => found.push((
                         ItemDef::TABLE,
                         item.key(content).to_owned(),
-                        by(RowSourceKind::Gives),
+                        by(AtlasSourceKind::Gives),
                     )),
                     Reach::OpensShop(shop) => {
                         let shop_key = shop.key(content);
@@ -696,34 +696,34 @@ impl WorldAtlas {
                             found.push((
                                 ItemDef::TABLE,
                                 offer.item.key(content).to_owned(),
-                                source(RowSourceKind::Sells, shop_key, &opens),
+                                source(AtlasSourceKind::Sells, shop_key, &opens),
                             ));
                         }
                         found.push((
                             ShopDef::TABLE,
                             shop_key.to_owned(),
-                            by(RowSourceKind::Opens),
+                            by(AtlasSourceKind::Opens),
                         ));
                     }
                     Reach::Remembers(memory) => found.push((
                         MemoryDef::TABLE,
                         memory.key(content).to_owned(),
-                        by(RowSourceKind::Remembers),
+                        by(AtlasSourceKind::Remembers),
                     )),
                     _ => {}
                 }
                 let (kind, quest) = match reach {
-                    Reach::Offers(quest) => (RowSourceKind::Offers, quest),
-                    Reach::Accepts(quest) => (RowSourceKind::Accepts, quest),
-                    Reach::TurnsIn(quest) => (RowSourceKind::TurnsIn, quest),
-                    Reach::Fails(quest) => (RowSourceKind::Fails, quest),
-                    Reach::Completes(quest) => (RowSourceKind::Completes, quest),
-                    Reach::Decides(quest) => (RowSourceKind::Decides, quest),
+                    Reach::Offers(quest) => (AtlasSourceKind::Offers, quest),
+                    Reach::Accepts(quest) => (AtlasSourceKind::Accepts, quest),
+                    Reach::TurnsIn(quest) => (AtlasSourceKind::TurnsIn, quest),
+                    Reach::Fails(quest) => (AtlasSourceKind::Fails, quest),
+                    Reach::Completes(quest) => (AtlasSourceKind::Completes, quest),
+                    Reach::Decides(quest) => (AtlasSourceKind::Decides, quest),
                     _ => continue,
                 };
                 let quest_key = quest.key(content);
                 found.push((QuestDef::TABLE, quest_key.to_owned(), by(kind)));
-                if matches!(kind, RowSourceKind::Offers | RowSourceKind::TurnsIn) {
+                if matches!(kind, AtlasSourceKind::Offers | AtlasSourceKind::TurnsIn) {
                     let def = quest.get(content);
                     let opens = OpenTarget::Row {
                         table: QuestDef::TABLE,
@@ -738,7 +738,7 @@ impl WorldAtlas {
                         found.push((
                             ItemDef::TABLE,
                             stack.item.key(content).to_owned(),
-                            source(RowSourceKind::Quest, quest_key, &opens),
+                            source(AtlasSourceKind::Quest, quest_key, &opens),
                         ));
                     }
                 }
@@ -765,7 +765,7 @@ impl WorldAtlas {
                     found.push((
                         table,
                         usage.value.clone(),
-                        source(RowSourceKind::Named, &info.key, &here),
+                        source(AtlasSourceKind::Named, &info.key, &here),
                     ));
                 }
             }
@@ -986,9 +986,9 @@ impl WorldAtlas {
             .keys()
             .copied()
             .filter(|area| {
-                self.sources(*area, table, key)
-                    .iter()
-                    .any(|source| matches!(source.kind, RowSourceKind::Drop | RowSourceKind::Gives))
+                self.sources(*area, table, key).iter().any(|source| {
+                    matches!(source.kind, AtlasSourceKind::Drop | AtlasSourceKind::Gives)
+                })
             })
             .collect()
     }

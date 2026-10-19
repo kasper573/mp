@@ -9,7 +9,7 @@ use engine::systems::area::{AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};
-use super::placement::{self, PartView, Placement};
+use super::placement::{self, AreaPlacement, PartView};
 use super::{
     AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
     blueprint_part, module_index, module_part, pick, pins, shapes,
@@ -113,7 +113,7 @@ pub(super) fn select_input(
 enum SelectScope<'a> {
     Area,
     Blueprint {
-        place: &'a Placement,
+        place: &'a AreaPlacement,
         parts: Vec<PartView>,
     },
 }

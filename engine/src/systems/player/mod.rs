@@ -42,7 +42,7 @@ use crate::systems::{
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
-    app.replicate_once::<Owner>()
+    app.replicate_once::<PlayedBy>()
         .replicate::<Xp>()
         .replicate::<CommandLock>()
         .replicate::<ArrivalHold>()
@@ -70,7 +70,7 @@ pub fn register(app: &mut App) {
 pub struct ClientId(pub u32);
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Owner {
+pub struct PlayedBy {
     pub client: ClientId,
 }
 
@@ -433,7 +433,7 @@ pub(crate) fn place(
                 AreaTag { area: zone },
             ),
             OwnedBy(client),
-            Owner { client },
+            PlayedBy { client },
             HeardMove::default(),
             ArrivalHold {
                 until: now + ARRIVAL_PATIENCE,

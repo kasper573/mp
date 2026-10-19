@@ -27,7 +27,7 @@ use crate::core::script::{
 };
 use crate::core::tiling::Tiles;
 use crate::systems::WorldArea;
-use crate::systems::actor::model::Face;
+use crate::systems::actor::model::Expression;
 use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaId, AreaObject};
 use crate::systems::class::{ClassDef, ClassId};
@@ -167,7 +167,7 @@ pub enum RowRef {
 #[serde(from = "LineRow", into = "LineRow")]
 pub struct Line {
     pub by: Speaker,
-    pub face: Option<Face>,
+    pub face: Option<Expression>,
     pub text: Vec<Span>,
 }
 
@@ -184,7 +184,7 @@ enum SpeakerRow {
     Npc {
         npc: NpcId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        face: Option<Face>,
+        face: Option<Expression>,
     },
     Object,
     Narrator,

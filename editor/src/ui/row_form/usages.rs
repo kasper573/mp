@@ -1,5 +1,5 @@
 use egui::{Align, Layout, Sense, Ui};
-use engine::core::assets::FileBytes;
+use engine::core::assets::FileSize;
 use engine::core::content::{asset_file, row_of};
 
 use super::{theme, widgets};
@@ -101,7 +101,7 @@ pub fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
         };
         (thumb, bytes)
     };
-    ui.label(theme::muted(FileBytes(size).to_string()));
+    ui.label(theme::muted(FileSize(size).to_string()));
     if let Some(thumb) = thumb {
         let scale = ((ui.available_width() - 8.0) / thumb.size[0].max(1) as f32).min(4.0);
         ui.add(egui::Image::from_texture((

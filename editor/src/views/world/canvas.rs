@@ -13,7 +13,7 @@ use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
 use engine::systems::area::{self, AreaId};
 
-use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
+use super::atlas::{AtlasSource, AtlasWarp, WorldAtlas};
 use super::filters::{self, ColorRanges};
 use super::interact::{self, MapDrag};
 use super::{
@@ -238,7 +238,7 @@ pub fn viridis(t: f32) -> Color32 {
 }
 
 struct Overlays<'a> {
-    lit: Option<BTreeMap<AreaId, Vec<RowSource>>>,
+    lit: Option<BTreeMap<AreaId, Vec<AtlasSource>>>,
     colors: Option<ColorRanges>,
     route: Option<Vec<&'a AtlasWarp>>,
 }

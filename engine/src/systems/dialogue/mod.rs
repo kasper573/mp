@@ -16,7 +16,7 @@ use crate::core::script::{
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
-use crate::systems::actor::model::Face;
+use crate::systems::actor::model::Expression;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
@@ -84,7 +84,7 @@ pub struct Remark {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SpokenLine {
     pub by: Speaker,
-    pub face: Option<Face>,
+    pub face: Option<Expression>,
     pub text: LineText,
 }
 

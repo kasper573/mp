@@ -326,7 +326,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
 }
 
 #[derive(Clone, Debug)]
-pub struct Placement {
+pub struct AreaPlacement {
     pub module: usize,
     pub blueprint: String,
     pub at: Pos<Tiles>,
@@ -338,7 +338,7 @@ pub fn resolve_in_place(
     content: &Content,
     modules: &[Value],
     path: &[usize],
-) -> Option<Vec<Placement>> {
+) -> Option<Vec<AreaPlacement>> {
     let (&top, parts) = path.split_first()?;
     let module = modules.get(top)?;
     if !module.is_module(AreaModuleKind::Blueprint) {
@@ -365,8 +365,8 @@ pub fn resolve_in_place(
     Some(chain)
 }
 
-fn placement_of(module: usize, json: &Value) -> Option<Placement> {
-    Some(Placement {
+fn placement_of(module: usize, json: &Value) -> Option<AreaPlacement> {
+    Some(AreaPlacement {
         module,
         blueprint: json.text("blueprint").to_owned(),
         at: shapes::pos_of(&json["at"])?,
@@ -382,7 +382,7 @@ pub struct PartView {
     pub nested: Option<String>,
 }
 
-pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
+pub fn parts_in_place(frame: &AreaFrame, place: &AreaPlacement) -> Vec<PartView> {
     let content = frame.content.clone();
     let Some(id) = content.by_key::<BlueprintDef>(&place.blueprint) else {
         return Vec::new();
@@ -470,7 +470,7 @@ pub fn overlay_in_place(
     editor: &Editor,
     painter: &egui::Painter,
     frame: &AreaFrame,
-    place: &Placement,
+    place: &AreaPlacement,
 ) {
     let canvas = frame.canvas;
     let parts = parts_in_place(frame, place);
@@ -529,7 +529,7 @@ pub fn overlay_in_place(
 pub fn move_parts_in_place(
     editor: &mut Editor,
     frame: &AreaFrame,
-    place: &Placement,
+    place: &AreaPlacement,
     indices: &[usize],
     dx: f32,
     dy: f32,
@@ -556,7 +556,7 @@ pub fn move_parts_in_place(
     editor.apply(edit);
 }
 
-pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &Placement) {
+pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &AreaPlacement) {
     let indices = selected_part_indices(editor, &place.blueprint);
     if indices.is_empty() {
         return;

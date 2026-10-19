@@ -29,7 +29,7 @@ use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::{Pos, Rgba, Size};
-use crate::core::render::present::{self, PRESENT_LAYER, Viewport};
+use crate::core::render::present::{self, PRESENT_LAYER, PresentScale};
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::render::{
     self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, atlas_rect,
@@ -446,8 +446,8 @@ impl SiteFrame {
                 };
                 let px = present::SCALE
                     * world
-                        .get_resource::<Viewport>()
-                        .map_or(1.0, |viewport| viewport.scale.max(0.01));
+                        .get_resource::<PresentScale>()
+                        .map_or(1.0, |scale| scale.0.max(0.01));
                 Some(SiteFrame::screen(size, Some(texture), px).headed(heading))
             }
             VfxSite::Widget(_) => None,

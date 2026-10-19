@@ -93,7 +93,7 @@ impl Plugin for WorldRenderPlugin {
         app.add_plugins(Material2dPlugin::<present::Present>::default())
             .init_resource::<Animator>()
             .init_resource::<present::ScreenGrade>()
-            .init_resource::<present::Viewport>()
+            .init_resource::<present::PresentScale>()
             .init_resource::<GroundDepth>()
             .init_resource::<RowDepths>()
             .init_resource::<transition::ActiveTransition>()

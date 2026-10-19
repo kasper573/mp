@@ -19,7 +19,7 @@ use crate::systems::attention::Attention;
 use crate::systems::dialogue::Conversation;
 use crate::systems::item::Inventory;
 use crate::systems::movement::{HeardMove, MoveTarget, Position, position};
-use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players};
+use crate::systems::player::{ArrivalHold, ClientId, CommandLock, PlayedBy, Players};
 use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
@@ -49,7 +49,7 @@ pub fn present(world: &World, subject: Entity, viewer: Entity) -> bool {
     match world.get::<Presence>(subject) {
         None => true,
         Some(Presence::For(client)) => world
-            .get::<Owner>(viewer)
+            .get::<PlayedBy>(viewer)
             .is_some_and(|owner| owner.client == *client),
         Some(Presence::When(shown)) => shown.holds(world, viewer),
     }
@@ -155,7 +155,7 @@ pub fn seen_by(world: &mut World, entity: Entity) -> Vec<Entity> {
 }
 
 pub fn private_viewers(world: &mut World, player: Entity) -> Vec<Entity> {
-    let Some(owner) = world.get::<Owner>(player).map(|owner| owner.client) else {
+    let Some(owner) = world.get::<PlayedBy>(player).map(|owner| owner.client) else {
         return Vec::new();
     };
     world.resource_scope(|world, mut sights: Mut<Sights>| {

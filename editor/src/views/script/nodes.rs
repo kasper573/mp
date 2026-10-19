@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use engine::core::content::{Content, ContentScope, with_content};
 use engine::core::script::node::MAX_CALL_DEPTH;
 use engine::core::script::{EffectDef, EventDef, NodeKind, OwnerKindDef, REFUSED};
-use engine::systems::actor::model::Face;
+use engine::systems::actor::model::Expression;
 use engine::systems::area::blueprint::hole_name;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{
@@ -149,7 +149,7 @@ pub fn bust_file(content: Option<&Content>, speaker: &LineSpeaker) -> Option<Str
         .busts()?;
     let face = face
         .as_deref()
-        .map(|face| serde_json::from_value::<Face>(Value::String(face.to_owned())))
+        .map(|face| serde_json::from_value::<Expression>(Value::String(face.to_owned())))
         .transpose()
         .ok()?;
     let file = match face {

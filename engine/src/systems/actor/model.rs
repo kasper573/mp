@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::Action;
-use crate::core::assets::{FileBytes, ImageRef};
+use crate::core::assets::{FileSize, ImageRef};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
@@ -23,7 +23,7 @@ pub type ModelId = ContentId<ModelDef>;
 #[serde(deny_unknown_fields)]
 pub struct ModelDef {
     pub hitbox: HitboxSize,
-    pub sprites: Sheet,
+    pub sprites: SpriteSheet,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<ModelModule>,
 }
@@ -90,7 +90,7 @@ impl HitboxSize {
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Sheet {
+pub struct SpriteSheet {
     pub image: ImageRef,
     pub frame_size: FrameSize,
     pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
@@ -172,32 +172,32 @@ pub struct GenericBusts {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(from = "String", into = "String")]
-pub enum Face {
+pub enum Expression {
     Generic(GenericExpression),
     Own(String),
 }
 
-impl From<String> for Face {
-    fn from(name: String) -> Face {
+impl From<String> for Expression {
+    fn from(name: String) -> Expression {
         match name.parse() {
-            Ok(expression) => Face::Generic(expression),
-            Err(_) => Face::Own(name),
+            Ok(expression) => Expression::Generic(expression),
+            Err(_) => Expression::Own(name),
         }
     }
 }
 
-impl From<Face> for String {
-    fn from(face: Face) -> String {
+impl From<Expression> for String {
+    fn from(face: Expression) -> String {
         match face {
-            Face::Generic(expression) => expression.as_ref().to_owned(),
-            Face::Own(name) => name,
+            Expression::Generic(expression) => expression.as_ref().to_owned(),
+            Expression::Own(name) => name,
         }
     }
 }
 
-impl JsonSchema for Face {
+impl JsonSchema for Expression {
     fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("Face")
+        Cow::Borrowed("Expression")
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
@@ -246,10 +246,10 @@ impl Busts {
             .chain(self.own.iter().map(|own| &own.file))
     }
 
-    pub fn face(&self, face: &Face) -> Option<&ImageRef> {
+    pub fn face(&self, face: &Expression) -> Option<&ImageRef> {
         match face {
-            Face::Generic(expression) => Some(self.generic.of(*expression)),
-            Face::Own(name) => self
+            Expression::Generic(expression) => Some(self.generic.of(*expression)),
+            Expression::Own(name) => self
                 .own
                 .iter()
                 .find(|own| own.name == *name)
@@ -274,8 +274,8 @@ impl GenericBusts {
 pub const MAX_STRIP_FRAMES: usize = 256;
 pub const MAX_FRAME_PX: u32 = 8192;
 // The client loads every bust at startup, so each one, and the whole cast, must stay a quick download.
-pub const MAX_BUST_BYTES: FileBytes = FileBytes::kib(120);
-pub const MAX_CAST_BYTES: FileBytes = FileBytes::kib(3 * 1024);
+pub const MAX_BUST_BYTES: FileSize = FileSize::kib(120);
+pub const MAX_CAST_BYTES: FileSize = FileSize::kib(3 * 1024);
 pub const MAX_FRAME_MS: u32 = 60_000;
 
 pub struct Models(pub Vec<Option<ActorModel>>);
@@ -630,19 +630,19 @@ struct CastWeight {
 impl CastWeight {
     /// Counts `bust` once however many models share it, and tells the total the first time it
     /// passes the budget.
-    fn add(&mut self, bust: &str, weight: FileBytes) -> Option<FileBytes> {
+    fn add(&mut self, bust: &str, weight: FileSize) -> Option<FileSize> {
         if !self.counted.insert(bust.to_owned()) {
             return None;
         }
         self.total += weight.0;
-        let total = FileBytes(self.total);
+        let total = FileSize(self.total);
         (total > MAX_CAST_BYTES && !std::mem::replace(&mut self.over, true)).then_some(total)
     }
 }
 
 struct BustFiles {
     figure: Option<BustFigure>,
-    weights: Vec<(String, FileBytes)>,
+    weights: Vec<(String, FileSize)>,
 }
 
 fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles> {
@@ -676,7 +676,7 @@ fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles
                 figure,
                 weights: files
                     .into_iter()
-                    .map(|(path, bytes)| (path, FileBytes(bytes.len())))
+                    .map(|(path, bytes)| (path, FileSize(bytes.len())))
                     .collect(),
             }
         })

@@ -8,7 +8,7 @@ use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::npc::Npc;
-use crate::systems::player::{CharacterState, ClientId, Owner, Players};
+use crate::systems::player::{CharacterState, ClientId, PlayedBy, Players};
 use crate::systems::script::{EventKind, RiftEvent, RiftInstances, area_owner};
 use crate::systems::text::LineText;
 
@@ -78,7 +78,7 @@ pub fn leave(
     let mut state = CharacterState::of(world, entity, spawn)?;
     state.memory.leave_area(&content);
     let traveler = Traveler {
-        client: world.get::<Owner>(entity)?.client,
+        client: world.get::<PlayedBy>(entity)?.client,
         dest_area,
         dest,
         state,

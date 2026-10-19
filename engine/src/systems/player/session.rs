@@ -6,7 +6,7 @@ use bevy_replicon::shared::server_entity_map::ServerEntityMap;
 use bevy_state::prelude::{OnEnter, OnExit};
 use bevy_time::Time;
 
-use super::{ClientId, Owner, Welcome};
+use super::{ClientId, PlayedBy, Welcome};
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::time::{Seconds, ServerClock};
 use crate::systems::stat;
@@ -84,7 +84,7 @@ fn record_welcome(
 
 fn track_character(
     me: Res<MyClient>,
-    characters: Query<(Entity, &Owner)>,
+    characters: Query<(Entity, &PlayedBy)>,
     mut mine: ResMut<MyCharacter>,
 ) {
     let my_character = me.0.and_then(|client| {

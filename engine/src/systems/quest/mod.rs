@@ -32,12 +32,12 @@ use crate::systems::item::{
 };
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::NpcId;
-use crate::systems::player::{Owner, player_requests};
+use crate::systems::player::{PlayedBy, player_requests};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition::{self, CompiledCondition};
 use crate::systems::script::{
-    self, Condition, EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, Reach, RiftInstances,
-    RiftScripts, ScriptModule, ScriptedRow,
+    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftInstances, RiftScripts,
+    ScriptModule, ScriptedRow,
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
@@ -896,7 +896,7 @@ pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
 
 fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Quest, quest.raw()),
+        Owner::Row(OwnerKind::Quest, quest.raw()),
         kind,
         Some(player),
         Vec::new(),
@@ -1301,7 +1301,7 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
     for notification in counted {
         notification::notify(world, player, notification);
     }
-    if let Some(client) = world.get::<Owner>(player).map(|owner| owner.client) {
+    if let Some(client) = world.get::<PlayedBy>(player).map(|owner| owner.client) {
         scatter_drop(
             world,
             kill.victim,

@@ -9,7 +9,7 @@ use engine::systems::area::world_map::{
 use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
 
-use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
+use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use super::canvas::{line_badge, viridis};
 use super::filters::{self, AreaRange, ColorField, ColorOf, ColorRanges, ColorShow, ColorTable};
 use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
@@ -108,7 +108,7 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             .collect::<Vec<_>>()
             .join(" · "),
     );
-    let mut by_kind: BTreeMap<RowSourceKind, BTreeMap<&RowSource, Vec<&str>>> = BTreeMap::new();
+    let mut by_kind: BTreeMap<AtlasSourceKind, BTreeMap<&AtlasSource, Vec<&str>>> = BTreeMap::new();
     for (area, sources) in &lit {
         for source in sources {
             by_kind

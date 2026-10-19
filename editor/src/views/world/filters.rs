@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use strum::VariantArray;
 
-use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
+use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::schema;
@@ -47,9 +47,9 @@ impl MapLens {
         }
     }
 
-    fn sources(&self, atlas: &WorldAtlas, area: AreaId) -> Vec<RowSource> {
+    fn sources(&self, atlas: &WorldAtlas, area: AreaId) -> Vec<AtlasSource> {
         let info = &atlas.areas[&area];
-        let here = |kind: RowSourceKind, name: String| RowSource {
+        let here = |kind: AtlasSourceKind, name: String| AtlasSource {
             kind,
             name,
             opens: OpenTarget::Area {
@@ -60,10 +60,10 @@ impl MapLens {
         match self {
             MapLens::Row { table, key } => atlas.sources(area, table, key).to_vec(),
             MapLens::Module(kind) if info.modules.contains(kind) => {
-                vec![here(RowSourceKind::Module, kind.tag().to_owned())]
+                vec![here(AtlasSourceKind::Module, kind.tag().to_owned())]
             }
             MapLens::Text(text) if info.text.contains(&text.to_lowercase()) => {
-                vec![here(RowSourceKind::Mention, text.clone())]
+                vec![here(AtlasSourceKind::Mention, text.clone())]
             }
             MapLens::Module(_) | MapLens::Text(_) => Vec::new(),
         }
@@ -73,7 +73,7 @@ impl MapLens {
 pub fn lit_areas(
     atlas: &WorldAtlas,
     lenses: &[MapLens],
-) -> Option<BTreeMap<AreaId, Vec<RowSource>>> {
+) -> Option<BTreeMap<AreaId, Vec<AtlasSource>>> {
     if lenses.is_empty() {
         return None;
     }
@@ -96,8 +96,8 @@ pub fn lit_areas(
     Some(lit)
 }
 
-pub fn tag_line(sources: &[RowSource]) -> String {
-    let mut counts: BTreeMap<RowSourceKind, usize> = BTreeMap::new();
+pub fn tag_line(sources: &[AtlasSource]) -> String {
+    let mut counts: BTreeMap<AtlasSourceKind, usize> = BTreeMap::new();
     for source in sources {
         *counts.entry(source.kind).or_default() += 1;
     }

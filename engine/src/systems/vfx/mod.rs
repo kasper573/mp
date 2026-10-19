@@ -22,7 +22,7 @@ use crate::core::vfx::{ParamKind, ParamValue, VfxId, VfxInstance, VfxParams, Vfx
 use crate::systems::WorldArea;
 use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
-use crate::systems::player::Owner;
+use crate::systems::player::PlayedBy;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::skill::{self, SkillDef};
@@ -114,7 +114,7 @@ pub fn spawn_for(
     site: VfxSite,
     params: VfxParams,
 ) -> Option<Entity> {
-    let client = world.get::<Owner>(player)?.client;
+    let client = world.get::<PlayedBy>(player)?.client;
     let at = position(world, player)?;
     Some(spawn_at(
         world,

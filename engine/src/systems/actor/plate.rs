@@ -20,7 +20,7 @@ use crate::systems::attention;
 use crate::systems::combat::Attitude;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
-use crate::systems::player::{Owner, session};
+use crate::systems::player::{PlayedBy, session};
 use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
@@ -98,7 +98,7 @@ pub fn label_of(world: &World, content: &Content, actor: Entity) -> Option<Plate
         content,
         world.get::<Name>(actor),
         world.get::<Npc>(actor),
-        world.get::<Owner>(actor),
+        world.get::<PlayedBy>(actor),
         world.get::<Attitude>(actor),
         world.get::<AreaObject>(actor).is_some(),
     )
@@ -151,7 +151,7 @@ pub fn draw_plates(world: &mut World) {
             Entity,
             Option<&Name>,
             Option<&Npc>,
-            Option<&Owner>,
+            Option<&PlayedBy>,
             Option<&Attitude>,
             Has<AreaObject>,
             Option<&RenderPosition>,
@@ -284,7 +284,7 @@ fn label(
     content: &Content,
     name: Option<&Name>,
     npc: Option<&Npc>,
-    owner: Option<&Owner>,
+    owner: Option<&PlayedBy>,
     attitude: Option<&Attitude>,
     object: bool,
 ) -> Option<PlateLabel> {

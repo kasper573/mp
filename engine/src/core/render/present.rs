@@ -61,10 +61,9 @@ impl WorldTargets {
     }
 }
 
+/// Window pixels per pixel of the world's render target.
 #[derive(Resource, Default, Clone, Copy)]
-pub struct Viewport {
-    pub scale: f32,
-}
+pub struct PresentScale(pub f32);
 
 #[derive(Resource, ShaderType, Clone, Copy, PartialEq, Debug)]
 pub struct ScreenGrade {
@@ -181,11 +180,11 @@ pub(super) fn fit(
     mut camera: Query<(&mut RenderTarget, &mut Projection), With<WorldCamera>>,
     mut quad: Query<(&mut Transform, &MeshMaterial2d<Present>), With<Screen>>,
     mut materials: ResMut<Assets<Present>>,
-    mut viewport: ResMut<Viewport>,
+    mut scale: ResMut<PresentScale>,
 ) {
     let (width, height) = (window.resolution.width(), window.resolution.height());
     let (target_w, target_h) = target_size(&window);
-    viewport.scale = height / target_h as f32;
+    scale.0 = height / target_h as f32;
     if targets.size != (target_w, target_h) {
         // A fresh live texture rather than a resized one: the screen's bind group would keep the old
         // texture otherwise. The held frame keeps its size and is stretched over the window, so a

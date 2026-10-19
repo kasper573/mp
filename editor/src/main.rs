@@ -7,7 +7,7 @@ use bevy::window::{PresentMode, WindowResolution};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use editor::app::{EditorLaunch, EditorPlugin};
-use editor::scenes::Step;
+use editor::scenes::SceneStep;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::SfxPlugin;
 use engine::core::babble::BabblePlugin;
@@ -93,6 +93,6 @@ fn scene_help() -> String {
         "Opens the folder on a state, for recordings and tests: a JSON array of steps, each an object \
          keyed by its step name, e.g. [{{\"area\":\"island\"}},{{\"model\":{{\"open\":\"walk\"}}}}]. \
          The steps: {}. A step that opens a view, as model does, takes that view's own steps.",
-        Step::VARIANTS.join(", ")
+        SceneStep::VARIANTS.join(", ")
     )
 }

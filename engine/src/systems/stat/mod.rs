@@ -95,17 +95,17 @@ impl Stats {
 
 /// A system's say in an actor's effective stats, on top of its own `Stats`, pushed onto the
 /// modifiers gathered so far; registered with `source`.
-pub type Source = fn(&World, Entity, &mut Vec<Stat>);
+pub type StatSource = fn(&World, Entity, &mut Vec<Stat>);
 
 #[derive(Resource, Default)]
-pub struct Sources(Vec<Source>);
+pub struct Sources(Vec<StatSource>);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Stats>();
 }
 
-pub fn source(world: &mut World, source: Source) {
+pub fn source(world: &mut World, source: StatSource) {
     world.resource_mut::<Sources>().0.push(source);
 }
 

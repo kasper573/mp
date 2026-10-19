@@ -451,7 +451,7 @@ pub fn append_modules(editor: &mut Editor, area_key: &str, new: Vec<Value>, labe
     applied
 }
 
-pub enum Placement {
+pub enum PlaceOutcome {
     Whole,
     Partly { skipped: usize, reason: String },
 }
@@ -461,7 +461,7 @@ pub fn place_modules(
     area_key: &str,
     new: Vec<Value>,
     label: &str,
-) -> Placement {
+) -> PlaceOutcome {
     let count = new.len();
     let existing = area_modules(editor, area_key);
     let start = existing.len();
@@ -474,7 +474,7 @@ pub fn place_modules(
         *list = whole;
         Some(label.to_owned())
     }) else {
-        return Placement::Partly {
+        return PlaceOutcome::Partly {
             skipped: count,
             reason: "the area is gone".to_owned(),
         };
@@ -487,9 +487,9 @@ pub fn place_modules(
         return match editor.try_apply(edit) {
             Ok(()) => {
                 select_appended(editor, area_key, start, count);
-                Placement::Whole
+                PlaceOutcome::Whole
             }
-            Err(reason) => Placement::Partly {
+            Err(reason) => PlaceOutcome::Partly {
                 skipped: count,
                 reason,
             },
@@ -530,7 +530,7 @@ pub fn place_modules(
     {
         let _ = editor.try_apply(edit);
     }
-    Placement::Partly { skipped, reason }
+    PlaceOutcome::Partly { skipped, reason }
 }
 
 fn select_appended(editor: &mut Editor, area_key: &str, start: usize, count: usize) {

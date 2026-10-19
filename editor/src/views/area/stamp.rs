@@ -423,8 +423,8 @@ pub(super) fn place_stamps(
     };
     let area_key = frame.area_key.clone();
     let text = match modules::place_modules(editor, &area_key, modules, &label) {
-        modules::Placement::Whole => None,
-        modules::Placement::Partly { skipped, reason } => {
+        modules::PlaceOutcome::Whole => None,
+        modules::PlaceOutcome::Partly { skipped, reason } => {
             Some(format!("{skipped} of {count} skipped: {reason}"))
         }
     };

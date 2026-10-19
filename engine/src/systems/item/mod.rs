@@ -27,10 +27,10 @@ use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, Players, player_requests};
+use crate::systems::player::{ClientId, PlayedBy, Players, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
-    Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
+    Condition, EventKind, Owner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
@@ -515,7 +515,7 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
 
 pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Item, item.raw()),
+        Owner::Row(OwnerKind::Item, item.raw()),
         kind,
         Some(actor),
         Vec::new(),
@@ -602,7 +602,7 @@ pub fn expire_drops(
 }
 
 pub fn reserve(world: &mut World, npc: Entity, attacker: Entity, now: Seconds) {
-    let Some(account) = world.get::<Owner>(attacker).map(|owner| owner.client) else {
+    let Some(account) = world.get::<PlayedBy>(attacker).map(|owner| owner.client) else {
         return;
     };
     if world.get::<Npc>(npc).is_none() {
@@ -701,7 +701,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     let Some(drop) = world.get::<DroppedItem>(item).cloned() else {
         return;
     };
-    let account = world.get::<Owner>(player).map(|owner| owner.client);
+    let account = world.get::<PlayedBy>(player).map(|owner| owner.client);
     if world
         .get::<Reservation>(item)
         .is_some_and(|reservation| !reservation.allows(account))

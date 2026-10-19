@@ -36,7 +36,7 @@ use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro, pop};
 use crate::systems::npc::{Npc, NpcId};
-use crate::systems::player::{Owner, commands_locked, session};
+use crate::systems::player::{PlayedBy, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
@@ -801,7 +801,7 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
             .map_or_else(String::new, |name| name.name.clone()),
         model,
         flies,
-        player: entity.contains::<Owner>(),
+        player: entity.contains::<PlayedBy>(),
         at,
         drawn: entity.get::<RenderPosition>().map_or(at, |drawn| drawn.0),
         aim: hitbox.center(),

@@ -97,15 +97,15 @@ asset_ref!(AudioRef, Audio);
 
 /// How much a file weighs to download.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FileBytes(pub usize);
+pub struct FileSize(pub usize);
 
-impl FileBytes {
-    pub const fn kib(kib: usize) -> FileBytes {
-        FileBytes(kib * 1024)
+impl FileSize {
+    pub const fn kib(kib: usize) -> FileSize {
+        FileSize(kib * 1024)
     }
 }
 
-impl Display for FileBytes {
+impl Display for FileSize {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{} KiB", self.0.div_ceil(1024))
     }

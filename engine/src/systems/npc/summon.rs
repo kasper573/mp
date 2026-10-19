@@ -11,7 +11,7 @@ use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::{self, position};
 use crate::systems::npc::NpcId;
-use crate::systems::player::{ClientId, Owner};
+use crate::systems::player::{ClientId, PlayedBy};
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
     Condition, EffectCall, OwnerKind, Reach, RiftScripting, effect as effects,
@@ -131,7 +131,7 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
             let only_for = match shown {
                 ShownFor::Subject => cx
                     .subject
-                    .and_then(|subject| world.get::<Owner>(subject))
+                    .and_then(|subject| world.get::<PlayedBy>(subject))
                     .map(|owner| owner.client),
                 ShownFor::Everyone => None,
             };
