@@ -10,10 +10,11 @@ use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pins, shapes};
 use super::{pick, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{play, schema};
+use engine::core::content::row_file;
 
 #[derive(Clone, Copy)]
 pub struct AreaMenuAnchor {

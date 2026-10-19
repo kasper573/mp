@@ -7,9 +7,10 @@ use serde_json::Value;
 use strum::VariantArray;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs};
+use engine::core::content::{row_file, row_of};
 
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 

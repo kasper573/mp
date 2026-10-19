@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use engine::core::content::MemoryFolder;
+use engine::core::content::{MemoryFolder, row_of, table_folder};
 use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;
@@ -129,7 +129,7 @@ impl ProjectFiles {
     }
 
     pub fn keys_of(&self, table: &str) -> impl Iterator<Item = &str> {
-        let prefix = format!("tables/{table}/");
+        let prefix = format!("{}/", table_folder(table));
         self.map
             .range::<str, _>((
                 std::ops::Bound::Included(prefix.as_str()),
@@ -163,19 +163,6 @@ pub fn json_bytes(value: &serde_json::Value) -> FileBytes {
 
 pub fn text_bytes(text: String) -> FileBytes {
     FileBytes::from(text.into_bytes())
-}
-
-pub const GAME_FILE: &str = "game.json";
-
-pub fn row_file(table: &str, key: &str) -> String {
-    format!("tables/{table}/{key}.json")
-}
-
-pub fn row_of(file: &str) -> Option<(&str, &str)> {
-    let rest = file.strip_prefix("tables/")?;
-    let (table, name) = rest.split_once('/')?;
-    let key = name.strip_suffix(".json")?;
-    (!key.contains('/')).then_some((table, key))
 }
 
 #[derive(Clone, Debug)]

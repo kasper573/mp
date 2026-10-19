@@ -13,7 +13,7 @@ use crate::app::{
     RenameTarget,
 };
 use crate::keymap::{EditorKey, KeyScope};
-use crate::project::{ContentEdit, GAME_FILE, row_file, row_of};
+use crate::project::ContentEdit;
 use crate::rows::{UsageDecision, UsageSummary};
 use crate::templates::GameTemplate;
 use crate::ui::start;
@@ -21,6 +21,7 @@ use crate::views::area::{layers, pick, resize};
 use crate::views::script::inspect;
 use crate::views::{area, script, world};
 use crate::{import, play, rows, templates, ui};
+use engine::core::content::{GAME_FILE, row_file, row_of};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     import::show_readings(editor, ctx);

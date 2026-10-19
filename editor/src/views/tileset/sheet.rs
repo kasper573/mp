@@ -15,11 +15,12 @@ use super::{
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, rows, value};
+use engine::core::content::row_file;
 
 const WALKABLE: Color32 = Color32::from_rgb(110, 200, 110);
 const BLOCKS: Color32 = Color32::from_rgb(230, 90, 90);

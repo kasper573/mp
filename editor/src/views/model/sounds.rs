@@ -4,8 +4,9 @@ use engine::core::content::ContentRow;
 
 use crate::app::Editor;
 use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::{theme, widgets};
+use engine::core::content::row_file;
 
 pub const PEAK_CEILING_DBFS: f64 = -12.0;
 

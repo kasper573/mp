@@ -8,9 +8,10 @@ use serde_json::Value;
 
 use super::{Candidate, Category, Dragged, Pick, PickSource};
 use crate::forms::{FormAction, FormCx};
-use crate::project::{ProjectFiles, row_file, row_of};
+use crate::project::ProjectFiles;
 use crate::thumbs;
 use crate::value::RowValue;
+use engine::core::content::{row_file, row_of};
 
 const PICTURE_TABLES: [&str; 6] = [
     "model",

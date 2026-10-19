@@ -18,10 +18,11 @@ use super::nodes::{self, NodeReads};
 use super::{ScriptDoc, ScriptOwner, ScriptPanel, ScriptPath, ScriptRef, run};
 use crate::app::Editor;
 use crate::condition;
-use crate::project::{RowSelection, row_file, row_of};
+use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use engine::core::content::{row_file, row_of};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
     match panel {

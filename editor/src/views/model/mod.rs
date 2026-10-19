@@ -20,11 +20,12 @@ use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection};
 use crate::thumbs::Thumbnail;
 use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::{import, thumbs, value};
+use engine::core::content::{row_file, row_of};
 
 pub const TABLE: &str = "model";
 pub const MAX_FRAMES: usize = 256;

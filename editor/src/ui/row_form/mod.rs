@@ -32,7 +32,7 @@ use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms;
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
 use crate::schema;
 use crate::stage;
@@ -41,6 +41,7 @@ use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
 use crate::views::script::{PendingScriptAction, ScriptOwner};
 use crate::views::{class, model, script, skill, tileset, vfx};
+use engine::core::content::row_file;
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;

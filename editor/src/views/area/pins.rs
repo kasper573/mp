@@ -6,8 +6,9 @@ use engine::systems::area::{self, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
-use crate::project::{ContentEdit, GAME_FILE, ProjectFiles, RowSelection, row_of};
+use crate::project::{ContentEdit, ProjectFiles, RowSelection};
 use crate::tabs::EditorTab;
+use engine::core::content::{GAME_FILE, row_of};
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
 

@@ -13,7 +13,7 @@ use serde::Deserialize;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::views::area;
@@ -21,6 +21,7 @@ use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
 use crate::{import, value};
 use animation::OffsetUnit;
+use engine::core::content::row_file;
 
 pub const TABLE: &str = "tileset";
 pub const TERRAINS_PART: &str = "/terrains";

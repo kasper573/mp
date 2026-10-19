@@ -6,11 +6,12 @@ use engine::systems::area::tileset::SurfaceDef;
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
 use crate::audio::Waveform;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
+use engine::core::content::row_file;
 
 const TABLE: &str = "surface";
 const CARD: Vec2 = Vec2::new(190.0, 120.0);

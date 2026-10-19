@@ -12,10 +12,11 @@ use super::placement;
 use super::{AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, REFUSED};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, rows, value};
+use engine::core::content::row_file;
 
 pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
     let Some(row) = editor.row_value("area", area_key) else {

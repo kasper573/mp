@@ -12,13 +12,14 @@ use serde_json::Value;
 use crate::app::Editor;
 use crate::forms::{self, FormCx, FormState};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;
 use crate::ui::assets::ICON_DECODES_PER_FRAME;
 use crate::ui::widgets;
 use crate::ui::{self, browser, sidebar, theme};
 use crate::user::SpreadsheetView;
+use engine::core::content::row_file;
 
 const ROW_H: f32 = 29.0;
 const KEY_W: f32 = 110.0;

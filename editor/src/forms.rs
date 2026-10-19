@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 
 use crate::drafts;
 use crate::keymap::EditorKey;
-use crate::project::{Project, ProjectFiles, row_file};
+use crate::project::{Project, ProjectFiles};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
 use crate::ui::assets::AssetKind;
 use crate::ui::{browser, theme, widgets};
@@ -18,6 +18,7 @@ use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
 use crate::views::vfx;
 use crate::{audio, condition, picker, spans, thumbs, value};
+use engine::core::content::row_file;
 
 pub const KEPT_TIP: &str = "Kept: the engine reads this from every game, so it stays as it is";
 

@@ -11,11 +11,12 @@ use serde_json::{Map, Value};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::keymap::EditorKey;
-use crate::project::{ProjectFiles, row_of};
+use crate::project::ProjectFiles;
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
 use crate::value::RowValue;
 use crate::{condition, rows, spans};
+use engine::core::content::row_of;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
 #[strum(serialize_all = "snake_case")]

@@ -24,12 +24,13 @@ use crate::app::{Editor, ModalDialog, PlacePick};
 use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::FormCx;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
+use engine::core::content::{GAME_FILE, row_file};
 
 /// The area itself: its card, modules, palette, the spawn and the ways in.
 pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {

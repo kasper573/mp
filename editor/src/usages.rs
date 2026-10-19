@@ -5,8 +5,9 @@ use engine::core::content::{Content, Reference, asset_of};
 use engine::core::vfx::shader_file;
 use rayon::prelude::*;
 
-use crate::project::{GAME_FILE, ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::views::vfx;
+use engine::core::content::{GAME_FILE, row_file};
 use engine::systems::registry;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

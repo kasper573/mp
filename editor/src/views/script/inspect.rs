@@ -14,12 +14,13 @@ use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, sel
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
+use engine::core::content::{row_file, row_of};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
     let owner = doc.owner.clone();

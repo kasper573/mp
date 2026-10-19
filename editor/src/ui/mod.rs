@@ -24,11 +24,12 @@ use egui_dock::{DockArea, DockState, TabViewer};
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
-use crate::project::{RowSelection, row_file};
+use crate::project::RowSelection;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::ScriptKeys;
 use crate::views::{area, character, class, model, script, spreadsheet, tileset, vfx, world};
 use crate::{import, play, views};
+use engine::core::content::row_file;
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.status.right.clear();

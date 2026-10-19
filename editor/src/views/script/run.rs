@@ -43,10 +43,11 @@ use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
 use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
-use crate::project::{ProjectFiles, RowSelection, catalogue_of, row_file, row_of};
+use crate::project::{ProjectFiles, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
+use engine::core::content::{row_file, row_of};
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;

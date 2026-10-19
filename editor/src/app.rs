@@ -23,7 +23,7 @@ use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJour
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
 use crate::project::{
-    ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection, row_file,
+    ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
 };
 use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
@@ -38,6 +38,7 @@ use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, ui, views};
+use engine::core::content::row_file;
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 
 #[derive(Clone, Debug)]

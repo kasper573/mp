@@ -11,9 +11,10 @@ use super::{theme, widgets};
 use crate::app::Editor;
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::value::RowValue;
+use engine::core::content::row_file;
 
 pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection, wide: bool) {
     let table = selection.table.clone();

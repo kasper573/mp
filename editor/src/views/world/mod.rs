@@ -23,12 +23,13 @@ use serde::Deserialize;
 use std::str::FromStr;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, Project, RowSelection, row_file};
+use crate::project::{ContentEdit, Project, RowSelection};
 use crate::ui::{sidebar, theme};
 use crate::value;
 use crate::views::area::TILE_PX;
 use crate::views::navigation;
 use atlas::WorldAtlas;
+use engine::core::content::row_file;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
 const MIN_FOOTPRINT: Vec2 = Vec2::new(62.5, 38.75);

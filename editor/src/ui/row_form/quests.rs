@@ -4,9 +4,10 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::{RowSelection, row_file, row_of};
+use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
+use engine::core::content::{row_file, row_of};
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
     let (givers, turn_ins) = quest_parties(editor, quest);

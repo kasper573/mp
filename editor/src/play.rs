@@ -24,11 +24,12 @@ use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
 use crate::keymap::EditorKey;
-use crate::project::{RowSelection, row_of};
+use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, play, ui};
+use engine::core::content::row_of;
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";

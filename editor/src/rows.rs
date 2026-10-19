@@ -9,7 +9,7 @@ use engine::systems::registry;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
-use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection};
 use crate::schema::SchemaShapes;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
@@ -17,6 +17,7 @@ use crate::usages::ContentUsage;
 use crate::views::area::placement;
 use crate::views::{vfx, world};
 use crate::{schema, usages};
+use engine::core::content::{row_file, row_of};
 
 pub const KEY_MAX: usize = 64;
 

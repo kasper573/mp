@@ -13,7 +13,7 @@ use super::model_ui::TextureCache;
 use super::records::{DueReimport, ImportRecord};
 use super::tileset::{self, AnimPlan, TileGridCut, TileGridSettings, TilePlan};
 use crate::app::Editor;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::widgets;
 use crate::ui::{dialogs, theme};
@@ -21,6 +21,7 @@ use crate::value::RowValue;
 use crate::views::area;
 use crate::views::tileset::{ANIMATION_PART, TABLE};
 use crate::{forms, rows, schema};
+use engine::core::content::row_file;
 
 pub struct TilesetDialog {
     pub key: String,

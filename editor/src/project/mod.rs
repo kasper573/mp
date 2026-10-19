@@ -5,9 +5,7 @@ pub mod lock;
 pub mod save;
 pub mod watch;
 
-pub use files::{
-    FileBytes, FileChange, GAME_FILE, ProjectFiles, hash, json_bytes, row_file, row_of, text_bytes,
-};
+pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_bytes};
 pub use history::{EditHistory, EditStep, RowSelection};
 
 use std::collections::BTreeMap;
@@ -17,7 +15,7 @@ use std::sync::mpsc::{self, TryRecvError};
 use std::time::{Duration, Instant, SystemTime};
 
 use engine::core::content::ErrorPlace::{Json, WholeFile};
-use engine::core::content::{Content, ContentProblem, LoadError, LoadReport};
+use engine::core::content::{Content, ContentProblem, GAME_FILE, LoadError, LoadReport};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems;

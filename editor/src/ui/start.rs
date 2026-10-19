@@ -8,9 +8,9 @@ use super::{theme, widgets};
 use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, content_version};
 use crate::keymap::EditorKey;
 use crate::project::journal::RecoveryJournal;
-use crate::project::{GAME_FILE, row_of};
 use crate::ui::dialogs;
 use crate::{templates, ui};
+use engine::core::content::{GAME_FILE, row_of};
 
 pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     let ctx = root.ctx().clone();

@@ -10,8 +10,9 @@ use serde_json::{Map, Value};
 
 use super::{SHADER_TABLE, TABLE};
 use crate::forms::{self, FormChange, FormCx};
-use crate::project::{ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::ui::{theme, widgets};
+use engine::core::content::row_file;
 
 const PARAM_INDENT: f32 = 22.0;
 const BOUND_WIDTH: f32 = 64.0;

@@ -3,8 +3,9 @@ use egui::Ui;
 use super::theme;
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormCx};
-use crate::project::{ContentEdit, GAME_FILE, RowSelection};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
+use engine::core::content::GAME_FILE;
 
 pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
     let Some(mut value) = editor

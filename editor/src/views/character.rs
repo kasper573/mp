@@ -20,13 +20,14 @@ use serde_json::{Map, Value};
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{FormAction, FormChange, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
 use crate::{condition, forms, picker, play, schema, stage};
+use engine::core::content::row_file;
 
 pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;

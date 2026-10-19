@@ -12,10 +12,11 @@ use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTa
 use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 use crate::picker::{self, PictureFrame};
-use crate::project::{GAME_FILE, Project, RowSelection, row_of};
+use crate::project::{Project, RowSelection};
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
+use engine::core::content::{GAME_FILE, row_of};
 
 pub struct BrowserState {
     pub search: String,

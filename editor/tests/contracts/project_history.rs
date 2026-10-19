@@ -2,10 +2,11 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use editor::project::{
-    ContentEdit, EditHistory, EditStep, EditViewpoint, FileChange, GAME_FILE, Project,
-    RowSelection, json_bytes,
+    ContentEdit, EditHistory, EditStep, EditViewpoint, FileChange, Project, RowSelection,
+    json_bytes,
 };
 use editor::schema::SchemaShapes;
+use engine::core::content::GAME_FILE;
 
 use crate::support::game_folder;
 

@@ -2,8 +2,9 @@ use egui::{Align, Layout, Sense, Ui};
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::{RowSelection, row_of};
+use crate::project::RowSelection;
 use crate::tabs::EditorTab;
+use engine::core::content::row_of;
 
 pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, titled: bool) {
     let Some(project) = &editor.project else {

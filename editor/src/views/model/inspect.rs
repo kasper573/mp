@@ -9,11 +9,12 @@ use super::{FrameCueKind, MAX_FRAME_MS, ModelStrip, StripFrame, strip::TimingSet
 use crate::app::Editor;
 use crate::forms::FormChange;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_of};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::assets::AssetKind;
 use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::{forms, picker};
+use engine::core::content::row_of;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {

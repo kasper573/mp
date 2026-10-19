@@ -12,8 +12,9 @@ use strum::VariantArray;
 
 use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
 use crate::app::Editor;
-use crate::project::{ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::schema;
+use engine::core::content::row_file;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MapLens {

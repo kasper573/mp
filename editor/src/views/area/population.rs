@@ -12,10 +12,10 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
-use crate::project::row_file;
 use crate::thumbs;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use engine::core::content::row_file;
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {

@@ -7,9 +7,10 @@ use serde_json::Value;
 use super::{pins, shapes};
 use crate::app::{Editor, REFUSED};
 use crate::forms;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
+use engine::core::content::row_file;
 
 pub struct ResizeDialog {
     pub area: String,

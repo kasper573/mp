@@ -19,10 +19,11 @@ use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::FormCx;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema, value};
+use engine::core::content::{row_file, row_of};
 
 pub fn placement_bounds(content: &Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
     let mut out: HashMap<usize, Rect<Tiles>> = HashMap::new();

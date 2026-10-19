@@ -2,12 +2,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use editor::app::Editor;
-use editor::project::{ContentEdit, Project, RowSelection, row_file};
+use editor::project::{ContentEdit, Project, RowSelection};
 use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
 use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, run_action};
+use engine::core::content::row_file;
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
 use serde_json::{Value, json};

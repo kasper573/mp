@@ -12,12 +12,13 @@ use super::model::{
 };
 use super::records::{DueReimport, ImportRecord};
 use crate::app::Editor;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::widgets;
 use crate::ui::{dialogs, theme};
 use crate::views::model::{StripFrame, TABLE};
 use crate::{rows, schema};
+use engine::core::content::row_file;
 
 const FRAME_CARD: f32 = 48.0;
 

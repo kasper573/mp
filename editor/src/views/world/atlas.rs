@@ -18,8 +18,9 @@ use engine::systems::script::{
 use engine::systems::shop::ShopDef;
 use strum::VariantArray;
 
-use crate::project::{ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::usages::ContentUsages;
+use engine::core::content::row_file;
 
 pub struct WorldAtlas {
     pub generation: u64,

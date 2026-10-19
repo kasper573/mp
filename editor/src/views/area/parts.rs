@@ -12,10 +12,11 @@ use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema};
+use engine::core::content::row_file;
 
 /// The blueprint itself: its parts to pick from, where it is placed, its variables and modules.
 pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {

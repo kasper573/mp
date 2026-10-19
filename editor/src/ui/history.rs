@@ -7,8 +7,9 @@ use serde_json::Value;
 use super::{theme, widgets};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::FileBytes;
 use crate::project::history::EditStep;
-use crate::project::{FileBytes, row_of};
+use engine::core::content::row_of;
 
 const ROW: f32 = 28.0;
 

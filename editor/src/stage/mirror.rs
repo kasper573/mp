@@ -29,9 +29,10 @@ use engine::systems::item::ItemId;
 use engine::systems::item::render::drop_sprite;
 
 use super::{SIZE, ZOOM};
-use crate::project::{ProjectFiles, hash, row_file};
+use crate::project::{ProjectFiles, hash};
 use crate::views::area::scene;
 use crate::views::vfx::SHADER_TABLE;
+use engine::core::content::row_file;
 
 const FIRST_LAYER: usize = 500;
 const SPRITE_DEPTH_ABOVE_GROUND: f32 = 0.001;

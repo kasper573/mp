@@ -5,8 +5,9 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::forms::FormChange;
-use crate::project::{ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::value::RowValue;
+use engine::core::content::row_file;
 
 pub(super) fn bindings_section(
     ui: &mut Ui,

@@ -17,8 +17,9 @@ pub use preview::{Target, VfxViews};
 
 use self::preview::preview;
 use crate::app::Editor;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::{row_form, theme, widgets};
+use engine::core::content::row_file;
 
 pub const TABLE: &str = "vfx";
 pub const SHADER_TABLE: &str = "vfx_shader";

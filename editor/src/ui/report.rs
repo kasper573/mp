@@ -4,7 +4,7 @@ use egui::{Context, RichText, Ui};
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::GAME_FILE;
+use engine::core::content::GAME_FILE;
 
 pub enum ReportAction {
     None,

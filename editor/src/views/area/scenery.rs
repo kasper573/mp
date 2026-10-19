@@ -13,10 +13,11 @@ use super::stamp::object_names;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::widgets;
 use crate::value::RowValue;
 use crate::{app::Editor, forms, rows, value};
+use engine::core::content::row_file;
 
 pub struct PlacedTile {
     pub column: usize,

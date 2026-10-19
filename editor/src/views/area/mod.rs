@@ -48,12 +48,13 @@ use self::overlays::{
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
-use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_file};
+use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
+use engine::core::content::row_file;
 
 pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;

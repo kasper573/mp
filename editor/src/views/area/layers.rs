@@ -7,9 +7,10 @@ use super::grid;
 use crate::app::{
     ConfirmAction, ConfirmDialog, Editor, ModalDialog, REFUSED, RenameDialog, RenameTarget,
 };
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::rows;
 use crate::ui::{theme, widgets};
+use engine::core::content::row_file;
 
 const WIDTH: f32 = 190.0;
 

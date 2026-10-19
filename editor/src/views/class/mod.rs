@@ -11,8 +11,9 @@ use strum::VariantArray;
 
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{self, row_form, sidebar, theme, widgets};
+use engine::core::content::row_file;
 
 pub const TABLE: &str = "class";
 pub const TREE_PART: &str = "/tree/";

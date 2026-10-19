@@ -19,12 +19,13 @@ use serde_json::{Map, Value};
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, Project, RowSelection, catalogue_of, row_file};
+use crate::project::{ContentEdit, Project, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::thumbs;
 use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
 use crate::value::RowValue;
+use engine::core::content::row_file;
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{LineSpeaker, NodeCatalogue};
 
