@@ -141,7 +141,7 @@ pub fn keyed_button(ui: &mut Ui, label: &str, key: Option<EditorKey>, enabled: b
     );
     if let Some(keys) = keys {
         x += label_width + 8.0;
-        let cap = egui::Rect::from_min_size(
+        let cap = Rect::from_min_size(
             egui::pos2(x, rect.center().y - 9.0),
             Vec2::new(keys_width - 8.0, 18.0),
         );

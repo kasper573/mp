@@ -395,7 +395,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         glyph::paint(
             painter,
             Mark::Pin,
-            egui::Rect::from_min_size(
+            Rect::from_min_size(
                 card.art.right_top() + Vec2::new(-14.0, 2.0),
                 Vec2::splat(11.0),
             ),

@@ -13,7 +13,7 @@ use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::thumbs;
 use crate::ui::{patterns, theme};
-use crate::user::{self, BrushSettings};
+use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
 
 #[derive(Clone, Default, Debug)]
@@ -125,7 +125,7 @@ pub(super) fn apply_brush(
     view_key: &str,
     frame: &AreaFrame,
     center: CellPos,
-    brush: &user::BrushSettings,
+    brush: &BrushSettings,
 ) {
     let content = frame.content.clone();
     let view = editor.views.area.view_mut(view_key);

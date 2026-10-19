@@ -636,7 +636,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                 let response = ui
                     .allocate_ui_with_layout(
                         egui::vec2(SLOT_WIDTH, ui.spacing().interact_size.y),
-                        egui::Layout::left_to_right(egui::Align::Center),
+                        Layout::left_to_right(Align::Center),
                         |ui| {
                             ui.set_width(SLOT_WIDTH);
                             forms::boxed_input(ui, Some("slot"), |ui| {

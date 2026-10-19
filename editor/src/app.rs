@@ -64,8 +64,8 @@ impl Plugin for EditorPlugin {
             .launch
             .frame_log
             .as_ref()
-            .and_then(|path| std::fs::File::create(path).ok())
-            .map(std::io::BufWriter::new);
+            .and_then(|path| File::create(path).ok())
+            .map(BufWriter::new);
         if let Some(folder) = &self.launch.folder {
             editor.open_folder(folder);
         }

@@ -602,9 +602,6 @@ fn toggle_keys(input: ActionInput, mut open: ResMut<Open>) {
 fn sized(ui: &mut Ui, image: Option<gui::GuiImage>, size: f32) -> egui::Response {
     match image {
         Some(image) => ui.add(image.widget(Vec2::splat(size))),
-        None => {
-            ui.allocate_exact_size(Vec2::splat(size), egui::Sense::hover())
-                .1
-        }
+        None => ui.allocate_exact_size(Vec2::splat(size), Sense::hover()).1,
     }
 }

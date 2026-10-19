@@ -38,7 +38,7 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.dialogs = keep;
 }
 
-fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
+fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut Ui)) {
     let mut under = None;
     let shown = egui::Window::new(title)
         .title_bar(false)
@@ -93,7 +93,7 @@ pub fn answer_row(ui: &mut Ui, confirm: &str) -> Option<DialogAnswer> {
     answer
 }
 
-pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui)) {
+pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut Ui)) {
     egui::Area::new(egui::Id::new(id))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .order(egui::Order::Middle)

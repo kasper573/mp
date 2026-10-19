@@ -334,7 +334,7 @@ pub fn start_server(app: &mut App) {
     app.update();
 }
 
-pub fn from_client<M: bevy_ecs::message::Message>(world: &mut World, conn: Entity, message: M) {
+pub fn from_client<M: Message>(world: &mut World, conn: Entity, message: M) {
     use bevy_replicon::prelude::{ClientId, FromClient};
 
     world.write_message(FromClient {

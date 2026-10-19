@@ -72,7 +72,7 @@ pub fn panel_body(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)
-            .layout(egui::Layout::top_down(egui::Align::Min)),
+            .layout(Layout::top_down(Align::Min)),
     );
     child.set_clip_rect(rect.intersect(ui.clip_rect()));
     body(&mut child);

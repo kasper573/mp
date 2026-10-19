@@ -140,7 +140,7 @@ pub(crate) fn system_screen<R>(
     gui: &egui::Context,
     id: &str,
     backdrop: Option<egui::Color32>,
-    add: impl FnOnce(&mut egui::Ui) -> R,
+    add: impl FnOnce(&mut Ui) -> R,
 ) -> egui::InnerResponse<R> {
     let area = egui::Area::new(egui::Id::new(("screen", id)))
         .order(Band::System.order())

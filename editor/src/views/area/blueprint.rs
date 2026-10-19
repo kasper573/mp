@@ -6,7 +6,7 @@ use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::{self, AreaDef, AreaModuleKind, Flip};
+use engine::systems::area::{AreaDef, AreaModuleKind, Flip};
 use serde_json::Value;
 
 use super::{AreaSnapshot, shapes};
@@ -99,7 +99,7 @@ fn matching_groups(
     };
     let wanted = signature(&relative);
     let mut out = Vec::new();
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         let key = area_id.key(content);
         let Ok(row) = value::json(area_id.get(content)) else {
             continue;

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use engine::core::assets::AudioRef;
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
 use engine::core::content::locate;
@@ -498,14 +499,8 @@ pub fn variable_schema(ty: VariableType, table: Option<&str>) -> Value {
         VariableType::Boolean => json!({ "type": "boolean" }),
         VariableType::Text | VariableType::Name => json!({ "type": "string" }),
         VariableType::Row => json!({ "type": "string", "x-table": table.unwrap_or_default() }),
-        VariableType::Audio => json!({ "type": "string", "x-asset": "audio" }),
-        VariableType::Place => {
-            let schema = schemars::generate::SchemaSettings::draft2020_12()
-                .with(|settings| settings.inline_subschemas = true)
-                .into_generator()
-                .into_root_schema_for::<Place>();
-            serde_json::to_value(schema).expect("a schema is json")
-        }
+        VariableType::Audio => schema_of::<AudioRef>(),
+        VariableType::Place => schema_of::<Place>(),
         VariableType::Condition => json!({ "x-condition": true }),
     }
 }
@@ -582,4 +577,12 @@ fn number_paths_in(
     {
         number_paths_in(root, modules, path, out, depth + 1);
     }
+}
+
+fn schema_of<T: schemars::JsonSchema>() -> Value {
+    let schema = schemars::generate::SchemaSettings::draft2020_12()
+        .with(|settings| settings.inline_subschemas = true)
+        .into_generator()
+        .into_root_schema_for::<T>();
+    serde_json::to_value(schema).expect("a schema is json")
 }

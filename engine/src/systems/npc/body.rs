@@ -530,7 +530,7 @@ impl EffectDef<RiftScripting> for Attack {
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
-        vec![crate::systems::script::Reach::Targets]
+        vec![Reach::Targets]
     }
 }
 

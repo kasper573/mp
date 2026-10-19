@@ -57,13 +57,13 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
 }
 
 pub fn placement_count(content: &Content, blueprint: &str) -> String {
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(blueprint) else {
         return String::new();
     };
     let mut direct = 0;
     let mut areas: Vec<AreaId> = Vec::new();
     let mut nested = 0;
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         for placement in area::placements(content, area_id) {
             if placement.blueprint != id {
                 continue;
@@ -111,7 +111,7 @@ pub fn placement_card(
     let Some(blueprint) = module["blueprint"].as_str().map(str::to_owned) else {
         return false;
     };
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&blueprint) else {
         return false;
     };
     let def = id.get(content);
@@ -168,14 +168,12 @@ pub fn placement_card(
 }
 
 pub fn variable_template(variable: &Variable) -> Value {
-    use engine::core::script::VariableType as T;
     match variable.ty {
-        T::Integer => Value::from(0),
-        T::Number => Value::from(0.0),
-        T::Boolean => Value::Bool(false),
-        T::Text | T::Name | T::Row | T::Audio => Value::String(String::new()),
-        T::Place => serde_json::json!({ "area": "", "x": 0.0, "y": 0.0 }),
-        T::Condition => value::empty_object(),
+        VariableType::Condition => value::empty_object(),
+        ty => {
+            let schema = schema::variable_schema(ty, variable.table.as_deref());
+            schema::template(&schema, &schema)
+        }
     }
 }
 
@@ -266,7 +264,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
         .as_str()
         .unwrap_or("")
         .to_owned();
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&blueprint) else {
         return false;
     };
     let def = id.get(&content);
@@ -336,7 +334,7 @@ pub fn resolve_in_place(
     let mut chain = vec![placement_of(top, module)?];
     for &part in parts {
         let current = chain.last()?;
-        let id = content.by_key::<area::blueprint::BlueprintDef>(&current.blueprint)?;
+        let id = content.by_key::<BlueprintDef>(&current.blueprint)?;
         let def = id.get(content);
         let placed = placed_part(
             content,
@@ -373,7 +371,7 @@ pub struct PartView {
 
 pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
     let content = frame.content.clone();
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&place.blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&place.blueprint) else {
         return Vec::new();
     };
     let def = id.get(&content);
@@ -569,7 +567,7 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
 }
 
 pub fn unpacked(content: &Content, module: &Value) -> Option<Vec<Value>> {
-    let id = content.by_key::<area::blueprint::BlueprintDef>(module["blueprint"].as_str()?)?;
+    let id = content.by_key::<BlueprintDef>(module["blueprint"].as_str()?)?;
     let def = id.get(content);
     let at = shapes::pos_of(&module["at"])?;
     let flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
@@ -654,7 +652,7 @@ pub fn replace_with(editor: &mut Editor, area_key: &str, index: usize, replaceme
     let Some(mut row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
-    let Some(new_id) = content.by_key::<area::blueprint::BlueprintDef>(replacement) else {
+    let Some(new_id) = content.by_key::<BlueprintDef>(replacement) else {
         return;
     };
     let module = &mut row["modules"][index];

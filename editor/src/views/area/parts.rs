@@ -365,7 +365,7 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(key) else {
+    let Some(id) = content.by_key::<BlueprintDef>(key) else {
         return;
     };
     let editing: Option<(String, usize)> = editor.views.area.views.values().find_map(|view| {
@@ -376,7 +376,7 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
     });
     let mut placed: Vec<PlacedAt> = Vec::new();
     let mut nested = 0;
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         let area_key = area_id.key(&content).to_owned();
         for placement in area::placements(&content, area_id) {
             if placement.blueprint != id {
@@ -464,7 +464,7 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
         .and_then(|p| p.content.clone())
         .map(|content| {
             content
-                .ids::<area::AreaDef>()
+                .ids::<AreaDef>()
                 .map(|id| id.key(&content).to_owned())
                 .collect()
         })
@@ -567,7 +567,7 @@ fn placements_keeping(
         return Vec::new();
     };
     let mut out = Vec::new();
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         let area_key = area_id.key(&content).to_owned();
         let Some(mut row) = editor.row_value(AreaDef::TABLE, &area_key) else {
             continue;

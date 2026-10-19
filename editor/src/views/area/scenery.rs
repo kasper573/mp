@@ -236,10 +236,10 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(here_id) = content.by_key::<area::AreaDef>(area_key) else {
+    let Some(here_id) = content.by_key::<AreaDef>(area_key) else {
         return;
     };
-    let Some(there_id) = content.by_key::<area::AreaDef>(&target_area) else {
+    let Some(there_id) = content.by_key::<AreaDef>(&target_area) else {
         return;
     };
     let here = area::load(&content, here_id);
@@ -390,7 +390,7 @@ pub(super) fn scenery_extras(
 
 pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Option<usize> {
     let content = cx.content.clone()?;
-    let area_id = content.by_key::<area::AreaDef>(area_key)?;
+    let area_id = content.by_key::<AreaDef>(area_key)?;
     let grids = area::load(&content, area_id).grids.clone();
     let rect = shapes::scenery_rect(module)?;
     let size = grids.size;
@@ -404,7 +404,7 @@ pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Opti
     )
 }
 
-pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usize) {
+pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = super::shapes::scenery_rect(module) else {
         return;
@@ -443,7 +443,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usi
     editor.apply(edit);
 }
 
-pub fn selected_scenery(editor: &Editor, frame: &super::AreaFrame) -> Option<usize> {
+pub fn selected_scenery(editor: &Editor, frame: &AreaFrame) -> Option<usize> {
     let parts = super::selected_parts(editor, &frame.area_key);
     if parts.len() != 1 {
         return None;

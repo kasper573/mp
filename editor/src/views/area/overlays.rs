@@ -448,7 +448,7 @@ pub(super) fn overlay_populations(
 ) {
     let canvas = frame.canvas;
     let ctx = ui.ctx().clone();
-    let live: std::collections::HashSet<String> = frame
+    let live: HashSet<String> = frame
         .modules
         .iter()
         .filter(|module| module.is_module(AreaModuleKind::Population))

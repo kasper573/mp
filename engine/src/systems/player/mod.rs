@@ -273,7 +273,7 @@ pub(crate) fn last_connection(
     (!elsewhere).then_some(id)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpawnPolicy {
     Map,

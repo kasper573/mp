@@ -508,7 +508,7 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
     let picked = sheet.picked_cost(&content, def, &plan);
     let dock = Rect::from_min_max(Pos2::new(room.min.x, room.max.y - DOCK_HEIGHT), room.max);
     ui.scope_builder(
-        egui::UiBuilder::new()
+        UiBuilder::new()
             .max_rect(dock)
             .layout(egui::Layout::right_to_left(egui::Align::Center)),
         |ui| {

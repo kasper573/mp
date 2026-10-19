@@ -39,7 +39,7 @@ pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(key) else {
+    let Some(area_id) = content.by_key::<AreaDef>(key) else {
         return;
     };
     if !editor.views.area.views.contains_key(&view_key) {
@@ -88,7 +88,7 @@ fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(key) else {
+    let Some(area_id) = content.by_key::<AreaDef>(key) else {
         return;
     };
     if !editor.views.area.views.contains_key(&view_key) {
@@ -555,7 +555,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
         });
         let variables = content
-            .by_key::<area::blueprint::BlueprintDef>(&stamp)
+            .by_key::<BlueprintDef>(&stamp)
             .map(|id| id.get(content).variables.clone())
             .unwrap_or_default();
         if variables.is_empty() {
@@ -787,7 +787,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         }
     });
     if picked != spawn_area
-        && let Some(target) = content.by_key::<area::AreaDef>(&picked)
+        && let Some(target) = content.by_key::<AreaDef>(&picked)
     {
         let grid = area::load(content, target).size.grid();
         let middle = CellPos::new((grid.width / 2) as i32, (grid.height / 2) as i32).center();
@@ -1108,7 +1108,7 @@ fn module_inspector(
                 && content
                     .as_ref()
                     .and_then(|c| {
-                        c.by_key::<area::blueprint::BlueprintDef>(&blueprint)
+                        c.by_key::<BlueprintDef>(&blueprint)
                             .map(|id| !id.get(c).variables.is_empty())
                     })
                     .unwrap_or(false)

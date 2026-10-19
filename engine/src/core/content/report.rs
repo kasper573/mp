@@ -165,7 +165,7 @@ fn sort_key(error: &LoadError) -> SortKey<'_> {
     (rank, &error.file, line, column, within, error.problem.rule)
 }
 
-impl fmt::Display for LoadReport {
+impl Display for LoadReport {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "# Rift content load report")?;
         writeln!(f, "folder   {}", self.folder)?;

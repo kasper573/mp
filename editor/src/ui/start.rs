@@ -11,7 +11,7 @@ use crate::project::journal::RecoveryJournal;
 use crate::templates;
 use crate::ui::{self, dialogs};
 
-pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
+pub fn show(editor: &mut Editor, root: &mut Ui) {
     let ctx = root.ctx().clone();
     let ctx = &ctx;
     egui::CentralPanel::default()
@@ -71,7 +71,7 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     recover_dialog(editor, ctx);
 }
 
-fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
+fn recent_list(editor: &mut Editor, ui: &mut Ui) {
     let recent = editor.settings.recent.clone();
     if recent.is_empty() {
         ui.label(theme::muted(
@@ -175,11 +175,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
     dialogs::card(ctx, "recover", 520.0, |ui| {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
-        ui.label(
-            egui::RichText::new("Recover unsaved work?")
-                .strong()
-                .size(18.0),
-        );
+        ui.label(RichText::new("Recover unsaved work?").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(
             theme::muted(format!(

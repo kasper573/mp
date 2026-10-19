@@ -543,7 +543,7 @@ fn claims_follow_walks(world: &mut World) -> bool {
         .collect();
     actors.into_iter().all(|(actor, at, goal)| {
         let claim = movement::claim_of(world, actor).map(|claim| claim.cell);
-        if world.get::<npc::Npc>(actor).is_none()
+        if world.get::<Npc>(actor).is_none()
             && world.get::<engine::systems::player::Owner>(actor).is_none()
         {
             return true;

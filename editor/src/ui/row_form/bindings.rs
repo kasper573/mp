@@ -131,7 +131,7 @@ pub(super) fn bindings_section(
     }
     if capturing {
         let captured = ui.input(|i| {
-            if i.key_pressed(egui::Key::Escape) {
+            if i.key_pressed(Key::Escape) {
                 return Some(None);
             }
             for event in &i.events {
@@ -242,7 +242,7 @@ pub fn binding_label(binding: &Value) -> (String, String) {
     (parts.join(" "), kind)
 }
 
-pub(super) fn key_code_name(key: egui::Key) -> String {
+pub(super) fn key_code_name(key: Key) -> String {
     let name = key.name();
     match key {
         Key::ArrowDown => "ArrowDown".to_owned(),

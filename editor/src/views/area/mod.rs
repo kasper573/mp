@@ -467,7 +467,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) 
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(&area_key) else {
+    let Some(area_id) = content.by_key::<AreaDef>(&area_key) else {
         return;
     };
     match tab {
@@ -491,7 +491,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .project
                 .as_ref()
                 .and_then(|p| p.content.clone())
-                .and_then(|c| c.table::<area::AreaDef>().keys().first().cloned())
+                .and_then(|c| c.table::<AreaDef>().keys().first().cloned())
         });
     let Some(preview) = preview else {
         ui.label("No area to preview the blueprint on");
@@ -538,7 +538,7 @@ fn show_canvas(
         );
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(area_key) else {
+    let Some(area_id) = content.by_key::<AreaDef>(area_key) else {
         ui.label(format!("area {area_key} is gone"));
         return;
     };
@@ -656,10 +656,10 @@ fn banners(
     let mut done = false;
     if let Some(place) = in_place.last() {
         let count = content
-            .by_key::<area::blueprint::BlueprintDef>(&place.blueprint)
+            .by_key::<BlueprintDef>(&place.blueprint)
             .map(|id| {
                 content
-                    .ids::<area::AreaDef>()
+                    .ids::<AreaDef>()
                     .flat_map(|a| {
                         area::placements(content, a)
                             .iter()
@@ -696,7 +696,7 @@ fn banners(
             );
         });
     } else if blueprint.is_some() {
-        let areas: Vec<String> = content.table::<area::AreaDef>().keys().to_vec();
+        let areas: Vec<String> = content.table::<AreaDef>().keys().to_vec();
         let mut picked = preview_area.clone().unwrap_or(area_key.clone());
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Eye, 13.0, theme::MUTED);
@@ -905,7 +905,7 @@ impl AreaSnapshot {
 
     pub fn for_area(editor: &mut Editor, area_key: &str) -> Option<Self> {
         let content = editor.project.as_ref()?.content.clone()?;
-        let area_id = content.by_key::<area::AreaDef>(area_key)?;
+        let area_id = content.by_key::<AreaDef>(area_key)?;
         let view_key = area_view_key(area_key);
         let in_place = if editor.views.area.views.contains_key(&view_key) {
             resolve_in_place(editor, &content, &view_key, area_key)

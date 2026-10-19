@@ -518,7 +518,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                 }
             }
         }
-        let mut folders: BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut folders: BTreeSet<String> = BTreeSet::new();
         for path in project.files.paths_under("assets/") {
             let relative = path.trim_start_matches("assets/");
             if AssetKind::of(relative).is_none() {

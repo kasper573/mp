@@ -31,7 +31,7 @@ pub fn resize_dialog(
         .as_ref()
         .and_then(|p| p.content.clone())
         .and_then(|c| {
-            c.by_key::<area::AreaDef>(&dialog.area)
+            c.by_key::<AreaDef>(&dialog.area)
                 .map(|id| area::load(&c, id).size)
         })
         .map(|size| (size.width as u32, size.height as u32))
@@ -212,7 +212,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     let id = content
-        .by_key::<area::AreaDef>(&dialog.area)
+        .by_key::<AreaDef>(&dialog.area)
         .ok_or("the area is gone")?;
     let area = area::load(&content, id);
     let old = area.size.grid();
