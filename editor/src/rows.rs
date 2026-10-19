@@ -17,9 +17,7 @@ use crate::usages::ContentUsage;
 use crate::views::area::placement;
 use crate::views::{vfx, world};
 use crate::{schema, usages};
-use engine::core::content::{row_file, row_of};
-
-pub const KEY_MAX: usize = 64;
+use engine::core::content::{load, row_file, row_of};
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
@@ -40,21 +38,24 @@ pub enum UsageDecision {
 }
 
 pub fn key_problem(files: &ProjectFiles, table: &str, key: &str) -> Option<String> {
-    if key.is_empty() || key.len() > KEY_MAX {
-        return Some(format!("a key is 1 to {KEY_MAX} characters"));
+    key_problem_besides(files, table, key, None)
+}
+
+/// Why `key` can't name a row of the table, leaving out the row keyed `own` that is being renamed.
+fn key_problem_besides(
+    files: &ProjectFiles,
+    table: &str,
+    key: &str,
+    own: Option<&str>,
+) -> Option<String> {
+    if !load::valid_key(key) {
+        return Some(format!("a key is {}", load::KEY_RULE));
     }
-    if !key
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-    {
-        return Some("a key uses letters, digits, _ and - only".to_owned());
-    }
-    let lower = key.to_lowercase();
-    let clash = files
-        .paths_under(&format!("tables/{table}/"))
-        .filter_map(|file| row_of(file).map(|(_, other)| other.to_owned()))
-        .find(|other| other.to_lowercase() == lower);
-    clash.map(|other| format!("{table}/{other} already exists (keys ignore case)"))
+    files
+        .keys_of(table)
+        .filter(|other| Some(*other) != own)
+        .find(|other| other.eq_ignore_ascii_case(key))
+        .map(|other| format!("{table}/{other} already exists (keys ignore case)"))
 }
 
 pub fn key_from_name(name: &str) -> String {
@@ -207,9 +208,7 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         return Err("fixtures keep their key".to_owned());
     }
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = key_problem(&project.files, table, new_key)
-        && !(new_key.to_lowercase() == key.to_lowercase() && new_key.len() <= KEY_MAX)
-    {
+    if let Some(problem) = key_problem_besides(&project.files, table, new_key, Some(key)) {
         return Err(problem);
     }
     let mut edit = ContentEdit::new(format!("Rename {table}/{key} to {new_key}"));

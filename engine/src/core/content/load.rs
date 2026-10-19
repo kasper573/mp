@@ -1368,7 +1368,7 @@ impl Listing {
     }
 }
 
-const KEY_RULE: &str =
+pub const KEY_RULE: &str =
     "1 to 64 of ASCII letters, digits, _ and -, not starting with -, not a Windows device name";
 
 fn describe(entry: &FolderEntry) -> String {
