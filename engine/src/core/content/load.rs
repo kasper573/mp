@@ -63,6 +63,26 @@ pub struct ContentRegistry {
     version: OnceLock<ContentVersion>,
 }
 
+/// The shape of every table and of the game's settings, for tools that edit content.
+#[derive(Serialize)]
+pub struct ContentShapes {
+    pub tables: Vec<TableShape>,
+    pub settings: Option<serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct TableShape {
+    pub table: String,
+    /// Whether each row keeps a folder of files beside its file.
+    pub folders: bool,
+    pub shape: serde_json::Value,
+    pub fixtures: Vec<String>,
+    /// What each fixture's row keeps as the engine reads it, by key.
+    pub locks: BTreeMap<String, Vec<FixtureLock>>,
+    /// Whether the table holds its fixtures and nothing else.
+    pub closed: bool,
+}
+
 /// What the entries of a JSON list field are called in shape errors: a list of `field` whose
 /// entry names an unknown variant reports `rule`, and asks for `expected` in its place.
 #[derive(Clone, Copy, Debug)]
@@ -176,8 +196,8 @@ impl ContentRegistry {
             .clone()
     }
 
-    pub fn shapes(&self, settings: &SchemaSettings) -> serde_json::Value {
-        let tables: Vec<serde_json::Value> = self
+    pub fn shapes(&self, settings: &SchemaSettings) -> ContentShapes {
+        let tables = self
             .rows
             .iter()
             .map(|row| {
@@ -187,29 +207,26 @@ impl ContentRegistry {
                         .filter(|fixture| fixture.table == row.name())
                         .flat_map(|fixture| fixture.keys.iter())
                 };
-                let keys: Vec<&str> = fixtures().map(|(key, _)| *key).collect();
-                let locks: serde_json::Map<String, serde_json::Value> = fixtures()
-                    .filter(|(_, locks)| !locks.is_empty())
-                    .map(|(key, locks)| ((*key).to_owned(), serde_json::json!(locks)))
-                    .collect();
-                let closed = self
-                    .fixtures
-                    .iter()
-                    .any(|fixture| fixture.table == row.name() && fixture.whole_table);
-                serde_json::json!({
-                    "table": row.name(),
-                    "folders": row.folders(),
-                    "shape": row.shape(settings),
-                    "fixtures": keys,
-                    "locks": locks,
-                    "closed": closed,
-                })
+                TableShape {
+                    table: row.name().to_owned(),
+                    folders: row.folders(),
+                    shape: row.shape(settings),
+                    fixtures: fixtures().map(|(key, _)| (*key).to_owned()).collect(),
+                    locks: fixtures()
+                        .filter(|(_, locks)| !locks.is_empty())
+                        .map(|(key, locks)| ((*key).to_owned(), locks.clone()))
+                        .collect(),
+                    closed: self
+                        .fixtures
+                        .iter()
+                        .any(|fixture| fixture.table == row.name() && fixture.whole_table),
+                }
             })
             .collect();
-        serde_json::json!({
-            "tables": tables,
-            "settings": self.settings.as_ref().map(|settings_loader| settings_loader.shape(settings)),
-        })
+        ContentShapes {
+            tables,
+            settings: self.settings.as_ref().map(|loader| loader.shape(settings)),
+        }
     }
 
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {

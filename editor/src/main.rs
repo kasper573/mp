@@ -44,7 +44,7 @@ fn main() {
         return;
     }
     if options.shapes {
-        let shapes = editor::schema::shapes_json();
+        let shapes = editor::schema::shapes();
         println!("{}", serde_json::to_string_pretty(&shapes).expect("json"));
         return;
     }
