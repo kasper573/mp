@@ -20,14 +20,13 @@ use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
 };
-use crate::systems::skill::{self, Learned};
-use crate::systems::stat::{self, Stat, StatMap};
+use crate::systems::skill::{self, Learned, SkillDef};
+use crate::systems::stat::{Stat, StatMap};
 use crate::systems::vfx::{self, VfxFixture, VfxShaderFixture};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Class>();
-    stat::source(app, level_stats);
 }
 
 pub type ClassId = ContentId<ClassDef>;
@@ -228,7 +227,11 @@ pub fn check_all(loading: &mut Loading) {
                     );
                 }
             }
-            if node.skill.get(&content).rank_count() == 0 {
+            if content
+                .table::<SkillDef>()
+                .get(node.skill)
+                .is_some_and(|skill| skill.rank_count() == 0)
+            {
                 check.error(
                     format!("/tree/{key}/skill"),
                     "no ranks",
@@ -278,7 +281,7 @@ impl EffectDef<RiftScripting> for GrantXp {
     }
 }
 
-fn level_stats(world: &World, entity: Entity, into: &mut Vec<Stat>) {
+pub(crate) fn level_stats(world: &World, entity: Entity, into: &mut Vec<Stat>) {
     let content = world.resource::<Content>();
     if let Some(class) = of(world, entity) {
         into.extend(class.get(content).stats_at(xp_of(world, entity)));

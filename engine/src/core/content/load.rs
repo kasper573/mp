@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use rayon::prelude::*;
 use schemars::JsonSchema;
@@ -59,6 +59,8 @@ pub struct ContentRegistry {
     writers: Vec<FolderWriter>,
     module_rules: Vec<(&'static str, ModuleProbe)>,
     list_kinds: Vec<ListKind>,
+    // Hashing every shape takes a while, and a registry is read far more often than it changes.
+    version: OnceLock<ContentVersion>,
 }
 
 /// What the entries of a JSON list field are called in shape errors: a list of `field` whose
@@ -74,6 +76,7 @@ type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send +
 
 impl ContentRegistry {
     pub fn row<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
+        self.version.take();
         self.rows.push(Box::new(RowLoader::<Row> {
             folders: false,
             marker: PhantomData,
@@ -82,6 +85,7 @@ impl ContentRegistry {
     }
 
     pub fn modules<Row: ModuleSet>(&mut self) -> &mut ContentRegistry {
+        self.version.take();
         self.module_rules.push((
             Row::TABLE,
             Box::new(|json| {
@@ -107,6 +111,7 @@ impl ContentRegistry {
         rule: &'static str,
         expected: &'static str,
     ) -> &mut ContentRegistry {
+        self.version.take();
         self.list_kinds.push(ListKind {
             field,
             rule,
@@ -116,6 +121,7 @@ impl ContentRegistry {
     }
 
     pub fn folder<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
+        self.version.take();
         self.rows.push(Box::new(RowLoader::<Row> {
             folders: true,
             marker: PhantomData,
@@ -124,6 +130,7 @@ impl ContentRegistry {
     }
 
     pub fn fixture<F: Fixture>(&mut self) -> &mut ContentRegistry {
+        self.version.take();
         self.fixtures.push(FixtureEntry {
             table: F::Row::TABLE,
             whole_table: F::WHOLE_TABLE,
@@ -137,6 +144,7 @@ impl ContentRegistry {
     }
 
     pub fn settings<G: Settings>(&mut self) -> &mut ContentRegistry {
+        self.version.take();
         self.settings = Some(Box::new(SettingsOf::<G>(PhantomData)));
         self
     }
@@ -163,7 +171,9 @@ impl ContentRegistry {
     }
 
     pub fn version(&self) -> ContentVersion {
-        super::version::compute(self)
+        self.version
+            .get_or_init(|| super::version::compute(self))
+            .clone()
     }
 
     pub fn shapes(&self, settings: &SchemaSettings) -> serde_json::Value {

@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
 use engine::core::content::ModuleRule;
+use engine::systems::registry;
 use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup};
 use super::{theme, widgets};
-use crate::app::{Editor, registry};
+use crate::app::Editor;
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};

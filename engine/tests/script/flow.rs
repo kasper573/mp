@@ -1,31 +1,21 @@
-use std::sync::Arc;
-
 use bevy_ecs::prelude::*;
-use engine::core::script::compile::compile_owner;
-use engine::core::tiling::Tiles;
+use engine::core::math::{Offset, Pos};
+
 use engine::systems::dialogue::Conversation;
-use engine::systems::item::ItemId;
-use engine::systems::movement::position;
-use engine::systems::notification::NotificationId;
+use engine::systems::memory::{self, MemoryDef};
+use engine::systems::movement;
+use engine::systems::notification::Notification;
 use engine::systems::npc::body::{self, Act, Priority};
-use engine::systems::npc::{self, NpcId, Pack};
-use engine::systems::script::{
-    EventKind, Owner, OwnerKind, Procedure, RiftInstances, ScriptModule,
-};
+use engine::systems::script::{EventKind, Owner, RiftInstances};
 use engine::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
+use testkit::{Sim, labels};
 
-use crate::json::{inline, inline_with};
-use testkit::{
-    Sim, content, conversation, count, errors, give, health, labels, later, leave, pick, place,
-    remembered, row, spawn_area, spoken,
-};
+use crate::game::{field, health, inline, inline_with, scripted_npc, spawn};
 
 #[test]
 fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    let gold: ItemId = row("Gold");
+    let (mut sim, player) = field();
     let script = inline(json!({
         "interacted": interacted("wait"),
         "wait": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "hello" },
@@ -45,35 +35,33 @@ fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
     assert!(!sim.run_until(0.5, |world| world.get::<Conversation>(player).is_some()));
     assert!(sim.run_until(1.0, |world| world.get::<Conversation>(player).is_some()));
     assert_eq!(
-        conversation(&mut sim, player).map(|now| now.node),
+        sim.conversation(1).map(|now| now.node),
         Some("hello".to_owned())
     );
 
-    let broke = pick(&mut sim, 1, player, "Pay.").expect("talking");
+    let broke = sim.pick(1, "Pay.").expect("talking");
     assert_eq!(broke.node, "broke");
-    leave(&mut sim, 1, player);
+    sim.leave(1);
 
-    give(&mut sim, player, gold, 5);
+    sim.give(player, "gold", 5);
     raise(&mut sim, owner, EventKind::Interacted, player);
     assert!(sim.run_until(2.0, |world| world.get::<Conversation>(player).is_some()));
-    let paid = pick(&mut sim, 1, player, "Pay.").expect("talking");
+    let paid = sim.pick(1, "Pay.").expect("talking");
     assert_eq!(paid.node, "paid");
-    assert_eq!(count(&mut sim, player, gold), 0);
+    assert_eq!(sim.count(player, "gold"), 0);
 }
 
 #[test]
 fn flows_run_in_the_order_their_events_were_raised() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    let gulls: NotificationId = row("Gulls");
-    let sails: NotificationId = row("GullSails");
+    let (mut sim, player) = field();
+    let (gulls, sails) = (sim.spoken("gulls"), sim.spoken("sails"));
     let script = inline(json!({
         "interacted": interacted("first"),
         "first": { "type": "notify", "notification": "gulls" },
         "came_near": {
             "type": "on", "event": "came_near", "within": 3.0, "by": "characters", "next": "second"
         },
-        "second": { "type": "notify", "notification": "gull_sails" },
+        "second": { "type": "notify", "notification": "sails" },
     }));
     let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
     sim.forget_notified();
@@ -81,20 +69,19 @@ fn flows_run_in_the_order_their_events_were_raised() {
     raise(&mut sim, owner, EventKind::Interacted, player);
     raise(&mut sim, owner, EventKind::CameNear, player);
     sim.tick();
-    assert_eq!(notified(&sim, 1, &[gulls, sails]), vec![gulls, sails]);
+    assert_eq!(told(&mut sim, &[&gulls, &sails]), vec![&gulls, &sails]);
 
     sim.forget_notified();
-    later(&mut sim, 61.0);
+    sim.later(61.0);
     raise(&mut sim, owner, EventKind::CameNear, player);
     raise(&mut sim, owner, EventKind::Interacted, player);
     sim.tick();
-    assert_eq!(notified(&sim, 1, &[gulls, sails]), vec![sails, gulls]);
+    assert_eq!(told(&mut sim, &[&gulls, &sails]), vec![&sails, &gulls]);
 }
 
 #[test]
 fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let (mut sim, player) = field();
     let script = inline(json!({
         "interacted": interacted("hostile"),
         "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
@@ -106,43 +93,42 @@ fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
             "lost": "lost",
             "interrupted": "stopped"
         },
-        "stopped": remember("bribed_ilsa", None),
-        "lost": remember("sided_with_orcs", None),
+        "stopped": remember("bribed", None),
+        "lost": remember("sided", None),
     }));
     let (npc, owner) = scripted_npc(&mut sim, player, &[&script]);
-    let full = health(&mut sim, player);
+    let full = health(&sim, player);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
     assert!(sim.run_until(5.0, |world| {
         stat::effective(world, player, StatKind::Health) < full
     }));
-    assert_eq!(body::target(sim.world(), npc), Some(player));
+    assert_eq!(body::target(&sim.world, npc), Some(player));
 
     body::order(
-        sim.world(),
+        &mut sim.world,
         npc,
         Act::Wander { leash: None },
         Priority(1),
         None,
     );
-    let hurt = health(&mut sim, player);
+    let hurt = health(&sim, player);
     assert!(sim.run_until(5.0, |world| {
         stat::effective(world, player, StatKind::Health) < hurt
     }));
-    assert_eq!(body::target(sim.world(), npc), Some(player));
-    assert!(!remembered(&mut sim, player, row("BribedIlsa")));
+    assert_eq!(body::target(&sim.world, npc), Some(player));
+    assert!(!remembered(&sim, player, "bribed"));
 
-    body::order(sim.world(), npc, Act::Stop, Priority(5), None);
+    body::order(&mut sim.world, npc, Act::Stop, Priority(5), None);
     sim.tick();
-    assert!(remembered(&mut sim, player, row("BribedIlsa")));
-    assert_eq!(body::target(sim.world(), npc), None);
-    assert!(!remembered(&mut sim, player, row("SidedWithOrcs")));
+    assert!(remembered(&sim, player, "bribed"));
+    assert_eq!(body::target(&sim.world, npc), None);
+    assert!(!remembered(&sim, player, "sided"));
 }
 
 #[test]
 fn an_attack_loses_a_target_that_leaves_its_range() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let (mut sim, player) = field();
     let script = inline(json!({
         "interacted": interacted("hostile"),
         "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "attack" },
@@ -153,26 +139,22 @@ fn an_attack_loses_a_target_that_leaves_its_range() {
             "priority": 5,
             "lost": "lost"
         },
-        "lost": remember("sided_with_orcs", None),
+        "lost": remember("sided", None),
     }));
     let (npc, owner) = scripted_npc(&mut sim, player, &[&script]);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
     assert!(sim.run_until(5.0, |world| body::target(world, npc) == Some(player)));
 
-    let here = position(sim.world(), player).expect("position");
-    let far = sim.walkable_near(here, Tiles(14.0), Tiles(30.0));
-    place(&mut sim, player, far);
+    movement::relocate(&mut sim.world, player, Pos::new(28.0, 28.0));
     assert!(sim.run_until(5.0, |world| body::target(world, npc).is_none()));
     sim.tick();
-    assert!(remembered(&mut sim, player, row("SidedWithOrcs")));
+    assert!(remembered(&sim, player, "sided"));
 }
 
 #[test]
 fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    let gold: ItemId = row("Gold");
+    let (mut sim, player) = field();
     let nobody = json!({ "type": "local", "local": "nobody" });
     let script = inline_with(
         json!({ "nobody": "actor" }),
@@ -185,64 +167,51 @@ fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
                 "done": "gave",
                 "refused": "refused"
             },
-            "gave": remember("sided_with_orcs", None),
-            "refused": remember("bribed_ilsa", Some("heal")),
+            "gave": remember("sided", None),
+            "refused": remember("bribed", Some("heal")),
             "heal": { "type": "heal", "who": nobody, "by": "full", "next": "despawn" },
             "despawn": { "type": "despawn", "who": nobody, "done": "gone" },
-            "gone": remember("tide_chest_looted", None),
+            "gone": remember("looted", None),
         }),
     );
     let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
-    stat::apply_damage(sim.world(), player, 1.0);
+    stat::apply_damage(&mut sim.world, player, 1.0);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
     sim.tick();
 
-    assert!(remembered(&mut sim, player, row("BribedIlsa")));
-    assert!(!remembered(&mut sim, player, row("SidedWithOrcs")));
-    assert!(!remembered(&mut sim, player, row("TideChestLooted")));
-    assert_eq!(count(&mut sim, player, gold), 0);
-    assert_eq!(errors(&sim, 1).len(), 1);
-    assert!(
-        errors(&sim, 1)[0].contains("Nobody"),
-        "{:?}",
-        errors(&sim, 1)
-    );
+    assert!(remembered(&sim, player, "bribed"));
+    assert!(!remembered(&sim, player, "sided"));
+    assert!(!remembered(&sim, player, "looted"));
+    assert_eq!(sim.count(player, "gold"), 0);
+    let errors = sim.errors(1);
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].contains("Nobody"), "{errors:?}");
 }
 
 #[test]
 fn an_npc_can_be_the_subject_of_a_flow() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let (mut sim, player) = field();
     let script = inline(json!({
         "came_near": { "type": "on", "event": "came_near", "within": 3.0, "by": "npcs", "next": "heal" },
         "heal": { "type": "heal", "by": "full" },
     }));
     let (_, healer) = scripted_npc(&mut sim, player, &[&script]);
-    let here = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(here, Tiles(1.0), Tiles(2.0));
-    let patient = npc::spawn(
-        sim.world(),
-        row::<NpcId>("Orc"),
-        spot,
-        spawn_area(),
-        Pack(u32::MAX),
-    );
+    let patient = spawn(&mut sim, "fighter", player, Offset::new(0.0, 2.0), u32::MAX);
     sim.tick();
-    let full = health(&mut sim, patient);
-    stat::apply_damage(sim.world(), patient, 3.0);
-    assert!(health(&mut sim, patient) < full);
+    let full = health(&sim, patient);
+    stat::apply_damage(&mut sim.world, patient, 3.0);
+    assert!(health(&sim, patient) < full);
 
     raise(&mut sim, healer, EventKind::CameNear, patient);
     sim.tick();
 
-    assert_eq!(health(&mut sim, patient), full);
+    assert_eq!(health(&sim, patient), full);
 }
 
 #[test]
 fn a_choice_label_fills_its_values_like_a_line_does() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let (mut sim, player) = field();
     let script = inline(json!({
         "talk": interacted("hello"),
         "hello": {
@@ -256,7 +225,7 @@ fn a_choice_label_fills_its_values_like_a_line_does() {
     raise(&mut sim, healer, EventKind::Interacted, player);
     sim.tick();
 
-    let conversation = conversation(&mut sim, player).expect("in conversation");
+    let conversation = sim.conversation(1).expect("in conversation");
     assert_eq!(labels(&conversation), vec!["Pay Gold".to_owned()]);
 }
 
@@ -286,55 +255,27 @@ fn remember(key: &str, next: Option<&str>) -> Value {
     }
 }
 
-fn compiled(modules: &[&ScriptModule]) -> Vec<Arc<Procedure>> {
-    compile_owner(content(), OwnerKind::Npc, "test/npc", modules).expect("compiles")
-}
-
-fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[&ScriptModule]) -> (Entity, Owner) {
-    let at = position(sim.world(), beside).expect("position");
-    let spot = sim.walkable_near(at, Tiles(1.0), Tiles(1.5));
-    let npc = npc::spawn(
-        sim.world(),
-        row::<NpcId>("Orc"),
-        spot,
-        spawn_area(),
-        Pack(u32::MAX),
-    );
-    let owner = Owner::Entity(OwnerKind::Npc, npc);
-    let procedures = compiled(modules);
-    let mut instances = sim.world().resource_mut::<RiftInstances>();
-    instances.remove_owner(owner);
-    instances.spawn_owner(owner, procedures);
-    instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
-    sim.tick();
-    (npc, owner)
-}
-
 fn raise(sim: &mut Sim, owner: Owner, kind: EventKind, subject: Entity) {
-    sim.world().resource_mut::<RiftInstances>().raise(
-        owner,
-        kind,
-        Some(subject),
-        Vec::new(),
-        |_| true,
-    );
+    sim.world
+        .resource_mut::<RiftInstances>()
+        .raise(owner, kind, Some(subject), Vec::new(), |_| true);
 }
 
-fn notified(sim: &Sim, client: u32, ids: &[NotificationId]) -> Vec<NotificationId> {
-    sim.notified(client)
+/// Which of `lines` the first client was told, in the order told.
+fn told<'a>(sim: &mut Sim, lines: &[&'a Notification]) -> Vec<&'a Notification> {
+    sim.told(1)
         .into_iter()
-        .filter_map(|sent| {
-            ids.iter()
-                .copied()
-                .find(|id| sent.notification.text == spoken(*id).text)
-        })
+        .filter_map(|told| lines.iter().copied().find(|line| line.text == told.text))
         .collect()
+}
+
+fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
+    memory::get(&sim.world, player, sim.id::<MemoryDef>(key)).truthy()
 }
 
 #[test]
 fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
+    let (mut sim, player) = field();
     let script = inline(json!({
         "interacted": interacted("roll"),
         "roll": { "type": "random", "weights": [1, 1], "outputs": ["hello", "bye"] },
@@ -343,7 +284,7 @@ fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
     }));
     let (_, owner) = scripted_npc(&mut sim, player, &[&script]);
 
-    let world: &World = sim.world();
+    let world: &World = &sim.world;
     let found = world.resource::<RiftInstances>().next_dialogue(
         world,
         owner,

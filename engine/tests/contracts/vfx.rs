@@ -5,71 +5,67 @@ use engine::core::geometry::{Degrees, Footprint, Radians, Shape};
 use engine::core::math::{Offset, Pos, Rgba};
 use engine::core::tiling::Tiles;
 use engine::core::time::UnixMillis;
-use engine::core::vfx::{ParamValue, VfxId, VfxInstance, VfxParams, VfxSite};
-use engine::systems::GameSettings;
+use engine::core::vfx::{ParamValue, VfxDef, VfxInstance, VfxParams, VfxSite};
+use engine::systems::area::AreaDef;
 use engine::systems::class::{self, NodeKey};
-use engine::systems::combat;
-use engine::systems::movement::position;
+use engine::systems::combat::{self, Attitude};
+use engine::systems::movement::{self, position};
+use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::player::Owner;
-use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs, SnapshotSkill};
-use engine::systems::skill::{self, CastAim, LearnSkillsRequest, Rank, UseSkillRequest};
+use engine::systems::skill::{self, CastAim, Rank, SkillDef, UseSkillRequest};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
-
-use testkit::{Sim, content, later, row, settle, spawn_area, target_dummy};
+use engine::systems::{actor, script, vfx};
+use serde_json::{Value, json};
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn damage_shows_on_the_one_hit_and_the_effect_passes() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let orc = orc_toward(&mut sim, player, 1.0);
+    let (mut sim, player) = arena();
+    let dummy = dummy_toward(&mut sim, player, 1.0);
 
-    combat::inflict(sim.world(), orc, Some(player), 4.0);
+    combat::inflict(&mut sim.world, dummy, Some(player), 4.0);
     sim.tick();
 
-    let shown = instances(&mut sim, row("DamageTaken"));
+    let shown = instances(&mut sim, "damage_taken");
     assert_eq!(shown.len(), 1);
-    assert_eq!(shown[0].site, VfxSite::Actor(orc));
+    assert_eq!(shown[0].site, VfxSite::Actor(dummy));
 
-    later(&mut sim, 3.0);
-    assert!(instances(&mut sim, row("DamageTaken")).is_empty());
+    sim.later(3.0);
+    assert!(instances(&mut sim, "damage_taken").is_empty());
 }
 
 #[test]
 fn healing_shows_but_regeneration_does_not() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    stat::apply_damage(sim.world(), player, 6.0);
+    let (mut sim, player) = arena();
+    stat::apply_damage(&mut sim.world, player, 6.0);
     sim.tick();
 
-    stat::regenerate(sim.world(), player, 1.0);
+    stat::regenerate(&mut sim.world, player, 1.0);
     sim.tick();
-    assert!(instances(&mut sim, row("Healed")).is_empty());
+    assert!(instances(&mut sim, "healed").is_empty());
 
-    stat::heal(sim.world(), player, 3.0);
+    stat::heal(&mut sim.world, player, 3.0);
     sim.tick();
-    let shown = instances(&mut sim, row("Healed"));
+    let shown = instances(&mut sim, "healed");
     assert_eq!(shown.len(), 1);
     assert_eq!(shown[0].site, VfxSite::Actor(player));
 }
 
 #[test]
 fn a_level_reached_plays_on_the_actor_for_everyone_and_on_the_screen_for_the_player_alone() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let client = sim.world().get::<Owner>(player).expect("owner").client;
+    let (mut sim, player) = arena();
+    let client = sim.world.get::<Owner>(player).expect("owner").client;
 
-    class::grant_xp(sim.world(), player, 30);
+    class::grant_xp(&mut sim.world, player, 30);
     sim.tick();
 
+    let level_up = sim.id::<VfxDef>("level_up");
     let shown: Vec<(VfxInstance, Option<Presence>)> = sim
-        .world()
+        .world
         .query::<(&VfxInstance, Option<&Presence>)>()
-        .iter(sim.world())
-        .filter(|(instance, _)| instance.vfx == row::<VfxId>("LevelUp"))
+        .iter(&sim.world)
+        .filter(|(instance, _)| instance.vfx == level_up)
         .map(|(instance, presence)| (instance.clone(), presence.cloned()))
         .collect();
     assert_eq!(shown.len(), 2);
@@ -87,49 +83,30 @@ fn a_level_reached_plays_on_the_actor_for_everyone_and_on_the_screen_for_the_pla
 
 #[test]
 fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    sim.send(
-        1,
-        LearnSkillsRequest {
-            ranks: vec![(NodeKey::from("cleave"), Rank(1))],
-        },
-    );
-    settle(&mut sim);
-    let near = orc_toward(&mut sim, player, 1.0);
-    let far = orc_toward(&mut sim, player, 2.0);
-    let full = stat::effective(sim.world(), near, StatKind::Health);
-    let at = position(sim.world(), near).expect("position");
+    let (mut sim, player) = arena();
+    learn(&mut sim, player, "cleave");
+    let near = dummy_toward(&mut sim, player, 1.0);
+    let far = dummy_toward(&mut sim, player, 2.0);
+    let full = stat::effective(&sim.world, near, StatKind::Health);
+    let at = position(&sim.world, near).expect("position");
 
-    sim.send(
-        1,
-        UseSkillRequest {
-            skill: row("Cleave"),
-            aim: CastAim::Point(at),
-        },
-    );
-    assert!(sim.run_until(10.0, |world| {
-        world
-            .query::<&VfxInstance>()
-            .iter(world)
-            .any(|instance| instance.vfx == row::<VfxId>("SlashHit"))
-    }));
+    cast(&mut sim, "cleave", at);
+    assert!(sim.run_until(10.0, |world| any_shown(world, "slash_hit")));
 
-    let mut hit: Vec<VfxSite> = instances(&mut sim, row("SlashHit"))
+    let mut hit: Vec<VfxSite> = instances(&mut sim, "slash_hit")
         .iter()
         .map(|instance| instance.site.clone())
         .collect();
     hit.sort_by_key(|site| format!("{site:?}"));
     let mut struck: Vec<VfxSite> = [near, far]
         .into_iter()
-        .filter(|orc| stat::effective(sim.world(), *orc, StatKind::Health) < full)
+        .filter(|dummy| stat::effective(&sim.world, *dummy, StatKind::Health) < full)
         .map(VfxSite::Actor)
         .collect();
     struck.sort_by_key(|site| format!("{site:?}"));
     assert!(!struck.is_empty());
     assert_eq!(hit, struck);
-    let sweeps = instances(&mut sim, row("CleaveSwoosh"));
+    let sweeps = instances(&mut sim, "swoosh");
     assert_eq!(sweeps.len(), 1);
     assert!(
         matches!(sweeps[0].site, VfxSite::Area(_)),
@@ -140,49 +117,15 @@ fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
 
 #[test]
 fn an_area_vfx_reaches_the_targets_it_struck_and_not_the_caster() {
-    let mut sim = Sim::area(spawn_area());
-    let settings = content().built::<GameSettings>();
-    let mage = row("Mage");
-    let mut snapshot =
-        CharacterSnapshot::fresh(content(), "Caster", settings.player.get(content()));
-    snapshot.class = mage;
-    snapshot.xp = mage
-        .get(content())
-        .levels
-        .iter()
-        .map(|level| level.xp)
-        .max()
-        .unwrap_or(0);
-    snapshot.skills = vec![SnapshotSkill {
-        node: NodeKey::from("fireball"),
-        rank: Rank::FIRST,
-    }];
-    let player = sim.join_as(
-        1,
-        JoinAs {
-            snapshot,
-            start: settings.initial_spawn,
-        },
-    );
-    settle(&mut sim);
-    let orc = orc_toward(&mut sim, player, 1.0);
-    let feet = position(sim.world(), player).expect("position");
+    let (mut sim, player) = arena();
+    learn(&mut sim, player, "fireball");
+    let dummy = dummy_toward(&mut sim, player, 1.0);
+    let feet = position(&sim.world, player).expect("position");
 
-    sim.send(
-        1,
-        UseSkillRequest {
-            skill: row("Fireball"),
-            aim: CastAim::Point(feet),
-        },
-    );
-    assert!(sim.run_until(10.0, |world| {
-        world
-            .query::<&VfxInstance>()
-            .iter(world)
-            .any(|instance| instance.vfx == row::<VfxId>("FireballBlast"))
-    }));
+    cast(&mut sim, "fireball", feet);
+    assert!(sim.run_until(10.0, |world| any_shown(world, "blast")));
 
-    let blasts = instances(&mut sim, row("FireballBlast"));
+    let blasts = instances(&mut sim, "blast");
     let circles: Vec<Footprint> = blasts
         .iter()
         .filter_map(|blast| match blast.site {
@@ -199,13 +142,36 @@ fn an_area_vfx_reaches_the_targets_it_struck_and_not_the_caster() {
             _ => None,
         })
         .collect();
-    assert_eq!(struck, vec![(orc, circles[0].facing)]);
+    assert_eq!(struck, vec![(dummy, circles[0].facing)]);
+}
+
+#[test]
+fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
+    let (mut sim, player) = arena();
+    learn(&mut sim, player, "chain");
+    let from = position(&sim.world, player).expect("position");
+    let far = dummy_toward(&mut sim, player, 5.0);
+    let near = dummy_toward(&mut sim, player, 2.0);
+    let middle = dummy_toward(&mut sim, player, 4.0);
+    sim.run(0.5);
+
+    cast(&mut sim, "chain", from + Offset::new(3.0, 0.0));
+    assert!(sim.run_until(10.0, |world| any_shown(world, "arc")));
+
+    let shown = instances(&mut sim, "arc");
+    assert_eq!(shown.len(), 1);
+    let stops: Vec<_> = [player, near, middle, far]
+        .iter()
+        .map(|who| position(&sim.world, *who).expect("position"))
+        .collect();
+    assert_eq!(shown[0].site, VfxSite::Path(stops));
 }
 
 #[test]
 fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
+    let (sim, _) = arena();
     let sent = VfxInstance {
-        vfx: row("DamageTaken"),
+        vfx: sim.id("damage_taken"),
         site: VfxSite::Screen,
         params: VfxParams(vec![
             ("amount".to_owned(), ParamValue::Number(4.5)),
@@ -222,8 +188,9 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
 
 #[test]
 fn an_instance_on_an_area_survives_the_wire() {
+    let (sim, _) = arena();
     let sent = VfxInstance {
-        vfx: row("Sweep"),
+        vfx: sim.id("swoosh"),
         site: VfxSite::Area(Footprint {
             at: Pos::new(3.0, 4.0),
             facing: Radians(0.5),
@@ -242,60 +209,168 @@ fn an_instance_on_an_area_survives_the_wire() {
     assert_eq!(received, sent);
 }
 
-fn instances(sim: &mut Sim, vfx: VfxId) -> Vec<VfxInstance> {
-    let world = sim.world();
+fn arena() -> (Sim, Entity) {
+    let content = Game::new()
+        .area("arena", &Map::open(15, 9), json!([]))
+        .hero("arena", 4.0, 4.0)
+        .edit("class", "hero", |hero| {
+            hero["levels"] = json!([
+                { "xp": 0, "skill_points": 1 },
+                { "xp": 30, "skill_points": 1 },
+            ]);
+            hero["tree"] = json!({
+                "cleave": { "skill": "cleave", "at": { "x": 0.0, "y": 0.0 } },
+                "fireball": { "skill": "fireball", "at": { "x": 80.0, "y": 0.0 } },
+                "chain": { "skill": "chain", "at": { "x": 160.0, "y": 0.0 } },
+            });
+        })
+        .row(
+            "skill",
+            "cleave",
+            area_skill(json!({ "type": "cone", "angle": 90.0, "length": 2.0 }), json!({
+                "sweep": { "type": "vfx", "vfx": "swoosh", "on": { "type": "skill_area" }, "next": "hit" },
+                "hit": damage("show"),
+                "show": { "type": "vfx", "vfx": "slash_hit", "on": { "type": "skill_targets" } },
+            }), "sweep"),
+        )
+        .row(
+            "skill",
+            "fireball",
+            area_skill(json!({ "type": "circle", "radius": 2.0 }), json!({
+                "blast": { "type": "vfx", "vfx": "blast", "on": { "type": "skill_area" }, "next": "hit" },
+                "hit": damage_last(),
+            }), "blast"),
+        )
+        .row(
+            "skill",
+            "chain",
+            area_skill(json!({ "type": "circle", "radius": 3.0 }), json!({
+                "arc": {
+                    "type": "vfx",
+                    "vfx": "arc",
+                    "on": { "type": "skill_targets" },
+                    "site": { "type": "path" },
+                    "next": "hit",
+                },
+                "hit": damage_last(),
+            }), "arc"),
+        )
+        .asset("icons/skill.png", testkit::png(1, 1))
+        .npc("dummy", 100.0, json!([]))
+        .vfx("slash_hit")
+        .vfx("swoosh")
+        .vfx("blast")
+        .edit("vfx", "blast", |blast| blast["on_actors_inside"] = json!("blast"))
+        .vfx("arc")
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("healed")
+        .shader("heal_pop")
+        .vfx("level_up")
+        .shader("level_pop")
+        .vfx("defeated")
+        .sfx("rising_chime")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("arena")
+        .accept::<UseSkillRequest>()
+        .add((
+            vfx::expire,
+            skill::casting::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            movement::advance,
+        ))
+        .add((stat::settle_health, combat::defeats, actor::settle));
+    script::spawn_stateless(&mut sim.world);
+    let player = sim.join(1);
+    sim.run(0.5);
+    (sim, player)
+}
+
+fn area_skill(area: Value, mut nodes: Value, first: &str) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "swing" });
+    nodes["swing"] =
+        json!({ "type": "animate", "action": "attack", "wait": "apex", "next": first });
+    json!({
+        "name": "Area skill",
+        "icon": "icons/skill.png",
+        "target": "area_enemy",
+        "range": 6.0,
+        "area": area,
+        "cooldown": 6.0,
+        "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
+        "modules": [{ "type": "inline_script", "nodes": nodes }],
+    })
+}
+
+fn damage(next: &str) -> Value {
+    let mut hit = damage_last();
+    hit["next"] = json!(next);
+    hit
+}
+
+fn damage_last() -> Value {
+    json!({
+        "type": "damage",
+        "who": { "type": "skill_targets" },
+        "by": { "type": "stat", "stat": "damage" },
+    })
+}
+
+fn learn(sim: &mut Sim, player: Entity, node: &str) {
+    sim.world
+        .entity_mut(player)
+        .insert(skill::Learned(BTreeMap::from([(
+            NodeKey::from(node),
+            Rank(1),
+        )])));
+}
+
+fn cast(sim: &mut Sim, skill: &str, at: Pos<Tiles>) {
+    let conn = sim.conn(1);
+    let skill = sim.id::<SkillDef>(skill);
+    sim.send(
+        conn,
+        UseSkillRequest {
+            skill,
+            aim: CastAim::Point(at),
+        },
+    );
+}
+
+fn any_shown(world: &mut World, key: &str) -> bool {
+    let vfx = world
+        .resource::<engine::core::content::Content>()
+        .by_key::<VfxDef>(key)
+        .expect("a declared vfx");
     world
         .query::<&VfxInstance>()
         .iter(world)
+        .any(|instance| instance.vfx == vfx)
+}
+
+fn instances(sim: &mut Sim, key: &str) -> Vec<VfxInstance> {
+    let vfx = sim.id::<VfxDef>(key);
+    sim.world
+        .query::<&VfxInstance>()
+        .iter(&sim.world)
         .filter(|instance| instance.vfx == vfx)
         .cloned()
         .collect()
 }
 
-fn orc_toward(sim: &mut Sim, player: Entity, east: f32) -> Entity {
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_toward(start, Offset::new(east, 0.0));
-    target_dummy(sim, row("Orc"), spot)
-}
-
-#[test]
-fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    sim.world().entity_mut(player).insert((
-        class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([(
-            NodeKey::from("chain_lightning"),
-            Rank(1),
-        )])),
-    ));
-    let from = position(sim.world(), player).expect("position");
-    let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
-    let far = orc_toward(&mut sim, player, 5.0);
-    let near = orc_toward(&mut sim, player, 2.0);
-    let middle = orc_toward(&mut sim, player, 4.0);
-    settle(&mut sim);
-
-    sim.send(
-        1,
-        UseSkillRequest {
-            skill: row("ChainLightning"),
-            aim: CastAim::Point(aimed),
-        },
-    );
-    assert!(sim.run_until(10.0, |world| {
-        world
-            .query::<&VfxInstance>()
-            .iter(world)
-            .any(|instance| instance.vfx == row::<VfxId>("ChainLightning"))
-    }));
-
-    let shown = instances(&mut sim, row("ChainLightning"));
-    assert_eq!(shown.len(), 1);
-    let stops: Vec<_> = [player, near, middle, far]
-        .iter()
-        .map(|who| position(sim.world(), *who).expect("position"))
-        .collect();
-    assert_eq!(shown[0].site, VfxSite::Path(stops));
+/// A hostile dummy that stands where it's put and never fights back.
+fn dummy_toward(sim: &mut Sim, player: Entity, east: f32) -> Entity {
+    let at = position(&sim.world, player).expect("position") + Offset::new(east, 0.0);
+    let area = sim.id::<AreaDef>("arena");
+    let dummy = sim.id::<NpcDef>("dummy");
+    let dummy = npc::spawn(&mut sim.world, dummy, at, area, Pack(u32::MAX));
+    sim.world.entity_mut(dummy).insert(Attitude::Hostile);
+    sim.tick();
+    dummy
 }

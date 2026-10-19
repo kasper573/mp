@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 
+use bevy_ecs::message::Message;
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::{Cell, CellPos, TilePos, Tiles};
 use engine::systems::area::warp::warp;
-use engine::systems::area::{self, AreaDef, AreaId};
+use engine::systems::area::{AreaDef, AreaId};
 use engine::systems::combat::{self, AttackRequest, Attitude};
 use engine::systems::movement::{
     self, MoveRequest, MoveSeq, MoveTarget, TileClaim, TileClaims, moving, position,
 };
 use engine::systems::npc::body::{self, Act, Priority};
-use engine::systems::npc::{self, Home, Npc, Pack};
-use engine::systems::script::{Owner, OwnerKind, Place, RiftInstances};
-use engine::systems::stat;
-
-use testkit::{Sim, content, place, row, spawn_area};
+use engine::systems::npc::{self, Home, Npc, NpcDef, Pack};
+use engine::systems::script::Place;
+use engine::systems::{actor, script, skill, stat};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 const FIGHTERS: Pack = Pack(1);
 const VICTIMS: Pack = Pack(2);
@@ -27,7 +28,7 @@ fn two_actors_reaching_for_each_other_end_on_neighbouring_tiles() {
             let player = arena.player();
             let foe = arena.fighter(arena.at(direction.0 * gap, direction.1 * gap));
 
-            arena.sim.send(1, AttackRequest { target: foe });
+            arena.send(AttackRequest { target: foe });
             arena.attack(foe, player);
             let rested_apart = arena.watch(4.0, |world| {
                 !(resting(world, player)
@@ -36,7 +37,7 @@ fn two_actors_reaching_for_each_other_end_on_neighbouring_tiles() {
             });
 
             assert!(rested_apart, "gap {gap} {direction:?}: rested on one tile");
-            let world = arena.sim.world();
+            let world = arena.world();
             assert!(resting(world, player) && resting(world, foe));
             assert_eq!(
                 apart(cell(world, player), cell(world, foe)),
@@ -54,13 +55,13 @@ fn reach_met_mid_step_never_lands_on_the_target() {
         let player = arena.player();
         let target = arena.victim(arena.at(offset.0, offset.1));
 
-        arena.sim.send(1, AttackRequest { target });
+        arena.send(AttackRequest { target });
         let never_on_it = arena.watch(4.0, |world| {
             !(resting(world, player) && cell(world, player) == cell(world, target))
         });
 
         assert!(never_on_it, "{offset:?}: came to rest on the target");
-        let world = arena.sim.world();
+        let world = arena.world();
         assert!(resting(world, player), "{offset:?}");
         assert_eq!(apart(cell(world, player), cell(world, target)), 1);
     }
@@ -79,7 +80,7 @@ fn a_pack_from_one_side_fills_distinct_berths() {
     }
     arena.run(4.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     let target = cell(world, player);
     let mut tiles: Vec<CellPos> = pack.iter().map(|&f| cell(world, f)).collect();
     assert!(pack.iter().all(|&f| resting(world, f)));
@@ -100,7 +101,7 @@ fn a_ninth_attacker_shares_the_emptiest_berth() {
 
     arena.run(6.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     let crowds = crowds(world, &pack);
     assert!(in_reach_of(world, &pack, player));
     assert_eq!(crowds.len(), 8, "{crowds:?}");
@@ -114,7 +115,7 @@ fn a_crowded_tile_evens_out_when_another_frees() {
     let mut pack = arena.ring_of_fighters(9, player);
     arena.run(6.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     let before = crowds(world, &pack);
     let alone = pack
         .iter()
@@ -124,7 +125,7 @@ fn a_crowded_tile_evens_out_when_another_frees() {
     npc::despawn(world, gone);
     arena.run(6.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     let crowds = crowds(world, &pack);
     assert!(in_reach_of(world, &pack, player));
     assert_eq!(crowds.len(), 8, "{crowds:?}");
@@ -142,16 +143,13 @@ fn a_pack_fans_out_when_its_target_stops() {
     }
 
     let away = arena.at(4, 0);
-    arena.sim.send(
-        1,
-        MoveRequest {
-            pos: away,
-            seq: MoveSeq(1),
-        },
-    );
+    arena.send(MoveRequest {
+        pos: away,
+        seq: MoveSeq(1),
+    });
     arena.run(8.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     assert_eq!(position(world, player), Some(away));
     assert!(in_reach_of(world, &pack, player));
     assert_eq!(crowds(world, &pack).len(), pack.len());
@@ -164,23 +162,20 @@ fn berths_hold_while_the_target_steps_within_reach() {
     let fighter = arena.fighter(arena.at(0, 3));
     arena.attack(fighter, player);
     arena.run(4.0);
-    let berth = cell(arena.sim.world(), fighter);
+    let berth = cell(arena.world(), fighter);
     assert_eq!(berth, arena.at(0, 1).cell());
 
     let step = arena.at(1, 0);
-    arena.sim.send(
-        1,
-        MoveRequest {
-            pos: step,
-            seq: MoveSeq(1),
-        },
-    );
+    arena.send(MoveRequest {
+        pos: step,
+        seq: MoveSeq(1),
+    });
     let held = arena.watch(3.0, |world| {
         position(world, fighter) == Some(berth.center())
     });
 
     assert!(held, "the fighter left a berth still in reach");
-    assert_eq!(position(arena.sim.world(), player), Some(step));
+    assert_eq!(position(arena.world(), player), Some(step));
 }
 
 #[test]
@@ -190,16 +185,13 @@ fn a_ground_click_onto_an_occupied_tile_is_honoured() {
     let spot = arena.at(3, 1);
     arena.victim(spot);
 
-    arena.sim.send(
-        1,
-        MoveRequest {
-            pos: spot,
-            seq: MoveSeq(1),
-        },
-    );
+    arena.send(MoveRequest {
+        pos: spot,
+        seq: MoveSeq(1),
+    });
     arena.run(4.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     assert_eq!(position(world, player), Some(spot));
     assert!(resting(world, player));
 }
@@ -212,7 +204,7 @@ fn no_attacker_is_ever_held_out_of_reach() {
 
     arena.run(8.0);
 
-    let world = arena.sim.world();
+    let world = arena.world();
     assert!(pack.iter().all(|&fighter| resting(world, fighter)));
     assert!(in_reach_of(world, &pack, player));
     assert!(crowds(world, &pack).values().all(|&crowd| crowd <= 2));
@@ -227,12 +219,12 @@ fn players_and_npcs_pick_berths_alike() {
             let target = arena.victim(arena.at(0, 0));
             let attacker = if as_player {
                 let start = arena.at(offset.0, offset.1);
-                place(&mut arena.sim, player, start);
-                arena.sim.send(1, AttackRequest { target });
+                movement::relocate(arena.world(), player, start);
+                arena.send(AttackRequest { target });
                 player
             } else {
                 let aside = arena.at(-5, -5);
-                place(&mut arena.sim, player, aside);
+                movement::relocate(arena.world(), player, aside);
                 let fighter = arena.fighter(arena.at(offset.0, offset.1));
                 arena.attack(fighter, target);
                 fighter
@@ -241,7 +233,7 @@ fn players_and_npcs_pick_berths_alike() {
                 resting(world, attacker) && apart(cell(world, attacker), cell(world, target)) == 1
             });
             assert!(arrived, "{offset:?} as player: {as_player}");
-            cell(arena.sim.world(), attacker)
+            cell(arena.world(), attacker)
         });
 
         assert_eq!(berths[0], berths[1], "{offset:?}");
@@ -259,7 +251,7 @@ fn wandering_never_ends_on_a_claimed_tile() {
         .into_iter()
         .map(|(dx, dy)| {
             let wanderer = arena.victim(arena.at(dx, dy));
-            arena.sim.world().entity_mut(wanderer).insert(Home(home));
+            arena.world().entity_mut(wanderer).insert(Home(home));
             wanderer
         })
         .collect();
@@ -291,9 +283,9 @@ fn wandering_never_ends_on_a_claimed_tile() {
 
 #[test]
 fn placement_lands_on_the_nearest_free_tile() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = field();
     let players: Vec<Entity> = (1..=4).map(|client| sim.join(client)).collect();
-    let world = sim.world();
+    let world = &sim.world;
     let mut tiles: Vec<CellPos> = players.iter().map(|&p| cell(world, p)).collect();
     let spawn = tiles[0];
     assert!(
@@ -308,18 +300,13 @@ fn placement_lands_on_the_nearest_free_tile() {
     let player = arena.player();
     let spot = arena.at(4, 0);
     arena.victim(spot);
-    warp(
-        arena.sim.world(),
-        player,
-        Place {
-            area: arena.area,
-            at: spot,
-        },
-    )
-    .expect("warped");
+    let to = Place {
+        area: arena.area,
+        at: spot,
+    };
+    warp(arena.world(), player, to).expect("warped");
 
-    let world = arena.sim.world();
-    assert_eq!(cell(world, player), arena.at(4, 1).cell());
+    assert_eq!(cell(&arena.sim.world, player), arena.at(4, 1).cell());
 }
 
 #[test]
@@ -330,12 +317,12 @@ fn a_despawned_actor_leaves_no_claim() {
     let fallen = arena.victim(arena.at(2, 0));
     assert_eq!(arena.claims(spot), 2);
 
-    npc::despawn(arena.sim.world(), gone);
+    npc::despawn(arena.world(), gone);
     assert_eq!(arena.claims(spot), 1);
 
-    combat::inflict(arena.sim.world(), fallen, None, 1_000_000.0);
+    combat::inflict(arena.world(), fallen, None, 1_000_000.0);
     arena.run(0.2);
-    assert!(stat::is_dead(arena.sim.world(), fallen));
+    assert!(stat::is_dead(arena.world(), fallen));
     assert_eq!(arena.claims(spot), 0);
 }
 
@@ -346,20 +333,17 @@ fn the_claim_index_matches_a_rebuild_from_scratch() {
     let pack = arena.ring_of_fighters(10, player);
 
     for round in 0..8 {
-        let at = position(arena.sim.world(), player).expect("position");
+        let at = position(arena.world(), player).expect("position");
         let step = if round % 2 == 0 { 2.0 } else { -2.0 };
-        arena.sim.send(
-            1,
-            MoveRequest {
-                pos: at + Offset::new(step, 0.0),
-                seq: MoveSeq(round + 1),
-            },
-        );
+        arena.send(MoveRequest {
+            pos: at + Offset::new(step, 0.0),
+            seq: MoveSeq(round + 1),
+        });
         if round == 4 {
-            npc::despawn(arena.sim.world(), pack[0]);
+            npc::despawn(arena.world(), pack[0]);
         }
         if round == 6 {
-            combat::inflict(arena.sim.world(), pack[1], None, 1_000_000.0);
+            combat::inflict(arena.world(), pack[1], None, 1_000_000.0);
         }
         arena.sim.tick();
         let consistent = arena.watch(1.0, |world| {
@@ -376,31 +360,26 @@ struct Arena {
 }
 
 impl Arena {
-    /// A sim with nobody else about, centred on open ground the player can walk all over.
+    /// A player alone in the middle of open ground they can walk all over, twelve tiles each way.
     fn new() -> Arena {
-        let (area, origin) = open_ground();
-        let mut sim = Sim::area(area);
-        sim.join(1);
-        let world = sim.world();
-        let npcs: Vec<Entity> = world
-            .query_filtered::<Entity, With<Npc>>()
-            .iter(world)
-            .collect();
-        for npc in npcs {
-            npc::despawn(world, npc);
-        }
-        let mut arena = Arena { sim, area, origin };
-        let player = arena.player();
-        place(&mut arena.sim, player, origin.center());
-        arena.sim.tick();
-        arena
+        let mut sim = field();
+        let player = sim.join(1);
+        let origin = cell(&sim.world, player);
+        let area = sim.id::<AreaDef>("field");
+        Arena { sim, area, origin }
+    }
+
+    fn world(&mut self) -> &mut World {
+        &mut self.sim.world
     }
 
     fn player(&mut self) -> Entity {
-        self.sim
-            .world()
-            .resource::<engine::systems::player::Players>()
-            .0[&engine::systems::player::ClientId(1)]
+        self.sim.player(1)
+    }
+
+    fn send<M: Message>(&mut self, message: M) {
+        let conn = self.sim.conn(1);
+        self.sim.send(conn, message);
     }
 
     fn at(&self, dx: i32, dy: i32) -> Pos<Tiles> {
@@ -417,18 +396,15 @@ impl Arena {
 
     fn brute(&mut self, at: Pos<Tiles>, pack: Pack) -> Entity {
         let area = self.area;
-        let world = self.sim.world();
-        let brute = npc::spawn(world, row("Orc"), at, area, pack);
-        world
-            .resource_mut::<RiftInstances>()
-            .remove_owner(Owner::Entity(OwnerKind::Npc, brute));
-        world.entity_mut(brute).insert(Attitude::Hostile);
+        let def = self.sim.id::<NpcDef>("brute");
+        let brute = npc::spawn(self.world(), def, at, area, pack);
+        self.world().entity_mut(brute).insert(Attitude::Hostile);
         brute
     }
 
     fn attack(&mut self, attacker: Entity, target: Entity) {
         body::order(
-            self.sim.world(),
+            self.world(),
             attacker,
             Act::Attack {
                 target,
@@ -455,7 +431,7 @@ impl Arena {
     }
 
     fn run(&mut self, seconds: f32) {
-        self.sim.run_until(seconds, |_| false);
+        self.sim.run(seconds);
     }
 
     /// Plays on for `seconds`, as long as `holds` holds at every tick.
@@ -474,27 +450,49 @@ impl Arena {
 
     fn claims(&mut self, cell: CellPos) -> u16 {
         let area = self.area;
-        self.sim.world().resource::<TileClaims>().on(area, cell)
+        self.world().resource::<TileClaims>().on(area, cell)
     }
 }
 
-/// The middle of the first square of ground in any area, six tiles each way, open to walk all over.
-fn open_ground() -> (AreaId, CellPos) {
-    content()
-        .ids::<AreaDef>()
-        .find_map(|area| {
-            let grid = &area::load(content(), area).grid;
-            let open = |center: &Pos<Tiles>| {
-                let cell = center.cell();
-                (-6..=6).all(|dy| (-6..=6).all(|dx| grid.walkable(cell.step((dx, dy)).center())))
-            };
-            grid.nodes()
-                .iter()
-                .copied()
-                .find(open)
-                .map(|at| (area, at.cell()))
+/// Open ground, with brutes to fight that hit back with a strike but hardly ever fall.
+fn field() -> Sim {
+    let content = Game::new()
+        .area("field", &Map::open(25, 25), json!([]))
+        .hero("field", 12.0, 12.0)
+        .sword()
+        .wearing(&["sword"])
+        .npc("brute", 100_000.0, json!([]))
+        .edit("npc", "brute", |brute| {
+            brute["basic_attack"] = json!("strike")
         })
-        .expect("open ground in some area")
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("defeated")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("field")
+        .accept::<AttackRequest>()
+        .accept::<MoveRequest>()
+        .add((
+            movement::move_request,
+            combat::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            npc::body::drive,
+            movement::advance,
+        ))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            skill::hotbar::settle_basic_attack,
+            actor::settle,
+        ));
+    script::spawn_stateless(&mut sim.world);
+    sim
 }
 
 fn resting(world: &World, actor: Entity) -> bool {

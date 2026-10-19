@@ -1,10 +1,11 @@
+use bevy_ecs::entity::Entity;
+use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::core::math::{Offset, Pos};
-use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::{self, AreaDef, AreaId};
+use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::movement::{self, HeardMove, MoveRequest, MoveSeq, position};
 use engine::systems::player::CommandLock;
-
-use testkit::{Sim, content};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 const TICKS: usize = 240;
 
@@ -140,7 +141,7 @@ fn the_server_owns_up_to_the_latest_move_asked_of_it_heeded_or_not() {
     walk.ask(Offset::new(3.0, 0.0));
     walk.ask(Offset::new(4.0, 0.0));
     walk.ticks(1);
-    walk.sim.world().entity_mut(walk.player).insert(CommandLock);
+    walk.sim.world.entity_mut(walk.player).insert(CommandLock);
     walk.ask(Offset::new(-4.0, 0.0));
     walk.ticks(1);
 
@@ -149,20 +150,27 @@ fn the_server_owns_up_to_the_latest_move_asked_of_it_heeded_or_not() {
 
 struct Walk {
     sim: Sim,
-    player: bevy_ecs::entity::Entity,
+    conn: Entity,
+    player: Entity,
     start: Pos<Tiles>,
     asked: MoveSeq,
 }
 
 impl Walk {
     fn start() -> Walk {
-        let (area, start) = open_ground(8);
-        let mut sim = Sim::area(area);
+        let content = Game::new()
+            .area("field", &Map::open(19, 19), json!([]))
+            .hero("field", 9.0, 9.0)
+            .load();
+        let mut sim = Sim::new(content);
+        sim.serve("field")
+            .add((movement::move_request, movement::advance).chain());
         let player = sim.join(1);
-        sim.tick();
-        movement::relocate(sim.world(), player, start);
+        let conn = sim.conn(1);
+        let start = position(&sim.world, player).expect("the player");
         Walk {
             sim,
+            conn,
             player,
             start,
             asked: MoveSeq::default(),
@@ -178,7 +186,7 @@ impl Walk {
         self.asked = MoveSeq(self.asked.0 + 1);
         let pos = self.start + to;
         self.sim.send(
-            1,
+            self.conn,
             MoveRequest {
                 pos,
                 seq: self.asked,
@@ -193,13 +201,13 @@ impl Walk {
     }
 
     fn at(&mut self) -> Offset<Tiles> {
-        position(self.sim.world(), self.player).expect("the player") - self.start
+        position(&self.sim.world, self.player).expect("the player") - self.start
     }
 
     fn heard(&mut self) -> HeardMove {
         *self
             .sim
-            .world()
+            .world
             .get::<HeardMove>(self.player)
             .expect("the latest move heard")
     }
@@ -267,21 +275,4 @@ fn tiles_passed(trail: &[Offset<Tiles>]) -> Vec<Offset<Tiles>> {
         }
     }
     tiles
-}
-
-// The middle of the first square of ground, `reach` tiles each way, open to walk all over.
-fn open_ground(reach: i32) -> (AreaId, Pos<Tiles>) {
-    content()
-        .ids::<AreaDef>()
-        .find_map(|area| {
-            let grid = &area::load(content(), area).grid;
-            let open = |center: &Pos<Tiles>| {
-                let cell = center.cell();
-                (-reach..=reach).all(|dy| {
-                    (-reach..=reach).all(|dx| grid.walkable(cell.step((dx, dy)).center()))
-                })
-            };
-            grid.nodes().iter().copied().find(open).map(|at| (area, at))
-        })
-        .expect("open ground in some area")
 }

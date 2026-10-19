@@ -1,60 +1,50 @@
-use engine::core::content::ErrorPlace;
+use engine::core::content::{ErrorPlace, LoadReport};
 use serde_json::json;
+use testkit::Game;
 
-use crate::support::{TempFolder, load};
+use crate::support::game;
 
 const PINNED: &str = include_str!("load_errors.txt");
 
 #[test]
 fn every_rule_names_its_file_line_pointer_and_nearest_value() {
-    let folder = TempFolder::of_template();
-    folder.edit("game.json", |game| {
-        game["player"] = json!("adventurr");
-        game["initial_spawn"]["x"] = json!(40.0);
-        game["initial_spawn"]["y"] = json!(40.0);
-    });
-    folder.write(
-        "tables/sfx/splash.json",
-        &json!({ "file": "audio/combat/splash.wav", "role": "combat", "volume": 1.0, "pitch": 1.0 })
-            .to_string(),
-    );
-    folder.remove("tables/input/interact.json");
-    folder.write("tables/class/apprentice.json", "{ \"name\": 3 }");
-    folder.write(
-        "tables/area/cove.json",
-        &serde_json::to_string_pretty(&json!({
-            "name": "Cove",
-            "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
-            "modules": [
-                { "type": "scenery", "at": { "x": 9.0, "y": 0.0 }, "tileset": "beach_tileset", "tiles": [[338]] }
-            ]
-        }))
-        .expect("json"),
-    );
-    folder.write(
-        "tables/area/cove/palette.csv",
-        "tileset,tile,flip\nbeach_tileset,338,\n",
-    );
-    folder.write(
-        "tables/area/cove/ground.csv",
-        "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n",
-    );
-    folder.write(
-        "tables/area/cove/walk.csv",
-        "1,1,1,1\n1,1,1,1\n1,1,1,1\n1,1,1,1\n",
-    );
-    folder.write(
-        "tables/test_character/lost.json",
-        &serde_json::to_string_pretty(&json!({
-            "name": "Lost",
-            "class": "adventurer",
-            "known_areas": ["cove"],
-            "start": { "area": "start", "x": 40.0, "y": 40.0 }
-        }))
-        .expect("json"),
-    );
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = game()
+        .edit_settings(|settings| {
+            settings["player"] = json!("heroo");
+            settings["initial_spawn"]["x"] = json!(40.0);
+            settings["initial_spawn"]["y"] = json!(40.0);
+        })
+        .sfx("slash")
+        .row(
+            "sfx",
+            "splash",
+            json!({ "file": "audio/splash.wav", "role": "sounds", "volume": 1.0, "pitch": 1.0 }),
+        )
+        .file("tables/class/apprentice.json", "{ \"name\": 3 }")
+        .row(
+            "area",
+            "cove",
+            json!({
+                "name": "Cove",
+                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+            }),
+        )
+        .file("tables/area/cove/palette.csv", "tileset,tile,flip\nstart_ground,0,\n")
+        .file("tables/area/cove/ground.csv", "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n")
+        .file("tables/area/cove/walk.csv", "1,1,1,1\n".repeat(4))
+        .row(
+            "test_character",
+            "lost",
+            json!({
+                "name": "Lost",
+                "class": "hero",
+                "known_areas": ["cove"],
+                "start": { "area": "start", "x": 40.0, "y": 40.0 },
+            }),
+        )
+        .try_load()
+        .err()
+        .expect("refused");
 
     let text = report.to_string();
     let body = text
@@ -70,23 +60,24 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
 
 #[test]
 fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
-    let folder = TempFolder::of_template();
-    folder.write(
-        "tables/area/cove.json",
-        &json!({
-            "name": "Cove",
-            "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] }
-        })
-        .to_string(),
-    );
-    folder.write(
-        "tables/area/cove/palette.csv",
-        "tileset,tile,flip\nbeach_tileset,x,\nbeach_tileset,1,sideways\nbeach_tileset,1\n",
-    );
-    folder.write("tables/area/cove/ground.csv", &"0,0,0,0\n".repeat(4));
-    folder.write("tables/area/cove/walk.csv", &"1,1,1,1\n".repeat(4));
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = game()
+        .row(
+            "area",
+            "cove",
+            json!({
+                "name": "Cove",
+                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+            }),
+        )
+        .file(
+            "tables/area/cove/palette.csv",
+            "tileset,tile,flip\nstart_ground,x,\nstart_ground,0,sideways\nstart_ground,0\n",
+        )
+        .file("tables/area/cove/ground.csv", "0,0,0,0\n".repeat(4))
+        .file("tables/area/cove/walk.csv", "1,1,1,1\n".repeat(4))
+        .try_load()
+        .err()
+        .expect("refused");
 
     let palette: Vec<(ErrorPlace, &str)> = report
         .errors
@@ -112,20 +103,28 @@ fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
 
 #[test]
 fn a_bust_listed_before_the_generic_ones_is_placed_at_its_own_line() {
-    let folder = TempFolder::of_template();
-    let model = folder.path().join("tables/model/adventurer.json");
-    let text = std::fs::read_to_string(&model).expect("read");
-    let busts = r#"{ "modules": [{ "type": "bust", "own": [{ "name": "Scar", "file": "busts/adventurer/scar.png" }], "neutral": "busts/adventurer/neutral.png", "happy": "busts/adventurer/happy.png", "sad": "busts/adventurer/sad.png", "angry": "busts/adventurer/angry.png", "surprised": "busts/adventurer/surprised.png", "thinking": "busts/adventurer/thinking.png" }],"#;
-    let edited = text.replacen('{', busts, 1);
-    std::fs::write(&model, edited).expect("written");
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = game()
+        .busts("hero")
+        .edit("model", "hero", |model| {
+            let generic = model["modules"][0].take();
+            let mut bust = json!({
+                "type": "bust",
+                "own": [{ "name": "Scar", "file": "busts/hero/scar.png" }],
+            });
+            for (expression, file) in generic.as_object().expect("a bust") {
+                bust[expression] = file.clone();
+            }
+            model["modules"][0] = bust;
+        })
+        .try_load()
+        .err()
+        .expect("refused");
 
     let own = report
         .errors
         .iter()
         .find(|error| {
-            error.file == "tables/model/adventurer.json" && error.problem.found.contains("scar.png")
+            error.file == "tables/model/hero.json" && error.problem.found.contains("scar.png")
         })
         .expect("the own bust is refused");
     assert_eq!(own.problem.rule, "missing file");
@@ -138,33 +137,32 @@ fn a_bust_listed_before_the_generic_ones_is_placed_at_its_own_line() {
 
 #[test]
 fn a_binding_the_game_never_reads_for_its_action_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.edit("tables/input/carry_item.json", |row| {
-        row["bindings"] = json!([{ "type": "click", "button": "Left", "times": 1 }]);
-    });
+    let report = Game::new()
+        .row(
+            "input",
+            "carry_item",
+            json!({
+                "label": "Carry an item",
+                "bindings": [{ "type": "click", "button": "Left", "times": 1 }],
+            }),
+        )
+        .try_load_whole()
+        .err()
+        .expect("refused");
 
-    let report = load(folder.path()).err().expect("refused");
-
-    let rules: Vec<(&str, &str)> = report
-        .errors
-        .iter()
-        .map(|error| (error.problem.rule, error.problem.expected.as_str()))
-        .collect();
-    assert_eq!(rules, vec![("variant the engine never reads", "drag")]);
-    assert_eq!(report.errors[0].file, "tables/input/carry_item.json");
+    assert_eq!(
+        rules_in(&report, "tables/input/carry_item.json"),
+        vec![("variant the engine never reads", "drag")]
+    );
 }
 
 #[test]
 fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.edit("tables/vfx_shader/skill_area.json", |row| {
-        row["params"]
-            .as_array_mut()
-            .expect("params")
-            .retain(|param| param["name"] != "hostile");
-    });
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = Game::new()
+        .shader("skill_area")
+        .try_load_whole()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -181,13 +179,15 @@ fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
 
 #[test]
 fn a_shader_that_does_not_compile_is_refused_at_its_line() {
-    let folder = TempFolder::of_template();
-    folder.write(
-        "assets/shaders/tint.wgsl",
-        "fn vfx(uv: vec2<f32>) -> vec4<f32> {\n    return oops;\n}\n",
-    );
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = Game::new()
+        .shader("tint")
+        .asset(
+            "shaders/tint.wgsl",
+            b"fn vfx(uv: vec2<f32>) -> vec4<f32> {\n    return oops;\n}\n".to_vec(),
+        )
+        .try_load()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -204,10 +204,12 @@ fn a_shader_that_does_not_compile_is_refused_at_its_line() {
 
 #[test]
 fn a_shader_row_without_its_file_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.remove("assets/shaders/tint.wgsl");
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = Game::new()
+        .shader("tint")
+        .remove("assets/shaders/tint.wgsl")
+        .try_load()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -220,12 +222,27 @@ fn a_shader_row_without_its_file_is_refused() {
 
 #[test]
 fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.edit("tables/vfx/healed.json", |row| {
-        row["layers"][0]["params"]["glow"] = json!(1.0);
-    });
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = Game::new()
+        .shader("tint")
+        .edit("vfx_shader", "tint", |shader| {
+            shader["params"] = json!([{ "name": "amount", "kind": "number", "default": 0.6, "min": 0.0, "max": 1.0 }]);
+        })
+        .row(
+            "vfx",
+            "healed",
+            json!({
+                "name": "Healed",
+                "layers": [{
+                    "type": "shader",
+                    "shader": "tint",
+                    "duration": 0.35,
+                    "params": { "amount": 0.5, "glow": 1.0 },
+                }],
+            }),
+        )
+        .try_load()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -242,10 +259,11 @@ fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
 
 #[test]
 fn a_game_file_that_does_not_parse_is_refused_at_its_field() {
-    let folder = TempFolder::of_template();
-    folder.edit("game.json", |game| game["initial_spawn"] = json!("start"));
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = game()
+        .edit_settings(|settings| settings["initial_spawn"] = json!("start"))
+        .try_load()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -257,10 +275,11 @@ fn a_game_file_that_does_not_parse_is_refused_at_its_field() {
 
 #[test]
 fn a_folder_without_a_game_file_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.remove("game.json");
-
-    let report = load(folder.path()).err().expect("refused");
+    let report = Game::new()
+        .remove("game.json")
+        .try_load_whole()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -271,14 +290,29 @@ fn a_folder_without_a_game_file_is_refused() {
 }
 
 #[test]
-fn a_row_of_its_own_in_a_table_of_fixtures_alone_is_refused() {
-    let folder = TempFolder::of_template();
-    folder.write(
-        "tables/input/wave_hello.json",
-        r#"{ "label": "Wave hello", "bindings": [] }"#,
-    );
+fn a_fixture_without_its_row_is_refused() {
+    let report = Game::new().try_load_whole().err().expect("refused");
 
-    let report = load(folder.path()).err().expect("refused");
+    assert_eq!(
+        rules_in(&report, "tables/input/interact.json"),
+        vec![(
+            "missing fixture",
+            "one row for every input fixture the engine requires"
+        )]
+    );
+}
+
+#[test]
+fn a_row_of_its_own_in_a_table_of_fixtures_alone_is_refused() {
+    let report = Game::new()
+        .row(
+            "input",
+            "wave_hello",
+            json!({ "label": "Wave hello", "bindings": [] }),
+        )
+        .try_load_whole()
+        .err()
+        .expect("refused");
 
     let error = report
         .errors
@@ -286,4 +320,33 @@ fn a_row_of_its_own_in_a_table_of_fixtures_alone_is_refused() {
         .find(|error| error.file == "tables/input/wave_hello.json")
         .expect("the stray row is refused");
     assert_eq!(error.problem.rule, "row the engine never reads");
+}
+
+#[test]
+fn a_class_tree_naming_a_skill_that_did_not_load_reports_only_the_skill() {
+    let report = game()
+        .row("skill", "broken", json!({ "name": "Broken", "icon": 3 }))
+        .edit("class", "hero", |hero| {
+            hero["tree"] = json!({ "broken": { "skill": "broken", "at": { "x": 0.0, "y": 0.0 } } });
+        })
+        .try_load()
+        .err()
+        .expect("refused");
+
+    let files: Vec<&str> = report
+        .errors
+        .iter()
+        .map(|error| error.file.as_str())
+        .collect();
+    assert!(files.contains(&"tables/skill/broken.json"), "{report}");
+    assert!(!files.contains(&"tables/class/hero.json"), "{report}");
+}
+
+fn rules_in<'a>(report: &'a LoadReport, file: &str) -> Vec<(&'a str, &'a str)> {
+    report
+        .errors
+        .iter()
+        .filter(|error| error.file == file)
+        .map(|error| (error.problem.rule, error.problem.expected.as_str()))
+        .collect()
 }

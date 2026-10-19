@@ -1,80 +1,77 @@
 use bevy_ecs::prelude::*;
-use engine::core::script::Expr;
+use engine::core::content::Content;
+use engine::core::math::{Offset, Pos};
+use engine::core::script::{Expr, Value};
 use engine::core::tiling::Tiles;
-use engine::systems::combat::{AttackRequest, Attitude};
-use engine::systems::item::{ItemId, ItemKind};
-use engine::systems::movement::position;
-use engine::systems::npc::{self, Pack};
+use engine::systems::area::AreaDef;
+use engine::systems::combat::{self, AttackRequest, Attitude};
+use engine::systems::item::{ItemDef, ItemKind};
+use engine::systems::memory::{self, MemoryDef};
+use engine::systems::movement::{self, position};
+use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::player::ClientId;
-use engine::systems::reach;
 use engine::systems::script::RiftQuery;
 use engine::systems::script::condition::{self, CompiledCondition};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::{self, Presence};
-
-use testkit::{Sim, content, remember, row, spawn_area, townsperson};
+use engine::systems::{actor, reach, script, skill};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = arena();
     let owner = sim.join(1);
     sim.join(2);
-    let orc = orc_near(&mut sim, owner);
-    sim.world()
-        .entity_mut(orc)
-        .insert(Presence::For(ClientId(1)));
-    let full = stat::effective(sim.world(), orc, StatKind::Health);
+    let brute = spawn(&mut sim, "brute", owner, Offset::new(2.0, 0.0));
+    sim.world
+        .entity_mut(brute)
+        .insert((Attitude::Hostile, Presence::For(ClientId(1))));
+    let full = stat::effective(&sim.world, brute, StatKind::Health);
 
-    sim.send(2, AttackRequest { target: orc });
-    sim.run_until(4.0, |_| false);
-    assert_eq!(stat::effective(sim.world(), orc, StatKind::Health), full);
+    let other = sim.conn(2);
+    sim.send(other, AttackRequest { target: brute });
+    sim.run(4.0);
+    assert_eq!(stat::effective(&sim.world, brute, StatKind::Health), full);
 
-    sim.send(1, AttackRequest { target: orc });
-    assert!(
-        sim.run_until(10.0, |world| stat::effective(world, orc, StatKind::Health)
-            < full)
-    );
+    let own = sim.conn(1);
+    sim.send(own, AttackRequest { target: brute });
+    assert!(sim.run_until(10.0, |world| stat::effective(
+        world,
+        brute,
+        StatKind::Health
+    ) < full));
 }
 
 #[test]
 fn a_friendly_npc_cannot_be_attacked() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = arena();
     let player = sim.join(1);
-    let grisha = townsperson(&mut sim, row("Grisha"));
-    assert_eq!(
-        sim.world().get::<Attitude>(grisha),
-        Some(&Attitude::Friendly)
-    );
-    let full = stat::effective(sim.world(), grisha, StatKind::Health);
+    let friend = spawn(&mut sim, "brute", player, Offset::new(1.0, 0.0));
+    assert_eq!(sim.world.get::<Attitude>(friend), Some(&Attitude::Friendly));
+    let full = stat::effective(&sim.world, friend, StatKind::Health);
 
-    sim.send(1, AttackRequest { target: grisha });
-    sim.run_until(4.0, |_| false);
+    let conn = sim.conn(1);
+    sim.send(conn, AttackRequest { target: friend });
+    sim.run(4.0);
 
-    assert_eq!(reach::attacking(sim.world(), player), None);
-    assert_eq!(stat::effective(sim.world(), grisha, StatKind::Health), full);
+    assert_eq!(reach::attacking(&sim.world, player), None);
+    assert_eq!(stat::effective(&sim.world, friend, StatKind::Health), full);
 }
 
 #[test]
 fn a_monster_spawned_for_one_player_ignores_everyone_else() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = arena();
     let owner = sim.join(1);
     let bystander = sim.join(2);
-    let start = position(sim.world(), bystander).expect("position");
-    let spot = sim.walkable_near(start, Tiles(1.0), Tiles(2.0));
-    let skeleton = npc::spawn(
-        sim.world(),
-        row("Skeleton"),
-        spot,
-        spawn_area(),
-        Pack(u32::MAX),
-    );
-    sim.world()
-        .entity_mut(skeleton)
+    let hunter = spawn(&mut sim, "hunter", bystander, Offset::new(1.0, 0.0));
+    sim.world
+        .entity_mut(hunter)
         .insert(Presence::For(ClientId(1)));
 
     let mut hunted = Vec::new();
     sim.run_until(3.0, |world| {
-        hunted.extend(reach::attacking(world, skeleton));
+        hunted.extend(reach::attacking(world, hunter));
         false
     });
 
@@ -84,46 +81,132 @@ fn a_monster_spawned_for_one_player_ignores_everyone_else() {
 
 #[test]
 fn presence_by_condition_follows_the_players_memory() {
-    let pell_dead = Expr::Query(RiftQuery::Memory {
-        of: None,
-        memory: row("PellDead"),
-    });
-    let pell_alive = Expr::Not(Box::new(pell_dead));
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = arena();
     let player = sim.join(1);
-    let orc = orc_near(&mut sim, player);
-    sim.world()
-        .entity_mut(orc)
-        .insert(Presence::When(CompiledCondition::new(
-            content(),
-            &pell_alive,
-        )));
-    assert!(visibility::present(sim.world(), orc, player));
+    let brute = spawn(&mut sim, "brute", player, Offset::new(2.0, 0.0));
+    let slain = sim.id::<MemoryDef>("slain");
+    let alive = Expr::Not(Box::new(Expr::Query(RiftQuery::Memory {
+        of: None,
+        memory: slain,
+    })));
+    let shown = CompiledCondition::new(sim.world.resource::<Content>(), &alive);
+    sim.world.entity_mut(brute).insert(Presence::When(shown));
+    assert!(visibility::present(&sim.world, brute, player));
 
-    remember(&mut sim, player, row("PellDead"));
+    memory::set(&mut sim.world, player, slain, Value::Bool(true));
 
-    assert!(!visibility::present(sim.world(), orc, player));
+    assert!(!visibility::present(&sim.world, brute, player));
 }
 
 #[test]
 fn a_world_that_serves_no_area_judges_an_items_requirements() {
-    let shield: ItemId = row("BoneShield");
+    let content = Game::new()
+        .item(
+            "shield",
+            json!({
+                "kind": {
+                    "type": "equipment",
+                    "slot": "offhand",
+                    "requires": { "type": "at_least", "a": { "type": "level" }, "b": 2 },
+                },
+            }),
+        )
+        .load();
+    let shield = content.by_key::<ItemDef>("shield").expect("the shield");
     let ItemKind::Equipment {
         requires: Some(requirement),
         ..
-    } = &shield.get(content()).kind
+    } = &shield.get(&content).kind
     else {
-        panic!("the bone shield asks something of its wearer");
+        panic!("the shield asks something of its wearer");
     };
     let mut world = World::new();
-    world.insert_resource(content().clone());
+    world.insert_resource(content.clone());
     let viewer = world.spawn_empty().id();
 
     assert!(!condition::holds(&world, viewer, requirement));
 }
 
-fn orc_near(sim: &mut Sim, player: Entity) -> Entity {
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(2.0), Tiles(4.0));
-    npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX))
+fn arena() -> Sim {
+    let content = Game::new()
+        .area("arena", &Map::open(11, 7), json!([]))
+        .hero("arena", 3.0, 3.0)
+        .sword()
+        .wearing(&["sword"])
+        .npc("brute", 25.0, json!([]))
+        .npc(
+            "hunter",
+            25.0,
+            json!([{
+                "type": "inline_script",
+                "locals": { "target": "actor" },
+                "nodes": {
+                    "spawned": { "type": "on", "event": "started", "next": "hostile" },
+                    "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
+                    "look": {
+                        "type": "set",
+                        "values": [{
+                            "local": "target",
+                            "to": { "type": "nearest", "among": "characters", "within": 8.0 },
+                        }],
+                        "next": "found",
+                    },
+                    "found": {
+                        "type": "if",
+                        "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
+                        "yes": "fight",
+                        "no": "tick",
+                    },
+                    "fight": {
+                        "type": "attack",
+                        "target": { "type": "local", "local": "target" },
+                        "within": 8.0,
+                        "priority": 5,
+                        "defeated": "look",
+                        "lost": "look",
+                        "interrupted": "look",
+                    },
+                    "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
+                },
+            }]),
+        )
+        .edit("npc", "hunter", |hunter| hunter["basic_attack"] = json!("strike"))
+        .row(
+            "memory",
+            "slain",
+            json!({ "label": "Slew the brute", "type": "boolean", "resets": "never" }),
+        )
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("defeated")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("arena")
+        .accept::<AttackRequest>()
+        .add((
+            combat::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            npc::body::drive,
+            movement::advance,
+        ))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            skill::hotbar::settle_basic_attack,
+            actor::settle,
+        ));
+    script::spawn_stateless(&mut sim.world);
+    sim
+}
+
+fn spawn(sim: &mut Sim, key: &str, near: Entity, offset: Offset<Tiles>) -> Entity {
+    let at: Pos<Tiles> = position(&sim.world, near).expect("a position") + offset;
+    let area = sim.id::<AreaDef>("arena");
+    let def = sim.id::<NpcDef>(key);
+    npc::spawn(&mut sim.world, def, at, area, Pack(u32::MAX))
 }

@@ -9,7 +9,7 @@ use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 use crate::systems::actor;
-use crate::systems::attention::{self, AttentionId, AttentionMark};
+use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
@@ -23,7 +23,6 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Interactive>()
         .add_mapped_client_message::<InteractRequest>(Channel::Ordered);
-    attention::mark_source(app, marks);
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, IntoStaticStr)]
@@ -125,7 +124,7 @@ fn respond(world: &mut World, player: Entity, target: Entity) {
     );
 }
 
-fn marks(
+pub(crate) fn marks(
     world: &World,
     target: Entity,
     viewers: &[Entity],

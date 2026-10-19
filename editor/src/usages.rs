@@ -5,9 +5,9 @@ use engine::core::content::{Content, Reference, asset_of};
 use engine::core::vfx::shader_file;
 use rayon::prelude::*;
 
-use crate::app::registry;
 use crate::project::{GAME_FILE, ProjectFiles, row_file};
 use crate::views::vfx;
+use engine::systems::registry;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContentUsage {

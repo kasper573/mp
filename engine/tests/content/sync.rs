@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use bevy::tasks::futures_lite::future::block_on;
-use engine::core::content::FilesystemFolder;
 use engine::core::content::store::ContentStore;
 use engine::core::content::sync::{
     ContentSource, ServedContent, SyncError, SyncPolicy, SyncStatus, SyncedContent, sync,
@@ -12,15 +11,16 @@ use engine::core::content::version;
 use engine::core::platform::{FetchFailure, LocalFuture};
 use engine::core::time::{Backoff, Seconds};
 
+use testkit::{Game, wav};
+
 use crate::store::MemoryStore;
-use crate::support::{TempFolder, load};
+use crate::support::game;
 
 const FILES: &str = "/content/files/";
 
 #[test]
 fn a_first_visit_fetches_everything_and_the_next_day_only_the_manifest() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
 
     let synced = run(&server, &store).expect("the first visit syncs");
@@ -49,8 +49,7 @@ fn a_first_visit_fetches_everything_and_the_next_day_only_the_manifest() {
 
 #[test]
 fn an_interrupted_sync_fetches_exactly_the_files_the_store_lacks() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let complete = MemoryStore::default();
     run(&server, &complete).expect("a full sync");
     let every_file = complete.hashes();
@@ -72,8 +71,7 @@ fn an_interrupted_sync_fetches_exactly_the_files_the_store_lacks() {
 
 #[test]
 fn a_bad_hash_is_fetched_again() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
     let first = run(&server, &store).expect("a full sync");
     let file = first.index.files[0].clone();
@@ -107,11 +105,8 @@ fn a_bad_hash_is_fetched_again() {
 
 #[test]
 fn a_file_gone_from_the_server_restarts_from_the_manifest() {
-    let before = TempFolder::of_template();
-    let after = TempFolder::of_template();
-    after.append("assets/audio/combat/slash03.wav", &[0; 16]);
-    let v1 = served(&before);
-    let v2 = served(&after);
+    let v1 = served(sounding());
+    let v2 = served(sounding().asset("audio/slash.wav", longer_slash()));
     let changed = v1.manifest.index.hash.clone();
     let server = FakeServer::new(v1);
     *server.deploy_on_404.borrow_mut() = Some((changed, v2));
@@ -127,24 +122,21 @@ fn a_file_gone_from_the_server_restarts_from_the_manifest() {
 
 #[test]
 fn a_deploy_fetches_only_what_changed_and_drops_what_it_replaced() {
-    let before = TempFolder::of_template();
-    let after = TempFolder::of_template();
-    after.edit("tables/class/adventurer.json", |row| {
-        row["name"] = serde_json::Value::String("Wanderer".to_owned());
-    });
-    after.append("assets/audio/combat/slash03.wav", &[0; 16]);
-    let server = FakeServer::new(served(&before));
+    let after = sounding()
+        .edit("class", "hero", |row| row["name"] = "Wanderer".into())
+        .asset("audio/slash.wav", longer_slash());
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
     let v1 = run(&server, &store).expect("the first visit syncs");
     let old_sound = v1
         .index
         .files
         .iter()
-        .find(|file| file.path == "assets/audio/combat/slash03.wav")
+        .find(|file| file.path == "assets/audio/slash.wav")
         .expect("the sound is indexed")
         .clone();
 
-    *server.served.borrow_mut() = served(&after);
+    *server.served.borrow_mut() = served(after);
     server.forget_requests();
     let v2 = run(&server, &store).expect("the deploy syncs");
 
@@ -177,8 +169,7 @@ fn a_deploy_fetches_only_what_changed_and_drops_what_it_replaced() {
 
 #[test]
 fn a_store_that_refuses_writes_keeps_the_visit_in_memory() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::refusing_writes();
 
     let synced = run(&server, &store).expect("the visit still syncs");
@@ -190,8 +181,7 @@ fn a_store_that_refuses_writes_keeps_the_visit_in_memory() {
 
 #[test]
 fn stale_entries_leave_the_store_after_a_full_sync() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
     let stale = "0".repeat(64);
     store.put(&stale, b"left over from another game");
@@ -205,8 +195,7 @@ fn stale_entries_leave_the_store_after_a_full_sync() {
 
 #[test]
 fn another_build_is_refused_before_anything_downloads() {
-    let folder = TempFolder::of_template();
-    let server = FakeServer::new(served(&folder));
+    let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
 
     let refused = block_on(sync(
@@ -227,15 +216,21 @@ fn another_build_is_refused_before_anything_downloads() {
     assert!(store.hashes().is_empty());
 }
 
-fn served(folder: &TempFolder) -> ServedContent {
-    let content = load(folder.path()).unwrap_or_else(|report| panic!("{report}"));
-    ServedContent::new(
-        &content,
-        &FilesystemFolder(folder.path().to_path_buf()),
-        version::build(),
-        "Rift",
-    )
-    .expect("the folder is served")
+/// A small game with a sound to fetch.
+fn sounding() -> Game {
+    game().sfx("slash")
+}
+
+fn longer_slash() -> Vec<u8> {
+    let mut slash = wav();
+    slash.extend([0; 16]);
+    slash
+}
+
+fn served(game: Game) -> ServedContent {
+    let folder = game.folder();
+    let content = game.load();
+    ServedContent::new(&content, &folder, version::build(), "Rift").expect("the folder is served")
 }
 
 fn quickly() -> SyncPolicy {

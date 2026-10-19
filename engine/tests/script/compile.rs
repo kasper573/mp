@@ -1,19 +1,22 @@
 use std::sync::Arc;
 
-use engine::core::content::{Content, ContentBuilder, ContentScope, Table, with_content};
+use engine::core::content::{
+    Content, ContentBuilder, ContentId, ContentRow, ContentScope, Table, with_content,
+};
 use engine::core::math::Pos;
 use engine::core::script::compile::compile_owner;
 use engine::core::script::{EffectDef, Expr, ScriptError};
-use engine::systems::item::ItemId;
-use engine::systems::memory::MemoryId;
+use engine::systems::area::AreaDef;
+use engine::systems::item::ItemDef;
+use engine::systems::memory::MemoryDef;
+use engine::systems::quest::QuestDef;
 use engine::systems::script::{
     EventKind, OwnerKind, Place, Procedure, Reach, RiftScripting, ScriptDef, ScriptModule,
 };
-use engine::systems::shop::ShopId;
+use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
 
-use crate::json::{effect, inline, inline_with, parse};
-use testkit::{content, row};
+use crate::game::{content, effect, inline, inline_with, parse};
 
 const OWNERS: [OwnerKind; 6] = [
     OwnerKind::Object,
@@ -52,12 +55,12 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
 
 #[test]
 fn may_do_lists_exactly_what_a_script_reaches() {
-    let gold: ItemId = row("Gold");
-    let pass: ItemId = row("RoadPass");
-    let bribed: MemoryId = row("BribedIlsa");
-    let honesty_box: ShopId = row("HonestyBox");
+    let gold = id::<ItemDef>("gold");
+    let pass = id::<ItemDef>("pass");
+    let bribed = id::<MemoryDef>("bribed");
+    let honesty_box = id::<ShopDef>("box");
     let place = Place {
-        area: row("Forest"),
+        area: id::<AreaDef>("forest"),
         at: Pos::new(3.0, 18.0),
     };
     let script = inline(json!({
@@ -73,13 +76,13 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         "pay": {
             "type": "items",
             "take": [{ "item": "gold", "count": 5 }],
-            "give": [{ "item": "road_pass" }],
+            "give": [{ "item": "pass" }],
             "done": "warp"
         },
         "warp": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } },
         "go": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "mark" },
-        "mark": { "type": "remember", "memory": "bribed_ilsa", "next": "shop" },
-        "shop": { "type": "open_shop", "shop": "honesty_box" },
+        "mark": { "type": "remember", "memory": "bribed", "next": "shop" },
+        "shop": { "type": "open_shop", "shop": "box" },
     }));
 
     let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
@@ -136,7 +139,7 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
         "on": entry(OwnerKind::Npc, "decide"),
         "decide": {
             "type": "decide",
-            "quest": "shamans_plea",
+            "quest": "plea",
             "path": "Keep them",
         },
     }));
@@ -145,11 +148,11 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
     let reaches = &procedures[0].may_do.reaches;
 
     assert!(
-        reaches.contains(&Reach::Decides(row("ShamansPlea"))),
+        reaches.contains(&Reach::Decides(id::<QuestDef>("plea"))),
         "{reaches:?}"
     );
     assert!(
-        !reaches.contains(&Reach::Completes(row("ShamansPlea"))),
+        !reaches.contains(&Reach::Completes(id::<QuestDef>("plea"))),
         "{reaches:?}"
     );
 }
@@ -158,13 +161,13 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
 fn an_effect_or_query_refuses_by_its_own_rule() {
     let effect = inline(json!({
         "on": entry(OwnerKind::Npc, "a"),
-        "a": { "type": "complete_task", "quest": "x_marks_the_spot", "task": "no_such_task" },
+        "a": { "type": "complete_task", "quest": "x_marks", "task": "no_such_task" },
     }));
     let query = inline(json!({
         "on": entry(OwnerKind::Npc, "a"),
         "a": {
             "type": "if",
-            "test": { "type": "task_done", "quest": "x_marks_the_spot", "task": "no_such_task" },
+            "test": { "type": "task_done", "quest": "x_marks", "task": "no_such_task" },
         },
     }));
 
@@ -206,7 +209,7 @@ fn an_if_always_taken_still_compiles_both_arrows() {
         "on": entry(OwnerKind::Area, "check"),
         "check": { "type": "if", "test": { "type": "not", "of": true }, "yes": "yes", "no": "no" },
         "yes": { "type": "notify", "notification": "gulls" },
-        "no": { "type": "notify", "notification": "forest_intro" },
+        "no": { "type": "notify", "notification": "intro" },
     }));
 
     let procedures = compile(OwnerKind::Area, &[&script]).expect("compiles");
@@ -259,6 +262,12 @@ fn a_shared_script_row_reads_back_as_written() {
     assert_eq!(def.nodes.len(), 2);
 }
 
+fn id<Row: ContentRow>(key: &str) -> ContentId<Row> {
+    content()
+        .by_key::<Row>(key)
+        .expect("a row of the test game")
+}
+
 fn compile(
     owner: OwnerKind,
     modules: &[&ScriptModule],
@@ -290,8 +299,8 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "apply_status", "effect": "guarded", "power": 10.0, "seconds": 10.0 }),
         json!({ "type": "remove_status", "category": "debuff" }),
         json!({ "type": "items", "take": [{ "item": "gold" }] }),
-        json!({ "type": "use_item", "item": "tattered_map" }),
-        json!({ "type": "equip", "item": "road_pass" }),
+        json!({ "type": "use_item", "item": "map" }),
+        json!({ "type": "equip", "item": "pass" }),
         json!({ "type": "unequip", "slot": "weapon" }),
         json!({ "type": "drop_items", "item": "gold", "count": 1 }),
         json!({ "type": "spawn_ground_items", "items": [{ "item": "gold" }], "for": "subject" }),
@@ -301,15 +310,15 @@ fn every_capability() -> Vec<Value> {
             "items": [{ "item": "gold" }]
         }),
         json!({ "type": "grant_xp", "xp": 1 }),
-        json!({ "type": "remember", "memory": "bribed_ilsa" }),
-        json!({ "type": "forget", "memories": ["bribed_ilsa"] }),
-        json!({ "type": "offer_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "accept_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "turn_in", "quest": "x_marks_the_spot" }),
-        json!({ "type": "fail_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "complete_task", "quest": "x_marks_the_spot", "task": "find_stone" }),
-        json!({ "type": "decide", "quest": "shamans_plea", "path": "Keep them" }),
-        json!({ "type": "open_shop", "shop": "honesty_box" }),
+        json!({ "type": "remember", "memory": "bribed" }),
+        json!({ "type": "forget", "memories": ["bribed"] }),
+        json!({ "type": "offer_quest", "quest": "x_marks" }),
+        json!({ "type": "accept_quest", "quest": "x_marks" }),
+        json!({ "type": "turn_in", "quest": "x_marks" }),
+        json!({ "type": "fail_quest", "quest": "x_marks" }),
+        json!({ "type": "complete_task", "quest": "x_marks", "task": "find_stone" }),
+        json!({ "type": "decide", "quest": "plea", "path": "Keep them" }),
+        json!({ "type": "open_shop", "shop": "box" }),
         json!({ "type": "notify", "notification": "gulls" }),
         json!({ "type": "say", "text": ["Hm."] }),
         json!({ "type": "wander", "priority": 1 }),
@@ -318,11 +327,11 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "stop", "priority": 9 }),
         json!({ "type": "face", "toward": { "type": "subject" } }),
         json!({ "type": "animate", "action": "attack", "wait": "apex" }),
-        json!({ "type": "use_skill", "skill": "slash", "at": { "type": "subject" } }),
+        json!({ "type": "use_skill", "skill": "strike", "at": { "type": "subject" } }),
         json!({ "type": "reset_skills" }),
         json!({ "type": "vfx", "vfx": "damage_taken" }),
         json!({ "type": "set_attitude", "attitude": "hostile" }),
-        json!({ "type": "spawn_npcs", "npc": "orc", "count": 1, "near": "subject", "shown": "everyone" }),
+        json!({ "type": "spawn_npcs", "npc": "fighter", "count": 1, "near": "subject", "shown": "everyone" }),
         json!({ "type": "despawn" }),
         json!({ "type": "play_sound", "sfx": "ui_pick", "for": "subject" }),
     ]

@@ -34,7 +34,6 @@ const VIEW_DISTANCE_SQ: f32 = VIEW_DISTANCE.0 * VIEW_DISTANCE.0;
 pub fn register(app: &mut App) {
     app.add_visibility_filter::<OwnedBy>();
     app.init_resource::<ScopeBits>();
-    app.init_resource::<Sights>();
     app.add_observer(grant_hidden_slots);
     app.add_observer(forget_subject);
     app.add_observer(reveal_to_all);
@@ -262,7 +261,7 @@ fn reveal_to_all(
 }
 
 #[derive(Resource)]
-struct Sights(QueryState<(Entity, &'static ClientId)>);
+pub(crate) struct Sights(QueryState<(Entity, &'static ClientId)>);
 
 impl FromWorld for Sights {
     fn from_world(world: &mut World) -> Self {

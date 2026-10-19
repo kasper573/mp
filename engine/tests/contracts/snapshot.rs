@@ -1,46 +1,43 @@
 use std::collections::BTreeMap;
 
+use engine::core::content::{Content, ContentId, ContentRow};
 use engine::core::math::Pos;
 use engine::core::script::Value;
-use engine::core::time::{Seconds, UnixMillis, WallClock};
+use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::systems::GameSettings;
 use engine::systems::actor::Name;
-use engine::systems::area::AreaId;
+use engine::systems::area::AreaDef;
 use engine::systems::area::transition::Discovered;
-use engine::systems::class::Class;
+use engine::systems::class::{Class, ClassDef};
 use engine::systems::dialogue;
 use engine::systems::equipment::{Equipment, EquipmentSlot};
 use engine::systems::history::{History, HistoryEntry, HistoryTopic};
-use engine::systems::item::{Inventory, ItemStack};
-use engine::systems::memory;
+use engine::systems::item::{Inventory, ItemDef, ItemStack};
+use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::Position;
 use engine::systems::player::snapshot::{
     AtInitialSpawn, CharacterSnapshot, CharacterStart, HeardLine, JoinAs, MemoryValue, QuestState,
     SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
 };
 use engine::systems::player::{SpawnPolicy, SpawnRules, Xp};
-use engine::systems::quest::{QuestLog, QuestResult};
+use engine::systems::quest::{QuestDef, QuestLog, QuestResult};
 use engine::systems::script::Place;
-use engine::systems::shop::{Sale, ShopLedger};
+use engine::systems::shop::{Sale, ShopDef, ShopLedger};
 use engine::systems::stat::{StatKind, StatMap, Stats};
 use engine::systems::text::LineText;
-
-use testkit::{CLOCK, Sim, content, row};
-
-const LATER: WallClock = WallClock {
-    now: UnixMillis(1_000_000_000),
-    ..CLOCK
-};
+use serde_json::json;
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn a_character_joined_from_a_row_is_that_character() {
-    let forest = row("forest");
+    let mut sim = returning_to("forest");
+    let content = sim.world.resource::<Content>().clone();
+    let forest = sim.id::<AreaDef>("forest");
     let start = Place {
         area: forest,
-        at: Pos::new(12.0, 10.0),
+        at: Pos::new(6.0, 4.0),
     };
-    let snapshot = tess(start);
-    let mut sim = returning_to(forest);
+    let snapshot = tess(&content, start);
 
     let player = sim.join_as(
         1,
@@ -49,7 +46,7 @@ fn a_character_joined_from_a_row_is_that_character() {
             start,
         },
     );
-    let world = sim.world();
+    let world = &sim.world;
 
     assert_eq!(
         world.get::<Name>(player).map(|name| name.name.as_str()),
@@ -68,7 +65,7 @@ fn a_character_joined_from_a_row_is_that_character() {
     assert_eq!(
         world.get::<Class>(player),
         Some(&Class {
-            def: row("fighter")
+            def: id::<ClassDef>(&content, "hero")
         })
     );
     let stats = world.get::<Stats>(player).expect("stats");
@@ -85,38 +82,27 @@ fn a_character_joined_from_a_row_is_that_character() {
         })
     );
     let known = world.get::<Discovered>(player).expect("known areas");
-    assert!(known.knows(forest) && known.knows(row("island")));
+    assert!(known.knows(forest) && known.knows(id::<AreaDef>(&content, "village")));
     let joined_at = world.resource::<WallClock>().now;
     let log = world.get::<QuestLog>(player).expect("quest log");
-    let tusks = log
-        .active(row("tusks_for_the_chief"))
-        .expect("on the errand");
-    assert_eq!(tusks.counts, vec![0, 1]);
+    let errand = id::<QuestDef>(&content, "errand");
     assert_eq!(
-        log.finished(row("letter_for_the_captain"))
+        log.active(errand).expect("on the errand").counts,
+        vec![0, 1]
+    );
+    assert_eq!(
+        log.finished(id::<QuestDef>(&content, "letter"))
             .map(|finished| finished.result),
         Some(QuestResult::Completed)
     );
-    assert_eq!(log.tracked, vec![row("tusks_for_the_chief")]);
-    assert_eq!(
-        memory::get(world, player, row("chief_taunted_you")),
-        Value::Bool(true)
-    );
-    assert!(memory::set_within(
-        world,
-        player,
-        row("chief_taunted_you"),
-        Seconds(20.0)
-    ));
-    assert!(!memory::set_within(
-        world,
-        player,
-        row("chief_taunted_you"),
-        Seconds(5.0)
-    ));
-    assert!(dialogue::heard(world, player, "npc/tobb", "news"));
+    assert_eq!(log.tracked, vec![errand]);
+    let taunted = id::<MemoryDef>(&content, "taunted");
+    assert_eq!(memory::get(world, player, taunted), Value::Bool(true));
+    assert!(memory::set_within(world, player, taunted, Seconds(20.0)));
+    assert!(!memory::set_within(world, player, taunted, Seconds(5.0)));
+    assert!(dialogue::heard(world, player, "npc/crier", "news"));
     let mut ledger = ShopLedger::default();
-    ledger.record_sale(row("mara_wares"), sale());
+    ledger.record_sale(id::<ShopDef>(&content, "wares"), sale(&content));
     assert_eq!(world.get::<ShopLedger>(player), Some(&ledger));
     let history = world.get::<History>(player).expect("history");
     let records: Vec<_> = history.records().collect();
@@ -127,17 +113,18 @@ fn a_character_joined_from_a_row_is_that_character() {
 
 #[test]
 fn a_start_of_its_own_moves_the_character_and_nothing_else() {
-    let island = row("island");
-    let spawn = content().built::<GameSettings>().initial_spawn;
+    let mut sim = returning_to("village");
+    let content = sim.world.resource::<Content>().clone();
+    let village = sim.id::<AreaDef>("village");
+    let spawn = content.built::<GameSettings>().initial_spawn;
     let snapshot = CharacterSnapshot {
         start: CharacterStart::InitialSpawn(AtInitialSpawn::InitialSpawn),
-        ..tess(spawn)
+        ..tess(&content, spawn)
     };
     let here = Place {
-        area: island,
+        area: village,
         at: Pos::new(spawn.at.x + 3.0, spawn.at.y),
     };
-    let mut sim = returning_to(island);
 
     let player = sim.join_as(
         1,
@@ -146,7 +133,7 @@ fn a_start_of_its_own_moves_the_character_and_nothing_else() {
             start: here,
         },
     );
-    let world = sim.world();
+    let world = &sim.world;
 
     assert_eq!(
         world.get::<Position>(player).map(|position| position.pos),
@@ -157,47 +144,116 @@ fn a_start_of_its_own_moves_the_character_and_nothing_else() {
         world
             .get::<Discovered>(player)
             .expect("known areas")
-            .knows(island)
+            .knows(village)
     );
 }
 
 // A snapshot counts its times back from now, which needs a clock well past zero, and its stats
 // hold only for a mortal character.
-fn returning_to(area: AreaId) -> Sim {
-    let mut sim = Sim::area(area);
-    sim.world().insert_resource(LATER);
-    sim.world().insert_resource(SpawnRules {
+fn returning_to(area: &str) -> Sim {
+    let content = Game::new()
+        .area("village", &Map::open(9, 9), json!([]))
+        .area("forest", &Map::open(9, 9), json!([]))
+        .hero("village", 4.0, 4.0)
+        .item(
+            "gold",
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }),
+        )
+        .item(
+            "tusk",
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 50 }] }),
+        )
+        .item("bone", json!({ "kind": { "type": "resource" } }))
+        .item("shield", json!({ "kind": { "type": "equipment", "slot": "offhand" } }))
+        .npc("chief", 60.0, json!([]))
+        .row(
+            "quest",
+            "errand",
+            json!({
+                "title": "An errand",
+                "category": "Errands",
+                "blurb": "Bring five tusks, and the chief down.",
+                "xp": 120,
+                "modules": [
+                    { "type": "hold", "item": "tusk", "count": 5 },
+                    { "type": "defeat", "npc": "chief", "count": 1 },
+                    { "type": "hand_over", "text": ["Done."] },
+                ],
+            }),
+        )
+        .row(
+            "quest",
+            "letter",
+            json!({
+                "title": "A letter",
+                "category": "Errands",
+                "blurb": "Hold on to this.",
+                "xp": 40,
+                "modules": [
+                    { "type": "hold", "item": "bone", "count": 1 },
+                    { "type": "hand_over", "text": ["Here."] },
+                ],
+            }),
+        )
+        .row(
+            "shop",
+            "wares",
+            json!({
+                "title": "Wares",
+                "mark": "merchant",
+                "modules": [{
+                    "type": "sells",
+                    "item": "bone",
+                    "price": [{ "item": "gold", "count": 2 }],
+                    "stock": { "type": "unlimited" },
+                }],
+            }),
+        )
+        .mark("merchant")
+        .row(
+            "memory",
+            "taunted",
+            json!({ "label": "Taunted", "type": "boolean", "resets": "never" }),
+        )
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve(area);
+    sim.world.insert_resource(WallClock {
+        now: UnixMillis(1_000_000_000),
+        reset: UtcHour::MIDNIGHT,
+    });
+    sim.world.insert_resource(SpawnRules {
         policy: SpawnPolicy::Map,
         immortal: false,
     });
     sim
 }
 
-fn tess(start: Place) -> CharacterSnapshot {
+fn tess(content: &Content, start: Place) -> CharacterSnapshot {
     CharacterSnapshot {
         name: "Tess".to_owned(),
-        class: row("fighter"),
+        class: id(content, "hero"),
         xp: 60,
         skills: Vec::new(),
         hotbar: Vec::new(),
         basic_attack: None,
         stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
         bag: vec![
-            ItemStack::new(row("orc_tusk"), 5),
-            ItemStack::new(row("gold"), 20),
+            ItemStack::new(id(content, "tusk"), 5),
+            ItemStack::new(id(content, "gold"), 20),
         ],
-        equipment: BTreeMap::from([(EquipmentSlot::Offhand, row("bone_shield"))]),
-        known_areas: vec![row("island"), row("forest")],
+        equipment: BTreeMap::from([(EquipmentSlot::Offhand, id(content, "shield"))]),
+        known_areas: vec![id(content, "village"), id(content, "forest")],
         quests: vec![
             SnapshotQuest {
-                quest: row("tusks_for_the_chief"),
+                quest: id(content, "errand"),
                 state: QuestState::Active,
                 progress: vec![0, 1],
                 left: None,
                 decided: None,
             },
             SnapshotQuest {
-                quest: row("letter_for_the_captain"),
+                quest: id(content, "letter"),
                 state: QuestState::Completed,
                 progress: Vec::new(),
                 left: None,
@@ -205,18 +261,18 @@ fn tess(start: Place) -> CharacterSnapshot {
             },
         ],
         memories: vec![SnapshotMemory {
-            memory: row("chief_taunted_you"),
+            memory: id(content, "taunted"),
             value: MemoryValue::Bool(true),
             ago: Seconds(10.0),
         }],
         lines_heard: vec![HeardLine {
-            script: "npc/tobb".to_owned(),
+            script: "npc/crier".to_owned(),
             node: "news".to_owned(),
         }],
         shops: vec![SnapshotShop {
-            shop: row("mara_wares"),
+            shop: id(content, "wares"),
             stock: Vec::new(),
-            sales: vec![sale()],
+            sales: vec![sale(content)],
         }],
         history: vec![SnapshotRecord {
             ago: Seconds(5.0),
@@ -226,10 +282,16 @@ fn tess(start: Place) -> CharacterSnapshot {
     }
 }
 
-fn sale() -> Sale {
+fn sale(content: &Content) -> Sale {
     Sale {
-        item: row("bone"),
+        item: id::<ItemDef>(content, "bone"),
         count: 2,
-        paid: vec![ItemStack::new(row("gold"), 4)],
+        paid: vec![ItemStack::new(id(content, "gold"), 4)],
     }
+}
+
+fn id<Row: ContentRow>(content: &Content, key: &str) -> ContentId<Row> {
+    content
+        .by_key::<Row>(key)
+        .unwrap_or_else(|| panic!("no {} row `{key}`", Row::TABLE))
 }

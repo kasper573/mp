@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use rayon::prelude::*;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::Action;
-use crate::core::assets::AssetRef;
+use crate::core::assets::{AssetRef, FileBytes};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
@@ -284,6 +284,9 @@ impl GenericBusts {
 }
 
 pub const MAX_STRIP_FRAMES: usize = 256;
+// The client loads every bust at startup, so each one, and the whole cast, must stay a quick download.
+pub const MAX_BUST_BYTES: FileBytes = FileBytes::kib(120);
+pub const MAX_CAST_BYTES: FileBytes = FileBytes::kib(3 * 1024);
 pub const MAX_FRAME_MS: u32 = 60_000;
 
 pub struct Models(pub Vec<Option<ActorModel>>);
@@ -293,8 +296,9 @@ pub fn build_all(loading: &mut Loading) {
     let sizes = content.built::<ImageSizes>();
     let mut models: Vec<Option<ActorModel>> = content.ids::<ModelDef>().map(|_| None).collect();
     let rows = loading.rows::<ModelDef>(&content);
-    let figures = bust_figures(loading, &rows);
-    for ((id, def), figure) in rows.into_iter().zip(figures) {
+    let files = bust_files(loading, &rows);
+    let mut cast = CastWeight::default();
+    for ((id, def), busts) in rows.into_iter().zip(files) {
         let mut check = RowCheck::default();
         let sheet = def.sheet();
         let image = sizes.0.get(sheet.image.as_str()).copied();
@@ -409,8 +413,26 @@ pub fn build_all(loading: &mut Loading) {
                 }
             }
         }
+        for (bust, weight) in &busts.weights {
+            if *weight > MAX_BUST_BYTES {
+                check.error(
+                    "/modules",
+                    "bust too heavy",
+                    format!("{bust} weighs {weight}"),
+                    format!("at most {MAX_BUST_BYTES}"),
+                );
+            }
+            if let Some(total) = cast.add(bust, *weight) {
+                check.error(
+                    "/modules",
+                    "cast too heavy",
+                    format!("the busts up to {bust} weigh {total}"),
+                    format!("at most {MAX_CAST_BYTES} for every bust in the game"),
+                );
+            }
+        }
         if check.is_empty() {
-            models[id.index()] = Some(ActorModel::new(def, image, figure));
+            models[id.index()] = Some(ActorModel::new(def, image, busts.figure));
         } else {
             loading.row_errors(id, check);
             loading.fail(id);
@@ -606,15 +628,47 @@ fn crossed(once: bool, total: Millis, at: Millis, prev: Option<Millis>, now: Mil
     count(now) > prev.map_or(0, count)
 }
 
-fn bust_figures(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<Option<BustFigure>> {
+#[derive(Default)]
+struct CastWeight {
+    counted: HashSet<String>,
+    total: usize,
+    over: bool,
+}
+
+impl CastWeight {
+    /// Counts `bust` once however many models share it, and tells the total the first time it
+    /// passes the budget.
+    fn add(&mut self, bust: &str, weight: FileBytes) -> Option<FileBytes> {
+        if !self.counted.insert(bust.to_owned()) {
+            return None;
+        }
+        self.total += weight.0;
+        let total = FileBytes(self.total);
+        (total > MAX_CAST_BYTES && !std::mem::replace(&mut self.over, true)).then_some(total)
+    }
+}
+
+struct BustFiles {
+    figure: Option<BustFigure>,
+    weights: Vec<(String, FileBytes)>,
+}
+
+fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles> {
     let folder = loading.folder();
     rows.par_iter()
         .map(|(_, def)| {
-            let spans: Vec<VisiblePixelColumns> = def
-                .busts()?
-                .all()
-                .filter_map(|bust| folder.read(&bust.path()).ok())
-                .filter_map(|bytes| visible_columns(&bytes).ok().flatten())
+            let files: Vec<(String, Vec<u8>)> = def
+                .busts()
+                .into_iter()
+                .flat_map(Busts::all)
+                .filter_map(|bust| {
+                    let bytes = folder.read(&bust.path()).ok()?;
+                    Some((bust.as_str().to_owned(), bytes))
+                })
+                .collect();
+            let spans: Vec<VisiblePixelColumns> = files
+                .iter()
+                .filter_map(|(_, bytes)| visible_columns(bytes).ok().flatten())
                 .collect();
             let left = spans
                 .iter()
@@ -622,10 +676,17 @@ fn bust_figures(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<Option<
             let right = spans
                 .iter()
                 .map(|span| (span.last + 1) as f32 / span.image_width as f32);
-            Some(BustFigure {
-                left: left.reduce(f32::min)?,
-                right: right.reduce(f32::max)?,
-            })
+            let figure = left
+                .reduce(f32::min)
+                .zip(right.reduce(f32::max))
+                .map(|(left, right)| BustFigure { left, right });
+            BustFiles {
+                figure,
+                weights: files
+                    .into_iter()
+                    .map(|(path, bytes)| (path, FileBytes(bytes.len())))
+                    .collect(),
+            }
         })
         .collect()
 }

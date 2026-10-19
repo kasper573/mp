@@ -1,54 +1,99 @@
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::sync::Arc;
 
-use engine::core::content::write;
-use engine::systems::registry;
+use engine::core::content::{Content, FilesystemFolder, version, write};
+use serde_json::json;
+use testkit::{Game, settled_tables};
 use walkdir::WalkDir;
 
-use crate::support::{TempFolder, load, repo};
-
-#[test]
-fn writing_the_shipped_folder_back_changes_no_bytes() {
-    let folder = repo().join("example_game");
-    let content = load(&folder).unwrap_or_else(|report| panic!("{report}"));
-    let writer = write(&registry(), content, &folder).expect("written");
-
-    assert_eq!(writer.written(), &[] as &[String], "rewritten files");
-    assert_eq!(writer.kept(), rows_and_grids(&folder).len());
-}
+use crate::support::game;
 
 #[test]
 fn a_folder_written_from_scratch_lists_every_row_and_grid() {
-    let folder = repo().join("example_game");
-    let content = load(&folder).unwrap_or_else(|report| panic!("{report}"));
-    let fresh = TempFolder::of_template();
-    std::fs::remove_dir_all(fresh.path().join("tables")).expect("the template's tables");
-    std::fs::remove_file(fresh.path().join("game.json")).expect("the template's game.json");
+    let game = rich_game();
+    let declared = rows_and_grids(&game);
+    let out = tempfile::tempdir().expect("a temp folder");
 
-    let writer = write(&registry(), content, fresh.path()).expect("written");
+    let writer = write(settled_tables(), game.load(), out.path()).expect("written");
 
     let written: BTreeSet<String> = writer.written().iter().cloned().collect();
-    assert_eq!(written, rows_and_grids(&folder));
-    for file in &written {
-        assert_eq!(
-            std::fs::read(fresh.path().join(file)).expect("fresh"),
-            std::fs::read(folder.join(file)).expect("shipped"),
-            "{file} differs"
-        );
-    }
+    assert_eq!(written, declared);
+    assert_eq!(on_disk(out.path()), declared);
 }
 
-fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
-    let tables = WalkDir::new(folder.join("tables"))
-        .follow_links(true)
+#[test]
+fn writing_a_written_folder_back_changes_no_bytes() {
+    let game = rich_game();
+    let out = tempfile::tempdir().expect("a temp folder");
+    for (path, bytes) in game.folder().files {
+        if path.starts_with("assets/") {
+            let file = out.path().join(&path);
+            std::fs::create_dir_all(file.parent().expect("a parent folder")).expect("folders");
+            std::fs::write(file, bytes).expect("an asset");
+        }
+    }
+    let first = write(settled_tables(), game.load(), out.path()).expect("written");
+
+    let reread = load(out.path());
+    let again = write(settled_tables(), reread, out.path()).expect("written again");
+
+    assert_eq!(again.written(), &[] as &[String], "rewritten files");
+    assert_eq!(again.kept(), first.written().len());
+}
+
+/// A game of rows from many tables, and the grids of its area.
+fn rich_game() -> Game {
+    game()
+        .sword()
+        .wearing(&["sword"])
+        .busts("hero")
+        .babble("brute")
+        .npc(
+            "brute",
+            30.0,
+            json!([{ "type": "voice", "babble": "brute" }]),
+        )
+        .item(
+            "bone",
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 20 }] }),
+        )
+        .row(
+            "memory",
+            "met",
+            json!({ "label": "Met", "type": "boolean", "resets": "never" }),
+        )
+        .vfx("sparkle")
+        .shader("glow")
+        .mark("news")
+}
+
+fn load(folder: &Path) -> Content {
+    engine::core::content::load(
+        settled_tables(),
+        Arc::new(FilesystemFolder(folder.to_path_buf())),
+        version::build(),
+        "the written folder did not load",
+    )
+    .unwrap_or_else(|report| panic!("{report}"))
+}
+
+fn rows_and_grids(game: &Game) -> BTreeSet<String> {
+    game.folder()
+        .files
+        .into_keys()
+        .filter(|path| path == "game.json" || path.starts_with("tables/"))
+        .collect()
+}
+
+fn on_disk(folder: &Path) -> BTreeSet<String> {
+    WalkDir::new(folder)
         .into_iter()
         .map(|entry| entry.expect("an entry"))
         .filter(|entry| entry.file_type().is_file())
         .map(|entry| {
             let relative = entry.path().strip_prefix(folder).expect("under the folder");
             relative.to_string_lossy().replace('\\', "/")
-        });
-    std::iter::once("game.json".to_owned())
-        .chain(tables)
+        })
         .collect()
 }

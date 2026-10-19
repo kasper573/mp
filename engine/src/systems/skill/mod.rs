@@ -64,7 +64,6 @@ pub fn register(app: &mut App) {
         .add_client_message::<AssignHotbarRequest>(Channel::Ordered)
         .add_client_message::<AssignBasicAttackRequest>(Channel::Ordered)
         .add_client_message::<ResetAnswerRequest>(Channel::Ordered);
-    stat::source(app, casting::chase);
 }
 
 /// Every request a client may send about its skills, answered in one place.
@@ -542,7 +541,10 @@ pub fn check_rank(
     skill: SkillId,
     rank: Rank,
 ) {
-    let def = skill.get(content);
+    // A skill whose row failed to load has its own errors reported, and no ranks to check against.
+    let Some(def) = content.table::<SkillDef>().get(skill) else {
+        return;
+    };
     if !def.ranks().contains(&rank) {
         check.error(
             pointer,

@@ -1,253 +1,411 @@
 use bevy_ecs::prelude::*;
-use engine::core::tiling::Tiles;
-use engine::systems::interact::InteractRequest;
-use engine::systems::item::{ItemId, ItemStack};
-use engine::systems::movement::position;
-use engine::systems::npc::NpcId;
-use engine::systems::script::Speaker;
-use engine::systems::shop::{SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView};
-
-use testkit::{
-    Sim, content, conversation, count, give, later, leave, object, pick, place, row, slot_of,
-    spawn_area, talk, townsperson,
-};
+use engine::core::content::Content;
+use engine::core::math::Offset;
+use engine::core::time::{Seconds, WallClock};
+use engine::systems::area;
+use engine::systems::dialogue::{self, ConversationRequest};
+use engine::systems::interact::{self, InteractRequest};
+use engine::systems::item::{ItemDef, ItemStack};
+use engine::systems::movement::{self, position};
+use engine::systems::npc::{self, NpcDef};
+use engine::systems::script::{self, Speaker};
+use engine::systems::shop::{self, SaleQuote, SaleVerdict, ShopDef, ShopRequest, ShopView};
+use serde_json::{Value, json};
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    give(&mut sim, player, row("Gold"), 10);
+    sim.give(player, "gold", 10);
 
-    let opened = browse(&mut sim, 1, player, row("Mara"));
-    assert_eq!(opened.shop, row::<ShopId>("MaraWares"));
-    let now = conversation(&mut sim, player).expect("browsing");
-    assert_eq!(now.node, "wares");
+    let opened = browse(&mut sim, 1, "merchant");
+    assert_eq!(opened.shop, sim.id::<ShopDef>("wares"));
+    assert_eq!(sim.conversation(1).expect("browsing").node, "wares");
 
-    sim.send(
-        1,
-        ShopRequest::Buy {
-            offer: offer_of(row("MaraWares"), row("HealthPotion")),
-        },
-    );
+    let conn = sim.conn(1);
+    let offer = offer_of(&sim, "wares", "potion");
+    sim.send(conn, ShopRequest::Buy { offer });
     sim.tick();
 
-    assert_eq!(count(&mut sim, player, row("Gold")), 4);
-    assert_eq!(count(&mut sim, player, row("HealthPotion")), 1);
+    assert_eq!(sim.count(player, "gold"), 4);
+    assert_eq!(sim.count(player, "potion"), 1);
 }
 
 #[test]
 fn a_purchase_you_cannot_cover_changes_nothing_and_the_keeper_says_so() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    give(&mut sim, player, row("Gold"), 12);
-    let mara = townsperson(&mut sim, row("Mara"));
-    let opened = browse(&mut sim, 1, player, row("Mara"));
-    let potion = offer_of(row("MaraWares"), row("GreaterHealthPotion"));
-    assert!(opened.offers[potion as usize].refusal.is_some());
+    sim.give(player, "gold", 12);
+    let merchant = sim.npc("merchant");
+    let opened = browse(&mut sim, 1, "merchant");
+    let tonic = offer_of(&sim, "wares", "tonic");
+    assert!(opened.offers[tonic as usize].refusal.is_some());
 
-    sim.send(1, ShopRequest::Buy { offer: potion });
+    let conn = sim.conn(1);
+    sim.send(conn, ShopRequest::Buy { offer: tonic });
     sim.tick();
 
-    assert_eq!(count(&mut sim, player, row("Gold")), 12);
-    assert_eq!(count(&mut sim, player, row("GreaterHealthPotion")), 0);
-    let talking = conversation(&mut sim, player).expect("still browsing");
-    assert_eq!(talking.with, Some(mara));
-    let remark = talking.remark.expect("Mara reacts");
-    assert_eq!(remark.line.by, Speaker::Npc(row("Mara")));
+    assert_eq!(sim.count(player, "gold"), 12);
+    assert_eq!(sim.count(player, "tonic"), 0);
+    let talking = sim.conversation(1).expect("still browsing");
+    assert_eq!(talking.with, Some(merchant));
+    let remark = talking.remark.expect("the merchant reacts");
+    assert_eq!(remark.line.by, Speaker::Npc(sim.id::<NpcDef>("merchant")));
 }
 
 #[test]
 fn limited_stock_is_kept_per_player_and_restocks_on_its_timer() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let first = sim.join(1);
     let second = sim.join(2);
     for player in [first, second] {
-        give(&mut sim, player, row("Gold"), 100);
-        give(&mut sim, player, row("BatWing"), 20);
+        sim.give(player, "gold", 100);
+        sim.give(player, "wing", 20);
     }
-    browse(&mut sim, 1, first, row("Mara"));
-    browse(&mut sim, 2, second, row("Mara"));
-    let potion = offer_of(row("MaraWares"), row("GreaterHealthPotion"));
+    browse(&mut sim, 1, "merchant");
+    browse(&mut sim, 2, "merchant");
+    let tonic = offer_of(&sim, "wares", "tonic");
+    let (one, two) = (sim.conn(1), sim.conn(2));
 
     for _ in 0..4 {
-        sim.send(1, ShopRequest::Buy { offer: potion });
+        sim.send(one, ShopRequest::Buy { offer: tonic });
         sim.tick();
     }
-    assert_eq!(count(&mut sim, first, row("GreaterHealthPotion")), 3);
-    let sold_out = shown(&mut sim, first).expect("open");
-    assert_eq!(sold_out.offers[potion as usize].left, Some(0));
+    assert_eq!(sim.count(first, "tonic"), 3);
+    let sold_out = shown(&sim, first).expect("open");
+    assert_eq!(sold_out.offers[tonic as usize].left, Some(0));
 
-    sim.send(2, ShopRequest::Buy { offer: potion });
+    sim.send(two, ShopRequest::Buy { offer: tonic });
     sim.tick();
-    assert_eq!(count(&mut sim, second, row("GreaterHealthPotion")), 1);
+    assert_eq!(sim.count(second, "tonic"), 1);
 
-    later(&mut sim, 600.0);
-    sim.send(1, ShopRequest::Buy { offer: potion });
+    let mut clock = sim.world.resource_mut::<WallClock>();
+    clock.now = clock.now.after(Seconds(600.0));
+    sim.run(0.5);
+    sim.send(one, ShopRequest::Buy { offer: tonic });
     sim.tick();
-    assert_eq!(count(&mut sim, first, row("GreaterHealthPotion")), 4);
+    assert_eq!(sim.count(first, "tonic"), 4);
 }
 
 #[test]
 fn a_collector_pays_in_his_own_currency_and_buyback_costs_exactly_what_he_paid() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    give(&mut sim, player, row("Bone"), 7);
-    give(&mut sim, player, row("OrcTusk"), 1);
+    sim.give(player, "bone", 7);
+    sim.give(player, "tusk", 1);
 
-    let opened = browse(&mut sim, 1, player, row("Wren"));
-    assert_eq!(opened.shop, row::<ShopId>("BoneExchange"));
-    let now = conversation(&mut sim, player)
+    let opened = browse(&mut sim, 1, "collector");
+    assert_eq!(opened.shop, sim.id::<ShopDef>("exchange"));
+    let now = sim
+        .conversation(1)
         .expect("a shop without reactions still keeps its conversation");
     assert_eq!(now.node, "counter");
 
-    let tusk = slot_of(&mut sim, player, row("OrcTusk"));
+    let conn = sim.conn(1);
+    let tusk = sim.slot_of(player, "tusk");
+    let one_tusk = ItemStack::new(sim.id::<ItemDef>("tusk"), 1);
     sim.send(
-        1,
+        conn,
         ShopRequest::Sell {
             slot: tusk,
-            stack: ItemStack::new(row("OrcTusk"), 1),
+            stack: one_tusk,
         },
     );
     sim.tick();
-    assert_eq!(count(&mut sim, player, row("OrcTusk")), 1);
+    assert_eq!(sim.count(player, "tusk"), 1);
 
-    let bones = slot_of(&mut sim, player, row("Bone"));
-    let all_bones = ItemStack::new(row("Bone"), 7);
-    sim.send(
-        1,
-        ShopRequest::Sell {
-            slot: bones,
-            stack: all_bones,
-        },
-    );
-    sim.send(
-        1,
-        ShopRequest::Sell {
-            slot: bones,
-            stack: all_bones,
-        },
-    );
+    let bones = sim.slot_of(player, "bone");
+    let all_bones = ItemStack::new(sim.id::<ItemDef>("bone"), 7);
+    for _ in 0..2 {
+        sim.send(
+            conn,
+            ShopRequest::Sell {
+                slot: bones,
+                stack: all_bones,
+            },
+        );
+    }
     sim.tick();
-    assert_eq!(count(&mut sim, player, row("Bone")), 0);
-    assert_eq!(count(&mut sim, player, row("BoneToken")), 7);
-    let sold = shown(&mut sim, player).expect("open");
-    assert_eq!(sold.buyback.len(), 1);
+    assert_eq!(sim.count(player, "bone"), 0);
+    assert_eq!(sim.count(player, "token"), 7);
+    assert_eq!(shown(&sim, player).expect("open").buyback.len(), 1);
 
-    sim.send(1, ShopRequest::Buyback { sale: 0 });
+    sim.send(conn, ShopRequest::Buyback { sale: 0 });
     sim.tick();
-    assert_eq!(count(&mut sim, player, row("Bone")), 7);
-    assert_eq!(count(&mut sim, player, row("BoneToken")), 0);
-    assert!(shown(&mut sim, player).expect("open").buyback.is_empty());
+    assert_eq!(sim.count(player, "bone"), 7);
+    assert_eq!(sim.count(player, "token"), 0);
+    assert!(shown(&sim, player).expect("open").buyback.is_empty());
 }
 
 #[test]
 fn the_view_quotes_what_each_bag_item_fetches_or_why_it_does_not_sell() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    give(&mut sim, player, row("Bone"), 7);
-    give(&mut sim, player, row("OrcTusk"), 1);
+    sim.give(player, "bone", 7);
+    sim.give(player, "tusk", 1);
 
-    browse(&mut sim, 1, player, row("Wren"));
+    browse(&mut sim, 1, "collector");
 
-    let view = shown(&mut sim, player).expect("open");
-    let bone = quote(&view, row("Bone")).expect("quoted");
+    let view = shown(&sim, player).expect("open");
+    let token = sim.id::<ItemDef>("token");
+    let bone = quote(&view, &sim, "bone").expect("quoted");
     assert!(matches!(
         &bone.verdict,
-        SaleVerdict::Pays(pays) if pays.iter().any(|stack| stack.item == row("BoneToken"))
+        SaleVerdict::Pays(pays) if pays.iter().any(|stack| stack.item == token)
     ));
-    let tusk = quote(&view, row("OrcTusk")).expect("quoted");
+    let tusk = quote(&view, &sim, "tusk").expect("quoted");
     assert!(matches!(tusk.verdict, SaleVerdict::Refused(_)));
 }
 
 #[test]
 fn walking_out_of_reach_closes_the_shop() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    browse(&mut sim, 1, player, row("Wren"));
-    let at = position(sim.world(), player).expect("position");
+    browse(&mut sim, 1, "collector");
+    let at = position(&sim.world, player).expect("position");
 
-    let away = sim.walkable_near(at, Tiles(8.0), Tiles(12.0));
-    place(&mut sim, player, away);
+    movement::relocate(&mut sim.world, player, at + Offset::new(0.0, 8.0));
     sim.tick();
 
-    assert!(shown(&mut sim, player).is_none());
+    assert!(shown(&sim, player).is_none());
 }
 
 #[test]
 fn leaving_the_conversation_closes_the_shop() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    browse(&mut sim, 1, player, row("Mara"));
+    browse(&mut sim, 1, "merchant");
 
-    leave(&mut sim, 1, player);
+    sim.leave(1);
 
-    assert!(conversation(&mut sim, player).is_none());
-    assert!(shown(&mut sim, player).is_none());
+    assert!(sim.conversation(1).is_none());
+    assert!(shown(&sim, player).is_none());
 }
 
 #[test]
 fn a_map_object_can_keep_a_shop() {
-    let mut sim = Sim::area(spawn_area());
+    let mut sim = market();
     let player = sim.join(1);
-    give(&mut sim, player, row("Gold"), 3);
-    let honesty_box = object(&mut sim, "honesty-box");
+    sim.give(player, "gold", 3);
+    let honesty_box = sim.object("box");
 
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         InteractRequest {
             target: honesty_box,
         },
     );
     assert!(sim.run_until(20.0, |world| world.get::<ShopView>(player).is_some()));
     assert_eq!(
-        shown(&mut sim, player).map(|opened| opened.shop),
-        Some(row::<ShopId>("HonestyBox"))
+        shown(&sim, player).map(|opened| opened.shop),
+        Some(sim.id::<ShopDef>("box"))
     );
-    let now = conversation(&mut sim, player).expect("the box keeps its shop inside a conversation");
+    let now = sim
+        .conversation(1)
+        .expect("the box keeps its shop inside a conversation");
     assert_eq!(now.node, "note");
 
-    sim.send(
-        1,
-        ShopRequest::Buy {
-            offer: offer_of(row("HonestyBox"), row("FishSteak")),
-        },
-    );
+    let offer = offer_of(&sim, "box", "steak");
+    sim.send(conn, ShopRequest::Buy { offer });
     sim.tick();
-    assert_eq!(count(&mut sim, player, row("FishSteak")), 1);
-    assert_eq!(count(&mut sim, player, row("Gold")), 0);
+    assert_eq!(sim.count(player, "steak"), 1);
+    assert_eq!(sim.count(player, "gold"), 0);
 }
 
-fn quote(view: &ShopView, item: ItemId) -> Option<&SaleQuote> {
-    view.quotes.iter().find(|quote| quote.item == item)
+fn market() -> Sim {
+    let stacked =
+        || json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] });
+    let content = Game::new()
+        .area(
+            "market",
+            &Map::open(15, 15),
+            json!([
+                { "type": "resident", "npc": "merchant", "at": { "x": 4.0, "y": 4.0 } },
+                { "type": "resident", "npc": "collector", "at": { "x": 10.0, "y": 4.0 } },
+                {
+                    "type": "object",
+                    "name": "box",
+                    "label": "Honesty box",
+                    "shape": { "type": "point", "x": 7.0, "y": 10.0 },
+                    "look": "objects/box.png",
+                    "scripts": [{
+                        "type": "inline_script",
+                        "nodes": {
+                            "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
+                            "note": said("Pay what's written.", "shop"),
+                            "shop": { "type": "open_shop", "shop": "box" },
+                        },
+                    }],
+                },
+            ]),
+        )
+        .asset("objects/box.png", testkit::png(1, 1))
+        .hero("market", 7.0, 7.0)
+        .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 100_000 }] }))
+        .item("potion", stacked())
+        .item("tonic", stacked())
+        .item("wing", stacked())
+        .item("bone", stacked())
+        .item("token", stacked())
+        .item("tusk", stacked())
+        .item("steak", stacked())
+        .npc(
+            "merchant",
+            40.0,
+            json!([keeper("Show me your wares.", "wares", "wares")]),
+        )
+        .npc(
+            "collector",
+            40.0,
+            json!([keeper("I've brought bones.", "counter", "exchange")]),
+        )
+        .row(
+            "shop",
+            "wares",
+            json!({
+                "title": "Wares",
+                "mark": "merchant",
+                "modules": [
+                    {
+                        "type": "sells",
+                        "item": "potion",
+                        "price": [{ "item": "gold", "count": 6 }],
+                        "stock": { "type": "unlimited" },
+                    },
+                    {
+                        "type": "sells",
+                        "item": "tonic",
+                        "price": [{ "item": "gold", "count": 10 }, { "item": "wing", "count": 2 }],
+                        "stock": { "type": "limited", "count": 3, "restock": 600.0 },
+                    },
+                    {
+                        "type": "reactions",
+                        "bought": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["A fine choice."] }],
+                        "sold": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["It'll do."] }],
+                        "cant_afford": [{
+                            "by": { "type": "npc", "npc": "merchant" },
+                            "text": ["Come back when your purse is heavier."],
+                        }],
+                    },
+                ],
+            }),
+        )
+        .row(
+            "shop",
+            "exchange",
+            json!({
+                "title": "Exchange",
+                "mark": "collector",
+                "modules": [
+                    {
+                        "type": "sells",
+                        "item": "tonic",
+                        "price": [{ "item": "token", "count": 3 }],
+                        "stock": { "type": "unlimited" },
+                    },
+                    { "type": "buys", "what": { "type": "item", "item": "bone" }, "pays": [{ "item": "token" }] },
+                ],
+            }),
+        )
+        .row(
+            "shop",
+            "box",
+            json!({
+                "title": "Honesty box",
+                "mark": "merchant",
+                "modules": [{
+                    "type": "sells",
+                    "item": "steak",
+                    "price": [{ "item": "gold", "count": 3 }],
+                    "stock": { "type": "limited", "count": 5, "restock": 1800.0 },
+                }],
+            }),
+        )
+        .mark("merchant")
+        .mark("collector")
+        .sfx("ui_refuse")
+        .sfx("ui_close")
+        .sfx("coins")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("market")
+        .accept::<InteractRequest>()
+        .accept::<ConversationRequest>()
+        .accept::<ShopRequest>()
+        .add((
+            interact::interact_request,
+            dialogue::requests,
+            shop::requests,
+        ))
+        .add((
+            script::run_tick,
+            movement::advance,
+            interact::interactions,
+            dialogue::hold,
+            dialogue::refresh,
+            shop::hold,
+            shop::refresh,
+        ));
+    script::spawn_stateless(&mut sim.world);
+    npc::spawn_all(&mut sim.world);
+    area::object::spawn_all(&mut sim.world);
+    sim
 }
 
-fn shown(sim: &mut Sim, player: Entity) -> Option<ShopView> {
-    sim.world().get::<ShopView>(player).cloned()
+fn keeper(ask: &str, browsing: &str, shop: &str) -> Value {
+    let mut nodes = json!({
+        "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
+        "hello": {
+            "type": "dialogue",
+            "lines": [{ "by": { "type": "narrator" }, "text": ["Welcome."] }],
+            "choices": [{ "label": [ask], "to": browsing }, { "label": ["Goodbye."] }],
+        },
+        "shop": { "type": "open_shop", "shop": shop },
+    });
+    nodes[browsing] = said("Take your time.", "shop");
+    json!({ "type": "inline_script", "nodes": nodes })
 }
 
-fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: NpcId) -> ShopView {
-    talk(sim, client, player, keeper);
-    pick(sim, client, player, ask_of(keeper));
+fn said(text: &str, next: &str) -> Value {
+    json!({
+        "type": "dialogue",
+        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
+        "next": next,
+    })
+}
+
+fn browse(sim: &mut Sim, client: u32, keeper: &str) -> ShopView {
+    let player = sim.player(client);
+    sim.talk(client, keeper);
+    let ask = match keeper {
+        "merchant" => "Show me your wares.",
+        "collector" => "I've brought bones.",
+        other => panic!("{other} keeps no shop"),
+    };
+    sim.pick(client, ask);
     assert!(
         sim.run_until(20.0, |world| world.get::<ShopView>(player).is_some()),
-        "the shop with {} never opened",
-        keeper.key(content())
+        "the shop with the {keeper} never opened"
     );
     shown(sim, player).expect("the shop opened")
 }
 
-fn ask_of(keeper: NpcId) -> &'static str {
-    if keeper == row("Mara") {
-        "Show me your wares."
-    } else if keeper == row("Wren") {
-        "I've brought bones."
-    } else {
-        panic!("{} keeps no shop", keeper.key(content()))
-    }
+fn shown(sim: &Sim, player: Entity) -> Option<ShopView> {
+    sim.world.get::<ShopView>(player).cloned()
 }
 
-fn offer_of(shop: ShopId, item: ItemId) -> u32 {
-    shop.get(content())
+fn quote<'a>(view: &'a ShopView, sim: &Sim, item: &str) -> Option<&'a SaleQuote> {
+    let item = sim.id::<ItemDef>(item);
+    view.quotes.iter().find(|quote| quote.item == item)
+}
+
+fn offer_of(sim: &Sim, shop: &str, item: &str) -> u32 {
+    let content = sim.world.resource::<Content>();
+    let item = sim.id::<ItemDef>(item);
+    sim.id::<ShopDef>(shop)
+        .get(content)
         .sells()
         .position(|offer| offer.item == item)
         .expect("on sale") as u32

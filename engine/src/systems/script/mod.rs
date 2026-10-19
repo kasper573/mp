@@ -716,6 +716,14 @@ pub fn check_all(loading: &mut Loading) {
             );
         }
     }
+    loading.built(Parties::of(&content, scripts));
+}
+
+/// What a whole game must do with its quests and shops: offer and take back every quest, from an
+/// owner placed somewhere, and open every shop.
+pub fn check_reached(loading: &mut Loading) {
+    let content = loading.content();
+    let scripts = content.built::<RiftScripts>();
     for (id, _) in loading.rows::<ShopDef>(&content) {
         let opened = scripts.owners().any(|(row, _)| {
             scripts
@@ -736,7 +744,5 @@ pub fn check_all(loading: &mut Loading) {
             );
         }
     }
-    let parties = Parties::of(&content, scripts);
-    crate::systems::quest::check_parties(loading, scripts, &parties);
-    loading.built(parties);
+    crate::systems::quest::check_parties(loading, scripts, content.built::<Parties>());
 }

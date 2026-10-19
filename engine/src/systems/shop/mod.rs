@@ -14,6 +14,7 @@ use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptF
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention::AttentionId;
 use crate::systems::dialogue;
+use crate::systems::drain_requests;
 use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemId, ItemStack};
 use crate::systems::notification;
 use crate::systems::player::sender_player;
@@ -22,7 +23,6 @@ use crate::systems::script::{
     self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
     RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
 };
-use crate::systems::{attention, drain_requests};
 
 pub type ShopId = ContentId<ShopDef>;
 
@@ -33,7 +33,6 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<ShopView>()
         .add_client_message::<ShopRequest>(Channel::Ordered);
-    attention::mark_source(app, marks);
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -494,7 +493,7 @@ fn bound(world: &World, player: Entity) -> bool {
         .is_some_and(|visit| dialogue::flow_of(world, player) == Some(visit.flow))
 }
 
-fn marks(
+pub(crate) fn marks(
     world: &World,
     target: Entity,
     viewers: &[Entity],

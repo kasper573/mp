@@ -1,353 +1,528 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
-use engine::core::math::Offset;
+use engine::core::math::{Offset, Pos};
+use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
-use engine::core::vfx::{VfxId, VfxInstance, VfxSite};
-use engine::systems::class::{self, NodeKey};
+use engine::core::vfx::{VfxDef, VfxInstance, VfxSite};
+use engine::systems::area::AreaDef;
+use engine::systems::class::NodeKey;
+use engine::systems::combat::{self, Attitude};
 use engine::systems::equipment::{self, EquipmentSlot, UnequipRequest};
-use engine::systems::item::{Inventory, ItemId, UseItemRequest};
+use engine::systems::item::{self, Inventory, ItemDef, UseItemRequest};
+use engine::systems::movement::{self, position};
+use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::skill::{
-    self, AssignHotbarRequest, CastAim, Hotbar, HotbarEntry, HotbarSlot, Rank, UseSkillRequest,
+    self, AssignBasicAttackRequest, AssignHotbarRequest, CastAim, Hotbar, HotbarEntry, HotbarSlot,
+    Rank, SkillDef, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
-use engine::systems::status::{self, StatusCategory, Statuses};
-
-use engine::core::tiling::Tiles;
-use engine::systems::movement::position;
-
-use testkit::{Sim, count, errors, give, later, row, settle, slot_of, spawn_area, target_dummy};
+use engine::systems::status::{self, StatusCategory, StatusEffectDef, Statuses};
+use engine::systems::{actor, script, vfx};
+use serde_json::{Value, json};
+use testkit::{Game, Map, Sim};
 
 #[test]
 fn a_status_holds_its_boost_until_its_time_runs_out() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let base = stat::max_health(sim.world(), player);
+    let (mut sim, player) = clinic();
+    let base = stat::max_health(&sim.world, player);
+    let guarded = sim.id::<StatusEffectDef>("guarded");
 
-    status::apply(
-        sim.world(),
-        player,
-        row("Guarded"),
-        10.0,
-        Some(Seconds(5.0)),
-    );
-    settle(&mut sim);
-    assert_eq!(stat::max_health(sim.world(), player), base + 10.0);
+    status::apply(&mut sim.world, player, guarded, 10.0, Some(Seconds(5.0)));
+    sim.run(0.5);
+    assert_eq!(stat::max_health(&sim.world, player), base + 10.0);
 
-    later(&mut sim, 5.0);
-    assert_eq!(stat::max_health(sim.world(), player), base);
-    assert!(!status::has(sim.world(), player, row("Guarded")));
+    sim.later(5.0);
+    assert_eq!(stat::max_health(&sim.world, player), base);
+    assert!(!status::has(&sim.world, player, guarded));
 }
 
 #[test]
 fn applying_a_held_status_refreshes_it_instead_of_stacking() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let base = stat::max_health(sim.world(), player);
+    let (mut sim, player) = clinic();
+    let base = stat::max_health(&sim.world, player);
+    let guarded = sim.id::<StatusEffectDef>("guarded");
 
-    status::apply(
-        sim.world(),
-        player,
-        row("Guarded"),
-        10.0,
-        Some(Seconds(1.0)),
-    );
-    settle(&mut sim);
-    status::apply(
-        sim.world(),
-        player,
-        row("Guarded"),
-        18.0,
-        Some(Seconds(5.0)),
-    );
-    settle(&mut sim);
-    assert_eq!(statuses(&mut sim, player).0.len(), 1);
-    assert_eq!(stat::max_health(sim.world(), player), base + 18.0);
+    status::apply(&mut sim.world, player, guarded, 10.0, Some(Seconds(1.0)));
+    sim.run(0.5);
+    status::apply(&mut sim.world, player, guarded, 18.0, Some(Seconds(5.0)));
+    sim.run(0.5);
+    assert_eq!(statuses(&sim, player).0.len(), 1);
+    assert_eq!(stat::max_health(&sim.world, player), base + 18.0);
 
-    later(&mut sim, 1.5);
-    assert_eq!(stat::max_health(sim.world(), player), base + 18.0);
+    sim.later(1.5);
+    assert_eq!(stat::max_health(&sim.world, player), base + 18.0);
 }
 
 #[test]
 fn a_cleanse_takes_only_the_category_it_names() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    status::apply(sim.world(), player, row("Guarded"), 10.0, None);
-    status::apply(sim.world(), player, row("Poisoned"), 1.0, None);
-    settle(&mut sim);
+    let (mut sim, player) = clinic();
+    let guarded = sim.id::<StatusEffectDef>("guarded");
+    let poisoned = sim.id::<StatusEffectDef>("poisoned");
+    status::apply(&mut sim.world, player, guarded, 10.0, None);
+    status::apply(&mut sim.world, player, poisoned, 1.0, None);
+    sim.run(0.5);
 
-    let antidote: ItemId = row("Antidote");
-    give(&mut sim, player, antidote, 1);
-    let slot = slot_of(&mut sim, player, antidote);
-    sim.send(1, UseItemRequest { slot });
-    settle(&mut sim);
+    use_item(&mut sim, player, "antidote");
 
-    assert!(!status::has(sim.world(), player, row("Poisoned")));
-    assert!(status::has(sim.world(), player, row("Guarded")));
-    assert_eq!(count(&mut sim, player, antidote), 0);
-    let content = testkit::content();
+    assert!(!status::has(&sim.world, player, poisoned));
+    assert!(status::has(&sim.world, player, guarded));
+    assert_eq!(sim.count(player, "antidote"), 0);
+    let content = sim.world.resource::<engine::core::content::Content>();
     assert_eq!(
-        statuses(&mut sim, player).count(content, Some(StatusCategory::Debuff)),
+        statuses(&sim, player).count(content, Some(StatusCategory::Debuff)),
         0
     );
 }
 
 #[test]
 fn a_status_on_an_interval_strikes_every_period_while_it_holds() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let full = stat::current_health(sim.world(), player);
+    let (mut sim, player) = clinic();
+    let full = stat::current_health(&sim.world, player);
+    let poisoned = sim.id::<StatusEffectDef>("poisoned");
 
-    let bog_water: ItemId = row("BogWater");
-    give(&mut sim, player, bog_water, 1);
-    let slot = slot_of(&mut sim, player, bog_water);
-    sim.send(1, UseItemRequest { slot });
-    settle(&mut sim);
-    assert!(status::has(sim.world(), player, row("Poisoned")));
-    assert_eq!(stat::current_health(sim.world(), player), full);
+    use_item(&mut sim, player, "bog_water");
+    assert!(status::has(&sim.world, player, poisoned));
+    assert_eq!(stat::current_health(&sim.world, player), full);
 
-    later(&mut sim, 2.0);
-    assert_eq!(stat::current_health(sim.world(), player), full - 2.0);
-    later(&mut sim, 2.0);
-    assert_eq!(stat::current_health(sim.world(), player), full - 4.0);
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, player), full - 2.0);
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, player), full - 4.0);
 
-    later(&mut sim, 10.0);
-    assert!(!status::has(sim.world(), player, row("Poisoned")));
-    let bitten = stat::current_health(sim.world(), player);
-    later(&mut sim, 2.0);
-    assert_eq!(stat::current_health(sim.world(), player), bitten);
+    sim.later(10.0);
+    assert!(!status::has(&sim.world, player, poisoned));
+    let bitten = stat::current_health(&sim.world, player);
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, player), bitten);
 }
 
 #[test]
 fn worn_gear_boosts_only_while_it_is_worn() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let bare = {
-        sim.send(
-            1,
-            UnequipRequest {
-                slot: EquipmentSlot::Weapon,
-            },
-        );
-        settle(&mut sim);
-        stat::effective(sim.world(), player, StatKind::Damage)
-    };
+    let (mut sim, player) = clinic();
+    let bare = stat::effective(&sim.world, player, StatKind::Damage);
 
-    let sword: ItemId = row("IronSword");
-    give(&mut sim, player, sword, 1);
-    equipment::equip_held(sim.world(), player, sword).expect("the sword is worn");
-    settle(&mut sim);
+    sim.give(player, "blade", 1);
+    let blade = sim.id::<ItemDef>("blade");
+    equipment::equip_held(&mut sim.world, player, blade).expect("the blade is worn");
+    sim.run(0.5);
     assert_eq!(
-        stat::effective(sim.world(), player, StatKind::Damage),
+        stat::effective(&sim.world, player, StatKind::Damage),
         bare + 4.0
     );
 
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         UnequipRequest {
             slot: EquipmentSlot::Weapon,
         },
     );
-    settle(&mut sim);
-    assert_eq!(stat::effective(sim.world(), player, StatKind::Damage), bare);
+    sim.run(0.5);
+    assert_eq!(stat::effective(&sim.world, player, StatKind::Damage), bare);
 }
 
 #[test]
 fn a_carried_charm_boosts_only_while_it_is_carried() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let base = stat::effective(sim.world(), player, StatKind::MovementSpeed);
+    let (mut sim, player) = clinic();
+    let base = stat::effective(&sim.world, player, StatKind::MovementSpeed);
 
-    let wing: ItemId = row("BatWing");
-    give(&mut sim, player, wing, 1);
-    settle(&mut sim);
+    sim.give(player, "wing", 1);
+    sim.run(0.5);
     assert_eq!(
-        stat::effective(sim.world(), player, StatKind::MovementSpeed),
+        stat::effective(&sim.world, player, StatKind::MovementSpeed),
         base + 0.5
     );
 
-    sim.world()
+    let wing = sim.id::<ItemDef>("wing");
+    sim.world
         .get_mut::<Inventory>(player)
         .expect("bag")
         .set_count(wing, 0);
-    settle(&mut sim);
+    sim.run(0.5);
     assert_eq!(
-        stat::effective(sim.world(), player, StatKind::MovementSpeed),
+        stat::effective(&sim.world, player, StatKind::MovementSpeed),
         base
     );
 }
 
 #[test]
 fn a_passive_skill_holds_its_boost_while_known_and_cannot_be_cast_or_slotted() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let base = stat::max_health(sim.world(), player);
+    let (mut sim, player) = clinic();
+    let base = stat::max_health(&sim.world, player);
+    let toughness = sim.id::<SkillDef>("toughness");
 
     skill::learn::learn(
-        sim.world(),
+        &mut sim.world,
         player,
         &[(NodeKey::from("toughness"), Rank(1))],
     )
     .expect("toughness is learned");
-    settle(&mut sim);
-    assert_eq!(stat::max_health(sim.world(), player), base + 6.0);
+    sim.run(0.5);
+    assert_eq!(stat::max_health(&sim.world, player), base + 6.0);
 
     sim.forget_notified();
+    let conn = sim.conn(1);
     sim.send(
-        1,
+        conn,
         UseSkillRequest {
-            skill: row("Toughness"),
+            skill: toughness,
             aim: CastAim::Actor(player),
         },
     );
-    settle(&mut sim);
-    assert!(errors(&sim, 1).iter().any(|text| text.contains("passive")));
+    sim.run(0.5);
+    assert!(sim.errors(1).iter().any(|text| text.contains("passive")));
 
     sim.send(
-        1,
+        conn,
         AssignHotbarRequest {
             slot: HotbarSlot(8),
-            entry: HotbarEntry::Skill(row("Toughness")),
+            entry: HotbarEntry::Skill(toughness),
         },
     );
-    settle(&mut sim);
-    let hotbar = sim
-        .world()
-        .get::<Hotbar>(player)
-        .cloned()
-        .unwrap_or_default();
+    sim.run(0.5);
+    let hotbar = sim.world.get::<Hotbar>(player).cloned().unwrap_or_default();
     assert_eq!(hotbar.entry(HotbarSlot(8)), HotbarEntry::Empty);
 
-    skill::reset::reset(sim.world(), player);
-    settle(&mut sim);
-    assert_eq!(stat::max_health(sim.world(), player), base);
-}
-
-fn statuses(sim: &mut Sim, who: Entity) -> Statuses {
-    sim.world()
-        .get::<Statuses>(who)
-        .cloned()
-        .unwrap_or_default()
+    skill::reset::reset(&mut sim.world, player);
+    sim.run(0.5);
+    assert_eq!(stat::max_health(&sim.world, player), base);
 }
 
 #[test]
 fn a_status_plays_its_vfx_coming_staying_and_going() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
+    let (mut sim, player) = clinic();
+    let warded = sim.id::<StatusEffectDef>("warded");
 
-    status::apply(sim.world(), player, row("Warded"), 10.0, Some(Seconds(3.0)));
-    settle(&mut sim);
-    assert!(playing(&mut sim, "WardUp", player));
-    assert!(playing(&mut sim, "WardBubble", player));
+    status::apply(&mut sim.world, player, warded, 10.0, Some(Seconds(3.0)));
+    sim.run(0.5);
+    assert!(playing(&mut sim, "ward_up", player));
+    assert!(playing(&mut sim, "ward_bubble", player));
 
-    later(&mut sim, 1.6);
-    assert!(playing(&mut sim, "WardBubble", player));
-    assert!(!playing(&mut sim, "WardBreak", player));
+    sim.later(1.6);
+    assert!(playing(&mut sim, "ward_bubble", player));
+    assert!(!playing(&mut sim, "ward_break", player));
 
-    later(&mut sim, 1.5);
-    assert!(!status::has(sim.world(), player, row("Warded")));
-    assert!(playing(&mut sim, "WardBreak", player));
-    later(&mut sim, 2.0);
-    assert!(!playing(&mut sim, "WardBubble", player));
+    sim.later(1.5);
+    assert!(!status::has(&sim.world, player, warded));
+    assert!(playing(&mut sim, "ward_break", player));
+    sim.later(2.0);
+    assert!(!playing(&mut sim, "ward_bubble", player));
 }
 
 #[test]
 fn an_interval_status_can_heal_as_well_as_harm() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    let at = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(at, Tiles(2.0), Tiles(4.0));
-    let orc = target_dummy(&mut sim, row("Orc"), spot);
-    stat::apply_damage(sim.world(), orc, 20.0);
-    let hurt = stat::current_health(sim.world(), orc);
+    let (mut sim, player) = clinic();
+    let at = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
+    let dummy = dummy(&mut sim, at);
+    stat::apply_damage(&mut sim.world, dummy, 20.0);
+    let hurt = stat::current_health(&sim.world, dummy);
+    let sanctified = sim.id::<StatusEffectDef>("sanctified");
 
-    status::apply(sim.world(), orc, row("Sanctified"), 3.0, Some(Seconds(9.0)));
-    settle(&mut sim);
-    assert_eq!(stat::current_health(sim.world(), orc), hurt);
-    later(&mut sim, 2.0);
-    assert_eq!(stat::current_health(sim.world(), orc), hurt + 3.0);
-    later(&mut sim, 2.0);
-    assert_eq!(stat::current_health(sim.world(), orc), hurt + 6.0);
-}
-
-fn playing(sim: &mut Sim, vfx: &str, on: Entity) -> bool {
-    let wanted: VfxId = row(vfx);
-    let world = sim.world();
-    world
-        .query::<&VfxInstance>()
-        .iter(world)
-        .any(|instance| instance.vfx == wanted && instance.site == VfxSite::Actor(on))
+    status::apply(&mut sim.world, dummy, sanctified, 3.0, Some(Seconds(9.0)));
+    sim.run(0.5);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt);
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 3.0);
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 6.0);
 }
 
 #[test]
 fn an_area_skill_leaves_its_status_on_everyone_it_hit() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    sim.world().entity_mut(player).insert((
-        class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([(NodeKey::from("fireball"), Rank(1))])),
-    ));
-    let from = position(sim.world(), player).expect("position");
-    let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
-    let near = target_dummy(&mut sim, row("Orc"), aimed);
-    let beside = sim.walkable_toward(aimed, Offset::new(1.0, 0.0));
-    let far = target_dummy(&mut sim, row("Orc"), beside);
-    settle(&mut sim);
+    let (mut sim, player) = clinic();
+    knows_fireball(&mut sim, player);
+    let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
+    let near = dummy(&mut sim, aimed);
+    let far = dummy(&mut sim, aimed + Offset::new(1.0, 0.0));
+    sim.run(0.5);
+    let burning = sim.id::<StatusEffectDef>("burning");
 
-    sim.send(
-        1,
-        UseSkillRequest {
-            skill: row("Fireball"),
-            aim: CastAim::Point(aimed),
-        },
-    );
+    cast_fireball(&mut sim, aimed);
     assert!(sim.run_until(10.0, |world| {
-        status::has(world, near, row("Burning")) && status::has(world, far, row("Burning"))
+        status::has(world, near, burning) && status::has(world, far, burning)
     }));
-    settle(&mut sim);
-    assert!(playing(&mut sim, "Embers", near));
-    assert!(playing(&mut sim, "Embers", far));
+    sim.run(0.5);
+    assert!(playing(&mut sim, "embers", near));
+    assert!(playing(&mut sim, "embers", far));
 }
 
 #[test]
 fn an_area_skill_leaves_its_status_on_a_monster_running_its_own_script() {
-    let mut sim = Sim::area(spawn_area());
-    let player = sim.join(1);
-    settle(&mut sim);
-    sim.world().entity_mut(player).insert((
-        class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([(NodeKey::from("fireball"), Rank(1))])),
-    ));
-    let from = position(sim.world(), player).expect("position");
-    let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
-    let area = sim.world().resource::<engine::systems::WorldArea>().0;
-    let monster = engine::systems::npc::spawn(
-        sim.world(),
-        row("Orc"),
-        aimed,
-        area,
-        engine::systems::npc::Pack(7),
-    );
-    settle(&mut sim);
+    let (mut sim, player) = clinic();
+    knows_fireball(&mut sim, player);
+    let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
+    let area = sim.id::<AreaDef>("clinic");
+    let roamer = sim.id::<NpcDef>("roamer");
+    let monster = npc::spawn(&mut sim.world, roamer, aimed, area, Pack(7));
+    sim.run(0.5);
+    let burning = sim.id::<StatusEffectDef>("burning");
 
+    cast_fireball(&mut sim, aimed);
+    assert!(sim.run_until(10.0, |world| status::has(world, monster, burning)));
+    sim.run(0.5);
+    assert!(playing(&mut sim, "embers", monster));
+}
+
+fn clinic() -> (Sim, Entity) {
+    let content = Game::new()
+        .area("clinic", &Map::open(13, 9), json!([]))
+        .hero("clinic", 4.0, 4.0)
+        .edit("class", "hero", |hero| {
+            hero["tree"] = json!({
+                "toughness": { "skill": "toughness", "at": { "x": 0.0, "y": 0.0 } },
+                "fireball": { "skill": "fireball", "at": { "x": 80.0, "y": 0.0 } },
+            });
+        })
+        .row("status_effect", "guarded", effect("buff", json!({ "on_activate": "guard_up" }), boost_by_power()))
+        .row(
+            "status_effect",
+            "warded",
+            effect(
+                "buff",
+                json!({ "on_activate": "ward_up", "during": "ward_bubble", "on_expire": "ward_break" }),
+                boost_by_power(),
+            ),
+        )
+        .row(
+            "status_effect",
+            "poisoned",
+            effect("debuff", json!({ "during": "poison_bubbles" }), every(2.0, "damage")),
+        )
+        .row(
+            "status_effect",
+            "sanctified",
+            effect("buff", json!({ "during": "holy_motes" }), every(2.0, "heal")),
+        )
+        .row(
+            "status_effect",
+            "burning",
+            effect("debuff", json!({ "during": "embers" }), every(1.0, "damage")),
+        )
+        .asset("icons/status.png", testkit::png(1, 1))
+        .item(
+            "antidote",
+            usable(json!({
+                "drink": { "type": "items", "take": [{ "item": "antidote" }], "done": "cleanse" },
+                "cleanse": { "type": "remove_status", "category": "debuff" },
+            })),
+        )
+        .item(
+            "bog_water",
+            usable(json!({
+                "drink": { "type": "items", "take": [{ "item": "bog_water" }], "done": "sicken" },
+                "sicken": { "type": "apply_status", "effect": "poisoned", "power": 2.0, "seconds": 12.0 },
+            })),
+        )
+        .item(
+            "wing",
+            json!({
+                "kind": { "type": "resource" },
+                "modules": [{ "type": "stack", "max": 50 }, boosting("movement_speed", 0.5)],
+            }),
+        )
+        .item(
+            "blade",
+            json!({
+                "kind": { "type": "equipment", "slot": "weapon" },
+                "modules": [boosting("damage", 4.0)],
+            }),
+        )
+        .row(
+            "skill",
+            "toughness",
+            json!({
+                "name": "Toughness",
+                "icon": "icons/status.png",
+                "kind": "passive",
+                "target": "self",
+                "levels": [{ "cost": 1, "stats": { "power": 6.0 } }],
+                "modules": [{
+                    "type": "inline_script",
+                    "nodes": {
+                        "activated": { "type": "on", "event": "activated", "next": "harden" },
+                        "harden": {
+                            "type": "boost",
+                            "stat": "max_health",
+                            "by": { "type": "skill_stat", "skill": "toughness", "stat": "power" },
+                        },
+                    },
+                }],
+            }),
+        )
+        .row(
+            "skill",
+            "fireball",
+            json!({
+                "name": "Fireball",
+                "icon": "icons/status.png",
+                "target": "area_enemy",
+                "range": 6.0,
+                "area": { "type": "circle", "radius": 2.0 },
+                "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
+                "modules": [{
+                    "type": "inline_script",
+                    "nodes": {
+                        "used": { "type": "on", "event": "used", "next": "cast" },
+                        "cast": { "type": "animate", "action": "attack", "wait": "apex", "next": "burn" },
+                        "burn": {
+                            "type": "apply_status",
+                            "who": { "type": "skill_targets" },
+                            "effect": "burning",
+                            "power": 1.0,
+                            "seconds": 6.0,
+                        },
+                    },
+                }],
+            }),
+        )
+        .npc("dummy", 100.0, json!([]))
+        .npc(
+            "roamer",
+            100.0,
+            json!([{
+                "type": "inline_script",
+                "nodes": {
+                    "spawned": { "type": "on", "event": "started", "next": "hostile" },
+                    "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "rest" },
+                    "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
+                },
+            }]),
+        )
+        .vfx("guard_up")
+        .vfx("ward_up")
+        .vfx("ward_bubble")
+        .vfx("ward_break")
+        .vfx("poison_bubbles")
+        .vfx("holy_motes")
+        .vfx("embers")
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .vfx("healed")
+        .shader("heal_pop")
+        .shader("status_pop")
+        .vfx("defeated")
+        .sfx("ui_refuse")
+        .load();
+    let mut sim = Sim::new(content);
+    sim.serve("clinic")
+        .accept::<UseItemRequest>()
+        .accept::<UnequipRequest>()
+        .accept::<UseSkillRequest>()
+        .accept::<AssignHotbarRequest>()
+        .accept::<AssignBasicAttackRequest>()
+        .add((
+            (status::expire, status::aspect::settle, status::aspect::tick).chain(),
+            vfx::expire,
+            skill::casting::request,
+            skill::hotbar::requests,
+            item::use_item,
+            equipment::unequip,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((
+            script::query::take_tick_roster,
+            script::run_tick,
+            movement::advance,
+        ))
+        .add((stat::settle_health, combat::defeats, actor::settle));
+    script::spawn_stateless(&mut sim.world);
+    let player = sim.join(1);
+    sim.run(0.5);
+    (sim, player)
+}
+
+fn effect(category: &str, vfx: Value, nodes: Value) -> Value {
+    json!({
+        "name": "Effect",
+        "icon": "icons/status.png",
+        "category": category,
+        "description": "An effect.",
+        "vfx": vfx,
+        "modules": [{ "type": "inline_script", "nodes": nodes }],
+    })
+}
+
+fn boost_by_power() -> Value {
+    json!({
+        "activated": { "type": "on", "event": "activated", "next": "hold" },
+        "hold": { "type": "boost", "stat": "max_health", "by": { "type": "status_power" } },
+    })
+}
+
+fn every(seconds: f32, act: &str) -> Value {
+    json!({
+        "every": { "type": "on", "event": "interval", "seconds": seconds, "next": "act" },
+        "act": { "type": act, "by": { "type": "status_power" } },
+    })
+}
+
+fn usable(mut nodes: Value) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "drink" });
+    json!({
+        "kind": { "type": "usable" },
+        "modules": [{ "type": "stack", "max": 5 }, { "type": "inline_script", "nodes": nodes }],
+    })
+}
+
+fn boosting(stat: &str, by: f32) -> Value {
+    json!({
+        "type": "inline_script",
+        "nodes": {
+            "activated": { "type": "on", "event": "activated", "next": "boost" },
+            "boost": { "type": "boost", "stat": stat, "by": by },
+        },
+    })
+}
+
+fn use_item(sim: &mut Sim, player: Entity, key: &str) {
+    sim.give(player, key, 1);
+    let slot = sim.slot_of(player, key);
+    let conn = sim.conn(1);
+    sim.send(conn, UseItemRequest { slot });
+    sim.run(0.5);
+}
+
+fn knows_fireball(sim: &mut Sim, player: Entity) {
+    sim.world
+        .entity_mut(player)
+        .insert(skill::Learned(BTreeMap::from([(
+            NodeKey::from("fireball"),
+            Rank(1),
+        )])));
+}
+
+fn cast_fireball(sim: &mut Sim, at: Pos<Tiles>) {
+    let conn = sim.conn(1);
+    let fireball = sim.id::<SkillDef>("fireball");
     sim.send(
-        1,
+        conn,
         UseSkillRequest {
-            skill: row("Fireball"),
-            aim: CastAim::Point(aimed),
+            skill: fireball,
+            aim: CastAim::Point(at),
         },
     );
-    assert!(sim.run_until(10.0, |world| status::has(world, monster, row("Burning"))));
-    settle(&mut sim);
-    assert!(playing(&mut sim, "Embers", monster));
+}
+
+/// A hostile dummy that stands where it's put and never fights back.
+fn dummy(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
+    let area = sim.id::<AreaDef>("clinic");
+    let def = sim.id::<NpcDef>("dummy");
+    let dummy = npc::spawn(&mut sim.world, def, at, area, Pack(u32::MAX));
+    sim.world.entity_mut(dummy).insert(Attitude::Hostile);
+    sim.tick();
+    dummy
+}
+
+fn statuses(sim: &Sim, who: Entity) -> Statuses {
+    sim.world.get::<Statuses>(who).cloned().unwrap_or_default()
+}
+
+fn playing(sim: &mut Sim, vfx: &str, on: Entity) -> bool {
+    let wanted = sim.id::<VfxDef>(vfx);
+    sim.world
+        .query::<&VfxInstance>()
+        .iter(&sim.world)
+        .any(|instance| instance.vfx == wanted && instance.site == VfxSite::Actor(on))
 }
