@@ -759,7 +759,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
                         if !is_set {
                             ui.label(theme::muted("unset").size(13.0));
                         }
-                        if widgets::toggle(ui, &mut on).changed() {
+                        if ui.checkbox(&mut on, "").changed() {
                             changed = Some(ScriptValue::Bool(on));
                         }
                     }

@@ -201,7 +201,7 @@ fn arranged(map: &OpenWorldMap, options: &ArrangeOptions) -> WorldMapDef {
 
 fn toggle_row(ui: &mut Ui, on: &mut bool, label: &str, note: &str) {
     ui.horizontal(|ui| {
-        widgets::toggle(ui, on);
+        ui.checkbox(on, "");
         ui.label(RichText::new(label).size(13.0));
         if !note.is_empty() {
             ui.label(theme::faint(format!("· {note}")).size(12.0));

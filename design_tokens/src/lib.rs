@@ -10,19 +10,14 @@ pub mod raster;
 pub mod sheet;
 pub mod slip;
 
-use egui::epaint::Shadow;
-use egui::{Context, FontDefinitions, Margin, Stroke, Style, TextStyle};
+use egui::{Context, Margin, Stroke, Style, TextStyle};
 
 pub use face::{Face, TextRole};
 
 pub fn apply(ctx: &Context) {
-    ctx.set_fonts(fonts());
+    ctx.set_fonts(fonts::definitions());
     ctx.set_theme(egui::Theme::Light);
     ctx.all_styles_mut(style);
-}
-
-pub fn fonts() -> FontDefinitions {
-    fonts::definitions()
 }
 
 pub fn style(style: &mut Style) {
@@ -123,9 +118,3 @@ pub fn popup_style(style: &mut Style) {
         widget.expansion = 0.0;
     }
 }
-
-pub fn popup_frame() -> egui::Frame {
-    slip::frame()
-}
-
-pub const SLIP_SHADOW: Shadow = slip::SHADOW;

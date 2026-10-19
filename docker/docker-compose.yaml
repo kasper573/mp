@@ -45,7 +45,7 @@ services:
     profiles: ["prod", "test"]
     # Every player connection is one socket fd. A server built for thousands of concurrent players
     # must not inherit Docker's default 1024 nofile limit, or accept() fails with EMFILE near 1k
-    # clients — the very cap this transport was rebuilt to remove.
+    # clients.
     ulimits:
       nofile:
         soft: 1048576
@@ -96,7 +96,6 @@ services:
     image: postgres:16.15
     restart: always
     volumes:
-      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
       # A named volume (not a host bind) so each stack owns its data and `down -v` resets it.
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

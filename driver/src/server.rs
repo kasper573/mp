@@ -16,7 +16,8 @@ use engine::systems::script::Place;
 
 use crate::content::to_json;
 
-// The game server binary, run natively on fake auth, where an unsigned token names the account that signs in.
+/// The game server binary, run natively on fake auth, where an unsigned token names the account
+/// that signs in.
 pub struct Server {
     process: Child,
     binary: PathBuf,
@@ -63,7 +64,8 @@ impl Server {
         format!("ws://{LOCALHOST}:{}", self.ready.ws)
     }
 
-    // The account's next sign-in plays the test character, starting where it says or where it would.
+    /// The account's next sign-in plays the test character, starting where it says or where it
+    /// would.
     pub fn hand_over(&self, account: &str, character: &str, start: Option<Place>) {
         let request = TestCharacterRequest {
             test_character: character.to_owned(),
@@ -75,8 +77,8 @@ impl Server {
             .unwrap_or_else(|error| panic!("the game server refused {character}: {error}"));
     }
 
-    // A deploy: the same ports, so connected clients find the server again, on the content in `folder`.
-    // `while_down` runs while there is no server to find.
+    /// A deploy: the same ports, so connected clients find the server again, on the content in
+    /// `folder`. `while_down` runs while there is no server to find.
     pub fn restart_on(&mut self, folder: &Path, while_down: impl FnOnce()) {
         self.stop();
         while_down();

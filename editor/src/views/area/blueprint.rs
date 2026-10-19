@@ -344,7 +344,7 @@ fn matches_card(ui: &mut Ui, dialog: &mut MakeBlueprintDialog) {
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            widgets::toggle(ui, &mut dialog.take_matches);
+            ui.checkbox(&mut dialog.take_matches, "");
             ui.vertical(|ui| {
                 ui.label(theme::strong(format!(
                     "{} identical arrangement{} {where_}",

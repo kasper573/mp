@@ -1862,7 +1862,7 @@ pub fn make_shared_body(
                 .show(ui, |ui| {
                     for constant in &mut dialog.constants {
                         ui.horizontal(|ui| {
-                            widgets::toggle(ui, &mut constant.ticked);
+                            ui.checkbox(&mut constant.ticked, "");
                             ui.add_space(8.0);
                             ui.allocate_ui_with_layout(
                                 egui::vec2(300.0, 20.0),

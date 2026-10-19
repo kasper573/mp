@@ -9,6 +9,7 @@ engine = { path = "../engine" }
 bevy_ecs.workspace = true
 bevy_replicon = { workspace = true, features = ["server"] }
 bevy_time = { workspace = true, features = ["std"] }
+hound = "3.5"
 png = "0.18"
 serde_json.workspace = true
 strum.workspace = true

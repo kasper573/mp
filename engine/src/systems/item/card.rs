@@ -198,7 +198,7 @@ pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Re
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         icon(ui);
-        ui.label(card::bold(&def.name));
+        ui.label(face::bold(&def.name).size(TextRole::CardBody.size()));
         ui.label(
             TextRole::CardBody
                 .rich(def.target.describe())

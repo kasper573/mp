@@ -3,17 +3,6 @@ use axum::response::{IntoResponse, Response};
 
 pub use std::alloc::System as ServiceAllocator;
 
-#[macro_export]
-macro_rules! heap_profiling {
-    () => {
-        $crate::heap_profiling!($crate::ServiceAllocator, $crate::ServiceAllocator);
-    };
-    ($allocator:ty, $init:expr) => {
-        #[global_allocator]
-        static GLOBAL_ALLOCATOR: $allocator = $init;
-    };
-}
-
 pub enum CpuProfiler {}
 
 pub fn profiler(application: &str, enabled: bool, _sample_hz: u32) -> Option<CpuProfiler> {

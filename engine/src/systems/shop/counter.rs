@@ -20,6 +20,7 @@ use crate::systems::screen::ClientScreen;
 
 const COUNTER_WIDTH: f32 = 620.0;
 const COUNTER_HEIGHT: f32 = 400.0;
+const SHOP_PAGE_WIDTH: f32 = 290.0;
 const PAGE_GAP: f32 = 10.0;
 const HINT_ROOM: f32 = 24.0;
 const ICON: f32 = 24.0;
@@ -166,10 +167,10 @@ fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
     let room = ui.available_rect_before_wrap();
     let list = Rect::from_min_max(
         room.min,
-        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH - PAGE_GAP, room.max.y),
+        Pos2::new(room.max.x - SHOP_PAGE_WIDTH - PAGE_GAP, room.max.y),
     );
     let page = Rect::from_min_max(
-        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH, room.min.y),
+        Pos2::new(room.max.x - SHOP_PAGE_WIDTH, room.min.y),
         room.max,
     );
     ui.scope_builder(
@@ -266,7 +267,7 @@ fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui
 
 fn ware_card(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize, most: f32) {
     let look = CardLook {
-        width: card::SHOP_PAGE_WIDTH,
+        width: SHOP_PAGE_WIDTH,
         max_height: (most - BUTTON_GAP - controls::CONTROL_HEIGHT - card::MARGIN)
             .min(card::MAX_HEIGHT),
         art: card::ART_SHORT,

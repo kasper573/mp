@@ -99,15 +99,16 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     ui.spacing_mut().slider_width = SLIDER_WIDTH;
     sheet::section(ui, "Interface");
     let mut snapping = settings.snapping_enabled();
-    if controls::checkbox(ui, &mut snapping, "UI snapping").changed() {
+    if ui.checkbox(&mut snapping, "UI snapping").changed() {
         settings.toggle_snapping();
     }
     let mut frame_rate = settings.frame_rate_shown();
-    if controls::checkbox(ui, &mut frame_rate, "Show FPS").changed() {
+    if ui.checkbox(&mut frame_rate, "Show FPS").changed() {
         settings.toggle_frame_rate();
     }
     let mut quick_cast = settings.quick_cast();
-    if controls::checkbox(ui, &mut quick_cast, "Quick cast skills")
+    if ui
+        .checkbox(&mut quick_cast, "Quick cast skills")
         .on_hover_text("A skill is cast the moment it is used, at what the pointer rests on")
         .changed()
     {

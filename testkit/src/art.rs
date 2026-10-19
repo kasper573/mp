@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 /// A PNG of `width` × `height` transparent pixels: an image a row can name, the right size and no
 /// more.
 pub fn png(width: u32, height: u32) -> Vec<u8> {
@@ -16,21 +18,18 @@ pub fn png(width: u32, height: u32) -> Vec<u8> {
 /// A WAV of a moment of silence.
 pub fn wav() -> Vec<u8> {
     const RATE: u32 = 8000;
-    const SAMPLES: u32 = 8;
-    let data = SAMPLES * 2;
-    let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"RIFF");
-    bytes.extend_from_slice(&(36 + data).to_le_bytes());
-    bytes.extend_from_slice(b"WAVEfmt ");
-    bytes.extend_from_slice(&16u32.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&RATE.to_le_bytes());
-    bytes.extend_from_slice(&(RATE * 2).to_le_bytes());
-    bytes.extend_from_slice(&2u16.to_le_bytes());
-    bytes.extend_from_slice(&16u16.to_le_bytes());
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&data.to_le_bytes());
-    bytes.extend(std::iter::repeat_n(0u8, data as usize));
-    bytes
+    const SAMPLES: usize = 8;
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: RATE,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut bytes = Cursor::new(Vec::new());
+    let mut writer = hound::WavWriter::new(&mut bytes, spec).expect("a wav header");
+    for _ in 0..SAMPLES {
+        writer.write_sample(0i16).expect("a wav sample");
+    }
+    writer.finalize().expect("a wav");
+    bytes.into_inner()
 }

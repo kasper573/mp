@@ -4,9 +4,10 @@ use std::time::Duration;
 use engine::systems::launch;
 use engine::systems::script::Place;
 use serde_json::Value;
+use walkdir::WalkDir;
 
 use crate::content;
-use crate::desktop::{Desktop, SCREEN, WaitBudget};
+use crate::desktop::{Desktop, WaitBudget};
 use crate::player::{Pace, Player};
 use crate::seen::in_world;
 use crate::server::Server;
@@ -14,21 +15,21 @@ use crate::server::Server;
 pub struct PlaytestSetup {
     pub server_binary: PathBuf,
     pub client_binary: PathBuf,
-    // The content the server starts on, and that the driver reads names and places from.
+    /// The content the server starts on, and that the driver reads names and places from.
     pub content: PathBuf,
-    // Where the playtest keeps what it leaves behind: logs, recordings and profiles.
+    /// Where the playtest keeps what it leaves behind: logs, recordings and profiles.
     pub folder: PathBuf,
     pub pace: Pace,
-    // Without one, the server draws its own and logs it.
+    /// Without one, the server draws its own and logs it.
     pub seed: Option<u64>,
     pub recorded: bool,
 }
 
-// A content file, and how a deploy changes it.
+/// A content file, and how a deploy changes it.
 pub type ContentEdit<'a> = (&'a str, &'a dyn Fn(&mut Value));
 
-// One game server and the players who join it. What they leave behind is kept should anything
-// fail, and cleared otherwise.
+/// One game server and the players who join it. What they leave behind is kept should anything
+/// fail, and cleared otherwise.
 pub struct Playtest {
     server: Server,
     client_binary: PathBuf,
@@ -42,7 +43,8 @@ pub struct Playtest {
 impl Playtest {
     pub fn start(setup: PlaytestSetup) -> Playtest {
         content::load(&setup.content);
-        // What an earlier playtest left behind there, its players' profiles among it, plays no part.
+        // What an earlier playtest left behind there, its players' profiles among it, plays no
+        // part.
         if setup.folder.exists() {
             std::fs::remove_dir_all(&setup.folder).expect("the earlier playtest's folder cleared");
         }
@@ -64,29 +66,29 @@ impl Playtest {
         }
     }
 
-    // A player whose first sign-in plays the test character, starting at `start` or where the
-    // character would.
+    /// A player whose first sign-in plays the test character, starting at `start` or where the
+    /// character would.
     pub fn join_as(&mut self, character: &str, start: Option<Place>) -> Player {
         let account = self.next_account();
         self.server.hand_over(&account, character, start);
-        self.enter_world(&account, SCREEN)
+        self.enter_world(&account)
     }
 
-    // A player new to the game, on a character of their own.
+    /// A player new to the game, on a character of their own.
     pub fn join_fresh(&mut self) -> Player {
         let account = self.next_account();
-        self.enter_world(&account, SCREEN)
+        self.enter_world(&account)
     }
 
-    // A desktop client started without a sign-in, on the screen that asks for one.
+    /// A desktop client started without a sign-in, on the screen that asks for one.
     pub fn start_signed_out(&mut self) -> Player {
         let account = self.next_account();
-        self.start_client(&account, None, SCREEN)
+        self.start_client(&account, None)
     }
 
-    // A content deploy: rows of the content change and the server restarts on them, as a deploy does,
-    // running `while_down` in between. Clients reconnect, sync the changed files and rejoin. Returns
-    // how many files changed.
+    /// A content deploy: rows of the content change and the server restarts on them, as a deploy
+    /// does, running `while_down` in between. Clients reconnect, sync the changed files and rejoin.
+    /// Returns how many files changed.
     pub fn deploy(&mut self, edits: &[ContentEdit], while_down: impl FnOnce()) -> usize {
         let deployed = self.folder.join("deployed");
         if !deployed.exists() {
@@ -109,23 +111,22 @@ impl Playtest {
         format!("player{}", self.joined)
     }
 
-    fn enter_world(&mut self, account: &str, screen: (u32, u32)) -> Player {
+    fn enter_world(&mut self, account: &str) -> Player {
         let token = launch::fake_token(account);
-        let mut player = self.start_client(account, Some(token), screen);
+        let mut player = self.start_client(account, Some(token));
         player.wait_within("the player to stand in the world", JOINING, |snapshot| {
             in_world(snapshot).then_some(())
         });
         player
     }
 
-    fn start_client(&mut self, account: &str, token: Option<String>, screen: (u32, u32)) -> Player {
+    fn start_client(&mut self, account: &str, token: Option<String>) -> Player {
         let desktop = Desktop::start(
             &self.server,
             &self.client_binary,
             token,
             &self.folder.join(account),
             self.recorded,
-            screen,
         );
         let mut player = Player::new(desktop, self.pace);
         player.snapshot();
@@ -157,12 +158,16 @@ const JOINING: WaitBudget = WaitBudget {
 };
 
 fn copy_folder(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).expect("a folder to copy into");
-    for entry in std::fs::read_dir(from).expect("a folder to copy") {
+    for entry in WalkDir::new(from).follow_links(true) {
         let entry = entry.expect("a folder entry");
-        let target = to.join(entry.file_name());
-        if entry.file_type().expect("an entry's type").is_dir() {
-            copy_folder(&entry.path(), &target);
+        let target = to.join(
+            entry
+                .path()
+                .strip_prefix(from)
+                .expect("an entry within the folder"),
+        );
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&target).expect("a folder to copy into");
         } else {
             std::fs::copy(entry.path(), &target).expect("a copied file");
         }

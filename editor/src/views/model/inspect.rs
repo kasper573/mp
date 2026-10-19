@@ -198,7 +198,7 @@ fn frame_card(
         });
         widgets::kv(ui, "apex", |ui| {
             let mut on = frame.apex;
-            if widgets::toggle(ui, &mut on).changed() {
+            if ui.checkbox(&mut on, "").changed() {
                 changed.apex = on;
                 label = Some(if on {
                     format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
@@ -243,7 +243,7 @@ fn frame_card(
         });
         widgets::kv(ui, "step", |ui| {
             let mut on = frame.step;
-            if widgets::toggle(ui, &mut on).changed() {
+            if ui.checkbox(&mut on, "").changed() {
                 changed.step = on;
                 label = Some(if on {
                     format!("Step on frame {} of {} of {key}", index + 1, strip.name())

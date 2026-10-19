@@ -53,11 +53,13 @@ To see the game in action without playing it, record its showcase chapters
 ([`showcase/src/chapters/`](showcase/src/chapters)):
 
 ```sh
-just showcase combat travel   # some chapters: target/showcase/03-combat.mp4, target/showcase/06-travel.mp4
+just showcase combat travel   # one video per chapter: target/showcase/NN-<chapter>.mp4
 just showcase                 # all of them, stitched: target/showcase/showcase.mp4
 ```
 
-The website lives at <https://rift.localhost> and Grafana at <https://grafana.rift.localhost>.
+The website lives at <https://rift.lan> and Grafana at <https://grafana.rift.lan>. Point `rift.lan` and its
+subdomains (`auth.`, `game-server.`, `grafana.`) at 127.0.0.1 in your hosts file, and trust Caddy's local root
+certificate to get past the browser's warning.
 
 ## Tests
 
@@ -96,12 +98,14 @@ the editor maps it onto the row, keeps the cues and tile data that still fit, an
 for changes.
 
 A content deploy needs no client build: the server restarts on the new folder, and players reconnect,
-sync the changed files and rejoin. The game server's image carries the example game at `/content`;
-another game runs on the same image with its own folder mounted there instead.
+sync the changed files and rejoin. The game server's image carries no game. Each stack mounts a game
+folder at `/content`: the test stack the example game, production the content folder its deploy syncs.
+Another game runs on the same image with its own folder mounted there.
 
 ## Release and deploy
 
 Pushing to `main` builds the wasm client and stack images, and deploys them to production. The
 website serves the wasm at `/play`; the game server serves the content folder, which the client
-syncs at boot and keeps on the device. The same push builds the archive for Linux, Windows and macOS
-(`just archive` on each) and attaches it to the workflow run.
+syncs at boot and keeps on the device. The same push builds the downloads for Linux, Windows and macOS
+(`just release-files` on each). On `main` they're published as one GitHub release per platform, which
+the website's downloads page links to.

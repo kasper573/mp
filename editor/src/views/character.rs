@@ -1463,7 +1463,7 @@ fn memories(
                 match ty.as_str() {
                     "boolean" => {
                         let mut on = entry.and_then(|m| m["value"].as_bool()).unwrap_or(false);
-                        if widgets::toggle(ui, &mut on).changed() {
+                        if ui.checkbox(&mut on, "").changed() {
                             updates.push((key.clone(), Some(Value::Bool(on))));
                         }
                     }

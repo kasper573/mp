@@ -25,6 +25,7 @@ use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
+const QUESTS_PAGE_WIDTH: f32 = 320.0;
 const LIST_WIDTH: f32 = 250.0;
 const ROW_ICON: f32 = 20.0;
 const DETAIL_PADDING: f32 = 10.0;
@@ -352,7 +353,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     let trackable = page.log.trackable(&content, quest);
     let footer = if trackable { FOOTER } else { 0.0 };
     let look = QuestCardLook {
-        width: card::QUESTS_PAGE_WIDTH.min(ui.available_width()),
+        width: QUESTS_PAGE_WIDTH.min(ui.available_width()),
         max_height: (ui.available_height() - footer).max(card::KIND_BAND),
         moment: None,
     };
@@ -435,7 +436,14 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
             ),
             QuestResult::Failed => ("Failed".to_owned(), ink::RUBRIC),
         };
-        ui.add(Label::new(card::bold(&outcome).color(color)).wrap());
+        ui.add(
+            Label::new(
+                face::bold(&outcome)
+                    .size(TextRole::CardBody.size())
+                    .color(color),
+            )
+            .wrap(),
+        );
     }
 }
 
@@ -444,7 +452,11 @@ fn timer(ui: &mut Ui, content: &Content, page: &Page, quest: QuestId) {
         let left = Countdown::LeftDetail
             .label(&page.log, quest, page.now)
             .unwrap_or_default();
-        ui.label(card::bold(&left).color(ink::OCHRE));
+        ui.label(
+            face::bold(&left)
+                .size(TextRole::CardBody.size())
+                .color(ink::OCHRE),
+        );
         let (rect, _) = ui.allocate_exact_size(TIMER_BAR, Sense::hover());
         let share = time_left(content, &page.log, quest, page.now);
         let y = rect.center().y;
@@ -463,7 +475,7 @@ fn footer_row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     ui.horizontal(|ui| {
         let tracked = page.log.tracked.contains(&quest);
         let mut track = tracked;
-        if controls::checkbox(ui, &mut track, "Track on HUD").changed() {
+        if ui.checkbox(&mut track, "Track on HUD").changed() {
             world.write_message(QuestRequest::Track {
                 quest,
                 tracked: track,

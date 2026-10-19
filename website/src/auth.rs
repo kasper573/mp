@@ -159,17 +159,10 @@ impl Auth {
             .expect("post-logout url");
         let auth = Auth {
             client_id: config.audience,
-            auth_url: AuthUrl::new(format!(
-                "{}/protocol/openid-connect/auth",
-                config.issuer.as_str()
-            ))
-            .expect("auth url"),
+            auth_url: AuthUrl::new(openid_endpoint(&config.issuer, "auth")).expect("auth url"),
             token_url: config.token_uri,
-            end_session_url: EndSessionUrl::new(format!(
-                "{}/protocol/openid-connect/logout",
-                config.issuer.as_str()
-            ))
-            .expect("end-session url"),
+            end_session_url: EndSessionUrl::new(openid_endpoint(&config.issuer, "logout"))
+                .expect("end-session url"),
             jwks_url: config.jwks_uri,
             jwks: RwLock::new(CoreJsonWebKeySet::new(Vec::new())),
             last_jwks_fetch: Mutex::new(None),
@@ -281,6 +274,10 @@ type RiftClient =
 
 fn accept_nonce(_: Option<&Nonce>) -> Result<(), String> {
     Ok(())
+}
+
+fn openid_endpoint(issuer: &IssuerUrl, endpoint: &str) -> String {
+    format!("{}/protocol/openid-connect/{endpoint}", issuer.as_str())
 }
 
 fn cookie(name: &'static str, value: &str) -> Cookie<'static> {

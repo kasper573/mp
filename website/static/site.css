@@ -239,16 +239,8 @@ button.subtle:hover {
 }
 
 .downloads code,
-.downloads pre,
-.downloads kbd {
+.downloads pre {
   font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.downloads kbd {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
 }
 
 .downloads pre {
