@@ -35,12 +35,13 @@ pub enum TabOpening {
     Kept,
 }
 
-/// What a tab's context menu asked to close, done once the dock is no longer being drawn.
+/// What a tab asked of the dock while the dock was being drawn, done once it no longer is.
 #[derive(Clone, Debug, PartialEq)]
-pub enum CloseTabs {
-    All,
-    Others(EditorTab),
-    ToTheRight(EditorTab),
+pub enum DockRequest {
+    CloseAll,
+    CloseOthers(EditorTab),
+    CloseToTheRight(EditorTab),
+    Focus(EditorTab),
 }
 
 impl EditorTab {
@@ -175,6 +176,28 @@ pub(crate) fn place(
         }
     }
     dock.push_to_focused_leaf(tab);
+}
+
+pub(crate) fn serve(dock: &mut DockState<EditorTab>, request: DockRequest) {
+    match request {
+        DockRequest::CloseAll => dock.retain_tabs(|_| false),
+        DockRequest::CloseOthers(kept) => dock.retain_tabs(|tab| *tab == kept),
+        DockRequest::CloseToTheRight(from) => {
+            let Some(path) = dock.find_tab(&from) else {
+                return;
+            };
+            let Ok(leaf) = dock.leaf_mut(path.node_path()) else {
+                return;
+            };
+            leaf.tabs.truncate(path.tab.0 + 1);
+            leaf.active = path.tab;
+        }
+        DockRequest::Focus(tab) => {
+            if let Some(path) = dock.find_tab(&tab) {
+                dock.set_focused_node_and_surface(path.node_path());
+            }
+        }
+    }
 }
 
 fn holds_row(table: &str, key: &str, file: &str) -> bool {

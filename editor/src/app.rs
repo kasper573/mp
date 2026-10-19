@@ -32,7 +32,7 @@ use crate::project::{
 use crate::rows;
 use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
-use crate::tabs::{self, CloseTabs, EditorTab, TabOpening};
+use crate::tabs::{self, DockRequest, EditorTab, TabOpening};
 use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
@@ -126,7 +126,7 @@ pub struct Editor {
     pub start: StartScreen,
     pub open_tabs: Vec<(EditorTab, TabOpening)>,
     pub preview: Option<EditorTab>,
-    pub close_tabs: Option<CloseTabs>,
+    pub dock_requests: Vec<DockRequest>,
     pub scene: Option<Vec<SceneStep>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
@@ -397,7 +397,7 @@ impl Editor {
             start: StartScreen::default(),
             open_tabs: Vec::new(),
             preview: None,
-            close_tabs: None,
+            dock_requests: Vec::new(),
             scene: None,
             clipboard: None,
             views: EditorViews::default(),
@@ -690,6 +690,12 @@ impl Editor {
     pub fn place_tabs(&mut self) {
         for (tab, opening) in mem::take(&mut self.open_tabs) {
             tabs::place(&mut self.dock, &mut self.preview, tab, opening);
+        }
+    }
+
+    pub fn serve_dock_requests(&mut self) {
+        for request in mem::take(&mut self.dock_requests) {
+            tabs::serve(&mut self.dock, request);
         }
     }
 

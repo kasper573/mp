@@ -3,9 +3,10 @@ use std::sync::Arc;
 use editor::app::Editor;
 use editor::project::{ContentEdit, Project};
 use editor::schema::SchemaShapes;
-use editor::tabs::EditorTab;
+use editor::tabs::{DockRequest, EditorTab};
 use editor::ui;
 use editor::user::{EditorSettings, UserFolder};
+use egui_dock::NodeIndex;
 use engine::core::content::{ContentRow, row_file};
 use engine::systems::area::AreaDef;
 
@@ -115,6 +116,22 @@ fn editing_what_a_preview_shows_keeps_it() {
             EditorTab::Game
         ]
     );
+}
+
+#[test]
+fn a_tab_asking_for_focus_takes_it_from_the_other_side_of_a_split() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = editor(&scratch);
+    keep(&mut editor, item("a"));
+    let surface = editor.dock.main_surface_mut();
+    let [left, _] = surface.split_right(NodeIndex::root(), 0.5, vec![item("b")]);
+    surface.set_focused_node(left);
+    assert_eq!(ui::active_tab(&editor), Some(item("a")));
+
+    editor.dock_requests.push(DockRequest::Focus(item("b")));
+    editor.serve_dock_requests();
+
+    assert_eq!(ui::active_tab(&editor), Some(item("b")));
 }
 
 fn editor(scratch: &tempfile::TempDir) -> Editor {

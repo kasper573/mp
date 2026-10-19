@@ -20,6 +20,7 @@ use std::time::Duration;
 use design_tokens::controls::{self, Pill};
 use design_tokens::face::{self, TextRole};
 use design_tokens::{ink, sheet, slip};
+use egui::text::{LayoutJob, TextFormat};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
 use engine::core::content::{ContentRow, LoadReport, row_file};
@@ -30,7 +31,7 @@ use engine::systems::player::snapshot::CharacterSnapshot;
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::{self, EditRefusal};
-use crate::tabs::{CloseTabs, EditorTab};
+use crate::tabs::{DockRequest, EditorTab};
 use crate::views::script::{self, ScriptKeys};
 use crate::views::{self, area, character, class, model, spreadsheet, tileset, vfx, world};
 use crate::{import, play};
@@ -358,30 +359,8 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                 .show_leaf_collapse_buttons(false)
                 .show_inside(ui, &mut viewer);
         });
-    if let Some(request) = editor.close_tabs.take() {
-        close_tabs(&mut dock, request);
-    }
     editor.dock = dock;
-}
-
-fn close_tabs(dock: &mut DockState<EditorTab>, request: CloseTabs) {
-    match request {
-        CloseTabs::All => dock.retain_tabs(|_| false),
-        CloseTabs::Others(kept) => dock.retain_tabs(|tab| *tab == kept),
-        CloseTabs::ToTheRight(from) => {
-            let Some(path) = dock.find_tab(&from) else {
-                return;
-            };
-            let Ok(leaf) = dock.leaf_mut(egui_dock::NodePath {
-                surface: path.surface,
-                node: path.node,
-            }) else {
-                return;
-            };
-            leaf.tabs.truncate(path.tab.0 + 1);
-            leaf.active = path.tab;
-        }
-    }
+    editor.serve_dock_requests();
 }
 
 fn empty_centre(ui: &mut egui::Ui) {
@@ -549,7 +528,12 @@ impl TabViewer for Viewer<'_> {
             .as_ref()
             .zip(tab.row())
             .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
-        let mut job = TextRole::Tab.job(&title, egui::Color32::PLACEHOLDER);
+        let mut job = LayoutJob::default();
+        let format = TextFormat {
+            italics: self.editor.preview.as_ref() == Some(tab),
+            ..TextRole::Tab.format(egui::Color32::PLACEHOLDER)
+        };
+        job.append(&title, 0.0, format);
         if unsaved {
             job.append(" \u{2022}", 0.0, TextRole::Tab.format(ink::OCHRE));
         }
@@ -611,15 +595,19 @@ impl TabViewer for Viewer<'_> {
 
     fn context_menu(&mut self, ui: &mut egui::Ui, tab: &mut EditorTab, _: egui_dock::NodePath) {
         if ui.button("Close all").clicked() {
-            self.editor.close_tabs = Some(CloseTabs::All);
+            self.editor.dock_requests.push(DockRequest::CloseAll);
             ui.close();
         }
         if ui.button("Close other tabs").clicked() {
-            self.editor.close_tabs = Some(CloseTabs::Others(tab.clone()));
+            self.editor
+                .dock_requests
+                .push(DockRequest::CloseOthers(tab.clone()));
             ui.close();
         }
         if ui.button("Close tabs to the right").clicked() {
-            self.editor.close_tabs = Some(CloseTabs::ToTheRight(tab.clone()));
+            self.editor
+                .dock_requests
+                .push(DockRequest::CloseToTheRight(tab.clone()));
             ui.close();
         }
     }

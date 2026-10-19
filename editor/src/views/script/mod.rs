@@ -23,7 +23,7 @@ use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, Project, RowSelection, catalogue_of};
-use crate::tabs::EditorTab;
+use crate::tabs::{DockRequest, EditorTab};
 use crate::thumbs;
 use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
@@ -594,11 +594,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
             }
         }
     }
-    if ui.input(|i| i.pointer.any_pressed())
-        && ui.rect_contains_pointer(ui.max_rect())
-        && let Some(path) = editor.dock.find_tab(&EditorTab::Script(owner.clone()))
-    {
-        editor.dock.main_surface_mut().set_focused_node(path.node);
+    if ui.input(|i| i.pointer.any_pressed()) && ui.rect_contains_pointer(ui.max_rect()) {
+        editor
+            .dock_requests
+            .push(DockRequest::Focus(EditorTab::Script(owner.clone())));
     }
     sync_with_content(editor);
     sync_graph(editor, &doc);
