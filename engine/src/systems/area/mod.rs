@@ -23,7 +23,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::{
@@ -304,8 +304,7 @@ pub struct SoundscapeDef {
 #[serde(deny_unknown_fields)]
 pub struct SoundChannel {
     pub channel: u32,
-    #[schemars(extend("x-asset" = "audio"))]
-    pub file: AssetRef,
+    pub file: AudioRef,
     #[schemars(extend("default" = serial::one_f32()))]
     #[serde(
         default = "serial::one_f32",

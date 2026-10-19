@@ -1,7 +1,6 @@
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::Content;
-use engine::core::content::ContentRow;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
@@ -12,7 +11,6 @@ use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
-use engine::core::content::row_file;
 
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
@@ -118,7 +116,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             play = widgets::chip(ui, "▶").clicked();
             let mut picked = footstep.clone();
             let changed = row_form::with_row_form(editor, SurfaceDef::TABLE, surface, |cx| {
-                picker::row(ui, cx, "sfx", &mut picked, "/footstep")
+                picker::row(ui, cx, SfxDef::TABLE, &mut picked, "/footstep")
             });
             if changed && !picked.is_empty() && picked != footstep {
                 new_footstep = Some(picked);

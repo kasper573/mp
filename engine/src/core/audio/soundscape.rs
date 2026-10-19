@@ -6,7 +6,7 @@ use bevy_kira_audio::prelude::{Audio, AudioControl, AudioInstance, AudioSource, 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::decibels;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::playback::{Listener, PositionalAudio};
@@ -69,7 +69,7 @@ pub struct SoundscapeChannel(pub u32);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeLayer {
-    pub src: AssetRef,
+    pub src: AudioRef,
     pub volume: f32,
     pub pan: f32,
     pub category: AudioCategory,
@@ -78,7 +78,7 @@ pub struct SoundscapeLayer {
 #[derive(Resource, Default)]
 pub struct SoundscapeMixer {
     clock_start: Duration,
-    sources: HashMap<AssetRef, Handle<AudioSource>>,
+    sources: HashMap<AudioRef, Handle<AudioSource>>,
     voices: Vec<SoundscapeVoice>,
     refused: Option<Vec<WantedLayer>>,
 }
@@ -86,7 +86,7 @@ pub struct SoundscapeMixer {
 pub struct SoundscapeVoice {
     pub channel: SoundscapeChannel,
     pub category: AudioCategory,
-    pub src: AssetRef,
+    pub src: AudioRef,
     instance: Handle<AudioInstance>,
     share: f32,
     volume: f32,
@@ -169,7 +169,7 @@ impl SoundscapeVoice {
 struct WantedLayer {
     channel: SoundscapeChannel,
     category: AudioCategory,
-    src: AssetRef,
+    src: AudioRef,
     share: f32,
     volume: f32,
     pan: f32,

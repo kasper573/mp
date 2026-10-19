@@ -11,13 +11,13 @@ use crate::drafts;
 use crate::keymap::EditorKey;
 use crate::project::{Project, ProjectFiles};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
-use crate::ui::assets::AssetKind;
 use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
 use crate::views::vfx;
 use crate::{audio, condition, picker, spans, thumbs, value};
+use engine::core::assets::AssetKind;
 use engine::core::content::row_file;
 
 pub const KEPT_TIP: &str = "Kept: the engine reads this from every game, so it stays as it is";
@@ -1519,12 +1519,14 @@ fn asset(
     value: &mut Value,
     path: &str,
 ) -> FormChange {
-    let kinds: Vec<AssetKind> = schema["x-asset"]
+    let Some(kind) = schema["x-asset"]
         .as_str()
-        .and_then(AssetKind::named)
-        .map_or_else(|| AssetKind::ALL.to_vec(), |kind| vec![kind]);
+        .and_then(|kind| kind.parse::<AssetKind>().ok())
+    else {
+        return FormChange::default();
+    };
     let mut file = value.as_str().unwrap_or_default().to_owned();
-    if picker::asset_of(ui, cx, &kinds, &mut file, path) {
+    if picker::asset_of(ui, cx, kind, &mut file, path) {
         *value = Value::String(file);
         return FormChange::at(path);
     }

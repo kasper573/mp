@@ -14,10 +14,10 @@ use strum::VariantArray;
 use super::{TABLE, node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
 use crate::{picker, rows, thumbs};
+use engine::core::assets::AssetKind;
 
 pub const NODE_RADIUS: f32 = 24.0;
 const ICON: f32 = 28.0;
@@ -219,7 +219,7 @@ fn backdrop_bar(
             ui.label(theme::muted("backdrop").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(260.0);
-                picker::asset_of(ui, cx, &[AssetKind::Image], &mut image, "/backdrop/image");
+                picker::asset_of(ui, cx, AssetKind::Image, &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
                 widgets::combo_box(ui.id().with("backdrop-fit"))

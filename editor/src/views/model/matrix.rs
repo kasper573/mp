@@ -1,12 +1,11 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
-use engine::core::content::ContentRow;
-use engine::systems::actor::ModelDef;
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::Direction;
-use engine::systems::actor::Action;
+use engine::systems::actor::{Action, ModelDef};
 use serde_json::Value;
 use strum::VariantArray;
 

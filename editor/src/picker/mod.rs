@@ -15,8 +15,9 @@ pub use self::rows::{PictureFrame, RowSource, picture_of};
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
 use crate::keymap::EditorKey;
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
+use engine::core::assets::AssetKind;
+use engine::core::content::asset_file;
 
 /// What a picker field holds: a key within a category (a row's key within its table, a file's
 /// path within its kind).
@@ -51,7 +52,7 @@ impl Dragged {
     pub fn label(&self) -> String {
         match self {
             Dragged::Row { table, key } => format!("{table}/{key}"),
-            Dragged::Asset(path) => format!("assets/{path}"),
+            Dragged::Asset(path) => asset_file(path),
         }
     }
 }
@@ -153,15 +154,12 @@ pub fn row_among(
 pub fn asset_of(
     ui: &mut Ui,
     cx: &mut FormCx,
-    kinds: &[AssetKind],
+    kind: AssetKind,
     file: &mut String,
     path: &str,
 ) -> bool {
-    let mut pick = Pick::new(
-        assets::kind_of(file).map(AssetKind::id).unwrap_or_default(),
-        file.as_str(),
-    );
-    let changed = field(ui, cx, &AssetSource::of(kinds), &mut pick, path);
+    let mut pick = Pick::new(<&str>::from(kind), file.as_str());
+    let changed = field(ui, cx, &AssetSource::of(kind), &mut pick, path);
     if changed {
         *file = pick.key;
     }
@@ -354,7 +352,7 @@ fn popover(
                 );
                 widgets::default_focus(ui, &response);
                 if response.changed() {
-                    set_draft(ui, search_id, &search.clone());
+                    set_draft(ui, search_id, &search);
                     highlight = 0;
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

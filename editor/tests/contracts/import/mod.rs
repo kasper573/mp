@@ -264,9 +264,11 @@ fn importing_again_asks_before_replacing_lengths_edited_here() {
     let attack = plan.strips.iter().find(|s| s.name == "attack_s").unwrap();
     let retimed = attack.retimed.as_ref().expect("asks which lengths win");
     assert_eq!(retimed.here[4], 90);
-    assert_eq!(retimed.export[4], 60);
     assert!(retimed.keep_here);
     assert_eq!(attack.final_lengths()[4], 90);
+    let mut export_wins = attack.clone();
+    export_wins.retimed.as_mut().unwrap().keep_here = false;
+    assert_eq!(export_wins.final_lengths()[4], 60);
     let untouched = plan.strips.iter().find(|s| s.name == "walk_s").unwrap();
     assert!(untouched.retimed.is_none());
     let same = model::plan(

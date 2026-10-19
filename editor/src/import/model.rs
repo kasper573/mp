@@ -58,7 +58,6 @@ pub struct StripPlan {
 pub struct StripRetiming {
     pub here: Vec<u32>,
     pub recorded: Vec<u32>,
-    pub export: Vec<u32>,
     pub keep_here: bool,
 }
 
@@ -447,7 +446,6 @@ pub fn plan(
             .map(|recorded| StripRetiming {
                 here: model::lengths(&before),
                 recorded: recorded.clone(),
-                export: lengths.clone(),
                 keep_here: true,
             });
         let origins = new_hashes

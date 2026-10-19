@@ -13,7 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -32,7 +32,7 @@ pub fn register(app: &mut App) {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct StatusEffectDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     pub category: StatusCategory,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,

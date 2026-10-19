@@ -3,7 +3,7 @@ use design_tokens::face::TextRole;
 use design_tokens::{controls, ink, sheet};
 use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
@@ -93,7 +93,7 @@ impl HudWindow for InventoryWindow {
 }
 
 pub(crate) struct SlotLook<'a> {
-    pub icon: Option<&'a AssetRef>,
+    pub icon: Option<&'a ImageRef>,
     pub count: u32,
     pub wanted: bool,
     pub faded: bool,

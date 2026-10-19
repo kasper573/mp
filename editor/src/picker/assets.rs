@@ -1,29 +1,24 @@
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
+use engine::core::assets::AssetKind;
+use engine::core::content::{ASSETS_DIR, asset_file, asset_of};
 
 use super::{Candidate, Category, Dragged, Pick, PickSource};
 use crate::forms::FormCx;
-use crate::ui::assets::{self, AssetKind};
 use crate::ui::theme;
 
-/// Files under `assets/` of the given kinds; several kinds become the popover's category chips.
+/// Files under the assets folder of one kind.
 pub struct AssetSource {
-    kinds: Vec<AssetKind>,
+    kind: AssetKind,
 }
 
 impl AssetSource {
-    pub fn of(kinds: &[AssetKind]) -> AssetSource {
-        AssetSource {
-            kinds: kinds.to_vec(),
-        }
+    pub fn of(kind: AssetKind) -> AssetSource {
+        AssetSource { kind }
     }
 
-    fn spoken(&self) -> String {
-        self.kinds
-            .iter()
-            .map(|kind| kind.id().to_owned())
-            .collect::<Vec<_>>()
-            .join(" or ")
+    fn spoken(&self) -> &'static str {
+        self.kind.into()
     }
 }
 
@@ -33,35 +28,24 @@ impl PickSource for AssetSource {
     }
 
     fn categories(&self, _cx: &FormCx) -> Vec<Category> {
-        if self.kinds.len() < 2 {
-            return Vec::new();
-        }
-        self.kinds
-            .iter()
-            .map(|kind| Category {
-                id: kind.id().to_owned(),
-                label: kind.id().to_owned(),
-            })
-            .collect()
+        Vec::new()
     }
 
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate> {
         cx.files
-            .paths_under("assets/")
-            .filter_map(|file| file.strip_prefix("assets/"))
-            .filter_map(|path| {
-                let kind = kind_of(path).filter(|kind| self.kinds.contains(kind))?;
-                Some(Candidate {
-                    pick: Pick::new(kind.id(), path),
-                    category: kind.id().to_owned(),
-                    name: String::new(),
-                    hint: path
-                        .rsplit_once('/')
-                        .map(|(folder, _)| folder)
-                        .unwrap_or("")
-                        .to_owned(),
-                    blocked: None,
-                })
+            .paths_under(&format!("{ASSETS_DIR}/"))
+            .map(|file| asset_of(file))
+            .filter(|path| AssetKind::of(path) == Some(self.kind))
+            .map(|path| Candidate {
+                pick: Pick::new(self.spoken(), path),
+                category: self.spoken().to_owned(),
+                name: String::new(),
+                hint: path
+                    .rsplit_once('/')
+                    .map(|(folder, _)| folder)
+                    .unwrap_or("")
+                    .to_owned(),
+                blocked: None,
             })
             .collect()
     }
@@ -73,21 +57,21 @@ impl PickSource for AssetSource {
                 self.spoken()
             ));
         };
-        match kind_of(path) {
-            Some(kind) if self.kinds.contains(&kind) => Ok(Pick::new(kind.id(), path.as_str())),
-            _ => Err(format!(
+        if AssetKind::of(path) != Some(self.kind) {
+            return Err(format!(
                 "this field takes {} files, not {path}",
                 self.spoken()
-            )),
+            ));
         }
+        Ok(Pick::new(self.spoken(), path.as_str()))
     }
 
     fn shown(&self, pick: &Pick) -> (String, String) {
-        ("assets/".to_owned(), pick.key.clone())
+        (format!("{ASSETS_DIR}/"), pick.key.clone())
     }
 
     fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32) {
-        match kind_of(&pick.key) {
+        match AssetKind::of(&pick.key) {
             Some(AssetKind::Image) => {
                 let ctx = ui.ctx().clone();
                 if let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &pick.key) {
@@ -105,17 +89,13 @@ impl PickSource for AssetSource {
                 glyph::show(ui, Mark::Note, 13.0, theme::MUTED);
             }
             Some(AssetKind::Font) => {
-                ui.label(crate::ui::theme::muted("A"));
+                ui.label(theme::muted("A"));
             }
             None => {}
         }
     }
 
     fn footer(&self, _cx: &FormCx, pick: &Pick) -> String {
-        format!("assets/{}", pick.key)
+        asset_file(&pick.key)
     }
-}
-
-pub fn kind_of(path: &str) -> Option<AssetKind> {
-    assets::kind(path)
 }

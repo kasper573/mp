@@ -2,13 +2,13 @@ use bevy_ecs::world::World;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
 use crate::core::content::{Content, ContentRow, Fixture};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct CursorDef {
-    pub image: AssetRef,
+    pub image: ImageRef,
     pub hotspot: Hotspot,
 }
 
@@ -50,7 +50,7 @@ impl Fixture for CursorShape {
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct InterfaceIconDef {
-    pub image: AssetRef,
+    pub image: ImageRef,
 }
 
 impl ContentRow for InterfaceIconDef {

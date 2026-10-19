@@ -114,7 +114,6 @@ pub struct TilePlan {
     pub tile: u32,
     pub old_columns: u32,
     pub new_columns: u32,
-    pub old_rows: u32,
     pub new_rows: u32,
     pub matches: BTreeMap<u32, u32>,
     pub found: usize,
@@ -296,7 +295,6 @@ pub fn tile_plan(
         tile,
         old_columns,
         new_columns,
-        old_rows: old.height() / tile,
         new_rows: new.height() / tile,
         found: matches.len(),
         matches,
@@ -408,7 +406,6 @@ pub struct AnimCell {
 #[derive(Clone, Debug)]
 pub struct AnimPlan {
     pub block: (u32, u32),
-    pub size: (u32, u32),
     pub cells: Vec<AnimCell>,
     pub still: usize,
     pub reused: Vec<u32>,
@@ -551,7 +548,6 @@ pub fn anim_plan(
     }
     Ok(AnimPlan {
         block,
-        size,
         cells,
         still,
         reused: reused.into_iter().collect(),

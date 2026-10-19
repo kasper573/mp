@@ -1,10 +1,12 @@
-use engine::core::content::ContentRow;
-use engine::systems::actor::ModelDef;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use engine::core::content::{ContentRow, TABLES_DIR, asset_file, row_file, row_of};
+use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::GenericExpression;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::ScriptDef;
 use serde_json::Value;
 use strum::VariantArray;
 
@@ -12,7 +14,6 @@ use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs};
-use engine::core::content::{row_file, row_of};
 
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
@@ -261,7 +262,7 @@ fn replace_file(editor: &mut Editor, key: &str, face: &BustFace, path: &Path) {
         }
     };
     let mut edit = ContentEdit::new(format!("Replace {} of {key}'s bust", face.name));
-    edit.write(format!("assets/{}", face.file), bytes.into());
+    edit.write(asset_file(&face.file), bytes.into());
     editor.apply(edit);
 }
 
@@ -296,7 +297,7 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
         .expect("an array")
         .push(serde_json::json!({ "name": name, "file": file }));
     let mut edit = ContentEdit::new(format!("Add expression {name} to {key}'s bust"));
-    edit.write(format!("assets/{file}"), bytes.into());
+    edit.write(asset_file(&file), bytes.into());
     edit.write_json(row_file(ModelDef::TABLE, key), &changed);
     if editor.apply(edit) {
         let view = editor.views.model.view_mut(key);
@@ -325,14 +326,13 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
     };
     let speakers: Vec<String> = super::users(editor, key)
         .into_iter()
-        .filter(|(table, _)| table == "npc")
+        .filter(|(table, _)| table == NpcDef::TABLE)
         .map(|(_, key)| key)
         .collect();
     let mut found = Vec::new();
     let files: Vec<String> = project
         .files
-        .paths_under("tables/")
-        .filter(|path| path.ends_with(".json"))
+        .paths_under(&format!("{TABLES_DIR}/"))
         .cloned()
         .collect();
     for file in files {
@@ -340,13 +340,13 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
             continue;
         };
         let owners: Vec<String> = match table {
-            "npc" => vec![row_key.to_owned()],
-            "script" => project
+            NpcDef::TABLE => vec![row_key.to_owned()],
+            ScriptDef::TABLE => project
                 .usages
-                .of_row("script", row_key)
+                .of_row(ScriptDef::TABLE, row_key)
                 .iter()
                 .filter_map(|usage| row_of(&usage.file))
-                .filter(|(table, _)| *table == "npc")
+                .filter(|(table, _)| *table == NpcDef::TABLE)
                 .map(|(_, key)| key.to_owned())
                 .collect(),
             _ => Vec::new(),
@@ -442,7 +442,7 @@ pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str
         format!("Remove face {} of {key}", face.name),
     );
     edit.write_json(row_file(ModelDef::TABLE, key), &row);
-    edit.remove(format!("assets/{}", face.file));
+    edit.remove(asset_file(&face.file));
     editor.apply(edit)
 }
 

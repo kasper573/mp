@@ -10,10 +10,89 @@ use bevy::asset::io::{
 use bevy::prelude::Resource;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
-#[serde(transparent)]
-pub struct AssetRef(String);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum AssetKind {
+    Image,
+    Audio,
+    Font,
+}
+
+impl AssetKind {
+    pub fn extensions(self) -> &'static [&'static str] {
+        match self {
+            AssetKind::Image => &["png"],
+            AssetKind::Audio => &["flac", "wav"],
+            AssetKind::Font => &["ttf", "otf"],
+        }
+    }
+
+    pub fn of(path: &str) -> Option<AssetKind> {
+        let (_, extension) = path.rsplit_once('.')?;
+        AssetKind::VARIANTS.iter().copied().find(|kind| {
+            kind.extensions()
+                .iter()
+                .any(|known| extension.eq_ignore_ascii_case(known))
+        })
+    }
+}
+
+macro_rules! asset_ref {
+    ($name:ident, $kind:ident) => {
+        #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+        #[serde(transparent)]
+        pub struct $name(String);
+
+        impl $name {
+            pub fn new(path: impl Into<String>) -> $name {
+                $name(path.into())
+            }
+
+            pub fn path(&self) -> String {
+                crate::core::content::asset_file(&self.0)
+            }
+
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl JsonSchema for $name {
+            fn schema_name() -> Cow<'static, str> {
+                Cow::Borrowed(stringify!($name))
+            }
+
+            fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+                let mut schema = String::json_schema(generator);
+                let kind: &'static str = AssetKind::$kind.into();
+                schema.insert("x-asset".to_owned(), kind.into());
+                schema
+            }
+
+            fn inline_schema() -> bool {
+                true
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(
+                deserializer: D,
+            ) -> Result<$name, D::Error> {
+                let human = deserializer.is_human_readable();
+                let path = String::deserialize(deserializer)?;
+                if human {
+                    crate::core::content::id::scope_asset(&path);
+                }
+                Ok($name(path))
+            }
+        }
+    };
+}
+
+asset_ref!(ImageRef, Image);
+asset_ref!(AudioRef, Audio);
 
 /// How much a file weighs to download.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,47 +107,6 @@ impl FileBytes {
 impl std::fmt::Display for FileBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{} KiB", self.0.div_ceil(1024))
-    }
-}
-
-impl AssetRef {
-    pub fn new(path: impl Into<String>) -> AssetRef {
-        AssetRef(path.into())
-    }
-
-    pub fn path(&self) -> String {
-        crate::core::content::asset_file(&self.0)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl JsonSchema for AssetRef {
-    fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("AssetPath")
-    }
-
-    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        let mut schema = String::json_schema(generator);
-        schema.insert("x-asset".to_owned(), true.into());
-        schema
-    }
-
-    fn inline_schema() -> bool {
-        true
-    }
-}
-
-impl<'de> Deserialize<'de> for AssetRef {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<AssetRef, D::Error> {
-        let human = deserializer.is_human_readable();
-        let path = String::deserialize(deserializer)?;
-        if human {
-            crate::core::content::id::scope_asset(&path);
-        }
-        Ok(AssetRef(path))
     }
 }
 

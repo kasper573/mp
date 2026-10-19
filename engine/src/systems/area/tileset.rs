@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
@@ -20,7 +20,7 @@ pub const MAX_TILE_FRAME_MS: u32 = 60_000;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TilesetDef {
-    pub image: AssetRef,
+    pub image: ImageRef,
     pub tile: u32,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub terrains: BTreeMap<String, Vec<String>>,

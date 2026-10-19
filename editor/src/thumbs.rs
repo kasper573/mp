@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
+use engine::core::content::asset_file;
 use image::RgbaImage;
 use image::imageops::FilterType;
 
@@ -43,7 +44,7 @@ impl Thumbnails {
         path: &str,
         budget: &mut u32,
     ) -> Option<Thumbnail> {
-        let file = format!("assets/{path}");
+        let file = asset_file(path);
         self.load(ctx, files, file.clone(), file, budget, |image| image)
     }
 
@@ -54,14 +55,9 @@ impl Thumbnails {
         path: &str,
         budget: &mut u32,
     ) -> Option<Thumbnail> {
-        let file = format!("assets/{path}");
+        let file = asset_file(path);
         let key = format!("icon:{file}");
         self.load(ctx, files, key, file, budget, |image| shrink(image, ICON))
-    }
-
-    pub fn forget(&mut self, path: &str) {
-        self.entries.remove(&format!("assets/{path}"));
-        self.entries.remove(&format!("icon:assets/{path}"));
     }
 
     fn load(

@@ -4,9 +4,9 @@ use engine::core::audio;
 use serde_json::Value;
 
 use crate::forms::FormCx;
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::{forms, picker};
+use engine::core::assets::AssetKind;
 
 pub(super) fn soundscape_extras(
     ui: &mut Ui,
@@ -30,7 +30,7 @@ pub(super) fn soundscape_extras(
             if picker::asset_of(
                 ui,
                 cx,
-                &[AssetKind::Audio],
+                AssetKind::Audio,
                 &mut file,
                 &format!("{channel_path}/file"),
             ) {

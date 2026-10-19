@@ -45,16 +45,6 @@ pub struct ExportFrame {
 }
 
 impl ExportFormat {
-    pub fn label(self) -> &'static str {
-        match self {
-            ExportFormat::SheetJson => "sheet + JSON",
-            ExportFormat::Grid => "grid",
-            ExportFormat::Sequence => "sequence",
-            ExportFormat::Gif => "GIF",
-            ExportFormat::Apng => "APNG",
-        }
-    }
-
     pub fn sentence(self) -> &'static str {
         match self {
             ExportFormat::SheetJson => "a sheet and its JSON",

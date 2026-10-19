@@ -14,6 +14,8 @@ use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatReader, TrackType};
 use symphonia::core::io::MediaSourceStream;
 
+use crate::core::assets::AssetKind;
+
 // Decoding a whole track at once holds the thread for hundreds of milliseconds, and on the web that
 // thread also feeds the audio output and runs the frame that asked for the sound, so decoding hands
 // the thread back before every slice, the first included. Waiting on a timer rather than merely
@@ -159,6 +161,6 @@ impl AssetLoader for AudioLoader {
     }
 
     fn extensions(&self) -> &[&str] {
-        &["flac", "wav"]
+        AssetKind::Audio.extensions()
     }
 }

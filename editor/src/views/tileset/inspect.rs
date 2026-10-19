@@ -15,10 +15,10 @@ use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
 use crate::picker;
 use crate::project::{ContentEdit, RowSelection};
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
+use engine::core::assets::AssetKind;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let (Some(key), Some(part)) = (selection.keys.first(), selection.parts.first()) else {
@@ -58,7 +58,7 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
     widgets::kv(ui, "image", |ui| {
         let mut file = value["image"].as_str().unwrap_or_default().to_owned();
-        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/image") {
+        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/image") {
             value["image"] = Value::String(file);
             changed = FormChange::at("/image");
         }

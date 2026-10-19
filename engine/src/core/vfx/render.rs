@@ -24,7 +24,7 @@ use super::{
     BodyShape, CompiledVfxShaders, ParamKind, ParamValue, SiteKind, VfxDef, VfxInstance, VfxLayer,
     VfxParams, VfxShaderDef, VfxShaderId, VfxSite, sprite_cell,
 };
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
@@ -378,7 +378,7 @@ pub fn present_layers(
 pub fn pieces_for(
     world: &mut World,
     layers: &[VfxLayer],
-    image_of: &mut dyn FnMut(&mut World, &AssetRef) -> Handle<Image>,
+    image_of: &mut dyn FnMut(&mut World, &ImageRef) -> Handle<Image>,
 ) -> Vec<Entity> {
     layers
         .iter()

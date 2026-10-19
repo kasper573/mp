@@ -17,7 +17,6 @@ use crate::app::{BottomTab, Editor};
 use crate::project::{ContentEdit, RowSelection};
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
-use crate::views::area;
 use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
 use crate::{import, value};
@@ -51,20 +50,12 @@ impl TilesetViews {
             .and_then(|counts| counts.surfaces.get(surface).cloned())
             .unwrap_or_default()
     }
-
-    pub fn areas_using(&self, tileset: &str) -> Vec<String> {
-        self.counts
-            .as_ref()
-            .and_then(|counts| counts.areas_using.get(tileset).cloned())
-            .unwrap_or_default()
-    }
 }
 
 pub struct TilesetCounts {
     pub generation: u64,
     pub surfaces: HashMap<String, SurfaceUse>,
     pub with_surface: usize,
-    pub areas_using: HashMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Default)]
@@ -739,24 +730,10 @@ fn refresh_counts(editor: &mut Editor) {
             entry.tilesets.insert(tileset.to_owned());
         }
     }
-    let mut areas_using: HashMap<String, Vec<String>> = HashMap::new();
-    for (area, rows) in area::grid::palettes(&project.files) {
-        let seen: BTreeSet<&str> = rows.iter().map(|row| row.tileset.as_str()).collect();
-        for tileset in seen {
-            areas_using
-                .entry(tileset.to_owned())
-                .or_default()
-                .push(area.clone());
-        }
-    }
-    for areas in areas_using.values_mut() {
-        areas.sort();
-    }
     editor.views.tileset.counts = Some(TilesetCounts {
         generation: project.generation,
         surfaces,
         with_surface,
-        areas_using,
     });
 }
 

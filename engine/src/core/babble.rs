@@ -7,7 +7,7 @@ use bevy_replicon::prelude::AppRuleExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{HushVoice, PlayClip, SfxPlace, SfxTune};
 use crate::core::content::{
@@ -133,10 +133,10 @@ impl Plugin for BabblePlugin {
     }
 }
 
-pub fn letter_files(bank: &BabbleBankDef) -> impl Iterator<Item = AssetRef> + '_ {
+pub fn letter_files(bank: &BabbleBankDef) -> impl Iterator<Item = AudioRef> + '_ {
     LETTERS
         .chars()
-        .map(move |letter| AssetRef::new(format!("{}/{letter}.wav", bank.letters)))
+        .map(move |letter| AudioRef::new(format!("{}/{letter}.wav", bank.letters)))
 }
 
 #[derive(Resource, Default)]

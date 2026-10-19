@@ -3,6 +3,7 @@ use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
 use egui::{Align, Layout, Sense, Ui};
+use engine::core::assets::AssetKind;
 use engine::core::content::ContentRow;
 use engine::systems::area::world_map::WorldMapDef;
 
@@ -532,7 +533,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         let mut folders: BTreeSet<String> = std::collections::BTreeSet::new();
         for path in project.files.paths_under("assets/") {
             let relative = path.trim_start_matches("assets/");
-            if super::assets::kind(relative).is_none() {
+            if AssetKind::of(relative).is_none() {
                 continue;
             }
             if let Some((folder, _)) = relative.rsplit_once('/')

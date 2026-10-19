@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::assets::AssetKind;
+use engine::core::audio::playback::SfxDef;
+use engine::core::content::{ContentRow, row_of};
 use engine::systems::actor::model::MAX_FRAME_MS;
 use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
@@ -13,10 +15,8 @@ use crate::forms::FormChange;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
-use crate::ui::assets::AssetKind;
 use crate::ui::{dialogs, row_form, theme, widgets};
 use crate::{forms, picker};
-use engine::core::content::row_of;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {
@@ -643,7 +643,7 @@ fn sound_picker(
     path: &str,
 ) -> bool {
     row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
-        picker::row(ui, cx, "sfx", sound, path)
+        picker::row(ui, cx, SfxDef::TABLE, sound, path)
     })
 }
 
@@ -655,7 +655,7 @@ fn asset_picker(
     path: &str,
 ) -> bool {
     row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
-        picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
+        picker::asset_of(ui, cx, AssetKind::Image, file, path)
     })
 }
 
@@ -935,7 +935,7 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/sprites/image") {
+        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
             changed = FormChange::at("/sprites/image");
         }

@@ -49,7 +49,6 @@ pub struct TilesetReimport {
     pub old: RgbaImage,
     pub plan: TilePlan,
     pub textures: TextureCache,
-    pub while_closed: bool,
 }
 
 pub struct AnimationDialog {
@@ -179,7 +178,6 @@ pub fn land(
         old,
         plan,
         textures: TextureCache::default(),
-        while_closed: again.is_some_and(|due| due.while_closed),
     };
     editor.open_tab(EditorTab::Tileset {
         key: key.to_owned(),

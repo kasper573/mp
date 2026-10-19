@@ -11,7 +11,7 @@ use kira::StartTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::Lufs;
 use crate::core::audio::decibels;
 use crate::core::audio::loader::AudioLoader;
@@ -56,7 +56,7 @@ pub type SfxId = ContentId<SfxDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
-    pub file: AssetRef,
+    pub file: AudioRef,
     pub role: SfxRoleId,
     pub volume: SfxScalar,
     pub pitch: SfxScalar,

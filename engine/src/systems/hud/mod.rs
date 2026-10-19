@@ -11,7 +11,7 @@ use design_tokens::sheet;
 use design_tokens::{controls, face, ink, slip};
 use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::WindowPx;
@@ -135,7 +135,7 @@ pub(crate) fn dropped(response: &egui::Response) -> Option<Carried> {
     Some(carried)
 }
 
-pub(crate) fn icon(ui: &mut Ui, world: &mut World, asset: &AssetRef, size: f32) -> egui::Response {
+pub(crate) fn icon(ui: &mut Ui, world: &mut World, asset: &ImageRef, size: f32) -> egui::Response {
     sized(ui, gui::image(world, asset), size)
 }
 

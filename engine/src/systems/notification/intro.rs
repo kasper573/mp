@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::rows::{self, Clock, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
 use crate::core::math::Rgba;
@@ -41,7 +41,7 @@ const PRESENCE: Presence = Presence {
 pub struct IntroAppearance {
     pub tint: Option<Rgba>,
     pub motion: Option<TextMotion>,
-    pub emblem: Option<AssetRef>,
+    pub emblem: Option<ImageRef>,
 }
 
 pub struct IntroPlugin;

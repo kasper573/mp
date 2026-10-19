@@ -19,7 +19,7 @@ use super::{
     ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, RefusedPick,
     Speaker, SpokenLine,
 };
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
@@ -256,7 +256,7 @@ enum Depth {
 struct CastMember {
     who: Speaker,
     since: Duration,
-    bust: AssetRef,
+    bust: ImageRef,
     model: ModelId,
     side: Side,
     depth: Depth,
