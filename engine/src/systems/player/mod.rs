@@ -289,7 +289,7 @@ pub struct SpawnRules {
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
     let content = world.resource::<Content>().clone();
-    let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
+    let policy = world.resource::<SpawnRules>().policy;
     let requests = drain_requests::<JoinRequest>(world);
     if requests.is_empty() {
         return;
@@ -327,9 +327,6 @@ pub fn join(world: &mut World) {
             }
         };
         let entity = place(world, client, zone, at, state);
-        if immortal {
-            world.entity_mut(entity).insert(Immortal);
-        }
         spawned(world, entity);
     }
 }
@@ -443,6 +440,9 @@ pub(crate) fn place(
         .id();
     let belongings = belongings::of(world, entity);
     world.entity_mut(entity).insert(belongings);
+    if world.resource::<SpawnRules>().immortal {
+        world.entity_mut(entity).insert(Immortal);
+    }
     world.resource_mut::<Players>().0.insert(client, entity);
     entity
 }

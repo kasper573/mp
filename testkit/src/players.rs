@@ -2,10 +2,13 @@ use bevy_ecs::message::Message;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::FromClient;
 use engine::core::content::Content;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
 use engine::systems::area::AreaDef;
+use engine::systems::area::transition::{self, Crossing};
 use engine::systems::player::snapshot::JoinAs;
 use engine::systems::player::{
-    self, AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules,
+    self, AreaDrawn, ClientId, JoinRequest, PlayedBy, Players, SpawnPolicy, SpawnRules,
 };
 use engine::systems::{GameSettings, WorldArea, from_client};
 
@@ -59,6 +62,25 @@ impl Sim {
     pub fn send<M: Message>(&mut self, conn: Entity, message: M) {
         self.accept::<M>();
         from_client(&mut self.world, conn, message);
+    }
+
+    /// Hands `player` over from this area's server to `to`'s, the way a crossing does, landing at
+    /// `at` and drawing the area there: the character as it arrived.
+    pub fn cross(&mut self, player: Entity, to: &mut Sim, at: Pos<Tiles>) -> Entity {
+        let client = self.world.get::<PlayedBy>(player).expect("a player").client;
+        let dest_area = to.world.resource::<WorldArea>().0;
+        to.connect(client.0);
+        self.world.entity_mut(player).insert(Crossing {
+            dest_area,
+            dest: at,
+        });
+        let traveler = transition::departing(&mut self.world)
+            .pop()
+            .expect("a traveler");
+        let arrived = transition::arrive(&mut to.world, traveler);
+        let conn = to.conn(client.0);
+        to.send(conn, AreaDrawn);
+        arrived
     }
 
     pub fn player(&self, client: u32) -> Entity {
