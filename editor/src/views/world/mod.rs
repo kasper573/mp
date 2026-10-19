@@ -271,7 +271,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
-    sidebar::right(ui, "world", |ui| {
+    sidebar::inspector(ui, "world", |ui| {
         let selection = if editor.selection.table == WorldMapDef::TABLE {
             editor.selection.clone()
         } else {

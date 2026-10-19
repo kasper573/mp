@@ -241,7 +241,18 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
     inspect::remove_face_dialog(editor, &ctx, key);
     let page = editor.views.model.view(key).page;
-    sidebar::right(ui, "model", |ui| sidebar(editor, ui, key));
+    sidebar::row(ui, "model", |ui| row_form::show_row(editor, ui, TABLE, key));
+    let selection = editor.selection.clone();
+    sidebar::inspector(ui, "model", |ui| {
+        if selection.table == TABLE
+            && selection.keys.first().is_some_and(|k| k == key)
+            && !selection.parts.is_empty()
+        {
+            inspect_parts(editor, ui, &selection);
+        } else {
+            sidebar::nothing_selected(ui, "Select a strip, frame or face to inspect it here.");
+        }
+    });
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
@@ -252,13 +263,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
             page_bar(editor, ui, key, page);
             ui.add_space(4.0);
-            match page {
-                ModelPage::Matrix => matrix::show(editor, ui, key, &row),
-                ModelPage::Timing => strip::show(editor, ui, key, &row),
-                ModelPage::Cues => cues::show(editor, ui, key, &row),
-                ModelPage::Hitbox => hitbox::show(editor, ui, key, &row),
-                ModelPage::Busts => busts::show(editor, ui, key, &row),
-            }
+            egui::ScrollArea::both()
+                .id_salt(("model-page", key))
+                .auto_shrink([false, false])
+                .show(ui, |ui| match page {
+                    ModelPage::Matrix => matrix::show(editor, ui, key, &row),
+                    ModelPage::Timing => strip::show(editor, ui, key, &row),
+                    ModelPage::Cues => cues::show(editor, ui, key, &row),
+                    ModelPage::Hitbox => hitbox::show(editor, ui, key, &row),
+                    ModelPage::Busts => busts::show(editor, ui, key, &row),
+                });
         });
 }
 
@@ -293,20 +307,6 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
             }
         }
     });
-}
-
-/// The model window's inspector: the selected strip, frame, cue, hitbox or face, or else the
-/// model row itself.
-fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let selection = editor.selection.clone();
-    if selection.table == TABLE
-        && selection.keys.first().is_some_and(|k| k == key)
-        && !selection.parts.is_empty()
-    {
-        inspect_parts(editor, ui, &selection);
-    } else {
-        row_form::show_row(editor, ui, TABLE, key);
-    }
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {

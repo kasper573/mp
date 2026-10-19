@@ -21,6 +21,7 @@ use crate::ui::{theme, widgets};
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
+const PREVIEW_GAP: f32 = 12.0;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
@@ -47,9 +48,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.ctx().request_repaint();
     let mut open = None;
     let mut pick = None;
-    ui.horizontal_top(|ui| {
+    let grid_width = LABEL_W + Direction::VARIANTS.len() as f32 * (CELL + 8.0);
+    let layout = if ui.available_width() >= grid_width + PREVIEW_GAP + stage::NARROWEST {
+        egui::Layout::left_to_right(egui::Align::Min)
+    } else {
+        egui::Layout::top_down(egui::Align::Min)
+    };
+    ui.with_layout(layout, |ui| {
         ui.vertical(|ui| {
-            ui.set_width(LABEL_W + Direction::VARIANTS.len() as f32 * (CELL + 8.0));
+            ui.set_width(grid_width);
             header(ui);
             let mut strips = 0;
             let mut frames_total = 0;
@@ -131,7 +138,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 });
             }
         });
-        ui.add_space(12.0);
+        ui.add_space(PREVIEW_GAP);
         ui.vertical(|ui| {
             ui.set_width(stage::preview_width(ui.available_width()));
             ui.label(

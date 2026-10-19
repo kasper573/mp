@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use egui::emath::GuiRounding;
 use egui::emath::Rot2;
-use egui::epaint::{Mesh, Shadow, TextShape};
+use egui::epaint::{Mesh, TextShape};
 use egui::{
     Align, Align2, Color32, CornerRadius, InnerResponse, Key, Margin, Painter, Pos2, Rangef, Rect,
     Response, Sense, Shape, Stroke, StrokeKind, Ui, UiBuilder, Vec2, WidgetInfo, WidgetText,
@@ -22,12 +22,6 @@ pub const SLOT: f32 = 36.0;
 pub const SLOT_ICON: f32 = 30.0;
 pub const PILL_HEIGHT: f32 = 20.0;
 const BEAD: f32 = 6.0;
-const LIFT: Shadow = Shadow {
-    offset: [0, 2],
-    blur: 4,
-    spread: 0,
-    color: Color32::from_black_alpha(70),
-};
 
 pub fn button(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
     button_look(ui, text.into(), None, Look::Outline)
@@ -425,6 +419,12 @@ enum Look {
     Faded,
 }
 
+enum Interaction {
+    Idle,
+    Hovered,
+    Pressed,
+}
+
 fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) -> Response {
     let mut job = Arc::unwrap_or_clone(text.into_layout_job(
         ui.style(),
@@ -451,60 +451,61 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
     let enabled = ui.is_enabled();
     let hovered = enabled && response.hovered();
     let pressed = hovered && response.is_pointer_button_down_on();
-    let drawn = if hovered && !pressed {
-        rect.translate(Vec2::new(0.0, -1.0))
-    } else {
-        rect
+    let state = match (hovered, pressed) {
+        (_, true) => Interaction::Pressed,
+        (true, false) => Interaction::Hovered,
+        (false, false) => Interaction::Idle,
     };
     let painter = ui.painter();
-    if hovered && !pressed {
-        painter.add(LIFT.as_shape(drawn, RADIUS));
-    }
     let (fill, line, text_color) = match (look, enabled) {
         (_, false) | (Look::Faded, true) => (Color32::TRANSPARENT, ink::ink_wash(0.3), ink::INK3),
         (Look::Outline, true) => (
-            if pressed {
-                ink::ink_wash(0.08)
-            } else {
-                Color32::TRANSPARENT
+            match state {
+                Interaction::Idle => Color32::TRANSPARENT,
+                Interaction::Hovered => ink::ink_wash(0.05),
+                Interaction::Pressed => ink::ink_wash(0.1),
             },
             ink::INK,
             ink::INK,
         ),
         (Look::Primary, true) => (
-            if pressed { ink::INK2 } else { ink::INK },
+            match state {
+                Interaction::Idle => ink::INK,
+                Interaction::Hovered => ink::INK.lerp_to_gamma(ink::INK2, 0.5),
+                Interaction::Pressed => ink::INK2,
+            },
             ink::INK,
             ink::CREAM,
         ),
         (Look::Danger, true) => (
-            if pressed {
-                ink::wash(ink::RUBRIC, 0.08)
-            } else {
-                Color32::TRANSPARENT
+            match state {
+                Interaction::Idle => Color32::TRANSPARENT,
+                Interaction::Hovered => ink::wash(ink::RUBRIC, 0.05),
+                Interaction::Pressed => ink::wash(ink::RUBRIC, 0.1),
             },
             ink::RUBRIC,
             ink::RUBRIC,
         ),
     };
     painter.rect(
-        drawn,
+        rect,
         RADIUS,
         fill,
         Stroke::new(1.0, line),
         StrokeKind::Inside,
     );
-    let mut text_at = drawn.center() - galley.size() / 2.0;
+    let mut text_at = rect.center() - galley.size() / 2.0;
     if let Some(mark) = mark {
         text_at.x += mark_room / 2.0;
         let mark_rect = Rect::from_center_size(
-            Pos2::new(text_at.x - mark_room / 2.0 - 4.0, drawn.center().y),
+            Pos2::new(text_at.x - mark_room / 2.0 - 4.0, rect.center().y),
             Vec2::splat(13.0),
         );
         glyph::paint(painter, mark, mark_rect, text_color);
     }
     painter.galley(text_at, galley, text_color);
     if response.has_focus() {
-        focus_ring(painter, drawn, RADIUS);
+        focus_ring(painter, rect, RADIUS);
     }
     response
 }

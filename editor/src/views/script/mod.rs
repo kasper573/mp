@@ -622,16 +622,17 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     let mut actions = Vec::new();
     keys(editor, ui, &doc, &mut actions);
     status(editor, &doc);
-    sidebar::right(ui, "script", |ui| {
-        let (table, key) = owner.row();
-        let selection = if editor.selection.table == table
-            && editor.selection.keys.first().is_some_and(|k| *k == key)
-        {
-            editor.selection.clone()
-        } else {
-            RowSelection::row(&table, &key)
-        };
-        inspect::show(editor, ui, &selection);
+    sidebar::row(ui, "script", |ui| inspect::script_row(editor, ui, &doc));
+    let (table, key) = owner.row();
+    let selection = if editor.selection.table == table
+        && editor.selection.keys.first().is_some_and(|k| *k == key)
+    {
+        editor.selection.clone()
+    } else {
+        RowSelection::row(&table, &key)
+    };
+    sidebar::inspector(ui, "script", |ui| {
+        inspect::show(editor, ui, &doc, &selection)
     });
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)

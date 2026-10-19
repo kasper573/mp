@@ -34,7 +34,7 @@ use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
-const NARROWEST: f32 = 240.0;
+pub const NARROWEST: f32 = 240.0;
 const SPREAD_CANDIDATES: usize = 4096;
 const SPREAD_ROUNDS: usize = 12;
 

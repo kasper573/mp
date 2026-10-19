@@ -5,9 +5,7 @@ use engine::systems::actor::Action;
 use forms::FormCx;
 use serde_json::Value;
 
-use super::{
-    FrameCueKind, MAX_FRAME_MS, ModelPage, ModelStrip, StripFrame, strip::TimingSetBy, strip_of,
-};
+use super::{FrameCueKind, MAX_FRAME_MS, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
 use crate::app::Editor;
 use crate::forms::FormChange;
 use crate::keymap::EditorKey;
@@ -28,7 +26,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         return;
     };
     super::ensure_view(editor, &key);
-    let page = editor.views.model.view(&key).page;
     if let Some(rest) = part.strip_prefix("/sprites/actions/") {
         let bits: Vec<&str> = rest.split('/').collect();
         let Some(strip) =
@@ -41,10 +38,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         egui::ScrollArea::vertical()
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
-                if page == ModelPage::Matrix {
-                    row_form::show_row(editor, ui, super::TABLE, &key);
-                    ui.add_space(8.0);
-                }
                 match (
                     bits.get(2).and_then(|i| i.parse::<usize>().ok()),
                     bits.get(3),
@@ -87,14 +80,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                         strip_card(editor, ui, &key, &row, &frames, strip);
                     }
                 }
-            });
-        return;
-    }
-    if part == "/hitbox" {
-        egui::ScrollArea::vertical()
-            .id_salt(("model-inspect", &key))
-            .show(ui, |ui| {
-                row_form::show_row(editor, ui, super::TABLE, &key);
             });
         return;
     }

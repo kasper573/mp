@@ -26,32 +26,62 @@ use crate::forms::FormCx;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
-use crate::ui::{patterns, row_form, theme, widgets};
+use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
 
-/// The area window's inspector: the selected modules, the blueprint parts edited in place, or
-/// else the card of the tool in hand.
+/// The area itself: its card, modules, palette, the spawn and the ways in.
+pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    let view_key = super::area_view_key(key);
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
+        return;
+    };
+    let Some(area_id) = content.by_key::<area::AreaDef>(key) else {
+        return;
+    };
+    if !editor.views.area.views.contains_key(&view_key) {
+        return;
+    }
+    ui.label(theme::muted(format!("area/{key}")).monospace().size(13.0));
+    ui.add_space(4.0);
+    area_card(editor, ui, key, &content, area_id);
+    module_counts(editor, ui, &view_key, key);
+    palette_summary(ui, &content, area_id);
+    spawn_card(editor, ui, key, &content);
+    ways_in(editor, ui, key);
+}
+
+/// The area window's inspector: the selected modules, the blueprint parts edited in place, a paste
+/// or a pick under way, or else the card of the tool in hand.
 pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let selection = editor.selection.clone();
-    let of_this_area =
-        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
-    if of_this_area
-        && selection
-            .parts
-            .iter()
-            .any(|part| super::module_index(part).is_some())
-    {
-        show_parts(editor, ui, &selection);
-    } else if selection.table == "blueprint" && !selection.parts.is_empty() {
+    if selection.table == "blueprint" && !selection.parts.is_empty() {
         super::inspect_parts(editor, ui, &selection);
+    } else if selected_parts(editor, key) {
+        show_parts(editor, ui, &selection);
     } else {
-        show(editor, ui, key);
+        tool(editor, ui, key);
     }
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
+fn selected_parts(editor: &Editor, key: &str) -> bool {
+    let selection = &editor.selection;
+    let of_this_area =
+        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
+    (of_this_area
+        && selection
+            .parts
+            .iter()
+            .any(|part| super::module_index(part).is_some()))
+        || (selection.table == "blueprint" && !selection.parts.is_empty())
+}
+
+fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
     let Some(content) = editor
         .project
@@ -76,8 +106,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         pick_preview(editor, ui);
         return;
     }
-    ui.label(theme::muted(format!("area/{key}")).monospace().size(13.0));
-    ui.add_space(4.0);
     match tool {
         AreaTool::Paint if walk => {
             walk_card(editor, ui, &view_key);
@@ -85,23 +113,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
         AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper => {
             paint_card(editor, ui, &view_key, &content, area_id);
-            palette_summary(ui, &content, area_id);
         }
-        AreaTool::Terrain => {
-            terrain_card(editor, ui, &view_key, &content, area_id);
-        }
-        AreaTool::Stamp => {
-            stamp_card(editor, ui, &view_key, &content);
-        }
-        AreaTool::Module => {
-            area_card(editor, ui, key, &content, area_id);
-            module_counts(editor, ui, &view_key, key);
-        }
-        AreaTool::Select => {
-            area_card(editor, ui, key, &content, area_id);
-            spawn_card(editor, ui, key, &content);
-            ways_in(editor, ui, key);
-        }
+        AreaTool::Terrain => terrain_card(editor, ui, &view_key, &content, area_id),
+        AreaTool::Stamp => stamp_card(editor, ui, &view_key, &content),
+        AreaTool::Select | AreaTool::Module => sidebar::nothing_selected(
+            ui,
+            "Select modules on the map, or take a tool with settings, to inspect them here.",
+        ),
     }
 }
 
@@ -1002,15 +1020,6 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     if editor.pick.is_some() {
         ui.add_space(6.0);
         pick_preview(editor, ui);
-    }
-    if editor
-        .views
-        .area
-        .views
-        .contains_key(&super::area_view_key(&area_key))
-    {
-        ui.add_space(8.0);
-        module_counts(editor, ui, &super::area_view_key(&area_key), &area_key);
     }
 }
 
