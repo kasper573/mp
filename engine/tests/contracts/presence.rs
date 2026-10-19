@@ -85,10 +85,12 @@ fn presence_by_condition_follows_the_players_memory() {
     let player = sim.join(1);
     let brute = spawn(&mut sim, "brute", player, Offset::new(2.0, 0.0));
     let slain = sim.id::<MemoryDef>("slain");
-    let alive = Expr::Not(Box::new(Expr::Query(RiftQuery::Memory {
-        of: None,
-        memory: slain,
-    })));
+    let alive = Expr::Not {
+        of: Box::new(Expr::Query(RiftQuery::Memory {
+            of: None,
+            memory: slain,
+        })),
+    };
     let shown = CompiledCondition::new(sim.world.resource::<Content>(), &alive);
     sim.world.entity_mut(brute).insert(Presence::When(shown));
     assert!(visibility::present(&sim.world, brute, player));

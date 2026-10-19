@@ -586,9 +586,11 @@ pub fn spawn_stateless(world: &mut World) {
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
             OwnerKind::Area if row.row == area.raw() => Owner::Row(OwnerKind::Area, row.row),
-            OwnerKind::Blueprint if row.row == area.raw() => {
-                Owner::Row(OwnerKind::Blueprint, row.object.unwrap_or_default())
-            }
+            OwnerKind::Blueprint if row.row == area.raw() => Owner::Row(
+                OwnerKind::Blueprint,
+                row.object
+                    .expect("a placement's owner row names its ordinal"),
+            ),
             OwnerKind::Item
             | OwnerKind::Quest
             | OwnerKind::Shop

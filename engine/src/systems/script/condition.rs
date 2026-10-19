@@ -5,7 +5,6 @@ use bevy_ecs::prelude::*;
 use super::{Condition, RiftQuery, RiftScripting};
 use crate::core::content::Content;
 use crate::core::script::{Compiler, Eval, Expr, FlowCx, ScriptFault, Value, ValueType};
-use crate::systems::stat::StatKind;
 use crate::systems::text::{self, LineText, Span};
 
 #[derive(Clone)]
@@ -71,7 +70,7 @@ pub fn check_value(content: &Content, value: &Condition) -> Result<(), ScriptFau
 
 pub fn min_level(part: &Condition) -> Option<u32> {
     match part {
-        Expr::AtLeast(a, b) => match (&**a, &**b) {
+        Expr::AtLeast { a, b } => match (&**a, &**b) {
             (Expr::Query(RiftQuery::Level { .. }), Expr::Int(level)) => u32::try_from(*level).ok(),
             _ => None,
         },
@@ -81,7 +80,7 @@ pub fn min_level(part: &Condition) -> Option<u32> {
 
 pub fn standing(world: &World, subject: Entity, condition: &Condition) -> Option<String> {
     match condition {
-        Expr::AtLeast(a, _) | Expr::More(a, _) => match &**a {
+        Expr::AtLeast { a, .. } | Expr::More { a, .. } => match &**a {
             Expr::Query(RiftQuery::Level { .. }) => Some(format!(
                 "you are level {}",
                 crate::systems::class::level(world, subject)
@@ -94,34 +93,34 @@ pub fn standing(world: &World, subject: Entity, condition: &Condition) -> Option
 
 pub fn parts(condition: &Condition) -> Vec<&Condition> {
     match condition {
-        Expr::All(parts) => parts.iter().collect(),
+        Expr::All { of: parts } => parts.iter().collect(),
         other => vec![other],
     }
 }
 
 pub fn describe(content: &Content, condition: &Condition) -> String {
     match condition {
-        Expr::Not(of) => format!("not {}", describe(content, of)),
-        Expr::All(parts) => parts
+        Expr::Not { of } => format!("not {}", describe(content, of)),
+        Expr::All { of: parts } => parts
             .iter()
             .map(|part| describe(content, part))
             .collect::<Vec<_>>()
             .join(" and "),
-        Expr::Any(parts) => parts
+        Expr::Any { of: parts } => parts
             .iter()
             .map(|part| describe(content, part))
             .collect::<Vec<_>>()
             .join(" or "),
-        Expr::AtLeast(a, b) | Expr::More(a, b) => match (&**a, &**b) {
+        Expr::AtLeast { a, b } | Expr::More { a, b } => match (&**a, &**b) {
             (Expr::Query(RiftQuery::Level { .. }), Expr::Int(level)) => format!("Level {level}"),
             (Expr::Query(RiftQuery::Holding { item, .. }), Expr::Int(count)) => {
                 format!("{count} {}", item.get(content).name)
             }
             (Expr::Query(RiftQuery::Stat { stat, .. }), Expr::Num(min)) => {
-                format!("{min} {}", stat_label(*stat))
+                format!("{min} {}", stat.label())
             }
             (Expr::Query(RiftQuery::Stat { stat, .. }), Expr::Int(min)) => {
-                format!("{min} {}", stat_label(*stat))
+                format!("{min} {}", stat.label())
             }
             (Expr::Query(RiftQuery::Memory { memory, .. }), Expr::Int(count)) => {
                 format!("{} {count}", memory.get(content).label)
@@ -137,10 +136,12 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
         Expr::Int(value) => value.to_string(),
         Expr::Num(value) => value.to_string(),
         Expr::Text(value) => (*value).to_owned(),
-        Expr::Equal(a, b) => format!("{} is {}", describe(content, a), describe(content, b)),
-        Expr::NotEqual(a, b) => format!("{} is not {}", describe(content, a), describe(content, b)),
-        Expr::Less(a, b) => format!("{} < {}", describe(content, a), describe(content, b)),
-        Expr::AtMost(a, b) => format!("{} ≤ {}", describe(content, a), describe(content, b)),
+        Expr::Equal { a, b } => format!("{} is {}", describe(content, a), describe(content, b)),
+        Expr::NotEqual { a, b } => {
+            format!("{} is not {}", describe(content, a), describe(content, b))
+        }
+        Expr::Less { a, b } => format!("{} < {}", describe(content, a), describe(content, b)),
+        Expr::AtMost { a, b } => format!("{} ≤ {}", describe(content, a), describe(content, b)),
         other => other.kind().to_owned(),
     }
 }
@@ -154,7 +155,7 @@ fn describe_query(content: &Content, query: &RiftQuery) -> String {
             format!("{} {}", skill.get(content).name, stat.label())
         }
         RiftQuery::SpentSkillPoints { .. } => "skill points spent".to_owned(),
-        RiftQuery::Stat { stat, .. } => stat_label(*stat).to_owned(),
+        RiftQuery::Stat { stat, .. } => stat.label().to_owned(),
         RiftQuery::HasStatus { effect, .. } => effect.get(content).name.to_owned(),
         RiftQuery::StatusCount { category, .. } => match category {
             Some(category) => format!("{}s", category.label().to_lowercase()),
@@ -191,10 +192,6 @@ fn describe_query(content: &Content, query: &RiftQuery) -> String {
         RiftQuery::SkillArea => "the skill's area".to_owned(),
         RiftQuery::AimedPoint => "the aimed point".to_owned(),
     }
-}
-
-fn stat_label(stat: StatKind) -> &'static str {
-    stat.into()
 }
 
 fn compiled(content: &Content, condition: &Condition, want: ValueType) -> Eval {

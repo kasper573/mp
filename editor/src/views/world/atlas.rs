@@ -1073,7 +1073,7 @@ fn area_info(content: &Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
 
 fn positive_queries<'a>(condition: &'a Condition, out: &mut Vec<&'a RiftQuery>) {
     match condition {
-        Expr::Not(_) => {}
+        Expr::Not { .. } => {}
         Expr::Query(query) => out.push(query),
         other => {
             for child in other.children() {

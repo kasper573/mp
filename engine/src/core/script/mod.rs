@@ -35,7 +35,6 @@ pub const NEXT: &str = "next";
 /// The output an effect takes when it would not do what it was asked.
 pub const REFUSED: &str = "refused";
 
-/// The node a flow goes on to, if any.
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(transparent)]
 #[schemars(extend("x-arrow" = true))]

@@ -1424,7 +1424,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             Expr::Int(value) => (constant(Value::Int(*value)), ValueType::Integer),
             Expr::Num(value) => (constant(Value::Num(*value)), ValueType::Number),
             Expr::Text(value) => (constant(Value::Text(value.clone())), ValueType::Text),
-            Expr::Var(name) => match *self.var(name)? {
+            Expr::Var { var: name } => match *self.var(name)? {
                 Bound::Integer(value) => (constant(Value::Int(value)), ValueType::Integer),
                 Bound::Number(value) => (constant(Value::Num(value)), ValueType::Number),
                 Bound::Boolean(value) => (constant(Value::Bool(value)), ValueType::Boolean),
@@ -1440,21 +1440,21 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ));
                 }
             },
-            Expr::Local(name) => {
+            Expr::Local { local: name } => {
                 let (index, ty) = self
                     .local(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("local {name}")))?;
                 self.read_slots.insert(Slot::Local(index));
                 (Box::new(move |_, cx: &FlowCx| cx.locals[index].clone()), ty)
             }
-            Expr::State(name) => {
+            Expr::State { state: name } => {
                 let (index, ty) = self
                     .state(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("state {name}")))?;
                 self.read_slots.insert(Slot::State(index));
                 (Box::new(move |_, cx: &FlowCx| cx.state[index].clone()), ty)
             }
-            Expr::Event(name) => {
+            Expr::Event { event: name } => {
                 let (index, ty) = self.event_field(name).ok_or_else(|| {
                     ScriptFault::new("unknown field", format!("the event has no field {name}"))
                 })?;
@@ -1467,8 +1467,8 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                 }
                 (query.compile(self)?, ty)
             }
-            Expr::All(list) | Expr::Any(list) => {
-                let all = matches!(expr, Expr::All(_));
+            Expr::All { of: list } | Expr::Any { of: list } => {
+                let all = matches!(expr, Expr::All { .. });
                 let parts = self.list(list, ValueType::Boolean)?;
                 (
                     Box::new(move |world, cx| {
@@ -1489,15 +1489,15 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Not(of) => {
+            Expr::Not { of } => {
                 let of = self.expr(of, ValueType::Boolean)?;
                 (
                     Box::new(move |world, cx| Value::Bool(!of(world, cx).truthy())),
                     ValueType::Boolean,
                 )
             }
-            Expr::Equal(a, b) | Expr::NotEqual(a, b) => {
-                let negate = matches!(expr, Expr::NotEqual(..));
+            Expr::Equal { a, b } | Expr::NotEqual { a, b } => {
+                let negate = matches!(expr, Expr::NotEqual { .. });
                 let (a, ta) = self.typed_inner(a)?;
                 let (b, tb) = self.typed_inner(b)?;
                 if !(ta.accepts(tb) || tb.accepts(ta)) {
@@ -1523,12 +1523,15 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Less(a, b) | Expr::AtMost(a, b) | Expr::More(a, b) | Expr::AtLeast(a, b) => {
+            Expr::Less { a, b }
+            | Expr::AtMost { a, b }
+            | Expr::More { a, b }
+            | Expr::AtLeast { a, b } => {
                 let (a, b, _) = self.numeric(a, b)?;
                 let compare: fn(f64, f64) -> bool = match expr {
-                    Expr::Less(..) => |a, b| a < b,
-                    Expr::AtMost(..) => |a, b| a <= b,
-                    Expr::More(..) => |a, b| a > b,
+                    Expr::Less { .. } => |a, b| a < b,
+                    Expr::AtMost { .. } => |a, b| a <= b,
+                    Expr::More { .. } => |a, b| a > b,
                     _ => |a, b| a >= b,
                 };
                 (
@@ -1538,17 +1541,17 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Add(a, b)
-            | Expr::Subtract(a, b)
-            | Expr::Multiply(a, b)
-            | Expr::Min(a, b)
-            | Expr::Max(a, b) => {
+            Expr::Add { a, b }
+            | Expr::Subtract { a, b }
+            | Expr::Multiply { a, b }
+            | Expr::Min { a, b }
+            | Expr::Max { a, b } => {
                 let (a, b, integer) = self.numeric(a, b)?;
                 let (on_ints, on_nums): Arithmetic = match expr {
-                    Expr::Add(..) => (i64::saturating_add, |a, b| a + b),
-                    Expr::Subtract(..) => (i64::saturating_sub, |a, b| a - b),
-                    Expr::Multiply(..) => (i64::saturating_mul, |a, b| a * b),
-                    Expr::Min(..) => (i64::min, f64::min),
+                    Expr::Add { .. } => (i64::saturating_add, |a, b| a + b),
+                    Expr::Subtract { .. } => (i64::saturating_sub, |a, b| a - b),
+                    Expr::Multiply { .. } => (i64::saturating_mul, |a, b| a * b),
+                    Expr::Min { .. } => (i64::min, f64::min),
                     _ => (i64::max, f64::max),
                 };
                 if integer {
@@ -1567,7 +1570,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     )
                 }
             }
-            Expr::Divide(a, b) => {
+            Expr::Divide { a, b } => {
                 let (a, b, _) = self.numeric(a, b)?;
                 (
                     Box::new(move |world, cx| {
@@ -1581,14 +1584,14 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Number,
                 )
             }
-            Expr::Round(of) => {
+            Expr::Round { of } => {
                 let of = self.expr(of, ValueType::Number)?;
                 (
                     Box::new(move |world, cx| Value::Int(of(world, cx).as_num().round() as i64)),
                     ValueType::Integer,
                 )
             }
-            Expr::Join(list) => {
+            Expr::Join { of: list } => {
                 if list.len() > expr::MAX_LIST {
                     return Err(ScriptFault::new(
                         "out of range",

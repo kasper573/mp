@@ -41,6 +41,10 @@ pub enum StatKind {
 }
 
 impl StatKind {
+    pub fn label(self) -> &'static str {
+        self.into()
+    }
+
     pub const fn of(self, value: f32) -> Stat {
         Stat { kind: self, value }
     }
@@ -66,7 +70,7 @@ pub struct Stat {
 
 impl Stat {
     pub fn label(self) -> &'static str {
-        self.kind.into()
+        self.kind.label()
     }
 }
 
