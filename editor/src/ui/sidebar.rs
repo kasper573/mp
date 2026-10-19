@@ -87,7 +87,7 @@ fn picked_tab(editor: &mut Editor, ui: &Ui, id: &str, row: &RowName) -> RightPan
     let selection = &editor.selection;
     let picked_inside = !selection.parts.is_empty()
         && selection.table == row.table
-        && selection.keys.iter().any(|key| *key == row.key);
+        && selection.keys.contains(&row.key);
     if panels.seen.get(id) != Some(selection) {
         if picked_inside {
             tab = RightPanelTab::Inspector;
