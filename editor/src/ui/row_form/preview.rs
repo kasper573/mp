@@ -1,7 +1,8 @@
 use design_tokens::card::{self, Art, Card};
 use design_tokens::controls::{self, Pill};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Kind, Mark};
-use design_tokens::{TextRole, ink};
+use design_tokens::ink;
 use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::content::Content;
 use engine::core::math::{Direction, Rgba};

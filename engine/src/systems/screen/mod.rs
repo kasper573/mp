@@ -7,8 +7,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
+use design_tokens::face::TextRole;
 use design_tokens::sheet;
-use design_tokens::{TextRole, controls, face, ink};
+use design_tokens::{controls, face, ink};
 use egui::{TextStyle, Ui};
 use renet2::RenetClient;
 

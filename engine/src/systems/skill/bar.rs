@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, controls, ink, sheet, slip};
+use design_tokens::{controls, ink, sheet, slip};
 use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;

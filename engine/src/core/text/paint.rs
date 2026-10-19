@@ -2,8 +2,8 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bevy::prelude::World;
+use design_tokens::face::{Face, TextRole};
 use design_tokens::ink::Ground;
-use design_tokens::{Face, TextRole};
 use egui::emath::TSTransform;
 use egui::epaint::TextShape;
 use egui::text::{LayoutJob, TextFormat};

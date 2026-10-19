@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, ink, sheet};
+use design_tokens::face::TextRole;
+use design_tokens::{ink, sheet};
 use egui::{Sense, Ui, Vec2};
 use strum::VariantArray;
 

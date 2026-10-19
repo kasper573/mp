@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, controls, ink, sheet};
+use design_tokens::face::TextRole;
+use design_tokens::{controls, ink, sheet};
 use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::AssetRef;

@@ -1,5 +1,6 @@
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, sheet};
+use design_tokens::sheet;
 use std::path::{Path, PathBuf};
 
 use egui::{Context, RichText, Ui};

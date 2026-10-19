@@ -2,9 +2,10 @@ use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::card::{self, Art, Card, CardResponse, Plate};
 use design_tokens::controls::{self, Pill};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::Kind;
 use design_tokens::sheet::Depth;
-use design_tokens::{TextRole, face, ink};
+use design_tokens::{face, ink};
 use egui::{Rect, Response, TextureId, Ui};
 
 use crate::core::content::Content;

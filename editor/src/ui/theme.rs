@@ -1,4 +1,5 @@
-use design_tokens::{Face, ink};
+use design_tokens::face::Face;
+use design_tokens::ink;
 use egui::{Color32, Context, FontFamily, RichText};
 
 pub const TEXT: Color32 = ink::INK;

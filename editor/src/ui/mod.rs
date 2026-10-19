@@ -17,7 +17,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use design_tokens::controls::{self, Pill};
-use design_tokens::{TextRole, face, ink, sheet, slip};
+use design_tokens::face::TextRole;
+use design_tokens::{face, ink, sheet, slip};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
 

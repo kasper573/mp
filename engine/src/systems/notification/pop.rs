@@ -4,7 +4,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use design_tokens::Face;
+use design_tokens::face::Face;
 use design_tokens::raster::raster;
 use serde::{Deserialize, Serialize};
 

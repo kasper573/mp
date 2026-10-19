@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
+use design_tokens::face::{Face, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{Face, TextRole, controls, ink, sheet};
+use design_tokens::{controls, ink, sheet};
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::theme;

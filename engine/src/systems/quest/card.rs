@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use design_tokens::card::{self, Art, Card, CardResponse};
 use design_tokens::controls::{self, Pill};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Kind, Mark};
-use design_tokens::{TextRole, face, ink};
+use design_tokens::{face, ink};
 use egui::{Align, Label, Layout, Margin, Response, Sense, Stroke, Ui, Vec2};
 
 use super::{

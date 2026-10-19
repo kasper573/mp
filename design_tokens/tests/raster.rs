@@ -1,4 +1,4 @@
-use design_tokens::Face;
+use design_tokens::face::Face;
 use design_tokens::raster::raster;
 
 #[test]

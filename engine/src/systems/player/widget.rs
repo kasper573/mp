@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, face, ink, slip};
+use design_tokens::face::TextRole;
+use design_tokens::{face, ink, slip};
 use egui::{Pos2, Rect, Sense, Stroke, Ui, Vec2};
 
 use crate::systems::actor::Name;

@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, card, face, ink, sheet};
+use design_tokens::{card, face, ink, sheet};
 use egui::{Align, Label, Layout, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use strum::IntoStaticStr;
 

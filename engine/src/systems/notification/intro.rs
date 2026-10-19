@@ -1,7 +1,7 @@
+use design_tokens::face::Face;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::Face;
 use egui::emath::TSTransform;
 use egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};

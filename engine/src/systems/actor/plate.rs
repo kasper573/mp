@@ -1,8 +1,8 @@
+use design_tokens::face::Face;
 use std::collections::HashMap;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::Face;
 use egui::emath::{GuiRounding, TSTransform};
 use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 

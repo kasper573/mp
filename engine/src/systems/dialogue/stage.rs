@@ -5,10 +5,11 @@ use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
 use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::motion::SheetPose;
 use design_tokens::sheet::{self, Sheet};
-use design_tokens::{TextRole, ink, slip};
+use design_tokens::{ink, slip};
 use egui::{
     Align, Align2, Color32, Id, LayerId, Layout, Pos2, Rect, Sense, Ui, UiBuilder, Vec2,
     WidgetInfo, WidgetType,

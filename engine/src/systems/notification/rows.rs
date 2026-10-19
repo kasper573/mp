@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use design_tokens::dusk;
+use design_tokens::face::Face;
 use design_tokens::ink::Ground;
-use design_tokens::{Face, dusk};
 use egui::emath::{TSTransform, easing};
 use egui::{
     Align, Align2, Color32, FontId, Id, LayerId, Layout, Order, Rect, RichText, Sense, Ui,

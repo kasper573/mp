@@ -12,7 +12,7 @@ pub mod slip;
 
 use egui::{Context, Margin, Stroke, Style, TextStyle};
 
-pub use face::{Face, TextRole};
+use crate::face::TextRole;
 
 pub fn apply(ctx: &Context) {
     ctx.set_fonts(fonts::definitions());

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_terminal::{LineTone, TerminalInput};
-use design_tokens::{TextRole, controls, ink, sheet};
+use design_tokens::face::TextRole;
+use design_tokens::{controls, ink, sheet};
 use egui::{Id, Pos2, Stroke, Ui};
 
 use crate::systems::hud::{self, HudWindow};

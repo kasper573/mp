@@ -2,7 +2,8 @@ use std::collections::VecDeque;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{Face, ink, slip};
+use design_tokens::face::Face;
+use design_tokens::{ink, slip};
 use egui::{Align2, Mesh, RichText, Sense, UiBuilder, Vec2};
 
 use crate::core::gui::{self, Band};

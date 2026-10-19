@@ -3,8 +3,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::dusk;
+use design_tokens::face::TextRole;
 use design_tokens::ink::Ground;
-use design_tokens::{TextRole, dusk};
 
 use super::ClientScreen;
 use crate::core::audio::soundscape::Soundscape;

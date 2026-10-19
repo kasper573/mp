@@ -6,8 +6,9 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
+use design_tokens::face::TextRole;
 use design_tokens::sheet;
-use design_tokens::{TextRole, controls, face, ink, slip};
+use design_tokens::{controls, face, ink, slip};
 use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::assets::AssetRef;

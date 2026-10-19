@@ -1,6 +1,7 @@
 use bevy::prelude::*;
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, face, ink, sheet, slip};
+use design_tokens::{face, ink, sheet, slip};
 use egui::{Align, Color32, Label, Layout, Pos2, Rect, Ui};
 
 use super::card::Countdown;
