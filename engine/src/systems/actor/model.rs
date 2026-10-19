@@ -39,14 +39,14 @@ impl ContentRow for ModelDef {
             "/sprites/frame_size/width",
             sheet.frame_size.width,
             1,
-            8192,
+            MAX_FRAME_PX,
             "pixels",
         );
         cx.range(
             "/sprites/frame_size/height",
             sheet.frame_size.height,
             1,
-            8192,
+            MAX_FRAME_PX,
             "pixels",
         );
         for (index, module) in self.modules.iter().enumerate() {
@@ -272,6 +272,7 @@ impl GenericBusts {
 }
 
 pub const MAX_STRIP_FRAMES: usize = 256;
+pub const MAX_FRAME_PX: u32 = 8192;
 // The client loads every bust at startup, so each one, and the whole cast, must stay a quick download.
 pub const MAX_BUST_BYTES: FileBytes = FileBytes::kib(120);
 pub const MAX_CAST_BYTES: FileBytes = FileBytes::kib(3 * 1024);
@@ -313,7 +314,7 @@ pub fn build_all(loading: &mut Loading) {
                     "/sprites/actions",
                     "missing frames",
                     format!("no {} action", action.as_ref()),
-                    "every action: idle, walk, run, attack, death",
+                    format!("every action: {}", listed(Action::VARIANTS)),
                 );
                 continue;
             };
@@ -328,7 +329,10 @@ pub fn build_all(loading: &mut Loading) {
                         format!("/sprites/actions/{}", action.as_ref()),
                         "missing frames",
                         format!("direction {} has no frames", direction.as_ref()),
-                        "1 to 256 frames in each of s, sw, nw, n, ne, se, e, w",
+                        format!(
+                            "1 to {MAX_STRIP_FRAMES} frames in each of {}",
+                            listed(Direction::VARIANTS)
+                        ),
                     );
                     continue;
                 };
@@ -677,4 +681,8 @@ fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles
             }
         })
         .collect()
+}
+
+fn listed<T: AsRef<str>>(all: &[T]) -> String {
+    all.iter().map(AsRef::as_ref).collect::<Vec<_>>().join(", ")
 }

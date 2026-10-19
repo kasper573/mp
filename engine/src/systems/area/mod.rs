@@ -542,6 +542,19 @@ pub fn modules(content: &Content, area: AreaId) -> impl Iterator<Item = &AreaMod
     placed(content, area).iter().map(|placed| &placed.module)
 }
 
+/// Where an npc lives: the first area that places it as a resident, at its spot there.
+pub fn residence(content: &Content, npc: NpcId) -> Option<script::Place> {
+    content.ids::<AreaDef>().find_map(|area| {
+        modules(content, area).find_map(|module| match module {
+            AreaModule::Resident(resident) if resident.npc == npc => Some(script::Place {
+                area,
+                at: resident.at,
+            }),
+            _ => None,
+        })
+    })
+}
+
 pub fn objects(modules: &[Flattened]) -> impl Iterator<Item = (u32, &ObjectDef)> {
     modules
         .iter()

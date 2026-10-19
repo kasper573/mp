@@ -76,17 +76,9 @@ pub fn area_named(name: &str) -> &'static Area {
 
 /// Where the townsperson lives: standing there puts a player at their feet.
 pub fn resident_home(area: &str, npc: &str) -> Place {
-    let npc = id(npc);
-    let home = area::modules(content(), id(area))
-        .find_map(|module| match module {
-            AreaModule::Resident(resident) if resident.npc == npc => Some(resident.at),
-            _ => None,
-        })
-        .unwrap_or_else(|| panic!("nobody named {npc:?} lives in {area}"));
-    Place {
-        area: id(area),
-        at: home,
-    }
+    area::residence(content(), id(npc))
+        .filter(|home| home.area == id(area))
+        .unwrap_or_else(|| panic!("nobody named {npc:?} lives in {area}"))
 }
 
 /// The middle of the ground where the monster roams: its own corner of the area, or all of it.
