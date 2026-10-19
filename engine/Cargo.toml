@@ -25,13 +25,17 @@ path = "src/bin/render_actor.rs"
 name = "desktop-client"
 path = "src/bin/desktop_client/main.rs"
 
+# Build with `--profile profiling --features profiling` for debug symbols.
+[[bin]]
+name = "profile"
+path = "src/bin/bench/profile.rs"
+required-features = ["profiling"]
+
 [[bench]]
 name = "client"
 harness = false
 
 [features]
-# Opt-in CPU (pprof flamegraph) + allocation profiling of a fixed workload.
-# Build with `--profile profiling --features profiling` for debug symbols.
 profiling = ["dep:pprof", "bevy/debug"]
 
 # One dependency set for every target keeps the source tree free of #[cfg] gates: the browser-only
