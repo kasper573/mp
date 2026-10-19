@@ -4,8 +4,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
 
-use super::AreaDef;
-use crate::core::content::{ContentProblem, ContentRow, ErrorPlace, LoadError, row_folder};
+use super::tileset::TilesetDef;
+use super::{AreaDef, AreaId, Tilemap};
+use crate::core::content::id::nearest;
+use crate::core::content::media::ImageSizes;
+use crate::core::content::{
+    Content, ContentProblem, ContentRow, ErrorPlace, LoadError, Loading, row_folder,
+};
 use crate::core::math::{Pos, Rect};
 use crate::core::tiling::{GridSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
@@ -191,6 +196,61 @@ fn write_grid<T>(size: GridSize, cells: &[T], show: impl Fn(&T) -> String) -> St
     )
 }
 
+/// Reads an area's grids from the files beside its row, reporting everything wrong with them.
+pub fn read_area(
+    loading: &mut Loading,
+    content: &Content,
+    sizes: &ImageSizes,
+    id: AreaId,
+    map: &Tilemap,
+) -> Option<AreaGrids> {
+    let folder = folder(id.key(content));
+    let files = loading.row_folder(id);
+    refuse_strays(loading, &folder, &files, map);
+    let read = |name: &str, pointer: &str, loading: &mut Loading| -> Option<String> {
+        let file = format!("{folder}/{name}");
+        if !files.iter().any(|listed| listed == name) {
+            loading.row_error(
+                id,
+                pointer,
+                ContentProblem::new(
+                    "missing file",
+                    format!("no {name} in {folder}/"),
+                    format!("{file} beside the row"),
+                ),
+            );
+            return None;
+        }
+        loading
+            .read_text(&file)
+            .map_err(|error| {
+                loading.file_error(
+                    file.clone(),
+                    ErrorPlace::WholeFile,
+                    ContentProblem::new("unreadable file", error, "a UTF-8 CSV file"),
+                )
+            })
+            .ok()
+    };
+    let palette = read(PALETTE_FILE, "/map", loading);
+    let walk = read(WALK_FILE, "/map", loading);
+    let layers: Vec<Option<String>> = map
+        .ground
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| read(&layer_file(layer), &format!("/map/ground/{index}"), loading))
+        .collect();
+    let texts = AreaTexts {
+        palette: palette?,
+        walk: walk?,
+        layers: layers.into_iter().collect::<Option<_>>()?,
+    };
+    let mut errors = Vec::new();
+    let grids = parse_area(content, sizes, map, &folder, &texts, &mut errors);
+    loading.extend_errors(errors);
+    grids
+}
+
 pub struct GridFile<'a> {
     pub path: &'a str,
     pub text: &'a str,
@@ -356,4 +416,187 @@ fn write_records(records: impl Iterator<Item = Vec<String>>) -> String {
     }
     String::from_utf8(writer.into_inner().expect("records write to memory"))
         .expect("records write as UTF-8")
+}
+
+struct AreaTexts {
+    palette: String,
+    walk: String,
+    layers: Vec<String>,
+}
+
+fn refuse_strays(loading: &mut Loading, folder: &str, files: &[String], map: &Tilemap) {
+    let mut expected = vec![PALETTE_FILE.to_owned(), WALK_FILE.to_owned()];
+    expected.extend(map.ground.iter().map(|layer| layer_file(layer)));
+    for file in files.iter().filter(|file| !expected.contains(file)) {
+        loading.file_error(
+            format!("{folder}/{file}"),
+            ErrorPlace::WholeFile,
+            ContentProblem::new(
+                "unknown entry",
+                format!("file {file}"),
+                format!("only {}", expected.join(", ")),
+            ),
+        );
+    }
+}
+
+fn parse_area(
+    content: &Content,
+    sizes: &ImageSizes,
+    map: &Tilemap,
+    folder: &str,
+    texts: &AreaTexts,
+    errors: &mut Vec<LoadError>,
+) -> Option<AreaGrids> {
+    let size = map.size.grid();
+    let palette_file = format!("{folder}/{PALETTE_FILE}");
+    let palette_keys = read_palette(
+        GridFile {
+            path: &palette_file,
+            text: &texts.palette,
+        },
+        errors,
+    )?;
+    let palette = resolve_palette(content, sizes, map, &palette_file, &palette_keys, errors);
+    let entries = palette_keys.len();
+    let ground: Vec<Option<GroundLayer>> = map
+        .ground
+        .iter()
+        .zip(&texts.layers)
+        .map(|(layer, text)| {
+            let file = format!("{folder}/{}", layer_file(layer));
+            let cells = read_grid(
+                GridFile { path: &file, text },
+                size,
+                |field| palette_cell(field, entries),
+                errors,
+            )?;
+            Some(GroundLayer {
+                name: layer.clone(),
+                cells,
+            })
+        })
+        .collect();
+    let walk_file = format!("{folder}/{WALK_FILE}");
+    let walk = read_grid(
+        GridFile {
+            path: &walk_file,
+            text: &texts.walk,
+        },
+        size,
+        walk_cell,
+        errors,
+    );
+    Some(AreaGrids {
+        size,
+        palette: palette?,
+        palette_keys,
+        ground: ground.into_iter().collect::<Option<_>>()?,
+        walk: walk?,
+    })
+}
+
+/// The palette's rows as the tiles they name, when every row names a tile its tileset has at the
+/// area's tile size.
+fn resolve_palette(
+    content: &Content,
+    sizes: &ImageSizes,
+    map: &Tilemap,
+    file: &str,
+    rows: &[PaletteRow],
+    errors: &mut Vec<LoadError>,
+) -> Option<Vec<PaletteEntry>> {
+    let tilesets = content.table::<TilesetDef>();
+    let mut fault = |row: usize, column: usize, problem: ContentProblem| {
+        errors.push(LoadError {
+            file: file.to_owned(),
+            at: ErrorPlace::Csv {
+                row: row + 2,
+                column,
+            },
+            problem,
+        });
+        None
+    };
+    let entries: Vec<Option<PaletteEntry>> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let Some(tileset) = tilesets.id_of(&row.tileset) else {
+                return fault(
+                    index,
+                    1,
+                    ContentProblem::unknown_row(
+                        TilesetDef::TABLE,
+                        &row.tileset,
+                        nearest(tilesets.keys(), &row.tileset).as_deref(),
+                    ),
+                );
+            };
+            let def = tilesets.get(tileset)?;
+            if def.tile != map.tile {
+                return fault(
+                    index,
+                    1,
+                    ContentProblem::new(
+                        "tile size mismatch",
+                        format!("{} against {}", map.tile, def.tile),
+                        format!("tilesets of {} px tiles, the area's", map.tile),
+                    ),
+                );
+            }
+            if let Some(&(width, height)) = sizes.0.get(def.image.as_str()) {
+                let count = def.grid(width, height).count();
+                if row.tile >= count {
+                    return fault(
+                        index,
+                        2,
+                        ContentProblem::new(
+                            "tile out of range",
+                            format!("tile {} of {count}", row.tile),
+                            format!("0 to {}", count.saturating_sub(1)),
+                        ),
+                    );
+                }
+            }
+            Some(PaletteEntry {
+                tileset,
+                tile: row.tile,
+                flip: row.flip,
+            })
+        })
+        .collect();
+    entries.into_iter().collect()
+}
+
+fn palette_cell(field: &str, entries: usize) -> Result<Option<u32>, BadCell> {
+    if field.is_empty() {
+        return Ok(None);
+    }
+    let index: u32 = field.parse().map_err(|_| BadCell {
+        rule: "bad cell",
+        expected: "empty or a palette index".to_owned(),
+    })?;
+    if index as usize >= entries {
+        return Err(BadCell {
+            rule: "palette out of range",
+            expected: format!(
+                "0 to {}, an index into the area's {entries} palette entries",
+                entries.saturating_sub(1)
+            ),
+        });
+    }
+    Ok(Some(index))
+}
+
+fn walk_cell(field: &str) -> Result<Option<bool>, BadCell> {
+    match field {
+        "" => Ok(None),
+        "1" => Ok(Some(true)),
+        "0" => Ok(Some(false)),
+        _ => Err(BadCell {
+            rule: "bad cell",
+            expected: "empty, 1 or 0".to_owned(),
+        }),
+    }
 }
