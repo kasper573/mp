@@ -24,7 +24,10 @@ fn play(shoot: &mut Shoot) {
         Some(resident_home("glimmercap", "gnome_alchemist")),
     );
     let mut me = shoot.roll(player);
-    me.caption("Your class grants skill points as you level: P opens your skills");
+    me.caption(&format!(
+        "Your class grants skill points as you level: {} opens your skills",
+        input_name(InputAction::ToggleSkills)
+    ));
     me.act(InputAction::ToggleSkills);
     me.find_ui("Skills");
     me.find_ui(UiTarget::containing("to spend"));
@@ -169,5 +172,17 @@ fn play(shoot: &mut Shoot) {
         "Every point is back. The slots that held the skills stay, dimmed, until they are learned again",
     );
     me.hover_ui(UiTarget::starting("Hotbar slot 1"));
+    me.hold();
+    me.caption(
+        "Raised to its last rank, Guard looks like any learned skill: only its corner says 2/2",
+    );
+    me.act(InputAction::ToggleSkills);
+    me.click_ui(UiTarget::starting("Guard node"));
+    me.click_ui(UiTarget::starting("Guard node"));
+    me.wait_until("Guard planned to its last rank", |snapshot| {
+        planned_rank(snapshot, "guard") == 2
+    });
+    me.click_ui(UiTarget::starting("Confirm"));
+    me.wait_until("Guard full", |snapshot| learned(snapshot, "guard") == 2);
     me.hold();
 }

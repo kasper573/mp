@@ -115,7 +115,10 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the refused pick to say why", |snapshot| {
         erred(snapshot, "Needs")
     });
-    me.caption("History is a window like any other: H opens it here too, over the conversation");
+    me.caption(&format!(
+        "History is a window like any other: {} opens it here too, over the conversation",
+        input_name(InputAction::ToggleHistory)
+    ));
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
     me.caption(&format!(
