@@ -231,16 +231,19 @@ pub enum Bound<'c, V: Vocabulary> {
     Condition(&'c Expr<V>),
 }
 
-pub type ModuleErrors = Vec<(usize, ScriptError)>;
-type ValuesOf<'c, V> = Option<&'c BTreeMap<String, VarValue<V>>>;
-type DeclaredOf<'c, V> = Option<&'c BTreeMap<String, Variable<V>>>;
+/// Why one of a row's script modules, the one at `module` among them, did not compile.
+#[derive(Debug)]
+pub struct ModuleError {
+    pub module: usize,
+    pub error: ScriptError,
+}
 
 pub fn compile_owner<'c, V: Vocabulary>(
     content: &'c Content,
     owner: V::OwnerKind,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     compile_modules(content, owner, None, label, modules)
 }
 
@@ -250,7 +253,7 @@ pub fn compile_row<'c, V: Vocabulary>(
     row: OwnerRow<V>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     compile_modules(content, row.kind, Some(row), label, modules)
 }
 
@@ -260,7 +263,7 @@ fn compile_modules<'c, V: Vocabulary>(
     row: Option<OwnerRow<V>>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     let mut procedures = Vec::new();
     let mut errors = Vec::new();
     let mut answered: HashMap<<V::Event as EventDef<V>>::Kind, Vec<String>> = HashMap::new();
@@ -276,16 +279,19 @@ fn compile_modules<'c, V: Vocabulary>(
         ) {
             Ok(procedure) => procedure,
             Err(error) => {
-                errors.push((index, error));
+                errors.push(ModuleError {
+                    module: index,
+                    error,
+                });
                 continue;
             }
         };
         for (node, event) in &procedure.entries {
             let twice = answered.entry(event.kind()).or_default();
             if let Some(first) = twice.first() {
-                errors.push((
-                    index,
-                    ScriptError {
+                errors.push(ModuleError {
+                    module: index,
+                    error: ScriptError {
                         rule: "answered twice",
                         owner: label.to_owned(),
                         node: Some(procedure.name(*node).to_owned()),
@@ -295,7 +301,7 @@ fn compile_modules<'c, V: Vocabulary>(
                         ),
                         script: None,
                     },
-                ));
+                });
             }
             twice.push(procedure.name(*node).to_owned());
         }
@@ -390,51 +396,50 @@ fn compile_source<'c, V: Vocabulary>(
         expected,
         script: None,
     };
-    let (source, values, declared): (Source<'c, V>, ValuesOf<'c, V>, DeclaredOf<'c, V>) =
-        match binding.call {
-            Call::Shared { script, values } => {
-                let def = script.get(content);
-                let called = !stack.is_empty();
-                if called {
-                    if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
-                        return Err(at_call(
-                            "owners of another kind",
-                            format!(
-                                "script/{} is {}'s, run by {}",
-                                script.key(content),
-                                def.owner.name(),
-                                binding.owner.name()
-                            ),
-                        ));
-                    }
-                } else if def.owner != binding.owner {
+    let (source, values, declared) = match binding.call {
+        Call::Shared { script, values } => {
+            let def = script.get(content);
+            let called = !stack.is_empty();
+            if called {
+                if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
                     return Err(at_call(
                         "owners of another kind",
-                        format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                        format!(
+                            "script/{} is {}'s, run by {}",
+                            script.key(content),
+                            def.owner.name(),
+                            binding.owner.name()
+                        ),
                     ));
                 }
-                (
-                    Source {
-                        state: slots(&def.state),
-                        locals: slots(&def.locals),
-                        nodes: &def.nodes,
-                        label: format!("script/{}", script.key(content)),
-                    },
-                    Some(values),
-                    Some(&def.variables),
-                )
+            } else if def.owner != binding.owner {
+                return Err(at_call(
+                    "owners of another kind",
+                    format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                ));
             }
-            Call::Inline(inline) => (
+            (
                 Source {
-                    state: slots(&inline.state),
-                    locals: slots(&inline.locals),
-                    nodes: &inline.nodes,
-                    label: binding.label.clone(),
+                    state: slots(&def.state),
+                    locals: slots(&def.locals),
+                    nodes: &def.nodes,
+                    label: format!("script/{}", script.key(content)),
                 },
-                None,
-                None,
-            ),
-        };
+                Some(values),
+                Some(&def.variables),
+            )
+        }
+        Call::Inline(inline) => (
+            Source {
+                state: slots(&inline.state),
+                locals: slots(&inline.locals),
+                nodes: &inline.nodes,
+                label: binding.label.clone(),
+            },
+            None,
+            None,
+        ),
+    };
     if source.nodes.len() > MAX_NODES {
         return Err(fail(
             "out of range",

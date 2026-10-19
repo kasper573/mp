@@ -3,6 +3,7 @@ pub mod effect;
 pub mod event;
 pub mod query;
 
+pub use crate::core::script::Fill;
 pub use effect::RiftEffect;
 pub use event::{EventKind, RiftEvent, Who};
 pub use query::RiftQuery;
@@ -105,7 +106,6 @@ pub type DialogueNode = script::DialogueNode<RiftScripting>;
 pub type Choice = script::Choice<RiftScripting>;
 pub type Procedure = script::Procedure<RiftScripting>;
 pub type MayDo = script::MayDo<RiftScripting>;
-pub type Fill<T> = script::Fill<T>;
 pub type Owner = script::Owner<RiftScripting>;
 pub type OwnerRow = script::OwnerRow<RiftScripting>;
 pub type FlowKey = script::FlowKey<RiftScripting>;
@@ -295,16 +295,16 @@ impl Vocabulary for RiftScripting {
 
     fn row_value(content: &Content, table: &str, key: &str) -> Option<RowRef> {
         Some(match table {
-            "area" => RowRef::Area(content.by_key::<AreaDef>(key)?),
-            "item" => RowRef::Item(content.by_key::<ItemDef>(key)?),
-            "npc" => RowRef::Npc(content.by_key::<NpcDef>(key)?),
-            "quest" => RowRef::Quest(content.by_key::<QuestDef>(key)?),
-            "shop" => RowRef::Shop(content.by_key::<ShopDef>(key)?),
-            "memory" => RowRef::Memory(content.by_key::<MemoryDef>(key)?),
-            "notification" => RowRef::Notification(content.by_key::<NotificationDef>(key)?),
-            "class" => RowRef::Class(content.by_key::<ClassDef>(key)?),
-            "skill" => RowRef::Skill(content.by_key::<SkillDef>(key)?),
-            "status_effect" => RowRef::StatusEffect(content.by_key::<StatusEffectDef>(key)?),
+            AreaDef::TABLE => RowRef::Area(content.by_key(key)?),
+            ItemDef::TABLE => RowRef::Item(content.by_key(key)?),
+            NpcDef::TABLE => RowRef::Npc(content.by_key(key)?),
+            QuestDef::TABLE => RowRef::Quest(content.by_key(key)?),
+            ShopDef::TABLE => RowRef::Shop(content.by_key(key)?),
+            MemoryDef::TABLE => RowRef::Memory(content.by_key(key)?),
+            NotificationDef::TABLE => RowRef::Notification(content.by_key(key)?),
+            ClassDef::TABLE => RowRef::Class(content.by_key(key)?),
+            SkillDef::TABLE => RowRef::Skill(content.by_key(key)?),
+            StatusEffectDef::TABLE => RowRef::StatusEffect(content.by_key(key)?),
             _ => return None,
         })
     }
@@ -333,21 +333,6 @@ pub fn owner_label(kind: OwnerKind, key: &str, object: Option<&str>) -> String {
     match object {
         Some(object) => format!("{}/{key} › {object}", kind.name()),
         None => format!("{}/{key}", kind.name()),
-    }
-}
-
-pub fn row_key(content: &Content, row: RowRef) -> String {
-    match row {
-        RowRef::Area(id) => id.key(content).to_owned(),
-        RowRef::Item(id) => id.key(content).to_owned(),
-        RowRef::Npc(id) => id.key(content).to_owned(),
-        RowRef::Quest(id) => id.key(content).to_owned(),
-        RowRef::Shop(id) => id.key(content).to_owned(),
-        RowRef::Memory(id) => id.key(content).to_owned(),
-        RowRef::Notification(id) => id.key(content).to_owned(),
-        RowRef::Class(id) => id.key(content).to_owned(),
-        RowRef::Skill(id) => id.key(content).to_owned(),
-        RowRef::StatusEffect(id) => id.key(content).to_owned(),
     }
 }
 
@@ -415,7 +400,7 @@ pub fn build_all(loading: &mut Loading) {
             Err(failed) => errors.extend(
                 failed
                     .into_iter()
-                    .map(|(index, error)| (modules[index].0.clone(), error)),
+                    .map(|failed| (modules[failed.module].0.clone(), failed.error)),
             ),
         }
     };

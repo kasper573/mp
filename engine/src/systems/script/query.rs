@@ -152,116 +152,114 @@ pub enum Among {
     Anyone,
 }
 
-type Of = Option<Box<Condition>>;
-
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RiftQuery {
     Level {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     IsClass {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         class: ClassId,
     },
     SkillRank {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         skill: SkillId,
     },
     SkillStat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         skill: SkillId,
         stat: SkillStat,
     },
     SpentSkillPoints {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     Stat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         stat: StatKind,
     },
     HasStatus {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         effect: StatusEffectId,
     },
     StatusCount {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         category: Option<StatusCategory>,
     },
     StatusPower,
     Holding {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         item: ItemId,
     },
     FreeSlots {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     Wearing {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         item: ItemId,
     },
     Memory {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         memory: MemoryId,
     },
     SetWithin {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         memory: MemoryId,
         seconds: Box<Condition>,
     },
     OnQuest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestCooling {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     TaskDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
         task: String,
     },
     QuestResetsIn {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     Inside {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         object: String,
     },
     InArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         area: AreaId,
     },
     KnowsArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         area: AreaId,
     },
     Nearest {

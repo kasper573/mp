@@ -185,7 +185,7 @@ fn a_script_that_runs_itself_is_refused() {
         .err()
         .expect("refused")
         .remove(0)
-        .1;
+        .error;
 
     assert_eq!(error.rule, "runs itself");
     assert!(error.expected.contains("loops"), "{}", error.expected);
@@ -272,7 +272,7 @@ fn compile(
     owner: OwnerKind,
     modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
-    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
+    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).error)
 }
 
 fn entry(owner: OwnerKind, next: &str) -> Value {

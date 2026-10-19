@@ -16,9 +16,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
-pub use dialogue::{
-    Choice, ChoiceOffer, DialogueNode, DialogueView, SpokenValues, check_reveals_unique,
-};
+pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
 pub use expr::Expr;
 pub use may_do::{MayDo, Reach};
 pub use node::{Assignment, Node, Target};

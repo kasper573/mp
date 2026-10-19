@@ -171,7 +171,7 @@ impl History {
             .records
             .iter_mut()
             .rev()
-            .take_while(|record| now.since(record.at).0 < MERGE_WITHIN.0);
+            .take_while(|record| now.since(record.at) < MERGE_WITHIN);
         for record in recent {
             if let Some(merged) = record.entry.merged(&entry) {
                 record.entry = merged;
