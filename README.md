@@ -84,6 +84,10 @@ A game is a folder: `game.json` for its settings, one JSON row per file under `t
 `assets/`. [`example_game/`](example_game) is one. The server loads the folder at start and serves it;
 clients sync it and keep it on the device; the same binaries run any folder that fits their build.
 
+A row whose file names an owner (`"owner": "area/island"`) is local to that row: only the owner and
+the rows inside it may use it, and the editor lists it in the owner's Local content rather than with
+the game's global rows.
+
 ```sh
 just editor               # build editor, game-server and desktop-client, open the editor on example_game/
 just editor ~/my-game     # …or on another folder
