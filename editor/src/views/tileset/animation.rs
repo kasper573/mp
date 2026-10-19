@@ -4,6 +4,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
 use engine::systems::area::tileset::{MAX_TILE_FRAME_MS, MAX_TILE_FRAMES, TileFrame};
+use strum::{IntoStaticStr, VariantArray};
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;
@@ -15,20 +16,12 @@ use crate::views::model::{StripFrame, preview};
 
 const PREVIEW_W: f32 = 224.0;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, VariantArray, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum OffsetUnit {
     #[default]
     Columns,
     Rows,
-}
-
-impl OffsetUnit {
-    fn label(self) -> &'static str {
-        match self {
-            OffsetUnit::Columns => "columns",
-            OffsetUnit::Rows => "rows",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -247,11 +240,11 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         });
         widgets::kv(ui, "offset by", |ui| {
             widgets::combo(("offset-unit", key))
-                .selected_text(unit.label())
+                .selected_text(<&str>::from(unit))
                 .width(140.0)
                 .show_ui(ui, |ui| {
-                    for option in [OffsetUnit::Columns, OffsetUnit::Rows] {
-                        ui.selectable_value(&mut picked_unit, option, option.label());
+                    for &option in OffsetUnit::VARIANTS {
+                        ui.selectable_value(&mut picked_unit, option, <&str>::from(option));
                     }
                 });
         });

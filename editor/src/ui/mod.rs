@@ -2,6 +2,7 @@ pub mod assets;
 pub mod browser;
 pub mod dialogs;
 pub mod history;
+pub mod levels;
 pub mod output;
 pub mod patterns;
 pub mod report;
