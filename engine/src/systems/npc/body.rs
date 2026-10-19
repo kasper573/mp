@@ -12,7 +12,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
 use crate::systems::area::{self, AreaTag, object};
 use crate::systems::dialogue;
-use crate::systems::movement;
+use crate::systems::movement::{self, Approach};
 use crate::systems::npc::{Home, Npc, Roams};
 use crate::systems::reach;
 use crate::systems::script::effect::{Aim, Arrow, Link};
@@ -226,17 +226,16 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             (!movement::moving(world, npc)).then_some(Outcome::Next)
         }
         Act::WalkTo { to, within } => {
-            let Some(goal) = destination(world, npc, to) else {
+            let Some(aim) = destination(world, npc, to, within) else {
                 return Some(Outcome::Blocked);
             };
-            if movement::approach(world, npc, goal, within) {
-                movement::halt(world, npc);
-                return Some(Outcome::Arrived);
+            match movement::approach(world, npc, aim, within) {
+                Approach::Arrived => Some(Outcome::Arrived),
+                Approach::Unreachable => Some(Outcome::Blocked),
+                Approach::Approaching => {
+                    (running.started && !movement::moving(world, npc)).then_some(Outcome::Blocked)
+                }
             }
-            if running.started && !movement::moving(world, npc) {
-                return Some(Outcome::Blocked);
-            }
-            None
         }
         Act::Attack { target, within } => {
             if world.get_entity(target).is_err() || stat::is_dead(world, target) {
@@ -276,20 +275,24 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
     }
 }
 
-fn destination(world: &World, npc: Entity, to: Destination) -> Option<Pos<Tiles>> {
-    match to {
-        Destination::Place(at) => Some(at),
-        Destination::Object(object) => object::shape_of(world, object).map(|shape| shape.center()),
+/// A place or object stood on by others is walked to beside them instead.
+fn destination(
+    world: &World,
+    npc: Entity,
+    to: Destination,
+    within: Tiles,
+) -> Option<movement::Aim> {
+    let spot = match to {
+        Destination::Place(at) => at,
+        Destination::Object(object) => object::shape_of(world, object)?.center(),
         Destination::Actor(actor) => {
-            if stat::is_dead(world, actor) {
-                return None;
-            }
-            if !area::same_area(world, npc, actor) {
-                return None;
-            }
-            movement::position(world, actor)
+            let there = !stat::is_dead(world, actor) && area::same_area(world, npc, actor);
+            return there.then_some(movement::Aim::Actor(actor));
         }
-    }
+    };
+    Some(movement::Aim::Point(movement::vacant_near(
+        world, npc, spot, within,
+    )))
 }
 
 fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
@@ -303,14 +306,14 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
     let grid = area.grid_for(area::wild(world, npc));
     let home = world.get::<Home>(npc).map(|home| home.0);
     let roams = world.get::<Roams>(npc).map(|roams| roams.0);
-    let goal = {
-        let mut rng = world.resource_mut::<Rng>();
+    let goal = world.resource_scope(|world, mut rng: Mut<Rng>| {
+        let free = |cell| movement::others_on(world, npc, cell) == 0;
         match (leash.zip(home), roams) {
-            (Some((leash, home)), _) => grid.random_reachable_near(&mut rng, at, home, leash),
-            (None, Some(roams)) => grid.random_reachable_within(&mut rng, at, roams),
-            (None, None) => grid.random_reachable(&mut rng, at),
+            (Some((leash, home)), _) => grid.random_reachable_near(&mut rng, at, home, leash, free),
+            (None, Some(roams)) => grid.random_reachable_within(&mut rng, at, roams, free),
+            (None, None) => grid.random_reachable(&mut rng, at, free),
         }
-    };
+    });
     if let Some(goal) = goal {
         movement::goto(world, npc, goal);
     }

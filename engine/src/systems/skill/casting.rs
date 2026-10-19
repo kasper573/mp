@@ -14,7 +14,6 @@ use crate::core::time::WallClock;
 use crate::systems::actor::{self, playing};
 use crate::systems::combat::{self, Relation};
 use crate::systems::item::Inventory;
-use crate::systems::movement::{halt, on_tile};
 use crate::systems::notification;
 use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
@@ -151,7 +150,8 @@ pub fn fits(world: &World, caster: Entity, target: Entity, targeting: Targeting)
 }
 
 /// Walks every caster toward what it aims at and performs the skill on arrival, once ready: the
-/// cost is taken, the cooldown starts and `used` is raised on the skill's script.
+/// cost is taken, the cooldown starts and `used` is raised on the skill's script. Between casts it
+/// settles, spreading out from others that crowd its tile.
 pub fn casts(world: &mut World, intents: &mut reach::Intents) {
     for (caster, intent) in reach::casting(world, intents) {
         let (ReachAct::Cast { skill, repeat }, target) = (intent.act, intent.target) else {
@@ -171,8 +171,8 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
             Pursuit::Approaching => continue,
             Pursuit::Arrived => {}
         }
-        halt(world, caster);
-        if !on_tile(world, caster) || !playing::ready(world, caster) {
+        if !playing::ready(world, caster) {
+            reach::settle(world, caster, range);
             continue;
         }
         let targeting = skill.get(world.resource::<Content>()).target;

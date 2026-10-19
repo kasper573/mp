@@ -20,7 +20,7 @@ use engine::systems::input::map::InputMap;
 use engine::systems::interact::InteractRequest;
 use engine::systems::item::{self, Inventory, ItemId, ItemStack};
 use engine::systems::memory::{self, MemoryId};
-use engine::systems::movement::{Position, position};
+use engine::systems::movement::{self, position};
 use engine::systems::notification::{
     Notification, NotificationId, NotificationKind, NotificationSent,
 };
@@ -372,7 +372,7 @@ pub fn health(sim: &mut Sim, who: Entity) -> f32 {
 }
 
 pub fn place(sim: &mut Sim, entity: Entity, at: Pos<Tiles>) {
-    sim.world().entity_mut(entity).insert(Position::at(at));
+    movement::relocate(sim.world(), entity, at);
 }
 
 pub fn spoken(id: NotificationId) -> Notification {

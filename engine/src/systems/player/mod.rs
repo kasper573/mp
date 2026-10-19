@@ -2,7 +2,7 @@ pub mod session;
 pub mod snapshot;
 pub mod widget;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::Rgba;
 use crate::core::math::{Direction, Pos, Rng};
-use crate::core::tiling::{CellPos, TilePos, Tiles};
+use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
 use crate::systems::GameSettings;
 use crate::systems::account::Identity;
@@ -30,7 +30,7 @@ use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
 use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
-use crate::systems::movement::{HeardMove, Position};
+use crate::systems::movement::{self, HeardMove, Position};
 use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
@@ -315,7 +315,7 @@ pub fn join(world: &mut World) {
             Some(JoinAs { snapshot, start }) if start.area == zone => {
                 let (snapshot, start) = (snapshot.clone(), *start);
                 (
-                    beside_anyone_standing_there(world, area, start.at),
+                    movement::place_beside(world, zone, &area.grid, start.at),
                     snapshot::materialize(&content, &snapshot, start, clock, immortal),
                 )
             }
@@ -323,7 +323,8 @@ pub fn join(world: &mut World) {
                 let name = world
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
-                let at = spawn_position(world, policy, zone, area);
+                let spawn = spawn_position(world, policy, zone, area);
+                let at = movement::place_beside(world, zone, &area.grid, spawn);
                 let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
                 let start = Place { area: zone, at };
                 let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
@@ -339,23 +340,6 @@ pub fn spawned(world: &mut World, player: Entity) {
     transition::raise_area(world, EventKind::Entered, player);
 }
 
-/// A character asked to start on a tile someone already stands on is put down on the nearest
-/// free one instead, so neither hides the other.
-fn beside_anyone_standing_there(
-    world: &mut World,
-    area: &area::Area,
-    at: Pos<Tiles>,
-) -> Pos<Tiles> {
-    let taken: HashSet<CellPos> = world
-        .query::<&Position>()
-        .iter(world)
-        .map(|position| position.pos.cell())
-        .collect();
-    area.grid
-        .nearest_walkable_where(at, |cell| !taken.contains(&cell))
-        .unwrap_or(at)
-}
-
 fn spawn_position(
     world: &mut World,
     policy: SpawnPolicy,
@@ -369,7 +353,7 @@ fn spawn_position(
         SpawnPolicy::Map => fallback(),
         SpawnPolicy::Dist => area
             .grid
-            .random_node(&mut world.resource_mut::<Rng>())
+            .random_node(&mut world.resource_mut::<Rng>(), |_| true)
             .unwrap_or_else(fallback),
     }
 }

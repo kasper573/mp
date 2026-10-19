@@ -56,7 +56,7 @@ use crate::systems::area::AreaId;
 use crate::systems::player::PlayerDefId;
 use actor::{Actor, Hitbox};
 use area::AreaTag;
-use movement::Position;
+use movement::{Position, TileClaim};
 use skill::Cooldowns;
 use status::{ActiveAspects, Boosts, Statuses};
 use terminal::TerminalKind;
@@ -114,6 +114,7 @@ pub struct GameSettings {
 pub struct Character {
     pub replicated: Replicated,
     pub position: Position,
+    pub claim: TileClaim,
     pub actor: Actor,
     pub hitbox: Hitbox,
     pub area: AreaTag,
@@ -127,6 +128,7 @@ impl Character {
     pub fn new(position: Position, actor: Actor, hitbox: Hitbox, area: AreaTag) -> Character {
         Character {
             replicated: Replicated,
+            claim: TileClaim::at(area.area, position.pos),
             position,
             actor,
             hitbox,
@@ -183,6 +185,7 @@ pub fn server_app(
     protocol(&mut app);
     visibility::register(&mut app);
     app.init_resource::<player::Players>()
+        .init_resource::<movement::TileClaims>()
         .init_resource::<area::transition::Departures>()
         .init_resource::<combat::RegenAt>()
         .init_resource::<skill::reset::PendingResets>()
