@@ -18,6 +18,7 @@ use atlas::WorldAtlas;
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, Fixture, row_file};
 use engine::core::math::{Pos, Size};
+use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
 use engine::systems::area::world_map::{Card, Note, Region, RegionColor, WorldMap, WorldMapDef};
 use engine::systems::area::{self, AreaDef, AreaId};
@@ -27,7 +28,6 @@ use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection};
 use crate::ui::{sidebar, theme};
 use crate::value;
-use crate::views::area::TILE_PX;
 use crate::views::navigation;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
@@ -365,7 +365,7 @@ fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {
 }
 
 fn shows_areas(zoom: f32) -> bool {
-    zoom * TILE_PX > AREA_PX_PER_TILE
+    zoom * TILE.0 > AREA_PX_PER_TILE
 }
 
 fn card_at(card: &Card) -> Pos2 {

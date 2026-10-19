@@ -5,6 +5,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
+use engine::core::render::TILE;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef};
@@ -799,7 +800,7 @@ fn start(
                 width: (MAP.x * ppp) as u32,
                 height: (MAP.y * ppp) as u32,
                 center,
-                zoom: px_per_tile / super::area::TILE_PX * ppp,
+                zoom: px_per_tile / TILE.0 * ppp,
                 generation,
                 live: true,
             });

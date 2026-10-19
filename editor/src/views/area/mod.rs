@@ -35,6 +35,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::{Pos, Rect, Size};
+use engine::core::render::TILE;
 use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
@@ -56,7 +57,6 @@ use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
 
-pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;
 pub const MAX_ZOOM: f32 = 16.0;
 const MAX_FIT_ZOOM: f32 = 4.0;
@@ -535,7 +535,7 @@ fn show_canvas(
             let fit = navigation::fit_zoom(
                 canvas_rect.size(),
                 Vec2::new(size.width, size.height),
-                TILE_PX,
+                TILE.0,
             ) * FIT_MARGIN;
             view.zoom = fit.clamp(MIN_ZOOM, MAX_FIT_ZOOM);
             view.fitted = true;

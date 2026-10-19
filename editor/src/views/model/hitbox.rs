@@ -1,5 +1,6 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::ContentRow;
+use engine::core::render::TILE;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
@@ -13,7 +14,6 @@ use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::stage::{self, Posed, PosedActor, Scene};
 use crate::ui::{theme, widgets};
-use crate::views::area::TILE_PX;
 
 const ZOOM: f32 = 4.0;
 const INSET: Vec2 = Vec2::new(400.0, 300.0);
@@ -85,7 +85,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let frame = strip_of(row, ModelStrip::default())
         .first()
         .map(|frame| frame.frame);
-    let tile = TILE_PX * ZOOM;
+    let tile = TILE.0 * ZOOM;
     ui.horizontal_top(|ui| {
         let canvas_w = (ui.available_width() - INSET.x - 24.0).max(200.0);
         let canvas_h = (ui.available_height() - 30.0).max(200.0);

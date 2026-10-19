@@ -8,6 +8,7 @@ use egui::{
     Vec2,
 };
 use engine::core::math::Pos;
+use engine::core::render::TILE;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
 use engine::systems::area::{self, AreaId};
@@ -21,7 +22,7 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
-use crate::views::area::{TILE_PX, scene};
+use crate::views::area::scene;
 use crate::views::navigation::{self, Viewport};
 
 const LABEL: f32 = 28.0;
@@ -309,7 +310,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         width: (card.art.width() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         height: (card.art.height() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         center: Pos::new(info.size.width / 2.0, info.size.height / 2.0),
-        zoom: px_per_tile / TILE_PX * drawing.ppp,
+        zoom: px_per_tile / TILE.0 * drawing.ppp,
         generation: atlas.generation,
         live: false,
     });
@@ -755,7 +756,7 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
             view.zoom = navigation::fit_zoom(
                 rect.size() - Vec2::splat(80.0),
                 Vec2::new(bounds.width(), bounds.height()),
-                TILE_PX,
+                TILE.0,
             )
             .clamp(MIN_ZOOM, MAX_ZOOM);
         }

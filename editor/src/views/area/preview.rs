@@ -1,5 +1,6 @@
 use egui::{Sense, Ui, Vec2};
 use engine::core::math::Pos;
+use engine::core::render::TILE;
 use engine::systems::area;
 use engine::systems::script::Place;
 use serde_json::Value;
@@ -94,7 +95,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let zoom = navigation::fit_zoom(
         rect.size(),
         Vec2::new(area.size.width, area.size.height),
-        super::TILE_PX,
+        TILE.0,
     );
     let center = Pos::new(area.size.width / 2.0 - 0.5, area.size.height / 2.0 - 0.5);
     let view_key = format!("pick:{area_key}");
