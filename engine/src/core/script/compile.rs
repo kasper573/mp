@@ -17,6 +17,7 @@ use super::{
     ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::time::Seconds;
 
 pub type Eval = Box<dyn Fn(&World, &FlowCx) -> Value + Send + Sync>;
 pub type EffectCall<V> =
@@ -107,7 +108,7 @@ pub enum Step<V: Vocabulary> {
     },
     Wait {
         seconds: Eval,
-        at_most: f32,
+        at_most: Seconds,
         next: Option<StepIndex>,
     },
     Set {
@@ -648,10 +649,10 @@ fn compile_source<'c, V: Vocabulary>(
                 at_most,
                 next,
             } => {
-                if !(*at_most > 0.0 && *at_most <= MAX_WAIT) {
+                if !(at_most.0 > 0.0 && *at_most <= MAX_WAIT) {
                     return Err(node_fail(
                         "out of range",
-                        format!("at_most up to {MAX_WAIT} seconds"),
+                        format!("at_most up to {} seconds", MAX_WAIT.0),
                     ));
                 }
                 let (seconds, uses) = cx

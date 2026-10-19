@@ -6,11 +6,12 @@ use serde::{Deserialize, Serialize};
 use super::dialogue::DialogueNode;
 use super::expr::Expr;
 use super::{Arrow, ScriptId, VarValue, Vocabulary};
+use crate::core::time::Seconds;
 
 pub const MAX_NODES: usize = 2_000;
 pub const MAX_SLOTS: usize = 32;
 pub const MAX_REPEAT: u32 = 1_000;
-pub const MAX_WAIT: f32 = 3_600.0;
+pub const MAX_WAIT: Seconds = Seconds(3_600.0);
 pub const MAX_STEPS: usize = 10_000;
 pub const MAX_CALL_DEPTH: usize = 8;
 pub const MAX_LIVE_FLOWS: usize = 32;
@@ -47,7 +48,7 @@ pub enum Node<V: Vocabulary> {
     },
     Wait {
         seconds: Expr<V>,
-        at_most: f32,
+        at_most: Seconds,
         #[serde(default, skip_serializing_if = "Arrow::is_none")]
         next: Arrow,
     },

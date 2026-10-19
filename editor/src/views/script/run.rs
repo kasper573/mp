@@ -2,6 +2,7 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
+use std::time::Duration;
 
 use crate::keymap::EditorKey;
 use crate::views::character::Standing;
@@ -79,7 +80,7 @@ impl Default for RunSetup {
 pub enum ScriptRunState {
     Running,
     Dialogue,
-    Waiting { seconds: f64 },
+    Waiting { left: Duration },
     Paused { what: String },
     Stepping,
     Ended,
@@ -371,7 +372,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let state = match &run.state {
         ScriptRunState::Running => "running".to_owned(),
         ScriptRunState::Dialogue => "waiting for a choice".to_owned(),
-        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.1} s"),
+        ScriptRunState::Waiting { left } => format!("waiting {:.1} s", left.as_secs_f64()),
         ScriptRunState::Paused { what } => format!("paused in {what}"),
         ScriptRunState::Stepping => "stepping".to_owned(),
         ScriptRunState::Ended => "ended".to_owned(),
@@ -608,7 +609,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
             .last()
             .map(|node| format!("waiting at {node}"))
             .unwrap_or_default(),
-        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.0} s"),
+        ScriptRunState::Waiting { left } => format!("waiting {:.0} s", left.as_secs_f64()),
         ScriptRunState::Ended => "ended".to_owned(),
         _ => run
             .visited
@@ -1292,15 +1293,17 @@ impl ScriptRun {
     }
 
     fn skip_wait(&mut self) {
-        if let ScriptRunState::Waiting { seconds } = self.state {
-            let jump = std::time::Duration::from_secs_f64(seconds.max(0.0) + 0.05);
+        if let ScriptRunState::Waiting { left } = self.state {
+            let jump = left + Duration::from_millis(50);
             self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(jump));
             self.tick();
             self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
-            self.log
-                .push(RunLogLine::Note(format!("skipped {seconds:.1} s")));
+            self.log.push(RunLogLine::Note(format!(
+                "skipped {:.1} s",
+                left.as_secs_f64()
+            )));
         }
     }
 
@@ -1336,10 +1339,7 @@ impl ScriptRun {
         };
         self.log.extend(notices);
         self.conversation = self.world().get::<Conversation>(self.subject).cloned();
-        let now = self
-            .world()
-            .resource::<bevy::time::Time>()
-            .elapsed_secs_f64();
+        let now = self.world().resource::<bevy::time::Time>().elapsed();
         let instances = self.world().resource::<RiftInstances>();
         let live = instances.live_flows(self.owner);
         let pause = self.flow.and_then(|key| instances.pause_of(key));
@@ -1348,7 +1348,7 @@ impl ScriptRun {
         } else {
             match pause {
                 Some(Pause::Wait { until }) => ScriptRunState::Waiting {
-                    seconds: (until - now).max(0.0),
+                    left: until.saturating_sub(now),
                 },
                 Some(Pause::NextTick { .. }) => ScriptRunState::Running,
                 Some(Pause::Step { .. }) => ScriptRunState::Stepping,
