@@ -13,7 +13,7 @@ use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
-use super::{move_dialogs, theme, unused_dialog, widgets};
+use super::{folder_dialogs, move_dialogs, theme, unused_dialog, widgets};
 use crate::app::{
     CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, RenameDialog,
     RenameTarget,
@@ -409,6 +409,7 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
     let title = match &dialog.target {
         RenameTarget::Row { table, key } => format!("Rename {table}/{key}"),
         RenameTarget::Layer { area, layer } => format!("Rename layer {layer} of {area}"),
+        RenameTarget::Folder { table, folder } => format!("Rename folder {folder} of {table}"),
     };
     card(ctx, "rename", 600.0, |ui| {
         pressed = keys(ui);
@@ -424,6 +425,11 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
         if let RenameTarget::Layer { .. } = &dialog.target {
             ui.label(theme::muted(
                 "The layer's grid file and every palette entry naming it change as one undo step.",
+            ));
+        } else if let RenameTarget::Folder { .. } = &dialog.target {
+            ui.label(theme::muted(
+                "The rows and folders in it move with it, as one undo step. Keys and files stay \
+                 as they are.",
             ));
         } else if let RenameTarget::Row { table, key } = &dialog.target {
             ui.label(theme::muted(if rows == 0 {
@@ -498,7 +504,7 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            let label = if matches!(dialog.target, RenameTarget::Layer { .. }) || rows == 0 {
+            let label = if !matches!(dialog.target, RenameTarget::Row { .. }) || rows == 0 {
                 "Rename".to_owned()
             } else {
                 format!("Rename and update {rows} row{}", widgets::plural(rows))
@@ -525,6 +531,9 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
                 }
                 RenameTarget::Row { table, key } => {
                     rows::rename(editor, table, key, dialog.draft.trim(), dialog.local_keys)
+                }
+                RenameTarget::Folder { table, folder } => {
+                    folder_dialogs::rename(editor, table, folder, dialog.draft.trim())
                 }
             };
             match renamed {
@@ -846,6 +855,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::MoveTo(dialog) => move_dialogs::move_to_dialog(editor, ctx, dialog),
         ModalDialog::Gather(dialog) => move_dialogs::gather_dialog(editor, ctx, dialog),
         ModalDialog::FindUnused(dialog) => unused_dialog::find_unused_dialog(editor, ctx, dialog),
+        ModalDialog::NewFolder(dialog) => folder_dialogs::new_folder_dialog(editor, ctx, dialog),
         ModalDialog::NewRow(mut dialog) => {
             let mut outcome = None;
             let title = match &dialog.owner {

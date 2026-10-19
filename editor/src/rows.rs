@@ -4,8 +4,8 @@ use std::sync::Arc;
 use egui::{RichText, Ui};
 use engine::core::content::id::LeafKind;
 use engine::core::content::{
-    ContentRow, GAME_FILE, ModuleRule, OWNER_FIELD, RowName, load, locate, row_file, row_folder,
-    row_holding, row_of,
+    ContentRow, GAME_FILE, ModuleRule, OWNER_FIELD, RowFolder, RowName, load, locate, row_file,
+    row_folder, row_holding, row_of,
 };
 use engine::core::vfx::{VfxShaderDef, shader_file};
 use engine::systems::area::AreaDef;
@@ -14,6 +14,7 @@ use engine::systems::registry;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, DuplicateDialog, Editor, ModalDialog, NewRowDialog};
+use crate::folders;
 use crate::project::{ContentEdit, Project, ProjectFiles};
 use crate::schema::{self, SchemaShapes};
 use crate::tabs::EditorTab;
@@ -99,8 +100,13 @@ pub fn free_name(name: &str, taken: &HashSet<String>) -> String {
         .expect("a free name")
 }
 
-pub fn new_row_dialog(editor: &mut Editor, table: &str, owner: Option<RowName>) {
-    new_row(editor, table, owner, None);
+pub fn new_row_dialog(
+    editor: &mut Editor,
+    table: &str,
+    owner: Option<RowName>,
+    folder: Option<RowFolder>,
+) {
+    new_row(editor, table, owner, folder, None);
 }
 
 pub fn new_row_into(
@@ -109,13 +115,14 @@ pub fn new_row_into(
     owner: Option<RowName>,
     into: Option<(String, String)>,
 ) {
-    new_row(editor, table, owner, into);
+    new_row(editor, table, owner, None, into);
 }
 
 fn new_row(
     editor: &mut Editor,
     table: &str,
     owner: Option<RowName>,
+    folder: Option<RowFolder>,
     into: Option<(String, String)>,
 ) {
     let Some(project) = &editor.project else {
@@ -133,6 +140,7 @@ fn new_row(
         error: None,
         into,
         owner,
+        folder,
     }));
 }
 
@@ -170,6 +178,9 @@ pub fn new_row_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut NewRowDialog)
             .small(),
         );
     }
+    if let Some(folder) = &dialog.folder {
+        ui.label(RichText::new(format!("In folder {folder}")).weak().small());
+    }
     if let Some((file, pointer)) = &dialog.into {
         ui.label(
             RichText::new(format!("Written into {file} at {pointer}"))
@@ -192,6 +203,10 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
     let row = match &dialog.owner {
         Some(owner) => owned_row(owner, &dialog.value),
         None => dialog.value.clone(),
+    };
+    let row = match &dialog.folder {
+        Some(folder) => folders::with_folder(&row, Some(folder)),
+        None => row,
     };
     edit.write_json(row_file(&dialog.table, &key), &row);
     if let Some(file) = companion_file(&dialog.table, &key) {

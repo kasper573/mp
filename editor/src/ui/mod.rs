@@ -4,6 +4,7 @@ pub mod browser;
 pub mod categories;
 pub mod content_list;
 pub mod dialogs;
+pub mod folder_dialogs;
 pub mod history;
 pub mod levels;
 pub mod move_dialogs;

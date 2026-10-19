@@ -5,17 +5,20 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui};
 use engine::core::assets::AssetKind;
 use engine::core::content::{
-    ASSETS_DIR, ContentOwners, ContentRow, GAME_FILE, RowName, asset_of, row_file, row_of,
+    ASSETS_DIR, ContentOwners, ContentRow, GAME_FILE, RowFolder, RowName, asset_of, row_file,
+    row_of,
 };
 use engine::systems::area::world_map::WorldMapDef;
 
 use super::browser::{self, BrowserAction, RowMenu};
 use super::categories::CATEGORIES;
 use super::tree::{self, TreeAction, TreeIcon, TreeNode, TreeState, TreeStyle};
-use super::{theme, widgets};
+use super::{folder_dialogs, theme, widgets};
 use crate::app::{Editor, LeftTab};
+use crate::folders;
 use crate::keymap::EditorKey;
 use crate::picker::{self, Dragged};
+use crate::project::ContentEdit;
 use crate::project::RowSelection;
 use crate::tabs::{EditorTab, TabOpening};
 use crate::user::ContentFolds;
@@ -187,8 +190,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, source: &ContentSource) {
 
 #[derive(Clone)]
 enum TableAction {
-    New,
-    OpenTable,
+    New(String, Option<RowFolder>),
+    NewFolder(String, Option<RowFolder>),
+    OpenTable(String),
+    RenameFolder(String, RowFolder),
+    RemoveFolder(String, RowFolder),
 }
 
 const GAME_LINE: &str = GAME_FILE;
@@ -235,26 +241,33 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
                 .keys_of(table)
                 .filter(|key| source.holds(&owners, table, key))
                 .collect();
-            let rows: Vec<TreeNode<TableAction>> = keys
+            let shown: Vec<&str> = keys
                 .iter()
+                .copied()
                 .filter(|key| {
                     (!list.only_unsaved || project.is_unsaved(&row_file(table, key)))
                         && (!list.only_fixtures || editor.shapes.is_fixture(table, key))
                         && (!list.only_unused || project.unused.row(table, key).is_some())
                 })
-                .map(|key| row_node(project, &selection, table, key))
                 .collect();
             total += keys.len();
-            matched += rows.len();
-            if hide_empty && rows.is_empty() {
+            matched += shown.len();
+            if hide_empty && shown.is_empty() {
                 continue;
             }
+            let empty_folders = if filtering {
+                Vec::new()
+            } else {
+                empty_folders(editor, table)
+            };
+            let rows = folder_lines(project, &selection, source, table, &shown, &empty_folders);
             let mut node = TreeNode::folder(*table, *table, Vec::new());
             node.style = TreeStyle::Mono;
-            node.unsaved = rows.iter().any(|row| row.unsaved);
-            node.selected = rows.iter().any(|row| row.selected);
-            node.count = Some(count_text(rows.len(), keys.len(), filtering));
-            node.actions = table_actions(editor, source, table);
+            node.unsaved = any_line(&rows, &|line| line.unsaved);
+            node.selected = any_line(&rows, &|line| line.selected);
+            node.count = Some(count_text(shown.len(), keys.len(), filtering));
+            node.actions = table_actions(editor, source, table, None);
+            node.drops = Some((*table).to_owned());
             if editor.shapes.is_closed(table) {
                 node.note = Some("Fixtures: a fixed set of rows, so none can be added".to_owned());
             }
@@ -299,7 +312,8 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
                     "Nothing local matches the chips.".to_owned()
                 } else {
                     format!(
-                        "Nothing is local to {owner} yet. Turn hide empty off to reach every table's +."
+                        "Nothing is local to {owner} yet. Turn hide empty off and right-click a \
+                         table to add a row."
                     )
                 }));
             }
@@ -360,11 +374,15 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
             .insert(source.folds_key(), folds);
         editor.save_settings();
     }
-    if let Some((table, action)) = out.action {
-        table_act(editor, source, &table, action);
+    if let Some((_, action)) = out.action {
+        table_act(editor, source, action);
+    }
+    if let Some((target, dragged)) = out.dropped {
+        drop_row(editor, &target, dragged);
     }
     if let Some(entered) = out.entered
         && !entered.starts_with("category:")
+        && !entered.starts_with("folder:")
     {
         editor.open_tab(EditorTab::Spreadsheet { table: entered });
     }
@@ -450,22 +468,18 @@ fn category_note(category: &TreeNode<TableAction>) -> String {
         .children
         .iter()
         .flatten()
-        .map(|table| {
-            format!(
-                "{} {}",
-                table.label,
-                table.children.as_ref().map_or(0, Vec::len)
-            )
-        })
+        .map(|table| format!("{} {}", table.label, table.count.as_deref().unwrap_or("0")))
         .collect();
-    let unsaved: Vec<String> = category
-        .children
-        .iter()
-        .flatten()
-        .flat_map(|table| table.children.iter().flatten())
-        .filter(|row| row.unsaved)
-        .filter_map(|row| row_of(&row.id).map(|(table, key)| format!("{table}/{key}")))
-        .collect();
+    let mut unsaved: Vec<String> = Vec::new();
+    for table in category.children.iter().flatten() {
+        each_leaf(table, &mut |row| {
+            if row.unsaved
+                && let Some((table, key)) = row_of(&row.id)
+            {
+                unsaved.push(format!("{table}/{key}"));
+            }
+        });
+    }
     let mut note = format!("{}\n{}", category.label, tables.join(" · "));
     if !unsaved.is_empty() {
         note.push_str(&format!(
@@ -477,41 +491,222 @@ fn category_note(category: &TreeNode<TableAction>) -> String {
     note
 }
 
+fn each_leaf<A>(node: &TreeNode<A>, visit: &mut dyn FnMut(&TreeNode<A>)) {
+    match &node.children {
+        Some(children) => children.iter().for_each(|child| each_leaf(child, visit)),
+        None => visit(node),
+    }
+}
+
+fn any_line<A>(lines: &[TreeNode<A>], test: &dyn Fn(&TreeNode<A>) -> bool) -> bool {
+    lines.iter().any(|line| {
+        test(line)
+            || line
+                .children
+                .as_deref()
+                .is_some_and(|children| any_line(children, test))
+    })
+}
+
+/// A table's lines: its folders, nested as their names say, each holding its rows, then the rows
+/// listed straight in the table. `empty` are folders kept although no row is listed in them yet.
+fn folder_lines(
+    project: &crate::project::Project,
+    selection: &RowSelection,
+    source: &ContentSource,
+    table: &str,
+    keys: &[&str],
+    empty: &[RowFolder],
+) -> Vec<TreeNode<TableAction>> {
+    let mut by_folder: BTreeMap<Option<RowFolder>, Vec<&str>> = BTreeMap::new();
+    let mut folders: BTreeSet<RowFolder> = BTreeSet::new();
+    for key in keys {
+        let folder = folders::folder_of(&project.files, table, key);
+        let mut at = folder.clone();
+        while let Some(folder) = at {
+            at = folder.parent();
+            folders.insert(folder);
+        }
+        by_folder.entry(folder).or_default().push(key);
+    }
+    for folder in empty {
+        let mut at = Some(folder.clone());
+        while let Some(folder) = at {
+            at = folder.parent();
+            folders.insert(folder);
+        }
+    }
+    let rows_in = |folder: Option<&RowFolder>| -> Vec<TreeNode<TableAction>> {
+        by_folder
+            .get(&folder.cloned())
+            .into_iter()
+            .flatten()
+            .map(|key| row_node(project, selection, table, key))
+            .collect()
+    };
+    fn nest(
+        within: Option<&RowFolder>,
+        folders: &BTreeSet<RowFolder>,
+        table: &str,
+        source: &ContentSource,
+        rows_in: &dyn Fn(Option<&RowFolder>) -> Vec<TreeNode<TableAction>>,
+    ) -> Vec<TreeNode<TableAction>> {
+        let mut lines: Vec<TreeNode<TableAction>> = folders
+            .iter()
+            .filter(|folder| folder.parent().as_ref() == within)
+            .map(|folder| {
+                let children = nest(Some(folder), folders, table, source, rows_in);
+                let mut count = 0;
+                for child in &children {
+                    each_leaf(child, &mut |_| count += 1);
+                }
+                let mut node = TreeNode::folder(folder_id(table, folder), folder.name(), children);
+                node.count = Some(count.to_string());
+                node.actions = folder_actions(source, table, folder);
+                node.drops = Some(table.to_owned());
+                node.unsaved = any_line(node.children.as_deref().unwrap_or(&[]), &|l| l.unsaved);
+                node.selected = any_line(node.children.as_deref().unwrap_or(&[]), &|l| l.selected);
+                node
+            })
+            .collect();
+        lines.extend(rows_in(within));
+        lines
+    }
+    nest(None, &folders, table, source, &rows_in)
+}
+
+/// The id of a folder's line in a table: `folder:table:path`.
+fn folder_id(table: &str, folder: &RowFolder) -> String {
+    format!("folder:{table}:{folder}")
+}
+
+fn folder_of_id(id: &str) -> Option<(&str, RowFolder)> {
+    let (table, folder) = id.strip_prefix("folder:")?.split_once(':')?;
+    Some((table, RowFolder::try_from(folder.to_owned()).ok()?))
+}
+
+/// The folders of `table` kept in this project although nothing is listed in them yet.
+fn empty_folders(editor: &Editor, table: &str) -> Vec<RowFolder> {
+    let Some(project) = &editor.project else {
+        return Vec::new();
+    };
+    editor
+        .settings
+        .folders
+        .get(&project.root.display().to_string())
+        .into_iter()
+        .flatten()
+        .filter_map(|kept| {
+            let (of, folder) = kept.split_once('/')?;
+            (of == table)
+                .then(|| RowFolder::try_from(folder.to_owned()).ok())
+                .flatten()
+        })
+        .collect()
+}
+
 fn table_actions(
     editor: &Editor,
     source: &ContentSource,
     table: &str,
+    folder: Option<&RowFolder>,
 ) -> Vec<TreeAction<TableAction>> {
     let open = TreeAction {
-        mark: Mark::Grid,
-        tip: "Open table".to_owned(),
-        menu_label: "Open table".to_owned(),
-        action: TableAction::OpenTable,
+        label: "Open table".to_owned(),
+        action: TableAction::OpenTable(table.to_owned()),
     };
     if editor.shapes.is_closed(table) {
         return vec![open];
     }
-    let tip = match source {
-        ContentSource::Global => format!("New {table}"),
-        ContentSource::LocalTo(owner) => format!("New {table} local to {owner}"),
+    let new = match source {
+        ContentSource::Global => format!("New {table}…"),
+        ContentSource::LocalTo(owner) => format!("New {table} local to {owner}…"),
     };
     vec![
         TreeAction {
-            mark: Mark::Plus,
-            menu_label: format!("{tip}…"),
-            tip,
-            action: TableAction::New,
+            label: new,
+            action: TableAction::New(table.to_owned(), folder.cloned()),
+        },
+        TreeAction {
+            label: "New folder…".to_owned(),
+            action: TableAction::NewFolder(table.to_owned(), folder.cloned()),
         },
         open,
     ]
 }
 
-fn table_act(editor: &mut Editor, source: &ContentSource, table: &str, action: TableAction) {
+fn folder_actions(
+    source: &ContentSource,
+    table: &str,
+    folder: &RowFolder,
+) -> Vec<TreeAction<TableAction>> {
+    let new = match source {
+        ContentSource::Global => format!("New {table} here…"),
+        ContentSource::LocalTo(owner) => format!("New {table} here, local to {owner}…"),
+    };
+    vec![
+        TreeAction {
+            label: new,
+            action: TableAction::New(table.to_owned(), Some(folder.clone())),
+        },
+        TreeAction {
+            label: "New folder…".to_owned(),
+            action: TableAction::NewFolder(table.to_owned(), Some(folder.clone())),
+        },
+        TreeAction {
+            label: "Rename folder…".to_owned(),
+            action: TableAction::RenameFolder(table.to_owned(), folder.clone()),
+        },
+        TreeAction {
+            label: "Remove folder".to_owned(),
+            action: TableAction::RemoveFolder(table.to_owned(), folder.clone()),
+        },
+    ]
+}
+
+fn table_act(editor: &mut Editor, source: &ContentSource, action: TableAction) {
     match action {
-        TableAction::New => rows::new_row_dialog(editor, table, source.owner().cloned()),
-        TableAction::OpenTable => editor.open_tab(EditorTab::Spreadsheet {
-            table: table.to_owned(),
-        }),
+        TableAction::New(table, folder) => {
+            rows::new_row_dialog(editor, &table, source.owner().cloned(), folder)
+        }
+        TableAction::NewFolder(table, parent) => folder_dialogs::new_folder(editor, table, parent),
+        TableAction::OpenTable(table) => editor.open_tab(EditorTab::Spreadsheet { table }),
+        TableAction::RenameFolder(table, folder) => {
+            folder_dialogs::rename_folder(editor, table, folder)
+        }
+        TableAction::RemoveFolder(table, folder) => {
+            folder_dialogs::remove_folder(editor, &table, &folder)
+        }
+    }
+}
+
+/// Lists a row dropped on a folder's line in that folder, or straight in its table when dropped
+/// on the table's line.
+fn drop_row(editor: &mut Editor, target: &str, dragged: Dragged) {
+    let Dragged::Row { table, key } = dragged else {
+        return;
+    };
+    let folder = folder_of_id(target).map(|(_, folder)| folder);
+    let Some(project) = &editor.project else {
+        return;
+    };
+    if folders::folder_of(&project.files, &table, &key) == folder {
+        return;
+    }
+    let label = match &folder {
+        Some(folder) => format!("Move {table}/{key} to folder {folder}"),
+        None => format!("Move {table}/{key} out of its folder"),
+    };
+    let mut edit = ContentEdit::new(label.clone());
+    folders::move_rows(
+        &mut edit,
+        &project.files,
+        &[RowName::new(&table, &key)],
+        folder.as_ref(),
+    );
+    match editor.try_apply(edit) {
+        Ok(()) => editor.toast(label),
+        Err(error) => editor.toast(error),
     }
 }
 
@@ -543,8 +738,13 @@ fn reveal_active_row(editor: &mut Editor) {
         .cloned()
         .unwrap_or_else(|| default_folds(&source));
     let unfolded_category = folds.categories.insert(category.name.to_owned(), true) != Some(true);
-    let unfolded_table = folds.tables.insert(table.clone());
-    if unfolded_category || unfolded_table {
+    let mut unfolded = folds.tables.insert(table.clone());
+    let mut folder = folders::folder_of(&project.files, &table, &key);
+    while let Some(at) = folder {
+        unfolded |= folds.tables.insert(folder_id(&table, &at));
+        folder = at.parent();
+    }
+    if unfolded_category || unfolded {
         editor.settings.content_folds.insert(folds_key, folds);
         editor.save_settings();
     }

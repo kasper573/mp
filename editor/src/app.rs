@@ -248,6 +248,7 @@ pub enum ModalDialog {
     MoveTo(MoveToDialog),
     Gather(GatherDialog),
     FindUnused(FindUnusedDialog),
+    NewFolder(NewFolderDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
@@ -319,6 +320,7 @@ pub struct NewRowDialog {
     pub error: Option<String>,
     pub into: Option<(String, String)>,
     pub owner: Option<RowName>,
+    pub folder: Option<engine::core::content::RowFolder>,
 }
 
 pub struct ConfirmDialog {
@@ -371,8 +373,25 @@ pub struct RenameDialog {
 }
 
 pub enum RenameTarget {
-    Row { table: String, key: String },
-    Layer { area: String, layer: String },
+    Row {
+        table: String,
+        key: String,
+    },
+    Layer {
+        area: String,
+        layer: String,
+    },
+    Folder {
+        table: String,
+        folder: engine::core::content::RowFolder,
+    },
+}
+
+pub struct NewFolderDialog {
+    pub table: String,
+    pub parent: Option<engine::core::content::RowFolder>,
+    pub draft: String,
+    pub error: Option<String>,
 }
 
 pub struct DeleteDialog {

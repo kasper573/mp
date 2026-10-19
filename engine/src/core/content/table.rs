@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::id::ContentId;
-use super::owner::ContentOwners;
+use super::owner::{ContentOwners, RowFolders};
 
 pub trait ContentRow: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 'static {
     const TABLE: &'static str;
@@ -203,6 +203,15 @@ impl Content {
                     std::any::type_name::<T>()
                 )
             })
+    }
+
+    /// The folder each row is listed in. Content put together without the loader has none.
+    pub fn folders(&self) -> &RowFolders {
+        self.0
+            .built
+            .get(&TypeId::of::<RowFolders>())
+            .and_then(|built| built.downcast_ref())
+            .unwrap_or(RowFolders::empty())
     }
 
     /// Which rows are local to which. Content put together without the loader has no local rows.

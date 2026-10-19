@@ -154,6 +154,58 @@ fn a_written_local_row_names_its_owner_first() {
 }
 
 #[test]
+fn a_rows_folder_is_read_off_and_written_back_after_its_owner() {
+    let content = game()
+        .npc("wren", 10.0, json!([]))
+        .own("model", "wren", "npc/wren")
+        .edit("model", "wren", |wren| {
+            wren["folder"] = json!("people/islanders")
+        })
+        .load();
+    let out = tempfile::tempdir().expect("a temp dir");
+
+    let folder = content
+        .folders()
+        .of("model", "wren")
+        .map(ToString::to_string);
+    write(testkit::Game::new().registry(), content, out.path()).expect("written");
+
+    assert_eq!(folder.as_deref(), Some("people/islanders"));
+    let written = std::fs::read_to_string(out.path().join("tables/model/wren.json")).expect("read");
+    assert!(
+        written.starts_with("{\n  \"owner\": \"npc/wren\",\n  \"folder\": \"people/islanders\",\n"),
+        "{written}"
+    );
+}
+
+#[test]
+fn a_folder_with_an_empty_name_is_refused() {
+    let report = game()
+        .npc("wren", 10.0, json!([]))
+        .edit("npc", "wren", |wren| {
+            wren["folder"] = json!("people//islanders")
+        })
+        .try_load()
+        .err()
+        .expect("refused");
+
+    let errors: Vec<String> = report
+        .errors
+        .iter()
+        .map(|error| format!("{} {} {}", error.file, error.at.pointer(), error.problem))
+        .collect();
+    assert_eq!(errors.len(), 1, "{report}");
+    assert!(
+        errors[0].starts_with("tables/npc/wren.json /folder "),
+        "{report}"
+    );
+    assert!(
+        errors[0].contains("names of 1 to 40 characters joined by /"),
+        "{report}"
+    );
+}
+
+#[test]
 fn an_owner_set_after_loading_moves_the_row_and_what_it_holds() {
     let island = RowName::new("area", "island");
     let forest = RowName::new("area", "forest");

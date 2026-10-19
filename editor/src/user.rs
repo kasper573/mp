@@ -108,6 +108,9 @@ pub struct EditorSettings {
     pub views: BTreeMap<String, SpreadsheetView>,
     pub last_play: Option<String>,
     pub content_folds: BTreeMap<String, ContentFolds>,
+    /// By project folder, the content list folders kept with nothing listed in them yet, each
+    /// written `table/folder`.
+    pub folders: BTreeMap<String, std::collections::BTreeSet<String>>,
 }
 
 /// What a content list folded: categories folded or unfolded by hand, and the tables unfolded.

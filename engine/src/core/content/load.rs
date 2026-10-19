@@ -16,7 +16,7 @@ use super::check::RowCheck;
 use super::fixture::{Fixture, FixtureLock};
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, ScopeReader, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
-use super::owner::{ContentOwners, OWNER_FIELD, RowName};
+use super::owner::{ContentOwners, FOLDER_FIELD, OWNER_FIELD, RowFolder, RowFolders, RowName};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
@@ -348,7 +348,7 @@ impl ContentRegistry {
             };
             &|value| loader.parse_value(value)
         };
-        let Ok((value, _)) = split_owner(text) else {
+        let Ok((value, _)) = split_header(text) else {
             return Vec::new();
         };
         let unread = ContentScope::of(content);
@@ -699,14 +699,17 @@ impl Loading {
             .collect();
 
         let mut owned: Vec<(RowName, RowName)> = Vec::new();
+        let mut folders: Vec<(RowName, RowFolder)> = Vec::new();
         for (loader, key, file) in &read {
+            let row = RowName::new(registry.row_loaders()[*loader].name(), key.clone());
             if let Some(owner) = &file.owner {
-                owned.push((
-                    RowName::new(registry.row_loaders()[*loader].name(), key.clone()),
-                    owner.clone(),
-                ));
+                owned.push((row.clone(), owner.clone()));
+            }
+            if let Some(folder) = &file.folder {
+                folders.push((row, folder.clone()));
             }
         }
+        self.builder.built(RowFolders::new(folders));
         for (_, _, file) in &read {
             if let Some(index) = &file.index {
                 self.indexes.insert(file.file.clone(), index.clone());
@@ -1008,11 +1011,13 @@ impl From<serde_path_to_error::Error<serde_json::Error>> for ParseError {
 }
 type ParseResult = Result<Box<dyn Any + Send + Sync>, ParseError>;
 
-/// A file read and parsed as JSON, with a row's owner taken off it, before any row type reads it.
+/// A file read and parsed as JSON, with a row's owner and folder taken off it, before any row type
+/// reads it.
 struct ReadFile {
     file: String,
     value: Option<serde_json::Value>,
     owner: Option<RowName>,
+    folder: Option<RowFolder>,
     index: Option<Arc<JsonIndex>>,
     errors: Vec<LoadError>,
 }
@@ -1022,6 +1027,7 @@ fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
         file: file.to_owned(),
         value: None,
         owner: None,
+        folder: None,
         index: None,
         errors: Vec::new(),
     };
@@ -1051,14 +1057,15 @@ fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
     };
     let index = Arc::new(JsonIndex::of(&text));
     let split = if row {
-        split_owner(&text)
+        split_header(&text)
     } else {
-        parse_json(&text).map(|value| (value, None))
+        parse_json(&text).map(|value| (value, RowHeader::default()))
     };
     match split {
-        Ok((value, owner)) => {
+        Ok((value, header)) => {
             read.value = Some(value);
-            read.owner = owner;
+            read.owner = header.owner;
+            read.folder = header.folder;
         }
         Err(error) => read.errors.push(shape_error(file, &error, &index, &[])),
     }
@@ -1066,20 +1073,37 @@ fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
     read
 }
 
-/// A row file's JSON without its owner field, and the owner it names.
-pub fn split_owner(text: &str) -> Result<(serde_json::Value, Option<RowName>), ParseError> {
+/// What a row file says about the row besides the row itself.
+#[derive(Default)]
+pub struct RowHeader {
+    pub owner: Option<RowName>,
+    pub folder: Option<RowFolder>,
+}
+
+/// A row file's JSON without its header fields, and the header they make.
+pub fn split_header(text: &str) -> Result<(serde_json::Value, RowHeader), ParseError> {
     let mut value: serde_json::Value = parse_json(text)?;
-    let owner = value
+    let header = RowHeader {
+        owner: take_field(&mut value, OWNER_FIELD)?,
+        folder: take_field(&mut value, FOLDER_FIELD)?,
+    };
+    Ok((value, header))
+}
+
+fn take_field<T: DeserializeOwned>(
+    value: &mut serde_json::Value,
+    field: &str,
+) -> Result<Option<T>, ParseError> {
+    value
         .as_object_mut()
-        .and_then(|fields| fields.shift_remove(OWNER_FIELD))
-        .map(|owner| {
-            serde_path_to_error::deserialize::<_, RowName>(owner).map_err(|error| ParseError {
-                pointer: format!("/{OWNER_FIELD}"),
+        .and_then(|fields| fields.shift_remove(field))
+        .map(|taken| {
+            serde_path_to_error::deserialize::<_, T>(taken).map_err(|error| ParseError {
+                pointer: format!("/{field}"),
                 inner: error.into_inner(),
             })
         })
-        .transpose()?;
-    Ok((value, owner))
+        .transpose()
 }
 
 fn parse_read(
@@ -1458,18 +1482,23 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         for (id, row) in content.table::<Row>().iter() {
             let key = id.key(content);
             let file = super::row_file(Row::TABLE, key);
-            match content.owners().owner(Row::TABLE, key) {
-                Some(owner) => writer.json(&file, &Owned { owner, row })?,
-                None => writer.json(&file, row)?,
-            }
+            let headed = Headed {
+                owner: content.owners().owner(Row::TABLE, key),
+                folder: content.folders().of(Row::TABLE, key),
+                row,
+            };
+            writer.json(&file, &headed)?;
         }
         Ok(())
     }
 }
 
 #[derive(Serialize)]
-struct Owned<'a, Row> {
-    owner: &'a RowName,
+struct Headed<'a, Row> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owner: Option<&'a RowName>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder: Option<&'a RowFolder>,
     #[serde(flatten)]
     row: &'a Row,
 }

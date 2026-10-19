@@ -23,9 +23,12 @@ pub struct TreeNode<A> {
     pub note: Option<String>,
     /// What assistive tech reads for the line, when more than its label.
     pub spoken: Option<String>,
+    /// For a folder: what its menu offers.
     pub actions: Vec<TreeAction<A>>,
     /// What the pointer carries away when the leaf is dragged.
     pub drag: Option<Dragged>,
+    /// For a folder: the table whose rows may be dropped into it, onto it or onto a row inside.
+    pub drops: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,9 +39,7 @@ pub enum TreeStyle {
 }
 
 pub struct TreeAction<A> {
-    pub mark: Mark,
-    pub tip: String,
-    pub menu_label: String,
+    pub label: String,
     pub action: A,
 }
 
@@ -74,6 +75,8 @@ pub struct TreeOutput<A> {
     pub toggled: Vec<String>,
     /// A folder Enter was pressed on.
     pub entered: Option<String>,
+    /// A row dropped into a folder, with the folder's id.
+    pub dropped: Option<(String, Dragged)>,
 }
 
 impl<A> Default for TreeOutput<A> {
@@ -84,6 +87,7 @@ impl<A> Default for TreeOutput<A> {
             action: None,
             toggled: Vec::new(),
             entered: None,
+            dropped: None,
         }
     }
 }
@@ -112,6 +116,7 @@ impl<A> TreeNode<A> {
             spoken: None,
             actions: Vec::new(),
             drag: None,
+            drops: None,
         }
     }
 
@@ -171,7 +176,7 @@ pub fn show<A: Clone>(
         hooks: &mut hooks,
     };
     for node in nodes {
-        node_line(ui, &mut walk, node, 0);
+        node_line(ui, &mut walk, node, 0, None);
     }
     let Walk {
         mut out, toggle, ..
@@ -184,7 +189,6 @@ pub fn show<A: Clone>(
 
 const LINE: f32 = 26.0;
 const INDENT: f32 = 14.0;
-const BUTTON: f32 = 18.0;
 const TYPING_PAUSE: f64 = 0.8;
 
 struct Line<'n> {
@@ -328,11 +332,14 @@ struct Walk<'a, 'b, 'c, A> {
     hooks: &'a mut TreeHooks<'b, 'c>,
 }
 
+/// One line of the tree and, for an open folder, the lines inside it. `into` is the folder a row
+/// dropped on a leaf line goes into.
 fn node_line<A: Clone>(
     ui: &mut Ui,
     walk: &mut Walk<'_, '_, '_, A>,
     node: &TreeNode<A>,
     depth: usize,
+    into: Option<&TreeNode<A>>,
 ) {
     let full = ui.available_rect_before_wrap();
     let sense = if node.drag.is_some() {
@@ -376,7 +383,7 @@ fn node_line<A: Clone>(
                     spoken_folder(node, open),
                 )
             });
-            folder_line(&mut child, node, open, &mut walk.out);
+            folder_line(&mut child, node, open);
             if response.clicked() {
                 walk.state.cursor = Some(node.id.clone());
                 walk.toggle.push(node.id.clone());
@@ -384,9 +391,11 @@ fn node_line<A: Clone>(
             if !node.actions.is_empty() {
                 response.context_menu(|ui| folder_menu(ui, node, &mut walk.out));
             }
+            take_drop(ui, &response, rect, node, &mut walk.out);
             if open {
+                let into = node.drops.is_some().then_some(node);
                 for child in children {
-                    node_line(ui, walk, child, depth + 1);
+                    node_line(ui, walk, child, depth + 1, into);
                 }
             }
         }
@@ -418,7 +427,40 @@ fn node_line<A: Clone>(
             if let Some(dragged) = &node.drag {
                 picker::carry(ui, &response, dragged);
             }
+            if let Some(folder) = into {
+                take_drop(ui, &response, rect, folder, &mut walk.out);
+            }
         }
+    }
+}
+
+/// Takes a row of the folder's table dropped on `response`, marking the line while one hovers.
+fn take_drop<A>(
+    ui: &Ui,
+    response: &egui::Response,
+    rect: egui::Rect,
+    folder: &TreeNode<A>,
+    out: &mut TreeOutput<A>,
+) {
+    let Some(table) = &folder.drops else {
+        return;
+    };
+    let fits = |dragged: &Dragged| matches!(dragged, Dragged::Row { table: of, .. } if of == table);
+    if response
+        .dnd_hover_payload::<Dragged>()
+        .is_some_and(|dragged| fits(&dragged))
+    {
+        ui.painter().rect_stroke(
+            rect.shrink(1.0),
+            3.0,
+            egui::Stroke::new(1.5, theme::ACCENT),
+            egui::StrokeKind::Inside,
+        );
+    }
+    if let Some(dragged) = response.dnd_release_payload::<Dragged>()
+        && fits(&dragged)
+    {
+        out.dropped = Some((folder.id.clone(), (*dragged).clone()));
     }
 }
 
@@ -442,7 +484,7 @@ fn unsaved_dot(ui: &Ui, rect: egui::Rect) {
     );
 }
 
-fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut TreeOutput<A>) {
+fn folder_line<A>(ui: &mut Ui, node: &TreeNode<A>, open: bool) {
     glyph::show(
         ui,
         if open {
@@ -471,11 +513,6 @@ fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut 
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 4.0;
-        for action in &node.actions {
-            if line_button(ui, action.mark, &action.tip).clicked() {
-                out.action = Some((node.id.clone(), action.action.clone()));
-            }
-        }
         if let Some(count) = &node.count {
             ui.label(theme::faint(count).size(12.5));
         }
@@ -499,29 +536,11 @@ fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut 
 
 fn folder_menu<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, out: &mut TreeOutput<A>) {
     for action in &node.actions {
-        if ui.button(&action.menu_label).clicked() {
+        if ui.button(&action.label).clicked() {
             out.action = Some((node.id.clone(), action.action.clone()));
             ui.close();
         }
     }
-}
-
-fn line_button(ui: &mut Ui, mark: Mark, tip: &str) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(BUTTON, BUTTON), Sense::click());
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
-    ui.painter().rect(
-        rect,
-        3.0,
-        if response.hovered() {
-            theme::ACCENT_SOFT
-        } else {
-            theme::RAISED
-        },
-        egui::Stroke::new(1.0, theme::BORDER),
-        egui::StrokeKind::Inside,
-    );
-    glyph::paint(ui.painter(), mark, rect.shrink(4.0), theme::TEXT);
-    response.on_hover_text(tip)
 }
 
 fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeThumbs<'_>>) {

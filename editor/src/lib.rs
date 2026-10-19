@@ -2,6 +2,7 @@ pub mod app;
 mod audio;
 mod condition;
 pub mod drafts;
+pub mod folders;
 mod forms;
 pub mod import;
 pub mod keymap;

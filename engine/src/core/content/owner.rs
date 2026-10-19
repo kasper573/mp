@@ -59,6 +59,86 @@ impl TryFrom<String> for RowName {
 /// type reads the file, so no row type knows about owners.
 pub const OWNER_FIELD: &str = "owner";
 
+/// The JSON field a row names the folder it is listed in. Folders only sort a table's rows for
+/// people editing them; the loader takes the field off with the owner's.
+pub const FOLDER_FIELD: &str = "folder";
+
+/// A folder a row is listed in, inside its table: names joined by slashes, `towns/riverside`.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+pub struct RowFolder(String);
+
+impl RowFolder {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// The folder holding this one, if any.
+    pub fn parent(&self) -> Option<RowFolder> {
+        self.0
+            .rsplit_once('/')
+            .map(|(parent, _)| RowFolder(parent.to_owned()))
+    }
+
+    pub fn name(&self) -> &str {
+        self.0.rsplit_once('/').map_or(&self.0, |(_, name)| name)
+    }
+
+    pub fn join(&self, name: &str) -> Result<RowFolder, String> {
+        RowFolder::try_from(format!("{}/{name}", self.0))
+    }
+}
+
+impl fmt::Display for RowFolder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<RowFolder> for String {
+    fn from(folder: RowFolder) -> String {
+        folder.0
+    }
+}
+
+impl TryFrom<String> for RowFolder {
+    type Error = String;
+
+    fn try_from(text: String) -> Result<RowFolder, String> {
+        let named = |name: &str| {
+            !name.is_empty() && name.len() <= 40 && name.trim() == name && !name.contains('\\')
+        };
+        if text.split('/').all(named) {
+            Ok(RowFolder(text))
+        } else {
+            Err(format!(
+                "{text:?} is not a folder: names of 1 to 40 characters joined by /"
+            ))
+        }
+    }
+}
+
+/// The folder each row is listed in, for writing rows back as they were read.
+#[derive(Clone, Debug, Default)]
+pub struct RowFolders(HashMap<RowName, RowFolder>);
+
+impl RowFolders {
+    pub fn new(folders: impl IntoIterator<Item = (RowName, RowFolder)>) -> RowFolders {
+        RowFolders(folders.into_iter().collect())
+    }
+
+    pub fn empty() -> &'static RowFolders {
+        static EMPTY: LazyLock<RowFolders> = LazyLock::new(RowFolders::default);
+        &EMPTY
+    }
+
+    pub fn of(&self, table: &str, key: &str) -> Option<&RowFolder> {
+        self.0.get(&RowName::new(table, key))
+    }
+}
+
 /// Which row each local row belongs to. A row without an owner is global.
 #[derive(Clone, Debug, Default)]
 pub struct ContentOwners {

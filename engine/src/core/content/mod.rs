@@ -22,7 +22,7 @@ pub use load::{
     FilesystemFolder, FolderEntry, LoadStep, Loading, MemoryFolder, Reference, Settings, load,
     pointer_of, valid_key, write,
 };
-pub use owner::{ContentOwners, OWNER_FIELD, RowName};
+pub use owner::{ContentOwners, FOLDER_FIELD, OWNER_FIELD, RowFolder, RowFolders, RowName};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 pub use version::ContentVersion;
