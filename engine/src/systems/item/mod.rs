@@ -15,7 +15,7 @@ use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
-use strum::IntoStaticStr;
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
@@ -358,8 +358,9 @@ impl ScriptedRow for ItemDef {
     }
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(name(ItemModuleKind))]
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
@@ -378,13 +379,6 @@ pub struct Flavor {
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct Stack {
     pub max: u32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ItemFlag {
-    Quest,
-    Bound,
-    Currency,
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
@@ -429,23 +423,18 @@ impl ItemDef {
             .unwrap_or(1)
     }
 
-    pub fn has(&self, flag: ItemFlag) -> bool {
-        self.modules.iter().any(|module| {
-            matches!(
-                (module, flag),
-                (ItemModule::QuestItem, ItemFlag::Quest)
-                    | (ItemModule::Bound, ItemFlag::Bound)
-                    | (ItemModule::Currency, ItemFlag::Currency)
-            )
-        })
+    pub fn has(&self, kind: ItemModuleKind) -> bool {
+        self.modules
+            .iter()
+            .any(|module| ItemModuleKind::from(module) == kind)
     }
 
     pub fn bound(&self) -> bool {
-        self.has(ItemFlag::Bound) || self.has(ItemFlag::Quest)
+        self.has(ItemModuleKind::Bound) || self.has(ItemModuleKind::QuestItem)
     }
 
     pub fn category(&self) -> ItemCategory {
-        if self.has(ItemFlag::Currency) {
+        if self.has(ItemModuleKind::Currency) {
             return ItemCategory::Currency;
         }
         match self.kind {
@@ -492,7 +481,7 @@ pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), St
         .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
         .ok_or_else(|| {
             format!(
-                "{} is not in the bag",
+                "{} is not in your bag",
                 item.get(world.resource::<Content>()).name
             )
         })?;

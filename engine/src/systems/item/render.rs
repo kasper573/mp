@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use design_tokens::motion;
 
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::Content;
@@ -135,7 +136,7 @@ fn animate_drops(
         let t = (anim.elapsed - anim.delay)
             .ratio(DROP_DURATION)
             .clamp(0.0, 1.0);
-        let ground = anim.from.lerp(anim.to, ease_out(t));
+        let ground = anim.from.lerp(anim.to, motion::ease_out(t));
         let hop = DROP_HOP.0 * (std::f32::consts::PI * t).sin();
         transform.translation.x = ground.x;
         transform.translation.y = ground.y + hop;
@@ -152,8 +153,4 @@ fn animate_drops(
 fn drop_z(content: &Content, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
     let area = area::load(content, tag.area);
     dynamic_z(area.size.height, area.sort_base(), Tiles(pos.y))
-}
-
-fn ease_out(t: f32) -> f32 {
-    1.0 - (1.0 - t).powi(3)
 }

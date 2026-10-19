@@ -27,7 +27,7 @@ use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{
-    INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack, scatter_drop,
+    INVENTORY_MAX, Inventory, ItemDef, ItemId, ItemModuleKind, ItemStack, scatter_drop,
 };
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::NpcId;
@@ -958,7 +958,7 @@ pub fn check_all(loading: &mut Loading) {
                 }
                 QuestModule::Grants { items } => {
                     for (at, item) in item_rows(items).into_iter().enumerate() {
-                        if !item.get(&content).has(ItemFlag::Quest) {
+                        if !item.get(&content).has(ItemModuleKind::QuestItem) {
                             check.error(
                                 format!("/modules/{index}/items/{at}/item"),
                                 "not a quest item",
@@ -970,7 +970,7 @@ pub fn check_all(loading: &mut Loading) {
                 }
                 QuestModule::Drop(drop)
                     if content.table::<ItemDef>().get(drop.item).is_some()
-                        && !drop.item.get(&content).has(ItemFlag::Quest) =>
+                        && !drop.item.get(&content).has(ItemModuleKind::QuestItem) =>
                 {
                     check.error(
                         format!("/modules/{index}/item"),

@@ -833,7 +833,12 @@ fn alert_title(ui: &mut Ui, label: &str) -> bool {
                 if response.hovered() {
                     ui.painter().rect_filled(rect, 4.0, dusk::HOVER);
                 }
-                glyph::paint(ui.painter(), Mark::Cross, rect.shrink(CLOSE * 0.2), dusk::TEXT);
+                glyph::paint(
+                    ui.painter(),
+                    Mark::Cross,
+                    rect.shrink(CLOSE * 0.2),
+                    dusk::TEXT,
+                );
                 response.clicked()
             })
             .inner

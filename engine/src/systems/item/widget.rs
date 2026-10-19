@@ -11,7 +11,7 @@ use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
-    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack,
+    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemId, ItemModuleKind, ItemStack,
     UseItemRequest, card,
 };
 use crate::systems::player::session;
@@ -197,7 +197,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         count: filled.stack.count,
         wanted,
         faded: refused || carried,
-        quest: def.has(ItemFlag::Quest),
+        quest: def.has(ItemModuleKind::QuestItem),
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
     let candidates: Vec<InputAction> = world
@@ -260,7 +260,7 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
 }
 
 fn bound_note(def: &ItemDef) -> Option<String> {
-    def.has(ItemFlag::Bound)
+    def.has(ItemModuleKind::Bound)
         .then(|| "bound · can't be sold or dropped".to_owned())
 }
 

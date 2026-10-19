@@ -20,7 +20,7 @@ use crate::systems::hud::{self, Confirm, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
-use crate::systems::item::{Inventory, ItemFlag, ItemStack};
+use crate::systems::item::{Inventory, ItemModuleKind, ItemStack};
 use crate::systems::player::session;
 use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
@@ -535,7 +535,7 @@ fn quest_note(world: &World, stack: ItemStack) -> Option<String> {
     }) {
         return Some("begins a quest · use to read it".to_owned());
     }
-    if !stack.item.get(content).has(ItemFlag::Quest) {
+    if !stack.item.get(content).has(ItemModuleKind::QuestItem) {
         return None;
     }
     let granted_by = session::me(world)

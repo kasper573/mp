@@ -13,7 +13,7 @@ use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried};
 use crate::systems::input::map::{self, InputAction, input};
-use crate::systems::item::{Inventory, ItemDef, ItemFlag, ItemId, ItemKind};
+use crate::systems::item::{Inventory, ItemDef, ItemId, ItemKind, ItemModuleKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::{Condition, condition};
@@ -288,8 +288,8 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
 
 fn tags(def: &ItemDef) -> Vec<(&'static str, Pill)> {
     [
-        (ItemFlag::Bound, "Bound", Pill::Rubric),
-        (ItemFlag::Quest, "Quest item", Pill::Gold),
+        (ItemModuleKind::Bound, "Bound", Pill::Rubric),
+        (ItemModuleKind::QuestItem, "Quest item", Pill::Gold),
     ]
     .into_iter()
     .filter(|(flag, ..)| def.has(*flag))

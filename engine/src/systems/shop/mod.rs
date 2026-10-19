@@ -16,7 +16,9 @@ use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention::AttentionId;
 use crate::systems::dialogue;
 use crate::systems::drain_requests;
-use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemId, ItemStack};
+use crate::systems::item::{
+    ExchangeRefusal, Inventory, ItemCategory, ItemId, ItemModuleKind, ItemStack,
+};
 use crate::systems::notification;
 use crate::systems::player::sender_player;
 use crate::systems::script::effect as effects;
@@ -114,7 +116,7 @@ impl ShopDef {
         declined: &[u32],
     ) -> Result<&[ItemStack], String> {
         let def = item.get(content);
-        if def.has(ItemFlag::Quest) {
+        if def.has(ItemModuleKind::QuestItem) {
             return Err("Quest items never sell".to_owned());
         }
         if def.bound() {
