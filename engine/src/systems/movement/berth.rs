@@ -125,13 +125,10 @@ pub fn settle(world: &mut World, entity: Entity, aim: Aim, reach: Tiles) {
     }
 }
 
-/// `spot` when no one claims it, else the nearest tile no one claims: southernmost, then
-/// westernmost, of equally near ones.
+/// The walkable tile at `spot` when no one claims it, else the nearest one no one claims:
+/// southernmost, then westernmost, of equally near ones.
 pub fn place_beside(world: &World, area: AreaId, grid: &Grid, spot: Pos<Tiles>) -> Pos<Tiles> {
     let claims = world.resource::<TileClaims>();
-    if claims.on(area, spot.cell()) == 0 {
-        return spot;
-    }
     grid.nearest_walkable_where(spot, |cell| claims.on(area, cell) == 0)
         .unwrap_or(spot)
 }
