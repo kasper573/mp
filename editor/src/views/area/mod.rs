@@ -50,7 +50,7 @@ use self::overlays::{
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
-use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection};
+use crate::project::{AreaCameraState, ContentEdit, Project, ProjectFiles, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{sidebar, theme, widgets};
 use crate::value::RowValue;
@@ -188,6 +188,9 @@ pub struct AreaViewState {
     pub walk_value: Option<bool>,
     pub preview_area: Option<String>,
     pub skipped: Option<String>,
+    /// The point of a blueprint, in its own tiles, held at the view's center: the middle of
+    /// what its parts covered when the view opened, kept while they are edited.
+    anchor: Pos<Tiles>,
     fitted: bool,
 }
 
@@ -545,6 +548,9 @@ fn show_canvas(
         view.area = area_key.to_owned();
         view.blueprint = blueprint.map(str::to_owned);
         if !view.fitted {
+            view.anchor = blueprint
+                .map(|key| blueprint_middle(&project.files, &content, key))
+                .unwrap_or(Pos::new(0.0, 0.0));
             let size = area::load(&content, area_id).size;
             view.center = Pos::new(size.width / 2.0, size.height / 2.0);
             let fit = navigation::fit_zoom(
@@ -696,7 +702,6 @@ fn banners(
                         }
                     }
                 });
-            ui.label(theme::muted("· not saved").size(12.5));
         });
         if Some(&picked) != preview_area.as_ref() && picked != area_key {
             editor.views.area.view_mut(view_key).preview_area = Some(picked);
@@ -733,7 +738,7 @@ fn canvas(
                 ground: area_key.clone(),
                 scenery: scene::SceneryOf::Parts {
                     blueprint: blueprint.clone(),
-                    at: origin_of(view.center, &in_place).0,
+                    at: origin_of(view.center, view.anchor, &in_place).0,
                     values: stamp::stamp_values(editor, view.stamp.as_deref()),
                 },
                 hidden_ground,
@@ -789,6 +794,7 @@ fn canvas(
     let frame = AreaFrame {
         snapshot,
         canvas,
+        anchor: editor.views.area.view(view_key).anchor,
         pointer: hovered,
         pointer_tile,
         response: &response,
@@ -851,6 +857,7 @@ pub struct AreaSnapshot {
 pub struct AreaFrame<'a> {
     pub snapshot: AreaSnapshot,
     pub canvas: Viewport<Tiles>,
+    anchor: Pos<Tiles>,
     pub pointer: Option<Pos2>,
     pub pointer_tile: Option<Pos<Tiles>>,
     pub response: &'a egui::Response,
@@ -937,7 +944,7 @@ impl AreaSnapshot {
 
 impl AreaFrame<'_> {
     pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
-        origin_of(self.canvas.center, &self.in_place)
+        origin_of(self.canvas.center, self.anchor, &self.in_place)
     }
 
     pub fn pointer_cell(&self) -> Option<CellPos> {
@@ -959,15 +966,36 @@ fn is_selectable(module: &Value) -> bool {
 
 fn origin_of(
     center: Pos<Tiles>,
+    anchor: Pos<Tiles>,
     in_place: &[placement::AreaPlacement],
 ) -> (Pos<Tiles>, area::Flip) {
     match in_place.last() {
         Some(place) => (place.at, place.flip),
         None => (
-            Pos::new(center.x.round(), center.y.round()),
+            Pos::new((center.x - anchor.x).round(), (center.y - anchor.y).round()),
             area::Flip::None,
         ),
     }
+}
+
+/// The middle of what a blueprint's parts cover, in its own tiles.
+fn blueprint_middle(files: &ProjectFiles, content: &Content, key: &str) -> Pos<Tiles> {
+    let Some(row) = files.json(&row_file(BlueprintDef::TABLE, key)) else {
+        return Pos::new(0.0, 0.0);
+    };
+    row["parts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|part| {
+            if part.is_module(AreaModuleKind::Blueprint) {
+                placement::nested_bounds(content, part.text("blueprint"), part)
+            } else {
+                shapes::bounds(part, None)
+            }
+        })
+        .reduce(|a, b| a.union(&b))
+        .map_or(Pos::new(0.0, 0.0), |bounds| bounds.center())
 }
 
 pub fn selected_parts(editor: &Editor, area_key: &str) -> HashSet<String> {
