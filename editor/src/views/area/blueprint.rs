@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentRow, RowName, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -246,6 +246,12 @@ pub fn make_blueprint_dialog(
             ui.add_space(8.0);
             matches_card(ui, &mut dialog);
         }
+        ui.add_space(4.0);
+        let scope = match blueprint_owner(&dialog) {
+            Some(owner) => format!("local to {owner}: only {} places it", dialog.area),
+            None => "global: placed in more than one area".to_owned(),
+        };
+        widgets::kv_text(ui, "scope", scope);
         ui.add_space(8.0);
         if let Some(error) = &dialog.error {
             ui.colored_label(theme::DANGER, error);
@@ -280,6 +286,14 @@ pub fn make_blueprint_dialog(
         Some(false) => None,
         None => Some(dialog),
     }
+}
+
+/// A blueprint only its own area places is local to that area; taking matches in other areas
+/// makes it global.
+fn blueprint_owner(dialog: &MakeBlueprintDialog) -> Option<RowName> {
+    let elsewhere =
+        dialog.take_matches && dialog.matches.iter().any(|found| found.area != dialog.area);
+    (!elsewhere).then(|| RowName::new(AreaDef::TABLE, &dialog.area))
 }
 
 fn selected_modules(row: &Value, indices: &[usize]) -> Vec<Value> {
@@ -380,6 +394,10 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         modules.len(),
         dialog.area
     ));
+    let blueprint = match blueprint_owner(dialog) {
+        Some(owner) => rows::owned_row(&owner, &blueprint),
+        None => blueprint,
+    };
     edit.write_json(row_file(BlueprintDef::TABLE, &key), &blueprint);
     let mut groups: Vec<BlueprintMatch> = vec![BlueprintMatch {
         area: dialog.area.clone(),

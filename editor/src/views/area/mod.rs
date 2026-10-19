@@ -179,7 +179,8 @@ pub struct AreaViewState {
     pub cursor_cell: Option<CellPos>,
     pub tileset_search: String,
     pub blueprint_search: String,
-    pub blueprint_everywhere: bool,
+    /// Whether the stamp panel lists global blueprints rather than the area's own.
+    pub blueprints_global: bool,
     pub palette_lens: palette::PaletteLens,
     pub menu: Option<modules::AreaMenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,

@@ -7,11 +7,13 @@ use egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
     Vec2,
 };
+use engine::core::content::{ContentRow, RowName};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
-use engine::systems::area::{self, AreaId};
+use engine::systems::area::{self, AreaDef, AreaId};
+use engine::systems::npc::NpcDef;
 
 use super::atlas::{AtlasSource, AtlasWarp, WorldAtlas};
 use super::filters::{self, ColorRanges};
@@ -740,7 +742,7 @@ fn overview_status(editor: &Editor, map: &OpenWorldMap, overlays: &Overlays) -> 
         )];
     }
     vec![
-        world_summary(atlas),
+        world_summary(editor, atlas),
         format!(
             "drag to arrange · scroll to zoom · {} drag to pan",
             EditorKey::Pan.name()
@@ -1258,7 +1260,7 @@ fn topmost_card_at(cards: &[MapCard], p: Pos2) -> Option<AreaId> {
         .map(|card| card.area)
 }
 
-fn world_summary(atlas: &WorldAtlas) -> String {
+fn world_summary(editor: &Editor, atlas: &WorldAtlas) -> String {
     let one_way = atlas
         .warps
         .iter()
@@ -1281,13 +1283,30 @@ fn world_summary(atlas: &WorldAtlas) -> String {
         _ => format!("{unreached} areas unreached from the initial spawn"),
     };
     let residents: usize = atlas.areas.values().map(|info| info.residents.len()).sum();
+    let owners = editor
+        .project
+        .as_ref()
+        .map(|project| project.files.owners())
+        .unwrap_or_default();
+    let local = atlas
+        .areas
+        .iter()
+        .map(|(area, info)| {
+            let area = RowName::new(AreaDef::TABLE, atlas.key(*area));
+            info.residents
+                .iter()
+                .filter(|placed| owners.owner(NpcDef::TABLE, &placed.key) == Some(&area))
+                .count()
+        })
+        .sum::<usize>();
     let populations: usize = atlas
         .areas
         .values()
         .map(|info| info.populations.len())
         .sum();
     format!(
-        "World · {} areas · {warps} · {reach} · {residents} residents, {populations} populations",
+        "World · {} areas · {warps} · {reach} · {residents} residents, {local} local to their \
+         area · {populations} populations",
         atlas.areas.len()
     )
 }

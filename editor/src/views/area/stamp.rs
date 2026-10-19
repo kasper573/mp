@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, RowName, row_file};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::{self, AreaId, Flip};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaId, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
 
@@ -13,6 +14,7 @@ use super::holes::fill_holes;
 use super::{AreaFrame, modules, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::ContentEdit;
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs, value};
 
@@ -67,12 +69,25 @@ pub fn stamp_panel(
                 .or_default() += 1;
         }
     }
-    let all: Vec<String> = content
-        .table::<area::blueprint::BlueprintDef>()
-        .keys()
-        .to_vec();
-    let (everywhere, needle) = {
+    let area_key = area_id.key(content).to_owned();
+    let area_row = RowName::new(AreaDef::TABLE, &area_key);
+    let owners = editor
+        .project
+        .as_ref()
+        .map(|project| project.files.owners())
+        .unwrap_or_default();
+    let keys = content.table::<BlueprintDef>().keys();
+    let local: Vec<&String> = keys
+        .iter()
+        .filter(|key| owners.owner(BlueprintDef::TABLE, key) == Some(&area_row))
+        .collect();
+    let global: Vec<&String> = keys
+        .iter()
+        .filter(|key| !owners.is_local(BlueprintDef::TABLE, key))
+        .collect();
+    let (show_global, needle) = {
         let view = editor.views.area.view_mut(view_key);
+        let show_global = view.blueprints_global || local.is_empty();
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             ui.scope(|ui| {
@@ -86,28 +101,31 @@ pub fn stamp_panel(
             });
             ui.add_space(8.0);
             for (value, label) in [
-                (false, "in this area".to_owned()),
-                (true, format!("everywhere · {}", all.len())),
+                (false, format!("{area_key}'s · {}", local.len())),
+                (true, format!("global · {}", global.len())),
             ] {
-                let on = view.blueprint_everywhere == value;
-                if widgets::toggle_chip(ui, &label, on).clicked() {
-                    view.blueprint_everywhere = value;
+                if widgets::toggle_chip(ui, &label, show_global == value).clicked() {
+                    view.blueprints_global = value;
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(theme::muted("one blueprint at a time").size(12.0));
+                ui.label(
+                    theme::muted(format!(
+                        "one blueprint at a time · {} makes one from the selection, local to \
+                         {area_key}",
+                        EditorKey::MakeBlueprint.name()
+                    ))
+                    .size(12.0),
+                );
             });
         });
-        (
-            view.blueprint_everywhere,
-            view.blueprint_search.to_lowercase(),
-        )
+        (show_global, view.blueprint_search.to_lowercase())
     };
-    let mut listed: Vec<(String, usize)> = all
+    let scope = if show_global { &global } else { &local };
+    let mut listed: Vec<(String, usize)> = scope
         .iter()
         .filter(|k| needle.is_empty() || k.to_lowercase().contains(&needle))
-        .map(|k| (k.clone(), counts.get(k).copied().unwrap_or(0)))
-        .filter(|(_, count)| everywhere || *count > 0)
+        .map(|k| ((*k).clone(), counts.get(*k).copied().unwrap_or(0)))
         .collect();
     listed.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     ui.add_space(6.0);
@@ -122,12 +140,22 @@ pub fn stamp_panel(
         listed.len()
     };
     let mut picked: Option<String> = None;
+    let mut copy_into: Option<String> = None;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = gap;
         for (key, count) in listed.iter().take(shown) {
             let selected = editor.views.area.view(view_key).stamp.as_deref() == Some(key);
-            if blueprint_card(editor, ui, content, key, *count, selected, card).clicked() {
+            let response = blueprint_card(editor, ui, content, key, *count, selected, card);
+            if response.clicked() {
                 picked = Some(key.clone());
+            }
+            if show_global {
+                response.context_menu(|ui| {
+                    if ui.button(format!("Copy into {area_key}")).clicked() {
+                        copy_into = Some(key.clone());
+                        ui.close();
+                    }
+                });
             }
         }
         if listed.len() > shown {
@@ -141,7 +169,7 @@ pub fn stamp_panel(
             let text = format!(
                 "{} more{}",
                 listed.len() - shown,
-                if everywhere { "" } else { " here" }
+                if show_global { "" } else { " here" }
             );
             ui.painter().text(
                 rect.center(),
@@ -152,11 +180,33 @@ pub fn stamp_panel(
             );
         }
     });
+    if let Some(key) = copy_into {
+        picked = local_copy(editor, &key, &area_row);
+        editor.views.area.view_mut(view_key).blueprints_global = false;
+    }
     if let Some(key) = picked {
         let view = editor.views.area.view_mut(view_key);
         view.set_tool(super::AreaTool::Stamp);
         view.stamp = Some(key);
     }
+}
+
+/// Copies a global blueprint into a variant local to `area`, to edit freely, and answers its key.
+fn local_copy(editor: &mut Editor, key: &str, area: &RowName) -> Option<String> {
+    let project = editor.project.as_ref()?;
+    let value = project.files.json(&row_file(BlueprintDef::TABLE, key))?;
+    let copy = rows::free_key(
+        &project.files,
+        BlueprintDef::TABLE,
+        &format!("{}_{key}", area.key),
+    );
+    let mut edit = ContentEdit::new(format!("Copy blueprint/{key} into {area} as {copy}"));
+    edit.write_json(
+        row_file(BlueprintDef::TABLE, &copy),
+        &rows::owned_row(area, &value),
+    );
+    editor.try_apply(edit).ok()?;
+    Some(copy)
 }
 
 pub(super) fn stamp_values(editor: &Editor, stamp: Option<&str>) -> Value {
