@@ -35,16 +35,16 @@ pub fn check_media(loading: &mut Loading) {
                     .then_some(None)
                     .ok_or((
                         "unreadable sound",
-                        "not a RIFF WAVE file".to_owned(),
-                        "a WAV or FLAC that decodes",
+                        "no RIFF WAVE header".to_owned(),
+                        "a WAV file",
                     ))
             } else if lower.ends_with(".flac") {
                 (bytes.len() >= 4 && &bytes[..4] == b"fLaC")
                     .then_some(None)
                     .ok_or((
                         "unreadable sound",
-                        "not a FLAC file".to_owned(),
-                        "a WAV or FLAC that decodes",
+                        "no FLAC header".to_owned(),
+                        "a FLAC file",
                     ))
             } else if lower.ends_with(".ttf") || lower.ends_with(".otf") {
                 (bytes.len() >= 4
@@ -52,8 +52,8 @@ pub fn check_media(loading: &mut Loading) {
                 .then_some(None)
                 .ok_or((
                     "unreadable font",
-                    "not a TrueType or OpenType font".to_owned(),
-                    "a TTF that parses",
+                    "no TrueType or OpenType header".to_owned(),
+                    "a TrueType or OpenType font",
                 ))
             } else {
                 Ok(None)
@@ -76,13 +76,6 @@ pub fn check_media(loading: &mut Loading) {
         }
     }
     loading.built(ImageSizes(sizes));
-}
-
-pub fn measure_png(bytes: &[u8]) -> Result<(u32, u32), String> {
-    let decoder = png::Decoder::new(Cursor::new(bytes));
-    let reader = decoder.read_info().map_err(|error| error.to_string())?;
-    let info = reader.info();
-    Ok((info.width, info.height))
 }
 
 pub struct VisiblePixelColumns {
@@ -126,4 +119,11 @@ pub fn visible_columns(bytes: &[u8]) -> Result<Option<VisiblePixelColumns>, Stri
         last,
         image_width: frame.width,
     }))
+}
+
+fn measure_png(bytes: &[u8]) -> Result<(u32, u32), String> {
+    let decoder = png::Decoder::new(Cursor::new(bytes));
+    let reader = decoder.read_info().map_err(|error| error.to_string())?;
+    let info = reader.info();
+    Ok((info.width, info.height))
 }

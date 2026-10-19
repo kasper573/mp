@@ -1,6 +1,5 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
-
 use engine::systems::dialogue::Conversation;
 use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement;

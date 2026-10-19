@@ -3,7 +3,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentRow, row_file};
+use engine::core::script::ScriptModuleKind;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
@@ -11,12 +12,11 @@ use serde_json::Value;
 use crate::app::Editor;
 use crate::forms::{self, FormCx, FormState};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;
 use crate::ui::assets::ICON_DECODES_PER_FRAME;
-use crate::ui::widgets;
-use crate::ui::{self, browser, sidebar, theme};
+use crate::ui::{self, browser, sidebar, theme, widgets};
 use crate::user::SpreadsheetView;
 
 const ROW_H: f32 = 29.0;
@@ -247,10 +247,10 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
 }
 
 fn short_tag(tag: &str) -> String {
-    match tag {
-        "shared_script" => "shared".to_owned(),
-        "inline_script" => "inline".to_owned(),
-        other => other.to_owned(),
+    match ScriptModuleKind::of(tag) {
+        Some(ScriptModuleKind::Shared) => "shared".to_owned(),
+        Some(ScriptModuleKind::Inline) => "inline".to_owned(),
+        None => tag.to_owned(),
     }
 }
 

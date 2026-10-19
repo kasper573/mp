@@ -1,5 +1,5 @@
 use driver::{
-    Player, UiTarget, aiming, beside_other_player, east_of, input_name, npc_is, other_player,
+    UiTarget, aiming, beside_other_player, east_of, input_name, npc_is, other_player,
     other_player_within, pack_ground, played, played_on, status_on_me,
 };
 use engine::core::math::Pos;
@@ -27,7 +27,7 @@ fn play(shoot: &mut Shoot) {
     let mut friend = shoot.join_as("armsman", Some(east_of(AREA, ring, 6.0)));
     friend.in_world();
     let mut me = shoot.roll(player);
-    stand_beside(&mut friend);
+    friend.walk_toward(beside_other_player);
     me.caption(
         "Every skill has one targeting kind. On yourself: Ward fires the moment its key is pressed",
     );
@@ -114,9 +114,4 @@ fn chained_through_several(snapshot: &ProbeSnapshot) -> bool {
     played(snapshot, "chain_lightning")
         .iter()
         .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
-}
-
-// The friend comes to stand at the star's shoulder.
-fn stand_beside(friend: &mut Player) {
-    friend.walk_toward(beside_other_player);
 }

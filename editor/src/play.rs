@@ -1,33 +1,35 @@
-use design_tokens::controls::{self, Pill};
-use design_tokens::glyph::{self, Mark};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentScope, version, with_content};
+use engine::core::content::{
+    Content, ContentRow, ContentScope, row_of, table_folder, version, with_content,
+};
 use engine::core::time::UtcHour;
 use engine::systems::GameSettings;
 use engine::systems::class::ClassDef;
 use engine::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
-    SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest, fake_token,
+    SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE, TestCharacterRequest,
+    fake_token,
 };
 use engine::systems::player::SpawnPolicy;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
+use crate::forms;
 use crate::keymap::EditorKey;
-use crate::project::{RowSelection, row_of};
-use crate::tabs::EditorTab;
-use crate::ui::{theme, widgets};
+use crate::ui::{self, theme, widgets};
 use crate::value::RowValue;
-use crate::{forms, play, ui};
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
@@ -71,13 +73,7 @@ pub struct RunningPlayTest {
     client: Option<Process>,
     lines: ChannelInbox<OutputLine>,
     sender: Sender<OutputLine>,
-    ports: Option<ServerPorts>,
-}
-
-#[derive(Clone, Copy)]
-struct ServerPorts {
-    http: u16,
-    ws: u16,
+    ports: Option<ServerReady>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -101,30 +97,37 @@ pub struct GameBinaries {
 }
 
 impl GameBinaries {
-    fn of(&self, name: &str) -> &Result<BuildInfo, String> {
-        if name == SERVER {
-            &self.server
-        } else {
-            &self.client
+    /// Why a play-test can't run on them, if it can't: the client joins only a server of its own
+    /// build, and both must read the rows this editor writes, which its content version tells.
+    pub fn problem(&self, content_version: &str) -> Option<String> {
+        let (server, client) = match (&self.server, &self.client) {
+            (Err(error), _) => return Some(format!("{SERVER} is {error} in this folder.")),
+            (_, Err(error)) => return Some(format!("{CLIENT} is {error} in this folder.")),
+            (Ok(server), Ok(client)) => (server, client),
+        };
+        if server.build != client.build {
+            return Some(format!("{SERVER} and {CLIENT} are different builds."));
         }
+        [(SERVER, server), (CLIENT, client)]
+            .into_iter()
+            .find(|(_, info)| info.content_version != content_version)
+            .map(|(name, _)| format!("{name} is of a different content version than the editor."))
     }
 
-    /// Whether a play-test can run on them: the client joins only a server of its own build, and
-    /// both must read the rows this editor writes, which its content version tells.
-    pub fn matches(&self, content_version: &str) -> bool {
-        match (&self.server, &self.client) {
-            (Ok(server), Ok(client)) => {
-                server.build == client.build
-                    && server.content_version == content_version
-                    && client.content_version == content_version
-            }
-            _ => false,
-        }
+    fn builds_agree(&self) -> bool {
+        matches!(
+            (&self.server, &self.client),
+            (Ok(server), Ok(client)) if server.build == client.build
+        )
+    }
+
+    fn named(&self) -> [(&'static str, &Result<BuildInfo, String>); 2] {
+        [(SERVER, &self.server), (CLIENT, &self.client)]
     }
 }
 
 struct SpawnJob {
-    ports: ServerPorts,
+    ports: ServerReady,
     character: String,
     start: Option<Place>,
     sender: Sender<OutputLine>,
@@ -289,7 +292,7 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         return;
     };
     let Some(binaries) =
-        check_binaries(editor).filter(|binaries| binaries.matches(content_version()))
+        check_binaries(editor).filter(|binaries| binaries.problem(content_version()).is_none())
     else {
         editor.dialogs.push(ModalDialog::Binaries);
         return;
@@ -345,7 +348,7 @@ pub fn stop(editor: &mut Editor) {
 }
 
 pub fn restart(editor: &mut Editor) {
-    let start = editor.play.last_start;
+    let from = editor.play.last_start;
     if let Some(mut running) = editor.play.running.take() {
         running.stop();
         let _ = running.server.child.wait();
@@ -357,7 +360,7 @@ pub fn restart(editor: &mut Editor) {
         }
         editor.output.say("editor", "restarting the play-test");
     }
-    play::start(editor, start);
+    start(editor, from);
 }
 
 pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
@@ -430,8 +433,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         start(editor, None);
     }
     if edit && let Some(key) = current_character(editor) {
-        editor.select(RowSelection::row("test_character", &key));
-        editor.open_tab(EditorTab::for_row("test_character", &key));
+        editor.open_row(CharacterSnapshot::TABLE, &key);
     }
     if stop_now {
         stop(editor);
@@ -528,9 +530,8 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
         save_output(editor);
     }
     if again {
-        let start = editor.play.last_start;
         editor.play.failure = None;
-        play::start(editor, start);
+        start(editor, editor.play.last_start);
     }
     if dismiss {
         editor.play.failure = None;
@@ -578,7 +579,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     });
     let mut characters: Vec<TestCharacter> = project
         .files
-        .paths_under("tables/test_character/")
+        .paths_under(&format!("{}/", table_folder(CharacterSnapshot::TABLE)))
         .filter_map(|file| {
             let (_, key) = row_of(file)?;
             let row = project.files.json(file)?;
@@ -694,9 +695,10 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
             .as_ref()
             .map(|content| content.built::<GameSettings>().content_version.0.clone())
     });
-    let ok = checked
+    let problem = checked
         .as_ref()
-        .is_some_and(|binaries| binaries.matches(content_version));
+        .and_then(|binaries| binaries.problem(content_version));
+    let ok = checked.is_some() && problem.is_none();
     if checked.is_none() {
         ui.ctx().request_repaint_after(Duration::from_millis(50));
     }
@@ -759,25 +761,27 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         &format!("build {build}, content version {content_version}"),
         None,
     );
-    let builds_agree = checked.as_ref().is_some_and(|binaries| {
-        matches!(
-            (&binaries.server, &binaries.client),
-            (Ok(server), Ok(client)) if server.build == client.build
-        )
-    });
-    for name in [SERVER, CLIENT] {
-        match checked.as_ref().map(|binaries| binaries.of(name)) {
-            Some(Ok(info)) => row(
-                ui,
-                name,
-                &format!(
-                    "build {}, content version {}",
-                    info.build, info.content_version
-                ),
-                Some(builds_agree && info.content_version == content_version),
-            ),
-            Some(Err(error)) => row(ui, name, error, Some(false)),
-            None => row(ui, name, "checking…", None),
+    match &checked {
+        Some(binaries) => {
+            for (name, info) in binaries.named() {
+                match info {
+                    Ok(info) => row(
+                        ui,
+                        name,
+                        &format!(
+                            "build {}, content version {}",
+                            info.build, info.content_version
+                        ),
+                        Some(binaries.builds_agree() && info.content_version == content_version),
+                    ),
+                    Err(error) => row(ui, name, error, Some(false)),
+                }
+            }
+        }
+        None => {
+            for name in [SERVER, CLIENT] {
+                row(ui, name, "checking…", None);
+            }
         }
     }
     if let Some(version) = &open_folder {
@@ -792,11 +796,10 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         }
     }
     ui.add_space(8.0);
-    if let Some(binaries) = checked.as_ref().filter(|_| !ok) {
-        let culprit = culprit(binaries, content_version);
+    if let Some(problem) = problem {
         ui.horizontal_wrapped(|ui| {
             glyph::show(ui, Mark::Warning, 14.0, theme::DANGER);
-            ui.label(RichText::new(culprit).color(theme::DANGER).size(13.0));
+            ui.label(RichText::new(problem).color(theme::DANGER).size(13.0));
         });
     }
     ui.add_space(10.0);
@@ -836,22 +839,6 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     close
 }
 
-fn culprit(binaries: &GameBinaries, content_version: &str) -> String {
-    let (server, client) = match (&binaries.server, &binaries.client) {
-        (Err(error), _) => return format!("{SERVER} is {error} in this folder."),
-        (_, Err(error)) => return format!("{CLIENT} is {error} in this folder."),
-        (Ok(server), Ok(client)) => (server, client),
-    };
-    if server.build != client.build {
-        return format!("{SERVER} and {CLIENT} are different builds.");
-    }
-    [(SERVER, server), (CLIENT, client)]
-        .into_iter()
-        .find(|(_, info)| info.content_version != content_version)
-        .map(|(name, _)| format!("{name} is of a different content version than the editor."))
-        .unwrap_or_default()
-}
-
 fn editor_folder(editor: &Editor) -> PathBuf {
     editor
         .project
@@ -867,12 +854,12 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         ws_port: 0,
         max_clients: 8,
         content_dir: folder.to_path_buf(),
-        player_spawn_type: SpawnPolicy::Map,
+        player_spawn_policy: SpawnPolicy::Map,
         player_immortal: false,
         rng_seed: None,
         daily_reset_utc_hour: UtcHour::MIDNIGHT,
         auth: launch::AuthMode::Fake,
-        test_characters: launch::Switch::On,
+        test_characters: true,
         exit_on_stdin_eof: true,
         pyroscope_enabled: false,
         pyroscope_sample_hz: 100,
@@ -884,7 +871,7 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
 
 fn spawn_client(
     editor: &Editor,
-    ports: ServerPorts,
+    ports: ServerReady,
     character: &str,
     sender: Sender<OutputLine>,
 ) -> io::Result<Process> {
@@ -919,25 +906,10 @@ fn spawn(
     let mut child = wrap.spawn()?;
     let stdin = child.stdin().take();
     if let Some(stdout) = child.stdout().take() {
-        let sender = sender.clone();
-        std::thread::spawn(move || {
-            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                let _ = sender.send(OutputLine {
-                    tag,
-                    text: plain(&line),
-                });
-            }
-        });
+        forward(stdout, tag, sender.clone());
     }
     if let Some(stderr) = child.stderr().take() {
-        std::thread::spawn(move || {
-            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                let _ = sender.send(OutputLine {
-                    tag,
-                    text: plain(&line),
-                });
-            }
-        });
+        forward(stderr, tag, sender);
     }
     Ok(Process {
         child,
@@ -946,12 +918,21 @@ fn spawn(
     })
 }
 
-fn ready_ports(line: &str) -> Option<ServerPorts> {
-    let line: ReadyLine = serde_json::from_str(line.trim()).ok()?;
-    Some(ServerPorts {
-        http: line.ready.http,
-        ws: line.ready.ws,
-    })
+fn forward(output: impl Read + Send + 'static, tag: &'static str, sender: Sender<OutputLine>) {
+    std::thread::spawn(move || {
+        for line in BufReader::new(output).lines().map_while(Result::ok) {
+            let _ = sender.send(OutputLine {
+                tag,
+                text: plain(&line),
+            });
+        }
+    });
+}
+
+fn ready_ports(line: &str) -> Option<ServerReady> {
+    serde_json::from_str::<ReadyLine>(line.trim())
+        .ok()
+        .map(|line| line.ready)
 }
 
 fn hand_over(

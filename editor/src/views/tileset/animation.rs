@@ -1,9 +1,10 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
-use engine::systems::area::tileset::TileFrame;
+use engine::systems::area::tileset::{MAX_TILE_FRAME_MS, MAX_TILE_FRAMES, TileFrame};
+use strum::{IntoStaticStr, VariantArray};
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;
@@ -11,26 +12,16 @@ use crate::forms;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::{patterns, theme, widgets};
-use crate::views::model::StripFrame;
-use crate::views::model::preview;
+use crate::views::model::{StripFrame, preview};
 
-pub const MAX_FRAMES: usize = 256;
 const PREVIEW_W: f32 = 224.0;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, VariantArray, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum OffsetUnit {
     #[default]
     Columns,
     Rows,
-}
-
-impl OffsetUnit {
-    fn label(self) -> &'static str {
-        match self {
-            OffsetUnit::Columns => "columns",
-            OffsetUnit::Rows => "rows",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,7 +230,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     picked_frame = Some(index);
                 }
             }
-            if common.frames.len() < MAX_FRAMES
+            if common.frames.len() < MAX_TILE_FRAMES
                 && widgets::chip(ui, "+")
                     .on_hover_text("another frame, one step further")
                     .clicked()
@@ -248,12 +239,12 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             }
         });
         widgets::kv(ui, "offset by", |ui| {
-            widgets::combo_box(("offset-unit", key))
-                .selected_text(unit.label())
+            widgets::combo(("offset-unit", key))
+                .selected_text(<&str>::from(unit))
                 .width(140.0)
                 .show_ui(ui, |ui| {
-                    for option in [OffsetUnit::Columns, OffsetUnit::Rows] {
-                        ui.selectable_value(&mut picked_unit, option, option.label());
+                    for &option in OffsetUnit::VARIANTS {
+                        ui.selectable_value(&mut picked_unit, option, <&str>::from(option));
                     }
                 });
         });
@@ -498,7 +489,7 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str, common: &CommonAnimation) {
         let mut frames = common.frames.clone();
         let ms = &mut frames[index].ms;
         *ms = if longer {
-            (*ms + step).min(60_000)
+            (*ms + step).min(MAX_TILE_FRAME_MS)
         } else {
             ms.saturating_sub(step).max(1)
         };

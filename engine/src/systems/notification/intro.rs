@@ -1,21 +1,19 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::Face;
+use design_tokens::face::Face;
 use egui::emath::TSTransform;
 use egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};
 
 use super::rows::{self, Clock, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
 use crate::core::math::Rgba;
-use crate::core::text::{self, TextShadow};
-use crate::systems::screen::ClientScreen;
-use crate::systems::screen::area;
-use crate::systems::text::Motion;
+use crate::core::text::{self, TextMotion, TextShadow};
+use crate::systems::screen::{ClientScreen, area};
 
 const TITLE_SIZE: f32 = 44.0;
 const LINE_SIZE: f32 = 19.0;
@@ -40,8 +38,8 @@ const PRESENCE: Presence = Presence {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct IntroAppearance {
     pub tint: Option<Rgba>,
-    pub motion: Option<Motion>,
-    pub emblem: Option<AssetRef>,
+    pub motion: Option<TextMotion>,
+    pub emblem: Option<ImageRef>,
 }
 
 pub struct IntroPlugin;
@@ -256,13 +254,15 @@ fn age(world: &mut World) {
     }
 }
 
-fn title_motion(motion: Option<Motion>, now: f64) -> TSTransform {
+fn title_motion(motion: Option<TextMotion>, now: f64) -> TSTransform {
     let t = now as f32;
     match motion {
         None => TSTransform::IDENTITY,
-        Some(Motion::Pulse) => TSTransform::from_scaling(1.0 + (t * 3.0).sin() * 0.04),
-        Some(Motion::Wave) => TSTransform::from_translation(Vec2::new(0.0, (t * 4.0).sin() * 3.0)),
-        Some(Motion::Shake) => {
+        Some(TextMotion::Pulse) => TSTransform::from_scaling(1.0 + (t * 3.0).sin() * 0.04),
+        Some(TextMotion::Wave) => {
+            TSTransform::from_translation(Vec2::new(0.0, (t * 4.0).sin() * 3.0))
+        }
+        Some(TextMotion::Shake) => {
             TSTransform::from_translation(Vec2::new((t * 53.0).sin() * 1.5, (t * 47.0).cos() * 1.5))
         }
     }

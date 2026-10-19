@@ -4,12 +4,13 @@ use std::collections::HashSet;
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 use engine::core::audio::soundscape::EDGE_FALLOFF;
 use engine::core::math::{Pos, Rect};
+use engine::core::render::TILE;
 use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
 use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
-use super::population::NpcSprite;
-use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
+use super::population::{self, NpcSprite};
+use super::{AreaFrame, AreaTool, modules, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
@@ -448,7 +449,7 @@ pub(super) fn overlay_populations(
 ) {
     let canvas = frame.canvas;
     let ctx = ui.ctx().clone();
-    let live: std::collections::HashSet<String> = frame
+    let live: HashSet<String> = frame
         .modules
         .iter()
         .filter(|module| module.is_module(AreaModuleKind::Population))
@@ -577,7 +578,7 @@ fn draw_sprite(
     sprite: &NpcSprite,
     alpha: u8,
 ) -> ERect {
-    let shown = sprite.drawn * canvas.scale() / TILE_PX;
+    let shown = sprite.drawn * canvas.scale() / TILE.0;
     let feet = canvas.to_screen(at) + Vec2::new(0.0, canvas.scale() * 0.5);
     let rect = ERect::from_min_max(
         feet - Vec2::new(shown.x / 2.0, shown.y),

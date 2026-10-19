@@ -1,5 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
+use std::time::Duration;
 
 use bevy_ecs::prelude::*;
 use bevy_platform::collections::HashMap;
@@ -12,8 +13,11 @@ use super::dialogue::{ChoiceOffer, DialogueView};
 use super::may_do::MayDo;
 use super::node::MAX_LIVE_FLOWS;
 use super::value::Value;
-use super::{EventDef, Name, RevealDef, Vocabulary};
+use super::{EventDef, RevealDef, Vocabulary};
 use crate::core::math::Rng;
+
+/// Flows that keep waking one another stop for the tick here, so they cannot hold the server.
+const MAX_ROUNDS_PER_TICK: u32 = 100_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Owner<V: Vocabulary> {
@@ -47,7 +51,7 @@ pub struct FlowId(u64);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Pause {
-    Wait { until: f64 },
+    Wait { until: Duration },
     NextTick { tick: u64 },
     Step { tick: u64 },
     Dialogue,
@@ -56,7 +60,7 @@ pub enum Pause {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Answer {
-    Output(Name),
+    Output(&'static str),
     Pick(usize),
     Left,
 }
@@ -396,7 +400,7 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
     if !world.contains_resource::<Instances<V>>() {
         return;
     }
-    let now = world.resource::<Time>().elapsed_secs_f64();
+    let now = world.resource::<Time>().elapsed();
     let tick = {
         let mut instances = world.resource_mut::<Instances<V>>();
         instances.tick += 1;
@@ -457,7 +461,9 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
             }
         };
         match picked {
-            Some(Picked::Dropped(owner)) => V::log_dropped_flow(world, &owner, "32 live flows"),
+            Some(Picked::Dropped(owner)) => {
+                V::log_dropped_flow(world, &owner, &format!("{MAX_LIVE_FLOWS} live flows"))
+            }
             Some(Picked::Start(key, flow)) => run_flow::<V>(world, key, flow, clock),
             Some(Picked::Resume(key, flow, answer)) => {
                 if let Some(flow) = resume::<V>(world, key, flow, answer) {
@@ -467,7 +473,7 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
             None => {}
         }
         rounds += 1;
-        if rounds > 100_000 {
+        if rounds > MAX_ROUNDS_PER_TICK {
             break;
         }
     }
@@ -476,7 +482,7 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
 #[derive(Clone, Copy)]
 struct TickClock {
     tick: u64,
-    now: f64,
+    now: Duration,
 }
 
 enum Picked<V: Vocabulary> {
@@ -551,13 +557,7 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
         match op {
             Op::Spawn { owner, procedures } => {
                 close_instance(world, owner);
-                let mut may_do = MayDo::default();
-                for procedure in &procedures {
-                    may_do.absorb(&procedure.may_do);
-                    may_do
-                        .answers
-                        .extend(procedure.may_do.answers.iter().copied());
-                }
+                let may_do = MayDo::owned(procedures.iter().map(|procedure| &procedure.may_do));
                 let mut instances = world.resource_mut::<Instances<V>>();
                 for kind in &may_do.answers {
                     let owners = instances.answering.entry(*kind).or_default();
@@ -934,14 +934,14 @@ fn run_flow_traced<V: Vocabulary>(
             Step::Wait {
                 seconds, at_most, ..
             } => {
-                let seconds = seconds(world, &cx).as_num().min(f64::from(*at_most));
+                let seconds = seconds(world, &cx).as_num().min(f64::from(at_most.0));
                 let pause = if seconds <= 0.0 {
                     Pause::NextTick {
                         tick: clock.tick + 1,
                     }
                 } else {
                     Pause::Wait {
-                        until: clock.now + seconds,
+                        until: clock.now + Duration::from_secs_f64(seconds),
                     }
                 };
                 outcome = StepOutcome::Pause(pause);

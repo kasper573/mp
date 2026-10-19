@@ -1,16 +1,17 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, controls, ink, sheet};
+use design_tokens::face::TextRole;
+use design_tokens::{controls, ink, sheet};
 use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
-use crate::core::gui;
+use crate::core::gui::ImageSource;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
-    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack,
+    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemId, ItemModuleKind, ItemStack,
     UseItemRequest, card,
 };
 use crate::systems::player::session;
@@ -92,7 +93,7 @@ impl HudWindow for InventoryWindow {
 }
 
 pub(crate) struct SlotLook<'a> {
-    pub icon: Option<&'a AssetRef>,
+    pub icon: Option<&'a ImageRef>,
     pub count: u32,
     pub wanted: bool,
     pub faded: bool,
@@ -109,7 +110,12 @@ impl SlotLook<'_> {
     };
 }
 
-pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
+pub(crate) fn slot(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    look: SlotLook,
+    sense: Sense,
+) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
     if !ui.is_rect_visible(rect) {
         return response;
@@ -128,7 +134,7 @@ pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense)
         ui.painter()
             .rect_stroke(rect, 3.0, Stroke::new(1.5, ink::OCHRE), StrokeKind::Inside);
     }
-    if let Some(image) = look.icon.and_then(|icon| gui::image(world, icon)) {
+    if let Some(image) = look.icon.and_then(|icon| images.image(icon)) {
         let tint = if look.faded {
             Color32::from_white_alpha((GHOST * 255.0) as u8)
         } else {
@@ -196,7 +202,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         count: filled.stack.count,
         wanted,
         faded: refused || carried,
-        quest: def.has(ItemFlag::Quest),
+        quest: def.has(ItemModuleKind::QuestItem),
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
     let candidates: Vec<InputAction> = world
@@ -259,7 +265,7 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
 }
 
 fn bound_note(def: &ItemDef) -> Option<String> {
-    def.has(ItemFlag::Bound)
+    def.has(ItemModuleKind::Bound)
         .then(|| "bound · can't be sold or dropped".to_owned())
 }
 

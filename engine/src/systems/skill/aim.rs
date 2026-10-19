@@ -5,20 +5,18 @@ use egui::Stroke;
 use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};
 use crate::core::geometry::{Footprint, Shape};
-use crate::core::gui;
 use crate::core::math::Pos;
-use crate::core::render;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::core::vfx::render::ShaderOverlay;
 use crate::core::vfx::{ParamValue, VfxParams, VfxSite};
+use crate::core::{gui, render};
 use crate::systems::actor::{self, Actor};
 use crate::systems::input::gestures::{ClickClaim, Cursor, Gesture};
 use crate::systems::interface::{CursorShape, InterfaceSound};
-use crate::systems::movement;
-use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::vfx::{VfxShaderFixture, fixture};
+use crate::systems::{movement, notification};
 
 /// The skill a press armed, waiting for the click that aims it, and the surface drawn on the ground
 /// where an area skill would land.

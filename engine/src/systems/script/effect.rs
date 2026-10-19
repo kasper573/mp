@@ -1,13 +1,12 @@
-pub use crate::core::script::{Arrow, Link};
-
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, REFUSED, ScriptFault, ValueType,
 };
 use crate::systems::actor::Animate;
 use crate::systems::area::warp::Warp;
@@ -30,12 +29,15 @@ use crate::systems::skill::{ResetSkills, UseSkill};
 use crate::systems::status::{ApplyStatus, Boost, RemoveStatus};
 use crate::systems::vfx::PlayVfx;
 
-pub type Aim = Option<Condition>;
-
 macro_rules! effects {
     ($($variant:ident($ty:ty)),* $(,)?) => {
-        #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+        #[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
         #[serde(tag = "type", rename_all = "snake_case")]
+        #[strum_discriminants(
+            name(RiftEffectKind),
+            derive(EnumString, IntoStaticStr),
+            strum(serialize_all = "snake_case")
+        )]
         pub enum RiftEffect {
             $($variant($ty),)*
         }
@@ -47,7 +49,7 @@ macro_rules! effects {
             fn needs_subject(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.needs_subject(),)* }
             }
-            fn outputs(&self) -> Vec<(Name, Link<'_>)> {
+            fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
                 match self { $(RiftEffect::$variant(e) => e.outputs(),)* }
             }
             fn pauses(&self) -> bool {
@@ -61,12 +63,6 @@ macro_rules! effects {
             }
             fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
                 match self { $(RiftEffect::$variant(e) => e.reach(cx),)* }
-            }
-        }
-
-        impl RiftEffect {
-            pub fn kind(&self) -> &'static str {
-                match self { $(RiftEffect::$variant(_) => stringify!($variant),)* }
             }
         }
     };
@@ -114,7 +110,22 @@ effects! {
     PlaySound(PlaySound),
 }
 
-pub fn aim<'c>(cx: &mut Compiler<'c, RiftScripting>, who: &'c Aim) -> Result<Eval, ScriptFault> {
+impl RiftEffect {
+    pub fn kind(&self) -> RiftEffectKind {
+        self.into()
+    }
+}
+
+impl RiftEffectKind {
+    pub fn name(self) -> &'static str {
+        self.into()
+    }
+}
+
+pub fn aim<'c>(
+    cx: &mut Compiler<'c, RiftScripting>,
+    who: &'c Option<Condition>,
+) -> Result<Eval, ScriptFault> {
     cx.actor(who.as_ref())
 }
 
@@ -128,7 +139,7 @@ pub fn aimed_character(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity>
 
 pub fn aim_all<'c>(
     cx: &mut Compiler<'c, RiftScripting>,
-    who: &'c Aim,
+    who: &'c Option<Condition>,
 ) -> Result<Eval, ScriptFault> {
     cx.actors(who.as_ref())
 }
@@ -140,7 +151,7 @@ pub fn aimed_all(world: &World, cx: &FlowCx, who: &Eval) -> Vec<Entity> {
 pub fn settle(
     world: &mut World,
     cx: &FlowCx,
-    refused: Link,
+    refused: &Arrow,
     outcome: Result<(), String>,
 ) -> EffectStep {
     match outcome {
@@ -153,13 +164,13 @@ pub fn settle(
 pub fn refuse(
     world: &mut World,
     cx: &FlowCx,
-    refused: Link,
+    refused: &Arrow,
     reason: impl Into<String>,
 ) -> EffectStep {
     if refused.is_none() {
         show_error(world, cx, reason);
     }
-    EffectStep::Output("refused")
+    EffectStep::Output(REFUSED)
 }
 
 pub fn show_error(world: &mut World, cx: &FlowCx, reason: impl Into<String>) {
@@ -178,7 +189,7 @@ pub struct PlaySound {
     pub sfx: super::Fill<SfxId>,
     #[serde(rename = "for")]
     pub audience: Audience,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -186,8 +197,8 @@ impl EffectDef<RiftScripting> for PlaySound {
     fn needs_subject(&self) -> bool {
         self.audience == Audience::Subject
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

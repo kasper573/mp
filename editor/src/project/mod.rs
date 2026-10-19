@@ -5,23 +5,25 @@ pub mod lock;
 pub mod save;
 pub mod watch;
 
-pub use files::{
-    FileBytes, FileChange, GAME_FILE, ProjectFiles, hash, json_bytes, row_file, row_of, text_bytes,
-};
+pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_bytes};
 pub use history::{EditHistory, EditStep, RowSelection};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{self, TryRecvError};
 use std::time::{Duration, Instant, SystemTime};
 
-use engine::core::content::ErrorPlace::{Json, WholeFile};
-use engine::core::content::{Content, ContentProblem, LoadError, LoadReport};
+use engine::core::content::ErrorPlace::WholeFile;
+use engine::core::content::{
+    Content, ContentProblem, ContentRow, GAME_FILE, LoadError, LoadReport,
+};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems;
+use engine::systems::script::ScriptDef;
 
+use self::watch::FolderChange;
 use crate::app::ChannelInbox;
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;
@@ -99,10 +101,6 @@ impl ContentEdit {
         self.changes.push(FileChange { file, bytes: None });
         self
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.changes.is_empty()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -121,13 +119,9 @@ impl EditRefusal {
             at: WholeFile,
             problem: ContentProblem::new("not loaded", "", "a folder that loads"),
         });
-        let pointer = match &first.at {
-            Json { pointer, .. } => pointer.clone(),
-            _ => String::new(),
-        };
         EditRefusal {
+            pointer: first.at.pointer().to_owned(),
             file: first.file,
-            pointer,
             problem: first.problem,
             errors,
         }
@@ -139,6 +133,19 @@ impl EditRefusal {
             text.push_str(&format!(" · {} errors in all", self.errors));
         }
         text
+    }
+
+    pub fn place(&self) -> String {
+        problem_place(&self.file, &self.pointer)
+    }
+}
+
+/// Where in the folder a problem is: its file, and the JSON pointer within it when it has one.
+pub fn problem_place(file: &str, pointer: &str) -> String {
+    if pointer.is_empty() {
+        file.to_owned()
+    } else {
+        format!("{file} at {pointer}")
     }
 }
 
@@ -158,6 +165,18 @@ pub struct AreaCameraState {
 pub struct AppliedStep {
     pub viewpoint: EditViewpoint,
     pub label: String,
+}
+
+impl AppliedStep {
+    fn of(step: &EditStep) -> AppliedStep {
+        AppliedStep {
+            viewpoint: EditViewpoint {
+                selection: step.selection.clone(),
+                camera: step.camera.clone(),
+            },
+            label: step.label.clone(),
+        }
+    }
 }
 
 pub struct Project {
@@ -189,7 +208,6 @@ struct Loading {
 struct Loaded {
     content: Content,
     usages: ContentUsages,
-    catalogue: NodeCatalogue,
     took: Duration,
     usages_took: Duration,
 }
@@ -201,13 +219,7 @@ pub fn errors_in(report: &LoadReport, file: &str) -> Vec<(String, String)> {
         .errors
         .iter()
         .filter(|error| error.file == file)
-        .map(|error| {
-            let pointer = match &error.at {
-                Json { pointer, .. } => pointer.clone(),
-                _ => String::new(),
-            };
-            (pointer, error.problem.to_string())
-        })
+        .map(|error| (error.at.pointer().to_owned(), error.problem.to_string()))
         .collect()
 }
 
@@ -219,7 +231,7 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
-        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), None);
+        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE));
         let mut project = Project {
             root: root.to_path_buf(),
             loading: None,
@@ -242,18 +254,6 @@ impl Project {
         Ok(project)
     }
 
-    pub fn name(&self) -> String {
-        self.files
-            .json(GAME_FILE)
-            .and_then(|game| game["name"].as_str().map(str::to_owned))
-            .unwrap_or_else(|| {
-                self.root
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default()
-            })
-    }
-
     pub fn loads(&self) -> bool {
         self.report.is_none() && self.content.is_some()
     }
@@ -270,7 +270,7 @@ impl Project {
         self.stale = false;
         match load(&self.files, &self.root.display().to_string()) {
             Ok((content, took)) => {
-                let loaded = Loaded::build(content, &self.files, &self.shapes, took);
+                let loaded = Loaded::build(content, &self.files, took);
                 self.report = None;
                 self.install(loaded);
             }
@@ -383,51 +383,37 @@ impl Project {
         Ok(())
     }
 
-    pub fn undo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
-        let Some(step) = self.history.undo_step() else {
-            return Ok(None);
-        };
-        let viewpoint = EditViewpoint {
-            selection: step.selection.clone(),
-            camera: step.camera.clone(),
-        };
-        let label = step.label.clone();
-        let changes = step.before.clone();
+    pub fn undo(&mut self) -> Option<AppliedStep> {
+        let step = self.history.undo_step()?;
+        let (applied, changes) = (AppliedStep::of(step), step.before.clone());
         self.restore(&changes);
         self.history.undone();
-        Ok(Some(AppliedStep { viewpoint, label }))
+        Some(applied)
     }
 
-    pub fn redo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
-        let Some(step) = self.history.redo_step() else {
-            return Ok(None);
-        };
-        let viewpoint = EditViewpoint {
-            selection: step.selection.clone(),
-            camera: step.camera.clone(),
-        };
-        let label = step.label.clone();
-        let changes = step.after.clone();
+    pub fn redo(&mut self) -> Option<AppliedStep> {
+        let step = self.history.redo_step()?;
+        let (applied, changes) = (AppliedStep::of(step), step.after.clone());
         self.restore(&changes);
         self.history.redone();
-        Ok(Some(AppliedStep { viewpoint, label }))
+        Some(applied)
     }
 
-    pub fn jump(&mut self, index: usize) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
+    pub fn jump(&mut self, index: usize) -> Option<AppliedStep> {
         let mut last = None;
         while self.history.applied() > index {
-            match self.undo()? {
-                Some(applied) => last = Some(applied),
-                None => break,
-            }
+            let Some(applied) = self.undo() else {
+                break;
+            };
+            last = Some(applied);
         }
         while self.history.applied() < index {
-            match self.redo()? {
-                Some(applied) => last = Some(applied),
-                None => break,
-            }
+            let Some(applied) = self.redo() else {
+                break;
+            };
+            last = Some(applied);
         }
-        Ok(last)
+        last
     }
 
     fn restore(&mut self, changes: &[FileChange]) {
@@ -454,14 +440,13 @@ impl Project {
         }
         let files = self.files.clone();
         let name = self.root.display().to_string();
-        let shapes = self.shapes.clone();
         let (sender, receiver) = mpsc::channel();
         self.loading = Some(Loading {
             receiver: ChannelInbox::new(receiver),
         });
         std::thread::spawn(move || {
-            let outcome = load(&files, &name)
-                .map(|(content, took)| Loaded::build(content, &files, &shapes, took));
+            let outcome =
+                load(&files, &name).map(|(content, took)| Loaded::build(content, &files, took));
             let _ = sender.send(outcome);
         });
     }
@@ -470,7 +455,6 @@ impl Project {
         self.last_load = Some(loaded.took);
         self.last_usages = Some(loaded.usages_took);
         self.usages = loaded.usages;
-        self.catalogue = loaded.catalogue;
         self.content = Some(loaded.content);
         self.generation += 1;
     }
@@ -481,7 +465,7 @@ impl Project {
             .chain(self.disk.keys())
             .filter(|path| self.is_unsaved(path))
             .cloned()
-            .collect::<std::collections::BTreeSet<String>>()
+            .collect::<BTreeSet<String>>()
             .into_iter()
             .collect()
     }
@@ -498,12 +482,12 @@ impl Project {
         outcome
     }
 
-    pub fn outside_changes(&mut self, paths: Option<Vec<String>>) -> OutsideChanges {
+    pub fn outside_changes(&mut self, change: FolderChange) -> OutsideChanges {
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
-        let candidates: Vec<String> = match paths {
-            Some(paths) => paths,
-            None => ProjectFiles::read_dir(&self.root)
+        let candidates: Vec<String> = match change {
+            FolderChange::Files(paths) => paths,
+            FolderChange::Unknown => ProjectFiles::read_dir(&self.root)
                 .map(|files| {
                     let mut all: Vec<String> = files.paths().cloned().collect();
                     all.extend(self.disk.keys().cloned());
@@ -563,19 +547,12 @@ impl Project {
 }
 
 impl Loaded {
-    fn build(
-        content: Content,
-        files: &ProjectFiles,
-        shapes: &SchemaShapes,
-        took: Duration,
-    ) -> Loaded {
+    fn build(content: Content, files: &ProjectFiles, took: Duration) -> Loaded {
         let started = Instant::now();
         let usages = ContentUsages::build(&content, files);
-        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), Some(&content));
         Loaded {
             content,
             usages,
-            catalogue,
             took,
             usages_took: started.elapsed(),
         }

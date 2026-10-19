@@ -14,8 +14,7 @@ use crate::keymap::EditorKey;
 use crate::play;
 use crate::project::ContentEdit;
 use crate::ui::widgets;
-use crate::views::area as area_view;
-use crate::views::navigation;
+use crate::views::{area as area_view, navigation};
 
 const SNAP_PX: f32 = 8.0;
 const DRAG_SLOP: f32 = 3.0;

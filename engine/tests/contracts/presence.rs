@@ -10,11 +10,11 @@ use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::player::ClientId;
-use engine::systems::script::RiftQuery;
 use engine::systems::script::condition::{self, CompiledCondition};
+use engine::systems::script::{self, RiftQuery};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::{self, Presence};
-use engine::systems::{actor, reach, script, skill};
+use engine::systems::{actor, reach, skill};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 
@@ -85,10 +85,12 @@ fn presence_by_condition_follows_the_players_memory() {
     let player = sim.join(1);
     let brute = spawn(&mut sim, "brute", player, Offset::new(2.0, 0.0));
     let slain = sim.id::<MemoryDef>("slain");
-    let alive = Expr::Not(Box::new(Expr::Query(RiftQuery::Memory {
-        of: None,
-        memory: slain,
-    })));
+    let alive = Expr::Not {
+        of: Box::new(Expr::Query(RiftQuery::Memory {
+            of: None,
+            memory: slain,
+        })),
+    };
     let shown = CompiledCondition::new(sim.world.resource::<Content>(), &alive);
     sim.world.entity_mut(brute).insert(Presence::When(shown));
     assert!(visibility::present(&sim.world, brute, player));

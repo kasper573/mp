@@ -10,24 +10,22 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
 };
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault, Value};
+use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention::AttentionId;
-use crate::systems::dialogue;
-use crate::systems::drain_requests;
-use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemId, ItemStack};
-use crate::systems::notification;
-use crate::systems::player::sender_player;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
-use crate::systems::script::{
-    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
-    RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
+use crate::systems::item::{
+    ExchangeRefusal, Inventory, ItemCategory, ItemId, ItemModuleKind, ItemStack,
 };
+use crate::systems::player::sender_player;
+use crate::systems::script::{
+    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, OwnerKind, Reach, RiftEvent,
+    RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition, effect as effects,
+};
+use crate::systems::{dialogue, drain_requests, notification};
 
 pub type ShopId = ContentId<ShopDef>;
 
 const BUYBACK_KEPT: usize = 12;
-const MINUTE: f32 = 60.0;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -114,7 +112,7 @@ impl ShopDef {
         declined: &[u32],
     ) -> Result<&[ItemStack], String> {
         let def = item.get(content);
-        if def.has(ItemFlag::Quest) {
+        if def.has(ItemModuleKind::QuestItem) {
             return Err("Quest items never sell".to_owned());
         }
         if def.bound() {
@@ -193,9 +191,9 @@ pub struct ShopReactions {
 #[schemars(extend("x-system" = "shop"))]
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub shop: ShopId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub closed: Arrow,
 }
 
@@ -203,8 +201,8 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("closed", self.closed.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("closed", &self.closed)]
     }
     fn pauses(&self) -> bool {
         true
@@ -518,7 +516,7 @@ pub(crate) fn marks(
 
 fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Shop, shop.raw()),
+        Owner::Row(OwnerKind::Shop, shop.raw()),
         kind,
         Some(player),
         vec![
@@ -676,14 +674,15 @@ fn held(inventory: &Inventory, price: &[ItemStack]) -> Vec<u32> {
         .collect()
 }
 
-fn price_refusal(
+fn trade_refusal(
     content: &Content,
     inventory: &Inventory,
     price: &[ItemStack],
+    bought: &[ItemStack],
 ) -> Option<WareRefusal> {
-    let mut trial = inventory.clone();
-    trial
-        .exchange(content, price, &[])
+    inventory
+        .clone()
+        .exchange(content, price, bought)
         .err()
         .map(|refusal| WareRefusal::of(refusal, content))
 }
@@ -703,15 +702,12 @@ fn offer_refusal(
     if stock(world, player, shop, index, now).is_some_and(|(left, _)| left == 0) {
         return Some(WareRefusal::Unavailable("Sold out for now".to_owned()));
     }
-    let mut inventory = world.get::<Inventory>(player)?.clone();
-    inventory
-        .exchange(
-            content,
-            &offer.price,
-            &[ItemStack::new(offer.item, offer.count)],
-        )
-        .err()
-        .map(|refusal| WareRefusal::of(refusal, content))
+    trade_refusal(
+        content,
+        world.get::<Inventory>(player)?,
+        &offer.price,
+        &[ItemStack::new(offer.item, offer.count)],
+    )
 }
 
 fn stock(
@@ -730,10 +726,10 @@ fn stock(
         .and_then(|ledger| ledger.stock.get(&(shop, index)).copied())
         .filter(|restock| now < restock.full_at);
     Some(match restock {
-        Some(restock) => {
-            let minutes = (restock.full_at.since(now).0 / MINUTE).ceil();
-            (restock.left, Some(Seconds(minutes * MINUTE)))
-        }
+        Some(restock) => (
+            restock.left,
+            Some(restock.full_at.since(now).up_to_minute()),
+        ),
         None => (count, None),
     })
 }
@@ -771,7 +767,7 @@ fn refresh_view(world: &mut World, player: Entity) {
                 .iter()
                 .map(|sale| BuybackView {
                     sale: sale.clone(),
-                    refusal: price_refusal(&content, &inventory, &sale.paid),
+                    refusal: trade_refusal(&content, &inventory, &sale.paid, &[]),
                     held: held(&inventory, &sale.paid),
                 })
                 .collect()

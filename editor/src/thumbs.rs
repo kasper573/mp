@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
+use engine::core::assets::ImageRef;
+use engine::core::content::asset_file;
+use engine::core::gui::{GuiImage, ImageSource};
 use image::RgbaImage;
 use image::imageops::FilterType;
 
@@ -23,7 +26,28 @@ pub struct Thumbnail {
     pub hash: String,
 }
 
+/// A project's pictures, for drawing the engine's own gui in the editor.
+pub struct ProjectImages<'a> {
+    pub ctx: &'a egui::Context,
+    pub files: &'a ProjectFiles,
+    pub thumbnails: &'a mut Thumbnails,
+}
+
+impl ImageSource for ProjectImages<'_> {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage> {
+        let thumb = self
+            .thumbnails
+            .image(self.ctx, self.files, asset.as_str())?;
+        Some(GuiImage {
+            texture: thumb.texture.id(),
+            size: thumb.texture.size_vec2(),
+            path: asset.as_str().to_owned(),
+        })
+    }
+}
+
 pub const ICON: u32 = 32;
+pub const FULL_UV: egui::Rect = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
 
 impl Thumbnails {
     pub fn image(
@@ -43,7 +67,7 @@ impl Thumbnails {
         path: &str,
         budget: &mut u32,
     ) -> Option<Thumbnail> {
-        let file = format!("assets/{path}");
+        let file = asset_file(path);
         self.load(ctx, files, file.clone(), file, budget, |image| image)
     }
 
@@ -54,14 +78,9 @@ impl Thumbnails {
         path: &str,
         budget: &mut u32,
     ) -> Option<Thumbnail> {
-        let file = format!("assets/{path}");
+        let file = asset_file(path);
         let key = format!("icon:{file}");
         self.load(ctx, files, key, file, budget, |image| shrink(image, ICON))
-    }
-
-    pub fn forget(&mut self, path: &str) {
-        self.entries.remove(&format!("assets/{path}"));
-        self.entries.remove(&format!("icon:assets/{path}"));
     }
 
     fn load(
@@ -103,22 +122,18 @@ impl Thumbnails {
     }
 }
 
-pub struct ModelFrame {
+pub struct SpriteFrame {
     pub uv: egui::Rect,
     pub size: egui::Vec2,
 }
 
-pub fn model_frame(model: &serde_json::Value, thumb: &Thumbnail) -> ModelFrame {
-    let sprites = &model["sprites"];
-    let w = sprites["frame_size"]["width"].as_f64().unwrap_or(16.0) as f32;
-    let h = sprites["frame_size"]["height"].as_f64().unwrap_or(16.0) as f32;
-    let frame = sprites["actions"]["idle"]["s"][0]["frame"]
-        .as_u64()
-        .unwrap_or(0) as f32;
+pub fn sprite_frame(size: (u32, u32), frame: u32, thumb: &Thumbnail) -> SpriteFrame {
+    let (w, h) = (size.0 as f32, size.1 as f32);
+    let frame = frame as f32;
     let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
     let x = (frame % columns) * w;
     let y = (frame / columns).floor() * h;
-    ModelFrame {
+    SpriteFrame {
         uv: uv(thumb.size, x, y, w, h),
         size: egui::vec2(w, h),
     }

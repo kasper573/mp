@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use engine::core::content::{GAME_FILE, row_of};
 use include_dir::{Dir, include_dir};
 use walkdir::WalkDir;
 
-use crate::project::files::GAME_FILE;
 use crate::value::RowValue;
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
@@ -11,87 +12,51 @@ static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
 pub struct GameTemplate {
     pub key: String,
     pub name: String,
-    pub areas: Vec<String>,
-    pub files: usize,
     pub initial_spawn: String,
-    pub tables: Vec<(String, Vec<String>)>,
+    /// The keys of the rows it holds, by table.
+    pub rows: BTreeMap<String, Vec<String>>,
+}
+
+impl GameTemplate {
+    pub fn rows_in(&self, table: &str) -> usize {
+        self.rows.get(table).map_or(0, Vec::len)
+    }
 }
 
 pub fn list() -> Vec<GameTemplate> {
     let mut templates: Vec<GameTemplate> = TEMPLATES
         .dirs()
         .map(|dir| {
-            let key = dir
-                .path()
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default();
+            let key = dir.path().to_string_lossy().into_owned();
             let game = dir
                 .get_file(dir.path().join(GAME_FILE))
                 .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
                 .unwrap_or_default();
-            let name = game["name"]
-                .as_str()
-                .map_or_else(|| key.clone(), str::to_owned);
-            let areas = dir
-                .get_dir(dir.path().join("tables/area"))
-                .map(|areas| {
-                    areas
-                        .files()
-                        .filter_map(|file| {
-                            let name = file.path().file_name()?.to_str()?;
-                            name.strip_suffix(".json").map(str::to_owned)
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            let initial_spawn = format!(
-                "{} · {}, {}",
-                game["initial_spawn"].text_or("area", "?"),
-                game["initial_spawn"]["x"].as_f64().unwrap_or_default(),
-                game["initial_spawn"]["y"].as_f64().unwrap_or_default()
-            );
-            let tables = dir
-                .get_dir(dir.path().join("tables"))
-                .map(|tables| {
-                    tables
-                        .dirs()
-                        .map(|table| {
-                            let table_name = table
-                                .path()
-                                .file_name()
-                                .map(|n| n.to_string_lossy().into_owned())
-                                .unwrap_or_default();
-                            let keys: Vec<String> = table
-                                .files()
-                                .filter_map(|file| {
-                                    file.path()
-                                        .file_name()?
-                                        .to_str()?
-                                        .strip_suffix(".json")
-                                        .map(str::to_owned)
-                                })
-                                .collect();
-                            (table_name, keys)
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
+            let mut rows: BTreeMap<String, Vec<String>> = BTreeMap::new();
+            for file in all_files(dir) {
+                let path = file.path().strip_prefix(dir.path()).unwrap_or(file.path());
+                if let Some((table, row)) = path.to_str().and_then(row_of) {
+                    rows.entry(table.to_owned())
+                        .or_default()
+                        .push(row.to_owned());
+                }
+            }
             GameTemplate {
+                name: game["name"]
+                    .as_str()
+                    .map_or_else(|| key.clone(), str::to_owned),
+                initial_spawn: format!(
+                    "{} · {}, {}",
+                    game["initial_spawn"].text_or("area", "?"),
+                    game["initial_spawn"]["x"].as_f64().unwrap_or_default(),
+                    game["initial_spawn"]["y"].as_f64().unwrap_or_default()
+                ),
                 key,
-                name,
-                areas,
-                files: all_files(dir).len(),
-                initial_spawn,
-                tables,
+                rows,
             }
         })
         .collect();
-    templates.sort_by(|a, b| {
-        (a.key != "new_game")
-            .cmp(&(b.key != "new_game"))
-            .then(a.key.cmp(&b.key))
-    });
+    templates.sort_by(|a, b| a.key.cmp(&b.key));
     templates
 }
 

@@ -85,19 +85,20 @@ pub fn atlas_rect(region: WorldRect<WorldPx>) -> Rect {
     )
 }
 
-pub struct RenderPlugin;
+pub struct WorldRenderPlugin;
 
-impl Plugin for RenderPlugin {
+impl Plugin for WorldRenderPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "present.wesl");
         app.add_plugins(Material2dPlugin::<present::Present>::default())
             .init_resource::<Animator>()
-            .init_resource::<present::ScreenTint>()
-            .init_resource::<present::Viewport>()
+            .init_resource::<present::ScreenGrade>()
+            .init_resource::<present::PresentScale>()
             .init_resource::<GroundDepth>()
             .init_resource::<RowDepths>()
             .init_resource::<transition::ActiveTransition>()
             .init_resource::<transition::ScreenTransitionPreference>()
+            .init_resource::<icons::ResidentIcons>()
             .configure_sets(
                 PreUpdate,
                 transition::WorldViewSystems.run_if(not(transition::covering)),
@@ -109,16 +110,20 @@ impl Plugin for RenderPlugin {
                     .after(RenderValueSystems),
             )
             .add_systems(Startup, present::setup)
-            .add_systems(Update, (present::match_display, present::fit).chain())
-            .init_resource::<icons::ResidentIcons>()
+            .add_systems(
+                Update,
+                (
+                    (present::match_display, present::fit).chain(),
+                    icons::keep_icons_resident,
+                ),
+            )
             .add_systems(
                 PostUpdate,
                 (
                     order_rows.before(bevy::transform::TransformSystems::Propagate),
                     present::apply_present.after(bevy::transform::TransformSystems::Propagate),
                 ),
-            )
-            .add_systems(Update, icons::keep_icons_resident);
+            );
     }
 }
 

@@ -1,19 +1,23 @@
 use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
-use engine::systems::actor::Action;
+use engine::core::assets::AssetKind;
+use engine::core::audio::playback::SfxDef;
+use engine::core::content::{ContentRow, row_of};
+use engine::systems::actor::model::MAX_FRAME_MS;
+use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
 use serde_json::Value;
 
-use super::{FrameCueKind, MAX_FRAME_MS, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
+use super::busts::{BustFace, FaceLine};
+use super::strip::StripConfirm;
+use super::{FrameCueKind, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
 use crate::app::Editor;
-use crate::forms::FormChange;
+use crate::forms::{self, FormChange};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_of};
-use crate::tabs::EditorTab;
-use crate::ui::assets::AssetKind;
+use crate::picker;
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, row_form, theme, widgets};
-use crate::{forms, picker};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {
@@ -22,7 +26,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(part) = selection.parts.first().cloned() else {
         return;
     };
-    let Some(row) = editor.row_value(super::TABLE, &key) else {
+    let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
         return;
     };
     super::ensure_view(editor, &key);
@@ -114,14 +118,10 @@ fn strip_card(
             .iter()
             .enumerate()
             .flat_map(|(index, frame)| {
-                frame.cues().into_iter().map(move |cue| match cue {
-                    FrameCueKind::Sound => format!(
-                        "{} on frame {}",
-                        frame.sound.clone().unwrap_or_default(),
-                        index + 1
-                    ),
-                    other => format!("{} on frame {}", other.key(), index + 1),
-                })
+                frame
+                    .cues()
+                    .into_iter()
+                    .map(move |cue| format!("{} on frame {}", cue.label(), index + 1))
             })
             .collect();
         widgets::kv_text(
@@ -198,7 +198,7 @@ fn frame_card(
         });
         widgets::kv(ui, "apex", |ui| {
             let mut on = frame.apex;
-            if widgets::toggle(ui, &mut on).changed() {
+            if ui.checkbox(&mut on, "").changed() {
                 changed.apex = on;
                 label = Some(if on {
                     format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
@@ -243,7 +243,7 @@ fn frame_card(
         });
         widgets::kv(ui, "step", |ui| {
             let mut on = frame.step;
-            if widgets::toggle(ui, &mut on).changed() {
+            if ui.checkbox(&mut on, "").changed() {
                 changed.step = on;
                 label = Some(if on {
                     format!("Step on frame {} of {} of {key}", index + 1, strip.name())
@@ -533,7 +533,7 @@ fn cue_card(
     ui.add_space(8.0);
     if ui.button("Copy cues to the other 7 directions…").clicked() {
         let view = editor.views.model.view_mut(key);
-        view.confirm = Some(super::strip::StripConfirm::Cues);
+        view.confirm = Some(StripConfirm::Cues);
     }
     if let Some(sound) = play {
         editor.views.sound.play.push(sound);
@@ -639,8 +639,8 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::row(ui, cx, "sfx", sound, path)
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
+        picker::row(ui, cx, SfxDef::TABLE, sound, path)
     })
 }
 
@@ -651,8 +651,8 @@ fn asset_picker(
     file: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
+        picker::asset_of(ui, cx, AssetKind::Image, file, path)
     })
 }
 
@@ -661,8 +661,8 @@ fn face_card(
     ui: &mut Ui,
     key: &str,
     row: &Value,
-    face: &super::busts::BustFace,
-    faces: &[super::busts::BustFace],
+    face: &BustFace,
+    faces: &[BustFace],
 ) {
     ui.label(
         theme::mono(format!("model/{key} › bust › {}", face.name))
@@ -730,7 +730,7 @@ fn face_card(
         });
         widgets::kv_text(ui, "size", size_text(&face.name, own_size, &sizes));
     });
-    let own_lines: Vec<&super::busts::FaceLine> = lines
+    let own_lines: Vec<&FaceLine> = lines
         .iter()
         .filter(|line| faces.iter().any(|f| f.own.is_some() && f.name == line.face))
         .collect();
@@ -773,8 +773,7 @@ fn face_card(
         widgets::hint(ui, "no line asks for an own face yet");
     }
     if let Some((table, row_key)) = open {
-        editor.select(RowSelection::row(&table, &row_key));
-        editor.open_tab(EditorTab::for_row(&table, &row_key));
+        editor.open_row(&table, &row_key);
     }
     if let Some(wanted) = rename_to
         && super::busts::rename(editor, key, face, &wanted)
@@ -804,13 +803,7 @@ fn face_card(
     }
 }
 
-fn remove_dialog(
-    editor: &mut Editor,
-    key: &str,
-    face: &super::busts::BustFace,
-    faces: &[super::busts::BustFace],
-    uses: usize,
-) {
+fn remove_dialog(editor: &mut Editor, key: &str, face: &BustFace, faces: &[BustFace], uses: usize) {
     let view = editor.views.model.view_mut(key);
     view.removing = Some(super::FaceRemoval {
         face: face.clone(),
@@ -834,7 +827,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         return;
     };
     let faces = editor
-        .row_value(super::TABLE, key)
+        .row_value(ModelDef::TABLE, key)
         .map(|row| super::busts::faces(&row))
         .unwrap_or_default();
     let mut decision = None;
@@ -851,7 +844,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
                 "{} lines ask for it. They take another face instead:",
                 removing.uses
             ));
-            widgets::combo_box("face-replacement")
+            widgets::combo("face-replacement")
                 .selected_text(replacement.clone())
                 .show_ui(ui, |ui| {
                     for other in faces.iter().filter(|f| f.name != removing.face.name) {
@@ -888,7 +881,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     if apply && super::busts::remove(editor, key, &removing.face, &replacement) {
         let view = editor.views.model.view_mut(key);
         view.face = None;
-        editor.select(RowSelection::row(super::TABLE, key));
+        editor.select(RowSelection::row(ModelDef::TABLE, key));
     }
 }
 
@@ -932,7 +925,7 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/sprites/image") {
+        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
             changed = FormChange::at("/sprites/image");
         }

@@ -9,12 +9,6 @@ pub const SHEET_CLOSE_SECS: f32 = 0.12;
 pub const DEAL_SECS: f32 = 0.22;
 pub const FLICK_SECS: f32 = 0.15;
 const LAND_AT: f32 = 0.19 / DEAL_SECS;
-const LOOSE_SHADOW: Shadow = Shadow {
-    offset: [0, 20],
-    blur: 26,
-    spread: 0,
-    color: Color32::from_black_alpha(115),
-};
 
 pub fn ease_out(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
@@ -179,10 +173,6 @@ pub fn posed(ctx: &Context, layer: LayerId, rest: Rect, pose: CardPose) -> Vec<M
             mesh
         })
         .collect()
-}
-
-pub fn loose_shadow() -> Shadow {
-    LOOSE_SHADOW
 }
 
 fn lerp(from: f32, to: f32, t: f32) -> f32 {

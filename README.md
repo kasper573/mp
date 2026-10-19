@@ -16,7 +16,7 @@ editor grow by building it: every feature is made for it and proven on it.
 | [`editor/`](editor) | The editor: opens a game folder, edits it through the engine's own loader and writer, and play-tests it on the engine's binaries. |
 | [`example_game/`](example_game) | The example game: a game folder like any other, and what production runs. |
 | [`design_tokens/`](design_tokens) | The look the editor and the game share: colors, shapes, text roles, fonts and themed egui helpers. |
-| [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and server-authoritative terminal channels. |
+| [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and a server-authoritative terminal. |
 | [`testkit/`](testkit), [`driver/`](driver), [`showcase/`](showcase) | Testing and showing the game: small games declared in code and a bare world of only the systems a test runs, and real clients driven by real input for the showcase's recorded chapters. |
 | [`website/`](website), [`service/`](service), [`docker/`](docker), [`e2e/`](e2e) | The hosted game: the website, the stack it runs in, and the browser suite that tests it. |
 
@@ -53,11 +53,13 @@ To see the game in action without playing it, record its showcase chapters
 ([`showcase/src/chapters/`](showcase/src/chapters)):
 
 ```sh
-just showcase combat travel   # some chapters: target/showcase/03-combat.mp4, target/showcase/06-travel.mp4
+just showcase combat travel   # one video per chapter: target/showcase/NN-<chapter>.mp4
 just showcase                 # all of them, stitched: target/showcase/showcase.mp4
 ```
 
-The website lives at <https://rift.localhost> and Grafana at <https://grafana.rift.localhost>.
+The website lives at <https://rift.lan> and Grafana at <https://grafana.rift.lan>. Point `rift.lan` and its
+subdomains (`auth.`, `game-server.`, `grafana.`) at 127.0.0.1 in your hosts file, and trust Caddy's local root
+certificate to get past the browser's warning.
 
 ## Tests
 
@@ -96,12 +98,14 @@ the editor maps it onto the row, keeps the cues and tile data that still fit, an
 for changes.
 
 A content deploy needs no client build: the server restarts on the new folder, and players reconnect,
-sync the changed files and rejoin. The game server's image carries the example game at `/content`;
-another game runs on the same image with its own folder mounted there instead.
+sync the changed files and rejoin. The game server's image carries no game. Each stack mounts a game
+folder at `/content`: the test stack the example game, production the content folder its deploy syncs.
+Another game runs on the same image with its own folder mounted there.
 
 ## Release and deploy
 
 Pushing to `main` builds the wasm client and stack images, and deploys them to production. The
 website serves the wasm at `/play`; the game server serves the content folder, which the client
-syncs at boot and keeps on the device. The same push builds the archive for Linux, Windows and macOS
-(`just archive` on each) and attaches it to the workflow run.
+syncs at boot and keeps on the device. The same push builds the downloads for Linux, Windows and macOS
+(`just release-files` on each). On `main` they're published as one GitHub release per platform, which
+the website's downloads page links to.

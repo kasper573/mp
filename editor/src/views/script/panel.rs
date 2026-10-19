@@ -1,27 +1,23 @@
 use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
-use engine::core::content::Content;
-use engine::core::script::MayDo;
+use engine::core::content::{Content, ContentRow, row_file, row_of};
+use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::item::ItemDef;
-use engine::systems::npc::NpcDef;
-use engine::systems::quest::QuestDef;
-use engine::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
-use engine::systems::shop::ShopDef;
-use engine::systems::skill::SkillDef;
-use engine::systems::status::StatusEffectDef;
+use engine::systems::script::{
+    OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts, ScriptDef,
+};
+use engine::systems::stat::StatKind;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};
 use super::{ScriptDoc, ScriptOwner, ScriptPanel, ScriptPath, ScriptRef, run};
 use crate::app::Editor;
 use crate::condition;
-use crate::project::{RowSelection, row_file, row_of};
+use crate::project::RowSelection;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
     match panel {
@@ -52,14 +48,14 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
         }
         ScriptOwner::Shared { key } => {
             let mut found: Vec<ScriptBinding> = Vec::new();
-            for usage in project.usages.of_row("script", key) {
+            for usage in project.usages.of_row(ScriptDef::TABLE, key) {
                 let Some((table, row_key)) = row_of(&usage.file) else {
                     continue;
                 };
                 let Some(module) = ScriptRef::parse(&usage.pointer).module else {
                     continue;
                 };
-                if table == "script" {
+                if table == ScriptDef::TABLE {
                     continue;
                 }
                 if let Some(bound) = owner_row(&content, table, row_key, &module.pointer())
@@ -141,24 +137,10 @@ pub fn owner_row(
             format!("{table}/{key}"),
             OwnerRow {
                 kind,
-                row: raw_of(content, kind, key)?,
+                row: content.table_named(table)?.raw_of(key)?,
                 object: None,
             },
         ),
-    })
-}
-
-fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
-    Some(match kind {
-        OwnerKind::Npc => content.by_key::<NpcDef>(key)?.raw(),
-        OwnerKind::Item => content.by_key::<ItemDef>(key)?.raw(),
-        OwnerKind::Quest => content.by_key::<QuestDef>(key)?.raw(),
-        OwnerKind::Shop => content.by_key::<ShopDef>(key)?.raw(),
-        OwnerKind::Skill => content.by_key::<SkillDef>(key)?.raw(),
-        OwnerKind::StatusEffect => content.by_key::<StatusEffectDef>(key)?.raw(),
-        OwnerKind::Area | OwnerKind::Object => content.by_key::<AreaDef>(key)?.raw(),
-        OwnerKind::Blueprint => content.by_key::<BlueprintDef>(key)?.raw(),
-        OwnerKind::Any => return None,
     })
 }
 
@@ -181,7 +163,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if bound.len() > 1 {
         ui.horizontal(|ui| {
             ui.label(theme::muted("as").size(13.0));
-            widgets::combo_box(pick_id)
+            widgets::combo(pick_id)
                 .selected_text(
                     theme::mono(
                         bound
@@ -370,7 +352,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             .collect();
         rows.push(MayRow::present("runs", calls.join(" · ")));
     }
-    let reads = NodeReads::of(nodes).text();
+    let reads = NodeReads::of(content, nodes).text();
     if !reads.is_empty() {
         rows.push(MayRow::present("reads", reads));
     }
@@ -523,7 +505,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let seconds: Vec<String> = nodes
         .values()
-        .filter(|node| node.kind() == "wait")
+        .filter(|node| nodes::kind_of(node) == NodeKind::Wait)
         .filter_map(|node| node["seconds"].as_f64())
         .map(|s| format!("{} s", s))
         .collect();
@@ -687,7 +669,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 return;
             };
             let mut rows: Vec<NamedBy> = Vec::new();
-            for (file, pointers) in project.usages.files_naming("script", key) {
+            for (file, pointers) in project.usages.files_naming(ScriptDef::TABLE, key) {
                 let row = project.files.json(&file);
                 let Some((table, row_key)) = row_of(&file) else {
                     continue;
@@ -764,7 +746,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         widgets::rule(ui);
                     }
                     if rows.len() > shown {
-                        let all_areas = owners.iter().all(|(table, _)| *table == "area");
+                        let all_areas = owners.iter().all(|(table, _)| *table == AreaDef::TABLE);
                         ui.label(
                             theme::muted(format!(
                                 "… {} more in {} {}{} · click one to open its {}",
@@ -796,7 +778,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     };
     editor.select(RowSelection::row(&table, &key));
     match module {
-        Some(ScriptPath::Module(index)) if table == "area" => {
+        Some(ScriptPath::Module(index)) if table == AreaDef::TABLE => {
             editor.select(RowSelection::parts(
                 &table,
                 &key,
@@ -812,10 +794,9 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 pub fn used_by_count(editor: &Editor, owner: &ScriptOwner) -> usize {
     match owner {
         ScriptOwner::Inline { .. } => 1,
-        ScriptOwner::Shared { key } => editor
-            .project
-            .as_ref()
-            .map_or(0, |project| project.usages.of_row("script", key).len()),
+        ScriptOwner::Shared { key } => editor.project.as_ref().map_or(0, |project| {
+            project.usages.of_row(ScriptDef::TABLE, key).len()
+        }),
     }
 }
 
@@ -835,7 +816,7 @@ fn summarise_values(values: &Value) -> String {
         .unwrap_or_default()
 }
 
-fn stat_name(stat: engine::systems::stat::StatKind) -> String {
+fn stat_name(stat: StatKind) -> String {
     let name: &'static str = stat.into();
     name.to_lowercase()
 }

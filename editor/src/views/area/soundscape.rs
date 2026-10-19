@@ -1,12 +1,12 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui, Vec2};
+use engine::core::assets::AssetKind;
 use engine::core::audio;
 use serde_json::Value;
 
-use crate::forms::FormCx;
-use crate::ui::assets::AssetKind;
+use crate::forms::{self, FormCx};
+use crate::picker;
 use crate::ui::{theme, widgets};
-use crate::{forms, picker};
 
 pub(super) fn soundscape_extras(
     ui: &mut Ui,
@@ -30,7 +30,7 @@ pub(super) fn soundscape_extras(
             if picker::asset_of(
                 ui,
                 cx,
-                &[AssetKind::Audio],
+                AssetKind::Audio,
                 &mut file,
                 &format!("{channel_path}/file"),
             ) {

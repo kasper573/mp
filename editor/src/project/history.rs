@@ -53,10 +53,6 @@ impl RowSelection {
     pub fn is_game(&self) -> bool {
         self.table == GAME
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.keys.is_empty()
-    }
 }
 
 pub struct EditHistory {

@@ -38,28 +38,38 @@ pub mod vfx;
 pub mod view;
 pub mod visibility;
 
+use actor::{Actor, Hitbox};
+use area::AreaTag;
 use bevy_app::App;
 use bevy_ecs::message::{Message, Messages};
 use bevy_ecs::prelude::{Bundle, Entity, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
+use movement::{Position, TileClaim};
 use schemars::JsonSchema;
+use skill::Cooldowns;
+use status::{ActiveAspects, Boosts, Statuses};
 
 use crate::core::assets::SyncedFiles;
+use crate::core::audio::playback::{SfxDef, SfxPlugin, SfxRoleDef};
+use crate::core::audio::soundscape::SoundscapePlugin;
+use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
     Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
     Loading, Settings,
 };
+use crate::core::gui::GuiPlugin;
+use crate::core::interpolate::SnapshotPlugin;
+use crate::core::math::Rng;
+use crate::core::net::auth::Credentials;
+use crate::core::net::transport::SocketClientPlugin;
 use crate::core::platform::{ClientPlatform, Platform, SignIn, StartParams};
+use crate::core::render::WorldRenderPlugin;
+use crate::core::text::StyledTextPlugin;
 use crate::core::time::{Hertz, Seconds, WallClock};
+use crate::core::vfx::render::VfxRenderPlugin;
 use crate::systems::area::AreaId;
 use crate::systems::player::PlayerDefId;
-use actor::{Actor, Hitbox};
-use area::AreaTag;
-use movement::{Position, TileClaim};
-use skill::Cooldowns;
-use status::{ActiveAspects, Boosts, Statuses};
-use terminal::TerminalKind;
 
 pub const TICK_HZ: Hertz = Hertz(30.0);
 
@@ -91,7 +101,7 @@ pub fn protocol(app: &mut App) {
     quest::register(app);
     player::register(app);
     reach::register(app);
-    terminal::register(app);
+    bevy_terminal::register(app, &[]);
     vfx::register(app);
     plug_ins(app.world_mut());
 }
@@ -117,9 +127,7 @@ pub fn plug_ins(world: &mut World) {
 pub fn area_state(world: &mut World, content: &Content) {
     use bevy_ecs::message::MessageRegistry;
 
-    world.insert_resource(content.clone());
-    world.insert_resource(content.built::<quest::Parties>().clone());
-    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    insert_content(world, content);
     world.init_resource::<script::RiftInstances>();
     world.init_resource::<player::Players>();
     world.init_resource::<movement::TileClaims>();
@@ -132,6 +140,13 @@ pub fn area_state(world: &mut World, content: &Content) {
     MessageRegistry::register_message::<rewards::KillCredited>(world);
     world.add_observer(player::greet);
     world.add_observer(player::client_left);
+}
+
+/// The content and the scripts and parties built from it, as every world playing it reads them.
+fn insert_content(world: &mut World, content: &Content) {
+    world.insert_resource(content.built::<quest::Parties>().clone());
+    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    world.insert_resource(content.clone());
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -185,7 +200,7 @@ pub fn server_app(
     ordinal: u64,
     rng_seed: u64,
     clock: WallClock,
-    assets: &Content,
+    content: &Content,
 ) -> App {
     use bevy_app::{First, PostUpdate, Startup, Update};
     use bevy_ecs::schedule::{IntoScheduleConfigs, Schedules, SingleThreadedExecutor};
@@ -195,16 +210,16 @@ pub fn server_app(
 
     let mut app = App::new();
     app.insert_resource(WorldArea(area));
-    app.insert_resource(assets.built::<GameSettings>().clone());
+    app.insert_resource(content.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(input::map::InputMap::new(assets));
+    app.insert_resource(input::map::InputMap::new(content));
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     // Every tick steps the same span of game time however long it took, so a seeded world plays out
     // alike tick for tick.
     app.insert_resource(bevy_time::TimeUpdateStrategy::ManualDuration(
         TICK_HZ.period(),
     ));
-    app.insert_resource(crate::core::math::Rng::for_world(rng_seed, ordinal));
+    app.insert_resource(Rng::for_world(rng_seed, ordinal));
     app.add_plugins(
         bevy_app::PluginGroup::build(bevy_replicon::prelude::RepliconPlugins)
             .set(RepliconSharedPlugin {
@@ -219,7 +234,7 @@ pub fn server_app(
     );
     protocol(&mut app);
     visibility::register(&mut app);
-    area_state(app.world_mut(), assets);
+    area_state(app.world_mut(), content);
     // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
     // serialization load across ticks instead of spiking every Nth tick in lockstep.
     app.insert_resource(ReplicationClock(ordinal))
@@ -297,8 +312,7 @@ pub fn server_app(
                     combat::defeats,
                     skill::hotbar::settle_basic_attack,
                     actor::settle,
-                    bevy_terminal::ingest::<TerminalKind>,
-                    bevy_terminal::dispatch::<TerminalKind>,
+                    bevy_terminal::ingest,
                     chat::rebroadcast,
                     belongings::notify_changes,
                     history::backfill,
@@ -331,7 +345,7 @@ pub fn start_server(app: &mut App) {
     app.update();
 }
 
-pub fn from_client<M: bevy_ecs::message::Message>(world: &mut World, conn: Entity, message: M) {
+pub fn from_client<M: Message>(world: &mut World, conn: Entity, message: M) {
     use bevy_replicon::prelude::{ClientId, FromClient};
 
     world.write_message(FromClient {
@@ -348,16 +362,14 @@ pub fn client_app(
     use bevy::prelude::*;
 
     let credentials = match &params.sign_in {
-        SignIn::Token(token) => Some(crate::core::net::auth::Credentials::from_access_token(
-            token,
-        )),
+        SignIn::Token(token) => Some(Credentials::from_access_token(token)),
         SignIn::AnyAccount | SignIn::Provider(_) => None,
     };
 
     let mut app = App::new();
     let files = SyncedFiles::default();
     app.insert_resource(files.clone());
-    app.insert_resource(crate::core::math::Rng::from_entropy());
+    app.insert_resource(Rng::from_entropy());
     bevy::asset::AssetApp::register_asset_source(
         &mut app,
         bevy::asset::io::AssetSourceId::Default,
@@ -386,33 +398,34 @@ pub fn client_app(
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
-            crate::core::gui::GuiPlugin,
-            crate::core::text::TextPlugin,
-            crate::core::net::transport::SocketClientPlugin,
-            crate::core::interpolate::SnapshotPlugin {
+            GuiPlugin,
+            StyledTextPlugin,
+            SocketClientPlugin,
+            SnapshotPlugin {
                 period: REPLICATION_PERIOD,
             },
-            crate::core::render::RenderPlugin,
-            crate::core::vfx::render::VfxRenderPlugin,
-            crate::core::audio::playback::SfxPlugin,
-            crate::core::audio::soundscape::SoundscapePlugin,
-            crate::core::babble::BabblePlugin,
+            WorldRenderPlugin,
+            VfxRenderPlugin,
+            SfxPlugin,
+            SoundscapePlugin,
+            BabblePlugin,
         ))
         .add_plugins((
             screen::ClientScreenPlugin { credentials },
-            actor::render::ActorPlugin,
+            actor::render::ActorRenderPlugin,
             actor::plate::PlatePlugin,
-            movement::MovementPlugin,
-            combat::render::CombatPlugin,
-            item::render::ItemsPlugin,
-            area::object::render::ObjectPlugin,
-            view::ViewPlugin,
+            movement::MovementRenderPlugin,
+            combat::render::CombatRenderPlugin,
+            item::render::ItemRenderPlugin,
+            area::object::render::ObjectRenderPlugin,
+            view::CameraFollowPlugin,
             player::session::ClientSessionPlugin,
-            input::InputPlugin,
+            input::PlayerInputPlugin,
         ))
         .add_plugins((
+            settings::plugin,
             hud::HudPlugin,
-            dialogue::stage::StagePlugin,
+            dialogue::stage::DialogueStagePlugin,
             notification::NotificationPlugin,
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,
@@ -479,11 +492,9 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
             }
         }
     }
-    world.insert_resource(content.built::<quest::Parties>().clone());
-    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    insert_content(world, &content);
     world.insert_resource(content.built::<GameSettings>().clone());
     world.insert_resource(input::map::InputMap::new(&content));
-    world.insert_resource(content);
     world.insert_resource(synced);
     Ok(())
 }
@@ -527,8 +538,8 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
-        .row::<crate::core::audio::playback::SfxDef>()
-        .row::<crate::core::audio::playback::SfxRoleDef>()
+        .row::<SfxDef>()
+        .row::<SfxRoleDef>()
         .row::<attention::AttentionDef>()
         .row::<input::map::InputDef>()
         .row::<interface::CursorDef>()

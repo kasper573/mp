@@ -3,12 +3,8 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{
-    ContentId, ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial,
-};
+use crate::core::content::{ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial};
 use crate::core::math::Pos;
-
-pub type WorldMapId = ContentId<WorldMapDef>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
 #[strum(serialize_all = "snake_case")]
@@ -28,7 +24,7 @@ pub const MAX_NOTE: usize = 280;
 #[serde(deny_unknown_fields)]
 pub struct WorldMapDef {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub cards: BTreeMap<super::AreaId, Card>,
+    pub cards: BTreeMap<super::AreaId, AreaCard>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub regions: Vec<Region>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -65,7 +61,7 @@ pub enum WorldMapTiles {}
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Card {
+pub struct AreaCard {
     #[schemars(with = "serial::PosRow")]
     #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<WorldMapTiles>,

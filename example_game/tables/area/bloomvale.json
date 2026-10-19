@@ -1,7 +1,6 @@
 {
   "name": "Bloomvale",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 88,
       "height": 64

@@ -1,10 +1,10 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, RichText, Ui};
+use engine::core::content::{ASSETS_DIR, GAME_FILE, TABLES_DIR};
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::GAME_FILE;
 
 pub enum ReportAction {
     None,
@@ -132,8 +132,8 @@ fn colored(line: &str) -> RichText {
         text.color(theme::WARN)
     } else if line.starts_with("result") {
         text.color(theme::DANGER)
-    } else if line.starts_with("tables/")
-        || line.starts_with("assets/")
+    } else if line.starts_with(TABLES_DIR)
+        || line.starts_with(ASSETS_DIR)
         || line.starts_with(GAME_FILE)
     {
         text.color(theme::CODE)

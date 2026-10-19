@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::sync::Arc;
 
 use bevy::asset::{AssetPath, AssetServer};
@@ -6,8 +7,9 @@ use bevy::prelude::{Entity, World};
 use egui::Ui;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
+use engine::core::audio::soundscape::{SoundscapeChannel, SoundscapeLayer, SoundscapeZone};
 use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
-use engine::core::content::Content;
+use engine::core::content::{ASSETS_DIR, Content};
 use engine::core::math::Pos;
 use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
@@ -19,45 +21,46 @@ use crate::ui::theme;
 
 pub const BABBLE_SAMPLE: &str = "The quick brown fox jumps over the lazy dog";
 
-#[derive(Clone, Debug, Default)]
 pub struct ListeningPoint {
     pub area: String,
-    pub at: (f32, f32),
-    pub heard: Vec<HeardModule>,
+    pub at: Pos<Tiles>,
+    pub heard: Vec<HeardZone>,
 }
 
-#[derive(Clone, Debug)]
-pub struct HeardModule {
-    pub module: usize,
+/// A soundscape zone as heard from a listening point.
+pub struct HeardZone {
+    pub name: String,
     pub gain: f32,
-    pub outside: f32,
-    pub channels: Vec<(u32, String, f32)>,
+    pub outside: Tiles,
+    pub zone: SoundscapeZone,
 }
 
 pub fn listen(editor: &mut Editor, content: &Content, area_id: AreaId, at: Pos<Tiles>) {
     let area = area::load(content, area_id);
-    let key = area_id.key(content).to_owned();
-    let mut heard = Vec::new();
-    for (index, zone) in area.soundscape.iter().enumerate() {
-        let Some(positional) = zone.heard_from(at) else {
-            continue;
-        };
-        let outside = ((at - zone.shape.nearest(at)).length() - zone.emit.0).max(0.0);
-        let channels = zone
-            .channels
-            .iter()
-            .map(|(channel, layer)| (channel.0, layer.src.as_str().to_owned(), layer.volume))
-            .collect();
-        heard.push(HeardModule {
-            module: index,
-            gain: positional.proximity,
-            outside,
-            channels,
-        });
-    }
+    let heard = area
+        .soundscape
+        .iter()
+        .enumerate()
+        .filter_map(|(index, zone)| {
+            let positional = zone.heard_from(at)?;
+            let stem = zone
+                .channels
+                .values()
+                .next()
+                .and_then(|layer| Path::new(layer.src.as_str()).file_stem())
+                .map(|stem| stem.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            Some(HeardZone {
+                name: format!("soundscape {} · {stem}", index + 1),
+                gain: positional.proximity,
+                outside: Tiles(((at - zone.shape.nearest(at)).length() - zone.emit.0).max(0.0)),
+                zone: zone.clone(),
+            })
+        })
+        .collect();
     editor.views.sound.listening = Some(ListeningPoint {
-        area: key,
-        at: (at.x, at.y),
+        area: area_id.key(content).to_owned(),
+        at,
         heard,
     });
 }
@@ -117,7 +120,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     if views.synced.as_ref().map(|(generation, _)| *generation) != Some(project.generation) {
         let hashes: HashMap<String, String> = project
             .files
-            .paths_under("assets/")
+            .paths_under(&format!("{ASSETS_DIR}/"))
             .filter_map(|path| Some((path.clone(), project.files.hash_of(path)?.to_owned())))
             .collect();
         let assets: HashMap<String, Arc<[u8]>> = hashes
@@ -211,8 +214,8 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
     };
     ui.label(theme::muted(format!(
         "Listening at {:.1}, {:.1} in {} · what a player there hears at the default settings · {} click moves the listener",
-        listening.at.0,
-        listening.at.1,
+        listening.at.x,
+        listening.at.y,
         listening.area,
         EditorKey::Listen.name()
     )));
@@ -221,28 +224,18 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
         ui.label(theme::muted("Silence: no soundscape reaches this spot."));
         return;
     }
-    let mut rows: Vec<(u32, String, String, String)> = Vec::new();
-    for heard in &listening.heard {
-        let from = soundscape_name(editor, &listening.area, heard.module);
-        for (channel, file, volume) in &heard.channels {
-            let where_ = if heard.outside <= 0.0 {
-                "inside".to_owned()
-            } else {
-                format!(
-                    "{:.1} tiles out · {:.0}%",
-                    heard.outside,
-                    heard.gain * 100.0
-                )
-            };
-            rows.push((
-                *channel,
-                format!("{file} · {volume:.2}"),
-                from.clone(),
-                where_,
-            ));
-        }
-    }
-    rows.sort_by_key(|row| row.0);
+    let mut rows: Vec<(SoundscapeChannel, &SoundscapeLayer, &HeardZone)> = listening
+        .heard
+        .iter()
+        .flat_map(|heard| {
+            heard
+                .zone
+                .channels
+                .iter()
+                .map(move |(channel, layer)| (*channel, layer, heard))
+        })
+        .collect();
+    rows.sort_by_key(|(channel, ..)| *channel);
     egui::Grid::new("listen")
         .num_columns(4)
         .spacing([28.0, 6.0])
@@ -252,35 +245,25 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
                 ui.label(theme::muted(head).monospace().size(12.0));
             }
             ui.end_row();
-            for (channel, plays, from, heard) in rows {
-                ui.label(theme::mono(channel.to_string()));
-                ui.label(theme::mono(plays));
-                ui.label(theme::mono(from));
-                ui.label(theme::mono(heard));
+            for (channel, layer, heard) in rows {
+                let reach = if heard.outside.0 <= 0.0 {
+                    "inside".to_owned()
+                } else {
+                    format!(
+                        "{:.1} tiles out · {:.0}%",
+                        heard.outside.0,
+                        heard.gain * 100.0
+                    )
+                };
+                ui.label(theme::mono(channel.0.to_string()));
+                ui.label(theme::mono(format!(
+                    "{} · {:.2}",
+                    layer.src.as_str(),
+                    layer.volume
+                )));
+                ui.label(theme::mono(&heard.name));
+                ui.label(theme::mono(reach));
                 ui.end_row();
             }
         });
-}
-
-fn soundscape_name(editor: &Editor, area: &str, module: usize) -> String {
-    let row = editor.row_value("area", area);
-    let soundscape = row
-        .as_ref()
-        .and_then(|row| row["modules"].as_array())
-        .into_iter()
-        .flatten()
-        .enumerate()
-        .filter(|(_, m)| m["type"] == "soundscape")
-        .nth(module);
-    let Some((index, module)) = soundscape else {
-        return "soundscape".to_owned();
-    };
-    let stem = module["channels"]
-        .as_array()
-        .and_then(|channels| channels.first())
-        .and_then(|channel| channel["file"].as_str())
-        .and_then(|file| std::path::Path::new(file).file_stem())
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    format!("soundscape {index} · {stem}")
 }

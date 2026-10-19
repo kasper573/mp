@@ -1,22 +1,23 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, controls, ink, sheet, slip};
+use design_tokens::face::TextRole;
+use design_tokens::glyph::{self, Halo, Mark};
+use design_tokens::{controls, ink, sheet, slip};
 use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
-use super::card;
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
-    HotbarEntry, HotbarSlot, Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
+    HotbarEntry, HotbarSlot, Rank, SkillId, Targeting, UseSkillRequest, card, casting,
 };
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
-use crate::core::time::Seconds;
-use crate::systems::equipment::{Equipment, EquipmentSlot};
+use crate::core::time::{self, Seconds};
+use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
 use crate::systems::input::map::{
     self, InputAction, InputBinding, InputMap, KeyGesture, KeyModifiers, input,
@@ -24,13 +25,12 @@ use crate::systems::input::map::{
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::widget::{SLOT, SlotLook, slot};
 use crate::systems::item::{Inventory, ItemId, ItemKind, UseItemRequest, card as item_card};
-use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::reach::Engaged;
 use crate::systems::script::condition;
 use crate::systems::settings::{HotbarKey, HotbarShape, UserSettings};
 use crate::systems::skill::{CastAim, aim};
-use crate::systems::stat;
+use crate::systems::{notification, stat};
 
 pub const HOTBAR_KEYS: [InputAction; 9] = [
     InputAction::Hotbar1,
@@ -213,10 +213,7 @@ pub fn fire(world: &mut World, entry: HotbarEntry) -> HotbarPress {
 /// An entry let go of anywhere but a slot leaves the bar, once the player agrees. A slot that took
 /// the drop has cleared what was carried by now.
 pub fn drop_off_bar(world: &mut World) {
-    let Some(gui) = world
-        .get_resource::<crate::core::gui::GuiContext>()
-        .map(|gui| gui.0.clone())
-    else {
+    let Some(gui) = gui::context(world) else {
         return;
     };
     let Some(Carried::HotbarEntry { from, entry }) = hud::carried(&gui) else {
@@ -314,7 +311,7 @@ enum Glyph {
 }
 
 struct SlotView {
-    icon: Option<crate::core::assets::AssetRef>,
+    icon: Option<ImageRef>,
     count: u32,
     dimmed: bool,
     fill: Fill,
@@ -355,7 +352,7 @@ impl SlotView {
                 let held = world
                     .get::<Inventory>(me)
                     .map_or(0, |inventory| inventory.count(item));
-                let worn = wears(world, me, item);
+                let worn = equipment::wears(world, me, item);
                 SlotView {
                     icon: Some(def.icon.clone()),
                     count: held,
@@ -372,12 +369,6 @@ impl SlotView {
     }
 }
 
-fn wears(world: &World, me: Entity, item: ItemId) -> bool {
-    world
-        .get::<Equipment>(me)
-        .is_some_and(|equipment| equipment.slots.values().any(|worn| *worn == item))
-}
-
 fn bag_item(world: &World, slot: u32) -> Option<ItemId> {
     session::my_character(world)
         .and_then(|me| me.get::<Inventory>())
@@ -386,9 +377,7 @@ fn bag_item(world: &World, slot: u32) -> Option<ItemId> {
 }
 
 fn worn_item(world: &World, slot: EquipmentSlot) -> Option<ItemId> {
-    session::my_character(world)
-        .and_then(|me| me.get::<Equipment>())
-        .and_then(|equipment| equipment.slots.get(&slot).copied())
+    equipment::in_slot(world, session::me(world)?, slot)
 }
 
 fn skill_fill(world: &World, me: Entity, skill: SkillId, rank: Rank) -> Fill {
@@ -397,7 +386,7 @@ fn skill_fill(world: &World, me: Entity, skill: SkillId, rank: Rank) -> Fill {
     if stat::is_dead(world, me) {
         return Fill::Blocked(Glyph::Cross);
     }
-    if let Some(now) = session::server_now(world)
+    if let Some(now) = time::server_now(world)
         && let Some(ready) = world
             .get::<Cooldowns>(me)
             .and_then(|cooldowns| cooldowns.ready_at(skill))
@@ -764,25 +753,14 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
             let wash = Rect::from_min_max(Pos2::new(rect.min.x, rect.max.y - height), rect.max);
             painter.rect_filled(wash.shrink(1.0), 2.0, ink::wash(ink::RUBRIC, 0.45));
             if fraction > 0.02 {
-                for offset in [
-                    Vec2::new(-1.0, 0.0),
-                    Vec2::new(1.0, 0.0),
-                    Vec2::new(0.0, 1.0),
-                ] {
-                    painter.text(
-                        rect.center() + offset,
-                        Align2::CENTER_CENTER,
-                        cooldown_text(left),
-                        TextRole::Count.font_id(),
-                        ink::CREAM,
-                    );
-                }
-                painter.text(
+                glyph::haloed(
+                    painter,
                     rect.center(),
                     Align2::CENTER_CENTER,
-                    cooldown_text(left),
+                    &cooldown_text(left),
                     TextRole::Count.font_id(),
                     ink::INK,
+                    CREAM_HALO,
                 );
             }
         }
@@ -837,28 +815,21 @@ fn drop_wash(ui: &Ui, rect: Rect) {
 }
 
 fn slot_key_mark(ui: &Ui, rect: Rect, key: &str) {
-    let at = rect.left_top() + Vec2::new(3.0, 1.0);
-    for offset in [
-        Vec2::new(-1.0, 0.0),
-        Vec2::new(1.0, 0.0),
-        Vec2::new(0.0, 1.0),
-    ] {
-        ui.painter().text(
-            at + offset,
-            Align2::LEFT_TOP,
-            key,
-            TextRole::Launcher.font_id(),
-            ink::CREAM,
-        );
-    }
-    ui.painter().text(
-        at,
+    glyph::haloed(
+        ui.painter(),
+        rect.left_top() + Vec2::new(3.0, 1.0),
         Align2::LEFT_TOP,
         key,
         TextRole::Launcher.font_id(),
         ink::INK2,
+        CREAM_HALO,
     );
 }
+
+const CREAM_HALO: Halo = Halo {
+    color: ink::CREAM,
+    width: 1.0,
+};
 
 fn uptime(world: &World) -> Seconds {
     Seconds(world.resource::<Time>().elapsed_secs())
@@ -894,20 +865,13 @@ fn use_skill(world: &mut World, skill: SkillId) -> bool {
     let Some(me) = session::me(world) else {
         return false;
     };
+    if let Some(refusal) = super::unusable(world, me, skill) {
+        notification::local_error(world, refusal);
+        return false;
+    }
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
     let rank = super::rank_of(world, me, skill);
-    if rank == Rank::NONE {
-        notification::local_error(world, format!("You don't know {}", def.name));
-        return false;
-    }
-    if def.kind == SkillKind::Passive {
-        notification::local_error(
-            world,
-            format!("{} is passive: it holds on its own", def.name),
-        );
-        return false;
-    }
     match def.target {
         Targeting::Caster => {
             world.write_message(UseSkillRequest {
@@ -957,13 +921,13 @@ fn use_item(world: &mut World, item: ItemId) -> bool {
     }
     let bag_slot = world
         .get::<Inventory>(me)
-        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item));
+        .and_then(|inventory| inventory.slot_of(item));
     match bag_slot {
         Some(slot) => {
             world.write_message(UseItemRequest { slot: slot as u32 });
             true
         }
-        None if wears(world, me, item) => {
+        None if equipment::wears(world, me, item) => {
             notification::local_error(world, format!("{} is worn already", def.name));
             false
         }
@@ -1018,7 +982,10 @@ fn key_pressed(world: &World, slot: HotbarSlot) -> bool {
 /// another slot holds moves over.
 fn capture(world: &mut World, slot: HotbarSlot) {
     let keys = world.resource::<ButtonInput<KeyCode>>();
-    let Some(&key) = keys.get_just_pressed().find(|key| !is_modifier(**key)) else {
+    let Some(&key) = keys
+        .get_just_pressed()
+        .find(|key| !KeyModifiers::is_modifier(**key))
+    else {
         return;
     };
     let modifiers = KeyModifiers::held(keys);
@@ -1080,20 +1047,6 @@ fn capture(world: &mut World, slot: HotbarSlot) {
     } else {
         InterfaceSound::UiPick.play(world);
     }
-}
-
-fn is_modifier(key: KeyCode) -> bool {
-    matches!(
-        key,
-        KeyCode::ShiftLeft
-            | KeyCode::ShiftRight
-            | KeyCode::ControlLeft
-            | KeyCode::ControlRight
-            | KeyCode::AltLeft
-            | KeyCode::AltRight
-            | KeyCode::SuperLeft
-            | KeyCode::SuperRight
-    )
 }
 
 fn rebind_panel(ui: &mut Ui, world: &World, bar: Rect) {

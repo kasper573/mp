@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
@@ -201,7 +202,7 @@ fn arranged(map: &OpenWorldMap, options: &ArrangeOptions) -> WorldMapDef {
 
 fn toggle_row(ui: &mut Ui, on: &mut bool, label: &str, note: &str) {
     ui.horizontal(|ui| {
-        widgets::toggle(ui, on);
+        ui.checkbox(on, "");
         ui.label(RichText::new(label).size(13.0));
         if !note.is_empty() {
             ui.label(theme::faint(format!("· {note}")).size(12.0));
@@ -584,7 +585,7 @@ fn hop_distances(adjacency: &[Vec<usize>], component: &[usize]) -> BTreeMap<(usi
         while let Some(node) = queue.pop_front() {
             let here = distance[&node];
             for &next in &adjacency[node] {
-                if let std::collections::hash_map::Entry::Vacant(slot) = distance.entry(next) {
+                if let Entry::Vacant(slot) = distance.entry(next) {
                     slot.insert(here + 1);
                     queue.push_back(next);
                 }

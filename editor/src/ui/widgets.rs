@@ -1,31 +1,21 @@
+pub use design_tokens::controls::{combo, danger, key_hint, primary};
+pub use design_tokens::sheet::{section, section_with, tabs};
+
 use std::fmt::Display;
 
+use design_tokens::face::{Face, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{Face, TextRole, controls, ink, sheet};
+use design_tokens::ink;
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
+use engine::core::time::{Seconds, UnixMillis};
 
 use super::theme;
 use crate::keymap::EditorKey;
-
-pub use design_tokens::controls::{danger, key_hint, primary};
-pub use design_tokens::sheet::{section, section_with};
 
 pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)
         .font(Face::SmallCapsBold.id(TextRole::Section.size()))
         .color(ink::RUBRIC)
-}
-
-pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
-    sheet::tabs(ui, tabs, active);
-}
-
-pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
-    controls::combo(id_salt)
-}
-
-pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
-    controls::checkbox(ui, on, "")
 }
 
 pub fn chip(ui: &mut Ui, text: &str) -> Response {
@@ -148,7 +138,7 @@ pub fn keyed_button(ui: &mut Ui, label: &str, key: Option<EditorKey>, enabled: b
     );
     if let Some(keys) = keys {
         x += label_width + 8.0;
-        let cap = egui::Rect::from_min_size(
+        let cap = Rect::from_min_size(
             egui::pos2(x, rect.center().y - 9.0),
             Vec2::new(keys_width - 8.0, 18.0),
         );
@@ -225,24 +215,37 @@ pub fn badge(ui: &mut Ui, kind: &str) {
     );
 }
 
+/// An open menu's "Move up" and "Move down" entries for the entry at `index` of `count`: the two
+/// indices to swap, once one is picked.
+pub fn move_entries(ui: &mut Ui, index: usize, count: usize) -> Option<(usize, usize)> {
+    let mut swap = None;
+    if index > 0 && ui.button("Move up").clicked() {
+        swap = Some((index, index - 1));
+    }
+    if index + 1 < count && ui.button("Move down").clicked() {
+        swap = Some((index, index + 1));
+    }
+    if swap.is_some() {
+        ui.close();
+    }
+    swap
+}
+
 pub fn card_header(
     ui: &mut Ui,
     title: &str,
     subtitle: &str,
     menu: impl FnOnce(&mut Ui),
 ) -> Response {
-    let response = ui
-        .horizontal(|ui| {
-            ui.label(theme::strong(title).monospace());
-            if !subtitle.is_empty() {
-                ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
-            }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.menu_button(theme::faint("…"), menu);
-            });
-        })
-        .response;
-    response.interact(Sense::click())
+    card_heading(ui, title, subtitle, |ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.menu_button(theme::faint("…"), menu);
+        });
+    })
+}
+
+pub fn card_title(ui: &mut Ui, title: &str) -> Response {
+    card_heading(ui, title, "", |_| {})
 }
 
 pub fn code_block(ui: &mut Ui, text: &str) {
@@ -313,10 +316,6 @@ pub fn mode_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
         (ink::ink_wash(0.05), ink::INK2)
     };
     chip_colored(ui, text, fill, ink)
-}
-
-pub fn card_title(ui: &mut Ui, title: &str) -> Response {
-    card_header(ui, title, "", |_| {})
 }
 
 pub fn rule(ui: &Ui) {
@@ -426,8 +425,8 @@ pub fn thousands(n: usize) -> String {
     out
 }
 
-pub fn clock(unix_seconds: u64, with_seconds: bool) -> String {
-    let seconds = unix_seconds % 86_400;
+pub fn clock(at: UnixMillis, with_seconds: bool) -> String {
+    let seconds = (at.0 / 1000) % 86_400;
     let (hours, minutes) = (seconds / 3600, (seconds % 3600) / 60);
     if with_seconds {
         format!("{hours:02}:{minutes:02}:{:02}", seconds % 60)
@@ -436,7 +435,8 @@ pub fn clock(unix_seconds: u64, with_seconds: bool) -> String {
     }
 }
 
-pub fn ago(seconds: u64) -> String {
+pub fn ago(elapsed: Seconds) -> String {
+    let seconds = elapsed.0.max(0.0) as u64;
     let minutes = seconds / 60;
     let hours = minutes / 60;
     let days = hours / 24;
@@ -457,4 +457,23 @@ pub fn ago(seconds: u64) -> String {
     } else {
         format!("{} months ago", days / 30)
     }
+}
+
+fn card_heading(
+    ui: &mut Ui,
+    title: &str,
+    subtitle: &str,
+    trailing: impl FnOnce(&mut Ui),
+) -> Response {
+    let response = ui
+        .horizontal(|ui| {
+            ui.set_min_height(ui.spacing().interact_size.y);
+            ui.label(theme::strong(title).monospace());
+            if !subtitle.is_empty() {
+                ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
+            }
+            trailing(ui);
+        })
+        .response;
+    response.interact(Sense::click())
 }

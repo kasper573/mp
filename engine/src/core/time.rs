@@ -1,6 +1,9 @@
 use std::hash::{Hash, Hasher};
+use std::ops::{Div, Mul, Rem};
+use std::time::{Duration, SystemTime};
 
-use bevy_ecs::prelude::Resource;
+use bevy_ecs::prelude::{Resource, World};
+use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -52,8 +55,8 @@ pub struct PlaybackRate(pub f32);
 pub struct Hertz(pub f32);
 
 impl Hertz {
-    pub fn period(self) -> std::time::Duration {
-        std::time::Duration::from_secs_f32(1.0 / self.0)
+    pub fn period(self) -> Duration {
+        Duration::from_secs_f32(1.0 / self.0)
     }
 }
 
@@ -63,21 +66,21 @@ impl PlaybackRate {
     }
 }
 
-impl std::ops::Div<PlaybackRate> for Seconds {
+impl Div<PlaybackRate> for Seconds {
     type Output = Seconds;
     fn div(self, rate: PlaybackRate) -> Seconds {
         Seconds(self.0 / rate.0)
     }
 }
 
-impl std::ops::Mul<PlaybackRate> for Millis {
+impl Mul<PlaybackRate> for Millis {
     type Output = Millis;
     fn mul(self, rate: PlaybackRate) -> Millis {
         Millis(self.0 * rate.0)
     }
 }
 
-impl std::ops::Rem for Millis {
+impl Rem for Millis {
     type Output = Millis;
     fn rem(self, other: Millis) -> Millis {
         Millis(self.0 % other.0)
@@ -92,6 +95,15 @@ impl Hash for Seconds {
 }
 
 impl Seconds {
+    /// Rounded up to whole minutes, for a countdown shown by the minute.
+    pub fn up_to_minute(self) -> Seconds {
+        Seconds((self.0 / 60.0).ceil() * 60.0)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+
     pub fn millis(self) -> Millis {
         Millis(self.0 * 1000.0)
     }
@@ -124,13 +136,13 @@ impl Seconds {
     }
 }
 
-impl From<Seconds> for std::time::Duration {
-    fn from(seconds: Seconds) -> std::time::Duration {
-        std::time::Duration::from_secs_f32(seconds.0.max(0.0))
+impl From<Seconds> for Duration {
+    fn from(seconds: Seconds) -> Duration {
+        Duration::from_secs_f32(seconds.0.max(0.0))
     }
 }
 
-impl std::ops::Mul<f32> for Seconds {
+impl Mul<f32> for Seconds {
     type Output = Seconds;
     fn mul(self, factor: f32) -> Seconds {
         Seconds(self.0 * factor)
@@ -190,6 +202,15 @@ impl UnixMillis {
 
     pub fn since(self, earlier: UnixMillis) -> Seconds {
         Millis(self.0.saturating_sub(earlier.0) as f32).seconds()
+    }
+}
+
+impl From<SystemTime> for UnixMillis {
+    fn from(time: SystemTime) -> UnixMillis {
+        let since_epoch = time
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("the clock is set after 1970");
+        UnixMillis(since_epoch.as_millis() as u64)
     }
 }
 
@@ -314,4 +335,10 @@ impl ServerClock {
         let (then, at) = self.0?;
         Some(then.after(uptime - at))
     }
+}
+
+/// The server's wall clock as this client reckons it, once the server has told it the time.
+pub fn server_now(world: &World) -> Option<UnixMillis> {
+    let uptime = Seconds(world.get_resource::<Time>()?.elapsed_secs());
+    world.get_resource::<ServerClock>()?.now(uptime)
 }

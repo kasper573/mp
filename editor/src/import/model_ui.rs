@@ -1,23 +1,25 @@
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
-use std::collections::{BTreeMap, HashMap};
-
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
+use engine::core::content::{ContentRow, asset_file, row_file};
+use engine::systems::actor::ModelDef;
 use image::RgbaImage;
 use serde_json::Value;
 
 use super::formats::{self, AnimationExport, ExportFormat};
 use super::model::{
-    self, CuePlacement, FrameCue, MappingNote, ModelImportPlan, StripMapping, StripPlan,
+    self, CueMove, CuePlacement, MappingNote, ModelImportPlan, StripPlan, StripRetiming,
 };
 use super::records::{DueReimport, ImportRecord};
 use crate::app::Editor;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
-use crate::ui::widgets;
-use crate::ui::{dialogs, theme};
-use crate::views::model::{StripFrame, TABLE};
-use crate::{rows, schema};
+use crate::ui::{dialogs, theme, widgets};
+use crate::views::model::{FrameCue, StripFrame, frame_size};
+use crate::{rows, schema, thumbs};
 
 const FRAME_CARD: f32 = 48.0;
 
@@ -46,7 +48,7 @@ pub struct ModelDialog {
     pub key: String,
     pub new_row: bool,
     pub export: AnimationExport,
-    pub mapping: StripMapping,
+    pub mapping: BTreeMap<String, Option<String>>,
     pub notes: BTreeMap<String, MappingNote>,
     pub asked: BTreeMap<String, String>,
     pub grid: (String, String),
@@ -60,30 +62,25 @@ pub struct ModelDialog {
 
 pub struct ModelReimport {
     pub export: AnimationExport,
-    pub mapping: StripMapping,
+    pub mapping: BTreeMap<String, Option<String>>,
     pub plan: ModelImportPlan,
     pub auto: bool,
     pub while_closed: bool,
     pub textures: TextureCache,
     pub sheet: Option<RgbaImage>,
-    pub old_frame: (u32, u32),
-}
-
-fn frame_size_of(row: &Value) -> (u32, u32) {
-    (
-        row["sprites"]["frame_size"]["width"].as_u64().unwrap_or(0) as u32,
-        row["sprites"]["frame_size"]["height"].as_u64().unwrap_or(0) as u32,
-    )
+    pub old_frame: Option<(u32, u32)>,
 }
 
 fn sheet_of(editor: &Editor, row: &Value) -> Option<RgbaImage> {
-    let image = row["sprites"]["image"].as_str()?;
-    let bytes = editor
-        .project
-        .as_ref()?
-        .files
-        .get(&format!("assets/{image}"))?;
-    formats::decode_image_bytes(bytes).ok()
+    super::asset_image(editor, row["sprites"]["image"].as_str()?)
+}
+
+fn asked_defaults(export: &AnimationExport) -> BTreeMap<String, String> {
+    export
+        .strips
+        .iter()
+        .map(|strip| (strip.tag.clone(), formats::DEFAULT_MS.to_string()))
+        .collect()
 }
 
 fn asked_ms(asked: &BTreeMap<String, String>) -> BTreeMap<String, u32> {
@@ -99,8 +96,8 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
-    let row = editor.row_value(TABLE, key);
-    let record = editor.imports.record_for(TABLE, key).cloned();
+    let row = editor.row_value(ModelDef::TABLE, key);
+    let record = editor.imports.record_for(ModelDef::TABLE, key).cloned();
     let sheet = row.as_ref().and_then(|row| sheet_of(editor, row));
     if let (Some(due), Some(record), Some(row)) = (again, &record, &row) {
         let mapping = model::recorded_mapping(record, &export);
@@ -121,20 +118,20 @@ pub fn land(
             while_closed: due.while_closed,
             textures: TextureCache::default(),
             sheet,
-            old_frame: frame_size_of(row),
+            old_frame: frame_size(row),
         };
         if !auto {
             editor.open_tab(EditorTab::Model {
                 key: key.to_owned(),
             });
             editor.select(RowSelection::parts(
-                TABLE,
+                ModelDef::TABLE,
                 key,
                 vec![super::IMPORT_PART.to_owned()],
             ));
             editor.toast(format!(
                 "{} changed{} · {} to decide in model/{key}",
-                record.names(),
+                formats::export_name(&record.files),
                 if due.while_closed {
                     " while the editor was closed"
                 } else {
@@ -157,16 +154,7 @@ pub fn land(
 }
 
 pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::ImportDialog> {
-    let wanted = export
-        .files
-        .first()
-        .map(|file| formats::stem(file).replace(['-', ' '], "_").to_lowercase())
-        .unwrap_or_else(|| "new_model".to_owned());
-    let key = editor
-        .project
-        .as_ref()
-        .map(|project| rows::free_key(&project.files, TABLE, &wanted))
-        .unwrap_or(wanted);
+    let key = super::free_key(editor, ModelDef::TABLE, &export);
     Some(super::ImportDialog::Model(Box::new(new_dialog(
         key, true, export, None, None, None,
     ))))
@@ -189,11 +177,7 @@ fn new_dialog(
             }
         }
     }
-    let asked = export
-        .strips
-        .iter()
-        .map(|strip| (strip.tag.clone(), formats::DEFAULT_MS.to_string()))
-        .collect();
+    let asked = asked_defaults(&export);
     let grid = match export.kind {
         ExportFormat::Grid => (String::new(), String::new()),
         _ => (export.frame.0.to_string(), export.frame.1.to_string()),
@@ -207,15 +191,7 @@ fn new_dialog(
         notes,
         asked,
         grid,
-        plan: ModelImportPlan {
-            strips: Vec::new(),
-            missing: Vec::new(),
-            frame: (0, 0),
-            trimmed: false,
-            keeps_hitbox: false,
-            busts: 0,
-            cues_total: 0,
-        },
+        plan: ModelImportPlan::default(),
         selected,
         textures: TextureCache::default(),
         record,
@@ -235,7 +211,7 @@ fn new_dialog(
 
 fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
     let row = (!dialog.new_row)
-        .then(|| editor.row_value(TABLE, &dialog.key))
+        .then(|| editor.row_value(ModelDef::TABLE, &dialog.key))
         .flatten();
     let choices: BTreeMap<(String, usize, FrameCue), CuePlacement> = dialog
         .plan
@@ -394,14 +370,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                                 let (mapping, notes) = model::default_mapping(&dialog.export);
                                 dialog.mapping = mapping;
                                 dialog.notes = notes;
-                                dialog.asked = dialog
-                                    .export
-                                    .strips
-                                    .iter()
-                                    .map(|strip| {
-                                        (strip.tag.clone(), formats::DEFAULT_MS.to_string())
-                                    })
-                                    .collect();
+                                dialog.asked = asked_defaults(&dialog.export);
                                 dialog.selected =
                                     dialog.export.strips.first().map(|s| s.tag.clone());
                                 dialog.error = None;
@@ -432,15 +401,14 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 checklist(ui, &dialog);
             });
         });
-        ui.add_space(8.0);
-        ui.add_space(8.0);
+        ui.add_space(16.0);
         ui.horizontal(|ui| {
             let ready = dialog.plan.ready();
             let key_problem = dialog
                 .new_row
                 .then(|| {
                     editor.project.as_ref().and_then(|project| {
-                        rows::key_problem(&project.files, TABLE, dialog.key.trim())
+                        rows::key_problem(&project.files, ModelDef::TABLE, dialog.key.trim())
                     })
                 })
                 .flatten();
@@ -546,7 +514,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 }
                 let current = dialog.mapping.get(tag).cloned().flatten();
                 let mut picked: Option<Option<String>> = None;
-                widgets::combo_box(("import-strip", tag))
+                widgets::combo(("import-strip", tag))
                     .width(150.0)
                     .selected_text(
                         current
@@ -592,7 +560,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label(theme::muted("every model needs this strip"));
                     });
                     let mut picked = None;
-                    widgets::combo_box(("import-pick-tag", &name))
+                    widgets::combo(("import-pick-tag", &name))
                         .width(120.0)
                         .selected_text("pick a tag")
                         .show_ui(ui, |ui| {
@@ -614,7 +582,11 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
     changed
 }
 
-fn has_issue(plan: &ModelImportPlan, mapping: &StripMapping, tag: &str) -> bool {
+fn has_issue(
+    plan: &ModelImportPlan,
+    mapping: &BTreeMap<String, Option<String>>,
+    tag: &str,
+) -> bool {
     let Some(Some(target)) = mapping.get(tag) else {
         return false;
     };
@@ -670,31 +642,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
                 cue.from + 1
             )));
         });
-        ui.horizontal(|ui| {
-            ui.label(theme::muted("put it on"));
-            let offered = cue.offered(count);
-            let mut picked = None;
-            widgets::combo_box(("import-place", &target, cue.from, cue.cue.label()))
-                .width(100.0)
-                .selected_text(theme::mono(format!("frame {}", offered + 1)).color(theme::FAINT))
-                .show_ui(ui, |ui| {
-                    for frame in 0..count {
-                        if ui
-                            .selectable_label(false, format!("frame {}", frame + 1))
-                            .clicked()
-                        {
-                            picked = Some(CuePlacement::Frame(frame));
-                        }
-                    }
-                    if ui.selectable_label(false, "remove the cue").clicked() {
-                        picked = Some(CuePlacement::Remove);
-                    }
-                });
-            if let Some(picked) = picked {
-                cue.choice = Some(picked);
-                changed = true;
-            }
-        });
+        changed |= place_cue(ui, &target, cue, count, 100.0);
     }
     if let Some(retimed) = &mut strip.retimed {
         any = true;
@@ -702,34 +650,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
             glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
             ui.label(theme::muted("retimed here since the last import"));
         });
-        ui.horizontal(|ui| {
-            ui.label(theme::muted("keep"));
-            let mut picked = None;
-            widgets::combo_box(("import-keep", &target))
-                .width(150.0)
-                .selected_text(if retimed.keep_here {
-                    "the lengths set here"
-                } else {
-                    "the export's"
-                })
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_label(retimed.keep_here, "the lengths set here")
-                        .clicked()
-                    {
-                        picked = Some(true);
-                    }
-                    if ui
-                        .selectable_label(!retimed.keep_here, "the export's")
-                        .clicked()
-                    {
-                        picked = Some(false);
-                    }
-                });
-            if let Some(picked) = picked {
-                retimed.keep_here = picked;
-            }
-        });
+        keep_lengths(ui, &target, retimed, 150.0);
     }
     if !any && !mapped_twice {
         let note = dialog
@@ -807,16 +728,7 @@ fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
     widgets::section(ui, "What the import does");
     let plan = &dialog.plan;
     let (fw, fh) = plan.frame;
-    let line = |ui: &mut Ui, ok: bool, text: String| {
-        ui.horizontal_wrapped(|ui| {
-            if ok {
-                glyph::show(ui, Mark::Tick, 14.0, theme::OK);
-            } else {
-                glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
-            }
-            ui.label(theme::muted(text).size(12.5));
-        });
-    };
+    let line = super::check_line;
     if plan.trimmed {
         line(
             ui,
@@ -857,10 +769,7 @@ fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
                 } else {
                     "the row"
                 },
-                match plan.busts {
-                    0 => String::new(),
-                    _ => ", the bust".to_owned(),
-                },
+                if plan.keeps_bust { ", the bust" } else { "" },
                 plan.cues_total
             ),
         );
@@ -919,12 +828,7 @@ fn draw_fit(painter: &egui::Painter, rect: Rect, texture: &TextureHandle, frame:
     let scale = (rect.width() / fw).min(rect.height() / fh);
     let size = Vec2::new(fw * scale, fh * scale);
     let fitted = Rect::from_center_size(rect.center(), size);
-    painter.image(
-        texture.id(),
-        fitted,
-        Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-        Color32::WHITE,
-    );
+    painter.image(texture.id(), fitted, thumbs::FULL_UV, Color32::WHITE);
 }
 
 pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDialog> {
@@ -941,19 +845,19 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
     let key = dialog.key.trim().to_owned();
     let row = if dialog.new_row {
         let project = editor.project.as_ref().ok_or("no folder is open")?;
-        if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
+        if let Some(problem) = rows::key_problem(&project.files, ModelDef::TABLE, &key) {
             return Err(problem);
         }
         let shape = editor
             .shapes
-            .table(TABLE)
+            .table(ModelDef::TABLE)
             .ok_or("the model table has no shape")?;
         Some(schema::template(&shape.shape, &shape.shape))
     } else {
-        editor.row_value(TABLE, &key)
+        editor.row_value(ModelDef::TABLE, &key)
     };
     let built = model::build(&dialog.plan, &dialog.export, row.as_ref(), &key)?;
-    let names = ImportRecord::of_files(&dialog.export.files, TABLE, &key).names();
+    let names = formats::export_name(&dialog.export.files);
     let label = if dialog.new_row {
         format!("Imported {names} as model/{key}")
     } else {
@@ -961,7 +865,7 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
     };
     let record = model::record(&dialog.export, &key, &dialog.mapping, built.lengths.clone());
     write(editor, &key, built, label, record)?;
-    editor.select(RowSelection::row(TABLE, &key));
+    editor.select(RowSelection::row(ModelDef::TABLE, &key));
     editor.open_tab(EditorTab::Model { key });
     Ok(())
 }
@@ -974,11 +878,8 @@ fn write(
     record: ImportRecord,
 ) -> Result<(), String> {
     let mut edit = ContentEdit::new(label);
-    edit.write(
-        format!("assets/{}", built.image),
-        std::sync::Arc::from(built.png),
-    );
-    edit.write_json(row_file(TABLE, key), &built.row);
+    edit.write(asset_file(&built.image), Arc::from(built.png));
+    edit.write_json(row_file(ModelDef::TABLE, key), &built.row);
     editor.try_apply(edit)?;
     editor.imports.remember(record);
     editor.views.model.reimports.remove(key);
@@ -1003,7 +904,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     let Some(draft) = editor.views.model.reimports.get(key) else {
         return;
     };
-    let row = editor.row_value(TABLE, key);
+    let row = editor.row_value(ModelDef::TABLE, key);
     let built = match model::build(&draft.plan, &draft.export, row.as_ref(), key) {
         Ok(built) => built,
         Err(error) => {
@@ -1011,7 +912,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
             return;
         }
     };
-    let names = ImportRecord::of_files(&draft.export.files, TABLE, key).names();
+    let names = formats::export_name(&draft.export.files);
     let changed = draft.plan.changed().len();
     let label = if auto {
         format!("Imported {names} into {key} again · nothing to decide")
@@ -1032,7 +933,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(draft) = editor.views.model.reimports.get_mut(key) else {
         return;
     };
-    let names = ImportRecord::of_files(&draft.export.files, TABLE, key).names();
+    let names = formats::export_name(&draft.export.files);
     let changed: Vec<usize> = draft
         .plan
         .strips
@@ -1094,7 +995,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
 struct Frames<'a> {
     export: &'a AnimationExport,
     sheet: &'a Option<RgbaImage>,
-    old_frame: (u32, u32),
+    old_frame: Option<(u32, u32)>,
     frame: (u32, u32),
 }
 
@@ -1145,7 +1046,6 @@ fn strip_section(
             Vec2::splat(FRAME_CARD),
         )
     };
-    let (ofw, ofh) = old_frame;
     for (index, frame_data) in strip.before.iter().enumerate() {
         let card = card_at(0, index);
         painter.rect(
@@ -1156,12 +1056,12 @@ fn strip_section(
             egui::StrokeKind::Inside,
         );
         if let Some(sheet) = sheet
-            && ofw > 0
-            && let Some(image) = frame_image(sheet, (ofw, ofh), frame_data.frame)
+            && let Some(old_frame) = old_frame
+            && let Some(image) = formats::cell(sheet, old_frame, frame_data.frame)
         {
             let hash = formats::pixel_hash(&image);
             let texture = textures.of(ctx, &hash, &image);
-            draw_fit(&painter, card.shrink(2.0), &texture, (ofw, ofh));
+            draw_fit(&painter, card.shrink(2.0), &texture, old_frame);
         }
         let cues = cue_labels(frame_data);
         painter.text(
@@ -1257,32 +1157,13 @@ fn strip_section(
     }
 }
 
-fn frame_image(sheet: &RgbaImage, frame: (u32, u32), index: u32) -> Option<RgbaImage> {
-    let (fw, fh) = frame;
-    let columns = sheet.width() / fw.max(1);
-    if columns == 0 {
-        return None;
-    }
-    let x = (index % columns) * fw;
-    let y = (index / columns) * fh;
-    if x + fw > sheet.width() || y + fh > sheet.height() {
-        return None;
-    }
-    Some(image::imageops::crop_imm(sheet, x, y, fw, fh).to_image())
-}
-
 fn cue_labels(frame: &StripFrame) -> String {
-    let mut labels = Vec::new();
-    if frame.apex {
-        labels.push("apex".to_owned());
-    }
-    if frame.step {
-        labels.push("step".to_owned());
-    }
-    if let Some(sound) = &frame.sound {
-        labels.push(sound.clone());
-    }
-    labels.join(" ")
+    frame
+        .cues()
+        .iter()
+        .map(FrameCue::label)
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -1346,53 +1227,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             cue.from + 1
                         )));
                     });
-                    ui.horizontal(|ui| {
-                        ui.label(theme::muted("put it on"));
-                        let offered = cue.offered(count);
-                        let shown = match cue.choice {
-                            Some(CuePlacement::Frame(frame)) => format!("frame {}", frame + 1),
-                            Some(CuePlacement::Remove) => "remove the cue".to_owned(),
-                            None => format!("frame {}", offered + 1),
-                        };
-                        let mut picked = None;
-                        widgets::combo_box((
-                            "reimport-place",
-                            &strip.name,
-                            cue.from,
-                            cue.cue.label(),
-                        ))
-                        .width(ui.available_width().min(200.0))
-                        .selected_text(theme::mono(shown).color(if cue.choice.is_some() {
-                            theme::TEXT
-                        } else {
-                            theme::FAINT
-                        }))
-                        .show_ui(ui, |ui| {
-                            for frame in 0..count {
-                                if ui
-                                    .selectable_label(
-                                        cue.choice == Some(CuePlacement::Frame(frame)),
-                                        format!("frame {}", frame + 1),
-                                    )
-                                    .clicked()
-                                {
-                                    picked = Some(CuePlacement::Frame(frame));
-                                }
-                            }
-                            if ui
-                                .selectable_label(
-                                    cue.choice == Some(CuePlacement::Remove),
-                                    "remove the cue",
-                                )
-                                .clicked()
-                            {
-                                picked = Some(CuePlacement::Remove);
-                            }
-                        });
-                        if let Some(picked) = picked {
-                            cue.choice = Some(picked);
-                        }
-                    });
+                    place_cue(ui, &strip.name, cue, count, 200.0);
                 }
             });
         });
@@ -1447,34 +1282,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         if differing.len() == 1 { "was" } else { "were" }
                     )));
                 });
-                ui.horizontal(|ui| {
-                    ui.label(theme::muted("keep"));
-                    let mut picked = None;
-                    widgets::combo_box(("reimport-keep", &strip.name))
-                        .width(ui.available_width().min(200.0))
-                        .selected_text(theme::mono(if retimed.keep_here {
-                            "the lengths set here"
-                        } else {
-                            "the export's"
-                        }))
-                        .show_ui(ui, |ui| {
-                            if ui
-                                .selectable_label(retimed.keep_here, "the lengths set here")
-                                .clicked()
-                            {
-                                picked = Some(true);
-                            }
-                            if ui
-                                .selectable_label(!retimed.keep_here, "the export's")
-                                .clicked()
-                            {
-                                picked = Some(false);
-                            }
-                        });
-                    if let Some(picked) = picked {
-                        retimed.keep_here = picked;
-                    }
-                });
+                keep_lengths(ui, &strip.name, retimed, 200.0);
             });
         });
         ui.add_space(6.0);
@@ -1503,14 +1311,85 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     if keep {
         editor.views.model.reimports.remove(key);
-        if let Some(record) = editor.imports.record_for(TABLE, key).cloned() {
-            let mut refreshed = ImportRecord::of_files(&record.files(), TABLE, key);
-            refreshed.mapping = record.mapping;
-            refreshed.strips = record.strips;
+        if let Some(record) = editor.imports.record_for(ModelDef::TABLE, key) {
+            let refreshed = record.refreshed();
             editor.imports.remember(refreshed);
         }
         editor.toast(format!(
             "Kept the old frames of {key}; the export is remembered as it is now"
         ));
     }
+}
+
+fn place_cue(ui: &mut Ui, strip: &str, cue: &mut CueMove, count: usize, width: f32) -> bool {
+    let mut picked = None;
+    ui.horizontal(|ui| {
+        ui.label(theme::muted("put it on"));
+        let shown = match cue.choice {
+            Some(CuePlacement::Frame(frame)) => format!("frame {}", frame + 1),
+            Some(CuePlacement::Remove) => "remove the cue".to_owned(),
+            None => format!("frame {}", cue.offered(count) + 1),
+        };
+        widgets::combo(("import-place", strip, cue.from, cue.cue.label()))
+            .width(ui.available_width().min(width))
+            .selected_text(theme::mono(shown).color(if cue.choice.is_some() {
+                theme::TEXT
+            } else {
+                theme::FAINT
+            }))
+            .show_ui(ui, |ui| {
+                for frame in 0..count {
+                    if ui
+                        .selectable_label(
+                            cue.choice == Some(CuePlacement::Frame(frame)),
+                            format!("frame {}", frame + 1),
+                        )
+                        .clicked()
+                    {
+                        picked = Some(CuePlacement::Frame(frame));
+                    }
+                }
+                if ui
+                    .selectable_label(cue.choice == Some(CuePlacement::Remove), "remove the cue")
+                    .clicked()
+                {
+                    picked = Some(CuePlacement::Remove);
+                }
+            });
+    });
+    if picked.is_some() {
+        cue.choice = picked;
+    }
+    picked.is_some()
+}
+
+fn keep_lengths(ui: &mut Ui, strip: &str, retimed: &mut StripRetiming, width: f32) {
+    ui.horizontal(|ui| {
+        ui.label(theme::muted("keep"));
+        let mut picked = None;
+        widgets::combo(("import-keep", strip))
+            .width(ui.available_width().min(width))
+            .selected_text(theme::mono(if retimed.keep_here {
+                "the lengths set here"
+            } else {
+                "the export's"
+            }))
+            .show_ui(ui, |ui| {
+                if ui
+                    .selectable_label(retimed.keep_here, "the lengths set here")
+                    .clicked()
+                {
+                    picked = Some(true);
+                }
+                if ui
+                    .selectable_label(!retimed.keep_here, "the export's")
+                    .clicked()
+                {
+                    picked = Some(false);
+                }
+            });
+        if let Some(picked) = picked {
+            retimed.keep_here = picked;
+        }
+    });
 }

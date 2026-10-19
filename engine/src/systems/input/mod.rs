@@ -18,9 +18,9 @@ use crate::systems::player::RespawnRequest;
 use crate::systems::player::session::{self, MyCharacter};
 use crate::systems::screen::ClientScreen;
 
-pub struct InputPlugin;
+pub struct PlayerInputPlugin;
 
-impl Plugin for InputPlugin {
+impl Plugin for PlayerInputPlugin {
     fn build(&self, app: &mut App) {
         map::plugin(app);
         gestures::plugin(app);

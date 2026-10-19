@@ -1,7 +1,6 @@
 {
   "name": "Gloomhollow",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 60,
       "height": 72

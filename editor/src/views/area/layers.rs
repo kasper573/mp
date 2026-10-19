@@ -1,13 +1,11 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::{Content, load};
-use engine::systems::area::{self, AreaId};
+use engine::core::content::{Content, ContentRow, load, row_file};
+use engine::systems::area::{self, AreaDef, AreaId};
 use serde_json::Value;
 
 use super::grid;
-use crate::app::{
-    ConfirmAction, ConfirmDialog, Editor, ModalDialog, REFUSED, RenameDialog, RenameTarget,
-};
-use crate::project::{ContentEdit, row_file};
+use crate::app::{ConfirmAction, ConfirmDialog, Editor, ModalDialog, RenameDialog, RenameTarget};
+use crate::project::ContentEdit;
 use crate::rows;
 use crate::ui::{theme, widgets};
 
@@ -22,7 +20,7 @@ pub fn popover(
     canvas: ERect,
 ) {
     let area_key = area_id.key(content).to_owned();
-    let Some(row) = editor.row_value("area", &area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, &area_key) else {
         return;
     };
     let layers: Vec<String> = row["map"]["ground"]
@@ -156,7 +154,7 @@ pub fn popover(
             let mut draft = grid::GridDraft::of(&area_key, &grids);
             draft.add_layer(&name);
             let mut edit = ContentEdit::new(format!("Add layer {name} to {area_key}"));
-            edit.write_json(row_file("area", &area_key), &row);
+            edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
             draft.write_into(&mut edit);
             if editor.apply(edit) {
                 editor.views.area.view_mut(view_key).layer = layers.len();
@@ -179,7 +177,7 @@ pub fn popover(
             layers.swap(a, b);
             row["map"]["ground"] = serde_json::json!(layers);
             let mut edit = ContentEdit::new(format!("Reorder layers of {area_key}"));
-            edit.write_json(row_file("area", &area_key), &row);
+            edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
             if editor.apply(edit) {
                 editor.views.area.view_mut(view_key).layer = b;
             }
@@ -263,7 +261,7 @@ pub fn rename_layer(
     from: &str,
     to: &str,
 ) -> Result<(), String> {
-    let Some(mut row) = editor.row_value("area", area_key) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return Err("the area is gone".to_owned());
     };
     let layers = row["map"]["ground"].as_array_mut().ok_or("no layers")?;
@@ -290,25 +288,22 @@ pub fn rename_layer(
         .cloned()
         .ok_or("the layer file is gone")?;
     let mut edit = ContentEdit::new(format!("Rename layer {from} of {area_key} to {to}"));
-    edit.write_json(row_file("area", area_key), &row);
+    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
     edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
     edit.remove(old);
-    if editor.apply(edit) {
-        for view in editor
-            .views
-            .area
-            .views
-            .values_mut()
-            .filter(|view| view.area == area_key)
-        {
-            if view.hidden_ground.remove(from) {
-                view.hidden_ground.insert(to.to_owned());
-            }
+    editor.try_apply(edit)?;
+    for view in editor
+        .views
+        .area
+        .views
+        .values_mut()
+        .filter(|view| view.area == area_key)
+    {
+        if view.hidden_ground.remove(from) {
+            view.hidden_ground.insert(to.to_owned());
         }
-        Ok(())
-    } else {
-        Err(REFUSED.to_owned())
     }
+    Ok(())
 }
 
 enum LayerAction {

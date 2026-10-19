@@ -1,7 +1,6 @@
 {
   "name": "Frostmere",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 64,
       "height": 52

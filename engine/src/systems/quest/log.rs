@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, card, face, ink, sheet};
+use design_tokens::{card, ink, sheet};
 use egui::{Align, Label, Layout, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use strum::IntoStaticStr;
 
 use super::card::{
-    Countdown, QuestCardLook, Standing, caption, objective_row, picks, reward_chips, time_left,
+    Countdown, QuestCardLook, Standing, caption, inspectable, objective_row, picks, reward_chips,
+    time_left,
 };
 use super::{
     ActiveQuest, FinishedQuest, Parties, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest,
@@ -19,12 +21,13 @@ use crate::systems::hud::{self, Confirm, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
-use crate::systems::item::{Inventory, ItemFlag, ItemStack};
+use crate::systems::item::{Inventory, ItemModuleKind, ItemStack};
 use crate::systems::player::session;
 use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
+const QUESTS_PAGE_WIDTH: f32 = 320.0;
 const LIST_WIDTH: f32 = 250.0;
 const ROW_ICON: f32 = 20.0;
 const DETAIL_PADDING: f32 = 10.0;
@@ -352,13 +355,13 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     let trackable = page.log.trackable(&content, quest);
     let footer = if trackable { FOOTER } else { 0.0 };
     let look = QuestCardLook {
-        width: card::QUESTS_PAGE_WIDTH.min(ui.available_width()),
+        width: QUESTS_PAGE_WIDTH.min(ui.available_width()),
         max_height: (ui.available_height() - footer).max(card::KIND_BAND),
         moment: None,
     };
     ui.vertical_centered(|ui| {
         ui.set_width(look.width);
-        super::card::show(ui, world, quest, look, |ui, world| {
+        super::card::show(ui, world, &content, quest, look, |ui, world| {
             plate(ui, world, page, quest)
         });
         if trackable {
@@ -395,7 +398,7 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
         };
         progress.counted &= finished.is_none();
         ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, &progress, standing);
+            objective_row(ui, world, &content, objective, &progress, standing);
         });
     }
     if let Some(paths) = def.decision() {
@@ -407,11 +410,13 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     let handed_in = finished.is_some_and(|finished| finished.result == QuestResult::Completed);
     if def.reveals(ChoiceReveal::Gains) || handed_in {
         card::heading(ui, "rewards");
-        reward_chips(ui, world, def);
+        let shown = reward_chips(ui, world, &content, def);
+        inspectable(world, shown);
     }
     if def.reveals(ChoiceReveal::Gains) && !def.pick_one().is_empty() && finished.is_none() {
         card::heading(ui, "pick one when you return");
-        picks(ui, world, def);
+        let shown = picks(ui, world, &content, def);
+        inspectable(world, shown);
     }
     if def.time_limit().is_some() {
         card::heading(ui, "if time runs out");
@@ -435,7 +440,14 @@ fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
             ),
             QuestResult::Failed => ("Failed".to_owned(), ink::RUBRIC),
         };
-        ui.add(Label::new(card::bold(&outcome).color(color)).wrap());
+        ui.add(
+            Label::new(
+                face::bold(&outcome)
+                    .size(TextRole::CardBody.size())
+                    .color(color),
+            )
+            .wrap(),
+        );
     }
 }
 
@@ -444,7 +456,11 @@ fn timer(ui: &mut Ui, content: &Content, page: &Page, quest: QuestId) {
         let left = Countdown::LeftDetail
             .label(&page.log, quest, page.now)
             .unwrap_or_default();
-        ui.label(card::bold(&left).color(ink::OCHRE));
+        ui.label(
+            face::bold(&left)
+                .size(TextRole::CardBody.size())
+                .color(ink::OCHRE),
+        );
         let (rect, _) = ui.allocate_exact_size(TIMER_BAR, Sense::hover());
         let share = time_left(content, &page.log, quest, page.now);
         let y = rect.center().y;
@@ -463,7 +479,7 @@ fn footer_row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     ui.horizontal(|ui| {
         let tracked = page.log.tracked.contains(&quest);
         let mut track = tracked;
-        if controls::checkbox(ui, &mut track, "Track on HUD").changed() {
+        if ui.checkbox(&mut track, "Track on HUD").changed() {
             world.write_message(QuestRequest::Track {
                 quest,
                 tracked: track,
@@ -522,7 +538,7 @@ fn quest_note(world: &World, stack: ItemStack) -> Option<String> {
     }) {
         return Some("begins a quest · use to read it".to_owned());
     }
-    if !stack.item.get(content).has(ItemFlag::Quest) {
+    if !stack.item.get(content).has(ItemModuleKind::QuestItem) {
         return None;
     }
     let granted_by = session::me(world)

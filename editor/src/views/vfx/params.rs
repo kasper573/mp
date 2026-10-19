@@ -4,13 +4,15 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Ui};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Rgba;
-use engine::core::vfx::{ParamFill, ParamKind, ParamValue, ShaderParam, VfxParam};
+use engine::core::vfx::{
+    ParamFill, ParamKind, ParamValue, ShaderParam, VfxDef, VfxParam, VfxShaderDef,
+};
 use serde_json::{Map, Value};
 
-use super::{SHADER_TABLE, TABLE};
 use crate::forms::{self, FormChange, FormCx};
-use crate::project::{ProjectFiles, row_file};
+use crate::project::ProjectFiles;
 use crate::ui::{theme, widgets};
 
 const PARAM_INDENT: f32 = 22.0;
@@ -59,11 +61,11 @@ pub fn params_of(files: &ProjectFiles, table: &str, key: &str) -> Vec<ParamSpec>
     };
     let declared = row["params"].as_array().into_iter().flatten();
     match table {
-        SHADER_TABLE => declared
+        VfxShaderDef::TABLE => declared
             .filter_map(|param| serde_json::from_value::<ShaderParam>(param.clone()).ok())
             .map(|param| ParamSpec::from(&param))
             .collect(),
-        TABLE => declared
+        VfxDef::TABLE => declared
             .filter_map(|param| serde_json::from_value::<VfxParam>(param.clone()).ok())
             .map(|param| ParamSpec::from(&param))
             .collect(),
@@ -127,11 +129,13 @@ pub fn param_fill(
         .get(&spec.name)
         .and_then(|fill| serde_json::from_value::<ParamFill>(fill.clone()).ok());
     let bindable: Vec<String> = match (&cx.owner_table, &cx.owner_key) {
-        (Some(table), Some(key)) if table == TABLE => params_of(cx.files, TABLE, key)
-            .into_iter()
-            .filter(|own| own.kind == spec.kind)
-            .map(|own| own.name)
-            .collect(),
+        (Some(table), Some(key)) if table == VfxDef::TABLE => {
+            params_of(cx.files, VfxDef::TABLE, key)
+                .into_iter()
+                .filter(|own| own.kind == spec.kind)
+                .map(|own| own.name)
+                .collect()
+        }
         _ => Vec::new(),
     };
     let mut changed = FormChange::default();
@@ -175,7 +179,7 @@ pub fn param_fill(
                 Some(ParamFill::Param { param }) => format!("◇ {param}"),
                 _ => "value".to_owned(),
             };
-            widgets::combo_box(ui.id().with(path).with("source"))
+            widgets::combo(ui.id().with(path).with("source"))
                 .width(SOURCE_WIDTH)
                 .selected_text(theme::mono(source).size(12.5))
                 .show_ui(ui, |ui| {
@@ -237,7 +241,7 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
                     ui.set_width(120.0);
                     changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
                 });
-                widgets::combo_box(("param-kind", index))
+                widgets::combo(("param-kind", index))
                     .width(90.0)
                     .selected_text(theme::mono(&kind).size(13.0))
                     .show_ui(ui, |ui| {

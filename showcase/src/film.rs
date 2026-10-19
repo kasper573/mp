@@ -5,9 +5,9 @@ use driver::{Footage, FootageOverlay, InsetCut, reading, seconds};
 use engine::core::time::Seconds;
 use engine::systems::probe::{ProbeSnapshot, ProbeVoice};
 
-// A chapter's cut of the screen it films: a title card, captions that pace the chapter, and
-// panels for what the picture can't show. The chapter plays as fast as the game lets it; only a
-// caption holds it, until a viewer could have read it.
+/// A chapter's cut of the screen it films: a title card, captions that pace the chapter, and
+/// panels for what the picture can't show. The chapter plays as fast as the game lets it; only a
+/// caption holds it, until a viewer could have read it.
 pub struct Film {
     title: String,
     summary: String,
@@ -37,7 +37,7 @@ impl Film {
         }
     }
 
-    // Until then the caption that's up is still being read.
+    /// Until then the caption that's up is still being read.
     pub fn read_until(&self) -> SystemTime {
         self.read_until
     }
@@ -60,7 +60,7 @@ impl Film {
         self.close_panel(SystemTime::now());
     }
 
-    // Redraws the mixer panel whenever what it shows changes.
+    /// Redraws the mixer panel whenever what it shows changes.
     pub fn watch(&mut self, snapshot: &ProbeSnapshot) {
         if !self.mixing {
             return;

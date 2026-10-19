@@ -1,18 +1,17 @@
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
 use crate::audio::Waveform;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
 
-const TABLE: &str = "surface";
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -116,8 +115,8 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         widgets::kv(ui, "footstep", |ui| {
             play = widgets::chip(ui, "▶").clicked();
             let mut picked = footstep.clone();
-            let changed = row_form::with_row_form(editor, TABLE, surface, |cx| {
-                picker::row(ui, cx, "sfx", &mut picked, "/footstep")
+            let changed = row_form::with_row_form(editor, SurfaceDef::TABLE, surface, |cx| {
+                picker::row(ui, cx, SfxDef::TABLE, &mut picked, "/footstep")
             });
             if changed && !picked.is_empty() && picked != footstep {
                 new_footstep = Some(picked);
@@ -192,7 +191,7 @@ pub fn new_surface_dialog(
             widgets::default_focus(ui, &response);
         });
         widgets::kv(ui, "footstep", |ui| {
-            widgets::combo_box("new-surface-footstep")
+            widgets::combo("new-surface-footstep")
                 .selected_text(theme::mono(&dialog.footstep))
                 .width(200.0)
                 .show_ui(ui, |ui| {
@@ -227,7 +226,7 @@ fn add_surface(
 ) -> Result<(), String> {
     let key = rows::key_from_name(&dialog.name);
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
+    if let Some(problem) = rows::key_problem(&project.files, SurfaceDef::TABLE, &key) {
         return Err(problem);
     }
     let content = editor.loaded().ok_or("the folder does not load")?;
@@ -240,7 +239,7 @@ fn add_surface(
     };
     let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
     let mut edit = ContentEdit::new(format!("New surface {key}"));
-    edit.write_json(row_file(TABLE, &key), &json);
+    edit.write_json(row_file(SurfaceDef::TABLE, &key), &json);
     editor.try_apply(edit)?;
     editor.views.tileset.view_mut(tileset).surface = Some(key);
     Ok(())
@@ -254,7 +253,7 @@ fn write_surface(
     mut edit: ContentEdit,
 ) {
     if let Some(json) = value::untyped(content, def) {
-        edit.write_json(row_file(TABLE, key), &json);
+        edit.write_json(row_file(SurfaceDef::TABLE, key), &json);
         editor.apply(edit);
     }
 }

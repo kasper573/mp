@@ -6,6 +6,17 @@ pub mod node;
 pub mod run;
 pub mod value;
 
+pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
+pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
+pub use expr::{Expr, ExprKind};
+pub use may_do::MayDo;
+pub use node::{Assignment, Node, NodeKind, Target};
+pub use run::{
+    Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
+    Owner, Pause, TraceStep,
+};
+pub use value::{Value, ValueType};
+
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -13,28 +24,29 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, IntoStaticStr, VariantArray};
-
-pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
-pub use dialogue::{
-    Choice, ChoiceOffer, DialogueNode, DialogueView, SpokenValues, check_reveals_unique,
-};
-pub use expr::Expr;
-pub use may_do::{MayDo, Reach};
-pub use node::{Assignment, Node, Target};
-pub use run::{
-    Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
-    Owner, Pause, TraceStep,
-};
-pub use value::{Value, ValueType};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::content::{Content, ContentId, ContentRow};
 
-pub type Name = &'static str;
 /// The output an effect takes when nothing else is said.
-pub const NEXT: Name = "next";
-pub type Arrow = Option<String>;
-pub type Link<'a> = Option<&'a str>;
+pub const NEXT: &str = "next";
+/// The output an effect takes when it would not do what it was asked.
+pub const REFUSED: &str = "refused";
+
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(transparent)]
+#[schemars(extend("x-arrow" = true))]
+pub struct Arrow(Option<String>);
+
+impl Arrow {
+    pub fn to(&self) -> Option<&str> {
+        self.0.as_deref()
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.0.is_none()
+    }
+}
 
 /// What kind of thing owns a script, which decides the events raised for it and the effects it
 /// may use.
@@ -127,7 +139,7 @@ pub trait EventDef<V: Vocabulary>: Clone {
     fn owners(&self) -> &'static [V::OwnerKind];
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
-    fn fields(&self) -> &'static [(Name, ValueType)];
+    fn fields(&self) -> &'static [(&'static str, ValueType)];
     /// The rules the event's own values keep, beyond what the schema says.
     fn check(&self) -> Result<(), ScriptFault> {
         Ok(())
@@ -159,7 +171,7 @@ pub trait EffectDef<V: Vocabulary> {
         V::OwnerKind::VARIANTS
     }
     fn needs_subject(&self) -> bool;
-    fn outputs(&self) -> Vec<(Name, Link<'_>)>;
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)>;
     fn pauses(&self) -> bool {
         false
     }
@@ -167,7 +179,7 @@ pub trait EffectDef<V: Vocabulary> {
         false
     }
     fn compile<'c>(&'c self, cx: &mut Compiler<'c, V>) -> Result<EffectCall<V>, ScriptFault>;
-    fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
+    fn reach(&self, cx: &Compiler<V>) -> Vec<V::Reach>;
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -201,18 +213,35 @@ pub struct InlineScript<V: Vocabulary> {
     pub nodes: BTreeMap<String, Node<V>>,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case", bound = "")]
 #[schemars(bound = "")]
+#[strum_discriminants(
+    name(ScriptModuleKind),
+    derive(EnumString, IntoStaticStr, VariantArray)
+)]
 pub enum ScriptModule<V: Vocabulary> {
     #[serde(rename = "shared_script")]
+    #[strum_discriminants(strum(serialize = "shared_script"))]
     Shared {
         script: ScriptId<V>,
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         values: BTreeMap<String, VarValue<V>>,
     },
     #[serde(rename = "inline_script")]
+    #[strum_discriminants(strum(serialize = "inline_script"))]
     Inline(InlineScript<V>),
+}
+
+impl ScriptModuleKind {
+    /// The kind of script module a `type` tag names, when it names one.
+    pub fn of(tag: &str) -> Option<ScriptModuleKind> {
+        tag.parse().ok()
+    }
+
+    pub fn tag(self) -> &'static str {
+        self.into()
+    }
 }
 
 #[derive(

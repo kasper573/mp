@@ -38,6 +38,41 @@ fn an_attacked_monster_is_fought_until_it_falls() {
     assert!(sim.run_until(60.0, |world| stat::is_dead(world, brute)));
 }
 
+#[test]
+fn an_immortal_player_is_worn_down_but_never_falls() {
+    let (mut sim, player) = fight();
+    let full = stat::effective(&sim.world, player, StatKind::Health);
+
+    stat::apply_damage(&mut sim.world, player, full * 0.5);
+    assert!(stat::effective(&sim.world, player, StatKind::Health) < full);
+
+    stat::apply_damage(&mut sim.world, player, full * 10.0);
+    sim.tick();
+    assert!(!stat::is_dead(&sim.world, player));
+}
+
+#[test]
+fn a_player_crossing_into_another_area_stays_immortal() {
+    let content = Game::new()
+        .area("field", &Map::open(7, 7), json!([]))
+        .area("meadow", &Map::open(7, 7), json!([]))
+        .hero("field", 3.0, 3.0)
+        .vfx("damage_taken")
+        .shader("damage_pop")
+        .load();
+    let mut field = Sim::new(content.clone());
+    field.serve("field");
+    let mut meadow = Sim::new(content);
+    meadow.serve("meadow");
+    let player = field.join(1);
+
+    let player = field.cross(player, &mut meadow, Pos::new(3.0, 3.0));
+    let full = stat::effective(&meadow.world, player, StatKind::Health);
+    stat::apply_damage(&mut meadow.world, player, full * 10.0);
+
+    assert!(!stat::is_dead(&meadow.world, player));
+}
+
 fn fight() -> (Sim, Entity) {
     let content = Game::new()
         .area("field", &Map::open(11, 11), json!([]))

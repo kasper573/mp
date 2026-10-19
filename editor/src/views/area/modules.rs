@@ -1,16 +1,16 @@
 use egui::{Pos2, RichText, Ui, Vec2};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::{CellPos, TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::{AreaDef, AreaModuleKind};
 use engine::systems::script::Place;
 use serde_json::Value;
 
 use super::select::start_paste;
-use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pins, shapes};
-use super::{pick, placement};
+use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pick, pins, placement, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{play, schema};
@@ -33,7 +33,7 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaF
         let part = super::module_part(hit);
         if !super::selected_parts(editor, &frame.area_key).contains(&part) {
             editor.selection = RowSelection {
-                table: "area".to_owned(),
+                table: AreaDef::TABLE.to_owned(),
                 keys: vec![frame.area_key.clone()],
                 parts: vec![part],
             };
@@ -326,10 +326,10 @@ pub fn variant_template(editor: &Editor, kind: &str) -> Option<Value> {
 }
 
 pub fn module_variants(editor: &Editor) -> Vec<(String, Value)> {
-    let root = editor.shapes.shape_of("area");
+    let root = editor.shapes.shape_of(AreaDef::TABLE);
     editor
         .shapes
-        .module_variants("area")
+        .module_variants(AreaDef::TABLE)
         .iter()
         .map(|variant| (variant.tag.clone(), schema::variant_template(root, variant)))
         .collect()
@@ -451,7 +451,7 @@ pub fn append_modules(editor: &mut Editor, area_key: &str, new: Vec<Value>, labe
     applied
 }
 
-pub enum Placement {
+pub enum PlaceOutcome {
     Whole,
     Partly { skipped: usize, reason: String },
 }
@@ -461,7 +461,7 @@ pub fn place_modules(
     area_key: &str,
     new: Vec<Value>,
     label: &str,
-) -> Placement {
+) -> PlaceOutcome {
     let count = new.len();
     let existing = area_modules(editor, area_key);
     let start = existing.len();
@@ -474,7 +474,7 @@ pub fn place_modules(
         *list = whole;
         Some(label.to_owned())
     }) else {
-        return Placement::Partly {
+        return PlaceOutcome::Partly {
             skipped: count,
             reason: "the area is gone".to_owned(),
         };
@@ -487,9 +487,9 @@ pub fn place_modules(
         return match editor.try_apply(edit) {
             Ok(()) => {
                 select_appended(editor, area_key, start, count);
-                Placement::Whole
+                PlaceOutcome::Whole
             }
-            Err(reason) => Placement::Partly {
+            Err(reason) => PlaceOutcome::Partly {
                 skipped: count,
                 reason,
             },
@@ -530,7 +530,7 @@ pub fn place_modules(
     {
         let _ = editor.try_apply(edit);
     }
-    Placement::Partly { skipped, reason }
+    PlaceOutcome::Partly { skipped, reason }
 }
 
 fn select_appended(editor: &mut Editor, area_key: &str, start: usize, count: usize) {
@@ -551,7 +551,7 @@ pub fn change_modules(
 
 pub fn area_modules(editor: &Editor, area_key: &str) -> Vec<Value> {
     editor
-        .row_value("area", area_key)
+        .row_value(AreaDef::TABLE, area_key)
         .and_then(|row| row["modules"].as_array().cloned())
         .unwrap_or_default()
 }
@@ -561,11 +561,11 @@ pub fn module_edit(
     area_key: &str,
     change: impl FnOnce(&mut Vec<Value>) -> Option<String>,
 ) -> Option<ContentEdit> {
-    let mut row = editor.row_value("area", area_key)?;
+    let mut row = editor.row_value(AreaDef::TABLE, area_key)?;
     let mut modules = area_modules(editor, area_key);
     let label = change(&mut modules)?;
     row["modules"] = Value::Array(modules);
     let mut edit = ContentEdit::new(label);
-    edit.write_json(row_file("area", area_key), &row);
+    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
     Some(edit)
 }

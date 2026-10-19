@@ -1,5 +1,7 @@
-use design_tokens::{Face, ink};
+use design_tokens::face::Face;
+use design_tokens::ink;
 use egui::{Color32, Context, FontFamily, RichText};
+use engine::core::script::ScriptModuleKind;
 
 pub const TEXT: Color32 = ink::INK;
 pub const MUTED: Color32 = ink::INK2;
@@ -63,10 +65,13 @@ pub fn strong(text: impl Into<String>) -> RichText {
 }
 
 pub fn badge_color(kind: &str) -> Color32 {
+    if ScriptModuleKind::of(kind).is_some() {
+        return ink::TYRIAN;
+    }
     match kind {
         "population" | "resident" | "npc" | "player" | "nameplate" | "tint" | "voice" => ink::OCHRE,
         "object" | "safe_zone" | "area" | "walk" => ink::VERDIGRIS,
-        "shared_script" | "inline_script" | "script" | "shown" | "requires" => ink::TYRIAN,
+        "script" | "shown" | "requires" => ink::TYRIAN,
         "soundscape" | "sfx" | "babble" | "step" => ink::GOLD,
         "loot" | "item" | "stack" | "reward" | "hold" | "deliver" | "offer" | "shop" => ink::AZURE,
         "blueprint" | "scenery" | "tileset" | "model" | "bust" => ink::INK2,
@@ -76,8 +81,11 @@ pub fn badge_color(kind: &str) -> Color32 {
 }
 
 pub fn badge_letter(kind: &str) -> String {
+    if ScriptModuleKind::of(kind).is_some() {
+        return "S".to_owned();
+    }
     match kind {
-        "shared_script" | "inline_script" | "script" => "S".to_owned(),
+        "script" => "S".to_owned(),
         "population" | "resident" | "npc" => "N".to_owned(),
         "object" => "P".to_owned(),
         "safe_zone" => "Z".to_owned(),

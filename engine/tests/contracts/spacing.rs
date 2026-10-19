@@ -12,8 +12,8 @@ use engine::systems::movement::{
 };
 use engine::systems::npc::body::{self, Act, Priority};
 use engine::systems::npc::{self, Home, Npc, NpcDef, Pack};
-use engine::systems::script::Place;
-use engine::systems::{actor, script, skill, stat};
+use engine::systems::script::{self, Place};
+use engine::systems::{actor, skill, stat};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 
@@ -543,8 +543,10 @@ fn claims_follow_walks(world: &mut World) -> bool {
         .collect();
     actors.into_iter().all(|(actor, at, goal)| {
         let claim = movement::claim_of(world, actor).map(|claim| claim.cell);
-        if world.get::<npc::Npc>(actor).is_none()
-            && world.get::<engine::systems::player::Owner>(actor).is_none()
+        if world.get::<Npc>(actor).is_none()
+            && world
+                .get::<engine::systems::player::PlayedBy>(actor)
+                .is_none()
         {
             return true;
         }

@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, Reference, asset_of};
-use engine::core::vfx::shader_file;
+use engine::core::content::{Content, ContentRow, GAME_FILE, Reference, asset_of, row_file};
+use engine::core::vfx::{VfxShaderDef, shader_file};
+use engine::systems::registry;
 use rayon::prelude::*;
 
-use crate::project::{GAME_FILE, ProjectFiles, row_file};
-use crate::views::vfx;
-use engine::systems::registry;
+use crate::project::ProjectFiles;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContentUsage {
@@ -58,13 +57,13 @@ impl ContentUsages {
             }
             usages.by_file.insert(file, references);
         }
-        for key in files.keys_of(vfx::SHADER_TABLE) {
+        for key in files.keys_of(VfxShaderDef::TABLE) {
             usages
                 .assets
                 .entry(asset_of(&shader_file(key)).to_owned())
                 .or_default()
                 .push(ContentUsage {
-                    file: row_file(vfx::SHADER_TABLE, key),
+                    file: row_file(VfxShaderDef::TABLE, key),
                     pointer: String::new(),
                     known: true,
                 });

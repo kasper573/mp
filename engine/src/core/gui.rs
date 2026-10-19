@@ -8,8 +8,9 @@ use bevy_egui::{
 };
 use egui::load::SizedTexture;
 use egui::{LayerId, Order};
+use strum::VariantArray;
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::asset_of;
 
 /// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
@@ -42,7 +43,7 @@ impl Band {
 /// The background stacks in tiers over what floats over the world: whatever a tier holds lies over
 /// everything in the tiers before it, however recently either was drawn or clicked. egui would
 /// otherwise stack the background by whichever layer it saw first.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray)]
 pub enum Tier {
     Back,
     Mid,
@@ -51,8 +52,6 @@ pub enum Tier {
 }
 
 impl Tier {
-    const ALL: [Tier; 4] = [Tier::Back, Tier::Mid, Tier::Front, Tier::Top];
-
     fn anchor(self) -> LayerId {
         LayerId::new(Order::Background, egui::Id::new(("tier", self)))
     }
@@ -89,6 +88,17 @@ pub struct GuiImage {
 impl GuiImage {
     pub fn widget(&self, size: egui::Vec2) -> egui::Image<'static> {
         egui::Image::new(SizedTexture::new(self.texture, size)).alt_text(self.path.clone())
+    }
+}
+
+/// Where a gui's pictures come from: the game's own asset loading, or a tool's.
+pub trait ImageSource {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage>;
+}
+
+impl ImageSource for World {
+    fn image(&mut self, asset: &ImageRef) -> Option<GuiImage> {
+        image(self, asset)
     }
 }
 
@@ -240,7 +250,7 @@ pub fn pointer_menu<R>(
 }
 
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.
-pub fn image(world: &mut World, asset: &AssetRef) -> Option<GuiImage> {
+pub fn image(world: &mut World, asset: &ImageRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
 }
 
@@ -364,7 +374,7 @@ fn raise_tiers(gui: Option<Res<GuiContext>>) {
     let Some(gui) = gui else {
         return;
     };
-    for tier in Tier::ALL {
+    for &tier in Tier::VARIANTS {
         gui.0.move_to_top(tier.anchor());
     }
 }

@@ -6,13 +6,12 @@ use super::{Action, Actor, ActorModel};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::math::Direction;
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
-use crate::core::time::{PlaybackRate, UnixMillis, WallClock};
-use crate::systems::movement;
-use crate::systems::notification;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
-use crate::systems::script::{EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
+use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault};
+use crate::core::time::{Millis, PlaybackRate, UnixMillis, WallClock};
+use crate::systems::script::effect::{self as effects, Audience};
+use crate::systems::script::{Condition, EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
 use crate::systems::stat::{self, StatKind};
+use crate::systems::{movement, notification};
 
 /// An action an actor was told to play, with the moments its model lands and ends it. Replicated,
 /// so every client animates the same stroke from the same start.
@@ -52,20 +51,21 @@ pub enum Wait {
 #[schemars(extend("x-system" = "actor"))]
 pub struct Animate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub action: Action,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sfx: Option<SfxId>,
     #[serde(default, skip_serializing_if = "Wait::is_no")]
     pub wait: Wait,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Taken when the action can't play or is cut short.
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }
 
-const NEXT: Name = "next";
-const INTERRUPTED: Name = "interrupted";
+const INTERRUPTED: &str = "interrupted";
 
 impl Wait {
     fn is_no(&self) -> bool {
@@ -77,11 +77,8 @@ impl EffectDef<RiftScripting> for Animate {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            (NEXT, self.next.as_deref()),
-            (INTERRUPTED, self.interrupted.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next), (INTERRUPTED, &self.interrupted)]
     }
     fn pauses(&self) -> bool {
         self.wait != Wait::No
@@ -190,7 +187,7 @@ pub fn ready(world: &World, actor: Entity) -> bool {
         return false;
     }
     let now = world.resource::<WallClock>().now;
-    let delay = crate::core::time::Millis(stat::effective(world, actor, StatKind::AttackDelay));
+    let delay = Millis(stat::effective(world, actor, StatKind::AttackDelay));
     world
         .get::<LastAction>(actor)
         .is_none_or(|last| now.since(last.at) >= delay.seconds())
@@ -203,7 +200,7 @@ fn interrupt(world: &mut World, actor: Entity) {
 
 /// An action's end answers the script still waiting on it: one that waited for the end, or one
 /// that waited for an apex that never came.
-fn settle_awaited(world: &mut World, actor: Entity, output: Name) {
+fn settle_awaited(world: &mut World, actor: Entity, output: &'static str) {
     if let Some(awaited) = world.entity_mut(actor).take::<Awaited>()
         && (awaited.wait == Wait::End || !awaited.apex_answered)
     {
@@ -211,7 +208,7 @@ fn settle_awaited(world: &mut World, actor: Entity, output: Name) {
     }
 }
 
-fn answer(world: &mut World, flow: FlowKey, output: Name) {
+fn answer(world: &mut World, flow: FlowKey, output: &'static str) {
     world
         .resource_mut::<RiftInstances>()
         .answer(flow, Answer::Output(output));

@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use base64::Engine;
+use engine::core::time::UnixMillis;
 use serde::{Deserialize, Serialize};
 
 use super::files::{FileBytes, FileChange};
@@ -19,7 +20,7 @@ pub struct RecoveryJournalData {
     pub build: String,
     pub content_version: String,
     pub folder: PathBuf,
-    pub written: u64,
+    pub written: UnixMillis,
     pub files: Vec<RecoveryJournalFile>,
 }
 

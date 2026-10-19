@@ -7,8 +7,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
-use design_tokens::sheet;
-use design_tokens::{TextRole, controls, face, ink};
+use connection::{Announce, PendingSession};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{controls, ink, sheet};
 use egui::{TextStyle, Ui};
 use renet2::RenetClient;
 
@@ -17,7 +18,6 @@ use crate::core::math::Rng;
 use crate::core::net::auth::Credentials;
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
-use connection::{Announce, PendingSession};
 
 const NOTICE_WIDTH: f32 = 356.0;
 const NOTE_PADDING: i8 = 22;
@@ -77,7 +77,7 @@ impl Plugin for ClientScreenPlugin {
             sign_in::SignInPlugin,
             loading::LoadingPlugin,
             connection::ConnectionPlugin,
-            area::AreaPlugin,
+            area::AreaScreenPlugin,
         ))
         .add_systems(Update, (connection::poll_session, drive, announce).chain());
     }
@@ -140,7 +140,7 @@ pub(crate) fn system_screen<R>(
     gui: &egui::Context,
     id: &str,
     backdrop: Option<egui::Color32>,
-    add: impl FnOnce(&mut egui::Ui) -> R,
+    add: impl FnOnce(&mut Ui) -> R,
 ) -> egui::InnerResponse<R> {
     let area = egui::Area::new(egui::Id::new(("screen", id)))
         .order(Band::System.order())

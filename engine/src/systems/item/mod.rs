@@ -15,9 +15,9 @@ use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
-use strum::IntoStaticStr;
+use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
@@ -27,10 +27,10 @@ use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, Players, player_requests};
+use crate::systems::player::{ClientId, PlayedBy, Players, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
-    Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
+    Condition, EventKind, Owner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
@@ -161,6 +161,10 @@ impl Inventory {
             .iter()
             .filter(|slot| slot.item == item)
             .fold(0, |total, slot| total.saturating_add(slot.count))
+    }
+
+    pub fn slot_of(&self, item: ItemId) -> Option<usize> {
+        self.slots.iter().position(|stack| stack.item == item)
     }
 
     pub fn free_slots(&self) -> u32 {
@@ -324,7 +328,7 @@ pub type ItemId = ContentId<ItemDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ItemDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     pub sfx: ItemSfx,
     pub kind: ItemKind,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -358,8 +362,9 @@ impl ScriptedRow for ItemDef {
     }
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(name(ItemModuleKind))]
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
@@ -378,13 +383,6 @@ pub struct Flavor {
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct Stack {
     pub max: u32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ItemFlag {
-    Quest,
-    Bound,
-    Currency,
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
@@ -429,23 +427,18 @@ impl ItemDef {
             .unwrap_or(1)
     }
 
-    pub fn has(&self, flag: ItemFlag) -> bool {
-        self.modules.iter().any(|module| {
-            matches!(
-                (module, flag),
-                (ItemModule::QuestItem, ItemFlag::Quest)
-                    | (ItemModule::Bound, ItemFlag::Bound)
-                    | (ItemModule::Currency, ItemFlag::Currency)
-            )
-        })
+    pub fn has(&self, kind: ItemModuleKind) -> bool {
+        self.modules
+            .iter()
+            .any(|module| ItemModuleKind::from(module) == kind)
     }
 
     pub fn bound(&self) -> bool {
-        self.has(ItemFlag::Bound) || self.has(ItemFlag::Quest)
+        self.has(ItemModuleKind::Bound) || self.has(ItemModuleKind::QuestItem)
     }
 
     pub fn category(&self) -> ItemCategory {
-        if self.has(ItemFlag::Currency) {
+        if self.has(ItemModuleKind::Currency) {
             return ItemCategory::Currency;
         }
         match self.kind {
@@ -487,16 +480,20 @@ pub fn use_item(world: &mut World) {
 }
 
 pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), String> {
-    let slot = world
+    let slot = held_slot(world, actor, item)?;
+    use_slot(world, actor, slot)
+}
+
+pub fn held_slot(world: &World, actor: Entity, item: ItemId) -> Result<usize, String> {
+    world
         .get::<Inventory>(actor)
-        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
+        .and_then(|inventory| inventory.slot_of(item))
         .ok_or_else(|| {
             format!(
-                "{} is not in the bag",
+                "{} is not in your bag",
                 item.get(world.resource::<Content>()).name
             )
-        })?;
-    use_slot(world, actor, slot)
+        })
 }
 
 fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String> {
@@ -518,7 +515,7 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
 
 pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Item, item.raw()),
+        Owner::Row(OwnerKind::Item, item.raw()),
         kind,
         Some(actor),
         Vec::new(),
@@ -605,7 +602,7 @@ pub fn expire_drops(
 }
 
 pub fn reserve(world: &mut World, npc: Entity, attacker: Entity, now: Seconds) {
-    let Some(account) = world.get::<Owner>(attacker).map(|owner| owner.client) else {
+    let Some(account) = world.get::<PlayedBy>(attacker).map(|owner| owner.client) else {
         return;
     };
     if world.get::<Npc>(npc).is_none() {
@@ -704,7 +701,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     let Some(drop) = world.get::<DroppedItem>(item).cloned() else {
         return;
     };
-    let account = world.get::<Owner>(player).map(|owner| owner.client);
+    let account = world.get::<PlayedBy>(player).map(|owner| owner.client);
     if world
         .get::<Reservation>(item)
         .is_some_and(|reservation| !reservation.allows(account))

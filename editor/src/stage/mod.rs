@@ -29,8 +29,10 @@ use engine::systems::status::StatusEffectId;
 use self::live::LiveWorld;
 use self::mirror::{ActorPose, Site, Source, Stage, VfxPose};
 use crate::app::Editor;
+use crate::project::ProjectFiles;
+use crate::thumbs;
 use crate::ui::theme;
-use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes, SceneryOf};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
@@ -44,6 +46,17 @@ pub struct Stages {
     stages: HashMap<String, Stage>,
     live: HashMap<String, LiveWorld>,
     indices: Vec<usize>,
+}
+
+impl Stages {
+    fn stage(&mut self, world: &mut World, key: &str) -> &mut Stage {
+        let indices = &mut self.indices;
+        self.stages.entry(key.to_owned()).or_insert_with(|| {
+            let index = (0..).find(|index| !indices.contains(index)).unwrap_or(0);
+            indices.push(index);
+            Stage::spawn(world, index)
+        })
+    }
 }
 
 /// What a window asks to see this frame.
@@ -217,12 +230,7 @@ pub fn show(
             .map(|live| live.report.clone()),
     };
     if let Some(stage) = editor.views.stage.stages.get(key) {
-        painter.image(
-            stage.texture,
-            rect,
-            egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        painter.image(stage.texture, rect, thumbs::FULL_UV, Color32::WHITE);
         for (top, label) in &stage.plates {
             plate::draw_label(ui, shown.screen(*top), label);
         }
@@ -287,9 +295,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
                             .insert_entry(live)
                             .into_mut(),
                         Err(problem) => {
-                            if let Some(stage) = stages.stages.get_mut(&request.key) {
-                                stage.problems = vec![problem];
-                            }
+                            stages.stage(world, &request.key).problems = vec![problem];
                             continue;
                         }
                     },
@@ -300,13 +306,9 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
             }
         };
         frame.behind = behind;
-        let taken: Vec<usize> = stages.indices.clone();
-        let stage = stages.stages.entry(request.key.clone()).or_insert_with(|| {
-            let index = (0..).find(|index| !taken.contains(index)).unwrap_or(0);
-            stages.indices.push(index);
-            Stage::spawn(world, index)
-        });
-        stage.render(world, &mut views.area.scenes, &frame);
+        stages
+            .stage(world, &request.key)
+            .render(world, &mut views.area.scenes, &frame);
     }
 }
 
@@ -378,10 +380,7 @@ fn ground_key(key: &str) -> String {
     format!("{key}/ground")
 }
 
-fn behind(
-    scenes: &crate::views::area::scene::AreaScenes,
-    request: &Request,
-) -> Option<SiteTexture> {
+fn behind(scenes: &AreaScenes, request: &Request) -> Option<SiteTexture> {
     if !request.ground {
         return None;
     }
@@ -397,7 +396,7 @@ fn behind(
 fn posed_frame<'a>(
     posed: &Posed,
     content: &'a Content,
-    files: &'a crate::project::ProjectFiles,
+    files: &'a ProjectFiles,
     request: &Request,
 ) -> mirror::Frame<'a> {
     let spawn = content.built::<GameSettings>().initial_spawn;
@@ -469,7 +468,7 @@ fn posed_frame<'a>(
 fn live_frame<'a>(
     live: &mut LiveWorld,
     content: &'a Content,
-    files: &'a crate::project::ProjectFiles,
+    files: &'a ProjectFiles,
     request: &Request,
 ) -> mirror::Frame<'a> {
     let spawn = content.built::<GameSettings>().initial_spawn;

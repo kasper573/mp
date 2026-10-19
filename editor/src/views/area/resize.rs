@@ -1,13 +1,15 @@
 use egui::{RichText, Vec2};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{GridSize, TileSize};
-use engine::systems::area::{self, AreaModuleKind};
+use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
+use super::grid::GridDraft;
 use super::{pins, shapes};
-use crate::app::{Editor, REFUSED};
+use crate::app::Editor;
 use crate::forms;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
 
@@ -30,7 +32,7 @@ pub fn resize_dialog(
         .as_ref()
         .and_then(|p| p.content.clone())
         .and_then(|c| {
-            c.by_key::<area::AreaDef>(&dialog.area)
+            c.by_key::<AreaDef>(&dialog.area)
                 .map(|id| area::load(&c, id).size)
         })
         .map(|size| (size.width as u32, size.height as u32))
@@ -211,7 +213,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     let id = content
-        .by_key::<area::AreaDef>(&dialog.area)
+        .by_key::<AreaDef>(&dialog.area)
         .ok_or("the area is gone")?;
     let area = area::load(&content, id);
     let old = area.size.grid();
@@ -220,10 +222,10 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = super::grid::GridDraft::of(&dialog.area, &area.grids);
+    let draft = GridDraft::of(&dialog.area, &area.grids);
     let (resized, clipped) = draft.resized(new, shift);
     let mut row = editor
-        .row_value("area", &dialog.area)
+        .row_value(AreaDef::TABLE, &dialog.area)
         .ok_or("the area is gone")?;
     row["map"]["size"]["width"] = Value::from(dialog.width);
     row["map"]["size"]["height"] = Value::from(dialog.height);
@@ -262,7 +264,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         "Resize {} to {} × {} ({clipped} cells clipped)",
         dialog.area, dialog.width, dialog.height
     ));
-    edit.write_json(row_file("area", &dialog.area), &row);
+    edit.write_json(row_file(AreaDef::TABLE, &dialog.area), &row);
     resized.write_all_into(&mut edit);
     if dx != 0.0 || dy != 0.0 {
         let files = &editor.project.as_ref().ok_or("no folder")?.files;
@@ -275,9 +277,5 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             });
         }
     }
-    if editor.apply(edit) {
-        Ok(())
-    } else {
-        Err(REFUSED.to_owned())
-    }
+    editor.try_apply(edit)
 }

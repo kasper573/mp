@@ -1,7 +1,7 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use egui::emath::TSTransform;
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
@@ -10,13 +10,12 @@ use egui_snarl::ui::{
     WireStyle,
 };
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
+use engine::core::script::NodeKind;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::ScriptDoc;
-use super::nodes::{
-    self, FlowKind, LineSpeaker, NodeCatalogue, NodePort, SummaryPiece, SummaryTone,
-};
+use super::nodes::{self, LineSpeaker, NodeCatalogue, NodePort, SummaryPiece, SummaryTone};
 use crate::keymap::EditorKey;
 use crate::spans;
 use crate::ui::{theme, widgets};
@@ -503,14 +502,14 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         snarl: &mut Snarl<ScriptGraphNode>,
     ) -> impl SnarlPin + 'static {
         let name = snarl[pin.id.node].name.clone();
-        let flow = self.node(&name).and_then(FlowKind::of);
+        let kind = self.node(&name).map(nodes::kind_of);
         let port = self.port(&name, pin.id.output).cloned();
         let label = port
             .as_ref()
             .map(|port| port.label.clone())
             .unwrap_or_default();
         let connected = port.as_ref().is_some_and(|port| port.target.is_some());
-        let dialogue_choice = flow == Some(FlowKind::Dialogue)
+        let dialogue_choice = kind == Some(NodeKind::Dialogue)
             && port
                 .as_ref()
                 .is_some_and(|port| port.field.starts_with("/choices/"));
@@ -535,18 +534,21 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let fill = if !connected {
             theme::FAINT
         } else {
-            match flow {
-                Some(FlowKind::On) => theme::WARN,
-                Some(FlowKind::Dialogue) => DIALOGUE,
+            match kind {
+                Some(NodeKind::On) => theme::WARN,
+                Some(NodeKind::Dialogue) => DIALOGUE,
+                Some(NodeKind::Effect) | None => {
+                    let fails = self
+                        .node(&name)
+                        .and_then(|node| self.catalogue.entry(node.kind()))
+                        .and_then(|entry| entry.outputs.iter().find(|output| output.name == label))
+                        .is_some_and(|output| output.fails);
+                    if fails { REFUSED } else { theme::OK }
+                }
                 Some(_) => WIRE,
-                None => match label.as_str() {
-                    "refused" | "blocked" | "lost" | "declined" | "cancelled" | "left"
-                    | "interrupted" => REFUSED,
-                    _ => theme::OK,
-                },
             }
         };
-        let wire = if flow == Some(FlowKind::On) {
+        let wire = if kind == Some(NodeKind::On) {
             theme::WARN
         } else {
             WIRE
@@ -862,29 +864,39 @@ const RUN: Color32 = ink::RUBRIC;
 const EFFECT_FILL: Color32 = Color32::from_rgb(221, 219, 194);
 
 fn kind_fill(node: &Value) -> Color32 {
-    match FlowKind::of(node) {
-        Some(FlowKind::On) => Color32::from_rgb(225, 211, 180),
-        Some(FlowKind::Run) => Color32::from_rgb(233, 211, 188),
-        Some(FlowKind::Dialogue) => Color32::from_rgb(226, 210, 199),
-        Some(_) => Color32::from_rgb(221, 216, 202),
-        None => EFFECT_FILL,
+    match nodes::kind_of(node) {
+        NodeKind::On => Color32::from_rgb(225, 211, 180),
+        NodeKind::Run => Color32::from_rgb(233, 211, 188),
+        NodeKind::Dialogue => Color32::from_rgb(226, 210, 199),
+        NodeKind::Effect => EFFECT_FILL,
+        NodeKind::If
+        | NodeKind::Random
+        | NodeKind::Repeat
+        | NodeKind::Wait
+        | NodeKind::Set
+        | NodeKind::Return => Color32::from_rgb(221, 216, 202),
     }
 }
 
 pub fn kind_mark(node: &Value) -> (Mark, Color32) {
-    match FlowKind::of(node) {
-        Some(FlowKind::On) => (Mark::Play, theme::WARN),
-        Some(FlowKind::Run) => (Mark::ChevronRight, RUN),
-        Some(FlowKind::Dialogue) => (Mark::Dot, DIALOGUE),
-        Some(_) => (Mark::Asterisk, WIRE),
-        None => (Mark::Warning, theme::OK),
+    match nodes::kind_of(node) {
+        NodeKind::On => (Mark::Play, theme::WARN),
+        NodeKind::Run => (Mark::ChevronRight, RUN),
+        NodeKind::Dialogue => (Mark::Dot, DIALOGUE),
+        NodeKind::Effect => (Mark::Warning, theme::OK),
+        NodeKind::If
+        | NodeKind::Random
+        | NodeKind::Repeat
+        | NodeKind::Wait
+        | NodeKind::Set
+        | NodeKind::Return => (Mark::Asterisk, WIRE),
     }
 }
 
 pub fn card_title(name: &str, node: &Value) -> String {
-    match FlowKind::of(node) {
-        Some(FlowKind::On) => format!("on {}", nodes::event_of(node).unwrap_or("?")),
-        Some(FlowKind::Dialogue) => name.to_owned(),
+    match nodes::kind_of(node) {
+        NodeKind::On => format!("on {}", nodes::event_of(node).unwrap_or("?")),
+        NodeKind::Dialogue => name.to_owned(),
         _ => node.kind().to_owned(),
     }
 }

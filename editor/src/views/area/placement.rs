@@ -1,28 +1,28 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::math::{Pos, Rect};
 use engine::core::script::VariableType;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaId, AreaModuleKind, Flip};
+use engine::systems::area::blueprint::{BlueprintDef, BlueprintId, PlacedBlueprint};
+use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::value_kind;
 use super::inspect::Followups;
-use super::modules;
 use super::stamp::placed_part;
-use super::{AreaFrame, AreaSnapshot, shapes};
+use super::{AreaFrame, AreaSnapshot, modules, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
-use crate::forms::FormCx;
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection};
+use crate::schema;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
-use crate::{forms, schema, value};
+use crate::value::{self, RowValue};
 
 pub fn placement_bounds(content: &Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
     let mut out: HashMap<usize, Rect<Tiles>> = HashMap::new();
@@ -47,37 +47,50 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
     let project = editor.project.as_ref()?;
     project
         .usages
-        .of_row("blueprint", blueprint)
+        .of_row(BlueprintDef::TABLE, blueprint)
         .iter()
         .find_map(|usage| {
             row_of(&usage.file)
-                .filter(|(table, _)| *table == "area")
+                .filter(|(table, _)| *table == AreaDef::TABLE)
                 .map(|(_, key)| key.to_owned())
         })
 }
 
-pub fn placement_count(content: &Content, blueprint: &str) -> String {
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(blueprint) else {
-        return String::new();
+/// Where a blueprint is placed: straight into areas, and how many more times inside other
+/// blueprints.
+pub struct BlueprintPlacements<'a> {
+    pub direct: Vec<(AreaId, &'a PlacedBlueprint)>,
+    pub nested: usize,
+}
+
+pub fn placements_of(content: &Content, blueprint: BlueprintId) -> BlueprintPlacements<'_> {
+    let mut placements = BlueprintPlacements {
+        direct: Vec::new(),
+        nested: 0,
     };
-    let mut direct = 0;
-    let mut areas: Vec<AreaId> = Vec::new();
-    let mut nested = 0;
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         for placement in area::placements(content, area_id) {
-            if placement.blueprint != id {
+            if placement.blueprint != blueprint {
                 continue;
             }
             if placement.chain.len() <= 1 {
-                direct += 1;
-                if !areas.contains(&area_id) {
-                    areas.push(area_id);
-                }
+                placements.direct.push((area_id, placement));
             } else {
-                nested += 1;
+                placements.nested += 1;
             }
         }
     }
+    placements
+}
+
+pub fn placement_count(content: &Content, blueprint: &str) -> String {
+    let Some(id) = content.by_key::<BlueprintDef>(blueprint) else {
+        return String::new();
+    };
+    let BlueprintPlacements { direct, nested } = placements_of(content, id);
+    let mut areas: Vec<AreaId> = direct.iter().map(|(area, _)| *area).collect();
+    areas.dedup();
+    let direct = direct.len();
     let mut text = match areas.as_slice() {
         [] => "Placed nowhere yet.".to_owned(),
         [only] => {
@@ -111,7 +124,7 @@ pub fn placement_card(
     let Some(blueprint) = module["blueprint"].as_str().map(str::to_owned) else {
         return false;
     };
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&blueprint) else {
         return false;
     };
     let def = id.get(content);
@@ -168,14 +181,12 @@ pub fn placement_card(
 }
 
 pub fn variable_template(variable: &Variable) -> Value {
-    use engine::core::script::VariableType as T;
     match variable.ty {
-        T::Integer => Value::from(0),
-        T::Number => Value::from(0.0),
-        T::Boolean => Value::Bool(false),
-        T::Text | T::Name | T::Row | T::Audio => Value::String(String::new()),
-        T::Place => serde_json::json!({ "area": "", "x": 0.0, "y": 0.0 }),
-        T::Condition => value::empty_object(),
+        VariableType::Condition => value::empty_object(),
+        ty => {
+            let schema = schema::variable_schema(ty, variable.table.as_deref());
+            schema::template(&schema, &schema)
+        }
     }
 }
 
@@ -208,34 +219,28 @@ pub(super) fn short_value(value: &Value) -> String {
 }
 
 pub fn warp_destinations(module: &Value) -> Vec<(String, Pos<Tiles>)> {
-    let mut out = Vec::new();
-    let mut walk = |value: &Value| {
-        if let Some(area) = value["area"].as_str()
-            && let (Some(x), Some(y)) = (value["x"].as_f64(), value["y"].as_f64())
-        {
-            out.push((area.to_owned(), Pos::new(x as f32, y as f32)));
-        }
-    };
-    fn visit(value: &Value, walk: &mut dyn FnMut(&Value)) {
-        match value {
-            Value::Object(map) => {
-                if map.contains_key("area") && map.contains_key("x") && map.contains_key("y") {
-                    walk(value);
-                }
-                for v in map.values() {
-                    visit(v, walk);
-                }
-            }
-            Value::Array(items) => {
-                for item in items {
-                    visit(item, walk);
-                }
-            }
-            _ => {}
-        }
+    let mut places = Vec::new();
+    collect_places(&module["scripts"], &mut places);
+    places
+        .into_iter()
+        .filter_map(|place| {
+            let area = place["area"].as_str()?;
+            let (x, y) = (place["x"].as_f64()?, place["y"].as_f64()?);
+            Some((area.to_owned(), Pos::new(x as f32, y as f32)))
+        })
+        .collect()
+}
+
+/// Points every place the scripts name at `to`, so a copy of a warp's scripts leads there instead.
+pub fn redirect_places(value: &mut Value, to: &Value) {
+    match value {
+        Value::Object(map) if is_place(map) => *value = to.clone(),
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|field| redirect_places(field, to)),
+        Value::Array(items) => items.iter_mut().for_each(|item| redirect_places(item, to)),
+        _ => {}
     }
-    visit(&module["scripts"], &mut walk);
-    out
 }
 
 pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[usize]) -> bool {
@@ -272,7 +277,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
         .as_str()
         .unwrap_or("")
         .to_owned();
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&blueprint) else {
         return false;
     };
     let def = id.get(&content);
@@ -321,7 +326,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
 }
 
 #[derive(Clone, Debug)]
-pub struct Placement {
+pub struct AreaPlacement {
     pub module: usize,
     pub blueprint: String,
     pub at: Pos<Tiles>,
@@ -333,7 +338,7 @@ pub fn resolve_in_place(
     content: &Content,
     modules: &[Value],
     path: &[usize],
-) -> Option<Vec<Placement>> {
+) -> Option<Vec<AreaPlacement>> {
     let (&top, parts) = path.split_first()?;
     let module = modules.get(top)?;
     if !module.is_module(AreaModuleKind::Blueprint) {
@@ -342,7 +347,7 @@ pub fn resolve_in_place(
     let mut chain = vec![placement_of(top, module)?];
     for &part in parts {
         let current = chain.last()?;
-        let id = content.by_key::<area::blueprint::BlueprintDef>(&current.blueprint)?;
+        let id = content.by_key::<BlueprintDef>(&current.blueprint)?;
         let def = id.get(content);
         let placed = placed_part(
             content,
@@ -360,8 +365,8 @@ pub fn resolve_in_place(
     Some(chain)
 }
 
-fn placement_of(module: usize, json: &Value) -> Option<Placement> {
-    Some(Placement {
+fn placement_of(module: usize, json: &Value) -> Option<AreaPlacement> {
+    Some(AreaPlacement {
         module,
         blueprint: json.text("blueprint").to_owned(),
         at: shapes::pos_of(&json["at"])?,
@@ -377,9 +382,9 @@ pub struct PartView {
     pub nested: Option<String>,
 }
 
-pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
+pub fn parts_in_place(frame: &AreaFrame, place: &AreaPlacement) -> Vec<PartView> {
     let content = frame.content.clone();
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&place.blueprint) else {
+    let Some(id) = content.by_key::<BlueprintDef>(&place.blueprint) else {
         return Vec::new();
     };
     let def = id.get(&content);
@@ -422,7 +427,7 @@ pub(super) fn nested_bounds(
 }
 
 pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index: usize) {
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
     let module = &row["modules"][index];
@@ -433,7 +438,7 @@ pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index
     let view = editor.views.area.ensure_view(view_key, area_key);
     view.in_place = vec![index];
     view.set_tool(super::AreaTool::Select);
-    editor.selection = RowSelection::row("blueprint", &blueprint);
+    editor.selection = RowSelection::row(BlueprintDef::TABLE, &blueprint);
 }
 
 pub fn edit_in_place(editor: &mut Editor, view_key: &str, frame: &AreaFrame, index: usize) {
@@ -442,11 +447,11 @@ pub fn edit_in_place(editor: &mut Editor, view_key: &str, frame: &AreaFrame, ind
 
 pub fn enter_nested(editor: &mut Editor, view_key: &str, part: usize, blueprint: &str) {
     editor.views.area.view_mut(view_key).in_place.push(part);
-    editor.selection = RowSelection::row("blueprint", blueprint);
+    editor.selection = RowSelection::row(BlueprintDef::TABLE, blueprint);
 }
 
 pub fn selected_part_indices(editor: &Editor, blueprint: &str) -> Vec<usize> {
-    if editor.selection.table != "blueprint"
+    if editor.selection.table != BlueprintDef::TABLE
         || !editor.selection.keys.iter().any(|k| k == blueprint)
     {
         return Vec::new();
@@ -465,7 +470,7 @@ pub fn overlay_in_place(
     editor: &Editor,
     painter: &egui::Painter,
     frame: &AreaFrame,
-    place: &Placement,
+    place: &AreaPlacement,
 ) {
     let canvas = frame.canvas;
     let parts = parts_in_place(frame, place);
@@ -524,12 +529,12 @@ pub fn overlay_in_place(
 pub fn move_parts_in_place(
     editor: &mut Editor,
     frame: &AreaFrame,
-    place: &Placement,
+    place: &AreaPlacement,
     indices: &[usize],
     dx: f32,
     dy: f32,
 ) {
-    let Some(mut row) = editor.row_value("blueprint", &place.blueprint) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, &place.blueprint) else {
         return;
     };
     let (bx, by) = (
@@ -547,16 +552,16 @@ pub fn move_parts_in_place(
         indices.len(),
         place.blueprint
     ));
-    edit.write_json(row_file("blueprint", &place.blueprint), &row);
+    edit.write_json(row_file(BlueprintDef::TABLE, &place.blueprint), &row);
     editor.apply(edit);
 }
 
-pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &Placement) {
+pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &AreaPlacement) {
     let indices = selected_part_indices(editor, &place.blueprint);
     if indices.is_empty() {
         return;
     }
-    let Some(mut row) = editor.row_value("blueprint", &place.blueprint) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, &place.blueprint) else {
         return;
     };
     if let Some(parts) = row["parts"].as_array_mut() {
@@ -568,14 +573,14 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
         indices.len(),
         place.blueprint
     ));
-    edit.write_json(row_file("blueprint", &place.blueprint), &row);
+    edit.write_json(row_file(BlueprintDef::TABLE, &place.blueprint), &row);
     if editor.apply(edit) {
         editor.selection.parts.clear();
     }
 }
 
 pub fn unpacked(content: &Content, module: &Value) -> Option<Vec<Value>> {
-    let id = content.by_key::<area::blueprint::BlueprintDef>(module["blueprint"].as_str()?)?;
+    let id = content.by_key::<BlueprintDef>(module["blueprint"].as_str()?)?;
     let def = id.get(content);
     let at = shapes::pos_of(&module["at"])?;
     let flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
@@ -634,13 +639,6 @@ pub fn unpack(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReplaceScope {
-    Here,
-    ThisArea,
-    Everywhere,
-}
-
 pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
         title: format!(
@@ -649,76 +647,39 @@ pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
                 .as_str()
                 .unwrap_or("the blueprint")
         ),
-        table: "blueprint".to_owned(),
+        table: BlueprintDef::TABLE.to_owned(),
         search: String::new(),
         picked: None,
         options: Vec::new(),
         then: PickRowThen::ReplaceBlueprint {
             area: frame.area_key.clone(),
             index,
-            scope: ReplaceScope::Here,
         },
     }));
 }
 
-pub fn replace_with(
-    editor: &mut Editor,
-    area_key: &str,
-    index: usize,
-    replacement: &str,
-    scope: ReplaceScope,
-) {
+pub fn replace_with(editor: &mut Editor, area_key: &str, index: usize, replacement: &str) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
-    let old = row["modules"][index]["blueprint"]
-        .as_str()
-        .unwrap_or("")
-        .to_owned();
-    let Some(new_id) = content.by_key::<area::blueprint::BlueprintDef>(replacement) else {
+    let Some(new_id) = content.by_key::<BlueprintDef>(replacement) else {
         return;
     };
-    let new_def = new_id.get(&content);
-    let areas: Vec<String> = match scope {
-        ReplaceScope::Here | ReplaceScope::ThisArea => vec![area_key.to_owned()],
-        ReplaceScope::Everywhere => content.table::<area::AreaDef>().keys().to_vec(),
-    };
-    let mut edit = ContentEdit::new(format!("Replace {old} with {replacement}"));
-    let mut dropped = 0;
-    let mut swapped = 0;
-    for area in areas {
-        let Some(mut row) = editor.row_value("area", &area) else {
-            continue;
-        };
-        let mut changed = false;
-        for (i, module) in row["modules"]
-            .as_array_mut()
-            .into_iter()
-            .flatten()
-            .enumerate()
-        {
-            if !module.is_module(AreaModuleKind::Blueprint)
-                || module["blueprint"].as_str() != Some(old.as_str())
-            {
-                continue;
-            }
-            if scope == ReplaceScope::Here && (area != area_key || i != index) {
-                continue;
-            }
-            dropped += retarget(module, replacement, &new_def.variables);
-            swapped += 1;
-            changed = true;
-        }
-        if changed {
-            edit.write_json(row_file("area", &area), &row);
-        }
+    let module = &mut row["modules"][index];
+    if !module.is_module(AreaModuleKind::Blueprint) {
+        return;
     }
+    let old = module.text("blueprint").to_owned();
+    let dropped = retarget(module, replacement, &new_id.get(&content).variables);
+    let mut edit = ContentEdit::new(format!("Replace {old} with {replacement}"));
+    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
     if editor.apply(edit) {
         editor.toast(format!(
-            "Replaced {swapped} placements; {dropped} values didn't carry"
+            "Replaced {old} with {replacement}; {dropped} value{} didn't carry",
+            widgets::plural(dropped)
         ));
     }
 }
@@ -750,4 +711,19 @@ pub(super) fn placement_extras(
         }
     });
     widgets::key_hint_text(ui, EditorKey::Confirm, "edits the blueprint in place");
+}
+
+fn collect_places<'a>(value: &'a Value, places: &mut Vec<&'a Value>) {
+    match value {
+        Value::Object(map) if is_place(map) => places.push(value),
+        Value::Object(map) => map.values().for_each(|field| collect_places(field, places)),
+        Value::Array(items) => items.iter().for_each(|item| collect_places(item, places)),
+        _ => {}
+    }
+}
+
+fn is_place(map: &serde_json::Map<String, Value>) -> bool {
+    ["area", "x", "y"]
+        .iter()
+        .all(|field| map.contains_key(*field))
 }

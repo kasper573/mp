@@ -59,7 +59,7 @@ pub fn assign(
                 return Err(format!("You don't know {}", def.name));
             }
             if def.kind == SkillKind::Passive {
-                return Err(format!("{} is passive: it holds without a slot", def.name));
+                return Err(super::unslotted(def));
             }
         }
         HotbarEntry::Item(item) => {
@@ -96,7 +96,7 @@ pub fn assign_basic_attack(
         BasicAttackPick::Weapon(item) => {
             let skill = super::first_flagged_grant(&content, std::iter::once(item))
                 .ok_or_else(|| format!("{} has no basic attack", item.get(&content).name))?;
-            if !wears(world, player, item) {
+            if !equipment::wears(world, player, item) {
                 equipment::equip_held(world, player, item)?;
             }
             Some(skill)
@@ -114,13 +114,7 @@ pub fn holds_item(world: &World, actor: Entity, item: ItemId) -> bool {
     world
         .get::<Inventory>(actor)
         .is_some_and(|inventory| inventory.count(item) > 0)
-        || wears(world, actor, item)
-}
-
-fn wears(world: &World, actor: Entity, item: ItemId) -> bool {
-    world
-        .get::<Equipment>(actor)
-        .is_some_and(|equipment| equipment.slots.values().any(|worn| *worn == item))
+        || equipment::wears(world, actor, item)
 }
 
 type Stirred = Or<(Changed<Equipment>, Changed<Learned>, Added<BasicAttack>)>;
@@ -148,10 +142,7 @@ pub fn settle_basic_attack(
         if !empty {
             continue;
         }
-        let worn = world
-            .get::<Equipment>(player)
-            .into_iter()
-            .flat_map(|equipment| equipment.slots.values().copied());
+        let worn = equipment::worn(world, player);
         let Some(skill) = super::first_flagged_grant(&content, worn) else {
             continue;
         };

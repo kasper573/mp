@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use super::present::Viewport;
+use super::present::PresentScale;
 use super::screen::{ToScreen, ToTile};
 use crate::core::gui;
 use crate::core::math::Pos;
@@ -19,11 +19,11 @@ pub fn cursor_tile(world: &mut World) -> Option<Pos<Tiles>> {
         .single(world)
         .ok()?
         .cursor_position()?;
-    let viewport = *world.resource::<Viewport>();
-    if viewport.scale <= 0.0 {
+    let scale = *world.resource::<PresentScale>();
+    if scale.0 <= 0.0 {
         return None;
     }
-    let target = cursor / viewport.scale;
+    let target = cursor / scale.0;
     let (camera, transform) = world
         .query_filtered::<(&Camera, &GlobalTransform), With<WorldCamera>>()
         .single(world)
@@ -33,16 +33,16 @@ pub fn cursor_tile(world: &mut World) -> Option<Pos<Tiles>> {
 }
 
 pub fn tile_to_window(world: &mut World, tile: Pos<Tiles>) -> Option<Vec2> {
-    let viewport = *world.resource::<Viewport>();
+    let scale = *world.resource::<PresentScale>();
     let (camera, transform) = world
         .query_filtered::<(&Camera, &GlobalTransform), With<WorldCamera>>()
         .single(world)
         .ok()?;
-    project(viewport, camera, transform, tile)
+    project(scale, camera, transform, tile)
 }
 
 fn project(
-    viewport: Viewport,
+    scale: PresentScale,
     camera: &Camera,
     transform: &GlobalTransform,
     tile: Pos<Tiles>,
@@ -50,5 +50,5 @@ fn project(
     let point = camera
         .world_to_viewport(transform, tile.to_screen().extend(0.0))
         .ok()?;
-    Some(point * viewport.scale)
+    Some(point * scale.0)
 }

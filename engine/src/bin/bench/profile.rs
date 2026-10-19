@@ -1,58 +1,110 @@
+//! A fixed workload near the bench's budget crossover, profiled for CPU (a pprof flamegraph and
+//! profile) and allocations. Arguments: `dist` for distributed players, and the folder to write
+//! the profile to (the working directory by default).
+
+#[path = "play.rs"]
+mod play;
+#[path = "sim.rs"]
+mod sim;
+
+use std::alloc::{GlobalAlloc, Layout};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
-use std::sync::atomic::Ordering::Relaxed;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Instant;
 
 use bevy_app::App;
 use bevy_ecs::prelude::{Entity, With};
 use bevy_replicon::prelude::Replicated;
-use engine::core::content::Content;
 use engine::systems::movement::Position;
 use engine::systems::visibility::seen_by;
 use serde::Deserialize;
 
-use crate::sim;
+use crate::sim::{Bench, load};
+
+// The server's own allocator setup, counted, so the measured ticks allocate exactly as production
+// does.
+service::heap_profiling!(Counting, Counting);
+
+static ALLOCS: AtomicU64 = AtomicU64::new(0);
+static BYTES: AtomicU64 = AtomicU64::new(0);
+
+struct Counting;
+
+// SAFETY: every call goes unchanged to the services' allocator, which upholds GlobalAlloc's
+// contract; counting touches only atomics and never allocates.
+unsafe impl GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        BYTES.fetch_add(layout.size() as u64, Relaxed);
+        unsafe { service::ServiceAllocator.alloc(layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { service::ServiceAllocator.dealloc(ptr, layout) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        if new_size > layout.size() {
+            BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
+        }
+        unsafe { service::ServiceAllocator.realloc(ptr, layout, new_size) }
+    }
+}
 
 const AREAS: usize = 250; // near the current budget crossover: the representative heavy workload
 const MEASURE: usize = 400;
 
 #[derive(Deserialize)]
 struct Env {
+    content_dir: PathBuf,
     no_clients: Option<bool>,
 }
 
-pub fn run(out_dir: &Path, layout: sim::Layout, content: Content) {
+fn main() {
     let env: Env = envy::prefixed("RIFT_BENCH_")
         .from_env()
         .expect("RIFT_BENCH_* environment");
-    let (mut worlds, rosters) = sim::worlds(AREAS, layout, &content);
+    let layout = if std::env::args().any(|arg| arg == "dist") {
+        sim::Layout::Distributed
+    } else {
+        sim::Layout::Congested
+    };
+    let out_dir = std::env::args()
+        .skip(1)
+        .find(|arg| arg != "dist")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().expect("cwd"));
+    let mut bench = Bench::new(AREAS, layout, &load(&env.content_dir));
     if !env.no_clients.unwrap_or(false) {
-        sim::connect(&mut worlds, &rosters);
+        bench.connect();
     }
 
     for _ in 0..sim::WARMUP {
-        sim::step_single_threaded(&mut worlds);
+        step(&mut bench);
     }
 
-    report_aoi(&mut worlds);
-    report_changes(&mut worlds);
+    report_aoi(&mut bench.worlds);
+    report_changes(&mut bench.worlds);
 
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(999)
         .blocklist(&["libc", "libgcc", "pthread", "vdso"])
         .build()
         .expect("start pprof profiler");
-    crate::ALLOCS.store(0, Relaxed);
-    crate::BYTES.store(0, Relaxed);
+    ALLOCS.store(0, Relaxed);
+    BYTES.store(0, Relaxed);
     let started = Instant::now();
     for _ in 0..MEASURE {
-        sim::step_single_threaded(&mut worlds);
+        step(&mut bench);
     }
     let elapsed = started.elapsed();
-    let allocs = crate::ALLOCS.load(Relaxed);
-    let bytes = crate::BYTES.load(Relaxed);
+    let allocs = ALLOCS.load(Relaxed);
+    let bytes = BYTES.load(Relaxed);
 
     let report = guard.report().build().expect("build pprof report");
     print_hotspots(&report);
@@ -93,6 +145,17 @@ pub fn run(out_dir: &Path, layout: sim::Layout, content: Content) {
 /// each replicated entity, and how many distinct AOIs exist. High avg viewers/entity means the
 /// per-(client,entity) replication work is heavily redundant and an AOI-dedup optimization would
 /// pay; ~1 means it would not. Uses the real `visibility::seen_by`, so it reflects the live rules.
+/// Advances every world one tick on the calling thread only, so CPU samples attribute cleanly to
+/// game systems instead of being scattered across rayon worker frames.
+fn step(bench: &mut Bench) {
+    let clock = bench.play();
+    for app in &mut bench.worlds {
+        app.insert_resource(clock);
+        app.update();
+    }
+    bench.acknowledge_sent();
+}
+
 fn report_aoi(worlds: &mut [App]) {
     let mut subjects = 0u64;
     let mut viewer_pairs = 0u64; // sum over entities of viewer count = sum over clients of AOI size
@@ -253,7 +316,7 @@ fn report_changes(worlds: &mut [App]) {
         }
     }
     let mut rows: Vec<_> = counts.into_iter().collect();
-    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows.sort_by_key(|row| Reverse(row.1));
     println!("[changes] replicated entities: {entities}, changed this tick: {changed_entities}");
     for (name, count) in rows.iter().take(20) {
         println!("[changes] {count:>8}  {name}");

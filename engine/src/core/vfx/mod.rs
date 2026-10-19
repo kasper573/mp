@@ -15,9 +15,11 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::media::ImageSizes;
-use crate::core::content::{ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck};
+use crate::core::content::{
+    ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck, serial,
+};
 use crate::core::geometry::{Footprint, Radians};
 use crate::core::math::{FrameSize, Pos, Rgba};
 use crate::core::tiling::Tiles;
@@ -69,18 +71,21 @@ pub struct VfxParam {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum VfxLayer {
     Sprite {
-        sheet: AssetRef,
+        sheet: ImageRef,
         frame: FrameSize,
         frames: u32,
         fps: Hertz,
         #[serde(default, skip_serializing_if = "SpriteAnchor::is_default")]
         anchor: SpriteAnchor,
-        #[serde(default = "one", skip_serializing_if = "is_one")]
-        #[schemars(extend("default" = one()))]
+        #[serde(
+            default = "serial::one_f32",
+            skip_serializing_if = "serial::is_one_f32"
+        )]
+        #[schemars(extend("default" = serial::one_f32()))]
         scale: f32,
         #[serde(default, skip_serializing_if = "SpritePlay::is_once")]
         play: SpritePlay,
-        #[serde(default, skip_serializing_if = "is_no_time")]
+        #[serde(default, skip_serializing_if = "Seconds::is_zero")]
         delay: Seconds,
     },
     Shader {
@@ -90,7 +95,7 @@ pub enum VfxLayer {
         #[schemars(extend("x-params-of" = "shader"))]
         params: BTreeMap<String, ParamFill>,
         duration: Seconds,
-        #[serde(default, skip_serializing_if = "is_no_time")]
+        #[serde(default, skip_serializing_if = "Seconds::is_zero")]
         delay: Seconds,
     },
 }
@@ -221,15 +226,12 @@ impl VfxLayer {
 impl VfxDef {
     /// How long the whole stack plays: when its last layer ends.
     pub fn lasts(&self) -> Seconds {
-        self.layers
-            .iter()
-            .map(VfxLayer::ends)
-            .fold(
-                Seconds(0.0),
-                |longest, ends| {
-                    if ends > longest { ends } else { longest }
-                },
-            )
+        Seconds(
+            self.layers
+                .iter()
+                .map(|layer| layer.ends().0)
+                .fold(0.0, f32::max),
+        )
     }
 
     pub fn declares(&self, name: &str) -> Option<ParamKind> {
@@ -445,18 +447,6 @@ fn check_all(loading: &mut Loading) {
 
 fn check_run(check: &mut RowCheck, pointer: String, run: Seconds) {
     check.range(pointer, run.0, SHORTEST_RUN.0, LONGEST_RUN.0, "seconds");
-}
-
-fn one() -> f32 {
-    1.0
-}
-
-fn is_one(scale: &f32) -> bool {
-    *scale == 1.0
-}
-
-fn is_no_time(seconds: &Seconds) -> bool {
-    seconds.0 == 0.0
 }
 
 impl SpriteAnchor {

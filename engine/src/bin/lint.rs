@@ -4,9 +4,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cargo_metadata::MetadataCommand;
-use engine::core::content::{FilesystemFolder, write};
+use engine::core::content::{FilesystemFolder, GAME_FILE, TABLES_DIR, write};
 use engine::systems::{load_content, registry};
-use serde::Deserialize;
 use syn::UseTree;
 use syn::visit::{self, Visit};
 use walkdir::{DirEntry, WalkDir};
@@ -18,18 +17,18 @@ fn main() {
         .expect("run `cargo metadata`");
 
     let mut violations = Vec::new();
-    for pkg in &metadata.packages {
-        if !opted_in(&pkg.metadata) {
-            continue;
-        }
-        let src = pkg
-            .manifest_path
-            .parent()
-            .expect("a manifest has a parent directory")
-            .as_std_path()
-            .join("src");
-        check_crate(&pkg.name, &src, &mut violations);
-    }
+    let engine = metadata
+        .packages
+        .iter()
+        .find(|pkg| pkg.name == env!("CARGO_PKG_NAME"))
+        .expect("the lint's own package in the workspace");
+    let src = engine
+        .manifest_path
+        .parent()
+        .expect("a manifest has a parent directory")
+        .as_std_path()
+        .join("src");
+    check_crate(&engine.name, &src, &mut violations);
     let root = metadata.workspace_root.as_std_path();
     let scratch = metadata.target_directory.as_std_path().join("lint");
     for game in SHIPPED_GAMES {
@@ -45,22 +44,6 @@ fn main() {
     }
     eprintln!("\nlint: {} violation(s)", violations.len());
     std::process::exit(1);
-}
-
-fn opted_in(metadata: &serde_json::Value) -> bool {
-    LintMetadata::deserialize(metadata).is_ok_and(|metadata| metadata.lint.game)
-}
-
-#[derive(Deserialize)]
-struct LintMetadata {
-    #[serde(default)]
-    lint: LintSwitches,
-}
-
-#[derive(Deserialize, Default)]
-struct LintSwitches {
-    #[serde(default)]
-    game: bool,
 }
 
 fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
@@ -131,7 +114,7 @@ fn check_shipped_game(name: &str, folder: &Path, scratch: &Path, out: &mut Vec<S
 }
 
 fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
-    let tables = WalkDir::new(folder.join("tables"))
+    let tables = WalkDir::new(folder.join(TABLES_DIR))
         .follow_links(true)
         .into_iter()
         .filter_map(Result::ok)
@@ -140,7 +123,7 @@ fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
             let relative = entry.path().strip_prefix(folder).unwrap_or(entry.path());
             relative.to_string_lossy().replace('\\', "/")
         });
-    std::iter::once("game.json".to_owned())
+    std::iter::once(GAME_FILE.to_owned())
         .chain(tables)
         .collect()
 }

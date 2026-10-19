@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::query::Has;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use super::{Condition, RiftScripting};
 use crate::core::content::Content;
@@ -13,12 +14,12 @@ use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, Area, AreaId, AreaTag, object};
 use crate::systems::class::{self, ClassId};
 use crate::systems::combat::{Attackers, Attitude};
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment;
 use crate::systems::item::{DroppedItem, Inventory, ItemId};
 use crate::systems::memory::{self, MemoryId};
 use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, NpcId, Pack, body};
-use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
+use crate::systems::player::{ArrivalHold, PlayedBy};
 use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::script::OwnerKind;
 use crate::systems::skill::{self, SkillDef, SkillId, SkillStat};
@@ -111,11 +112,11 @@ type RosterQuery = QueryState<
         &'static AreaTag,
         Option<&'static Npc>,
         Option<&'static Stats>,
-        Has<PlayerOwner>,
+        Has<PlayedBy>,
         Has<ArrivalHold>,
         Has<Presence>,
     ),
-    Or<(With<PlayerOwner>, With<Npc>)>,
+    Or<(With<PlayedBy>, With<Npc>)>,
 >;
 
 pub fn take_tick_roster(world: &mut World, query: &mut RosterQuery) {
@@ -152,116 +153,119 @@ pub enum Among {
     Anyone,
 }
 
-type Of = Option<Box<Condition>>;
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(
+    name(RiftQueryKind),
+    derive(EnumString, IntoStaticStr, VariantArray),
+    strum(serialize_all = "snake_case")
+)]
 pub enum RiftQuery {
     Level {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     IsClass {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         class: ClassId,
     },
     SkillRank {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         skill: SkillId,
     },
     SkillStat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         skill: SkillId,
         stat: SkillStat,
     },
     SpentSkillPoints {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     Stat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         stat: StatKind,
     },
     HasStatus {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         effect: StatusEffectId,
     },
     StatusCount {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         category: Option<StatusCategory>,
     },
     StatusPower,
     Holding {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         item: ItemId,
     },
     FreeSlots {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
     },
     Wearing {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         item: ItemId,
     },
     Memory {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         memory: MemoryId,
     },
     SetWithin {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         memory: MemoryId,
         seconds: Box<Condition>,
     },
     OnQuest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestCooling {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     TaskDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
         task: String,
     },
     QuestResetsIn {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         quest: QuestId,
     },
     Inside {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         object: String,
     },
     InArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         area: AreaId,
     },
     KnowsArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        of: Of,
+        of: Option<Box<Condition>>,
         area: AreaId,
     },
     Nearest {
@@ -307,29 +311,58 @@ pub enum RiftQuery {
     AimedPoint,
 }
 
+impl RiftQueryKind {
+    /// What a query of this kind yields; a memory's is none of its own, but whatever its memory
+    /// row holds.
+    pub fn value_type(self) -> Option<ValueType> {
+        Some(match self {
+            RiftQueryKind::Level
+            | RiftQueryKind::SkillRank
+            | RiftQueryKind::SpentSkillPoints
+            | RiftQueryKind::Holding
+            | RiftQueryKind::FreeSlots
+            | RiftQueryKind::Count
+            | RiftQueryKind::StatusCount
+            | RiftQueryKind::GroundItems => ValueType::Integer,
+            RiftQueryKind::Stat
+            | RiftQueryKind::SkillStat
+            | RiftQueryKind::StatusPower
+            | RiftQueryKind::Distance
+            | RiftQueryKind::Health => ValueType::Number,
+            RiftQueryKind::QuestResetsIn => ValueType::Text,
+            RiftQueryKind::Nearest | RiftQueryKind::Target | RiftQueryKind::Subject => {
+                ValueType::Actor
+            }
+            RiftQueryKind::SkillTargets => ValueType::Actors,
+            RiftQueryKind::SkillArea => ValueType::Area,
+            RiftQueryKind::AimedPoint => ValueType::Point,
+            RiftQueryKind::IsClass
+            | RiftQueryKind::HasStatus
+            | RiftQueryKind::Wearing
+            | RiftQueryKind::SetWithin
+            | RiftQueryKind::OnQuest
+            | RiftQueryKind::QuestDone
+            | RiftQueryKind::QuestCooling
+            | RiftQueryKind::TaskDone
+            | RiftQueryKind::Inside
+            | RiftQueryKind::InArea
+            | RiftQueryKind::KnowsArea
+            | RiftQueryKind::Present
+            | RiftQueryKind::IsNpc
+            | RiftQueryKind::Walking
+            | RiftQueryKind::Hostile => ValueType::Boolean,
+            RiftQueryKind::Memory => return None,
+        })
+    }
+}
+
 impl QueryDef<RiftScripting> for RiftQuery {
     fn value_type(&self, cx: &Compiler<RiftScripting>) -> ValueType {
         match self {
-            RiftQuery::Level { .. }
-            | RiftQuery::SkillRank { .. }
-            | RiftQuery::SpentSkillPoints { .. }
-            | RiftQuery::Holding { .. }
-            | RiftQuery::FreeSlots { .. }
-            | RiftQuery::Count { .. }
-            | RiftQuery::StatusCount { .. }
-            | RiftQuery::GroundItems { .. } => ValueType::Integer,
-            RiftQuery::Stat { .. }
-            | RiftQuery::SkillStat { .. }
-            | RiftQuery::StatusPower
-            | RiftQuery::Distance { .. }
-            | RiftQuery::Health { .. } => ValueType::Number,
             RiftQuery::Memory { memory, .. } => memory.get(cx.content).ty,
-            RiftQuery::QuestResetsIn { .. } => ValueType::Text,
-            RiftQuery::Nearest { .. } | RiftQuery::Target | RiftQuery::Subject => ValueType::Actor,
-            RiftQuery::SkillTargets => ValueType::Actors,
-            RiftQuery::SkillArea => ValueType::Area,
-            RiftQuery::AimedPoint => ValueType::Point,
-            _ => ValueType::Boolean,
+            query => RiftQueryKind::from(query)
+                .value_type()
+                .expect("every query but a memory yields a type of its own"),
         }
     }
 
@@ -479,11 +512,10 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 let item = *item;
                 let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
-                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
-                        world
-                            .get::<Equipment>(who)
-                            .is_some_and(|worn| worn.slots.values().any(|worn| *worn == item))
-                    }))
+                    Value::Bool(
+                        character(world, cx, &of)
+                            .is_some_and(|who| equipment::wears(world, who, item)),
+                    )
                 })
             }
             RiftQuery::Memory { of, memory } => {
@@ -772,15 +804,16 @@ fn skill_of(cx: &Compiler<RiftScripting>) -> Result<SkillId, ScriptFault> {
 }
 
 pub fn actor(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
-    let who = eval(world, cx).as_actor()?;
-    (world.get_entity(who).is_ok() && !stat::is_dead(world, who)).then_some(who)
+    eval(world, cx)
+        .as_actor()
+        .filter(|&who| stat::stands(world, who))
 }
 
 pub fn actors(world: &World, cx: &FlowCx, eval: &Eval) -> Vec<Entity> {
     eval(world, cx)
         .as_actors()
         .into_iter()
-        .filter(|who| world.get_entity(*who).is_ok() && !stat::is_dead(world, *who))
+        .filter(|&who| stat::stands(world, who))
         .collect()
 }
 
@@ -789,7 +822,7 @@ pub fn character(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
 }
 
 pub fn is_character(world: &World, who: Entity) -> bool {
-    world.get::<PlayerOwner>(who).is_some()
+    world.get::<PlayedBy>(who).is_some()
 }
 
 fn distance(world: &World, from: Entity, to: Entity) -> Option<Tiles> {

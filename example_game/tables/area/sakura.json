@@ -1,7 +1,6 @@
 {
   "name": "Sakura",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 56,
       "height": 84

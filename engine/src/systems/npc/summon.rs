@@ -5,28 +5,29 @@ use serde::{Deserialize, Serialize};
 use super::Home;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos};
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, REFUSED, ScriptFault};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::{self, position};
 use crate::systems::npc::NpcId;
-use crate::systems::player::{ClientId, Owner};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
-use crate::systems::script::{EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::player::{ClientId, PlayedBy};
+use crate::systems::script::event::NPC;
+use crate::systems::script::{
+    Condition, EffectCall, OwnerKind, Reach, RiftScripting, effect as effects,
+};
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
 
 const RING: Tiles = Tiles(1.5);
 const MAX_SPAWNED: u32 = 20;
-const NPC: &[OwnerKind] = &[OwnerKind::Npc];
 
 /// Hostile or friendly, until set again.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "npc"))]
 pub struct SetAttitude {
     pub attitude: Attitude,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -39,7 +40,7 @@ pub struct SpawnNpcs {
     pub count: u32,
     pub near: SpawnNear,
     pub shown: ShownFor,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -62,10 +63,11 @@ pub enum ShownFor {
 #[schemars(extend("x-system" = "npc"))]
 pub struct Despawn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -81,8 +83,8 @@ impl EffectDef<RiftScripting> for SetAttitude {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let attitude = self.attitude;
@@ -107,8 +109,8 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
@@ -129,7 +131,7 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
             let only_for = match shown {
                 ShownFor::Subject => cx
                     .subject
-                    .and_then(|subject| world.get::<Owner>(subject))
+                    .and_then(|subject| world.get::<PlayedBy>(subject))
                     .map(|owner| owner.client),
                 ShownFor::Everyone => None,
             };
@@ -153,11 +155,8 @@ impl EffectDef<RiftScripting> for Despawn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -167,15 +166,10 @@ impl EffectDef<RiftScripting> for Despawn {
         let refused = self.refused.clone();
         Ok(Box::new(move |world, _, cx| {
             let Some(npc) = effects::aimed(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody there to send away");
+                return effects::refuse(world, cx, &refused, "Nobody there to send away");
             };
             if world.get::<Summoned>(npc).is_none() {
-                return effects::refuse(
-                    world,
-                    cx,
-                    refused.as_deref(),
-                    "Only spawned npcs leave on command",
-                );
+                return effects::refuse(world, cx, &refused, "Only spawned npcs leave on command");
             }
             super::despawn(world, npc);
             EffectStep::Done

@@ -3,47 +3,48 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, version};
+use engine::core::content::{Content, row_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
+use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
-use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
+use strum::IntoStaticStr;
 
 use crate::forms::{FormCx, FormState};
+use crate::import::{self, ImportJobs, ImportRecords};
+use crate::play::{self, PlayTest};
 use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
 use crate::project::{
-    ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection, row_file,
+    AppliedStep, ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
 };
-use crate::scenes::{self, Step};
+use crate::rows;
+use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
-use crate::ui::row_form;
-use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
-use crate::views::area::placement::ReplaceScope;
-use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
+use crate::ui::{self, row_form};
+use crate::user::{BrushSettings, EditorSettings, UserFolder};
+use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
 use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
-use crate::views::{EditorCamera, EditorViews};
-use crate::{import, play, rows, ui, views};
-use engine::core::vfx::render::{VfxAssets, VfxMaterial};
+use crate::views::{self, EditorCamera, EditorViews};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
-    pub scene: Option<Vec<Step>>,
+    pub scene: Option<Vec<SceneStep>>,
     pub user: Option<PathBuf>,
     pub frame_log: Option<PathBuf>,
 }
@@ -65,8 +66,8 @@ impl Plugin for EditorPlugin {
             .launch
             .frame_log
             .as_ref()
-            .and_then(|path| std::fs::File::create(path).ok())
-            .map(std::io::BufWriter::new);
+            .and_then(|path| File::create(path).ok())
+            .map(BufWriter::new);
         if let Some(folder) = &self.launch.folder {
             editor.open_folder(folder);
         }
@@ -102,8 +103,6 @@ fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>
     }
 }
 
-pub const REFUSED: &str = "refused; see the output";
-
 #[derive(Resource)]
 pub struct Editor {
     pub user: UserFolder,
@@ -126,7 +125,7 @@ pub struct Editor {
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
     pub close_tabs: Option<CloseTabs>,
-    pub scene: Option<Vec<Step>>,
+    pub scene: Option<Vec<SceneStep>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
     pub play: play::PlayTest,
@@ -184,7 +183,7 @@ pub enum LeftTab {
     Assets,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, IntoStaticStr)]
 #[serde(rename_all = "snake_case")]
 pub enum BottomTab {
     #[default]
@@ -192,7 +191,9 @@ pub enum BottomTab {
     Output,
     Palette,
     Blueprints,
+    #[strum(serialize = "May do")]
     MayDo,
+    #[strum(serialize = "Used by")]
     UsedBy,
     Run,
     Timeline,
@@ -205,21 +206,7 @@ pub enum BottomTab {
 
 impl BottomTab {
     pub fn title(self) -> &'static str {
-        match self {
-            BottomTab::History => "History",
-            BottomTab::Output => "Output",
-            BottomTab::Palette => "Palette",
-            BottomTab::Blueprints => "Blueprints",
-            BottomTab::MayDo => "May do",
-            BottomTab::UsedBy => "Used by",
-            BottomTab::Run => "Run",
-            BottomTab::Timeline => "Timeline",
-            BottomTab::Sheet => "Sheet",
-            BottomTab::Sounds => "Sounds",
-            BottomTab::Surfaces => "Surfaces",
-            BottomTab::Mixes => "Mixes",
-            BottomTab::Listen => "Listen",
-        }
+        self.into()
     }
 }
 
@@ -250,7 +237,6 @@ pub enum ModalDialog {
     NewRow(NewRowDialog),
     Confirm(ConfirmDialog),
     Conflicts(Vec<FileConflict>),
-    Error(String, String),
     Rename(RenameDialog),
     Delete(DeleteDialog),
     Close(CloseDialog),
@@ -258,7 +244,6 @@ pub enum ModalDialog {
     Keys,
     MakeBlueprint(MakeBlueprintDialog),
     Resize(ResizeDialog),
-    DeleteBlueprint(DeleteBlueprintDialog),
     Arrange(ArrangeDialog),
     Import(Box<import::ImportDialog>),
     PickRow(PickRowDialog),
@@ -286,13 +271,11 @@ pub enum PickRowThen {
     ReplaceBlueprint {
         area: String,
         index: usize,
-        scope: ReplaceScope,
     },
 }
 
 #[derive(Clone)]
 pub struct Clipboard {
-    pub table: String,
     pub from: String,
     pub modules: Vec<Value>,
     pub origin: Option<Pos<Tiles>>,
@@ -349,9 +332,15 @@ pub enum ConfirmAction {
         owner: ScriptOwner,
         names: Vec<String>,
     },
-    RestartPlay {
-        start: Option<Place>,
-    },
+}
+
+impl ConfirmAction {
+    pub fn destroys(&self) -> bool {
+        match self {
+            ConfirmAction::ReplaceModule { .. } => false,
+            ConfirmAction::RemoveLayer { .. } | ConfirmAction::DeleteScriptNodes { .. } => true,
+        }
+    }
 }
 
 pub struct RenameDialog {
@@ -363,15 +352,6 @@ pub struct RenameDialog {
 pub enum RenameTarget {
     Row { table: String, key: String },
     Layer { area: String, layer: String },
-}
-
-impl RenameTarget {
-    pub fn name(&self) -> &str {
-        match self {
-            RenameTarget::Row { key, .. } => key,
-            RenameTarget::Layer { layer, .. } => layer,
-        }
-    }
 }
 
 pub struct DeleteDialog {
@@ -418,9 +398,9 @@ impl Editor {
             scene: None,
             clipboard: None,
             views: EditorViews::default(),
-            play: crate::play::PlayTest::default(),
-            imports: crate::import::ImportRecords::default(),
-            jobs: crate::import::ImportJobs::default(),
+            play: PlayTest::default(),
+            imports: ImportRecords::default(),
+            jobs: ImportJobs::default(),
             pick: None,
             quit: false,
             frame: 0,
@@ -434,7 +414,7 @@ impl Editor {
 
     pub fn toast(&mut self, text: impl Into<String>) {
         let text = text.into();
-        self.output.say("editor", text.clone());
+        self.say(text.clone());
         self.toast = Some((text, Instant::now()));
     }
 
@@ -450,7 +430,7 @@ impl Editor {
             Err(error) => {
                 let reason = format!("{}: {error}", folder.display());
                 self.start.failed = Some((folder.to_path_buf(), reason.clone()));
-                self.output.say("editor", reason);
+                self.say(reason);
                 return;
             }
         };
@@ -473,14 +453,11 @@ impl Editor {
                     .as_ref()
                     .map(|report| report.to_string())
                     .unwrap_or_default();
-                self.output.say(
-                    "editor",
-                    format!(
-                        "{} did not load: {} errors",
-                        folder.display(),
-                        project.report.as_ref().map_or(0, |r| r.errors.len())
-                    ),
-                );
+                self.say(format!(
+                    "{} did not load: {} errors",
+                    folder.display(),
+                    project.report.as_ref().map_or(0, |r| r.errors.len())
+                ));
                 self.settings.remember(folder);
                 self.save_settings();
                 self.start.failed = None;
@@ -492,7 +469,7 @@ impl Editor {
                     Ok(lock) => Some(lock),
                     Err(reason) => {
                         project.read_only = Some(reason.clone());
-                        self.output.say("editor", format!("Read-only: {reason}"));
+                        self.say(format!("Read-only: {reason}"));
                         None
                     }
                 };
@@ -506,38 +483,26 @@ impl Editor {
                         };
                     }
                     if let Err(refusal) = project.apply(edit, EditViewpoint::default()) {
-                        self.output.say(
-                            "editor",
-                            format!("The journal did not apply: {}", refusal.sentence()),
-                        );
+                        self.say(format!("The journal did not apply: {}", refusal.sentence()));
                     } else {
-                        self.output.say(
-                            "editor",
-                            format!("Recovered {} unsaved rows", recovered.len()),
-                        );
+                        self.say(format!("Recovered {} unsaved rows", recovered.len()));
                     }
                 }
                 match (&project.report, project.last_load) {
                     (Some(report), _) => {
-                        self.output.say(
-                            "editor",
-                            format!(
-                                "{} did not load: {} errors",
-                                folder.display(),
-                                report.errors.len()
-                            ),
-                        );
+                        self.say(format!(
+                            "{} did not load: {} errors",
+                            folder.display(),
+                            report.errors.len()
+                        ));
                     }
                     (None, Some(took)) => {
                         let usages = project.last_usages.map_or(0, |d| d.as_millis());
-                        self.output.say(
-                            "editor",
-                            format!(
-                                "Opened {} in {} ms (load) + {usages} ms (usages)",
-                                folder.display(),
-                                took.as_millis()
-                            ),
-                        );
+                        self.say(format!(
+                            "Opened {} in {} ms (load) + {usages} ms (usages)",
+                            folder.display(),
+                            took.as_millis()
+                        ));
                     }
                     _ => {}
                 }
@@ -552,7 +517,7 @@ impl Editor {
                 self.selection = RowSelection::default();
                 self.form = FormState::default();
                 self.views = EditorViews::default();
-                self.imports = crate::import::ImportRecords::load(&self.user, folder);
+                self.imports = ImportRecords::load(&self.user, folder);
                 if let Some(problem) = self.imports.unreadable.clone() {
                     self.toast(format!(
                         "Import records are unreadable and will not be saved: {problem}"
@@ -568,7 +533,7 @@ impl Editor {
             }
             Err(reason) => {
                 self.start.failed = Some((folder.to_path_buf(), reason.clone()));
-                self.output.say("editor", reason);
+                self.say(reason);
             }
         }
     }
@@ -585,9 +550,7 @@ impl Editor {
         self.journal = None;
         self.watcher = None;
         self.lock = None;
-        if let Some(project) = self.project.take() {
-            drop(project);
-        }
+        self.project = None;
         self.dock = DockState::new(Vec::new());
         self.panels = DockTabs::default();
     }
@@ -631,34 +594,24 @@ impl Editor {
     }
 
     pub fn undo(&mut self) {
-        let Some(project) = &mut self.project else {
-            return;
-        };
-        match project.undo() {
-            Ok(Some(applied)) => {
-                self.selection = applied.viewpoint.selection;
-                self.views.restore_camera(applied.viewpoint.camera);
-                self.views.content_changed();
-                self.toast(format!("Undid {}", applied.label));
-            }
-            Ok(None) => {}
-            Err(refusal) => self.refused("Undo", &refusal),
-        }
+        self.revisit(Project::undo, "Undid");
     }
 
     pub fn redo(&mut self) {
-        let Some(project) = &mut self.project else {
-            return;
-        };
-        match project.redo() {
-            Ok(Some(applied)) => {
-                self.selection = applied.viewpoint.selection;
-                self.views.restore_camera(applied.viewpoint.camera);
-                self.views.content_changed();
-                self.toast(format!("Redid {}", applied.label));
-            }
-            Ok(None) => {}
-            Err(refusal) => self.refused("Redo", &refusal),
+        self.revisit(Project::redo, "Redid");
+    }
+
+    pub fn return_to(&mut self, applied: AppliedStep) {
+        self.selection = applied.viewpoint.selection;
+        self.views.restore_camera(applied.viewpoint.camera);
+        self.views.content_changed();
+    }
+
+    fn revisit(&mut self, travel: fn(&mut Project) -> Option<AppliedStep>, verb: &str) {
+        if let Some(applied) = self.project.as_mut().and_then(travel) {
+            let label = applied.label.clone();
+            self.return_to(applied);
+            self.toast(format!("{verb} {label}"));
         }
     }
 
@@ -716,6 +669,11 @@ impl Editor {
 
     pub fn select(&mut self, selection: RowSelection) {
         self.selection = selection;
+    }
+
+    pub fn open_row(&mut self, table: &str, key: &str) {
+        self.select(RowSelection::row(table, key));
+        self.open_tab(EditorTab::for_row(table, key));
     }
 
     pub fn has_unsaved(&self) -> bool {
@@ -857,7 +815,7 @@ impl Editor {
             build: version::build().to_owned(),
             content_version: content_version().to_owned(),
             folder: project.root.clone(),
-            written: unix_seconds(),
+            written: SystemTime::now().into(),
             files: unsaved
                 .iter()
                 .map(|path| {

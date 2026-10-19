@@ -2,14 +2,16 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use editor::app::Editor;
-use editor::project::{ContentEdit, Project, RowSelection, row_file};
+use editor::project::{ContentEdit, Project, RowSelection};
 use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
 use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, run_action};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
+use engine::systems::area::AreaDef;
 use serde_json::{Value, json};
 
 use crate::support::{AREA, game_folder};
@@ -30,16 +32,18 @@ fn editor_with_a_door(scratch: &tempfile::TempDir) -> Editor {
         EditorSettings::default(),
     );
     editor.project = Some(project);
-    let mut row = editor.row_value("area", AREA).expect("the start area");
+    let mut row = editor
+        .row_value(AreaDef::TABLE, AREA)
+        .expect("the start area");
     row["modules"] = json!([barn_door()]);
     let mut edit = ContentEdit::new("Add a door");
-    edit.write_json(row_file("area", AREA), &row);
+    edit.write_json(row_file(AreaDef::TABLE, AREA), &row);
     editor.try_apply(edit).expect("the door is written");
     editor
 }
 
 fn modules(editor: &Editor) -> Vec<Value> {
-    editor.row_value("area", AREA).expect("the area")["modules"]
+    editor.row_value(AreaDef::TABLE, AREA).expect("the area")["modules"]
         .as_array()
         .cloned()
         .expect("modules")
@@ -78,7 +82,7 @@ fn duplicating_is_one_undo_step() {
 fn duplicating_with_nothing_selected_changes_nothing() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    editor.selection = RowSelection::row("area", AREA);
+    editor.selection = RowSelection::row(AreaDef::TABLE, AREA);
     let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
     assert_eq!(modules(&editor), vec![barn_door()]);
@@ -105,7 +109,6 @@ fn switching_tools_ends_the_stroke_held_across_it() {
         draft,
         kind: BrushStrokeKind::Paint,
         cells: HashSet::new(),
-        seed: 1,
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
     });
@@ -159,7 +162,6 @@ fn hold_a_stroke(editor: &mut Editor) {
         draft,
         kind: BrushStrokeKind::Paint,
         cells: HashSet::new(),
-        seed: 1,
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
     });

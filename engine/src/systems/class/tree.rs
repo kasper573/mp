@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, ContentProblem, RowCheck, id};
 use crate::systems::script::{Condition, condition};
 use crate::systems::skill::{Rank, SkillId};
@@ -65,7 +65,7 @@ pub struct CanvasPoint {
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TreeBackdrop {
-    pub image: AssetRef,
+    pub image: ImageRef,
     pub frame: CanvasRect,
     #[serde(default)]
     pub fit: BackdropFit,

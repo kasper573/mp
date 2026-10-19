@@ -1,8 +1,8 @@
 use bevy::prelude::*;
-use design_tokens::card;
 use design_tokens::controls::{self, RowLook};
+use design_tokens::face::{self, TextRole};
 use design_tokens::sheet::{self, Depth};
-use design_tokens::{TextRole, face, ink};
+use design_tokens::{card, ink};
 use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
 
 use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, WareRefusal};
@@ -17,9 +17,11 @@ use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_ve
 use crate::systems::item::{self, Inventory, ItemCategory, ItemId, ItemStack};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
+use crate::systems::text::duration;
 
 const COUNTER_WIDTH: f32 = 620.0;
 const COUNTER_HEIGHT: f32 = 400.0;
+const SHOP_PAGE_WIDTH: f32 = 290.0;
 const PAGE_GAP: f32 = 10.0;
 const HINT_ROOM: f32 = 24.0;
 const ICON: f32 = 24.0;
@@ -166,10 +168,10 @@ fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
     let room = ui.available_rect_before_wrap();
     let list = Rect::from_min_max(
         room.min,
-        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH - PAGE_GAP, room.max.y),
+        Pos2::new(room.max.x - SHOP_PAGE_WIDTH - PAGE_GAP, room.max.y),
     );
     let page = Rect::from_min_max(
-        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH, room.min.y),
+        Pos2::new(room.max.x - SHOP_PAGE_WIDTH, room.min.y),
         room.max,
     );
     ui.scope_builder(
@@ -266,7 +268,7 @@ fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui
 
 fn ware_card(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize, most: f32) {
     let look = CardLook {
-        width: card::SHOP_PAGE_WIDTH,
+        width: SHOP_PAGE_WIDTH,
         max_height: (most - BUTTON_GAP - controls::CONTROL_HEIGHT - card::MARGIN)
             .min(card::MAX_HEIGHT),
         art: card::ART_SHORT,
@@ -371,10 +373,7 @@ impl Shelf {
 fn stock_note(view: &OfferView) -> Option<String> {
     let left = view.left?;
     Some(match view.restocks_in {
-        Some(restocks) => format!(
-            "{left} left · restocks in {} min",
-            (restocks.0 / 60.0).ceil() as u32
-        ),
+        Some(restocks) => format!("{left} left · restocks in {}", duration(restocks)),
         None => format!("{left} left"),
     })
 }

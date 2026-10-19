@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use engine::core::content::{
-    Content, ContentId, ContentRow, ContentScope, FilesystemFolder, key_of, with_content,
+    Content, ContentId, ContentRow, ContentScope, FilesystemFolder, with_content,
 };
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
@@ -12,12 +12,12 @@ use engine::systems::input::map::{InputAction, InputMap};
 use engine::systems::load_content;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::script::Place;
-
-use crate::seen::{area_key, clickable_point};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-// The content the driver reads names and places from: the one the server it drives plays.
+use crate::seen::{area_key, clickable_point};
+
+/// The content the driver reads names and places from: the one the server it drives plays.
 pub fn content() -> &'static Content {
     CONTENT
         .get()
@@ -53,11 +53,11 @@ pub fn input_names(action: InputAction) -> Vec<String> {
 
 pub fn id<Row: ContentRow>(name: &str) -> ContentId<Row> {
     content()
-        .by_key::<Row>(key_of(name).as_str())
+        .by_key::<Row>(name)
         .unwrap_or_else(|| panic!("no {} named {name}", Row::TABLE))
 }
 
-// Content ids travel by key, so JSON is read and written within the content's scope.
+/// Content ids travel by key, so JSON is read and written within the content's scope.
 pub fn to_json(value: &impl Serialize) -> String {
     let (json, _) = with_content(ContentScope::of(content()), || {
         serde_json::to_string(value).expect("serializable")
@@ -74,22 +74,14 @@ pub fn area_named(name: &str) -> &'static Area {
     area::load(content(), id::<AreaDef>(name))
 }
 
-// Where the townsperson lives: standing there puts a player at their feet.
+/// Where the townsperson lives: standing there puts a player at their feet.
 pub fn resident_home(area: &str, npc: &str) -> Place {
-    let npc = id(npc);
-    let home = area::modules(content(), id(area))
-        .find_map(|module| match module {
-            AreaModule::Resident(resident) if resident.npc == npc => Some(resident.at),
-            _ => None,
-        })
-        .unwrap_or_else(|| panic!("nobody named {npc:?} lives in {area}"));
-    Place {
-        area: id(area),
-        at: home,
-    }
+    area::residence(content(), id(npc))
+        .filter(|home| home.area == id(area))
+        .unwrap_or_else(|| panic!("nobody named {npc:?} lives in {area}"))
 }
 
-// The middle of the ground where the monster roams: its own corner of the area, or all of it.
+/// The middle of the ground where the monster roams: its own corner of the area, or all of it.
 pub fn hunting_ground(area: &str, npc: &str) -> Pos<Tiles> {
     let npc = id(npc);
     let whole = Rect::from_size(area_named(area).size);
@@ -103,8 +95,8 @@ pub fn hunting_ground(area: &str, npc: &str) -> Pos<Tiles> {
         .unwrap_or_else(|| panic!("no {npc:?} roams {area}"))
 }
 
-// The middle of the tightest ground a pack of the monster keeps to: where several of them stand
-// close enough together for one cast to reach them all.
+/// The middle of the tightest ground a pack of the monster keeps to: where several of them stand
+/// close enough together for one cast to reach them all.
 pub fn pack_ground(area: &str, npc: &str) -> Pos<Tiles> {
     let npc = id(npc);
     area::modules(content(), id(area))
@@ -125,12 +117,13 @@ pub fn east_of(area: &str, spot: Pos<Tiles>, by: f32) -> Place {
     }
 }
 
-// A marked spot: a named object, or where a townsperson lives.
+/// A marked spot: a named object, or where a townsperson lives.
 pub fn marker_at(area: &str, name: &str) -> Pos<Tiles> {
     placed_object(area, name).unwrap_or_else(|| resident_home(area, name).at)
 }
 
-// Ground in view beside the player, farthest from anyone first, so nobody strolls under the pointer.
+/// Ground in view beside the player, farthest from anyone first, so nobody strolls under the
+/// pointer.
 pub fn open_ground_beside(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
     let me = snapshot.me.as_ref().expect("the player").at;
     let room = |tile: &Pos<Tiles>| {
@@ -152,15 +145,15 @@ pub fn open_ground_beside(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
     ground
 }
 
-// Nearest first, and only what can be walked to from the spot.
+/// Nearest first, and only what can be walked to from the spot.
 pub fn ground_near(area: &str, at: Pos<Tiles>, within: RangeInclusive<Tiles>) -> Vec<Pos<Tiles>> {
     let grid = &area_named(area).grid;
-    let reach = grid.component(grid.nearest_walkable(at).expect("walkable ground near"));
+    let reach = grid.region(grid.nearest_walkable(at).expect("walkable ground near"));
     let mut ground: Vec<Pos<Tiles>> = grid
         .nodes()
         .iter()
         .copied()
-        .filter(|tile| grid.component(*tile) == reach && within.contains(&tile.distance(at)))
+        .filter(|tile| grid.region(*tile) == reach && within.contains(&tile.distance(at)))
         .collect();
     ground.sort_by(|a, b| a.distance_to(at).total_cmp(&b.distance_to(at)));
     ground

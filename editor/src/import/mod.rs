@@ -18,17 +18,22 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 
-use egui::Context;
+use design_tokens::glyph::{self, Mark};
+use egui::{Context, Ui};
+use engine::core::content::{ContentRow, asset_file};
+use engine::systems::actor::ModelDef;
+use engine::systems::area::tileset::TilesetDef;
+use formats::{AnimationExport, DroppedFiles};
+use image::RgbaImage;
 use serde::Deserialize;
 
 use crate::app::{ChannelInbox, Editor, ModalDialog};
 use crate::project::ContentEdit;
+use crate::rows;
 use crate::scenes::StripName;
 use crate::tabs::EditorTab;
 use crate::ui::{active_tab, dialogs, theme};
-use crate::views::model::ModelPage;
-use crate::views::model::{strip_of, write_strip};
-use formats::{AnimationExport, DroppedFiles};
+use crate::views::model::{ModelPage, strip_of, write_strip};
 
 pub const IMPORT_PART: &str = "/import";
 
@@ -183,19 +188,10 @@ fn scripted(editor: &mut Editor) {
     match step {
         ImportStep::Files(paths) => {
             editor.jobs.script.pop_front();
-            let files = paths
-                .into_iter()
-                .map(|path| {
-                    match editor
-                        .project
-                        .as_ref()
-                        .and_then(|project| project.root.parent())
-                    {
-                        Some(parent) if path.starts_with("art") => parent.join(path),
-                        _ => path,
-                    }
-                })
-                .collect();
+            let files = match content_parent(editor) {
+                Some(parent) => paths.iter().map(|path| parent.join(path)).collect(),
+                None => paths,
+            };
             dropped(editor, files);
         }
         ImportStep::Apply => {
@@ -245,7 +241,7 @@ fn scripted(editor: &mut Editor) {
             let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
-            let Some(row) = editor.row_value("model", &key) else {
+            let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
                 return;
             };
             let Some(strip) = strip.strip() else {
@@ -323,16 +319,12 @@ fn pick_files(editor: &mut Editor, target: ImportTarget) {
 }
 
 pub fn art_dir(editor: &Editor) -> Option<PathBuf> {
-    let root = &editor.project.as_ref()?.root;
-    let art = root.parent()?.join("art");
+    let art = content_parent(editor)?.join("art");
     art.is_dir().then_some(art)
 }
 
 pub fn show_path(editor: &Editor, file: &Path) -> String {
-    editor
-        .project
-        .as_ref()
-        .and_then(|project| project.root.parent())
+    content_parent(editor)
         .and_then(|parent| file.strip_prefix(parent).ok())
         .map(|rest| rest.to_string_lossy().replace('\\', "/"))
         .unwrap_or_else(|| formats::name(file))
@@ -362,24 +354,22 @@ fn begin(
 fn start_again(editor: &mut Editor, due: records::DueReimport) {
     let Some(record) = editor
         .imports
-        .record_with(&due.table, &due.key, &due.part)
+        .record_with(&due.table, &due.key, due.block)
         .cloned()
     else {
         return;
     };
-    let files = record.files();
-    let Ok(dropped) = formats::sort_out(&files) else {
+    let Ok(dropped) = formats::sort_out(&record.files) else {
         editor.toast(format!(
             "{} changed but no longer reads as an export",
-            record.names()
+            formats::export_name(&record.files)
         ));
         return;
     };
-    let animation = !due.part.is_empty();
-    let target = match (due.table.as_str(), animation) {
-        ("model", _) => ImportTarget::Model(due.key.clone()),
-        ("tileset", true) => ImportTarget::Animation(due.key.clone()),
-        ("tileset", false) => ImportTarget::Tileset(due.key.clone()),
+    let target = match (due.table.as_str(), due.block) {
+        (ModelDef::TABLE, _) => ImportTarget::Model(due.key.clone()),
+        (TilesetDef::TABLE, Some(_)) => ImportTarget::Animation(due.key.clone()),
+        (TilesetDef::TABLE, None) => ImportTarget::Tileset(due.key.clone()),
         _ => return,
     };
     if editor.row_value(&due.table, &due.key).is_none() {
@@ -404,16 +394,42 @@ fn land(editor: &mut Editor, job: ImportReading, export: AnimationExport) {
     }
 }
 
-fn files_of(dropped: &DroppedFiles) -> Vec<PathBuf> {
-    match dropped {
-        DroppedFiles::Sheet { image, json } => vec![image.clone(), json.clone()],
-        DroppedFiles::Png(file) | DroppedFiles::Apng(file) | DroppedFiles::Gif(file) => {
-            vec![file.clone()]
-        }
-        DroppedFiles::Sequence(files) => files.clone(),
+fn names_of(job: &ImportReading) -> String {
+    formats::names(&job.dropped.files())
+}
+
+fn asset_image(editor: &Editor, path: &str) -> Option<RgbaImage> {
+    let bytes = editor.project.as_ref()?.files.get(&asset_file(path))?;
+    formats::decode_image_bytes(bytes).ok()
+}
+
+fn free_key(editor: &Editor, table: &str, export: &AnimationExport) -> String {
+    let wanted = export
+        .files
+        .first()
+        .map(|file| formats::stem(file).replace(['-', ' '], "_").to_lowercase())
+        .unwrap_or_else(|| format!("new_{table}"));
+    match &editor.project {
+        Some(project) => rows::free_key(&project.files, table, &wanted),
+        None => wanted,
     }
 }
 
-fn names_of(job: &ImportReading) -> String {
-    formats::names(&files_of(&job.dropped))
+fn asset_name(folder: &str, key: &str) -> String {
+    format!("{folder}/{}.png", key.replace('_', "-"))
+}
+
+fn check_line(ui: &mut Ui, ok: bool, text: String) {
+    ui.horizontal_wrapped(|ui| {
+        if ok {
+            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+        } else {
+            glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
+        }
+        ui.label(theme::muted(text).size(12.5));
+    });
+}
+
+fn content_parent(editor: &Editor) -> Option<&Path> {
+    editor.project.as_ref()?.root.parent()
 }

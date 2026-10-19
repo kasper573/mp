@@ -11,8 +11,9 @@ use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Fixture, Loading, ModuleRule, ModuleSet,
@@ -27,16 +28,16 @@ use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{
-    INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack, scatter_drop,
+    INVENTORY_MAX, Inventory, ItemDef, ItemId, ItemModuleKind, ItemStack, scatter_drop,
 };
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::NpcId;
-use crate::systems::player::{Owner, player_requests};
+use crate::systems::player::{PlayedBy, player_requests};
 use crate::systems::rewards::KillCredited;
-use crate::systems::script::condition::CompiledCondition;
+use crate::systems::script::condition::{self, CompiledCondition};
 use crate::systems::script::{
-    self, Condition, EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, Reach, RiftInstances,
-    RiftScripts, ScriptModule, ScriptedRow, condition,
+    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftInstances, RiftScripts,
+    ScriptModule, ScriptedRow,
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
@@ -325,7 +326,7 @@ impl QuestDef {
         )
     }
 
-    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a ImageRef {
         if self.daily() {
             return &AttentionMark::RepeatableOffered.get(content).icon;
         }
@@ -372,8 +373,13 @@ impl QuestDef {
     }
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(
+    name(ObjectiveKind),
+    derive(EnumString, IntoStaticStr, VariantArray),
+    strum(serialize_all = "snake_case")
+)]
 pub enum Objective {
     Hold(ItemStack),
     Defeat {
@@ -393,8 +399,19 @@ pub enum Objective {
     },
 }
 
+impl ObjectiveKind {
+    /// The kind of objective a `type` tag names, when it names one.
+    pub fn of(tag: &str) -> Option<ObjectiveKind> {
+        tag.parse().ok()
+    }
+
+    pub fn tag(self) -> &'static str {
+        self.into()
+    }
+}
+
 impl Objective {
-    pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a AssetRef> {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> Option<&'a ImageRef> {
         match self {
             Objective::Hold(stack) => Some(&stack.item.get(content).icon),
             Objective::Deliver { item } => Some(&item.get(content).icon),
@@ -669,7 +686,7 @@ impl FinishedQuest {
     pub fn resets_in(&self, now: UnixMillis) -> Option<Seconds> {
         self.resets_at
             .filter(|at| now < *at)
-            .map(|at| Seconds((at.since(now).0 / 60.0).ceil() * 60.0))
+            .map(|at| at.since(now).up_to_minute())
     }
 }
 
@@ -879,7 +896,7 @@ pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
 
 fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Quest, quest.raw()),
+        Owner::Row(OwnerKind::Quest, quest.raw()),
         kind,
         Some(player),
         Vec::new(),
@@ -891,7 +908,7 @@ fn tell(
     world: &mut World,
     player: Entity,
     text: String,
-    icon: Option<&AssetRef>,
+    icon: Option<&ImageRef>,
     sfx: Option<SfxId>,
 ) {
     let mut told = Notification::feed(HistoryTopic::Quest, text);
@@ -958,7 +975,7 @@ pub fn check_all(loading: &mut Loading) {
                 }
                 QuestModule::Grants { items } => {
                     for (at, item) in item_rows(items).into_iter().enumerate() {
-                        if !item.get(&content).has(ItemFlag::Quest) {
+                        if !item.get(&content).has(ItemModuleKind::QuestItem) {
                             check.error(
                                 format!("/modules/{index}/items/{at}/item"),
                                 "not a quest item",
@@ -970,7 +987,7 @@ pub fn check_all(loading: &mut Loading) {
                 }
                 QuestModule::Drop(drop)
                     if content.table::<ItemDef>().get(drop.item).is_some()
-                        && !drop.item.get(&content).has(ItemFlag::Quest) =>
+                        && !drop.item.get(&content).has(ItemModuleKind::QuestItem) =>
                 {
                     check.error(
                         format!("/modules/{index}/item"),
@@ -1183,7 +1200,7 @@ fn announce(world: &mut World, player: Entity, clock: WallClock) {
     let Some(mut log) = log_of(world, player).cloned() else {
         return;
     };
-    let mut told: Vec<(String, &AssetRef, Option<SfxId>)> = Vec::new();
+    let mut told: Vec<(String, &ImageRef, Option<SfxId>)> = Vec::new();
     let ready: Vec<QuestId> = log
         .active
         .iter()
@@ -1284,7 +1301,7 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
     for notification in counted {
         notification::notify(world, player, notification);
     }
-    if let Some(client) = world.get::<Owner>(player).map(|owner| owner.client) {
+    if let Some(client) = world.get::<PlayedBy>(player).map(|owner| owner.client) {
         scatter_drop(
             world,
             kill.victim,

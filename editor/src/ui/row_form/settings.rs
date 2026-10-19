@@ -1,10 +1,10 @@
 use egui::Ui;
+use engine::core::content::GAME_FILE;
 
 use super::theme;
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormCx};
-use crate::project::{ContentEdit, GAME_FILE, RowSelection};
-use crate::tabs::EditorTab;
+use crate::project::ContentEdit;
 
 pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
     let Some(mut value) = editor
@@ -47,8 +47,7 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
     for action in actions {
         match action {
             FormAction::OpenRow { table, key } => {
-                editor.select(RowSelection::row(&table, &key));
-                editor.open_tab(EditorTab::for_row(&table, &key));
+                editor.open_row(&table, &key);
             }
             FormAction::PickPlace { path } => {
                 editor.pick = Some(PlacePick {
@@ -58,7 +57,8 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
                 });
                 editor.toast("Click a walkable cell on an area to put the initial spawn there");
             }
-            FormAction::OpenScript { .. }
+            FormAction::OpenNode { .. }
+            | FormAction::OpenScript { .. }
             | FormAction::MakeShared { .. }
             | FormAction::MakeInline { .. }
             | FormAction::NewRow { .. }

@@ -1,24 +1,24 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
-use egui::{RichText, Ui, Vec2};
-use engine::core::content::Content;
+use design_tokens::glyph::{self, Mark};
+use egui::{RichText, Ui};
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaModuleKind, Flip};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{AreaDef, AreaModuleKind, Flip};
 use serde_json::Value;
 
-use super::placement;
 use super::{AreaSnapshot, shapes};
-use crate::app::{Editor, ModalDialog, REFUSED};
+use crate::app::{Editor, ModalDialog};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, theme, widgets};
-use crate::value::RowValue;
-use crate::{forms, rows, value};
+use crate::value::{self, RowValue};
+use crate::{forms, rows};
 
 pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
     let modules = selected_modules(&row, &indices);
@@ -39,7 +39,7 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
     ) else {
         return;
     };
-    let name = rows::free_key(&project.files, "blueprint", "new_blueprint");
+    let name = rows::free_key(&project.files, BlueprintDef::TABLE, "new_blueprint");
     let matches = matching_groups(&content, area_key, &modules, &indices);
     editor
         .dialogs
@@ -99,7 +99,7 @@ fn matching_groups(
     };
     let wanted = signature(&relative);
     let mut out = Vec::new();
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         let key = area_id.key(content);
         let Ok(row) = value::json(area_id.get(content)) else {
             continue;
@@ -194,7 +194,7 @@ pub fn make_blueprint_dialog(
 ) -> Option<MakeBlueprintDialog> {
     let mut outcome = None;
     let row = editor
-        .row_value("area", &dialog.area)
+        .row_value(AreaDef::TABLE, &dialog.area)
         .unwrap_or(Value::Null);
     let modules = selected_modules(&row, &dialog.indices);
     let origin = selection_origin(&modules);
@@ -344,7 +344,7 @@ fn matches_card(ui: &mut Ui, dialog: &mut MakeBlueprintDialog) {
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            widgets::toggle(ui, &mut dialog.take_matches);
+            ui.checkbox(&mut dialog.take_matches, "");
             ui.vertical(|ui| {
                 ui.label(theme::strong(format!(
                     "{} identical arrangement{} {where_}",
@@ -364,12 +364,12 @@ fn matches_card(ui: &mut Ui, dialog: &mut MakeBlueprintDialog) {
 fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder")?;
     let key = dialog.name.trim().to_owned();
-    if let Some(problem) = rows::key_problem(&project.files, "blueprint", &key) {
+    if let Some(problem) = rows::key_problem(&project.files, BlueprintDef::TABLE, &key) {
         return Err(problem);
     }
     let row = project
         .files
-        .json(&row_file("area", &dialog.area))
+        .json(&row_file(AreaDef::TABLE, &dialog.area))
         .ok_or("the area is gone")?;
     let modules = selected_modules(&row, &dialog.indices);
     let origin = selection_origin(&modules).ok_or("the selection has no place")?;
@@ -383,7 +383,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         modules.len(),
         dialog.area
     ));
-    edit.write_json(row_file("blueprint", &key), &blueprint);
+    edit.write_json(row_file(BlueprintDef::TABLE, &key), &blueprint);
     let mut groups: Vec<BlueprintMatch> = vec![BlueprintMatch {
         area: dialog.area.clone(),
         indices: dialog.indices.clone(),
@@ -401,7 +401,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
     for (area, groups) in by_area {
         let mut row = project
             .files
-            .json_owned(&row_file("area", &area))
+            .json_owned(&row_file(AreaDef::TABLE, &area))
             .ok_or("an area is gone")?;
         let mut list: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
         let mut remove: Vec<usize> = groups
@@ -436,13 +436,11 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
             first_placement = Some(first - before);
         }
         row["modules"] = Value::Array(list);
-        edit.write_json(row_file("area", &area), &row);
+        edit.write_json(row_file(AreaDef::TABLE, &area), &row);
     }
-    if !editor.apply(edit) {
-        return Err(REFUSED.to_owned());
-    }
+    editor.try_apply(edit)?;
     editor.selection = RowSelection {
-        table: "area".to_owned(),
+        table: AreaDef::TABLE.to_owned(),
         keys: vec![dialog.area.clone()],
         parts: first_placement
             .map(super::module_part)
@@ -450,182 +448,5 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
             .collect(),
     };
     editor.toast(format!("Made blueprint {key}"));
-    Ok(())
-}
-
-pub struct DeleteBlueprintDialog {
-    pub blueprint: String,
-    pub users: Vec<BlueprintUser>,
-    pub error: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct BlueprintUser {
-    pub file: String,
-    pub pointer: String,
-    pub label: String,
-    pub choice: BlueprintChoice,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum BlueprintChoice {
-    Unpack,
-    Replace(String),
-    Remove,
-}
-
-pub fn delete_blueprint_dialog(
-    editor: &mut Editor,
-    ctx: &egui::Context,
-    mut dialog: DeleteBlueprintDialog,
-) -> Option<DeleteBlueprintDialog> {
-    let mut outcome = None;
-    let others: Vec<String> = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .map(|c| {
-            c.table::<area::blueprint::BlueprintDef>()
-                .keys()
-                .iter()
-                .filter(|k| **k != dialog.blueprint)
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default();
-    egui::Window::new(format!("Delete blueprint {}", dialog.blueprint))
-        .collapsible(false)
-        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-        .show(ctx, |ui| {
-            if dialog.users.is_empty() {
-                ui.label("Nothing places it.");
-            } else {
-                ui.label(format!("{} placements. Each: unpack into scenery and modules, replace with another blueprint, or remove.", dialog.users.len()));
-            }
-            egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
-                for (index, user) in dialog.users.iter_mut().enumerate() {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(&user.label).monospace().small());
-                        ui.radio_value(&mut user.choice, BlueprintChoice::Unpack, "Unpack");
-                        ui.radio_value(&mut user.choice, BlueprintChoice::Remove, "Remove");
-                        let mut picked = match &user.choice {
-                            BlueprintChoice::Replace(k) => k.clone(),
-                            _ => String::new(),
-                        };
-                        widgets::combo_box(("replace", index))
-                            .selected_text(if picked.is_empty() { "Replace with…".to_owned() } else { picked.clone() })
-                            .show_ui(ui, |ui| {
-                                for other in &others {
-                                    if ui.selectable_label(picked == *other, other).clicked() {
-                                        picked = other.clone();
-                                    }
-                                }
-                            });
-                        if !picked.is_empty() {
-                            user.choice = BlueprintChoice::Replace(picked);
-                        }
-                    });
-                }
-            });
-            if let Some(error) = &dialog.error {
-                ui.colored_label(theme::DANGER, error);
-            }
-            ui.horizontal(|ui| {
-                if ui.button("Delete").clicked() {
-                    outcome = Some(true);
-                }
-                if ui.button("Cancel").clicked() {
-                    outcome = Some(false);
-                }
-            });
-        });
-    match outcome {
-        Some(true) => match delete_blueprint(editor, &dialog) {
-            Ok(()) => None,
-            Err(error) => {
-                dialog.error = Some(error);
-                Some(dialog)
-            }
-        },
-        Some(false) => None,
-        None => Some(dialog),
-    }
-}
-
-fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Result<(), String> {
-    let content = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .ok_or("the folder does not load")?;
-    content
-        .by_key::<area::blueprint::BlueprintDef>(&dialog.blueprint)
-        .ok_or("the blueprint is gone")?;
-    let project = editor.project.as_ref().ok_or("no folder")?;
-    let mut files: BTreeMap<String, Value> = BTreeMap::new();
-    let mut by_file: BTreeMap<String, Vec<&BlueprintUser>> = BTreeMap::new();
-    for user in &dialog.users {
-        by_file.entry(user.file.clone()).or_default().push(user);
-    }
-    for (file, users) in by_file {
-        let mut json = project.files.json_owned(&file).ok_or("a file is gone")?;
-        let mut users = users
-            .into_iter()
-            .map(|user| {
-                let cut = user.pointer.rfind('/').ok_or("a bad pointer")?;
-                let index = user.pointer[cut + 1..]
-                    .parse::<usize>()
-                    .map_err(|_| "a bad pointer")?;
-                Ok((user.pointer[..cut].to_owned(), index, user))
-            })
-            .collect::<Result<Vec<_>, &str>>()?;
-        users.sort_by(|a, b| (&b.0, b.1).cmp(&(&a.0, a.1)));
-        for (parent, index, user) in users {
-            let list = json
-                .pointer_mut(&parent)
-                .and_then(Value::as_array_mut)
-                .ok_or("a bad pointer")?;
-            match &user.choice {
-                BlueprintChoice::Remove => {
-                    if index >= list.len() {
-                        return Err("a bad pointer".into());
-                    }
-                    list.remove(index);
-                }
-                BlueprintChoice::Replace(other) => {
-                    let replacement = content
-                        .by_key::<area::blueprint::BlueprintDef>(other)
-                        .ok_or("a bad replacement")?;
-                    let placement = list.get_mut(index).ok_or("a bad pointer")?;
-                    placement::retarget(placement, other, &replacement.get(&content).variables);
-                }
-                BlueprintChoice::Unpack => {
-                    if index >= list.len() {
-                        return Err("a bad pointer".into());
-                    }
-                    let placement_json = list.remove(index);
-                    let unpacked = placement::unpacked(&content, &placement_json)
-                        .ok_or("a part the engine refuses")?;
-                    for (offset, module) in unpacked.into_iter().enumerate() {
-                        list.insert(index + offset, module);
-                    }
-                }
-            }
-        }
-        files.insert(file, json);
-    }
-    let mut edit = ContentEdit::new(format!(
-        "Delete blueprint {} ({} placements resolved)",
-        dialog.blueprint,
-        dialog.users.len()
-    ));
-    for (file, json) in files {
-        edit.write_json(file, &json);
-    }
-    edit.remove(row_file("blueprint", &dialog.blueprint));
-    if !editor.apply(edit) {
-        return Err(REFUSED.to_owned());
-    }
-    rows::close_tabs(editor, "blueprint", &dialog.blueprint);
     Ok(())
 }

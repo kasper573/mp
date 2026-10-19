@@ -2,8 +2,8 @@ mod health;
 pub mod widget;
 
 pub use health::{
-    apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill, regenerate,
-    revive, settle_health, stands,
+    Immortal, apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill,
+    regenerate, revive, settle_health, stands,
 };
 
 use std::collections::BTreeMap;
@@ -41,6 +41,10 @@ pub enum StatKind {
 }
 
 impl StatKind {
+    pub fn label(self) -> &'static str {
+        self.into()
+    }
+
     pub const fn of(self, value: f32) -> Stat {
         Stat { kind: self, value }
     }
@@ -66,16 +70,16 @@ pub struct Stat {
 
 impl Stat {
     pub fn label(self) -> &'static str {
-        self.kind.into()
+        self.kind.label()
     }
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Component, JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(transparent)]
 #[schemars(transform = schema_with_units)]
-pub struct StatMap(pub BTreeMap<StatKind, f32>);
+pub struct Stats(pub BTreeMap<StatKind, f32>);
 
-impl StatMap {
+impl Stats {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -89,31 +93,19 @@ impl StatMap {
     }
 }
 
-#[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct Stats(pub Vec<Stat>);
-
-impl Stats {
-    pub fn get(&self, kind: StatKind) -> f32 {
-        self.0
-            .iter()
-            .find(|stat| stat.kind == kind)
-            .map_or(0.0, |stat| stat.value)
-    }
-}
-
 /// A system's say in an actor's effective stats, on top of its own `Stats`, pushed onto the
 /// modifiers gathered so far; registered with `source`.
-pub type Source = fn(&World, Entity, &mut Vec<Stat>);
+pub type StatSource = fn(&World, Entity, &mut Vec<Stat>);
 
 #[derive(Resource, Default)]
-pub struct Sources(Vec<Source>);
+pub struct Sources(Vec<StatSource>);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Stats>();
 }
 
-pub fn source(world: &mut World, source: Source) {
+pub fn source(world: &mut World, source: StatSource) {
     world.resource_mut::<Sources>().0.push(source);
 }
 
@@ -155,7 +147,7 @@ pub fn effective_all(world: &World, entity: Entity) -> Stats {
                     .filter(|stat| stat.kind == kind)
                     .map(|stat| stat.value)
                     .sum();
-                kind.of(base(world, entity, kind) + delta)
+                (kind, base(world, entity, kind) + delta)
             })
             .collect(),
     )

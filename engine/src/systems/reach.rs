@@ -7,8 +7,7 @@ use crate::core::tiling::{Cell, TilePos, Tiles};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::movement::{self, Aim, Approach, position};
 use crate::systems::skill::SkillId;
-use crate::systems::stat;
-use crate::systems::visibility;
+use crate::systems::{stat, visibility};
 
 const DIAGONAL_MARGIN: Tiles = Tiles(std::f32::consts::SQRT_2 - 1.0);
 

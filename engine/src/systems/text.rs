@@ -1,14 +1,16 @@
+use std::ops::Not;
 use std::time::Duration;
+
+use design_tokens::ink::Prose;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::script::{Expr, Value};
 use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice};
 use crate::core::time::{Millis, Seconds};
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::script::RiftScripting;
-use design_tokens::ink::Prose;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use strum::{IntoStaticStr, VariantArray};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(try_from = "SpanRow", into = "SpanRow")]
@@ -44,10 +46,10 @@ struct StyledRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ink: Option<Ink>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    voice: Option<Voice>,
+    voice: Option<TextVoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    motion: Option<Motion>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    motion: Option<TextMotion>,
+    #[serde(default, skip_serializing_if = "Not::not")]
     slow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pause_after: Option<Millis>,
@@ -150,8 +152,8 @@ pub fn values(spans: &[Span]) -> Vec<&Expr<RiftScripting>> {
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum Fx {
     Ink(Ink),
-    Voice(Voice),
-    Motion(Motion),
+    Voice(TextVoice),
+    Motion(TextMotion),
     Slow,
     PauseAfter(Millis),
 }
@@ -176,45 +178,6 @@ pub enum Ink {
     Place,
     Name,
     Magic,
-}
-
-#[derive(
-    JsonSchema,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    IntoStaticStr,
-    VariantArray,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum Voice {
-    Whisper,
-    Shout,
-}
-
-#[derive(
-    JsonSchema,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    IntoStaticStr,
-    VariantArray,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum Motion {
-    Wave,
-    Shake,
-    Pulse,
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -300,9 +263,8 @@ impl SpanText {
         for fx in fx {
             match *fx {
                 Fx::Ink(ink) => span = span.prose(ink.prose()),
-                Fx::Voice(Voice::Whisper) => span = span.voice(TextVoice::Whisper),
-                Fx::Voice(Voice::Shout) => span = span.voice(TextVoice::Shout),
-                Fx::Motion(motion) => span = span.motion(motion.text_motion()),
+                Fx::Voice(voice) => span = span.voice(voice),
+                Fx::Motion(motion) => span = span.motion(motion),
                 Fx::Slow => span = span.slow(),
                 Fx::PauseAfter(wait) => {
                     pause = Some(TextPiece::Pause(Duration::from_secs_f32(wait.seconds().0)));
@@ -310,16 +272,6 @@ impl SpanText {
             }
         }
         std::iter::once(span.into()).chain(pause).collect()
-    }
-}
-
-impl Motion {
-    pub fn text_motion(self) -> TextMotion {
-        match self {
-            Motion::Wave => TextMotion::Wave,
-            Motion::Shake => TextMotion::Shake,
-            Motion::Pulse => TextMotion::Pulse,
-        }
     }
 }
 

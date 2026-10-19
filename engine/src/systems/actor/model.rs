@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::Action;
-use crate::core::assets::{AssetRef, FileBytes};
+use crate::core::assets::{FileSize, ImageRef};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
@@ -23,7 +23,7 @@ pub type ModelId = ContentId<ModelDef>;
 #[serde(deny_unknown_fields)]
 pub struct ModelDef {
     pub hitbox: HitboxSize,
-    pub sprites: Sprites,
+    pub sprites: SpriteSheet,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<ModelModule>,
 }
@@ -34,19 +34,19 @@ impl ContentRow for ModelDef {
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");
         cx.range("/hitbox/height", self.hitbox.height, 0.1, 8.0, "tiles");
-        let sheet = self.sheet();
+        let sheet = &self.sprites;
         cx.range(
             "/sprites/frame_size/width",
             sheet.frame_size.width,
             1,
-            8192,
+            MAX_FRAME_PX,
             "pixels",
         );
         cx.range(
             "/sprites/frame_size/height",
             sheet.frame_size.height,
             1,
-            8192,
+            MAX_FRAME_PX,
             "pixels",
         );
         for (index, module) in self.modules.iter().enumerate() {
@@ -89,15 +89,9 @@ impl HitboxSize {
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Sprites {
-    Sheet(Sheet),
-}
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Sheet {
-    pub image: AssetRef,
+pub struct SpriteSheet {
+    pub image: ImageRef,
     pub frame_size: FrameSize,
     pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
 }
@@ -149,12 +143,6 @@ impl ModelDef {
             .iter()
             .any(|module| matches!(module, ModelModule::Airborne))
     }
-
-    pub fn sheet(&self) -> &Sheet {
-        match &self.sprites {
-            Sprites::Sheet(sheet) => sheet,
-        }
-    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -169,47 +157,47 @@ pub struct Busts {
 #[serde(deny_unknown_fields)]
 pub struct OwnBust {
     pub name: String,
-    pub file: AssetRef,
+    pub file: ImageRef,
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct GenericBusts {
-    pub neutral: AssetRef,
-    pub happy: AssetRef,
-    pub sad: AssetRef,
-    pub angry: AssetRef,
-    pub surprised: AssetRef,
-    pub thinking: AssetRef,
+    pub neutral: ImageRef,
+    pub happy: ImageRef,
+    pub sad: ImageRef,
+    pub angry: ImageRef,
+    pub surprised: ImageRef,
+    pub thinking: ImageRef,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(from = "String", into = "String")]
-pub enum Face {
+pub enum Expression {
     Generic(GenericExpression),
     Own(String),
 }
 
-impl From<String> for Face {
-    fn from(name: String) -> Face {
+impl From<String> for Expression {
+    fn from(name: String) -> Expression {
         match name.parse() {
-            Ok(expression) => Face::Generic(expression),
-            Err(_) => Face::Own(name),
+            Ok(expression) => Expression::Generic(expression),
+            Err(_) => Expression::Own(name),
         }
     }
 }
 
-impl From<Face> for String {
-    fn from(face: Face) -> String {
+impl From<Expression> for String {
+    fn from(face: Expression) -> String {
         match face {
-            Face::Generic(expression) => expression.as_ref().to_owned(),
-            Face::Own(name) => name,
+            Expression::Generic(expression) => expression.as_ref().to_owned(),
+            Expression::Own(name) => name,
         }
     }
 }
 
-impl JsonSchema for Face {
+impl JsonSchema for Expression {
     fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("Face")
+        Cow::Borrowed("Expression")
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
@@ -251,17 +239,17 @@ pub enum GenericExpression {
 }
 
 impl Busts {
-    pub fn all(&self) -> impl Iterator<Item = &AssetRef> {
+    pub fn all(&self) -> impl Iterator<Item = &ImageRef> {
         GenericExpression::VARIANTS
             .iter()
             .map(|&expression| self.generic.of(expression))
             .chain(self.own.iter().map(|own| &own.file))
     }
 
-    pub fn face(&self, face: &Face) -> Option<&AssetRef> {
+    pub fn face(&self, face: &Expression) -> Option<&ImageRef> {
         match face {
-            Face::Generic(expression) => Some(self.generic.of(*expression)),
-            Face::Own(name) => self
+            Expression::Generic(expression) => Some(self.generic.of(*expression)),
+            Expression::Own(name) => self
                 .own
                 .iter()
                 .find(|own| own.name == *name)
@@ -271,7 +259,7 @@ impl Busts {
 }
 
 impl GenericBusts {
-    pub fn of(&self, expression: GenericExpression) -> &AssetRef {
+    pub fn of(&self, expression: GenericExpression) -> &ImageRef {
         match expression {
             GenericExpression::Neutral => &self.neutral,
             GenericExpression::Happy => &self.happy,
@@ -284,9 +272,10 @@ impl GenericBusts {
 }
 
 pub const MAX_STRIP_FRAMES: usize = 256;
+pub const MAX_FRAME_PX: u32 = 8192;
 // The client loads every bust at startup, so each one, and the whole cast, must stay a quick download.
-pub const MAX_BUST_BYTES: FileBytes = FileBytes::kib(120);
-pub const MAX_CAST_BYTES: FileBytes = FileBytes::kib(3 * 1024);
+pub const MAX_BUST_BYTES: FileSize = FileSize::kib(120);
+pub const MAX_CAST_BYTES: FileSize = FileSize::kib(3 * 1024);
 pub const MAX_FRAME_MS: u32 = 60_000;
 
 pub struct Models(pub Vec<Option<ActorModel>>);
@@ -300,7 +289,7 @@ pub fn build_all(loading: &mut Loading) {
     let mut cast = CastWeight::default();
     for ((id, def), busts) in rows.into_iter().zip(files) {
         let mut check = RowCheck::default();
-        let sheet = def.sheet();
+        let sheet = &def.sprites;
         let image = sizes.0.get(sheet.image.as_str()).copied();
         if let Some((width, height)) = image
             && (width % sheet.frame_size.width.max(1) != 0
@@ -325,7 +314,7 @@ pub fn build_all(loading: &mut Loading) {
                     "/sprites/actions",
                     "missing frames",
                     format!("no {} action", action.as_ref()),
-                    "every action: idle, walk, run, attack, death",
+                    format!("every action: {}", listed(Action::VARIANTS)),
                 );
                 continue;
             };
@@ -340,7 +329,10 @@ pub fn build_all(loading: &mut Loading) {
                         format!("/sprites/actions/{}", action.as_ref()),
                         "missing frames",
                         format!("direction {} has no frames", direction.as_ref()),
-                        "1 to 256 frames in each of s, sw, nw, n, ne, se, e, w",
+                        format!(
+                            "1 to {MAX_STRIP_FRAMES} frames in each of {}",
+                            listed(Direction::VARIANTS)
+                        ),
                     );
                     continue;
                 };
@@ -468,7 +460,7 @@ impl ActorModel {
 
     // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
     fn new(def: &ModelDef, image: Option<(u32, u32)>, figure: Option<BustFigure>) -> ActorModel {
-        let sheet = def.sheet();
+        let sheet = &def.sprites;
         let columns = image
             .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
             .max(1);
@@ -497,8 +489,8 @@ impl ActorModel {
         self.def.hitbox.tiles()
     }
 
-    pub fn sheet(&self) -> &crate::core::assets::AssetRef {
-        &self.def.sheet().image
+    pub fn sheet(&self) -> &ImageRef {
+        &self.def.sprites.image
     }
 
     pub fn airborne(&self) -> bool {
@@ -585,7 +577,7 @@ impl ActorModel {
     }
 
     fn region(&self, frame: u32) -> Rect<WorldPx> {
-        let size = self.def.sheet().frame_size;
+        let size = self.def.sprites.frame_size;
         let frame_size = Size::new(size.width as f32, size.height as f32);
         Rect::new(
             Pos::new(
@@ -638,19 +630,19 @@ struct CastWeight {
 impl CastWeight {
     /// Counts `bust` once however many models share it, and tells the total the first time it
     /// passes the budget.
-    fn add(&mut self, bust: &str, weight: FileBytes) -> Option<FileBytes> {
+    fn add(&mut self, bust: &str, weight: FileSize) -> Option<FileSize> {
         if !self.counted.insert(bust.to_owned()) {
             return None;
         }
         self.total += weight.0;
-        let total = FileBytes(self.total);
+        let total = FileSize(self.total);
         (total > MAX_CAST_BYTES && !std::mem::replace(&mut self.over, true)).then_some(total)
     }
 }
 
 struct BustFiles {
     figure: Option<BustFigure>,
-    weights: Vec<(String, FileBytes)>,
+    weights: Vec<(String, FileSize)>,
 }
 
 fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles> {
@@ -684,9 +676,13 @@ fn bust_files(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<BustFiles
                 figure,
                 weights: files
                     .into_iter()
-                    .map(|(path, bytes)| (path, FileBytes(bytes.len())))
+                    .map(|(path, bytes)| (path, FileSize(bytes.len())))
                     .collect(),
             }
         })
         .collect()
+}
+
+fn listed<T: AsRef<str>>(all: &[T]) -> String {
+    all.iter().map(AsRef::as_ref).collect::<Vec<_>>().join(", ")
 }

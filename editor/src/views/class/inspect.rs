@@ -1,11 +1,12 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
-use engine::core::content::Content;
-use engine::systems::class::{NodeKey, SkillTree};
+use engine::core::content::{Content, ContentRow};
+use engine::systems::class::{ClassDef, NodeKey, SkillTree};
+use engine::systems::skill::SkillDef;
 use serde_json::{Map, Value};
 
 use super::tree::{self, CarriedNode};
-use super::{TABLE, node_of, select_node, write};
+use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::RowSelection;
@@ -20,7 +21,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         return;
     };
     let key = selection.keys[0].clone();
-    let Some(mut row) = editor.row_value(TABLE, &key) else {
+    let Some(mut row) = editor.row_value(ClassDef::TABLE, &key) else {
         return;
     };
     if !row["tree"][&node].is_object() {
@@ -35,25 +36,30 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let shapes = editor.shapes.clone();
     let mut changed = FormChange::default();
     let mut removed = false;
-    editor.with_form(TABLE, Some(&key), shapes.shape_of(TABLE), |cx| {
-        egui::ScrollArea::vertical()
-            .id_salt(("class-node", &key, &node))
-            .show(ui, |ui| {
-                ui.label(
-                    theme::mono(format!("{TABLE}/{key} › node {node}"))
-                        .color(theme::CODE)
-                        .size(12.0),
-                );
-                ui.add_space(6.0);
-                changed |= fields(ui, cx, &mut row, &node);
-                widgets::section(ui, "access requirements");
-                changed |= requirements(ui, cx, &content, &mut row, &tree, &node);
-                ui.add_space(10.0);
-                if widgets::danger(ui, "Remove node").clicked() {
-                    removed = true;
-                }
-            });
-    });
+    editor.with_form(
+        ClassDef::TABLE,
+        Some(&key),
+        shapes.shape_of(ClassDef::TABLE),
+        |cx| {
+            egui::ScrollArea::vertical()
+                .id_salt(("class-node", &key, &node))
+                .show(ui, |ui| {
+                    ui.label(
+                        theme::mono(format!("{}/{key} › node {node}", ClassDef::TABLE))
+                            .color(theme::CODE)
+                            .size(12.0),
+                    );
+                    ui.add_space(6.0);
+                    changed |= fields(ui, cx, &mut row, &node);
+                    widgets::section(ui, "access requirements");
+                    changed |= requirements(ui, cx, &content, &mut row, &tree, &node);
+                    ui.add_space(10.0);
+                    if widgets::danger(ui, "Remove node").clicked() {
+                        removed = true;
+                    }
+                });
+        },
+    );
     if removed {
         tree::remove_node(&mut row, &node);
         write(editor, &key, "Remove node", &row);
@@ -68,7 +74,13 @@ fn fields(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, node: &str) -> FormChan
     let path = format!("{}{node}", super::TREE_PART);
     widgets::kv(ui, "skill", |ui| {
         let mut skill = row["tree"][node].text("skill").to_owned();
-        if picker::row(ui, cx, "skill", &mut skill, &format!("{path}/skill")) {
+        if picker::row(
+            ui,
+            cx,
+            SkillDef::TABLE,
+            &mut skill,
+            &format!("{path}/skill"),
+        ) {
             row["tree"][node]["skill"] = Value::String(skill);
             changed = FormChange::at(&path);
         }
@@ -133,7 +145,7 @@ fn requirements(
                     let named = item.text("node").to_owned();
                     widgets::kv(ui, "node", |ui| {
                         let mut picked = named.clone();
-                        widgets::combo_box(("requirement-node", index))
+                        widgets::combo(("requirement-node", index))
                             .width(ui.available_width() - 8.0)
                             .selected_text(if named.is_empty() {
                                 theme::muted("pick a node…")

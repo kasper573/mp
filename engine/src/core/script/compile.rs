@@ -13,11 +13,12 @@ use super::node::{
 use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKindDef, QueryDef,
-    ScriptError, ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType,
-    Vocabulary,
+    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, OwnerKindDef, QueryDef, ScriptError,
+    ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
+use crate::core::content::id::nearest;
 use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::time::Seconds;
 
 pub type Eval = Box<dyn Fn(&World, &FlowCx) -> Value + Send + Sync>;
 pub type EffectCall<V> =
@@ -26,7 +27,7 @@ pub type EffectCall<V> =
 pub enum EffectStep {
     /// Along the effect's first output: its way on when all went as planned.
     Done,
-    Output(Name),
+    Output(&'static str),
     Pause,
 }
 
@@ -54,12 +55,7 @@ impl<V: Vocabulary> Scripts<V> {
     }
 
     pub fn may_do(&self, owner: OwnerRow<V>) -> MayDo<V> {
-        let mut all = MayDo::default();
-        for procedure in self.of(owner) {
-            all.absorb(&procedure.may_do);
-            all.answers.extend(procedure.may_do.answers.iter().copied());
-        }
-        all
+        MayDo::owned(self.of(owner).iter().map(|procedure| &procedure.may_do))
     }
 
     pub fn owners(&self) -> impl Iterator<Item = (&OwnerRow<V>, &Vec<Arc<Procedure<V>>>)> {
@@ -108,7 +104,7 @@ pub enum Step<V: Vocabulary> {
     },
     Wait {
         seconds: Eval,
-        at_most: f32,
+        at_most: Seconds,
         next: Option<StepIndex>,
     },
     Set {
@@ -136,7 +132,7 @@ pub enum Step<V: Vocabulary> {
     Effect {
         def: V::Effect,
         call: EffectCall<V>,
-        outputs: Vec<(Name, Option<StepIndex>)>,
+        outputs: Vec<(&'static str, Option<StepIndex>)>,
         pauses: bool,
         keeps_box: bool,
     },
@@ -181,16 +177,6 @@ impl<V: Vocabulary> Procedure<V> {
     }
 }
 
-impl<V: Vocabulary> Step<V> {
-    pub fn pauses(&self) -> bool {
-        match self {
-            Step::Wait { .. } | Step::Dialogue { .. } => true,
-            Step::Effect { pauses, .. } => *pauses,
-            _ => false,
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub enum Call<'c, V: Vocabulary> {
     Shared {
@@ -232,16 +218,19 @@ pub enum Bound<'c, V: Vocabulary> {
     Condition(&'c Expr<V>),
 }
 
-pub type ModuleErrors = Vec<(usize, ScriptError)>;
-type ValuesOf<'c, V> = Option<&'c BTreeMap<String, VarValue<V>>>;
-type DeclaredOf<'c, V> = Option<&'c BTreeMap<String, Variable<V>>>;
+/// Why one of a row's script modules, the one at `module` among them, did not compile.
+#[derive(Debug)]
+pub struct ModuleError {
+    pub module: usize,
+    pub error: ScriptError,
+}
 
 pub fn compile_owner<'c, V: Vocabulary>(
     content: &'c Content,
     owner: V::OwnerKind,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     compile_modules(content, owner, None, label, modules)
 }
 
@@ -251,7 +240,7 @@ pub fn compile_row<'c, V: Vocabulary>(
     row: OwnerRow<V>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     compile_modules(content, row.kind, Some(row), label, modules)
 }
 
@@ -261,7 +250,7 @@ fn compile_modules<'c, V: Vocabulary>(
     row: Option<OwnerRow<V>>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
+) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
     let mut procedures = Vec::new();
     let mut errors = Vec::new();
     let mut answered: HashMap<<V::Event as EventDef<V>>::Kind, Vec<String>> = HashMap::new();
@@ -277,16 +266,19 @@ fn compile_modules<'c, V: Vocabulary>(
         ) {
             Ok(procedure) => procedure,
             Err(error) => {
-                errors.push((index, error));
+                errors.push(ModuleError {
+                    module: index,
+                    error,
+                });
                 continue;
             }
         };
         for (node, event) in &procedure.entries {
             let twice = answered.entry(event.kind()).or_default();
             if let Some(first) = twice.first() {
-                errors.push((
-                    index,
-                    ScriptError {
+                errors.push(ModuleError {
+                    module: index,
+                    error: ScriptError {
                         rule: "answered twice",
                         owner: label.to_owned(),
                         node: Some(procedure.name(*node).to_owned()),
@@ -296,7 +288,7 @@ fn compile_modules<'c, V: Vocabulary>(
                         ),
                         script: None,
                     },
-                ));
+                });
             }
             twice.push(procedure.name(*node).to_owned());
         }
@@ -391,51 +383,50 @@ fn compile_source<'c, V: Vocabulary>(
         expected,
         script: None,
     };
-    let (source, values, declared): (Source<'c, V>, ValuesOf<'c, V>, DeclaredOf<'c, V>) =
-        match binding.call {
-            Call::Shared { script, values } => {
-                let def = script.get(content);
-                let called = !stack.is_empty();
-                if called {
-                    if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
-                        return Err(at_call(
-                            "owners of another kind",
-                            format!(
-                                "script/{} is {}'s, run by {}",
-                                script.key(content),
-                                def.owner.name(),
-                                binding.owner.name()
-                            ),
-                        ));
-                    }
-                } else if def.owner != binding.owner {
+    let (source, values, declared) = match binding.call {
+        Call::Shared { script, values } => {
+            let def = script.get(content);
+            let called = !stack.is_empty();
+            if called {
+                if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
                     return Err(at_call(
                         "owners of another kind",
-                        format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                        format!(
+                            "script/{} is {}'s, run by {}",
+                            script.key(content),
+                            def.owner.name(),
+                            binding.owner.name()
+                        ),
                     ));
                 }
-                (
-                    Source {
-                        state: slots(&def.state),
-                        locals: slots(&def.locals),
-                        nodes: &def.nodes,
-                        label: format!("script/{}", script.key(content)),
-                    },
-                    Some(values),
-                    Some(&def.variables),
-                )
+            } else if def.owner != binding.owner {
+                return Err(at_call(
+                    "owners of another kind",
+                    format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                ));
             }
-            Call::Inline(inline) => (
+            (
                 Source {
-                    state: slots(&inline.state),
-                    locals: slots(&inline.locals),
-                    nodes: &inline.nodes,
-                    label: binding.label.clone(),
+                    state: slots(&def.state),
+                    locals: slots(&def.locals),
+                    nodes: &def.nodes,
+                    label: format!("script/{}", script.key(content)),
                 },
-                None,
-                None,
-            ),
-        };
+                Some(values),
+                Some(&def.variables),
+            )
+        }
+        Call::Inline(inline) => (
+            Source {
+                state: slots(&inline.state),
+                locals: slots(&inline.locals),
+                nodes: &inline.nodes,
+                label: binding.label.clone(),
+            },
+            None,
+            None,
+        ),
+    };
     if source.nodes.len() > MAX_NODES {
         return Err(fail(
             "out of range",
@@ -487,7 +478,7 @@ fn compile_source<'c, V: Vocabulary>(
                 format!(
                     "{name} is not a variable of {}{}",
                     source.label,
-                    nearest(
+                    nearest_note(
                         name,
                         declared
                             .into_iter()
@@ -521,13 +512,13 @@ fn compile_source<'c, V: Vocabulary>(
     }
     let index_of = |name: &str| names.iter().position(|known| *known == name).map(StepIndex);
     let arrow = |arrow: &'c Arrow, at: &'c str| -> Result<Option<StepIndex>, ScriptError> {
-        match arrow.as_deref() {
+        match arrow.to() {
             None => Ok(None),
             Some(name) => index_of(name).map(Some).ok_or_else(|| {
                 fail(
                     "unknown node",
                     Some(at),
-                    format!("{name:?}{}", nearest(name, names.iter().copied())),
+                    format!("{name:?}{}", nearest_note(name, names.iter().copied())),
                 )
             }),
         }
@@ -644,10 +635,10 @@ fn compile_source<'c, V: Vocabulary>(
                 at_most,
                 next,
             } => {
-                if !(*at_most > 0.0 && *at_most <= MAX_WAIT) {
+                if !(at_most.0 > 0.0 && *at_most <= MAX_WAIT) {
                     return Err(node_fail(
                         "out of range",
-                        format!("at_most up to {MAX_WAIT} seconds"),
+                        format!("at_most up to {} seconds", MAX_WAIT.0),
                     ));
                 }
                 let (seconds, uses) = cx
@@ -787,7 +778,7 @@ fn compile_source<'c, V: Vocabulary>(
                         format!("at most {MAX_CHOICES} choices"),
                     ));
                 }
-                if dialogue.next.is_some() && !dialogue.choices.is_empty() {
+                if dialogue.next.to().is_some() && !dialogue.choices.is_empty() {
                     return Err(node_fail(
                         "wrong type",
                         "next only without choices".to_owned(),
@@ -867,12 +858,12 @@ fn compile_source<'c, V: Vocabulary>(
                 let outputs = effect
                     .outputs()
                     .into_iter()
-                    .map(|(output, to)| match to {
+                    .map(|(output, to)| match to.to() {
                         None => Ok((output, None)),
                         Some(to) => index_of(to).map(|to| (output, Some(to))).ok_or_else(|| {
                             node_fail(
                                 "unknown node",
-                                format!("{to:?}{}", nearest(to, names.iter().copied())),
+                                format!("{to:?}{}", nearest_note(to, names.iter().copied())),
                             )
                         }),
                     })
@@ -913,7 +904,7 @@ fn compile_source<'c, V: Vocabulary>(
     for (index, (name, _)) in source.state.iter().enumerate() {
         if !cx.read_slots.contains(&Slot::State(index)) {
             return Err(fail(
-                "unused local",
+                "unused state",
                 None,
                 format!("state {name} is never read"),
             ));
@@ -951,7 +942,8 @@ fn compile_source<'c, V: Vocabulary>(
             ));
         }
     }
-    bound_steps(&steps, &names, &successors, &entries, &fail)?;
+    let pauses: Vec<bool> = source.nodes.values().map(Node::pauses).collect();
+    bound_steps(&steps, &pauses, &names, &successors, &entries, &fail)?;
     let any_needs_subject = needs_subject.iter().any(|needs| *needs);
     Ok(Arc::new(Procedure {
         id: ProcedureId(NEXT_PROCEDURE.fetch_add(1, Ordering::Relaxed)),
@@ -989,8 +981,8 @@ fn owned_slots(slots: &[(&str, ValueType)]) -> Vec<(String, ValueType)> {
 /// of the entry that started it.
 fn event_fields_by_node<V: Vocabulary>(
     nodes: &BTreeMap<String, Node<V>>,
-) -> HashMap<&str, &'static [(Name, ValueType)]> {
-    let mut fields: HashMap<&str, Option<&'static [(Name, ValueType)]>> = HashMap::new();
+) -> HashMap<&str, &'static [(&'static str, ValueType)]> {
+    let mut fields: HashMap<&str, Option<&'static [(&'static str, ValueType)]>> = HashMap::new();
     for (entry, node) in nodes {
         let Node::On { event, .. } = node else {
             continue;
@@ -1037,11 +1029,11 @@ fn node_arrows<V: Vocabulary>(node: &Node<V>) -> Vec<&str> {
             return effect
                 .outputs()
                 .into_iter()
-                .filter_map(|(_, to)| to)
+                .filter_map(|(_, to)| to.to())
                 .collect();
         }
     };
-    arrows.into_iter().filter_map(Option::as_deref).collect()
+    arrows.into_iter().filter_map(Arrow::to).collect()
 }
 
 fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
@@ -1070,6 +1062,7 @@ fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
 
 fn bound_steps<V: Vocabulary>(
     steps: &[Step<V>],
+    pauses: &[bool],
     names: &[&str],
     successors: &[Vec<StepIndex>],
     entries: &[(StepIndex, V::Event)],
@@ -1077,6 +1070,7 @@ fn bound_steps<V: Vocabulary>(
 ) -> Result<(), ScriptError> {
     let mut walk = Walk {
         steps,
+        pauses,
         names,
         successors,
         path: Vec::new(),
@@ -1084,13 +1078,9 @@ fn bound_steps<V: Vocabulary>(
         fail,
     };
     let mut sources: Vec<StepIndex> = entries.iter().map(|(entry, _)| *entry).collect();
-    sources.extend(
-        (0..steps.len())
-            .filter(|node| steps[*node].pauses())
-            .map(StepIndex),
-    );
+    sources.extend((0..steps.len()).filter(|node| pauses[*node]).map(StepIndex));
     for source in sources {
-        let starts: Vec<StepIndex> = if steps[source.0].pauses() {
+        let starts: Vec<StepIndex> = if pauses[source.0] {
             successors[source.0].clone()
         } else {
             vec![source]
@@ -1104,6 +1094,7 @@ fn bound_steps<V: Vocabulary>(
 
 struct Walk<'a, V: Vocabulary, F> {
     steps: &'a [Step<V>],
+    pauses: &'a [bool],
     names: &'a [&'a str],
     successors: &'a [Vec<StepIndex>],
     path: Vec<StepIndex>,
@@ -1113,7 +1104,7 @@ struct Walk<'a, V: Vocabulary, F> {
 
 impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Walk<'_, V, F> {
     fn longest(&mut self, node: StepIndex) -> Result<usize, ScriptError> {
-        if self.steps[node.0].pauses() {
+        if self.pauses[node.0] {
             return Ok(1);
         }
         if let Some(known) = self.memo.get(&node) {
@@ -1172,13 +1163,6 @@ impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Wa
     }
 }
 
-pub fn nearest<'a>(wanted: &str, known: impl Iterator<Item = &'a str>) -> String {
-    let known: Vec<String> = known.map(str::to_owned).collect();
-    crate::core::content::id::nearest(&known, wanted)
-        .map(|near| format!(" · nearest {near:?}"))
-        .unwrap_or_default()
-}
-
 pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
     owner: V::OwnerKind,
@@ -1192,7 +1176,7 @@ pub struct Compiler<'c, V: Vocabulary> {
     read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
     subject_read: bool,
-    event_fields: &'static [(Name, ValueType)],
+    event_fields: &'static [(&'static str, ValueType)],
 }
 
 type Arithmetic = (fn(i64, i64) -> i64, fn(f64, f64) -> f64);
@@ -1220,10 +1204,6 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         self.owner
     }
 
-    pub fn content(&self) -> &'c Content {
-        self.content
-    }
-
     /// The row whose script this is, when it is a row's own.
     pub fn owner_row(&self) -> Option<OwnerRow<V>> {
         self.row
@@ -1242,7 +1222,12 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         if !want.accepts(ty) {
             return Err(ScriptFault::new(
                 "wrong type",
-                format!("{} is {}, expected {}", expr.kind(), ty.name(), want.name()),
+                format!(
+                    "{} is {}, expected {}",
+                    expr.kind().name(),
+                    ty.name(),
+                    want.name()
+                ),
             ));
         }
         Ok(if ty == want {
@@ -1352,7 +1337,10 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         let Some((name, _)) = self.variables.get_key_value(name) else {
             return Err(ScriptFault::new(
                 "unknown variable",
-                format!("{name}{}", nearest(name, self.variables.keys().copied())),
+                format!(
+                    "{name}{}",
+                    nearest_note(name, self.variables.keys().copied())
+                ),
             ));
         };
         let name: &'c str = name;
@@ -1425,7 +1413,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             Expr::Int(value) => (constant(Value::Int(*value)), ValueType::Integer),
             Expr::Num(value) => (constant(Value::Num(*value)), ValueType::Number),
             Expr::Text(value) => (constant(Value::Text(value.clone())), ValueType::Text),
-            Expr::Var(name) => match *self.var(name)? {
+            Expr::Var { var: name } => match *self.var(name)? {
                 Bound::Integer(value) => (constant(Value::Int(value)), ValueType::Integer),
                 Bound::Number(value) => (constant(Value::Num(value)), ValueType::Number),
                 Bound::Boolean(value) => (constant(Value::Bool(value)), ValueType::Boolean),
@@ -1441,21 +1429,21 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ));
                 }
             },
-            Expr::Local(name) => {
+            Expr::Local { local: name } => {
                 let (index, ty) = self
                     .local(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("local {name}")))?;
                 self.read_slots.insert(Slot::Local(index));
                 (Box::new(move |_, cx: &FlowCx| cx.locals[index].clone()), ty)
             }
-            Expr::State(name) => {
+            Expr::State { state: name } => {
                 let (index, ty) = self
                     .state(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("state {name}")))?;
                 self.read_slots.insert(Slot::State(index));
                 (Box::new(move |_, cx: &FlowCx| cx.state[index].clone()), ty)
             }
-            Expr::Event(name) => {
+            Expr::Event { event: name } => {
                 let (index, ty) = self.event_field(name).ok_or_else(|| {
                     ScriptFault::new("unknown field", format!("the event has no field {name}"))
                 })?;
@@ -1468,8 +1456,8 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                 }
                 (query.compile(self)?, ty)
             }
-            Expr::All(list) | Expr::Any(list) => {
-                let all = matches!(expr, Expr::All(_));
+            Expr::All { of: list } | Expr::Any { of: list } => {
+                let all = matches!(expr, Expr::All { .. });
                 let parts = self.list(list, ValueType::Boolean)?;
                 (
                     Box::new(move |world, cx| {
@@ -1490,15 +1478,15 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Not(of) => {
+            Expr::Not { of } => {
                 let of = self.expr(of, ValueType::Boolean)?;
                 (
                     Box::new(move |world, cx| Value::Bool(!of(world, cx).truthy())),
                     ValueType::Boolean,
                 )
             }
-            Expr::Equal(a, b) | Expr::NotEqual(a, b) => {
-                let negate = matches!(expr, Expr::NotEqual(..));
+            Expr::Equal { a, b } | Expr::NotEqual { a, b } => {
+                let negate = matches!(expr, Expr::NotEqual { .. });
                 let (a, ta) = self.typed_inner(a)?;
                 let (b, tb) = self.typed_inner(b)?;
                 if !(ta.accepts(tb) || tb.accepts(ta)) {
@@ -1524,12 +1512,15 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Less(a, b) | Expr::AtMost(a, b) | Expr::More(a, b) | Expr::AtLeast(a, b) => {
+            Expr::Less { a, b }
+            | Expr::AtMost { a, b }
+            | Expr::More { a, b }
+            | Expr::AtLeast { a, b } => {
                 let (a, b, _) = self.numeric(a, b)?;
                 let compare: fn(f64, f64) -> bool = match expr {
-                    Expr::Less(..) => |a, b| a < b,
-                    Expr::AtMost(..) => |a, b| a <= b,
-                    Expr::More(..) => |a, b| a > b,
+                    Expr::Less { .. } => |a, b| a < b,
+                    Expr::AtMost { .. } => |a, b| a <= b,
+                    Expr::More { .. } => |a, b| a > b,
                     _ => |a, b| a >= b,
                 };
                 (
@@ -1539,17 +1530,17 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Boolean,
                 )
             }
-            Expr::Add(a, b)
-            | Expr::Subtract(a, b)
-            | Expr::Multiply(a, b)
-            | Expr::Min(a, b)
-            | Expr::Max(a, b) => {
+            Expr::Add { a, b }
+            | Expr::Subtract { a, b }
+            | Expr::Multiply { a, b }
+            | Expr::Min { a, b }
+            | Expr::Max { a, b } => {
                 let (a, b, integer) = self.numeric(a, b)?;
                 let (on_ints, on_nums): Arithmetic = match expr {
-                    Expr::Add(..) => (i64::saturating_add, |a, b| a + b),
-                    Expr::Subtract(..) => (i64::saturating_sub, |a, b| a - b),
-                    Expr::Multiply(..) => (i64::saturating_mul, |a, b| a * b),
-                    Expr::Min(..) => (i64::min, f64::min),
+                    Expr::Add { .. } => (i64::saturating_add, |a, b| a + b),
+                    Expr::Subtract { .. } => (i64::saturating_sub, |a, b| a - b),
+                    Expr::Multiply { .. } => (i64::saturating_mul, |a, b| a * b),
+                    Expr::Min { .. } => (i64::min, f64::min),
                     _ => (i64::max, f64::max),
                 };
                 if integer {
@@ -1568,7 +1559,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     )
                 }
             }
-            Expr::Divide(a, b) => {
+            Expr::Divide { a, b } => {
                 let (a, b, _) = self.numeric(a, b)?;
                 (
                     Box::new(move |world, cx| {
@@ -1582,14 +1573,14 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                     ValueType::Number,
                 )
             }
-            Expr::Round(of) => {
+            Expr::Round { of } => {
                 let of = self.expr(of, ValueType::Number)?;
                 (
                     Box::new(move |world, cx| Value::Int(of(world, cx).as_num().round() as i64)),
                     ValueType::Integer,
                 )
             }
-            Expr::Join(list) => {
+            Expr::Join { of: list } => {
                 if list.len() > expr::MAX_LIST {
                     return Err(ScriptFault::new(
                         "out of range",
@@ -1641,4 +1632,11 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
 fn constant(value: Value) -> Eval {
     Box::new(move |_, _| value.clone())
+}
+
+fn nearest_note<'a>(wanted: &str, known: impl Iterator<Item = &'a str>) -> String {
+    let known: Vec<String> = known.map(str::to_owned).collect();
+    nearest(&known, wanted)
+        .map(|near| format!(" · nearest {near:?}"))
+        .unwrap_or_default()
 }

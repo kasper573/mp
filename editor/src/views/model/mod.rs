@@ -9,31 +9,32 @@ pub mod sounds;
 pub mod strip;
 
 use std::collections::HashMap;
+use std::ops::Not;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use engine::core::math::Direction;
-use engine::systems::actor::Action;
+use engine::core::content::{ContentRow, row_file, row_of};
+use engine::core::math::{Direction, FrameSize};
+use engine::systems::actor::{Action, ModelDef};
+use engine::systems::npc::NpcDef;
+use engine::systems::player::PlayerDef;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum::{EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
+use crate::audio::WaveformCache;
+use crate::import;
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
-use crate::thumbs::Thumbnail;
+use crate::project::{ContentEdit, RowSelection};
+use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
-use crate::value::RowValue;
-use crate::{import, thumbs, value};
-
-pub const TABLE: &str = "model";
-pub const MAX_FRAMES: usize = 256;
-pub const MAX_FRAME_MS: u32 = 60_000;
+use crate::value::{self, RowValue};
 
 #[derive(Default)]
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
-    pub bank: crate::audio::WaveformCache,
+    pub bank: WaveformCache,
     pub drops: Vec<PathBuf>,
     pub reimports: HashMap<String, import::ModelReimport>,
 }
@@ -48,15 +49,27 @@ pub enum ModelPage {
     Busts,
 }
 
-#[derive(
-    Clone, Copy, PartialEq, Eq, Debug, EnumString, IntoStaticStr, VariantArray, Deserialize,
+/// What a strip frame marks: the apex of an action, a sound it plays, or a footstep.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, EnumDiscriminants)]
+#[strum_discriminants(
+    name(FrameCueKind),
+    derive(EnumString, IntoStaticStr, VariantArray, Deserialize),
+    strum(serialize_all = "lowercase"),
+    serde(rename_all = "lowercase")
 )]
-#[strum(serialize_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum FrameCueKind {
+pub enum FrameCue {
     Apex,
-    Sound,
+    Sound(String),
     Step,
+}
+
+impl FrameCue {
+    pub fn label(&self) -> String {
+        match self {
+            FrameCue::Sound(sound) => sound.clone(),
+            other => FrameCueKind::from(other).key().to_owned(),
+        }
+    }
 }
 
 impl FrameCueKind {
@@ -148,9 +161,9 @@ pub struct FaceRemoval {
 pub struct StripFrame {
     pub frame: u32,
     pub ms: u32,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "Not::not")]
     pub step: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "Not::not")]
     pub apex: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sound: Option<String>,
@@ -169,12 +182,24 @@ impl Default for StripFrame {
 }
 
 impl StripFrame {
-    pub fn cues(&self) -> Vec<FrameCueKind> {
-        FrameCueKind::VARIANTS
-            .iter()
-            .copied()
-            .filter(|kind| self.has(*kind))
-            .collect()
+    pub fn cues(&self) -> Vec<FrameCue> {
+        let mut cues = Vec::new();
+        if self.apex {
+            cues.push(FrameCue::Apex);
+        }
+        cues.extend(self.sound.clone().map(FrameCue::Sound));
+        if self.step {
+            cues.push(FrameCue::Step);
+        }
+        cues
+    }
+
+    pub fn mark(&mut self, cue: &FrameCue) {
+        match cue {
+            FrameCue::Apex => self.apex = true,
+            FrameCue::Sound(sound) => self.sound = Some(sound.clone()),
+            FrameCue::Step => self.step = true,
+        }
     }
 
     pub fn has(&self, kind: FrameCueKind) -> bool {
@@ -203,7 +228,7 @@ impl ModelSheet {
 
     pub fn uv(&self, frame: u32) -> ERect {
         let Some(thumb) = &self.thumb else {
-            return ERect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
+            return thumbs::FULL_UV;
         };
         let columns = self.columns.max(1);
         thumbs::uv(
@@ -233,7 +258,7 @@ impl ModelSheet {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(TABLE, key) else {
+    let Some(row) = editor.row_value(ModelDef::TABLE, key) else {
         ui.label(theme::muted(format!("model/{key} is gone")));
         return;
     };
@@ -241,10 +266,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
     inspect::remove_face_dialog(editor, &ctx, key);
     let page = editor.views.model.view(key).page;
-    sidebar::row(ui, "model", |ui| row_form::show_row(editor, ui, TABLE, key));
+    sidebar::row(ui, "model", |ui| {
+        row_form::show_row(editor, ui, ModelDef::TABLE, key)
+    });
     let selection = editor.selection.clone();
     sidebar::inspector(ui, "model", |ui| {
-        if selection.table == TABLE
+        if selection.table == ModelDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()
         {
@@ -314,10 +341,10 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
         return;
     }
     editor.views.model.view_mut(key);
-    if let Some(row) = editor.row_value(TABLE, key)
+    if let Some(row) = editor.row_value(ModelDef::TABLE, key)
         && let Some(index) = busts::module_index(&row)
     {
-        let path = format!("{TABLE}/modules/{index}");
+        let path = format!("{}/modules/{index}", ModelDef::TABLE);
         if !editor.form.unfolded.contains(&path) {
             editor.form.folded.insert(path);
         }
@@ -350,7 +377,7 @@ pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
-    let Some(row) = editor.row_value(TABLE, key) else {
+    let Some(row) = editor.row_value(ModelDef::TABLE, key) else {
         return;
     };
     ensure_view(editor, key);
@@ -372,6 +399,11 @@ pub fn strip_of(row: &Value, strip: ModelStrip) -> Vec<StripFrame> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+pub fn frame_size(row: &Value) -> Option<(u32, u32)> {
+    let size = FrameSize::deserialize(&row["sprites"]["frame_size"]).ok()?;
+    (size.width > 0 && size.height > 0).then_some((size.width, size.height))
 }
 
 pub fn frames_json(frames: &[StripFrame]) -> Value {
@@ -463,14 +495,7 @@ pub fn play_rule_long(action: Action) -> &'static str {
 
 pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> ModelSheet {
     let image = row["sprites"].text("image").to_owned();
-    let frame_width = row["sprites"]["frame_size"]["width"]
-        .as_u64()
-        .unwrap_or(1)
-        .max(1) as u32;
-    let frame_height = row["sprites"]["frame_size"]["height"]
-        .as_u64()
-        .unwrap_or(1)
-        .max(1) as u32;
+    let (frame_width, frame_height) = frame_size(row).unwrap_or((1, 1));
     let thumb = editor.thumb(ctx, &image);
     let (columns, rows) = thumb
         .as_ref()
@@ -498,7 +523,7 @@ pub fn write_strip(
     frames: &[StripFrame],
     edit: ContentEdit,
 ) -> bool {
-    let Some(mut row) = editor.row_value(TABLE, key) else {
+    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
         return false;
     };
     row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()] =
@@ -507,12 +532,16 @@ pub fn write_strip(
 }
 
 pub fn write_row(editor: &mut Editor, key: &str, row: &Value, mut edit: ContentEdit) -> bool {
-    edit.write_json(row_file(TABLE, key), row);
+    edit.write_json(row_file(ModelDef::TABLE, key), row);
     editor.apply(edit)
 }
 
 pub fn select_strip(editor: &mut Editor, key: &str, strip: ModelStrip) {
-    editor.select(RowSelection::parts(TABLE, key, vec![strip.pointer()]));
+    editor.select(RowSelection::parts(
+        ModelDef::TABLE,
+        key,
+        vec![strip.pointer()],
+    ));
 }
 
 pub fn select_frames(editor: &mut Editor, key: &str, strip: ModelStrip) {
@@ -529,7 +558,7 @@ pub fn select_frames(editor: &mut Editor, key: &str, strip: ModelStrip) {
     }
     let pointer = strip.pointer();
     editor.select(RowSelection::parts(
-        TABLE,
+        ModelDef::TABLE,
         key,
         frames
             .iter()
@@ -546,7 +575,7 @@ pub fn select_cue(
     cue: FrameCueKind,
 ) {
     editor.select(RowSelection::parts(
-        TABLE,
+        ModelDef::TABLE,
         key,
         vec![format!("{}/{frame}/{}", strip.pointer(), cue.key())],
     ));
@@ -558,10 +587,10 @@ pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
     };
     project
         .usages
-        .of_row(TABLE, key)
+        .of_row(ModelDef::TABLE, key)
         .iter()
         .filter_map(|usage| row_of(&usage.file))
-        .filter(|(table, _)| matches!(*table, "npc" | "player"))
+        .filter(|(table, _)| matches!(*table, NpcDef::TABLE | PlayerDef::TABLE))
         .map(|(table, key)| (table.to_owned(), key.to_owned()))
         .collect()
 }

@@ -18,6 +18,8 @@ pub const CLIENT_ENV_PREFIX: &str = "RIFT_CLIENT_";
 pub const OIDC_ENV_PREFIX: &str = "RIFT_AUTH_";
 pub const SETTINGS_FILE: &str = "rift.env";
 pub const TEST_CHARACTER_ROUTE: &str = "/test/character";
+/// The histogram of how long the server takes to step every world one tick.
+pub const TICK_METRIC: &str = "rift_tick_duration_seconds";
 
 /// What a server on fake auth takes as an account's sign-in.
 pub fn fake_token(account: &str) -> String {
@@ -101,12 +103,12 @@ impl BuildInfo {
 #[derive(Serialize, Deserialize)]
 pub struct ReadyLine {
     pub ready: ServerReady,
+    pub build: BuildInfo,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The ports a started server listens on, announced once players can connect.
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct ServerReady {
-    pub build: String,
-    pub content_version: String,
     pub http: u16,
     pub ws: u16,
 }
@@ -125,12 +127,12 @@ pub struct ServerConfig {
     pub ws_port: u16,
     pub max_clients: usize,
     pub content_dir: PathBuf,
-    pub player_spawn_type: SpawnPolicy,
+    pub player_spawn_policy: SpawnPolicy,
     pub player_immortal: bool,
     pub rng_seed: Option<u64>,
     pub daily_reset_utc_hour: UtcHour,
     pub auth: AuthMode,
-    pub test_characters: Switch,
+    pub test_characters: bool,
     pub exit_on_stdin_eof: bool,
     pub pyroscope_enabled: bool,
     pub pyroscope_sample_hz: u32,
@@ -150,13 +152,6 @@ pub struct OidcConfig {
     pub audience: String,
     pub jwks_uri: String,
     pub token_uri: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Switch {
-    On,
-    Off,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

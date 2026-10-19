@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use bevy_ecs::entity::Entity;
@@ -7,8 +8,7 @@ use engine::core::math::{Offset, Pos, Rect, WindowPx};
 use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area;
 use engine::systems::input::gestures::ClickClaim;
-use engine::systems::input::map::KeyModifiers;
-use engine::systems::input::map::{InputAction, InputBinding, InputMap};
+use engine::systems::input::map::{InputAction, InputBinding, InputMap, KeyModifiers};
 use engine::systems::movement::Grid;
 use engine::systems::probe::{ProbeBody, ProbeShop, ProbeSnapshot, ProbeStage, ProbeUiElement};
 
@@ -16,8 +16,8 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, aiming, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest,
-    open, passed_by, portal, taken, townsperson,
+    UiTarget, aiming, area_key, at_rest, clickable_point, in_warp, in_world, me_at_rest,
+    object_named, open, passed_by, taken, townsperson, warp_named,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -29,8 +29,8 @@ pub enum Pace {
     Viewer,
 }
 
-// Someone playing on a desktop: they act through the game's own input bindings, and judge every
-// click by the frame the game saw it in.
+/// Someone playing on a desktop: they act through the game's own input bindings, and judge every
+/// click by the frame the game saw it in.
 pub struct Player {
     desktop: Desktop,
     pace: Pace,
@@ -68,7 +68,7 @@ impl Player {
         self.desktop.wait_for(what, budget, found)
     }
 
-    // As `wait_for`, but running out is an answer rather than a failure: for what may not come.
+    /// As `wait_for`, but running out is an answer rather than a failure: for what may not come.
     pub fn try_wait_for<T>(
         &mut self,
         budget: WaitBudget,
@@ -113,8 +113,8 @@ impl Player {
         done
     }
 
-    // Returns the first frame the game saw the pointer there. On camera it glides over a few frames,
-    // as a hand would.
+    /// Returns the first frame the game saw the pointer there. On camera it glides over a few
+    /// frames, as a hand would.
     pub fn point_at(&mut self, to: Pos<WindowPx>) -> ProbeSnapshot {
         let from = self.desktop.cursor().unwrap_or(to);
         let steps = match self.pace {
@@ -143,7 +143,7 @@ impl Player {
         self.point_at(at)
     }
 
-    // Whatever the action's pointer binding is, where the pointer is.
+    /// Whatever the action's pointer binding is, where the pointer is.
     pub fn act_here(&mut self, action: InputAction) -> ProbeSnapshot {
         let (button, times, held) = pointer_binding(action);
         self.with_held(held, |player| {
@@ -151,7 +151,7 @@ impl Player {
         })
     }
 
-    // The interface's drag of `ui`, held while `during` plays and let go after it.
+    /// The interface's drag of `ui`, held while `during` plays and let go after it.
     pub fn dragging_ui<T>(
         &mut self,
         ui: impl Into<UiTarget>,
@@ -189,7 +189,7 @@ impl Player {
         self.act_here(action)
     }
 
-    // Pressed, moved over frames so the game sees the motion, and released.
+    /// Pressed, moved over frames so the game sees the motion, and released.
     pub fn drag_ui(&mut self, ui: impl Into<UiTarget>, by: Offset<WindowPx>) -> ProbeSnapshot {
         let from = self.aim_at_ui(&ui.into(), Aim::Click);
         let from = from.input.cursor.expect("the pointer is over the window");
@@ -227,7 +227,8 @@ impl Player {
         })
     }
 
-    // A tab sits on the row of tabs that "All" heads; the same title can show in the records below it.
+    /// A tab sits on the row of tabs that "All" heads; the same title can show in the records below
+    /// it.
     pub fn open_history_tab(&mut self, title: &str) {
         self.click_ui(UiTarget::button(title));
         self.wait_until(&format!("the {title} tab"), |snapshot| {
@@ -235,8 +236,8 @@ impl Player {
         });
     }
 
-    // Turns the wheel over `within` a line at a time until `shown` scrolls into sight; the other way,
-    // should it not show that way.
+    /// Turns the wheel over `within` a line at a time until `shown` scrolls into sight; the other
+    /// way, should it not show that way.
     pub fn scroll_until(
         &mut self,
         within: impl Into<UiTarget>,
@@ -254,8 +255,8 @@ impl Player {
             .fail(&format!("{} never scrolled into sight", shown.describe()));
     }
 
-    // The first frame in which the interface no longer moves: windows ease open, and lists glide as
-    // they scroll. What rides on the world moves with it, and never settles while anyone walks.
+    /// The first frame in which the interface no longer moves: windows ease open, and lists glide
+    /// as they scroll. What rides on the world moves with it, and never settles while anyone walks.
     pub fn settled(&mut self) -> ProbeSnapshot {
         let mut last = Vec::new();
         self.wait_for("the interface to settle", |snapshot| {
@@ -279,13 +280,13 @@ impl Player {
         self.desktop.type_text(text, delay, landed);
     }
 
-    // Walks there and comes to rest, and returns where: anyone standing on the tile stops the
-    // player short.
+    /// Walks there and comes to rest, and returns where: anyone standing on the tile stops the
+    /// player short.
     pub fn walk_to(&mut self, tile: Pos<Tiles>) -> Pos<Tiles> {
         self.walk_toward(|_| Some(tile))
     }
 
-    // As `walk_to`, for a goal re-read every frame, as something that moves.
+    /// As `walk_to`, for a goal re-read every frame, as something that moves.
     pub fn walk_toward(
         &mut self,
         goal: impl Fn(&ProbeSnapshot) -> Option<Pos<Tiles>>,
@@ -296,18 +297,18 @@ impl Player {
         self.come_to_rest()
     }
 
-    // The ground the player can walk to nearest the spot that nobody stands on, clear of warps.
+    /// The ground the player can walk to nearest the spot that nobody stands on, clear of warps.
     pub fn walk_near(&mut self, spot: Pos<Tiles>) -> Pos<Tiles> {
         let seen = self.in_world();
         let grid = grid_of(&seen);
         let me = seen.me.as_ref().expect("the player").at;
-        let region = grid.nearest_walkable(me).and_then(|at| grid.component(at));
+        let region = grid.nearest_walkable(me).and_then(|at| grid.region(at));
         let ground = grid
             .nodes()
             .iter()
             .copied()
             .filter(|tile| {
-                grid.component(*tile) == region && !in_warp(&seen, *tile) && !taken(&seen, *tile)
+                grid.region(*tile) == region && !in_warp(&seen, *tile) && !taken(&seen, *tile)
             })
             .min_by(|a, b| a.distance_to(spot).total_cmp(&b.distance_to(spot)))
             .expect("ground the player can walk to");
@@ -319,7 +320,7 @@ impl Player {
         self.walk_near(me + offset)
     }
 
-    // Into a marked spot of the area: a named object, or a townsperson's home.
+    /// Into a marked spot of the area: a named object, or a townsperson's home.
     pub fn walk_into(&mut self, marker: &str, reach: Tiles) -> Pos<Tiles> {
         let seen = self.in_world();
         let area = area_key(&seen).expect("the player is in an area");
@@ -332,11 +333,11 @@ impl Player {
         self.come_to_rest()
     }
 
-    // Through the warp to wherever it leads. A warp takes whoever steps into it, so a player standing
-    // in one steps off before stepping on.
+    /// Through the warp to wherever it leads. A warp takes whoever steps into it, so a player
+    /// standing in one steps off before stepping on.
     pub fn cross(&mut self, warp: &str) -> ProbeSnapshot {
         let seen = self.in_world();
-        let gate = portal(&seen, warp).clone();
+        let gate = warp_named(&seen, warp).clone();
         if gate.rect.contains(seen.me.as_ref().expect("the player").at) {
             let grid = grid_of(&seen);
             let off = grid
@@ -354,9 +355,9 @@ impl Player {
         })
     }
 
-    // Heads for the goal and ends once the player stands there, or as soon as `arrived` holds.
-    // Only what's in view can be clicked, so a far goal is approached along the game's own path to it,
-    // one click on the farthest open ground in view at a time.
+    /// Heads for the goal and ends once the player stands there, or as soon as `arrived` holds.
+    /// Only what's in view can be clicked, so a far goal is approached along the game's own path to
+    /// it, one click on the farthest open ground in view at a time.
     pub fn travel_to(
         &mut self,
         goal: impl Fn(&ProbeSnapshot) -> Option<Pos<Tiles>>,
@@ -413,8 +414,8 @@ impl Player {
             if !wanted(&self.point_at(at).claim) || !wanted(&self.click().claim) {
                 continue;
             }
-            // On the way the next click goes out as the player nears this one; onto the goal, once the
-            // walk ends.
+            // On the way the next click goes out as the player nears this one; onto the goal, once
+            // the walk ends.
             self.set_off(&arrived);
             self.wait_until("the walk toward the goal", |snapshot| {
                 arrived(snapshot)
@@ -429,7 +430,7 @@ impl Player {
         }
     }
 
-    // Heads for where `npc` roams, and ends once `done` holds.
+    /// Heads for where `npc` roams, and ends once `done` holds.
     pub fn look_out(&mut self, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) -> Pos<Tiles> {
         let area = area_key(&self.snapshot()).expect("an area");
         let ground = hunting_ground(area, npc);
@@ -437,8 +438,8 @@ impl Player {
         ground
     }
 
-    // Others show only once near enough: the player heads for where they are, and finds them on the
-    // way or there.
+    /// Others show only once near enough: the player heads for where they are, and finds them on
+    /// the way or there.
     pub fn look_for(
         &mut self,
         what: &str,
@@ -449,8 +450,7 @@ impl Player {
         self.wait_until(what, found)
     }
 
-    // The first frame with the player standing in an area, done crossing into it.
-    // In the world and free to act: a newcomer's commands are held for a moment after arriving.
+    /// In the world and free to act: a newcomer's commands are held for a moment after arriving.
     pub fn in_world(&mut self) -> ProbeSnapshot {
         self.wait_until("the player in the world", |snapshot| {
             in_world(snapshot) && snapshot.me.as_ref().is_some_and(|me| !me.locked)
@@ -498,9 +498,9 @@ impl Player {
     pub fn interact_with(&mut self, object: &str) -> ProbeStage {
         self.engage(
             &format!("using {object}"),
-            |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
+            |snapshot| object_named(snapshot, object).map(|seen| (seen.id, seen.at, seen.aim)),
             |snapshot| {
-                let with = fixture(snapshot, object)?.id;
+                let with = object_named(snapshot, object)?.id;
                 stage_with(snapshot, with)
             },
         )
@@ -509,13 +509,11 @@ impl Player {
     pub fn shop_at(&mut self, object: &str) -> ProbeShop {
         self.engage(
             &format!("the shop at {object}"),
-            |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
+            |snapshot| object_named(snapshot, object).map(|seen| (seen.id, seen.at, seen.aim)),
             |snapshot| snapshot.shop.clone(),
         )
     }
 
-    // Chases the nearest of `foes` and swings at whichever of them the click lands on, until `done`:
-    // monsters crowd, and the one in front takes the click.
     /// Arms the skill in the slot and points at the tile, ready to cast.
     pub fn aim_skill(&mut self, slot: InputAction, at: Pos<Tiles>) {
         self.act(slot);
@@ -581,6 +579,8 @@ impl Player {
         }
     }
 
+    /// Chases the nearest of `foes` and swings at whichever of them the click lands on, until
+    /// `done`: monsters crowd, and the one in front takes the click.
     pub fn fight(
         &mut self,
         foes: impl Fn(&ProbeSnapshot, &ProbeBody) -> bool,
@@ -614,7 +614,8 @@ impl Player {
         }
     }
 
-    // Whatever stands over the item takes a click instead, so it is clicked again as the way clears.
+    /// Whatever stands over the item takes a click instead, so it is clicked again as the way
+    /// clears.
     pub fn pick_up(&mut self, item: Entity, budget: WaitBudget) {
         let what = "the pick-up";
         let lying = |snapshot: &ProbeSnapshot| {
@@ -633,8 +634,9 @@ impl Player {
         }
     }
 
-    // Reads on line by line until the choices show. On camera each line, and then the choices, stay up
-    // long enough to read; the typewriter has already shown the line for as long as it took to type.
+    /// Reads on line by line until the choices show. On camera each line, and then the choices,
+    /// stay up long enough to read; the typewriter has already shown the line for as long as it
+    /// took to type.
     pub fn read_to_choices(&mut self) -> ProbeStage {
         loop {
             let began = SystemTime::now();
@@ -682,16 +684,16 @@ impl Player {
         self.aim_at_choice(label);
     }
 
-    // A walk click can land on a townsperson who strolled under it, and leaving one conversation can
-    // open another that someone held until the player was free.
-    // Presses Dismiss again whenever a press went unanswered, since one can land in a frame the
-    // stage is still settling and be lost.
+    /// A walk click can land on a townsperson who strolled under it, and leaving one conversation
+    /// can open another that someone held until the player was free.
     pub fn leave_conversation(&mut self) {
         let deadline = Deadline::from(&self.desktop, BUDGET);
         loop {
             let Some(before) = self.snapshot().stage else {
                 return;
             };
+            // Presses Dismiss again whenever a press went unanswered, since one can land in a frame
+            // the stage is still settling and be lost.
             self.act(InputAction::Dismiss);
             let moved_on = self.try_wait_for(NUDGE, |snapshot| {
                 snapshot
@@ -729,7 +731,8 @@ impl Player {
         self.conversation_over();
     }
 
-    // Lingers on what's on screen until then, a frame at a time, so every observer sees each frame.
+    /// Lingers on what's on screen until then, a frame at a time, so every observer sees each
+    /// frame.
     pub fn linger_until(&mut self, until: SystemTime) {
         while until.duration_since(SystemTime::now()).is_ok() {
             self.snapshot();
@@ -744,7 +747,7 @@ impl Player {
         self.desktop.stop()
     }
 
-    pub fn folder(&self) -> &std::path::Path {
+    pub fn folder(&self) -> &Path {
         self.desktop.folder()
     }
 
@@ -757,8 +760,8 @@ impl Player {
             .is_some()
     }
 
-    // Clicks it, re-read every frame, until `done`: the target moves, and others pass in front of it,
-    // so each try aims anew. Gives up when the budget runs out.
+    // Clicks it, re-read every frame, until `done`: the target moves, and others pass in front of
+    // it, so each try aims anew. Gives up when the budget runs out.
     fn reach<T>(
         &mut self,
         what: &str,
@@ -811,8 +814,8 @@ impl Player {
     }
 
     // Re-aimed until it is still under the pointer in the frame the game saw it there: windows ease
-    // open, and lists shift as they fill. Clicks pass through some of the interface, so only the rest
-    // can be clicked; all of it can be hovered.
+    // open, and lists shift as they fill. Clicks pass through some of the interface, so only the
+    // rest can be clicked; all of it can be hovered.
     fn aim_at_ui(&mut self, ui: &UiTarget, aim: Aim) -> ProbeSnapshot {
         let found = |snapshot: &ProbeSnapshot| {
             snapshot
@@ -829,7 +832,8 @@ impl Player {
         )
     }
 
-    // Choice labels can show elsewhere too (a quest title on the tracker), so only the choice row counts.
+    // Choice labels can show elsewhere too (a quest title on the tracker), so only the choice row
+    // counts.
     fn aim_at_choice(&mut self, label: &str) -> ProbeSnapshot {
         let row = |snapshot: &ProbeSnapshot| {
             snapshot
@@ -888,7 +892,8 @@ const GLIDE_STEPS: u32 = 8;
 const DRAG_STEPS: u32 = 8;
 const KEY_BEAT: Duration = Duration::from_millis(250);
 const TYPING: Duration = Duration::from_millis(45);
-// An element that keeps moving out from under the pointer is chased this many times before giving up.
+// An element that keeps moving out from under the pointer is chased this many times before giving
+// up.
 const AIM_ATTEMPTS: u32 = 60;
 const NEAR: Tiles = Tiles(1.5);
 const SCROLLS: u32 = 12;
@@ -898,7 +903,7 @@ const SET_OFF: WaitBudget = WaitBudget {
     frames: 120,
 };
 
-// About four words a second, the pace of subtitles, with a moment to find the text first.
+/// About four words a second, the pace of subtitles, with a moment to find the text first.
 pub fn reading(text: &str) -> Duration {
     Duration::from_millis(800 + 250 * text.split_whitespace().count() as u64)
 }
@@ -918,7 +923,8 @@ fn grid_of(snapshot: &ProbeSnapshot) -> &'static Grid {
     &area::load(content(), snapshot.area.expect("the player is in an area")).grid
 }
 
-// At rest, with someone standing on every step left of the way: as close as they let the player come.
+// At rest, with someone standing on every step left of the way: as close as they let the player
+// come.
 fn hemmed_in(snapshot: &ProbeSnapshot, goal: Pos<Tiles>) -> bool {
     let Some(me) = snapshot.me.as_ref().filter(|me| at_rest(me)) else {
         return false;
@@ -949,20 +955,20 @@ fn detour(
         .map(|(tile, _)| tile)
 }
 
-// The goal itself, or for a goal off the walkways (someone behind a counter), the ground the player
-// can walk to nearest it.
 // An enemy in front of the target takes the click, as it would take a player's: the way to the
 // target leads through it.
 fn in_the_way(seen: &ProbeSnapshot, target: Entity) -> bool {
     matches!(seen.claim, ClickClaim::Attack(other) | ClickClaim::Pickup(other) if other != target)
 }
 
+// The goal itself, or for a goal off the walkways (someone behind a counter), the ground the player
+// can walk to nearest it.
 fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos<Tiles>> {
-    let region = grid.component(grid.nearest_walkable(from)?)?;
+    let region = grid.region(grid.nearest_walkable(from)?)?;
     grid.nodes()
         .iter()
         .copied()
-        .filter(|node| grid.component(*node) == Some(region))
+        .filter(|node| grid.region(*node) == Some(region))
         .min_by(|a, b| a.distance_to(goal).total_cmp(&b.distance_to(goal)))
 }
 

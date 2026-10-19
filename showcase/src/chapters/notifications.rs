@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use driver::{
     Player, UiTarget, arrived_in, content, erred, holding, input_name, marker_at, nearest_npc,
-    noticed, npc_is, portal, told_by,
+    noticed, npc_is, told_by, warp_named,
 };
 use engine::core::math::Offset;
 use engine::systems::history::HistoryTopic;
@@ -27,7 +27,7 @@ fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("forest_bound", None);
     let mut me = shoot.roll(player);
     me.caption("Some places start a conversation on their own: Ilsa watches the forest road");
-    let road = portal(&me.snapshot(), "forest-road").clone();
+    let road = warp_named(&me.snapshot(), "forest-road").clone();
     me.walk_to(road.at);
     me.on_stage("halt");
     me.caption("Without a pass the road is just ground. Standing on it, she stops you and your commands lock");

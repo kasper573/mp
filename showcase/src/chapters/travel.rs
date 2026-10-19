@@ -42,7 +42,7 @@ fn play(shoot: &mut Shoot) {
     let mut me = shoot.roll(player);
     me.caption("Warps lead to other areas — step onto one to cross");
     let seen = me.snapshot();
-    let road = driver::portal(&seen, "forest-road").clone();
+    let road = driver::warp_named(&seen, "forest-road").clone();
     me.walk_to(road.at);
     me.on_stage("halt");
     me.caption("The forest road is locked without a pass: stand on it, and its warden stops you");
@@ -103,7 +103,7 @@ fn cross_into(me: &mut Player, area: AreaId) {
     let seen = me.snapshot();
     let here = seen.me.as_ref().expect("the player").at;
     let warp = seen
-        .portals
+        .warps
         .iter()
         .filter(|portal| portal.to == area)
         .min_by(|a, b| a.at.distance_to(here).total_cmp(&b.at.distance_to(here)))

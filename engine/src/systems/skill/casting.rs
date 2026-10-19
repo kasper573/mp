@@ -3,27 +3,25 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Cooldowns, Rank, SkillId, SkillKind, Targeting};
+use super::{Cooldowns, Rank, SkillId, Targeting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, NEXT, Name, ScriptFault, Value, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, NEXT, REFUSED, ScriptFault, Value, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::WallClock;
 use crate::systems::actor::{self, playing};
 use crate::systems::combat::{self, Relation};
 use crate::systems::item::Inventory;
-use crate::systems::notification;
 use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
-use crate::systems::script::event;
+use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::{
-    Condition, EffectCall, EventKind, Owner as ScriptOwner, OwnerKind, Reach, RiftInstances,
-    RiftScripting, condition,
+    Condition, EffectCall, EventKind, Owner, OwnerKind, Reach, RiftInstances, RiftScripting,
+    condition, event,
 };
-use crate::systems::stat;
+use crate::systems::{notification, stat};
 
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Debug, PartialEq)]
 pub struct UseSkillRequest {
@@ -46,13 +44,15 @@ pub enum CastAim {
 #[schemars(extend("x-system" = "skill"))]
 pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub skill: SkillId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Taken when the skill can't be cast, without telling anyone why.
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -71,14 +71,11 @@ pub fn cast(
     aim: CastAim,
     repeat: bool,
 ) -> Result<(), String> {
+    if let Some(refusal) = super::unusable(world, caster, skill) {
+        return Err(refusal);
+    }
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
-    if super::rank_of(world, caster, skill) == Rank::NONE {
-        return Err(format!("You don't know {}", def.name));
-    }
-    if def.kind == SkillKind::Passive {
-        return Err(format!("{} is passive: it holds on its own", def.name));
-    }
     ready(world, caster, skill)?;
     let target = match (def.target, aim) {
         (Targeting::Caster, _) => ReachTarget::Actor(caster),
@@ -183,7 +180,7 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
             continue;
         }
         if let Err(reason) = ready(world, caster, skill) {
-            if world.get::<player::Owner>(caster).is_some() {
+            if world.get::<player::PlayedBy>(caster).is_some() {
                 notification::error(world, caster, reason);
             }
             reach::forget(world, caster);
@@ -233,7 +230,7 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
         notification::play_sound(world, Some(caster), Some(caster), sfx, Audience::Everyone);
     }
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Row(OwnerKind::Skill, skill.raw()),
+        Owner::Row(OwnerKind::Skill, skill.raw()),
         EventKind::Used,
         Some(caster),
         event::used_payload(target.actor(), target.point(), i64::from(rank.0)),
@@ -241,17 +238,12 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
     );
 }
 
-const REFUSED: Name = "refused";
-
 impl EffectDef<RiftScripting> for UseSkill {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            (NEXT, self.next.as_deref()),
-            (REFUSED, self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -259,7 +251,7 @@ impl EffectDef<RiftScripting> for UseSkill {
     ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let skill = self.skill;
-        let at: Option<(Eval, ValueType)> = match &self.at {
+        let at: Option<Eval> = match &self.at {
             Some(at) => {
                 let (eval, ty) = cx.typed(at)?;
                 if !matches!(ty, ValueType::Actor | ValueType::Point) {
@@ -268,7 +260,7 @@ impl EffectDef<RiftScripting> for UseSkill {
                         format!("at is {}, expected an actor or a point", ty.name()),
                     ));
                 }
-                Some((eval, ty))
+                Some(eval)
             }
             None => None,
         };
@@ -278,7 +270,7 @@ impl EffectDef<RiftScripting> for UseSkill {
             };
             let aim = match &at {
                 None => CastAim::None,
-                Some((eval, _)) => match eval(world, cx) {
+                Some(eval) => match eval(world, cx) {
                     Value::Actor(Some(actor)) => CastAim::Actor(actor),
                     Value::Point(Some(point)) => CastAim::Point(point),
                     _ => CastAim::None,

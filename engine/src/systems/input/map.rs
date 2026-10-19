@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, ContentRow, Fixture};
+use crate::core::content::{Content, ContentRow, Fixture, serial};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -486,13 +486,13 @@ impl DragGesture {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct KeyModifiers {
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub ctrl: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub shift: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub alt: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "serial::is_false")]
     pub super_key: bool,
 }
 
@@ -515,11 +515,17 @@ impl KeyModifiers {
 
     pub fn held(keys: &ButtonInput<KeyCode>) -> KeyModifiers {
         KeyModifiers {
-            ctrl: keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]),
-            shift: keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
-            alt: keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]),
-            super_key: keys.any_pressed([KeyCode::SuperLeft, KeyCode::SuperRight]),
+            ctrl: keys.any_pressed(CTRL),
+            shift: keys.any_pressed(SHIFT),
+            alt: keys.any_pressed(ALT),
+            super_key: keys.any_pressed(SUPER),
         }
+    }
+
+    pub fn is_modifier(key: KeyCode) -> bool {
+        [CTRL, SHIFT, ALT, SUPER]
+            .iter()
+            .any(|keys| keys.contains(&key))
     }
 
     fn egui(self) -> egui::Modifiers {
@@ -545,9 +551,10 @@ fn publish(map: Res<InputMap>, mut names: ResMut<KeyNames>) {
     *names = map.key_names();
 }
 
-fn is_false(flag: &bool) -> bool {
-    !*flag
-}
+const CTRL: [KeyCode; 2] = [KeyCode::ControlLeft, KeyCode::ControlRight];
+const SHIFT: [KeyCode; 2] = [KeyCode::ShiftLeft, KeyCode::ShiftRight];
+const ALT: [KeyCode; 2] = [KeyCode::AltLeft, KeyCode::AltRight];
+const SUPER: [KeyCode; 2] = [KeyCode::SuperLeft, KeyCode::SuperRight];
 
 fn pointer_button(button: MouseButton) -> Option<egui::PointerButton> {
     match button {

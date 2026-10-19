@@ -1,18 +1,33 @@
+pub use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
+pub use profiling::{CpuProfiler, ServiceAllocator, profiler};
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::Router;
-use axum::ServiceExt;
 use axum::extract::Request;
 use axum::routing::get;
+use axum::{Router, ServiceExt};
 use axum_prometheus::PrometheusMetricLayerBuilder;
 use axum_prometheus::metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 use tower_http::normalize_path::NormalizePath;
 
-pub use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
-pub use profiling::{CpuProfiler, ServiceAllocator, profiler};
+#[macro_export]
+macro_rules! heap_profiling {
+    () => {
+        $crate::heap_profiling!($crate::ServiceAllocator, $crate::ServiceAllocator);
+    };
+    ($allocator:ty, $init:expr) => {
+        #[global_allocator]
+        static GLOBAL_ALLOCATOR: $allocator = $init;
+
+        // SAFETY: jemalloc reads its options from this one symbol at startup, and nothing else
+        // exports it.
+        #[unsafe(export_name = "malloc_conf")]
+        pub static MALLOC_CONF: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:19\0";
+    };
+}
 
 // jemalloc doesn't build for MSVC and pyroscope samples only Linux and macOS, so elsewhere the
 // services run on the system allocator, unprofiled.

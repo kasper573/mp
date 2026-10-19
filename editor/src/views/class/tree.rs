@@ -2,19 +2,19 @@ use std::collections::BTreeSet;
 
 use design_tokens::{glyph, ink};
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::assets::AssetKind;
+use engine::core::content::{Content, ContentRow};
 use engine::systems::class::{
-    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NodeKey, SkillNode, SkillTree,
-    TreeBackdrop,
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, ClassLevel, NodeKey,
+    SkillNode, SkillTree, TreeBackdrop,
 };
-use engine::systems::skill::Rank;
+use engine::systems::skill::{Rank, SkillDef};
 use serde_json::{Map, Value, json};
 use strum::VariantArray;
 
-use super::{TABLE, node_of, select_node, write};
+use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
 use crate::{picker, rows, thumbs};
@@ -77,7 +77,7 @@ pub fn backdrop_of(content: &Content, row: &Value) -> Option<TreeBackdrop> {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(mut row) = editor.row_value(TABLE, key) else {
+    let Some(mut row) = editor.row_value(ClassDef::TABLE, key) else {
         return;
     };
     let Some(content) = editor.loaded() else {
@@ -144,12 +144,11 @@ fn toolbar(
     let shapes = editor.shapes.clone();
     let mut snap = editor.views.class.snap;
     let mut picked = String::new();
-    let granted: u32 =
-        value::typed::<Vec<engine::systems::class::ClassLevel>>(content, row["levels"].clone())
-            .unwrap_or_default()
-            .iter()
-            .map(|level| level.skill_points.0)
-            .sum();
+    let granted: u32 = value::typed::<Vec<ClassLevel>>(content, row["levels"].clone())
+        .unwrap_or_default()
+        .iter()
+        .map(|level| level.skill_points.0)
+        .sum();
     let cost: u32 = tree
         .0
         .values()
@@ -158,34 +157,39 @@ fn toolbar(
             def.cost_to(Rank(def.rank_count())).0
         })
         .sum();
-    editor.with_form(TABLE, Some(key), shapes.shape_of(TABLE), |cx| {
-        ui.horizontal(|ui| {
-            ui.checkbox(&mut snap, "snap to grid")
-                .on_hover_text("A dragged node lands on the grid under the pointer");
-            ui.add_space(12.0);
-            ui.label(theme::muted("add node").size(12.5));
-            ui.scope(|ui| {
-                ui.set_width(220.0);
-                picker::row(ui, cx, "skill", &mut picked, "/tree/new/skill");
+    editor.with_form(
+        ClassDef::TABLE,
+        Some(key),
+        shapes.shape_of(ClassDef::TABLE),
+        |cx| {
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut snap, "snap to grid")
+                    .on_hover_text("A dragged node lands on the grid under the pointer");
+                ui.add_space(12.0);
+                ui.label(theme::muted("add node").size(12.5));
+                ui.scope(|ui| {
+                    ui.set_width(220.0);
+                    picker::row(ui, cx, SkillDef::TABLE, &mut picked, "/tree/new/skill");
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let line = format!(
+                        "levels grant {granted} point{} · the tree costs {cost}",
+                        widgets::plural(granted)
+                    );
+                    if granted > cost && cost > 0 {
+                        ui.label(theme::warn(format!(
+                            "{line} · every node can be maxed with {} to spare",
+                            granted - cost
+                        )));
+                    } else if granted == 0 && cost > 0 {
+                        ui.label(theme::warn(format!("{line} · no level grants a point")));
+                    } else {
+                        ui.label(theme::muted(line).size(12.5));
+                    }
+                });
             });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let line = format!(
-                    "levels grant {granted} point{} · the tree costs {cost}",
-                    widgets::plural(granted)
-                );
-                if granted > cost && cost > 0 {
-                    ui.label(theme::warn(format!(
-                        "{line} · every node can be maxed with {} to spare",
-                        granted - cost
-                    )));
-                } else if granted == 0 && cost > 0 {
-                    ui.label(theme::warn(format!("{line} · no level grants a point")));
-                } else {
-                    ui.label(theme::muted(line).size(12.5));
-                }
-            });
-        });
-    });
+        },
+    );
     editor.views.class.snap = snap;
     if !picked.is_empty() {
         let taken = tree.0.keys().map(|key| key.0.clone()).collect();
@@ -214,15 +218,15 @@ fn backdrop_bar(
     let mut fit = backdrop.map_or(BackdropFit::Contain, |backdrop| backdrop.fit);
     let mut framed = false;
     let mut removed = false;
-    editor.with_form(TABLE, Some(key), shapes.shape_of(TABLE), |cx| {
+    editor.with_form(ClassDef::TABLE, Some(key), shapes.shape_of(ClassDef::TABLE), |cx| {
         ui.horizontal(|ui| {
             ui.label(theme::muted("backdrop").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(260.0);
-                picker::asset_of(ui, cx, &[AssetKind::Image], &mut image, "/backdrop/image");
+                picker::asset_of(ui, cx, AssetKind::Image, &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
-                widgets::combo_box(ui.id().with("backdrop-fit"))
+                widgets::combo(ui.id().with("backdrop-fit"))
                     .selected_text(<&str>::from(fit))
                     .show_ui(ui, |ui| {
                         for &option in BackdropFit::VARIANTS {
@@ -339,7 +343,7 @@ fn canvas(
                     painter.with_clip_rect(on_screen.intersect(rect)).image(
                         image.texture.id(),
                         drawn,
-                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                        thumbs::FULL_UV,
                         Color32::WHITE,
                     );
                 }
@@ -692,7 +696,7 @@ fn draw_node(
             painter.image(
                 icon.texture.id(),
                 Rect::from_center_size(center, Vec2::splat(ICON)),
-                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                thumbs::FULL_UV,
                 Color32::WHITE,
             );
         }

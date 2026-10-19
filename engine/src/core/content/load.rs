@@ -12,14 +12,14 @@ use schemars::generate::SchemaSettings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use super::GAME_FILE;
 use super::check::RowCheck;
 use super::fixture::{Fixture, FixtureLock};
-use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
+use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
-use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE};
+use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
+use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_file, row_folder, table_folder};
 
 // The steps a load runs its hooks at, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -63,13 +63,33 @@ pub struct ContentRegistry {
     version: OnceLock<ContentVersion>,
 }
 
+/// The shape of every table and of the game's settings, for tools that edit content.
+#[derive(Serialize)]
+pub struct ContentShapes {
+    pub tables: Vec<TableShape>,
+    pub settings: Option<serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct TableShape {
+    pub table: String,
+    /// Whether each row keeps a folder of files beside its file.
+    pub folders: bool,
+    pub shape: serde_json::Value,
+    pub fixtures: Vec<String>,
+    /// What each fixture's row keeps as the engine reads it, by key.
+    pub locks: BTreeMap<String, Vec<FixtureLock>>,
+    /// Whether the table holds its fixtures and nothing else.
+    pub closed: bool,
+}
+
 /// What the entries of a JSON list field are called in shape errors: a list of `field` whose
 /// entry names an unknown variant reports `rule`, and asks for `expected` in its place.
 #[derive(Clone, Copy, Debug)]
 struct ListKind {
-    pub field: &'static str,
-    pub rule: &'static str,
-    pub expected: &'static str,
+    field: &'static str,
+    rule: &'static str,
+    expected: &'static str,
 }
 
 type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
@@ -103,6 +123,18 @@ impl ContentRegistry {
             .iter()
             .find(|(name, _)| *name == table)
             .and_then(|(_, probe)| probe(json))
+    }
+
+    /// Whether a row of `table` holding `modules` may take `module` as well: not when it holds
+    /// at most one of that kind and has one already.
+    pub fn takes_module(
+        &self,
+        table: &str,
+        modules: &[serde_json::Value],
+        module: &serde_json::Value,
+    ) -> bool {
+        let held = modules.iter().any(|known| known["type"] == module["type"]);
+        !held || self.module_rule(table, module) != Some(ModuleRule::AtMostOne)
     }
 
     pub fn list_kind(
@@ -176,8 +208,8 @@ impl ContentRegistry {
             .clone()
     }
 
-    pub fn shapes(&self, settings: &SchemaSettings) -> serde_json::Value {
-        let tables: Vec<serde_json::Value> = self
+    pub fn shapes(&self, settings: &SchemaSettings) -> ContentShapes {
+        let tables = self
             .rows
             .iter()
             .map(|row| {
@@ -187,29 +219,26 @@ impl ContentRegistry {
                         .filter(|fixture| fixture.table == row.name())
                         .flat_map(|fixture| fixture.keys.iter())
                 };
-                let keys: Vec<&str> = fixtures().map(|(key, _)| *key).collect();
-                let locks: serde_json::Map<String, serde_json::Value> = fixtures()
-                    .filter(|(_, locks)| !locks.is_empty())
-                    .map(|(key, locks)| ((*key).to_owned(), serde_json::json!(locks)))
-                    .collect();
-                let closed = self
-                    .fixtures
-                    .iter()
-                    .any(|fixture| fixture.table == row.name() && fixture.whole_table);
-                serde_json::json!({
-                    "table": row.name(),
-                    "folders": row.folders(),
-                    "shape": row.shape(settings),
-                    "fixtures": keys,
-                    "locks": locks,
-                    "closed": closed,
-                })
+                TableShape {
+                    table: row.name().to_owned(),
+                    folders: row.folders(),
+                    shape: row.shape(settings),
+                    fixtures: fixtures().map(|(key, _)| (*key).to_owned()).collect(),
+                    locks: fixtures()
+                        .filter(|(_, locks)| !locks.is_empty())
+                        .map(|(key, locks)| ((*key).to_owned(), locks.clone()))
+                        .collect(),
+                    closed: self
+                        .fixtures
+                        .iter()
+                        .any(|fixture| fixture.table == row.name() && fixture.whole_table),
+                }
             })
             .collect();
-        serde_json::json!({
-            "tables": tables,
-            "settings": self.settings.as_ref().map(|settings_loader| settings_loader.shape(settings)),
-        })
+        ContentShapes {
+            tables,
+            settings: self.settings.as_ref().map(|loader| loader.shape(settings)),
+        }
     }
 
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
@@ -219,8 +248,8 @@ impl ContentRegistry {
             };
             &|text| loader.parse(text)
         } else {
-            let loader =
-                table_of(file).and_then(|table| self.rows.iter().find(|row| row.name() == table));
+            let loader = super::row_of(file)
+                .and_then(|(table, _)| self.rows.iter().find(|row| row.name() == table));
             let Some(loader) = loader else {
                 return Vec::new();
             };
@@ -248,10 +277,6 @@ impl ContentRegistry {
         self.settings.as_deref()
     }
 
-    fn list_kinds(&self) -> &[ListKind] {
-        &self.list_kinds
-    }
-
     pub(super) fn row_loaders(&self) -> &[Box<dyn TableLoader>] {
         &self.rows
     }
@@ -270,12 +295,6 @@ pub struct Reference {
     pub key: bool,
     pub line: usize,
     pub column: usize,
-}
-
-fn table_of(file: &str) -> Option<&str> {
-    let rest = file.strip_prefix("tables/")?;
-    let (table, name) = rest.split_once('/')?;
-    name.ends_with(".json").then_some(table)
 }
 
 pub trait ContentFolder: Send + Sync {
@@ -577,13 +596,10 @@ impl Loading {
             .map(|(index, key)| {
                 let loader = &registry.row_loaders()[index];
                 let file = super::row_file(loader.name(), &key);
-                let parsed = parse_file(
-                    root.as_ref(),
-                    &file,
-                    &scope,
-                    registry.list_kinds(),
-                    |text| loader.parse(text),
-                );
+                let parsed =
+                    parse_file(root.as_ref(), &file, &scope, &registry.list_kinds, |text| {
+                        loader.parse(text)
+                    });
                 (index, key, parsed)
             })
             .collect();
@@ -612,7 +628,7 @@ impl Loading {
             root.as_ref(),
             GAME_FILE,
             &scope,
-            registry.list_kinds(),
+            &registry.list_kinds,
             |text| {
                 registry
                     .settings_loader()
@@ -669,7 +685,7 @@ impl Loading {
                 files.push(super::row_file(table, key));
             }
             for (key, names) in &listing.folders {
-                let folder = super::row_folder(table, key);
+                let folder = row_folder(table, key);
                 files.extend(names.iter().map(|name| format!("{folder}/{name}")));
             }
         }
@@ -844,43 +860,19 @@ fn whole_file(
 }
 
 pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<LoadError> {
-    let mut errors = Vec::new();
-    for (leaf, found) in placed(leaves, index) {
-        let Some(leaf_problem) = &leaf.problem else {
-            continue;
-        };
-        let at = match found {
-            Some(value) => ErrorPlace::Json {
-                line: value.line,
-                column: value.column,
-                pointer: value.pointer.clone(),
-            },
-            None => ErrorPlace::WholeFile,
-        };
-        let (rule, expected, nearest) = match (&leaf.kind, leaf_problem) {
-            (LeafKind::Row(table), LeafProblem::Unknown { nearest }) => (
-                "unknown row",
-                format!("the key of {} {table} row", article(table)),
-                nearest.as_ref().map(|key| format!("{key:?}")),
-            ),
-            (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
-                "missing file",
-                "a file under assets/".to_owned(),
-                nearest.as_ref().map(|path| format!("{path:?}")),
-            ),
-            (_, LeafProblem::Unsafe) => (
-                "unsafe path",
-                "a path under assets/: forward slashes, never absolute or through ..".to_owned(),
-                None,
-            ),
-        };
-        errors.push(LoadError {
-            file: file.to_owned(),
-            at,
-            problem: ContentProblem::new(rule, format!("{:?}", leaf.value), expected).near(nearest),
-        });
-    }
-    errors
+    placed(leaves, index)
+        .filter_map(|(leaf, found)| {
+            Some(LoadError {
+                file: file.to_owned(),
+                at: found.map_or(ErrorPlace::WholeFile, |value| ErrorPlace::Json {
+                    line: value.line,
+                    column: value.column,
+                    pointer: value.pointer.clone(),
+                }),
+                problem: leaf.reported()?,
+            })
+        })
+        .collect()
 }
 
 // A leaf is written where its value is. The parse may meet the leaves in another order than the
@@ -902,13 +894,6 @@ fn placed<'a>(
             .and_then(VecDeque::pop_front);
         (leaf, found)
     })
-}
-
-fn article(word: &str) -> &'static str {
-    match word.chars().next() {
-        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
-        _ => "a",
-    }
 }
 
 pub fn pointer_of(path: &serde_path_to_error::Path) -> String {
@@ -1279,8 +1264,8 @@ impl Listing {
             match (name.as_str(), entry.dir) {
                 (GAME_FILE, false) => listing.game_json = true,
                 ("credits.md" | "README.md", false) => {}
-                ("tables", true) => listing.read_tables(registry, root, &mut errors),
-                ("assets", true) => collect_assets(root, "assets", "", &mut listing.assets),
+                (TABLES_DIR, true) => listing.read_tables(registry, root, &mut errors),
+                (ASSETS_DIR, true) => collect_assets(root, ASSETS_DIR, "", &mut listing.assets),
                 _ => errors.push(whole_file(
                     &name,
                     "unknown entry",
@@ -1300,14 +1285,14 @@ impl Listing {
         errors: &mut Vec<LoadError>,
     ) {
         let names: Vec<&'static str> = registry.table_names();
-        for entry in entries(root, "tables") {
+        for entry in entries(root, TABLES_DIR) {
             let Some(loader) = registry
                 .row_loaders()
                 .iter()
                 .find(|loader| entry.dir && loader.name() == entry.name)
             else {
                 errors.push(whole_file(
-                    &format!("tables/{}", entry.name),
+                    &table_folder(&entry.name),
                     "unknown entry",
                     describe(&entry),
                     expected_options(
@@ -1318,11 +1303,11 @@ impl Listing {
                 continue;
             };
             let table = loader.name();
-            let dir = format!("tables/{table}");
+            let dir = table_folder(table);
             let mut keyed: Vec<(String, String)> = Vec::new();
             let mut folders: Vec<(String, Vec<String>)> = Vec::new();
             for entry in entries(root, &dir) {
-                let file = format!("tables/{table}/{}", entry.name);
+                let file = format!("{dir}/{}", entry.name);
                 match (entry.dir, entry.name.strip_suffix(".json")) {
                     (false, Some(key)) => {
                         if valid_key(key) {
@@ -1382,10 +1367,10 @@ impl Listing {
                     listing.folders.insert(folder, files);
                 } else {
                     errors.push(whole_file(
-                        &format!("tables/{table}/{folder}"),
+                        &row_folder(table, &folder),
                         "unknown entry",
                         format!("a folder with no {table} row {folder}.json beside it"),
-                        format!("tables/{table}/{folder}.json for its files"),
+                        format!("{} for its files", row_file(table, &folder)),
                     ));
                 }
             }
@@ -1395,7 +1380,7 @@ impl Listing {
     }
 }
 
-const KEY_RULE: &str =
+pub const KEY_RULE: &str =
     "1 to 64 of ASCII letters, digits, _ and -, not starting with -, not a Windows device name";
 
 fn describe(entry: &FolderEntry) -> String {

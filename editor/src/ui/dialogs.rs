@@ -1,9 +1,15 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, sheet};
 use std::path::{Path, PathBuf};
 
+use design_tokens::face::TextRole;
+use design_tokens::glyph::{self, Mark};
+use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
-use engine::core::content::version;
+use engine::core::content::{
+    ASSETS_DIR, ContentRow, GAME_FILE, TABLES_DIR, is_asset_file, row_file, row_of, version,
+};
+use engine::systems::area::AreaDef;
+use engine::systems::player::PlayerDef;
+use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
 use super::{theme, widgets};
@@ -12,14 +18,14 @@ use crate::app::{
     RenameTarget,
 };
 use crate::keymap::{EditorKey, KeyScope};
-use crate::project::{ContentEdit, GAME_FILE, row_file, row_of};
-use crate::rows::{UsageDecision, UsageSummary};
-use crate::templates::GameTemplate;
-use crate::ui::start;
-use crate::views::area::{layers, pick, resize};
-use crate::views::script::inspect;
-use crate::views::{area, script, world};
-use crate::{import, play, rows, templates, ui};
+use crate::project::{ContentEdit, files};
+use crate::rows::{self, UsageDecision, UsageSummary};
+use crate::templates::{self, GameTemplate};
+use crate::ui::{self, start};
+use crate::views::area::{self, layers, pick, resize};
+use crate::views::script::{self, inspect};
+use crate::views::world;
+use crate::{import, play};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     import::show_readings(editor, ctx);
@@ -34,7 +40,7 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.dialogs = keep;
 }
 
-fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
+fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut Ui)) {
     let mut under = None;
     let shown = egui::Window::new(title)
         .title_bar(false)
@@ -89,7 +95,7 @@ pub fn answer_row(ui: &mut Ui, confirm: &str) -> Option<DialogAnswer> {
     answer
 }
 
-pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui)) {
+pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut Ui)) {
     egui::Area::new(egui::Id::new(id))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .order(egui::Order::Middle)
@@ -176,20 +182,12 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                     ui.vertical(|ui| {
                         ui.set_width(300.0);
                         widgets::section(ui, "Copied");
-                        let rows: usize = std::fs::read_dir(source.join("tables"))
-                            .map(|tables| {
-                                tables
-                                    .flatten()
-                                    .map(|t| {
-                                        std::fs::read_dir(t.path()).map(|r| r.count()).unwrap_or(0)
-                                    })
-                                    .sum()
-                            })
-                            .unwrap_or(0);
-                        let assets = count_files_in(&source.join("assets"));
+                        let files = files::content_files(source).unwrap_or_default();
+                        let rows = files.iter().filter(|file| row_of(file).is_some()).count();
+                        let assets = files.iter().filter(|file| is_asset_file(file)).count();
                         ui.label(theme::mono(format!("{GAME_FILE}   name → {}", dialog.name)));
-                        ui.label(theme::mono(format!("tables/     {rows} rows")));
-                        ui.label(theme::mono(format!("assets/     {assets} files")));
+                        ui.label(theme::mono(format!("{TABLES_DIR}/     {rows} rows")));
+                        ui.label(theme::mono(format!("{ASSETS_DIR}/     {assets} files")));
                     });
                     ui.vertical(|ui| {
                         widgets::section(ui, "Stays behind");
@@ -287,11 +285,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
             match result {
                 Ok(()) => {
                     editor.say(format!("Created {}", folder.display()));
-                    if editor.has_unsaved() {
-                        ui::request_close(editor, CloseThen::Open(folder));
-                    } else {
-                        editor.open_folder(&folder);
-                    }
+                    ui::request_close(editor, CloseThen::Open(folder));
                     None
                 }
                 Err(error) => {
@@ -365,19 +359,12 @@ fn template_cards(ui: &mut Ui, picked: &mut String, templates: &[GameTemplate]) 
 }
 
 fn template_counts(template: &GameTemplate) -> String {
-    let rows_in = |table: &str| {
-        template
-            .tables
-            .iter()
-            .find(|(t, _)| t == table)
-            .map_or(0, |(_, keys)| keys.len())
-    };
-    let players = rows_in("player");
-    let scripts = rows_in("script");
+    let areas = template.rows_in(AreaDef::TABLE);
+    let players = template.rows_in(PlayerDef::TABLE);
+    let scripts = template.rows_in(ScriptDef::TABLE);
     format!(
-        "{} area{} · {players} player{} · {scripts} shared script{}",
-        template.areas.len(),
-        widgets::plural(template.areas.len()),
+        "{areas} area{} · {players} player{} · {scripts} shared script{}",
+        widgets::plural(areas),
         widgets::plural(players),
         widgets::plural(scripts)
     )
@@ -393,7 +380,7 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
         widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
         widgets::kv(ui, "holds", |ui| {
             let mut parts: Vec<String> = vec![GAME_FILE.to_owned(), "every fixture".to_owned()];
-            for (table, keys) in &template.tables {
+            for (table, keys) in &template.rows {
                 let own: Vec<&str> = keys
                     .iter()
                     .map(String::as_str)
@@ -406,23 +393,6 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
             ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
         });
     });
-}
-
-fn count_files_in(folder: &Path) -> usize {
-    std::fs::read_dir(folder)
-        .map(|entries| {
-            entries
-                .flatten()
-                .map(|entry| {
-                    if entry.path().is_dir() {
-                        count_files_in(&entry.path())
-                    } else {
-                        1
-                    }
-                })
-                .sum()
-        })
-        .unwrap_or(0)
 }
 
 fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Option<ModalDialog> {
@@ -548,16 +518,6 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
 
 fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalDialog> {
     match dialog {
-        ModalDialog::Error(title, text) => {
-            let mut open = true;
-            window(ctx, &title, |ui| {
-                ui.label(&text);
-                if ui.button("OK").clicked() {
-                    open = false;
-                }
-            });
-            open.then(|| ModalDialog::Error(title, text))
-        }
         ModalDialog::Confirm(confirm) => {
             let mut outcome = None;
             let mut pressed = DialogKeys::default();
@@ -585,9 +545,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     }
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
-                        let danger = confirm.label.starts_with("Delete")
-                            || confirm.label.starts_with("Remove");
-                        let clicked = if danger {
+                        let clicked = if confirm.action.destroys() {
                             widgets::danger(ui, &confirm.label).clicked()
                         } else {
                             widgets::primary(ui, &confirm.label).clicked()
@@ -937,9 +895,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::Resize(dialog) => {
             resize::resize_dialog(editor, ctx, dialog).map(ModalDialog::Resize)
         }
-        ModalDialog::DeleteBlueprint(dialog) => {
-            area::delete_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::DeleteBlueprint)
-        }
         ModalDialog::Arrange(dialog) => {
             world::arrange_dialog(editor, ctx, dialog).map(ModalDialog::Arrange)
         }
@@ -965,12 +920,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     editor
                         .project
                         .as_ref()
-                        .map(|p| {
-                            p.files
-                                .paths_under(&format!("tables/{}/", dialog.table))
-                                .filter_map(|f| row_of(f).map(|(_, k)| k.to_owned()))
-                                .collect()
-                        })
+                        .map(|p| p.files.keys_of(&dialog.table).map(str::to_owned).collect())
                         .unwrap_or_default()
                 } else {
                     dialog.options.clone()
@@ -1039,7 +989,6 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
         ConfirmAction::DeleteScriptNodes { owner, names } => {
             script::delete_nodes_now(editor, &owner, names)
         }
-        ConfirmAction::RestartPlay { start } => play::start(editor, start),
     }
 }
 

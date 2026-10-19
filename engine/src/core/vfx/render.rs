@@ -24,18 +24,18 @@ use super::{
     BodyShape, CompiledVfxShaders, ParamKind, ParamValue, SiteKind, VfxDef, VfxInstance, VfxLayer,
     VfxParams, VfxShaderDef, VfxShaderId, VfxSite, sprite_cell,
 };
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::{Pos, Rgba, Size};
-use crate::core::render::present::{self, PRESENT_LAYER, Viewport};
+use crate::core::render::present::{self, PRESENT_LAYER, PresentScale};
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::render::{
     self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, atlas_rect,
 };
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, ServerClock, UnixMillis};
+use crate::core::time::{Seconds, server_now};
 
 pub struct VfxRenderPlugin;
 
@@ -378,7 +378,7 @@ pub fn present_layers(
 pub fn pieces_for(
     world: &mut World,
     layers: &[VfxLayer],
-    image_of: &mut dyn FnMut(&mut World, &AssetRef) -> Handle<Image>,
+    image_of: &mut dyn FnMut(&mut World, &ImageRef) -> Handle<Image>,
 ) -> Vec<Entity> {
     layers
         .iter()
@@ -446,8 +446,8 @@ impl SiteFrame {
                 };
                 let px = present::SCALE
                     * world
-                        .get_resource::<Viewport>()
-                        .map_or(1.0, |viewport| viewport.scale.max(0.01));
+                        .get_resource::<PresentScale>()
+                        .map_or(1.0, |scale| scale.0.max(0.01));
                 Some(SiteFrame::screen(size, Some(texture), px).headed(heading))
             }
             VfxSite::Widget(_) => None,
@@ -829,7 +829,7 @@ fn sync(world: &mut World) {
         .map(|(entity, instance)| (entity, instance.clone()))
         .collect();
     let mut overdrawn = HashSet::new();
-    let screen_layer = RenderLayers::layer(PRESENT_LAYER);
+    let screen_layer = screen_layer();
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let pieces = match world.get::<VfxView>(entity) {
@@ -983,12 +983,7 @@ fn bounds(points: &[Pos<Tiles>]) -> (Vec2, Vec2) {
     ((min + max) / 2.0, max - min)
 }
 
-fn server_now(world: &World) -> Option<UnixMillis> {
-    let uptime = Seconds(world.get_resource::<Time>()?.elapsed_secs());
-    world.get_resource::<ServerClock>()?.now(uptime)
-}
-
-/// Every layer of a widget or screen site draws through the interface rather than the world.
+/// Every layer of a widget site draws through the interface rather than the world.
 fn draw_overlays(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
@@ -1007,7 +1002,7 @@ fn draw_overlays(world: &mut World) {
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let elapsed = now.since(instance.started);
-        let Some(rect) = overlay_rect(world, &gui, &instance.site) else {
+        let Some(rect) = widget_rect(world, &instance.site) else {
             continue;
         };
         for (index, layer) in def.layers.iter().enumerate() {
@@ -1063,10 +1058,9 @@ fn draw_overlays(world: &mut World) {
     }
 }
 
-/// Where a widget or screen site lies in the window; a world site draws in the world instead.
-fn overlay_rect(world: &World, gui: &egui::Context, site: &VfxSite) -> Option<egui::Rect> {
+/// Where a widget site lies in the window; every other site draws in the world instead.
+fn widget_rect(world: &World, site: &VfxSite) -> Option<egui::Rect> {
     match site {
-        VfxSite::Screen => Some(gui.content_rect()),
         VfxSite::Widget(name) => world.resource::<WidgetRects>().0.get(&name.0).copied(),
         _ => None,
     }

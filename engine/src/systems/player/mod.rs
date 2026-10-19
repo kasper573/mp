@@ -10,19 +10,17 @@ use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use snapshot::{CharacterSnapshot, JoinAs};
 
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
-use crate::core::math::Rgba;
-use crate::core::math::{Direction, Pos, Rng};
+use crate::core::math::{Direction, Pos, Rgba, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
-use crate::systems::GameSettings;
 use crate::systems::account::Identity;
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Tint};
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
-use crate::systems::belongings;
 use crate::systems::class::{Class, ClassId};
 use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
@@ -31,20 +29,20 @@ use crate::systems::history::History;
 use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{self, HeardMove, Position};
-use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::skill::{BasicAttack, Hotbar, Learned};
-use crate::systems::stat::{self, StatKind, StatMap, Stats};
+use crate::systems::stat::{self, Immortal, Stats};
 use crate::systems::visibility::{self, OwnedBy};
-use crate::systems::{Character, WorldArea, drain_requests};
-use snapshot::{CharacterSnapshot, JoinAs};
+use crate::systems::{
+    Character, GameSettings, WorldArea, belongings, drain_requests, notification,
+};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
-    app.replicate_once::<Owner>()
+    app.replicate_once::<PlayedBy>()
         .replicate::<Xp>()
         .replicate::<CommandLock>()
         .replicate::<ArrivalHold>()
@@ -72,7 +70,7 @@ pub fn register(app: &mut App) {
 pub struct ClientId(pub u32);
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Owner {
+pub struct PlayedBy {
     pub client: ClientId,
 }
 
@@ -115,16 +113,13 @@ pub struct Welcome {
     pub now: UnixMillis,
 }
 
-/// High enough that nothing in the world can grind it down.
-const IMMORTAL_HEALTH: f32 = 9999.0;
-
 pub type PlayerDefId = ContentId<PlayerDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
     pub model: ModelId,
     pub class: ClassId,
-    pub stats: StatMap,
+    pub stats: Stats,
     #[schemars(extend("x-usage" = "worn at creation"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wearing: Vec<ItemId>,
@@ -278,7 +273,7 @@ pub(crate) fn last_connection(
     (!elsewhere).then_some(id)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpawnPolicy {
     Map,
@@ -294,7 +289,7 @@ pub struct SpawnRules {
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
     let content = world.resource::<Content>().clone();
-    let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
+    let policy = world.resource::<SpawnRules>().policy;
     let requests = drain_requests::<JoinRequest>(world);
     if requests.is_empty() {
         return;
@@ -316,7 +311,7 @@ pub fn join(world: &mut World) {
                 let (snapshot, start) = (snapshot.clone(), *start);
                 (
                     movement::place_beside(world, zone, &area.grid, start.at),
-                    snapshot::materialize(&content, &snapshot, start, clock, immortal),
+                    snapshot::materialize(&content, &snapshot, start, clock),
                 )
             }
             _ => {
@@ -327,7 +322,7 @@ pub fn join(world: &mut World) {
                 let at = movement::place_beside(world, zone, &area.grid, spawn);
                 let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
                 let start = Place { area: zone, at };
-                let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
+                let state = snapshot::materialize(&content, &fresh, start, clock);
                 (at, state)
             }
         };
@@ -407,18 +402,6 @@ impl CharacterState {
     }
 }
 
-pub fn player_stats(stats: &stat::StatMap, immortal: bool) -> Stats {
-    Stats(
-        stats
-            .listed()
-            .map(|stat| match stat.kind {
-                StatKind::Health | StatKind::MaxHealth if immortal => stat.kind.of(IMMORTAL_HEALTH),
-                _ => stat,
-            })
-            .collect(),
-    )
-}
-
 pub(crate) fn place(
     world: &mut World,
     client: ClientId,
@@ -447,7 +430,7 @@ pub(crate) fn place(
                 AreaTag { area: zone },
             ),
             OwnedBy(client),
-            Owner { client },
+            PlayedBy { client },
             HeardMove::default(),
             ArrivalHold {
                 until: now + ARRIVAL_PATIENCE,
@@ -457,6 +440,9 @@ pub(crate) fn place(
         .id();
     let belongings = belongings::of(world, entity);
     world.entity_mut(entity).insert(belongings);
+    if world.resource::<SpawnRules>().immortal {
+        world.entity_mut(entity).insert(Immortal);
+    }
     world.resource_mut::<Players>().0.insert(client, entity);
     entity
 }

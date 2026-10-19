@@ -2,13 +2,13 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 use design_tokens::controls::{self, Pill};
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, face, ink};
+use design_tokens::ink;
 use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
 
-use super::card;
-use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
+use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind, card};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
@@ -403,13 +403,8 @@ fn node_input(
         }
     } else if map::clicked(world, InputAction::PinToHotbar, response) {
         if passive {
-            notification::local_error(
-                world,
-                format!(
-                    "{} is passive: it holds without a slot",
-                    skill.get(world.resource::<Content>()).name
-                ),
-            );
+            let refusal = super::unslotted(skill.get(world.resource::<Content>()));
+            notification::local_error(world, refusal);
         } else if held > Rank::NONE {
             bar::pin(world, super::HotbarEntry::Skill(skill));
         } else {
@@ -513,7 +508,7 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
     let picked = sheet.picked_cost(&content, def, &plan);
     let dock = Rect::from_min_max(Pos2::new(room.min.x, room.max.y - DOCK_HEIGHT), room.max);
     ui.scope_builder(
-        egui::UiBuilder::new()
+        UiBuilder::new()
             .max_rect(dock)
             .layout(egui::Layout::right_to_left(egui::Align::Center)),
         |ui| {

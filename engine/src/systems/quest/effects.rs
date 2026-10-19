@@ -6,13 +6,16 @@ use serde::{Deserialize, Serialize};
 
 use super::{Objective, QuestId};
 use crate::core::content::{Content, Fixture};
-use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::core::script::{
+    Answer, Arrow, Compiler, EffectDef, EffectStep, NEXT, REFUSED, ScriptFault,
+};
 use crate::systems::dialogue::{
     self, CardOffer, ChoiceChip, ChoiceReveal, ChoiceTag, ConversationPanel,
 };
 use crate::systems::item::{Inventory, ItemStack};
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
-use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
+use crate::systems::script::{
+    Condition, EffectCall, Reach, RiftScripting, condition, effect as effects,
+};
 use crate::systems::text::LineText;
 
 /// Shows the offer card and pauses.
@@ -20,13 +23,15 @@ use crate::systems::text::LineText;
 #[schemars(extend("x-system" = "quest"))]
 pub struct OfferQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub accepted: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub declined: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -35,11 +40,12 @@ pub struct OfferQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct AcceptQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
 }
 
@@ -48,13 +54,16 @@ pub struct AcceptQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct TurnIn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Taken when the card is closed without handing in.
+    #[schemars(extend("x-fails" = true))]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub cancelled: Arrow,
 }
 
@@ -63,9 +72,9 @@ pub struct TurnIn {
 #[schemars(extend("x-system" = "quest"))]
 pub struct FailQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -74,10 +83,10 @@ pub struct FailQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct CompleteTask {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
     pub task: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -86,10 +95,10 @@ pub struct CompleteTask {
 #[schemars(extend("x-system" = "quest"))]
 pub struct Decide {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub quest: QuestId,
     pub path: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -101,11 +110,11 @@ impl EffectDef<RiftScripting> for OfferQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
         vec![
-            ("accepted", self.accepted.as_deref()),
-            ("declined", self.declined.as_deref()),
-            ("refused", self.refused.as_deref()),
+            ("accepted", &self.accepted),
+            ("declined", &self.declined),
+            (REFUSED, &self.refused),
         ]
     }
     fn pauses(&self) -> bool {
@@ -122,10 +131,10 @@ impl EffectDef<RiftScripting> for OfferQuest {
         let (quest, refused) = (self.quest, self.refused.clone());
         Ok(Box::new(move |world, flow, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to offer it to");
+                return effects::refuse(world, cx, &refused, "Nobody to offer it to");
             };
             if let Some(reason) = super::offer_refusal(world, player, quest) {
-                return effects::refuse(world, cx, refused.as_deref(), reason);
+                return effects::refuse(world, cx, &refused, reason);
             }
             let offers = offer_card(world, player, quest);
             let panel = Some(ConversationPanel::QuestOffer(quest));
@@ -152,11 +161,8 @@ impl EffectDef<RiftScripting> for AcceptQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-        ]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![("done", &self.done), (REFUSED, &self.refused)]
     }
     fn compile<'c>(
         &'c self,
@@ -166,10 +172,10 @@ impl EffectDef<RiftScripting> for AcceptQuest {
         let (quest, refused) = (self.quest, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to accept it");
+                return effects::refuse(world, cx, &refused, "Nobody to accept it");
             };
             let accepted = super::accept(world, player, quest);
-            effects::settle(world, cx, refused.as_deref(), accepted)
+            effects::settle(world, cx, &refused, accepted)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -181,11 +187,11 @@ impl EffectDef<RiftScripting> for TurnIn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
         vec![
-            ("done", self.done.as_deref()),
-            ("refused", self.refused.as_deref()),
-            ("cancelled", self.cancelled.as_deref()),
+            ("done", &self.done),
+            (REFUSED, &self.refused),
+            ("cancelled", &self.cancelled),
         ]
     }
     fn pauses(&self) -> bool {
@@ -203,15 +209,15 @@ impl EffectDef<RiftScripting> for TurnIn {
         let decides = quest.get(cx.content).decision().is_some();
         Ok(Box::new(move |world, flow, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused.as_deref(), "Nobody to hand it in");
+                return effects::refuse(world, cx, &refused, "Nobody to hand it in");
             };
             if !super::ready_to_hand_in(world, player, quest) {
                 let message = super::not_ready(world.resource::<Content>(), quest);
-                return effects::refuse(world, cx, refused.as_deref(), message);
+                return effects::refuse(world, cx, &refused, message);
             }
             if decides {
                 let handed_in = super::turn_in(world, player, quest, None);
-                return effects::settle(world, cx, refused.as_deref(), handed_in);
+                return effects::settle(world, cx, &refused, handed_in);
             }
             let offers = turn_in_card(world, player, quest);
             let panel = Some(ConversationPanel::QuestTurnIn(quest));
@@ -238,8 +244,8 @@ impl EffectDef<RiftScripting> for FailQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -263,8 +269,8 @@ impl EffectDef<RiftScripting> for CompleteTask {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -299,8 +305,8 @@ impl EffectDef<RiftScripting> for Decide {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

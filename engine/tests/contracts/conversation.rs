@@ -11,7 +11,7 @@ use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, MoveRequest, MoveSeq, moving, position};
 use engine::systems::player::commands_locked;
 use engine::systems::script::{self, EventKind, RiftInstances};
-use engine::systems::stat::{self, StatKind};
+use engine::systems::stat::{self, Immortal, StatKind};
 use engine::systems::{combat, npc};
 use serde_json::{Value, json};
 use testkit::{Game, Map, Sim};
@@ -139,6 +139,7 @@ fn damage_keeps_a_conversation_but_death_ends_it() {
     sim.tick();
     assert!(sim.conversation(1).is_some());
 
+    sim.world.entity_mut(player).remove::<Immortal>();
     let health = stat::effective(&sim.world, player, StatKind::Health);
     stat::apply_damage(&mut sim.world, player, health);
     sim.tick();

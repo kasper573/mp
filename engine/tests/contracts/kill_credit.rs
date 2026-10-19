@@ -3,11 +3,10 @@ use bevy_ecs::prelude::*;
 use engine::core::time::Seconds;
 use engine::systems::area::AreaDef;
 use engine::systems::combat::{self, Died};
-use engine::systems::item;
 use engine::systems::movement::position;
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::rewards::{self, KillCredited};
-use engine::systems::stat;
+use engine::systems::{item, stat};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 

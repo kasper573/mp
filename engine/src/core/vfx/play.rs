@@ -1,10 +1,9 @@
 //! Where a layer is in its run and what it shows there, worked out the same wherever a vfx is
 //! drawn: on the client's world and interface, and on the editor's stage.
 
+use super::{SpriteAnchor, SpritePlay, VfxLayer};
 use crate::core::math::{FrameSize, Pos, Rect, Size, WorldPx};
 use crate::core::time::{Hertz, Seconds};
-
-use super::{SpriteAnchor, SpritePlay, VfxLayer};
 
 /// A layer caught mid-run: the seconds since it began and how far through its duration it is.
 #[derive(Clone, Copy, Debug, PartialEq)]

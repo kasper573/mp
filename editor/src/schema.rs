@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
 
+use engine::core::assets::AudioRef;
 use engine::core::content::fixture::FixtureLock;
+use engine::core::content::load::{ContentShapes, TableShape};
+use engine::core::content::locate;
 use engine::core::script::VariableType;
-use serde_json::{Map, Value, json};
-
 use engine::systems::registry;
+use engine::systems::script::Place;
+use serde_json::{Map, Value, json};
 
 pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,
@@ -12,17 +15,7 @@ pub struct SchemaShapes {
     pub settings: Value,
 }
 
-pub struct TableShape {
-    pub shape: Value,
-    pub fixtures: Vec<String>,
-    /// What each fixture's row keeps as the engine reads it, by key.
-    pub locks: BTreeMap<String, Vec<FixtureLock>>,
-    /// Whether the table holds its fixtures and nothing else.
-    pub closed: bool,
-    pub folders: bool,
-}
-
-pub fn shapes_json() -> Value {
+pub fn shapes() -> ContentShapes {
     let settings = schemars::generate::SchemaSettings::draft2020_12()
         .with(|settings| settings.inline_subschemas = true);
     registry().shapes(&settings)
@@ -30,32 +23,19 @@ pub fn shapes_json() -> Value {
 
 impl SchemaShapes {
     pub fn load() -> SchemaShapes {
-        let shapes = shapes_json();
-        let mut tables = BTreeMap::new();
-        let mut order = Vec::new();
-        for table in shapes["tables"].as_array().into_iter().flatten() {
-            let name = table["table"].as_str().unwrap_or_default().to_owned();
-            order.push(name.clone());
-            tables.insert(
-                name,
-                TableShape {
-                    shape: table["shape"].clone(),
-                    fixtures: table["fixtures"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|key| key.as_str().map(str::to_owned))
-                        .collect(),
-                    locks: serde_json::from_value(table["locks"].clone()).unwrap_or_default(),
-                    closed: table["closed"].as_bool().unwrap_or(false),
-                    folders: table["folders"].as_bool().unwrap_or(false),
-                },
-            );
-        }
+        let shapes = shapes();
         SchemaShapes {
-            tables,
-            order,
-            settings: shapes["settings"].clone(),
+            order: shapes
+                .tables
+                .iter()
+                .map(|table| table.table.clone())
+                .collect(),
+            tables: shapes
+                .tables
+                .into_iter()
+                .map(|table| (table.table.clone(), table))
+                .collect(),
+            settings: shapes.settings.unwrap_or_default(),
         }
     }
 
@@ -149,7 +129,7 @@ pub fn at_pointer<'a>(
     let mut schema = settle(root, schema, value);
     let mut value = value;
     for segment in pointer.split('/').skip(1) {
-        let segment = segment.replace("~1", "/").replace("~0", "~");
+        let segment = locate::unescape(segment);
         let field = match kind(root, schema) {
             SchemaKind::Object => schema.get("properties")?.get(&segment)?,
             SchemaKind::Map(values) => values,
@@ -519,17 +499,8 @@ pub fn variable_schema(ty: VariableType, table: Option<&str>) -> Value {
         VariableType::Boolean => json!({ "type": "boolean" }),
         VariableType::Text | VariableType::Name => json!({ "type": "string" }),
         VariableType::Row => json!({ "type": "string", "x-table": table.unwrap_or_default() }),
-        VariableType::Audio => json!({ "type": "string", "x-asset": "audio" }),
-        VariableType::Place => json!({
-            "type": "object",
-            "x-place": true,
-            "properties": {
-                "area": { "type": "string", "x-table": "area" },
-                "x": { "type": "number" },
-                "y": { "type": "number" }
-            },
-            "required": ["area", "x", "y"]
-        }),
+        VariableType::Audio => schema_of::<AudioRef>(),
+        VariableType::Place => schema_of::<Place>(),
         VariableType::Condition => json!({ "x-condition": true }),
     }
 }
@@ -606,4 +577,12 @@ fn number_paths_in(
     {
         number_paths_in(root, modules, path, out, depth + 1);
     }
+}
+
+fn schema_of<T: schemars::JsonSchema>() -> Value {
+    let schema = schemars::generate::SchemaSettings::draft2020_12()
+        .with(|settings| settings.inline_subschemas = true)
+        .into_generator()
+        .into_root_schema_for::<T>();
+    serde_json::to_value(schema).expect("a schema is json")
 }

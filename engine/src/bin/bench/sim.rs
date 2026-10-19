@@ -1,15 +1,17 @@
 use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::ConnectedClient;
 use bevy_replicon::shared::backend::channels::{ClientChannel, ServerChannel};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
-use engine::core::content::Content;
+use engine::core::content::{Content, FilesystemFolder};
+use engine::core::net::MAX_MESSAGE_BYTES;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
-use engine::systems::area::AreaModule;
 use engine::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
-use engine::systems::{GameSettings, TICK_HZ, from_client, server_app, start_server, step_areas};
+use engine::systems::{GameSettings, TICK_HZ, from_client, load_content, server_app, start_server};
 use strum::AsRefStr;
 
 use crate::play;
@@ -36,8 +38,6 @@ pub const WARMUP: usize = 30;
 // Runs play out alike, so they compare.
 const SEED: u64 = 1931;
 
-pub type Roster = Vec<Entity>;
-
 /// How the area's players are positioned, which sets how much their areas-of-interest overlap. Maps
 /// directly onto the server's [`SpawnPolicy`], so the bench spreads players exactly as production does.
 #[derive(Clone, Copy, PartialEq, AsRefStr)]
@@ -60,96 +60,87 @@ impl Layout {
     }
 }
 
-pub fn npcs_per_area(content: &Content) -> usize {
-    let area = content
-        .built::<GameSettings>()
-        .initial_spawn
-        .area
-        .get(content);
-    area.modules
-        .iter()
-        .map(|module| match module {
-            AreaModule::Population(population) => population.count as usize,
-            AreaModule::Resident(_) => 1,
-            _ => 0,
-        })
-        .sum()
+/// Areas of the content's spawn area, each with its players, stepped as the server steps its own.
+pub struct Bench {
+    pub worlds: Vec<App>,
+    rosters: Vec<Vec<Entity>>,
+    content: Content,
+    ticks: usize,
 }
 
-pub fn worlds(areas: usize, layout: Layout, content: &Content) -> (Vec<App>, Vec<Roster>) {
-    let mut worlds = Vec::with_capacity(areas);
-    let mut rosters = Vec::with_capacity(areas);
-    for ordinal in 0..areas {
-        let (app, roster) = build_world(layout, content, ordinal as u64);
-        worlds.push(app);
-        rosters.push(roster);
-    }
-    (worlds, rosters)
-}
-
-pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
-    for (app, roster) in worlds.iter_mut().zip(rosters) {
-        let world = app.world_mut();
-        for &conn in roster {
-            world
-                .entity_mut(conn)
-                .insert(ConnectedClient { max_size: 1200 });
+impl Bench {
+    pub fn new(areas: usize, layout: Layout, content: &Content) -> Bench {
+        let (worlds, rosters) = (0..areas)
+            .map(|ordinal| build_world(layout, content, ordinal as u64))
+            .unzip();
+        Bench {
+            worlds,
+            rosters,
+            content: content.clone(),
+            ticks: 0,
         }
     }
-}
 
-/// Advances every world one tick across all cores — the same parallel area fan-out the real server
-/// uses, so the benchmark's capacity reflects the threaded server — after its players have made
-/// their moves.
-pub fn step(worlds: &mut [App], rosters: &[Roster], content: &Content) {
-    let ticks = TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-    for (app, roster) in worlds.iter_mut().zip(rosters) {
-        play::act(app.world_mut(), content, roster, ticks);
-    }
-    step_areas(worlds, clock_after(ticks));
-    acknowledge_sent(worlds);
-}
-
-static TICKS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
-/// Advances every world one tick on the calling thread only. Used by the profiler so CPU samples
-/// attribute cleanly to game systems instead of being scattered across rayon worker frames.
-#[cfg(feature = "profiling")]
-pub fn step_single_threaded(worlds: &mut [App]) {
-    let ticks = TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-    for app in worlds.iter_mut() {
-        app.insert_resource(clock_after(ticks));
-        app.update();
-    }
-    acknowledge_sent(worlds);
-}
-
-/// What the wire and the clients do with the server's outgoing messages: they go out, and every
-/// mutate message comes back acknowledged, as a client acknowledges each one it receives. Left
-/// unacknowledged, the server would resend every changed component each replication tick and keep
-/// the bookkeeping for all of them, a load no connected client puts on it.
-fn acknowledge_sent(worlds: &mut [App]) {
-    for app in worlds.iter_mut() {
-        let mut messages = app.world_mut().resource_mut::<ServerMessages>();
-        let mut acks: HashMap<Entity, Vec<u8>> = HashMap::new();
-        for (client, channel, message) in messages.drain_sent() {
-            if channel == usize::from(ServerChannel::Mutations) {
-                acks.entry(client)
-                    .or_default()
-                    .extend_from_slice(&message[MUTATE_INDEX]);
+    pub fn connect(&mut self) {
+        for (app, roster) in self.worlds.iter_mut().zip(&self.rosters) {
+            let world = app.world_mut();
+            for &conn in roster {
+                world.entity_mut(conn).insert(ConnectedClient {
+                    max_size: MAX_MESSAGE_BYTES,
+                });
             }
         }
-        for (client, ack) in acks {
-            messages.insert_received(client, ClientChannel::MutationAcks, ack);
+    }
+
+    /// Has every player whose turn it is act, for the tick the worlds are about to step, and
+    /// gives the wall clock that tick runs at.
+    pub fn play(&mut self) -> WallClock {
+        self.ticks += 1;
+        for (app, roster) in self.worlds.iter_mut().zip(&self.rosters) {
+            play::act(app.world_mut(), &self.content, roster, self.ticks);
+        }
+        clock_after(self.ticks)
+    }
+
+    /// What the wire and the clients do with the server's outgoing messages: they go out, and
+    /// every mutate message comes back acknowledged, as a client acknowledges each one it
+    /// receives. Left unacknowledged, the server would resend every changed component each
+    /// replication tick and keep the bookkeeping for all of them, a load no connected client puts
+    /// on it.
+    pub fn acknowledge_sent(&mut self) {
+        for app in &mut self.worlds {
+            let mut messages = app.world_mut().resource_mut::<ServerMessages>();
+            let mut acks: HashMap<Entity, Vec<u8>> = HashMap::new();
+            for (client, channel, message) in messages.drain_sent() {
+                if channel == usize::from(ServerChannel::Mutations) {
+                    acks.entry(client)
+                        .or_default()
+                        .extend_from_slice(&message[MUTATE_INDEX]);
+                }
+            }
+            for (client, ack) in acks {
+                messages.insert_received(client, ClientChannel::MutationAcks, ack);
+            }
         }
     }
+}
+
+pub fn load(content_dir: &Path) -> Content {
+    load_content(
+        Arc::new(FilesystemFolder(content_dir.to_path_buf())),
+        "the program stopped",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    })
 }
 
 /// Where a mutate message carries its index, which is what an acknowledgement quotes: right after
 /// the flags byte.
 const MUTATE_INDEX: std::ops::Range<usize> = 1..3;
 
-fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster) {
+fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Vec<Entity>) {
     let mut app = server_app(
         content.built::<GameSettings>().initial_spawn.area,
         ordinal,

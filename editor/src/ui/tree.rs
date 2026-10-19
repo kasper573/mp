@@ -1,7 +1,7 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{controls, face};
 use std::collections::{BTreeMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{controls, face};
 use egui::{Align, Layout, Modifiers, Sense, Ui};
 
 use super::theme;
@@ -260,7 +260,7 @@ fn folder_menu<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, out: &mut TreeOutput<A
 }
 
 fn line_button(ui: &mut Ui, mark: Mark, tip: &str) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(BUTTON, BUTTON), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(BUTTON, BUTTON), Sense::click());
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
     ui.painter().rect(
         rect,

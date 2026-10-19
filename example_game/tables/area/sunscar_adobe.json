@@ -1,7 +1,6 @@
 {
   "name": "The potter's house",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 23,
       "height": 14

@@ -18,12 +18,15 @@ use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
 
 use crate::app::{BottomTab, Editor};
+use crate::play;
 use crate::project::AreaCameraState;
+use crate::stage::Stages;
 use crate::tabs::EditorTab;
+use crate::ui::assets::AssetsState;
 use crate::ui::browser::BrowserState;
+use crate::ui::row_form::preview::RowPreviewState;
 use crate::ui::row_form::usages;
-use crate::ui::theme;
-use crate::{play, ui};
+use crate::ui::{self, theme};
 
 #[derive(Component)]
 pub struct EditorCamera;
@@ -31,7 +34,6 @@ pub struct EditorCamera;
 #[derive(Default)]
 pub struct EditorViews {
     pub browser: BrowserState,
-    pub show_usages: bool,
     pub area: area::AreaViews,
     pub world: world::WorldView,
     pub script: script::ScriptViews,
@@ -42,9 +44,9 @@ pub struct EditorViews {
     pub character: character::CharacterView,
     pub class: class::ClassViews,
     pub vfx: vfx::VfxViews,
-    pub assets: crate::ui::assets::AssetsState,
-    pub preview: crate::ui::row_form::preview::RowPreviewState,
-    pub stage: crate::stage::Stages,
+    pub assets: AssetsState,
+    pub preview: RowPreviewState,
+    pub stage: Stages,
 }
 
 impl EditorViews {
@@ -115,10 +117,7 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
 
 pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
     match (ui::active_tab(editor), tab) {
-        (Some(EditorTab::Area { key }), BottomTab::Palette) => {
-            area::bottom(editor, ui, &area::area_view_key(&key), tab)
-        }
-        (Some(EditorTab::Area { key }), BottomTab::Blueprints) => {
+        (Some(EditorTab::Area { key }), BottomTab::Palette | BottomTab::Blueprints) => {
             area::bottom(editor, ui, &area::area_view_key(&key), tab)
         }
         (Some(EditorTab::Area { .. }) | Some(EditorTab::Blueprint { .. }), BottomTab::Listen) => {
@@ -138,23 +137,19 @@ pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
             Some(EditorTab::Tileset { key }),
             BottomTab::Surfaces | BottomTab::Mixes | BottomTab::Timeline,
         ) => tileset::bottom(editor, ui, &key, tab),
-        (_, BottomTab::UsedBy) => match used_by_subject(editor) {
-            Some(UsedBySubject::Row { table, key }) => {
-                egui::ScrollArea::vertical()
-                    .id_salt("used-by")
-                    .show(ui, |ui| {
+        (_, BottomTab::UsedBy) => {
+            let Some(subject) = used_by_subject(editor) else {
+                return;
+            };
+            egui::ScrollArea::vertical()
+                .id_salt("used-by")
+                .show(ui, |ui| match subject {
+                    UsedBySubject::Row { table, key } => {
                         usages::show_usages_grouped(editor, ui, &table, &key, false);
-                    })
-                    .inner
-            }
-            Some(UsedBySubject::Asset { path }) => {
-                egui::ScrollArea::vertical()
-                    .id_salt("used-by")
-                    .show(ui, |ui| usages::show_asset_usages(editor, ui, &path))
-                    .inner
-            }
-            None => {}
-        },
+                    }
+                    UsedBySubject::Asset { path } => usages::show_asset_usages(editor, ui, &path),
+                });
+        }
         _ => {
             ui.label(theme::muted("nothing to show here"));
         }

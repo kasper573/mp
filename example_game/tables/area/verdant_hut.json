@@ -1,7 +1,6 @@
 {
   "name": "The shaman's hut",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 16,
       "height": 12

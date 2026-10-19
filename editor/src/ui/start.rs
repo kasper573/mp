@@ -1,18 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Align, Context, Layout, RichText, Ui};
-use engine::core::content::version;
+use engine::core::content::{GAME_FILE, row_of, version};
 
 use super::report::{self, ReportAction};
 use super::{theme, widgets};
 use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, content_version};
 use crate::keymap::EditorKey;
 use crate::project::journal::RecoveryJournal;
-use crate::project::{GAME_FILE, row_of};
-use crate::ui::dialogs;
-use crate::{templates, ui};
+use crate::templates;
+use crate::ui::{self, dialogs};
 
-pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
+pub fn show(editor: &mut Editor, root: &mut Ui) {
     let ctx = root.ctx().clone();
     let ctx = &ctx;
     egui::CentralPanel::default()
@@ -72,7 +71,7 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     recover_dialog(editor, ctx);
 }
 
-fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
+fn recent_list(editor: &mut Editor, ui: &mut Ui) {
     let recent = editor.settings.recent.clone();
     if recent.is_empty() {
         ui.label(theme::muted(
@@ -176,17 +175,13 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
     dialogs::card(ctx, "recover", 520.0, |ui| {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
-        ui.label(
-            egui::RichText::new("Recover unsaved work?")
-                .strong()
-                .size(18.0),
-        );
+        ui.label(RichText::new("Recover unsaved work?").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(
             theme::muted(format!(
-                "The editor closed at {when} with {} unsaved {} of {}, kept in its journal outside the content folder.",
+                "The editor closed at {when} with {} unsaved row{} of {}, kept in its journal outside the content folder.",
                 data.files.len(),
-                if data.files.len() == 1 { "row" } else { "rows" },
+                widgets::plural(data.files.len()),
                 super::pretty_path(folder)
             ))
             .size(13.5),
@@ -270,11 +265,7 @@ pub fn pick_folder(editor: &mut Editor) {
         dialog = dialog.set_directory(start);
     }
     if let Some(folder) = dialog.pick_folder() {
-        if editor.has_unsaved() {
-            ui::request_close(editor, CloseThen::Open(folder));
-        } else {
-            editor.open_folder(&folder);
-        }
+        ui::request_close(editor, CloseThen::Open(folder));
     }
 }
 
@@ -295,7 +286,7 @@ pub fn new_game_dialog(editor: &mut Editor, copy: Option<PathBuf>) {
             let key = templates::list()
                 .first()
                 .map(|template| template.key.clone())
-                .unwrap_or_else(|| "new_game".to_owned());
+                .unwrap_or_default();
             (NewGameSource::Template(key), "My game".to_owned())
         }
     };

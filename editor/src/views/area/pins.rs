@@ -1,13 +1,12 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, GAME_FILE, row_of};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaId, ObjectShape};
+use engine::systems::area::{self, AreaDef, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
-use crate::project::{ContentEdit, GAME_FILE, ProjectFiles, RowSelection, row_of};
-use crate::tabs::EditorTab;
+use crate::project::{ContentEdit, ProjectFiles};
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
 
@@ -30,7 +29,7 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for usage in project.usages.of_row("area", area_key) {
+    for usage in project.usages.of_row(AreaDef::TABLE, area_key) {
         let Some(parent) = usage.pointer.strip_suffix("/area") else {
             continue;
         };
@@ -175,8 +174,7 @@ pub fn open_pin(editor: &mut Editor, pin: PinHit) {
         PinHit::Place { file, pointer } => {
             if let Some((table, key)) = row_of(&file) {
                 let (table, key) = (table.to_owned(), key.to_owned());
-                editor.select(RowSelection::row(&table, &key));
-                editor.open_tab(EditorTab::for_row(&table, &key));
+                editor.open_row(&table, &key);
                 editor.toast(format!("{table}/{key} {pointer}"));
             }
         }

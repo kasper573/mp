@@ -2,23 +2,22 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use egui::{RichText, Ui};
-use engine::core::content::ModuleRule;
 use engine::core::content::id::LeafKind;
-use engine::core::vfx::shader_file;
+use engine::core::content::{ContentRow, ModuleRule, load, locate, row_file, row_folder, row_of};
+use engine::core::vfx::{VfxShaderDef, shader_file};
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::registry;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
-use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection, row_file, row_of};
-use crate::schema::SchemaShapes;
+use crate::project::{ContentEdit, Project, ProjectFiles};
+use crate::schema::{self, SchemaShapes};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::usages::ContentUsage;
+use crate::usages::{self, ContentUsage};
 use crate::views::area::placement;
-use crate::views::{vfx, world};
-use crate::{schema, usages};
-
-pub const KEY_MAX: usize = 64;
+use crate::views::world;
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
@@ -39,21 +38,24 @@ pub enum UsageDecision {
 }
 
 pub fn key_problem(files: &ProjectFiles, table: &str, key: &str) -> Option<String> {
-    if key.is_empty() || key.len() > KEY_MAX {
-        return Some(format!("a key is 1 to {KEY_MAX} characters"));
+    key_problem_besides(files, table, key, None)
+}
+
+/// Why `key` can't name a row of the table, leaving out the row keyed `own` that is being renamed.
+fn key_problem_besides(
+    files: &ProjectFiles,
+    table: &str,
+    key: &str,
+    own: Option<&str>,
+) -> Option<String> {
+    if !load::valid_key(key) {
+        return Some(format!("a key is {}", load::KEY_RULE));
     }
-    if !key
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-    {
-        return Some("a key uses letters, digits, _ and - only".to_owned());
-    }
-    let lower = key.to_lowercase();
-    let clash = files
-        .paths_under(&format!("tables/{table}/"))
-        .filter_map(|file| row_of(file).map(|(_, other)| other.to_owned()))
-        .find(|other| other.to_lowercase() == lower);
-    clash.map(|other| format!("{table}/{other} already exists (keys ignore case)"))
+    files
+        .keys_of(table)
+        .filter(|other| Some(*other) != own)
+        .find(|other| other.eq_ignore_ascii_case(key))
+        .map(|other| format!("{table}/{other} already exists (keys ignore case)"))
 }
 
 pub fn key_from_name(name: &str) -> String {
@@ -157,8 +159,7 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
         edit.write_json(file, &target);
     }
     editor.try_apply(edit)?;
-    editor.select(RowSelection::row(&dialog.table, &key));
-    editor.open_tab(EditorTab::for_row(&dialog.table, &key));
+    editor.open_row(&dialog.table, &key);
     Ok(())
 }
 
@@ -172,29 +173,16 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
     let copy = free_key(&project.files, table, &format!("{key}_2"));
     let mut edit = ContentEdit::new(format!("Duplicate {table}/{key} as {copy}"));
     edit.write_json(row_file(table, &copy), &value);
-    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, &copy))
-        && let Some(bytes) = project.files.get(&from)
-    {
-        edit.write(to, bytes.clone());
-    }
-    for file in folder_files(project, table, key) {
-        if let Some(bytes) = project.files.get(&file) {
-            edit.write(
-                file.replacen(
-                    &format!("tables/{table}/{key}/"),
-                    &format!("tables/{table}/{copy}/"),
-                    1,
-                ),
-                bytes.clone(),
-            );
+    for (from, to) in beside_row(project, table, key, &copy) {
+        if let Some(bytes) = project.files.get(&from) {
+            edit.write(to, bytes.clone());
         }
     }
-    if table == "area" {
+    if table == AreaDef::TABLE {
         world::card_beside(project, &mut edit, key, &copy);
     }
     if editor.apply(edit) {
-        editor.select(RowSelection::row(table, &copy));
-        editor.open_tab(EditorTab::for_row(table, &copy));
+        editor.open_row(table, &copy);
     }
 }
 
@@ -206,9 +194,7 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         return Err("fixtures keep their key".to_owned());
     }
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = key_problem(&project.files, table, new_key)
-        && !(new_key.to_lowercase() == key.to_lowercase() && new_key.len() <= KEY_MAX)
-    {
+    if let Some(problem) = key_problem_besides(&project.files, table, new_key, Some(key)) {
         return Err(problem);
     }
     let mut edit = ContentEdit::new(format!("Rename {table}/{key} to {new_key}"));
@@ -240,29 +226,14 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         edit.write_json(row_file(table, new_key), &value);
     }
     edit.remove(own);
-    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, new_key))
-        && let Some(bytes) = project.files.get(&from)
-    {
-        edit.write(to, bytes.clone());
-        edit.remove(from);
-    }
-    for file in folder_files(project, table, key) {
-        if let Some(bytes) = project.files.get(&file) {
-            edit.write(
-                file.replacen(
-                    &format!("tables/{table}/{key}/"),
-                    &format!("tables/{table}/{new_key}/"),
-                    1,
-                ),
-                bytes.clone(),
-            );
-            edit.remove(file);
+    for (from, to) in beside_row(project, table, key, new_key) {
+        if let Some(bytes) = project.files.get(&from) {
+            edit.write(to, bytes.clone());
+            edit.remove(from);
         }
     }
     let count = edit.changes.len();
-    if !editor.apply(edit) {
-        return Err("the rename was refused; see the output".to_owned());
-    }
+    editor.try_apply(edit)?;
     editor.toast(format!(
         "Renamed {table}/{key} to {new_key}: {count} files rewritten"
     ));
@@ -302,7 +273,7 @@ fn rewrite(
 
 fn split_pointer(pointer: &str) -> (&str, String) {
     let cut = pointer.rfind('/').unwrap_or(0);
-    let name = pointer[cut + 1..].replace("~1", "/").replace("~0", "~");
+    let name = locate::unescape(&pointer[cut + 1..]);
     (&pointer[..cut], name)
 }
 
@@ -322,7 +293,7 @@ fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
 /// The file a row owns by convention besides its own, which follows the row through a copy, a
 /// rename and a deletion: a shader's WGSL.
 pub fn companion_file(table: &str, key: &str) -> Option<String> {
-    (table == vfx::SHADER_TABLE).then(|| shader_file(key))
+    (table == VfxShaderDef::TABLE).then(|| shader_file(key))
 }
 
 const NEW_SHADER: &str =
@@ -331,8 +302,21 @@ const NEW_SHADER: &str =
 pub fn folder_files(project: &Project, table: &str, key: &str) -> Vec<String> {
     project
         .files
-        .paths_under(&format!("tables/{table}/{key}/"))
+        .paths_under(&format!("{}/", row_folder(table, key)))
         .cloned()
+        .collect()
+}
+
+/// The files a row keeps beside its own, each with where it lands when the row is keyed `to`.
+fn beside_row(project: &Project, table: &str, key: &str, to: &str) -> Vec<(String, String)> {
+    let (from_folder, to_folder) = (row_folder(table, key), row_folder(table, to));
+    let companion = companion_file(table, key).zip(companion_file(table, to));
+    companion
+        .into_iter()
+        .chain(folder_files(project, table, key).into_iter().map(|file| {
+            let moved = file.replacen(&from_folder, &to_folder, 1);
+            (file, moved)
+        }))
         .collect()
 }
 
@@ -573,9 +557,9 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     }
     let candidates: Vec<String> = project
         .files
-        .paths_under(&format!("tables/{}/", dialog.table))
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .filter(|key| !dialog.keys.contains(key))
+        .keys_of(&dialog.table)
+        .filter(|key| !dialog.keys.iter().any(|deleted| deleted == key))
+        .map(str::to_owned)
         .collect();
     let details: Vec<Vec<(String, String)>> = dialog
         .groups
@@ -733,13 +717,13 @@ fn decision_picker(
         } else {
             format!("Remove {}", usage_phrase(shapes, &group.table, &group.kind))
         };
-        let unpackable = table == "blueprint" && group.whole_modules;
+        let unpackable = table == BlueprintDef::TABLE && group.whole_modules;
         let label = match group.decision {
             UsageDecision::Repoint(_) => "Replace with…".to_owned(),
             UsageDecision::Unpack => "Unpack into scenery".to_owned(),
             _ => remove_label.clone(),
         };
-        widgets::combo_box(("decision", index))
+        widgets::combo(("decision", index))
             .selected_text(theme::mono(label).size(13.0))
             .show_ui(ui, |ui| {
                 if unpackable
@@ -788,7 +772,7 @@ fn decision_picker(
         egui::vec2(170.0, ui.spacing().interact_size.y),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
-            widgets::combo_box(("repoint", index))
+            widgets::combo(("repoint", index))
                 .width(160.0)
                 .selected_text(selected)
                 .show_ui(ui, |ui| {
@@ -887,9 +871,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
             edit.remove(file);
         }
     }
-    if !editor.apply(edit) {
-        return Err("the deletion was refused; see the output".to_owned());
-    }
+    editor.try_apply(edit)?;
     for key in &dialog.keys {
         close_tabs(editor, &dialog.table, key);
     }

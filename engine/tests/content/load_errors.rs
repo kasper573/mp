@@ -26,11 +26,17 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
             "cove",
             json!({
                 "name": "Cove",
-                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+                "map": { "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
             }),
         )
-        .file("tables/area/cove/palette.csv", "tileset,tile,flip\nstart_ground,0,\n")
-        .file("tables/area/cove/ground.csv", "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n")
+        .file(
+            "tables/area/cove/palette.csv",
+            "tileset,tile,flip\nstart_ground,0,\n",
+        )
+        .file(
+            "tables/area/cove/ground.csv",
+            "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n",
+        )
         .file("tables/area/cove/walk.csv", "1,1,1,1\n".repeat(4))
         .row(
             "test_character",
@@ -66,7 +72,7 @@ fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
             "cove",
             json!({
                 "name": "Cove",
-                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+                "map": { "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
             }),
         )
         .file(
@@ -154,6 +160,34 @@ fn a_binding_the_game_never_reads_for_its_action_is_refused() {
     assert_eq!(
         rules_in(&report, "tables/input/carry_item.json"),
         vec![("variant the engine never reads", "drag")]
+    );
+}
+
+#[test]
+fn a_basic_attack_that_costs_or_cools_down_is_refused() {
+    let report = game()
+        .sword()
+        .item("ore", json!({ "kind": { "type": "resource" } }))
+        .edit("skill", "strike", |strike| {
+            strike["cost"] = json!([{ "item": "ore", "count": 1 }]);
+            strike["cooldown"] = json!(2.0);
+        })
+        .try_load()
+        .err()
+        .expect("refused");
+
+    assert_eq!(
+        rules_in(&report, "tables/skill/strike.json"),
+        vec![
+            (
+                "basic attack with a cost",
+                "nothing: a click on an enemy must always answer"
+            ),
+            (
+                "basic attack with a cooldown",
+                "nothing: a click on an enemy must always answer"
+            ),
+        ]
     );
 }
 

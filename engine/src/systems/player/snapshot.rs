@@ -18,7 +18,7 @@ use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{History, HistoryEntry};
 use crate::systems::item::{INVENTORY_MAX, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::memory::{Memory, MemoryId};
-use crate::systems::player::{CharacterState, PlayerDef, SpawnPoint, Xp, def, player_stats};
+use crate::systems::player::{CharacterState, PlayerDef, SpawnPoint, Xp, def};
 use crate::systems::quest::{ActiveQuest, FinishedQuest, Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::Place;
 use crate::systems::shop::{Sale, ShopId, ShopLedger};
@@ -26,7 +26,7 @@ use crate::systems::skill::learn::{PlanRefusal, plan};
 use crate::systems::skill::{
     self, BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, HotbarSlot, Learned, Rank, SkillId,
 };
-use crate::systems::stat::StatMap;
+use crate::systems::stat::Stats;
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -42,8 +42,8 @@ pub struct CharacterSnapshot {
     pub hotbar: Vec<SnapshotSlot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_attack: Option<SkillId>,
-    #[serde(default, skip_serializing_if = "StatMap::is_empty")]
-    pub stats: StatMap,
+    #[serde(default, skip_serializing_if = "Stats::is_empty")]
+    pub stats: Stats,
     #[schemars(extend("x-usage" = "from the bag"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bag: Vec<ItemStack>,
@@ -87,7 +87,7 @@ impl CharacterSnapshot {
             skills: Vec::new(),
             hotbar: Vec::new(),
             basic_attack,
-            stats: StatMap::default(),
+            stats: Stats::default(),
             bag: Vec::new(),
             equipment,
             known_areas: Vec::new(),
@@ -216,7 +216,6 @@ pub fn materialize(
     snapshot: &CharacterSnapshot,
     start: Place,
     clock: WallClock,
-    immortal: bool,
 ) -> CharacterState {
     let mut stats = def(content).stats.clone();
     stats.0.extend(&snapshot.stats.0);
@@ -260,7 +259,7 @@ pub fn materialize(
         },
         spawn: SpawnPoint(start.at),
         discovered,
-        stats: player_stats(&stats, immortal),
+        stats,
         inventory: Inventory {
             slots: snapshot.bag.clone(),
             max: INVENTORY_MAX,
@@ -433,7 +432,7 @@ fn check_equipment(content: &Content, snapshot: &CharacterSnapshot, check: &mut 
             ItemKind::Equipment { slot: made_for, .. } if made_for == slot
         );
         if !fits {
-            let slot = key_of(slot.label()).as_str().to_owned();
+            let slot = key_of(slot.label());
             check.error(
                 format!("/equipment/{slot}"),
                 "not wearable",

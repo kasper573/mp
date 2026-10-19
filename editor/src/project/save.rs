@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::fs::File;
+use std::io::{ErrorKind, Write};
 use std::path::Path;
 use std::time::Duration;
 
@@ -59,7 +60,7 @@ pub fn save(
     for path in removals {
         match std::fs::remove_file(root.join(&path)) {
             Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(SaveError {
                     file: path,
@@ -100,7 +101,7 @@ fn write_atomic(root: &Path, file: &str, bytes: &FileBytes) -> Result<(), String
         .ok_or("no file name")?;
     let temp = parent.join(format!(".{name}.tmp"));
     let written = (|| {
-        let mut out = std::fs::File::create(&temp)?;
+        let mut out = File::create(&temp)?;
         out.write_all(bytes)?;
         out.sync_all()
     })();

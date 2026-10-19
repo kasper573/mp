@@ -2,90 +2,80 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use engine::core::content::ContentRow;
+use engine::systems::actor::ModelDef;
 use serde::{Deserialize, Serialize};
 
+use super::tileset::{TileBlock, TileGridSettings};
 use crate::app::Editor;
-use crate::project::watch::FolderWatcher;
+use crate::project::watch::{FolderChange, FolderWatcher};
 use crate::user::UserFolder;
 use crate::views::model::ModelStrip;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportRecord {
-    pub export: PathBuf,
-    #[serde(default)]
     pub files: Vec<PathBuf>,
     pub table: String,
     pub key: String,
-    #[serde(default)]
-    pub mapping: serde_json::Value,
-    #[serde(default)]
+    pub mapping: ImportMapping,
     pub size: u64,
-    #[serde(default)]
     pub hash: String,
-    #[serde(default)]
     pub strips: BTreeMap<String, Vec<u32>>,
-    #[serde(default)]
-    pub part: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ImportMapping {
+    Grid { grid: TileGridSettings },
+    Animation { animation: TileBlock },
+    Strips(BTreeMap<String, Option<String>>),
 }
 
 impl ImportRecord {
-    pub fn of_files(files: &[PathBuf], table: &str, key: &str) -> ImportRecord {
+    pub fn new(files: &[PathBuf], table: &str, key: &str, mapping: ImportMapping) -> ImportRecord {
         let (size, hash) = fingerprint(files);
         ImportRecord {
-            export: super::model::primary_file(files),
             files: files.to_vec(),
             table: table.to_owned(),
             key: key.to_owned(),
-            mapping: serde_json::Value::Null,
+            mapping,
             size,
             hash,
             strips: BTreeMap::new(),
-            part: String::new(),
         }
     }
 
-    pub fn files(&self) -> Vec<PathBuf> {
-        if self.files.is_empty() {
-            vec![self.export.clone()]
-        } else {
-            self.files.clone()
+    pub fn refreshed(&self) -> ImportRecord {
+        let (size, hash) = fingerprint(&self.files);
+        ImportRecord {
+            size,
+            hash,
+            ..self.clone()
+        }
+    }
+
+    pub fn block(&self) -> Option<TileBlock> {
+        match self.mapping {
+            ImportMapping::Animation { animation } => Some(animation),
+            _ => None,
         }
     }
 
     pub fn missing(&self) -> bool {
-        self.files().iter().any(|file| !file.exists())
+        self.files.iter().any(|file| !file.exists())
     }
 
     pub fn changed(&self) -> Option<bool> {
         if self.missing() {
             return None;
         }
-        let (size, hash) = fingerprint(&self.files());
+        let (size, hash) = fingerprint(&self.files);
         Some(size != self.size || hash != self.hash)
     }
 
-    pub fn names(&self) -> String {
-        let files = self.files();
-        match files.as_slice() {
-            [image, json] if json.extension().is_some_and(|ext| ext == "json") => {
-                format!("{} and .json", super::formats::name(image))
-            }
-            [one] => super::formats::name(one),
-            many => format!("{} files", many.len()),
-        }
+    fn is_for(&self, table: &str, key: &str, block: Option<TileBlock>) -> bool {
+        self.table == table && self.key == key && self.block() == block
     }
-}
-
-pub fn fingerprint(files: &[PathBuf]) -> (u64, String) {
-    let mut hasher = blake3::Hasher::new();
-    let mut size = 0;
-    for file in files {
-        if let Ok(bytes) = std::fs::read(file) {
-            size += bytes.len() as u64;
-            hasher.update(&bytes);
-        }
-    }
-    (size, hasher.finalize().to_hex()[..16].to_owned())
 }
 
 pub const RETRIES: u32 = 3;
@@ -94,10 +84,23 @@ pub const RETRIES: u32 = 3;
 pub struct DueReimport {
     pub table: String,
     pub key: String,
-    pub part: String,
+    pub block: Option<TileBlock>,
     pub at: Instant,
     pub tries: u32,
     pub while_closed: bool,
+}
+
+impl DueReimport {
+    fn of(record: &ImportRecord, while_closed: bool) -> DueReimport {
+        DueReimport {
+            table: record.table.clone(),
+            key: record.key.clone(),
+            block: record.block(),
+            at: Instant::now(),
+            tries: 0,
+            while_closed,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -125,14 +128,7 @@ impl ImportRecords {
         let due = records
             .iter()
             .filter(|record| record.changed() == Some(true))
-            .map(|record| DueReimport {
-                table: record.table.clone(),
-                key: record.key.clone(),
-                part: record.part.clone(),
-                at: Instant::now(),
-                tries: 0,
-                while_closed: true,
-            })
+            .map(|record| DueReimport::of(record, true))
             .collect();
         let mut imports = ImportRecords {
             records,
@@ -146,14 +142,19 @@ impl ImportRecords {
     }
 
     pub fn record_for(&self, table: &str, key: &str) -> Option<&ImportRecord> {
-        self.record_with(table, key, "")
+        self.record_with(table, key, None)
     }
 
-    pub fn record_with(&self, table: &str, key: &str, part: &str) -> Option<&ImportRecord> {
+    pub fn record_with(
+        &self,
+        table: &str,
+        key: &str,
+        block: Option<TileBlock>,
+    ) -> Option<&ImportRecord> {
         self.records
             .iter()
             .rev()
-            .find(|record| record.table == table && record.key == key && record.part == part)
+            .find(|record| record.is_for(table, key, block))
     }
 
     pub fn forget(&mut self, table: &str, key: &str) {
@@ -163,9 +164,8 @@ impl ImportRecords {
     }
 
     pub fn remember(&mut self, record: ImportRecord) {
-        self.records.retain(|seen| {
-            !(seen.table == record.table && seen.key == record.key && seen.part == record.part)
-        });
+        self.records
+            .retain(|seen| !seen.is_for(&record.table, &record.key, record.block()));
         self.records.push(record);
         self.save();
         self.watch();
@@ -185,7 +185,7 @@ impl ImportRecords {
         let dirs: Vec<PathBuf> = self
             .records
             .iter()
-            .flat_map(|record| record.files())
+            .flat_map(|record| &record.files)
             .filter_map(|file| file.parent().map(Path::to_path_buf))
             .collect();
         for dir in dirs {
@@ -199,34 +199,28 @@ impl ImportRecords {
         let mut touched: Vec<PathBuf> = Vec::new();
         for (dir, watcher) in &mut self.watchers {
             match watcher.poll() {
-                Some(Some(paths)) => {
+                Some(FolderChange::Files(paths)) => {
                     touched.extend(paths.into_iter().map(|path| dir.join(path)));
                 }
-                Some(None) => touched.push(dir.clone()),
+                Some(FolderChange::Unknown) => touched.push(dir.clone()),
                 None => {}
             }
         }
         for record in &self.records {
-            let files = record.files();
             let hit = touched.iter().any(|path| {
-                files
+                record
+                    .files
                     .iter()
                     .any(|file| file == path || file.parent() == Some(path.as_path()))
             });
             if hit
                 && record.changed() == Some(true)
-                && !self.due.iter().any(|due| {
-                    due.table == record.table && due.key == record.key && due.part == record.part
-                })
+                && !self
+                    .due
+                    .iter()
+                    .any(|due| record.is_for(&due.table, &due.key, due.block))
             {
-                self.due.push(DueReimport {
-                    table: record.table.clone(),
-                    key: record.key.clone(),
-                    part: record.part.clone(),
-                    at: Instant::now(),
-                    tries: 0,
-                    while_closed: false,
-                });
+                self.due.push(DueReimport::of(record, false));
             }
         }
         let now = Instant::now();
@@ -252,8 +246,20 @@ impl ImportRecords {
 pub fn recorded_lengths(editor: &Editor, key: &str, strip: ModelStrip) -> Option<Vec<u32>> {
     editor
         .imports
-        .record_for("model", key)?
+        .record_for(ModelDef::TABLE, key)?
         .strips
         .get(&strip.record_key())
         .cloned()
+}
+
+fn fingerprint(files: &[PathBuf]) -> (u64, String) {
+    let mut hasher = blake3::Hasher::new();
+    let mut size = 0;
+    for file in files {
+        if let Ok(bytes) = std::fs::read(file) {
+            size += bytes.len() as u64;
+            hasher.update(&bytes);
+        }
+    }
+    (size, hasher.finalize().to_hex()[..16].to_owned())
 }

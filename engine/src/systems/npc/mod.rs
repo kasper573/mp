@@ -22,7 +22,6 @@ use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
-use crate::systems::dialogue;
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{self, Position, TileClaims, position};
@@ -33,10 +32,10 @@ use crate::systems::script::{
     ScriptModule, ScriptedRow, area_owner,
 };
 use crate::systems::skill::{self, Rank, SkillId};
-use crate::systems::stat::{StatMap, Stats};
+use crate::systems::stat::Stats;
 use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
-use crate::systems::{Character, WorldArea};
+use crate::systems::{Character, WorldArea, dialogue};
 
 pub type NpcId = ContentId<NpcDef>;
 
@@ -67,11 +66,7 @@ pub fn check_all(loading: &mut Loading) {
 
 pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
     scripts
-        .may_do(OwnerRow {
-            kind: OwnerKind::Npc,
-            row: npc.raw(),
-            object: None,
-        })
+        .may_do(OwnerRow::of_row(npc))
         .reaches
         .contains(&Reach::Hostile)
 }
@@ -97,7 +92,7 @@ pub struct Near(Vec<Entity>);
 pub struct NpcDef {
     pub name: String,
     pub model: ModelId,
-    pub stats: StatMap,
+    pub stats: Stats,
     #[schemars(extend("x-usage" = "the skill a click on a target uses"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_attack: Option<SkillId>,
@@ -310,11 +305,7 @@ fn spawn_wild(
     let at = world
         .resource_scope(|world, mut rng: Mut<Rng>| {
             let claims = world.resource::<TileClaims>();
-            let mut draw = |fits: &dyn Fn(CellPos) -> bool| match roams {
-                Some(bounds) => grid.random_node_within(&mut rng, bounds, fits),
-                None => grid.random_node(&mut rng, fits),
-            };
-            draw(&|cell| claims.on(area_id, cell) == 0).or_else(|| draw(&|_| true))
+            roaming_spot(grid, &mut rng, claims, area_id, roams)
         })
         .expect("validated at startup: populations have ground outside the safe zones");
     let entity = spawn(world, npc, at, area_id, pack);
@@ -324,7 +315,8 @@ fn spawn_wild(
     };
 }
 
-/// A bare actor of the definition, as a test stands one up; `spawn` makes a whole NPC of it.
+/// A bare actor of the definition, with none of an NPC's scripts or standing; `spawn` makes a
+/// whole NPC of it.
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
     let content = world.resource::<Content>().clone();
     world.spawn(actor_bundle(&content, def, at, area)).id()
@@ -512,29 +504,16 @@ fn actor_bundle(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -
         },
         AreaTag { area },
     );
-    (character, Stats(def.stats.listed().collect()))
+    (character, def.stats.clone())
 }
 
 fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
     let procedures = world
         .resource::<RiftScripts>()
-        .of(OwnerRow {
-            kind: OwnerKind::Npc,
-            row: def.raw(),
-            object: None,
-        })
+        .of(OwnerRow::of_row(def))
         .to_vec();
     let owner = Owner::Entity(OwnerKind::Npc, entity);
-    let interactive = procedures
-        .iter()
-        .flat_map(|procedure| procedure.entry(EventKind::Interacted))
-        .find_map(|(_, event)| match event {
-            RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
-                verb: *verb,
-                reach: *reach,
-            }),
-            _ => None,
-        });
+    let interactive = Interactive::of(&procedures);
     match interactive {
         Some(interactive) => {
             world.entity_mut(entity).insert(interactive);
@@ -546,6 +525,21 @@ fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
     let mut instances = world.resource_mut::<RiftInstances>();
     instances.spawn_owner(owner, procedures);
     instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
+}
+
+/// A walkable spot within `roams`, or anywhere without it, that nobody stands on if there is one.
+fn roaming_spot(
+    grid: &movement::Grid,
+    rng: &mut Rng,
+    claims: &TileClaims,
+    area: AreaId,
+    roams: Option<Rect<Tiles>>,
+) -> Option<Pos<Tiles>> {
+    let mut draw = |fits: &dyn Fn(CellPos) -> bool| match roams {
+        Some(bounds) => grid.random_node_within(rng, bounds, fits),
+        None => grid.random_node(rng, fits),
+    };
+    draw(&|cell| claims.on(area, cell) == 0).or_else(|| draw(&|_| true))
 }
 
 type NpcIds = QueryState<Entity, With<Npc>>;
@@ -575,22 +569,17 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
             if time - since < delay {
                 continue;
             }
-            let Some(region) = area::of(world, id) else {
+            let (Some(region), Some(&AreaTag { area: area_id })) =
+                (area::of(world, id), world.get::<AreaTag>(id))
+            else {
                 continue;
             };
             let grid = region.grid_for(area::wild(world, id));
             let roams = world.get::<Roams>(id).map(|roams| roams.0);
             let claims = world.resource::<TileClaims>();
-            let area_id = world.get::<AreaTag>(id).map(|tag| tag.area);
-            let free = |cell| area_id.is_none_or(|area| claims.on(area, cell) == 0);
-            let at = match (world.get::<Home>(id), roams) {
-                (Some(&Home(home)), _) => Some(home),
-                (None, Some(bounds)) => grid
-                    .random_node_within(&mut rng, bounds, free)
-                    .or_else(|| grid.random_node_within(&mut rng, bounds, |_| true)),
-                (None, None) => grid
-                    .random_node(&mut rng, free)
-                    .or_else(|| grid.random_node(&mut rng, |_| true)),
+            let at = match world.get::<Home>(id) {
+                Some(&Home(home)) => Some(home),
+                None => roaming_spot(grid, &mut rng, claims, area_id, roams),
             }
             .unwrap_or_else(|| region.fallback_spawn());
             crate::systems::combat::revive(world, id, at);

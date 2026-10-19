@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::SystemTime;
 
-use driver::{ContentEdit, Pace, Player, Playtest, PlaytestSetup};
+use driver::{DeployEdit, Pace, Player, Playtest, PlaytestSetup};
 use engine::systems::script::Place;
 
 use crate::chapters::Chapter;
@@ -13,7 +13,7 @@ use crate::film::Film;
 // Every take of a chapter plays out alike, wherever and however often it's shot.
 const SEED: u64 = 1931;
 
-// Where a chapter is played and filmed: a playtest of its own, everyone in it at a viewer's pace.
+/// Where a chapter is played and filmed: a playtest of its own, everyone in it at a viewer's pace.
 pub struct Shoot {
     playtest: Playtest,
     title: &'static str,
@@ -62,11 +62,11 @@ impl Shoot {
         self.playtest.start_signed_out()
     }
 
-    pub fn deploy(&mut self, edits: &[ContentEdit], while_down: impl FnOnce()) -> usize {
+    pub fn deploy(&mut self, edits: &[DeployEdit], while_down: impl FnOnce()) -> usize {
         self.playtest.deploy(edits, while_down)
     }
 
-    // Puts the player's screen on camera: the chapter opens on a card with its title and summary.
+    /// Puts the player's screen on camera: the chapter opens on a card with its title and summary.
     pub fn roll(&mut self, mut player: Player) -> Star {
         let film = Rc::new(RefCell::new(Film::roll(self.title, self.summary)));
         let watching = film.clone();
@@ -81,8 +81,8 @@ impl Shoot {
     }
 }
 
-// The player on camera. The chapter plays as fast as the game lets it; only a caption holds it,
-// until a viewer could have read it.
+/// The player on camera. The chapter plays as fast as the game lets it; only a caption holds it,
+/// until a viewer could have read it.
 pub struct Star {
     player: Player,
     film: Rc<RefCell<Film>>,
@@ -90,20 +90,21 @@ pub struct Star {
 }
 
 impl Star {
-    // Each caption starts a beat of the chapter: it goes up at once and the chapter plays on beneath
-    // it, but the next one waits until this one could be read.
+    /// Each caption starts a beat of the chapter: it goes up at once and the chapter plays on
+    /// beneath it, but the next one waits until this one could be read.
     pub fn caption(&mut self, text: &str) {
         self.hold();
         self.film.borrow_mut().caption(text);
     }
 
-    // Lets the viewer finish reading the caption that's up, while what it describes stays on screen.
+    /// Lets the viewer finish reading the caption that's up, while what it describes stays on
+    /// screen.
     pub fn hold(&mut self) {
         let until = self.film.borrow().read_until();
         self.player.linger_until(until);
     }
 
-    // A recording can't show which channel a track plays on, or how loud, so this panel does.
+    /// A recording can't show which channel a track plays on, or how loud, so this panel does.
     pub fn show_mixer(&mut self) {
         self.film.borrow_mut().show_mixer();
     }
@@ -112,7 +113,7 @@ impl Star {
         self.film.borrow_mut().hide_mixer();
     }
 
-    // The other player's screen shows in a corner of this one's while `during` plays.
+    /// The other player's screen shows in a corner of this one's while `during` plays.
     pub fn inset(
         &mut self,
         mut other: Player,

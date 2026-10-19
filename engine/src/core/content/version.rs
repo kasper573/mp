@@ -27,7 +27,8 @@ pub fn build() -> &'static str {
 pub fn compute(registry: &ContentRegistry) -> ContentVersion {
     let settings =
         SchemaSettings::draft2020_12().with(|settings| settings.inline_subschemas = true);
-    let shapes = canonical(registry.shapes(&settings));
+    let shapes =
+        canonical(serde_json::to_value(registry.shapes(&settings)).expect("shapes are json"));
     let text = serde_json::to_string(&shapes).expect("shapes are json");
     ContentVersion(blake3::hash(text.as_bytes()).to_hex()[..8].to_owned())
 }

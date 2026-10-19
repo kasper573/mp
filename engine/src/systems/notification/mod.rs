@@ -20,24 +20,24 @@ use bevy_egui::EguiPrimaryContextPass;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
-use crate::core::math::Pos;
-use crate::core::math::Rgba;
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::math::{Pos, Rgba};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
+use crate::core::text::TextMotion;
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, UnixMillis, WallClock};
+use crate::core::time::{Seconds, WallClock};
 use crate::core::vfx::{VfxParams, VfxShaderId};
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::screen::ClientScreen;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
-use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
-use crate::systems::text::{self, LineText, Motion, Span};
+use crate::systems::script::effect::{self as effects, Audience};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, condition};
+use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility;
 
 pub type NotificationId = ContentId<NotificationDef>;
@@ -128,7 +128,6 @@ pub struct NotificationSent {
     /// The actor the notification comes from, when it has one in the world.
     #[entities]
     pub actor: Option<Entity>,
-    pub at: UnixMillis,
 }
 
 pub fn notify(world: &mut World, player: Entity, notification: Notification) {
@@ -143,7 +142,6 @@ pub fn local_error(world: &mut World, text: impl Into<String>) {
         NotificationSent {
             notification: Notification::new(kind, LineText::plain(text.into())),
             actor: None,
-            at: UnixMillis(0),
         },
     );
 }
@@ -179,7 +177,6 @@ pub fn notify_from(
             NotificationSent {
                 notification,
                 actor: speaker,
-                at,
             },
         );
     }
@@ -323,9 +320,9 @@ pub enum NotificationDefKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tint: Option<Rgba>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        motion: Option<Motion>,
+        motion: Option<TextMotion>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        emblem: Option<AssetRef>,
+        emblem: Option<ImageRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sfx: Option<SfxId>,
     },
@@ -386,9 +383,9 @@ impl From<&NotificationDefKind> for NotificationKind {
 #[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub notification: NotificationId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -396,8 +393,8 @@ impl EffectDef<RiftScripting> for Notify {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

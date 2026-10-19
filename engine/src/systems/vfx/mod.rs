@@ -14,7 +14,7 @@ use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape, facing_from};
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, Name, ScriptFault, ValueType,
+    Arrow, Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, ScriptFault, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, WallClock};
@@ -22,8 +22,7 @@ use crate::core::vfx::{ParamKind, ParamValue, VfxId, VfxInstance, VfxParams, Vfx
 use crate::systems::WorldArea;
 use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
-use crate::systems::player::Owner;
-use crate::systems::script::effect::{Arrow, Link};
+use crate::systems::player::PlayedBy;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::skill::{self, SkillDef};
@@ -43,6 +42,10 @@ pub fn register(app: &mut App) {
 pub struct Delivery {
     pub from: Option<Pos<Tiles>>,
     pub struck: Option<Vec<Entity>>,
+}
+
+pub fn show(world: &mut World, vfx: VfxId, site: VfxSite) -> Option<Entity> {
+    spawn(world, vfx, site, VfxParams::default(), Delivery::default())
 }
 
 /// Plays a vfx on a site everyone nearby sees.
@@ -111,7 +114,7 @@ pub fn spawn_for(
     site: VfxSite,
     params: VfxParams,
 ) -> Option<Entity> {
-    let client = world.get::<Owner>(player)?.client;
+    let client = world.get::<PlayedBy>(player)?.client;
     let at = position(world, player)?;
     Some(spawn_at(
         world,
@@ -152,7 +155,7 @@ pub struct PlayVfx {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(extend("x-params-of" = "vfx"))]
     pub params: BTreeMap<String, Condition>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -172,8 +175,8 @@ impl EffectDef<RiftScripting> for PlayVfx {
     fn needs_subject(&self) -> bool {
         self.on.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,
@@ -188,20 +191,23 @@ impl EffectDef<RiftScripting> for PlayVfx {
                     ValueType::Point | ValueType::Area => {
                         return Err(ScriptFault::new(
                             "wrong type",
-                            format!("on is {ty:?}; a path runs through actors"),
+                            format!("on is {}; a path runs through actors", ty.name()),
                         ));
                     }
                     other => {
                         return Err(ScriptFault::new(
                             "wrong type",
-                            format!("on is {other:?}, not an actor, a set, a point or an area"),
+                            format!(
+                                "on is {}, not an actor, a set, a point or an area",
+                                other.name()
+                            ),
                         ));
                     }
                 }
             }
             None => cx.actor(None)?,
         };
-        let def = self.vfx.get(cx.content());
+        let def = self.vfx.get(cx.content);
         let mut fillers: Vec<(String, ParamFiller)> = Vec::new();
         for (name, expr) in &self.params {
             let filler = match def.declares(name) {

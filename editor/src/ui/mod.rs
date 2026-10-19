@@ -2,6 +2,7 @@ pub mod assets;
 pub mod browser;
 pub mod dialogs;
 pub mod history;
+pub mod levels;
 pub mod output;
 pub mod patterns;
 pub mod report;
@@ -17,17 +18,22 @@ use std::path::Path;
 use std::time::Duration;
 
 use design_tokens::controls::{self, Pill};
-use design_tokens::{TextRole, face, ink, sheet, slip};
+use design_tokens::face::{self, TextRole};
+use design_tokens::{ink, sheet, slip};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
+use engine::core::content::{ContentRow, LoadReport, row_file};
+use engine::core::vfx::{VfxDef, VfxShaderDef};
+use engine::systems::class::ClassDef;
+use engine::systems::player::snapshot::CharacterSnapshot;
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
-use crate::project::{RowSelection, row_file};
+use crate::project::{self, EditRefusal};
 use crate::tabs::{CloseTabs, EditorTab};
-use crate::views::script::ScriptKeys;
-use crate::views::{area, character, class, model, script, spreadsheet, tileset, vfx, world};
-use crate::{import, play, views};
+use crate::views::script::{self, ScriptKeys};
+use crate::views::{self, area, character, class, model, spreadsheet, tileset, vfx, world};
+use crate::{import, play};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.status.right.clear();
@@ -57,13 +63,8 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     if ctx.input(|i| i.viewport().close_requested()) && !editor.quit {
         if editor.has_unsaved() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            editor.dialogs.push(ModalDialog::Close(CloseDialog {
-                then: CloseThen::Quit,
-            }));
-        } else {
-            editor.close_project();
-            editor.quit = true;
         }
+        request_close(editor, CloseThen::Quit);
     }
 }
 
@@ -72,7 +73,7 @@ pub fn panel_body(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)
-            .layout(egui::Layout::top_down(egui::Align::Min)),
+            .layout(Layout::top_down(Align::Min)),
     );
     child.set_clip_rect(rect.intersect(ui.clip_rect()));
     body(&mut child);
@@ -207,8 +208,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         views::play_here(editor);
     }
     if played && let Some(key) = play::current_character(editor) {
-        editor.select(RowSelection::row("test_character", &key));
-        editor.open_tab(EditorTab::for_row("test_character", &key));
+        editor.open_row(CharacterSnapshot::TABLE, &key);
     }
     if editor.play.running.is_some() {
         ctx.request_repaint_after(Duration::from_millis(100));
@@ -338,7 +338,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                 (LeftTab::Content, "Content".to_owned()),
                 (LeftTab::Assets, "Assets".to_owned()),
             ];
-            widgets::tab_strip(ui, &tabs, &mut editor.panels.left);
+            widgets::tabs(ui, &tabs, &mut editor.panels.left);
             panel_body(ui, |ui| {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))
@@ -368,7 +368,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
             ..egui::Margin::ZERO
         }))
         .show(root, |ui| {
-            widgets::tab_strip(ui, &bottom_tabs, &mut editor.panels.bottom);
+            widgets::tabs(ui, &bottom_tabs, &mut editor.panels.bottom);
             panel_body(ui, |ui| {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))
@@ -504,17 +504,15 @@ fn dock_style(egui_style: &egui::Style) -> egui_dock::Style {
     style
 }
 
-fn report_summary(report: &engine::core::content::LoadReport) -> String {
+fn report_summary(report: &LoadReport) -> String {
     const SHOWN: usize = 8;
     let mut lines: Vec<String> = report
         .errors
         .iter()
         .take(SHOWN)
-        .map(|error| match &error.at {
-            engine::core::content::ErrorPlace::Json { pointer, .. } if !pointer.is_empty() => {
-                format!("{} at {pointer}: {}", error.file, error.problem)
-            }
-            _ => format!("{}: {}", error.file, error.problem),
+        .map(|error| {
+            let place = project::problem_place(&error.file, error.at.pointer());
+            format!("{place}: {}", error.problem)
         })
         .collect();
     if report.errors.len() > SHOWN {
@@ -538,16 +536,8 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         .as_ref()
         .and_then(|project| project.report.as_ref())
     {
-        let first = crate::project::EditRefusal::of(report);
-        left = vec![
-            "does not load".to_owned(),
-            if first.pointer.is_empty() {
-                first.file.clone()
-            } else {
-                format!("{} at {}", first.file, first.pointer)
-            },
-            first.sentence(),
-        ];
+        let first = EditRefusal::of(report);
+        left = vec!["does not load".to_owned(), first.place(), first.sentence()];
     } else if left.is_empty() {
         let selection = &editor.selection;
         if selection.keys.len() == 1 && selection.parts.is_empty() {
@@ -615,7 +605,7 @@ impl TabViewer for Viewer<'_> {
             EditorTab::Script(owner) => script::show(self.editor, ui, owner),
             EditorTab::Model { key } => model::show(self.editor, ui, key),
             EditorTab::Tileset { key } => tileset::show(self.editor, ui, key),
-            EditorTab::Row { table, key } if table == class::TABLE => {
+            EditorTab::Row { table, key } if table == ClassDef::TABLE => {
                 class::show(self.editor, ui, key)
             }
             EditorTab::Spreadsheet { table } => spreadsheet::show(self.editor, ui, table),
@@ -628,13 +618,13 @@ impl TabViewer for Viewer<'_> {
                     .show(ui, |ui| {
                         ui.set_min_size(ui.available_size());
                         match tab {
-                            EditorTab::Row { table, key } if table == character::TABLE => {
+                            EditorTab::Row { table, key } if table == CharacterSnapshot::TABLE => {
                                 character::show(self.editor, ui, key)
                             }
-                            EditorTab::Row { table, key } if table == vfx::TABLE => {
+                            EditorTab::Row { table, key } if table == VfxDef::TABLE => {
                                 vfx::show_vfx(self.editor, ui, key)
                             }
-                            EditorTab::Row { table, key } if table == vfx::SHADER_TABLE => {
+                            EditorTab::Row { table, key } if table == VfxShaderDef::TABLE => {
                                 vfx::show_shader(self.editor, ui, key)
                             }
                             EditorTab::Row { table, key } => {
@@ -678,7 +668,7 @@ impl TabViewer for Viewer<'_> {
             | EditorTab::Model { .. }
             | EditorTab::Tileset { .. }
             | EditorTab::Spreadsheet { .. } => [false, false],
-            EditorTab::Row { table, key } if table == class::TABLE => [
+            EditorTab::Row { table, key } if table == ClassDef::TABLE => [
                 false,
                 self.editor.views.class.page(key) == class::ClassPage::Levels,
             ],

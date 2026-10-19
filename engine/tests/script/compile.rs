@@ -5,7 +5,7 @@ use engine::core::content::{
 };
 use engine::core::math::Pos;
 use engine::core::script::compile::compile_owner;
-use engine::core::script::{EffectDef, Expr, ScriptError};
+use engine::core::script::{EffectDef, Expr, ScriptError, ScriptModuleKind};
 use engine::systems::area::AreaDef;
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
@@ -15,6 +15,7 @@ use engine::systems::script::{
 };
 use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
+use strum::VariantArray;
 
 use crate::game::{content, effect, inline, inline_with, parse};
 
@@ -36,7 +37,7 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     for owner in OWNERS {
         for value in &capabilities {
             let parsed = effect(value.clone());
-            let kind = parsed.kind();
+            let kind = parsed.kind().name();
             let allowed = parsed.owners().contains(&owner);
             let script = inline(json!({
                 "on": entry(owner, "do"),
@@ -185,7 +186,7 @@ fn a_script_that_runs_itself_is_refused() {
         .err()
         .expect("refused")
         .remove(0)
-        .1;
+        .error;
 
     assert_eq!(error.rule, "runs itself");
     assert!(error.expected.contains("loops"), "{}", error.expected);
@@ -272,7 +273,7 @@ fn compile(
     owner: OwnerKind,
     modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
-    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
+    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).error)
 }
 
 fn entry(owner: OwnerKind, next: &str) -> Value {
@@ -411,4 +412,20 @@ fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
         .expect("refused");
 
     assert_eq!(error.rule, "unknown field");
+}
+
+#[test]
+fn script_module_kinds_name_the_tags_modules_are_written_with() {
+    let schema = serde_json::to_value(schemars::schema_for!(ScriptModule)).expect("a schema");
+    let written: Vec<&str> = schema["oneOf"]
+        .as_array()
+        .expect("one schema per kind")
+        .iter()
+        .filter_map(|kind| kind["properties"]["type"]["const"].as_str())
+        .collect();
+    let named: Vec<&str> = ScriptModuleKind::VARIANTS
+        .iter()
+        .map(|kind| kind.tag())
+        .collect();
+    assert_eq!(written, named);
 }

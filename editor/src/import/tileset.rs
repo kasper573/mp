@@ -1,21 +1,29 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use engine::systems::area::grid::{self, PaletteRow};
+use engine::systems::area::tileset::MAX_TILE_PX;
 use image::{GenericImage, RgbaImage};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport};
 use crate::ui::widgets;
+use crate::views::tileset::tile_size;
 
-pub const MAX_TILE_PX: u32 = 512;
 pub const MAX_COLORS: usize = 256;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TileGridSettings {
     pub tile: u32,
     pub margin: u32,
     pub spacing: u32,
     pub extruded: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TileBlock {
+    pub column: u32,
+    pub row: u32,
 }
 
 pub struct TileGridCut {
@@ -79,25 +87,11 @@ pub fn cut_grid(image: &RgbaImage, settings: TileGridSettings) -> Result<TileGri
     })
 }
 
-pub fn tile_image(image: &RgbaImage, tile: u32, index: u32) -> Option<RgbaImage> {
-    let columns = image.width() / tile.max(1);
-    if columns == 0 {
-        return None;
-    }
-    let x = (index % columns) * tile;
-    let y = (index / columns) * tile;
-    if x + tile > image.width() || y + tile > image.height() {
-        return None;
-    }
-    Some(image::imageops::crop_imm(image, x, y, tile, tile).to_image())
-}
-
 pub fn tile_hashes(image: &RgbaImage, tile: u32) -> Vec<(String, bool)> {
-    let tile = tile.max(1);
     let columns = image.width() / tile;
     let rows = image.height() / tile;
     (0..columns * rows)
-        .filter_map(|index| tile_image(image, tile, index))
+        .filter_map(|index| formats::cell(image, (tile, tile), index))
         .map(|cut| (formats::pixel_hash(&cut), formats::is_blank(&cut)))
         .collect()
 }
@@ -120,7 +114,6 @@ pub struct TilePlan {
     pub tile: u32,
     pub old_columns: u32,
     pub new_columns: u32,
-    pub old_rows: u32,
     pub new_rows: u32,
     pub matches: BTreeMap<u32, u32>,
     pub found: usize,
@@ -175,8 +168,8 @@ pub fn tile_plan(
     new: &RgbaImage,
     key: &str,
     palettes: &[(String, Vec<PaletteRow>)],
-) -> TilePlan {
-    let tile = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
+) -> Result<TilePlan, String> {
+    let tile = tile_size(row)?;
     let old_hashes = tile_hashes(old, tile);
     let new_hashes = tile_hashes(new, tile);
     let old_columns = old.width() / tile;
@@ -196,7 +189,7 @@ pub fn tile_plan(
             continue;
         }
         let index = index as u32;
-        let (column, row_index) = (index % old_columns.max(1), index / old_columns.max(1));
+        let (column, row_index) = (index % old_columns, index / old_columns);
         let same_place = (column < new_columns)
             .then(|| row_index * new_columns + column)
             .filter(|candidate| {
@@ -298,11 +291,10 @@ pub fn tile_plan(
                 .find(|(old, new)| old != new)
                 .map(|(o, n)| (*o, *n))
         });
-    TilePlan {
+    Ok(TilePlan {
         tile,
         old_columns,
         new_columns,
-        old_rows: old.height() / tile,
         new_rows: new.height() / tile,
         found: matches.len(),
         matches,
@@ -317,7 +309,7 @@ pub fn tile_plan(
         walk,
         surfaces,
         animations,
-    }
+    })
 }
 
 pub fn apply_tile_plan(
@@ -414,7 +406,6 @@ pub struct AnimCell {
 #[derive(Clone, Debug)]
 pub struct AnimPlan {
     pub block: (u32, u32),
-    pub size: (u32, u32),
     pub cells: Vec<AnimCell>,
     pub still: usize,
     pub reused: Vec<u32>,
@@ -437,7 +428,7 @@ pub fn anim_plan(
     kind_limits: bool,
     block: (u32, u32),
 ) -> Result<AnimPlan, String> {
-    let tile = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
+    let tile = tile_size(row)?;
     let strip = export.strips.first().ok_or("the export has no frames")?;
     if strip.frames.len() < 2 {
         return Err("an animation has at least two frames".to_owned());
@@ -526,7 +517,7 @@ pub fn anim_plan(
         let mut colors = BTreeSet::new();
         let mut soft = false;
         for cell in &cells {
-            if let Some(image) = tile_image(tileset, tile, cell.tile) {
+            if let Some(image) = formats::cell(tileset, (tile, tile), cell.tile) {
                 for pixel in image.pixels() {
                     colors.insert(pixel.0);
                     soft |= pixel[3] != 0 && pixel[3] != 255;
@@ -557,7 +548,6 @@ pub fn anim_plan(
     }
     Ok(AnimPlan {
         block,
-        size,
         cells,
         still,
         reused: reused.into_iter().collect(),
@@ -578,7 +568,7 @@ pub fn apply_anim_plan(
     row: &Value,
     export: &AnimationExport,
 ) -> Result<(Option<Vec<u8>>, Value), String> {
-    let tile = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
+    let tile = tile_size(row)?;
     let columns = (tileset.width() / tile).max(1);
     let old_count = columns * (tileset.height() / tile);
     let total = old_count + plan.new_images.len() as u32;

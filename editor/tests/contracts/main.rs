@@ -9,5 +9,6 @@ mod palette;
 mod project_edits;
 mod project_history;
 mod scenes;
+mod spans;
 mod support;
 mod thumbnails;

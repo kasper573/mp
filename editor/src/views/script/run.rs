@@ -1,34 +1,32 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
+use std::time::Duration;
 
-use crate::keymap::EditorKey;
-use crate::views::character::Standing;
-use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
 use bevy::time::TimeUpdateStrategy;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::math::Pos;
-use engine::core::script::{FlowSteering, OwnerKindDef, Pause, Value as ScriptValue, ValueType};
+use engine::core::script::{
+    FlowSteering, NodeKind, OwnerKindDef, Pause, Value as ScriptValue, ValueType,
+};
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
-use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
+use engine::systems::area::{self, AreaId, AreaModule, AreaObject};
 use engine::systems::class::{self, Class, ClassDef, ClassId};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::input::map::InputMap;
 use engine::systems::item::{Inventory, ItemDef, ItemStack};
-use engine::systems::memory::{Memory, MemoryDef};
+use engine::systems::memory::{self, Memory, MemoryDef};
 use engine::systems::notification::NotificationSent;
-use engine::systems::npc::{Npc, NpcId};
-use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs};
-use engine::systems::player::{
-    AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules, Xp,
-};
+use engine::systems::npc::{self, Npc, NpcId};
+use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::player::{AreaDrawn, ClientId, Xp};
 use engine::systems::quest::{
     ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
 };
@@ -36,16 +34,20 @@ use engine::systems::script::{
     EventKind, FlowKey, FlowTrace, Owner, OwnerKind, Place, Reach, RiftInstances, RiftScripts,
     TraceStep,
 };
-use engine::systems::{self, GameSettings, TICK_HZ, memory, npc};
+use engine::systems::{self, GameSettings, TICK_HZ};
+use strum::VariantArray;
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
 use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
-use crate::project::{ProjectFiles, RowSelection, catalogue_of, row_file, row_of};
+use crate::keymap::EditorKey;
+use crate::project::{ProjectFiles, RowSelection, catalogue_of};
+use crate::stage::live;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::value::{self, RowValue};
+use crate::value;
+use crate::views::character::Standing;
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;
@@ -65,7 +67,7 @@ pub struct RunSetup {
 impl Default for RunSetup {
     fn default() -> RunSetup {
         RunSetup {
-            event: "interacted".to_owned(),
+            event: EventKind::Interacted.name().to_owned(),
             owner: 0,
             character: None,
             hour: 12.0,
@@ -79,7 +81,7 @@ impl Default for RunSetup {
 pub enum ScriptRunState {
     Running,
     Dialogue,
-    Waiting { seconds: f64 },
+    Waiting { left: Duration },
     Paused { what: String },
     Stepping,
     Ended,
@@ -144,7 +146,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let randoms: Vec<(String, usize)> = doc
         .nodes()
         .iter()
-        .filter(|(_, node)| node.kind() == "random")
+        .filter(|(_, node)| nodes::kind_of(node) == NodeKind::Random)
         .map(|(name, node)| (name.clone(), node["weights"].as_array().map_or(0, Vec::len)))
         .collect();
     let characters: Vec<(String, String)> = editor
@@ -173,7 +175,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         {
             start = true;
         }
-        widgets::combo_box(("run-event", doc.owner.slug()))
+        widgets::combo(("run-event", doc.owner.slug()))
             .selected_text(theme::mono(&setup.event).size(13.0))
             .show_ui(ui, |ui| {
                 for event in &events {
@@ -210,7 +212,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             }
             _ => {
-                widgets::combo_box(("run-owner", doc.owner.slug()))
+                widgets::combo(("run-owner", doc.owner.slug()))
                     .selected_text(
                         theme::mono(
                             bound
@@ -228,7 +230,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         ui.label(theme::muted("by").size(13.0));
-        widgets::combo_box(("run-character", doc.owner.slug()))
+        widgets::combo(("run-character", doc.owner.slug()))
             .selected_text(
                 theme::mono(
                     setup
@@ -285,7 +287,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted(format!("{name} takes")));
                     let pick = setup.random.get(name).copied();
-                    widgets::combo_box(("run-random", doc.owner.slug(), name))
+                    widgets::combo(("run-random", doc.owner.slug(), name))
                         .selected_text(pick.map_or("its weights".to_owned(), |index| {
                             format!("output {}", index + 1)
                         }))
@@ -316,8 +318,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if let Some(file) = open_owner
         && let Some((table, key)) = row_of(&file)
     {
-        editor.select(RowSelection::row(table, key));
-        editor.open_tab(EditorTab::for_row(table, key));
+        editor.open_row(table, key);
     }
     if stop {
         editor.views.script.run = None;
@@ -371,7 +372,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let state = match &run.state {
         ScriptRunState::Running => "running".to_owned(),
         ScriptRunState::Dialogue => "waiting for a choice".to_owned(),
-        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.1} s"),
+        ScriptRunState::Waiting { left } => format!("waiting {:.1} s", left.as_secs_f64()),
         ScriptRunState::Paused { what } => format!("paused in {what}"),
         ScriptRunState::Stepping => "stepping".to_owned(),
         ScriptRunState::Ended => "ended".to_owned(),
@@ -591,7 +592,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
         .or(bound.first())
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
-    let read_memories = NodeReads::of(doc.nodes()).memories;
+    let read_memories = NodeReads::of(&content, doc.nodes()).memories;
     let state_names = inspect::names_of(&doc.script["state"]);
     let mut open: Option<EditorTab> = None;
     let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
@@ -608,7 +609,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
             .last()
             .map(|node| format!("waiting at {node}"))
             .unwrap_or_default(),
-        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.0} s"),
+        ScriptRunState::Waiting { left } => format!("waiting {:.0} s", left.as_secs_f64()),
         ScriptRunState::Ended => "ended".to_owned(),
         _ => run
             .visited
@@ -673,7 +674,7 @@ fn character_card(
         widgets::card_title(ui, &name);
         widgets::kv(ui, "level", |ui| {
             let mut picked = level;
-            widgets::combo_box("run-level")
+            widgets::combo("run-level")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(level.to_string()))
                 .show_ui(ui, |ui| {
@@ -695,7 +696,7 @@ fn character_card(
                 .map(|class| class.key(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
             let mut picked = class;
-            widgets::combo_box("run-class")
+            widgets::combo("run-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current))
                 .show_ui(ui, |ui| {
@@ -759,7 +760,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
                         if !is_set {
                             ui.label(theme::muted("unset").size(13.0));
                         }
-                        if widgets::toggle(ui, &mut on).changed() {
+                        if ui.checkbox(&mut on, "").changed() {
                             changed = Some(ScriptValue::Bool(on));
                         }
                     }
@@ -869,13 +870,13 @@ fn quests_card(
             let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("quest/ {key}"), None, true).clicked() {
-                    *open = Some(EditorTab::for_row("quest", key));
+                    *open = Some(EditorTab::for_row(QuestDef::TABLE, key));
                 }
                 let mut picked = standing;
-                widgets::combo_box(("run-quest", key))
+                widgets::combo(("run-quest", key))
                     .selected_text(theme::mono(run_label(standing)))
                     .show_ui(ui, |ui| {
-                        for option in Standing::ALL {
+                        for &option in Standing::VARIANTS {
                             ui.selectable_value(&mut picked, option, run_label(option));
                         }
                     });
@@ -940,7 +941,7 @@ fn bag_card(
                 .sum::<u32>();
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("item/ {key}"), None, true).clicked() {
-                    *open = Some(EditorTab::for_row("item", key));
+                    *open = Some(EditorTab::for_row(ItemDef::TABLE, key));
                 }
                 let mut picked = count;
                 if ui
@@ -1023,12 +1024,12 @@ fn set_quest_standing(
 fn branch_taken(doc: &ScriptDoc, node: &str, next: Option<&RunLogLine>) -> Option<String> {
     let next = next?.node()?;
     let source = doc.nodes().get(node)?;
-    match nodes::FlowKind::of(source)? {
-        nodes::FlowKind::If => ["yes", "no"]
+    match nodes::kind_of(source) {
+        NodeKind::If => ["yes", "no"]
             .into_iter()
             .find(|arrow| source[arrow].as_str() == Some(next))
             .map(str::to_owned),
-        nodes::FlowKind::Random => source["outputs"]
+        NodeKind::Random => source["outputs"]
             .as_array()?
             .iter()
             .position(|arrow| arrow.as_str() == Some(next))
@@ -1052,39 +1053,24 @@ fn start_run(
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
         reset: UtcHour::MIDNIGHT,
     };
-    let mut app = systems::server_app(area_id, 0, RUN_SEED, clock, &content);
-    app.insert_resource(SpawnRules {
-        policy: SpawnPolicy::Map,
-        immortal: true,
-    });
-    app.insert_resource(FlowTrace::default());
-    app.insert_resource(FlowSteering::default());
-    systems::start_server(&mut app);
-    let mut world = std::mem::take(app.world_mut());
+    let mut world = live::sandbox(&content, area_id, RUN_SEED, clock);
+    world.insert_resource(FlowTrace::default());
+    world.insert_resource(FlowSteering::default());
     let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.files)?;
     let area = area::load(&content, area_id);
     let at = area
         .grid
         .nearest_walkable(near)
         .unwrap_or_else(|| area.fallback_spawn());
-    let conn = world
-        .spawn((
-            ClientId(CLIENT),
-            JoinAs {
-                snapshot,
-                start: Place { area: area_id, at },
-            },
-        ))
-        .id();
-    systems::from_client(&mut world, conn, JoinRequest);
-    step(&mut world);
+    let joined = live::join(
+        &mut world,
+        snapshot,
+        Place { area: area_id, at },
+        ClientId(CLIENT),
+    )?;
+    let (conn, subject) = (joined.conn, joined.actor);
     systems::from_client(&mut world, conn, AreaDrawn);
-    step(&mut world);
-    let subject = *world
-        .resource::<Players>()
-        .0
-        .get(&ClientId(CLIENT))
-        .ok_or("the pretend character did not join")?;
+    live::tick(&mut world);
     let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
     let mut run = ScriptRun {
@@ -1147,17 +1133,8 @@ fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(AreaId, Pos<Til
             Some((area, near))
         }
         OwnerKind::Npc => {
-            let npc: NpcId = owner.row.id();
-            for area in content.ids::<AreaDef>() {
-                for placed in area::placed(content, area) {
-                    if let AreaModule::Resident(resident) = &placed.module
-                        && resident.npc == npc
-                    {
-                        return Some((area, resident.at));
-                    }
-                }
-            }
-            Some((spawn.area, spawn.at))
+            let home = area::residence(content, owner.row.id()).unwrap_or(spawn);
+            Some((home.area, home.at))
         }
         _ => Some((spawn.area, spawn.at)),
     }
@@ -1218,14 +1195,9 @@ fn snapshot_for(
         ));
     };
     let json = files
-        .json_owned(&row_file("test_character", key))
+        .json_owned(&row_file(CharacterSnapshot::TABLE, key))
         .ok_or_else(|| format!("no test character {key}"))?;
     value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
-}
-
-fn step(world: &mut World) {
-    world.run_schedule(Main);
-    world.clear_trackers();
 }
 
 impl ScriptRun {
@@ -1251,7 +1223,7 @@ impl ScriptRun {
     }
 
     fn tick(&mut self) {
-        step(&mut self.world);
+        live::tick(&mut self.world);
     }
 
     pub fn go(&mut self) {
@@ -1292,15 +1264,17 @@ impl ScriptRun {
     }
 
     fn skip_wait(&mut self) {
-        if let ScriptRunState::Waiting { seconds } = self.state {
-            let jump = std::time::Duration::from_secs_f64(seconds.max(0.0) + 0.05);
+        if let ScriptRunState::Waiting { left } = self.state {
+            let jump = left + Duration::from_millis(50);
             self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(jump));
             self.tick();
             self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
-            self.log
-                .push(RunLogLine::Note(format!("skipped {seconds:.1} s")));
+            self.log.push(RunLogLine::Note(format!(
+                "skipped {:.1} s",
+                left.as_secs_f64()
+            )));
         }
     }
 
@@ -1336,10 +1310,7 @@ impl ScriptRun {
         };
         self.log.extend(notices);
         self.conversation = self.world().get::<Conversation>(self.subject).cloned();
-        let now = self
-            .world()
-            .resource::<bevy::time::Time>()
-            .elapsed_secs_f64();
+        let now = self.world().resource::<bevy::time::Time>().elapsed();
         let instances = self.world().resource::<RiftInstances>();
         let live = instances.live_flows(self.owner);
         let pause = self.flow.and_then(|key| instances.pause_of(key));
@@ -1348,7 +1319,7 @@ impl ScriptRun {
         } else {
             match pause {
                 Some(Pause::Wait { until }) => ScriptRunState::Waiting {
-                    seconds: (until - now).max(0.0),
+                    left: until.saturating_sub(now),
                 },
                 Some(Pause::NextTick { .. }) => ScriptRunState::Running,
                 Some(Pause::Step { .. }) => ScriptRunState::Stepping,

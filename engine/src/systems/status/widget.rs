@@ -6,7 +6,7 @@ use egui::{Color32, Sense, Stroke, StrokeKind, Ui, Vec2};
 use super::{StatusCategory, StatusInstance, Statuses};
 use crate::core::content::Content;
 use crate::core::gui;
-use crate::core::time::UnixMillis;
+use crate::core::time::{self, UnixMillis};
 use crate::systems::hud;
 use crate::systems::player::session;
 use crate::systems::text::duration;
@@ -26,7 +26,7 @@ pub fn grid(ui: &mut Ui, world: &mut World) {
         return;
     }
     let content = world.resource::<Content>().clone();
-    let now = session::server_now(world);
+    let now = time::server_now(world);
     ui.add_space(GAP);
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = Vec2::splat(GAP);

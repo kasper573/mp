@@ -9,7 +9,7 @@ use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
-use engine::core::content::Content;
+use engine::core::content::{Content, asset_file};
 use engine::core::math::{Pos, Rect};
 use engine::core::render::{self, TILE, ToScreen};
 use engine::core::tiling::{TileSize, Tiles};
@@ -386,7 +386,7 @@ pub fn image_handle(
     path: &str,
     world: &mut World,
 ) -> Handle<Image> {
-    let file = format!("assets/{path}");
+    let file = asset_file(path);
     let Some(bytes) = files.get(&file) else {
         return Handle::default();
     };

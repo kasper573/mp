@@ -1,18 +1,20 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui};
-use engine::core::content::ContentRow;
+use engine::core::assets::AssetKind;
+use engine::core::content::{
+    ASSETS_DIR, ContentRow, GAME_FILE, TABLES_DIR, asset_of, row_file, row_of,
+};
 use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget};
 use crate::keymap::EditorKey;
-use crate::picker::Dragged;
-use crate::picker::{self, PictureFrame};
-use crate::project::{GAME_FILE, Project, RowSelection, row_of};
+use crate::picker::{self, Dragged, PictureFrame};
+use crate::project::{Project, RowSelection};
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
@@ -63,6 +65,7 @@ enum Hit {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrowserAction {
     Open,
     OpenTab,
@@ -70,6 +73,40 @@ pub enum BrowserAction {
     Rename,
     Usages,
     Delete,
+}
+
+/// The menu of what can be done to one row, each with its shortcut; `opening` adds the ways to
+/// open it. Answers the one picked.
+pub fn row_menu(ui: &mut Ui, fixture: bool, opening: bool) -> Option<BrowserAction> {
+    use BrowserAction::*;
+    let opens: &[BrowserAction] = if opening { &[Open, OpenTab] } else { &[] };
+    let groups = [opens, &[Duplicate, Rename, Usages], &[Delete]];
+    let mut picked = None;
+    let mut drawn = false;
+    for group in groups {
+        let allowed: Vec<BrowserAction> = group
+            .iter()
+            .copied()
+            .filter(|action| !fixture || action.suits_fixtures())
+            .collect();
+        if allowed.is_empty() {
+            continue;
+        }
+        if drawn {
+            ui.separator();
+        }
+        drawn = true;
+        for action in allowed {
+            if ui
+                .add(widgets::shortcut_button(action.label(), action.key()))
+                .clicked()
+            {
+                picked = Some(action);
+                ui.close();
+            }
+        }
+    }
+    picked
 }
 
 pub fn focus_search(editor: &mut Editor) {
@@ -126,14 +163,12 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         paths.extend(
             project
                 .files
-                .paths_under(&format!("tables/{table}/"))
-                .filter(|file| {
-                    row_of(file).is_some_and(|(_, key)| {
-                        (!only_unsaved || project.is_unsaved(file))
-                            && (!only_fixtures || editor.shapes.is_fixture(table, key))
-                    })
+                .keys_of(table)
+                .filter(|key| {
+                    (!only_unsaved || project.is_unsaved(&row_file(table, key)))
+                        && (!only_fixtures || editor.shapes.is_fixture(table, key))
                 })
-                .map(|file| file.trim_start_matches("tables/").to_owned()),
+                .map(|key| format!("{table}/{key}.json")),
         );
     }
     let selection = editor.selection.clone();
@@ -145,7 +180,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         tree::from_paths(
             paths.iter().map(String::as_str),
             &mut |path| {
-                let file = format!("tables/{path}");
+                let file = format!("{TABLES_DIR}/{path}");
                 let (table, key) = row_of(&file)?;
                 let mut node = TreeNode::leaf(&file, key);
                 node.selected = selection.table == table && selection.keys.iter().any(|k| k == key);
@@ -215,7 +250,9 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                     menu: Some(&mut |ui, id| {
                         if let Some((table, key)) = row_of(id) {
                             let fixture = shapes.is_fixture(table, key);
-                            row_menu(ui, &mut action, table, key, fixture);
+                            if let Some(picked) = row_menu(ui, fixture, true) {
+                                action = Some((table.to_owned(), key.to_owned(), picked));
+                            }
                         }
                     }),
                     thumbs: Some(&mut |ctx, file| {
@@ -243,18 +280,10 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
-        if table == WorldMapDef::TABLE {
-            action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
-        } else if EditorKey::ToggleSelection.held_among(modifiers)
-            || EditorKey::ExtendSelection.held_among(modifiers)
-        {
-            select_rows(
-                editor,
-                table,
-                key,
-                EditorKey::ToggleSelection.held_among(modifiers),
-                EditorKey::ExtendSelection.held_among(modifiers),
-            );
+        let toggle = EditorKey::ToggleSelection.held_among(modifiers);
+        let extend = EditorKey::ExtendSelection.held_among(modifiers);
+        if table != WorldMapDef::TABLE && (toggle || extend) {
+            select_rows(editor, table, key, toggle, extend);
         } else {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         }
@@ -279,12 +308,12 @@ pub fn row_icon(
 ) -> Option<IconImage> {
     let picture = picker::picture_of(&project.files, table, key)?;
     match picture.frame {
-        PictureFrame::Sprite(model) => {
+        PictureFrame::Sprite { size, frame } => {
             let thumb = form
                 .thumbnails
                 .image_within(ctx, &project.files, &picture.path, budget)?;
-            let frame = thumbs::model_frame(&model, &thumb);
-            let scale = 18.0 / frame.size.y.max(1.0);
+            let frame = thumbs::sprite_frame(size, frame, &thumb);
+            let scale = 18.0 / frame.size.y;
             Some(IconImage {
                 texture: thumb.texture.id(),
                 uv: frame.uv,
@@ -317,75 +346,46 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     }
     let pressed = ui.input_mut(|i| {
         [
-            (BrowserAction::Rename, EditorKey::Rename.consume(i)),
-            (BrowserAction::Usages, EditorKey::Usages.consume(i)),
-            (BrowserAction::Duplicate, EditorKey::Duplicate.consume(i)),
-            (BrowserAction::Delete, EditorKey::Delete.consume(i)),
-            (BrowserAction::OpenTab, EditorKey::OpenInNewTab.consume(i)),
+            BrowserAction::Rename,
+            BrowserAction::Usages,
+            BrowserAction::Duplicate,
+            BrowserAction::Delete,
+            BrowserAction::OpenTab,
         ]
         .into_iter()
-        .find(|(_, hit)| *hit)
-        .map(|(action, _)| action)
+        .find(|action| action.key().consume(i))
     });
     if let Some(action) = pressed {
         act(editor, &selection.table, &selection.keys[0], action);
     }
 }
 
-fn row_menu(
-    ui: &mut Ui,
-    action: &mut Option<(String, String, BrowserAction)>,
-    table: &str,
-    key: &str,
-    fixture: bool,
-) {
-    let mut pick = |what: BrowserAction, ui: &mut Ui| {
-        *action = Some((table.to_owned(), key.to_owned(), what));
-        ui.close();
-    };
-    if ui
-        .add(widgets::shortcut_button("Open", EditorKey::Confirm))
-        .clicked()
-    {
-        pick(BrowserAction::Open, ui);
-    }
-    if ui
-        .add(widgets::shortcut_button(
-            "Open in new tab",
-            EditorKey::OpenInNewTab,
-        ))
-        .clicked()
-    {
-        pick(BrowserAction::OpenTab, ui);
-    }
-    ui.separator();
-    if ui
-        .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
-        .clicked()
-    {
-        pick(BrowserAction::Duplicate, ui);
-    }
-    if !fixture
-        && ui
-            .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
-            .clicked()
-    {
-        pick(BrowserAction::Rename, ui);
-    }
-    if ui
-        .add(widgets::shortcut_button("Show usages", EditorKey::Usages))
-        .clicked()
-    {
-        pick(BrowserAction::Usages, ui);
-    }
-    if !fixture {
-        ui.separator();
-        if ui
-            .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
-            .clicked()
-        {
-            pick(BrowserAction::Delete, ui);
+impl BrowserAction {
+    fn label(self) -> &'static str {
+        match self {
+            BrowserAction::Open => "Open",
+            BrowserAction::OpenTab => "Open in new tab",
+            BrowserAction::Duplicate => "Duplicate",
+            BrowserAction::Rename => "Rename key…",
+            BrowserAction::Usages => "Show usages",
+            BrowserAction::Delete => "Delete…",
         }
+    }
+
+    fn key(self) -> EditorKey {
+        match self {
+            BrowserAction::Open => EditorKey::Confirm,
+            BrowserAction::OpenTab => EditorKey::OpenInNewTab,
+            BrowserAction::Duplicate => EditorKey::Duplicate,
+            BrowserAction::Rename => EditorKey::Rename,
+            BrowserAction::Usages => EditorKey::Usages,
+            BrowserAction::Delete => EditorKey::Delete,
+        }
+    }
+
+    /// A fixture's key is one every game provides, so it is neither renamed nor deleted.
+    fn suits_fixtures(self) -> bool {
+        !matches!(self, BrowserAction::Rename | BrowserAction::Delete)
     }
 }
 
@@ -402,13 +402,7 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
         let keys: Vec<String> = editor
             .project
             .as_ref()
-            .map(|project| {
-                project
-                    .files
-                    .paths_under(&format!("tables/{table}/"))
-                    .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-                    .collect()
-            })
+            .map(|project| project.files.keys_of(table).map(str::to_owned).collect())
             .unwrap_or_default();
         let (a, b) = (
             keys.iter().position(|k| *k == last).unwrap_or(0),
@@ -437,8 +431,7 @@ fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend
 pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
     match action {
         BrowserAction::Open | BrowserAction::OpenTab => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+            editor.open_row(table, key);
         }
         BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
@@ -456,8 +449,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         }
         BrowserAction::Duplicate => rows::duplicate(editor, table, key),
         BrowserAction::Usages => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+            editor.open_row(table, key);
             editor.panels.bottom = BottomTab::UsedBy;
         }
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
@@ -476,16 +468,14 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         let mut modules = Vec::new();
         let mut files = Vec::new();
         for table in editor.shapes.order.clone() {
-            for file in project.files.paths_under(&format!("tables/{table}/")) {
-                let Some((_, key)) = row_of(file) else {
-                    continue;
-                };
-                if (only_unsaved && !project.is_unsaved(file))
+            for key in project.files.keys_of(&table) {
+                let file = row_file(&table, key);
+                if (only_unsaved && !project.is_unsaved(&file))
                     || (only_fixtures && !editor.shapes.is_fixture(&table, key))
                 {
                     continue;
                 }
-                let row = project.files.json(file);
+                let row = project.files.json(&file);
                 let name_hit = row.as_ref().is_some_and(|row| {
                     ["name", "title", "label"].iter().any(|f| {
                         row[*f]
@@ -528,10 +518,10 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                 }
             }
         }
-        let mut folders: BTreeSet<String> = std::collections::BTreeSet::new();
-        for path in project.files.paths_under("assets/") {
-            let relative = path.trim_start_matches("assets/");
-            if super::assets::kind(relative).is_none() {
+        let mut folders: BTreeSet<String> = BTreeSet::new();
+        for path in project.files.paths_under(&format!("{ASSETS_DIR}/")) {
+            let relative = asset_of(path);
+            if AssetKind::of(relative).is_none() {
                 continue;
             }
             if let Some((folder, _)) = relative.rsplit_once('/')
@@ -556,7 +546,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     editor.status.left.push(format!(
         "{} result{} for \"{}\"",
         hits.len(),
-        crate::ui::widgets::plural(hits.len()),
+        widgets::plural(hits.len()),
         editor.views.browser.search.trim()
     ));
     let mut clicked: Option<(String, String, bool, bool)> = None;
@@ -603,7 +593,11 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             action = Some((table.clone(), key.clone(), BrowserAction::Open));
                         }
                         let fixture = editor.shapes.is_fixture(table, key);
-                        response.context_menu(|ui| row_menu(ui, &mut action, table, key, fixture));
+                        response.context_menu(|ui| {
+                            if let Some(picked) = row_menu(ui, fixture, true) {
+                                action = Some((table.clone(), key.clone(), picked));
+                            }
+                        });
                     }
                     Hit::Module {
                         table,

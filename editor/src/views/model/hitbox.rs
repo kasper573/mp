@@ -1,9 +1,12 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use engine::core::content::ContentRow;
+use engine::core::render::TILE;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::render::ACTOR_ANCHOR;
 use serde_json::Value;
+use strum::VariantArray;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
@@ -11,14 +14,13 @@ use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::stage::{self, Posed, PosedActor, Scene};
 use crate::ui::{theme, widgets};
-use crate::views::area::TILE_PX;
 
 const ZOOM: f32 = 4.0;
 const INSET: Vec2 = Vec2::new(400.0, 300.0);
 const MIN: f32 = 0.1;
 const MAX: f32 = 8.0;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, VariantArray)]
 pub enum HitboxHandle {
     N,
     S,
@@ -31,17 +33,6 @@ pub enum HitboxHandle {
 }
 
 impl HitboxHandle {
-    const ALL: [HitboxHandle; 8] = [
-        HitboxHandle::N,
-        HitboxHandle::S,
-        HitboxHandle::E,
-        HitboxHandle::W,
-        HitboxHandle::Ne,
-        HitboxHandle::Nw,
-        HitboxHandle::Se,
-        HitboxHandle::Sw,
-    ];
-
     fn horizontal(self) -> bool {
         !matches!(self, HitboxHandle::N | HitboxHandle::S)
     }
@@ -85,7 +76,7 @@ pub fn airborne(row: &Value) -> bool {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let model = RowSelection::row(super::TABLE, key);
+    let model = RowSelection::row(ModelDef::TABLE, key);
     if editor.selection != model {
         editor.select(model);
     }
@@ -94,7 +85,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let frame = strip_of(row, ModelStrip::default())
         .first()
         .map(|frame| frame.frame);
-    let tile = TILE_PX * ZOOM;
+    let tile = TILE.0 * ZOOM;
     ui.horizontal_top(|ui| {
         let canvas_w = (ui.available_width() - INSET.x - 24.0).max(200.0);
         let canvas_h = (ui.available_height() - 30.0).max(200.0);
@@ -141,7 +132,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             );
             let hover = response.hover_pos();
             let mut hovered_handle = None;
-            for handle in HitboxHandle::ALL {
+            for &handle in HitboxHandle::VARIANTS {
                 let at = handle.at(hitbox);
                 let near = hover.is_some_and(|pos| (pos - at).length() <= 8.0);
                 if near {

@@ -23,19 +23,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::{
     SoundscapeChannel, SoundscapeLayer, SoundscapeShape, SoundscapeZone,
 };
-use crate::core::content::id::nearest;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRegistry, ContentRow, ErrorPlace, FileWriter,
-    LoadError, LoadStep, Loading, ModuleRule, ModuleSet, RowCheck, serial, valid_key,
+    Content, ContentId, ContentProblem, ContentRegistry, ContentRow, FileWriter, LoadStep, Loading,
+    ModuleRule, ModuleSet, RowCheck, serial, valid_key,
 };
-use crate::core::math::{Pos, Rect, Size};
+use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
@@ -94,7 +93,7 @@ pub fn same_area(world: &World, a: Entity, b: Entity) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct AreaDef {
     pub name: String,
-    pub map: AreaMap,
+    pub map: Tilemap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<AreaModule>,
 }
@@ -104,7 +103,7 @@ impl ContentRow for AreaDef {
 
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);
-        let map = self.map();
+        let map = &self.map;
         cx.range(
             "/map/size/width",
             map.size.width,
@@ -193,12 +192,6 @@ impl ScriptedRow for AreaDef {
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum AreaMap {
-    Tilemap(Tilemap),
-}
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tilemap {
     pub size: MapSize,
@@ -220,13 +213,6 @@ impl MapSize {
 
     pub fn tiles(self) -> Size<Tiles> {
         Size::new(self.width as f32, self.height as f32)
-    }
-}
-
-impl AreaDef {
-    pub fn map(&self) -> &Tilemap {
-        let AreaMap::Tilemap(map) = &self.map;
-        map
     }
 }
 
@@ -318,8 +304,7 @@ pub struct SoundscapeDef {
 #[serde(deny_unknown_fields)]
 pub struct SoundChannel {
     pub channel: u32,
-    #[schemars(extend("x-asset" = "audio"))]
-    pub file: AssetRef,
+    pub file: AudioRef,
     #[schemars(extend("default" = serial::one_f32()))]
     #[serde(
         default = "serial::one_f32",
@@ -555,6 +540,19 @@ pub fn modules(content: &Content, area: AreaId) -> impl Iterator<Item = &AreaMod
     placed(content, area).iter().map(|placed| &placed.module)
 }
 
+/// Where an npc lives: the first area that places it as a resident, at its spot there.
+pub fn residence(content: &Content, npc: NpcId) -> Option<script::Place> {
+    content.ids::<AreaDef>().find_map(|area| {
+        modules(content, area).find_map(|module| match module {
+            AreaModule::Resident(resident) if resident.npc == npc => Some(script::Place {
+                area,
+                at: resident.at,
+            }),
+            _ => None,
+        })
+    })
+}
+
 pub fn objects(modules: &[Flattened]) -> impl Iterator<Item = (u32, &ObjectDef)> {
     modules
         .iter()
@@ -588,11 +586,7 @@ pub fn warp_objects(content: &Content, area: AreaId) -> Vec<(u32, &ObjectDef)> {
     objects(placed(content, area))
         .filter(|(index, _)| {
             scripts
-                .may_do(OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: area.raw(),
-                    object: Some(*index),
-                })
+                .may_do(OwnerRow::of_object(area, *index))
                 .reaches
                 .iter()
                 .any(|reach| matches!(reach, Reach::Warp(_)))
@@ -691,221 +685,10 @@ fn read_grids(loading: &mut Loading) {
     let sizes = content.built::<ImageSizes>();
     let mut grids: Vec<Option<Arc<AreaGrids>>> = content.ids::<AreaDef>().map(|_| None).collect();
     for (id, def) in loading.rows::<AreaDef>(&content) {
-        let map = def.map();
-        let folder = grid::folder(id.key(&content));
-        let files = loading.row_folder(id);
-        let mut expected: Vec<String> =
-            vec![grid::PALETTE_FILE.to_owned(), grid::WALK_FILE.to_owned()];
-        expected.extend(map.ground.iter().map(|layer| grid::layer_file(layer)));
-        for file in &files {
-            if !expected.contains(file) {
-                loading.file_error(
-                    format!("{folder}/{file}"),
-                    ErrorPlace::WholeFile,
-                    ContentProblem::new(
-                        "unknown entry",
-                        format!("file {file}"),
-                        format!("only {}", expected.join(", ")),
-                    ),
-                );
-            }
+        match grid::read_area(loading, &content, sizes, id, &def.map) {
+            Some(read) => grids[id.index()] = Some(Arc::new(read)),
+            None => loading.fail(id),
         }
-        let mut errors: Vec<LoadError> = Vec::new();
-        let read = |name: &str, pointer: &str, loading: &mut Loading| -> Option<String> {
-            let file = format!("{folder}/{name}");
-            if !files.contains(&name.to_owned()) {
-                loading.row_error(
-                    id,
-                    pointer,
-                    ContentProblem::new(
-                        "missing file",
-                        format!("no {name} in {folder}/"),
-                        format!("{file} beside the row"),
-                    ),
-                );
-                return None;
-            }
-            match loading.read_text(&file) {
-                Ok(text) => Some(text),
-                Err(error) => {
-                    loading.file_error(
-                        file,
-                        ErrorPlace::WholeFile,
-                        ContentProblem::new("unreadable file", error, "a UTF-8 CSV file"),
-                    );
-                    None
-                }
-            }
-        };
-        let palette_text = read(grid::PALETTE_FILE, "/map", loading);
-        let walk_text = read(grid::WALK_FILE, "/map", loading);
-        let layer_texts: Vec<Option<String>> = map
-            .ground
-            .iter()
-            .enumerate()
-            .map(|(index, layer)| {
-                read(
-                    &grid::layer_file(layer),
-                    &format!("/map/ground/{index}"),
-                    loading,
-                )
-            })
-            .collect();
-        let (Some(palette_text), Some(walk_text)) = (palette_text, walk_text) else {
-            loading.fail(id);
-            continue;
-        };
-        if layer_texts.iter().any(Option::is_none) {
-            loading.fail(id);
-            continue;
-        }
-        let size = map.size.grid();
-        let palette_file = format!("{folder}/{}", grid::PALETTE_FILE);
-        let Some(rows) = grid::read_palette(
-            grid::GridFile {
-                path: &palette_file,
-                text: &palette_text,
-            },
-            &mut errors,
-        ) else {
-            loading.extend_errors(errors);
-            loading.fail(id);
-            continue;
-        };
-        let tilesets = content.table::<tileset::TilesetDef>();
-        let mut palette: Vec<PaletteEntry> = Vec::new();
-        let mut palette_keys = Vec::new();
-        let mut ok = true;
-        for (index, row) in rows.iter().enumerate() {
-            let at = ErrorPlace::Csv {
-                row: index + 2,
-                column: 1,
-            };
-            let Some(tileset_id) = tilesets.id_of(&row.tileset) else {
-                errors.push(LoadError {
-                    file: palette_file.clone(),
-                    at,
-                    problem: ContentProblem::new(
-                        "unknown row",
-                        format!("{:?}", row.tileset),
-                        "the key of a tileset row",
-                    )
-                    .near(nearest(tilesets.keys(), &row.tileset).map(|n| format!("{n:?}"))),
-                });
-                ok = false;
-                continue;
-            };
-            if let Some(tileset) = tilesets.get(tileset_id) {
-                if tileset.tile != map.tile {
-                    errors.push(LoadError {
-                        file: palette_file.clone(),
-                        at: at.clone(),
-                        problem: ContentProblem::new(
-                            "tile size mismatch",
-                            format!("{} against {}", map.tile, tileset.tile),
-                            format!("tilesets of {} px tiles, the area's", map.tile),
-                        ),
-                    });
-                    ok = false;
-                }
-                if let Some(&(width, height)) = sizes.0.get(tileset.image.as_str()) {
-                    let count = tileset.grid(width, height).count();
-                    if row.tile >= count {
-                        errors.push(LoadError {
-                            file: palette_file.clone(),
-                            at: ErrorPlace::Csv {
-                                row: index + 2,
-                                column: 2,
-                            },
-                            problem: ContentProblem::new(
-                                "tile out of range",
-                                format!("tile {} of {count}", row.tile),
-                                format!("0 to {}", count.saturating_sub(1)),
-                            ),
-                        });
-                        ok = false;
-                    }
-                }
-            } else {
-                ok = false;
-            }
-            palette.push(PaletteEntry {
-                tileset: tileset_id,
-                tile: row.tile,
-                flip: row.flip,
-            });
-            palette_keys.push(row.clone());
-        }
-        let entries = palette.len();
-        let mut ground: Vec<grid::GroundLayer> = Vec::new();
-        for (layer, text) in map.ground.iter().zip(layer_texts.iter().flatten()) {
-            let file = format!("{folder}/{}", grid::layer_file(layer));
-            let cells = grid::read_grid(
-                grid::GridFile { path: &file, text },
-                size,
-                |field| {
-                    if field.is_empty() {
-                        return Ok(None);
-                    }
-                    let index: u32 = field.parse().map_err(|_| grid::BadCell {
-                        rule: "bad cell",
-                        expected: "empty or a palette index".to_owned(),
-                    })?;
-                    if index as usize >= entries {
-                        return Err(grid::BadCell {
-                            rule: "palette out of range",
-                            expected: format!(
-                                "0 to {}, an index into the area's {entries} palette entries",
-                                entries.saturating_sub(1)
-                            ),
-                        });
-                    }
-                    Ok(Some(index))
-                },
-                &mut errors,
-            );
-            match cells {
-                Some(cells) => ground.push(grid::GroundLayer {
-                    name: layer.clone(),
-                    cells,
-                }),
-                None => ok = false,
-            }
-        }
-        let walk_file = format!("{folder}/{}", grid::WALK_FILE);
-        let walk = grid::read_grid(
-            grid::GridFile {
-                path: &walk_file,
-                text: &walk_text,
-            },
-            size,
-            |field| match field {
-                "" => Ok(None),
-                "1" => Ok(Some(true)),
-                "0" => Ok(Some(false)),
-                _ => Err(grid::BadCell {
-                    rule: "bad cell",
-                    expected: "empty, 1 or 0".to_owned(),
-                }),
-            },
-            &mut errors,
-        );
-        loading.extend_errors(errors);
-        let Some(walk) = walk else {
-            loading.fail(id);
-            continue;
-        };
-        if !ok {
-            loading.fail(id);
-            continue;
-        }
-        grids[id.index()] = Some(Arc::new(AreaGrids {
-            size,
-            palette,
-            palette_keys,
-            ground,
-            walk,
-        }));
     }
     loading.built(AreaGridSet(grids));
 }
@@ -948,7 +731,7 @@ fn build_all(loading: &mut Loading) {
             continue;
         };
         let modules = placed(&content, id);
-        let map = def.map();
+        let map = &def.map;
         let mut check = RowCheck::default();
         check_bounds(&content, map, modules, sizes, &mut check);
         let safe_zones: Vec<Rect<Tiles>> = modules
@@ -1024,9 +807,7 @@ fn check_bounds(
         match &placed.module {
             AreaModule::Object(object) => {
                 let b = object.shape.bounds();
-                if outside(b.min())
-                    || outside(b.max() - crate::core::math::Offset::new(0.001, 0.001))
-                {
+                if outside(b.min()) || outside(b.max() - Offset::new(0.001, 0.001)) {
                     out(check, object.shape.origin());
                 }
             }

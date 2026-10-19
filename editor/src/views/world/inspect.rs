@@ -1,6 +1,6 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, Fixture};
 use engine::systems::area::world_map::{
@@ -9,19 +9,18 @@ use engine::systems::area::world_map::{
 use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
 
-use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
+use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use super::canvas::{line_badge, viridis};
 use super::filters::{self, AreaRange, ColorField, ColorOf, ColorRanges, ColorShow, ColorTable};
 use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
 use crate::app::Editor;
-use crate::forms;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::ui::{sidebar, theme, widgets};
-use crate::value;
 use crate::views::area as area_view;
+use crate::{forms, value};
 
 fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     let Some(map) = OpenWorldMap::of(editor) else {
@@ -109,7 +108,7 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             .collect::<Vec<_>>()
             .join(" · "),
     );
-    let mut by_kind: BTreeMap<RowSourceKind, BTreeMap<&RowSource, Vec<&str>>> = BTreeMap::new();
+    let mut by_kind: BTreeMap<AtlasSourceKind, BTreeMap<&AtlasSource, Vec<&str>>> = BTreeMap::new();
     for (area, sources) in &lit {
         for source in sources {
             by_kind
@@ -187,7 +186,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     let fields = ColorField::all(editor);
     let mut next = color.clone();
     widgets::kv(ui, "value", |ui| {
-        widgets::combo_box("color-value")
+        widgets::combo("color-value")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.field.text()).size(12.5))
             .show_ui(ui, |ui| {
@@ -199,7 +198,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     });
     if next.field.table == ColorTable::Npc {
         widgets::kv(ui, "of", |ui| {
-            widgets::combo_box("color-of")
+            widgets::combo("color-of")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(next.of.label()).size(12.5))
                 .show_ui(ui, |ui| {
@@ -210,7 +209,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         });
     }
     widgets::kv(ui, "show", |ui| {
-        widgets::combo_box("color-show")
+        widgets::combo("color-show")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.show.label()).size(12.5))
             .show_ui(ui, |ui| {
@@ -552,7 +551,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         });
         widgets::kv(ui, "pinned", |ui| {
             let mut pinned = cards.iter().all(|area| map.layout.cards[area].pinned);
-            if widgets::toggle(ui, &mut pinned).changed() {
+            if ui.checkbox(&mut pinned, "").changed() {
                 for area in cards {
                     if let Some(pin) = next.cards.get_mut(area) {
                         pin.pinned = pinned;
@@ -658,7 +657,7 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
         widgets::kv(ui, "color", |ui| {
             let mut picked = region.color;
             let current = region_color_name(picked);
-            widgets::combo_box(("region-color", index))
+            widgets::combo(("region-color", index))
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(current).size(12.5).color(region_color(picked)))
                 .show_ui(ui, |ui| {

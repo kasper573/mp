@@ -14,9 +14,9 @@ use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::RenderPosition;
 use crate::systems::screen::ClientScreen;
 
-pub struct ActorPlugin;
+pub struct ActorRenderPlugin;
 
-impl Plugin for ActorPlugin {
+impl Plugin for ActorRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InterpolatePlugin::<RenderActor>::default())
             .add_systems(

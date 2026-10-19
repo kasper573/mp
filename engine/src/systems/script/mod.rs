@@ -3,9 +3,10 @@ pub mod effect;
 pub mod event;
 pub mod query;
 
-pub use effect::RiftEffect;
+pub use crate::core::script::Fill;
+pub use effect::{RiftEffect, RiftEffectKind};
 pub use event::{EventKind, RiftEvent, Who};
-pub use query::RiftQuery;
+pub use query::{RiftQuery, RiftQueryKind};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,18 +17,21 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentProblem, ContentRow, Loading, ModuleSet, row_file};
+use crate::core::content::{
+    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleSet, row_file,
+};
 use crate::core::math::Pos;
 use crate::core::script::{
     self, BoxEnding, DialogueView, Expr, Instances, LineDef, OwnerKindDef, ScriptError, Scripts,
     TextDef, Vocabulary, compile::compile_row,
 };
 use crate::core::tiling::Tiles;
-use crate::systems::actor::model::Face;
+use crate::systems::WorldArea;
+use crate::systems::actor::model::Expression;
 use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaId, AreaObject};
 use crate::systems::class::{ClassDef, ClassId};
-use crate::systems::dialogue::ChoiceReveal;
+use crate::systems::dialogue::{self, ChoiceReveal};
 use crate::systems::item::{ItemDef, ItemId, ItemKind};
 use crate::systems::memory::{MemoryDef, MemoryId};
 use crate::systems::notification::{NotificationDef, NotificationId};
@@ -38,7 +42,6 @@ use crate::systems::skill::{SkillDef, SkillId};
 use crate::systems::stat::StatKind;
 use crate::systems::status::{StatusEffectDef, StatusEffectId};
 use crate::systems::text::{self, Span};
-use crate::systems::{WorldArea, dialogue};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RiftScripting;
@@ -103,7 +106,6 @@ pub type DialogueNode = script::DialogueNode<RiftScripting>;
 pub type Choice = script::Choice<RiftScripting>;
 pub type Procedure = script::Procedure<RiftScripting>;
 pub type MayDo = script::MayDo<RiftScripting>;
-pub type Fill<T> = script::Fill<T>;
 pub type Owner = script::Owner<RiftScripting>;
 pub type OwnerRow = script::OwnerRow<RiftScripting>;
 pub type FlowKey = script::FlowKey<RiftScripting>;
@@ -165,7 +167,7 @@ pub enum RowRef {
 #[serde(from = "LineRow", into = "LineRow")]
 pub struct Line {
     pub by: Speaker,
-    pub face: Option<Face>,
+    pub face: Option<Expression>,
     pub text: Vec<Span>,
 }
 
@@ -182,7 +184,7 @@ enum SpeakerRow {
     Npc {
         npc: NpcId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        face: Option<Face>,
+        face: Option<Expression>,
     },
     Object,
     Narrator,
@@ -293,16 +295,16 @@ impl Vocabulary for RiftScripting {
 
     fn row_value(content: &Content, table: &str, key: &str) -> Option<RowRef> {
         Some(match table {
-            "area" => RowRef::Area(content.by_key::<AreaDef>(key)?),
-            "item" => RowRef::Item(content.by_key::<ItemDef>(key)?),
-            "npc" => RowRef::Npc(content.by_key::<NpcDef>(key)?),
-            "quest" => RowRef::Quest(content.by_key::<QuestDef>(key)?),
-            "shop" => RowRef::Shop(content.by_key::<ShopDef>(key)?),
-            "memory" => RowRef::Memory(content.by_key::<MemoryDef>(key)?),
-            "notification" => RowRef::Notification(content.by_key::<NotificationDef>(key)?),
-            "class" => RowRef::Class(content.by_key::<ClassDef>(key)?),
-            "skill" => RowRef::Skill(content.by_key::<SkillDef>(key)?),
-            "status_effect" => RowRef::StatusEffect(content.by_key::<StatusEffectDef>(key)?),
+            AreaDef::TABLE => RowRef::Area(content.by_key(key)?),
+            ItemDef::TABLE => RowRef::Item(content.by_key(key)?),
+            NpcDef::TABLE => RowRef::Npc(content.by_key(key)?),
+            QuestDef::TABLE => RowRef::Quest(content.by_key(key)?),
+            ShopDef::TABLE => RowRef::Shop(content.by_key(key)?),
+            MemoryDef::TABLE => RowRef::Memory(content.by_key(key)?),
+            NotificationDef::TABLE => RowRef::Notification(content.by_key(key)?),
+            ClassDef::TABLE => RowRef::Class(content.by_key(key)?),
+            SkillDef::TABLE => RowRef::Skill(content.by_key(key)?),
+            StatusEffectDef::TABLE => RowRef::StatusEffect(content.by_key(key)?),
             _ => return None,
         })
     }
@@ -334,21 +336,6 @@ pub fn owner_label(kind: OwnerKind, key: &str, object: Option<&str>) -> String {
     }
 }
 
-pub fn row_key(content: &Content, row: RowRef) -> String {
-    match row {
-        RowRef::Area(id) => id.key(content).to_owned(),
-        RowRef::Item(id) => id.key(content).to_owned(),
-        RowRef::Npc(id) => id.key(content).to_owned(),
-        RowRef::Quest(id) => id.key(content).to_owned(),
-        RowRef::Shop(id) => id.key(content).to_owned(),
-        RowRef::Memory(id) => id.key(content).to_owned(),
-        RowRef::Notification(id) => id.key(content).to_owned(),
-        RowRef::Class(id) => id.key(content).to_owned(),
-        RowRef::Skill(id) => id.key(content).to_owned(),
-        RowRef::StatusEffect(id) => id.key(content).to_owned(),
-    }
-}
-
 pub fn owner_of(world: &World, entity: Entity) -> Option<Owner> {
     if world.get::<Npc>(entity).is_some() {
         return Some(Owner::Entity(OwnerKind::Npc, entity));
@@ -363,6 +350,32 @@ pub trait ScriptedRow: ModuleSet {
     const OWNER: OwnerKind;
 
     fn script(module: &Self::Module) -> Option<&ScriptModule>;
+}
+
+impl OwnerRow {
+    pub fn of_row<Row: ScriptedRow>(id: ContentId<Row>) -> OwnerRow {
+        OwnerRow {
+            kind: Row::OWNER,
+            row: id.raw(),
+            object: None,
+        }
+    }
+
+    pub fn of_object(area: AreaId, index: u32) -> OwnerRow {
+        OwnerRow {
+            kind: OwnerKind::Object,
+            row: area.raw(),
+            object: Some(index),
+        }
+    }
+
+    pub fn of_placement(area: AreaId, ordinal: u32) -> OwnerRow {
+        OwnerRow {
+            kind: OwnerKind::Blueprint,
+            row: area.raw(),
+            object: Some(ordinal),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -387,7 +400,7 @@ pub fn build_all(loading: &mut Loading) {
             Err(failed) => errors.extend(
                 failed
                     .into_iter()
-                    .map(|(index, error)| (modules[index].0.clone(), error)),
+                    .map(|failed| (modules[failed.module].0.clone(), failed.error)),
             ),
         }
     };
@@ -423,11 +436,7 @@ pub fn build_all(loading: &mut Loading) {
                 })
                 .collect();
             bind(
-                OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: id.raw(),
-                    object: Some(index),
-                },
+                OwnerRow::of_object(id, index),
                 owner_label(OwnerKind::Object, key, Some(name)),
                 modules,
             );
@@ -449,11 +458,7 @@ pub fn build_all(loading: &mut Loading) {
                 })
                 .collect();
             bind(
-                OwnerRow {
-                    kind: OwnerKind::Blueprint,
-                    row: id.raw(),
-                    object: Some(ordinal as u32),
-                },
+                OwnerRow::of_placement(id, ordinal as u32),
                 owner_label(
                     OwnerKind::Blueprint,
                     blueprint,
@@ -504,12 +509,11 @@ fn bind_table<Row: ScriptedRow>(
                 Some((site, Row::script(module)?))
             })
             .collect();
-        let row = OwnerRow {
-            kind: Row::OWNER,
-            row: id.raw(),
-            object: None,
-        };
-        bind(row, owner_label(Row::OWNER, key, None), modules);
+        bind(
+            OwnerRow::of_row(id),
+            owner_label(Row::OWNER, key, None),
+            modules,
+        );
     }
 }
 
@@ -567,9 +571,11 @@ pub fn spawn_stateless(world: &mut World) {
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
             OwnerKind::Area if row.row == area.raw() => Owner::Row(OwnerKind::Area, row.row),
-            OwnerKind::Blueprint if row.row == area.raw() => {
-                Owner::Row(OwnerKind::Blueprint, row.object.unwrap_or_default())
-            }
+            OwnerKind::Blueprint if row.row == area.raw() => Owner::Row(
+                OwnerKind::Blueprint,
+                row.object
+                    .expect("a placement's owner row names its ordinal"),
+            ),
             OwnerKind::Item
             | OwnerKind::Quest
             | OwnerKind::Shop
@@ -698,11 +704,7 @@ pub fn check_all(loading: &mut Loading) {
     for (id, def) in loading.rows::<ItemDef>(&content) {
         let usable = matches!(def.kind, ItemKind::Usable);
         let answers = scripts
-            .may_do(OwnerRow {
-                kind: OwnerKind::Item,
-                row: id.raw(),
-                object: None,
-            })
+            .may_do(OwnerRow::of_row(id))
             .answers(EventKind::Used);
         if usable && !answers {
             loading.row_error(

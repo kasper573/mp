@@ -4,12 +4,10 @@ use engine::core::content::{Content, ContentId, ContentRow};
 use engine::core::math::Pos;
 use engine::core::script::Value;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
-use engine::systems::GameSettings;
 use engine::systems::actor::Name;
 use engine::systems::area::AreaDef;
 use engine::systems::area::transition::Discovered;
 use engine::systems::class::{Class, ClassDef};
-use engine::systems::dialogue;
 use engine::systems::equipment::{Equipment, EquipmentSlot};
 use engine::systems::history::{History, HistoryEntry, HistoryTopic};
 use engine::systems::item::{Inventory, ItemDef, ItemStack};
@@ -23,8 +21,9 @@ use engine::systems::player::{SpawnPolicy, SpawnRules, Xp};
 use engine::systems::quest::{QuestDef, QuestLog, QuestResult};
 use engine::systems::script::Place;
 use engine::systems::shop::{Sale, ShopDef, ShopLedger};
-use engine::systems::stat::{StatKind, StatMap, Stats};
+use engine::systems::stat::{StatKind, Stats};
 use engine::systems::text::LineText;
+use engine::systems::{GameSettings, dialogue};
 use serde_json::json;
 use testkit::{Game, Map, Sim};
 
@@ -237,7 +236,7 @@ fn tess(content: &Content, start: Place) -> CharacterSnapshot {
         skills: Vec::new(),
         hotbar: Vec::new(),
         basic_attack: None,
-        stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
+        stats: Stats(BTreeMap::from([(StatKind::Damage, 9.0)])),
         bag: vec![
             ItemStack::new(id(content, "tusk"), 5),
             ItemStack::new(id(content, "gold"), 20),

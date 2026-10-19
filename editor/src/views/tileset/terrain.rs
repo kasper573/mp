@@ -164,7 +164,7 @@ pub fn legend(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         return;
     };
     let view = editor.views.tileset.view_mut(&tileset.key);
-    widgets::combo_box(("terrain-set", &tileset.key))
+    widgets::combo(("terrain-set", &tileset.key))
         .selected_text(theme::mono(&set))
         .width(110.0)
         .show_ui(ui, |ui| {

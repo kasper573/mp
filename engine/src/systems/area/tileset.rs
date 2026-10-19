@@ -3,22 +3,24 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
 use crate::core::content::{ContentId, ContentProblem, ContentRow, RowCheck};
-use crate::core::math::{Pos, Rect, WorldPx};
+use crate::core::math::{Pos, Rect, Size, WorldPx};
 
 pub type TilesetId = ContentId<TilesetDef>;
 pub type SurfaceId = ContentId<SurfaceDef>;
 
 pub const MAX_TILE_PX: u32 = 512;
+pub const MAX_TILE_FRAMES: usize = 256;
+pub const MAX_TILE_FRAME_MS: u32 = 60_000;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TilesetDef {
-    pub image: AssetRef,
+    pub image: ImageRef,
     pub tile: u32,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub terrains: BTreeMap<String, Vec<String>>,
@@ -54,7 +56,7 @@ impl ContentRow for TilesetDef {
                     format!("{pointer}/animation"),
                     data.animation.len(),
                     2,
-                    256,
+                    MAX_TILE_FRAMES,
                     "frames",
                 );
                 for (index, frame) in data.animation.iter().enumerate() {
@@ -62,7 +64,7 @@ impl ContentRow for TilesetDef {
                         format!("{pointer}/animation/{index}/ms"),
                         frame.ms,
                         1,
-                        60_000,
+                        MAX_TILE_FRAME_MS,
                         "whole milliseconds",
                     );
                     if self
@@ -223,7 +225,7 @@ impl TilesetGrid {
                 (tile % self.columns) as f32 * tile_px,
                 (tile / self.columns) as f32 * tile_px,
             ),
-            crate::core::math::Size::splat(tile_px),
+            Size::splat(tile_px),
         )
     }
 }

@@ -10,7 +10,6 @@ use engine::core::content::sync::{
 use engine::core::content::version;
 use engine::core::platform::{FetchFailure, LocalFuture};
 use engine::core::time::{Backoff, Seconds};
-
 use testkit::{Game, wav};
 
 use crate::store::MemoryStore;

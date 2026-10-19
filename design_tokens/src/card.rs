@@ -4,15 +4,13 @@ use egui::{
     StrokeKind, TextureId, Ui, UiBuilder, Vec2, WidgetInfo, WidgetType,
 };
 
-use crate::face::{Face, TextRole};
+use crate::face::TextRole;
 use crate::glyph::{self, Kind, Mark};
 use crate::sheet::{self, Depth};
 use crate::{controls, ink};
 
 pub const WIDTH: f32 = 300.0;
 pub const DOCKED_WIDTH: f32 = 480.0;
-pub const QUESTS_PAGE_WIDTH: f32 = 320.0;
-pub const SHOP_PAGE_WIDTH: f32 = 290.0;
 pub const MAX_HEIGHT: f32 = 420.0;
 pub const MARGIN: f32 = 6.0;
 pub const CORNER: f32 = 10.0;
@@ -372,12 +370,4 @@ pub fn requirement(ui: &mut Ui, met: bool, text: &str) {
 pub fn foot(ui: &mut Ui, text: &str) {
     ui.add_space(2.0);
     ui.add(egui::Label::new(TextRole::Small.rich(text).color(ink::INK3)).wrap());
-}
-
-pub fn faint(text: &str) -> egui::RichText {
-    TextRole::CardBody.rich(text).color(ink::INK3)
-}
-
-pub fn bold(text: &str) -> egui::RichText {
-    egui::RichText::new(text).font(Face::BookBold.id(TextRole::CardBody.size()))
 }

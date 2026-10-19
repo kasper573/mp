@@ -1,7 +1,6 @@
 {
   "name": "The fairy's mushroom",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 16,
       "height": 13

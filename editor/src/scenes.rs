@@ -1,8 +1,15 @@
 use std::path::PathBuf;
 
+use engine::core::content::ContentRow;
+use engine::systems::actor::model::ModelDef;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::world_map::{Note, Region};
 use engine::systems::area::{self, AreaDef};
+use engine::systems::class::ClassDef;
+use engine::systems::script::ScriptDef;
 use serde::Deserialize;
+use strum::VariantNames;
 
 use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
 use crate::import::ImportStep;
@@ -11,22 +18,23 @@ use crate::tabs::EditorTab;
 use crate::views::area::resize::ResizeDialog;
 use crate::views::area::{blueprint, shapes};
 use crate::views::character::CharacterSection;
+use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
-use crate::views::model::{FrameCueKind, ModelPage, ModelStrip, busts};
+use crate::views::model::{self, FrameCueKind, ModelPage, ModelStrip, busts};
 use crate::views::script::{PendingScriptAction, ScriptOwner};
 use crate::views::tileset::{
-    NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
+    self, NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
     TilesetMode, WalkBrush,
 };
 use crate::views::world::{
-    ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
+    self, ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, VariantNames)]
 #[serde(rename_all = "snake_case")]
-pub enum Step {
+#[strum(serialize_all = "snake_case")]
+pub enum SceneStep {
     Area(String),
     Blueprint(String),
     Resize(String),
@@ -158,7 +166,7 @@ pub struct SetTiming {
 pub enum TilesetStep {
     Open(String),
     Mode(TilesetMode),
-    Brush(TileBrush),
+    Brush(SceneBrush),
     Select(TileSelection),
     Tile(u32),
     Set(String),
@@ -171,7 +179,7 @@ pub enum TilesetStep {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TileBrush {
+pub enum SceneBrush {
     Walk(WalkBrush),
     Surface(String),
     NoSurface,
@@ -265,23 +273,23 @@ pub enum WorldLayer {
     Givers,
 }
 
-pub fn open(editor: &mut Editor, steps: &[Step]) {
+pub fn open(editor: &mut Editor, steps: &[SceneStep]) {
     for step in steps {
         open_one(editor, step);
     }
 }
 
-fn open_one(editor: &mut Editor, step: &Step) {
+fn open_one(editor: &mut Editor, step: &SceneStep) {
     match step {
-        Step::Area(key) => {
-            editor.select(RowSelection::row("area", key));
+        SceneStep::Area(key) => {
+            editor.select(RowSelection::row(AreaDef::TABLE, key));
             editor.open_tab(EditorTab::Area { key: key.clone() });
         }
-        Step::Blueprint(key) => {
-            editor.select(RowSelection::row("blueprint", key));
+        SceneStep::Blueprint(key) => {
+            editor.select(RowSelection::row(BlueprintDef::TABLE, key));
             editor.open_tab(EditorTab::Blueprint { key: key.clone() });
         }
-        Step::Part {
+        SceneStep::Part {
             table,
             key,
             modules,
@@ -294,7 +302,7 @@ fn open_one(editor: &mut Editor, step: &Step) {
             });
             editor.open_tab(EditorTab::for_row(table, key));
         }
-        Step::Resize(key) => {
+        SceneStep::Resize(key) => {
             let size = editor
                 .project
                 .as_ref()
@@ -309,22 +317,21 @@ fn open_one(editor: &mut Editor, step: &Step) {
                 error: None,
             }));
         }
-        Step::Row { table, key } => {
-            editor.select(RowSelection::row(table, key));
-            editor.open_tab(EditorTab::for_row(table, key));
+        SceneStep::Row { table, key } => {
+            editor.open_row(table, key);
         }
-        Step::Rows { table, keys } => {
+        SceneStep::Rows { table, keys } => {
             editor.select(RowSelection::rows(table, keys.clone()));
             editor.open_tab(EditorTab::Rows {
                 table: table.clone(),
                 keys: keys.clone(),
             });
         }
-        Step::Fold { table, modules } => fold(editor, table, modules, true),
-        Step::Unfold { table, modules } => fold(editor, table, modules, false),
-        Step::Delete { table, key } => rows::delete_dialog(editor, table, vec![key.clone()]),
-        Step::Duplicate { table, key } => rows::duplicate(editor, table, key),
-        Step::Clipboard { table, key, module } => {
+        SceneStep::Fold { table, modules } => fold(editor, table, modules, true),
+        SceneStep::Unfold { table, modules } => fold(editor, table, modules, false),
+        SceneStep::Delete { table, key } => rows::delete_dialog(editor, table, vec![key.clone()]),
+        SceneStep::Duplicate { table, key } => rows::duplicate(editor, table, key),
+        SceneStep::Clipboard { table, key, module } => {
             let Some(module_value) = editor
                 .row_value(table, key)
                 .and_then(|value| value["modules"].get(*module).cloned())
@@ -336,23 +343,21 @@ fn open_one(editor: &mut Editor, step: &Step) {
             let mut relative = module_value;
             shapes::shift(&mut relative, -origin.x, -origin.y);
             editor.clipboard = Some(Clipboard {
-                table: table.clone(),
                 from: key.clone(),
                 modules: vec![relative],
                 origin: Some(origin),
             });
         }
-        Step::Script(target) => open_script(editor, target),
-        Step::Node(names) => {
+        SceneStep::Script(target) => open_script(editor, target),
+        SceneStep::Node(names) => {
             if let Some(owner) = last_script_owner(editor) {
-                editor.views.script.focus_on(&owner);
                 let parts = names.iter().map(|name| format!("node:{name}")).collect();
                 editor.select(RowSelection::parts(owner.table(), owner.key(), parts));
             }
         }
-        Step::MakeShared => set_pending(editor, PendingScriptAction::MakeShared),
-        Step::MakeInline => set_pending(editor, PendingScriptAction::MakeInline),
-        Step::Connect { from, field, to } => set_pending(
+        SceneStep::MakeShared => set_pending(editor, PendingScriptAction::MakeShared),
+        SceneStep::MakeInline => set_pending(editor, PendingScriptAction::MakeInline),
+        SceneStep::Connect { from, field, to } => set_pending(
             editor,
             PendingScriptAction::Connect {
                 from: from.clone(),
@@ -360,18 +365,18 @@ fn open_one(editor: &mut Editor, step: &Step) {
                 to: to.clone(),
             },
         ),
-        Step::Bottom(tab) => editor.panels.bottom = *tab,
-        Step::Model(step) => model_step(editor, step),
-        Step::Tileset(step) => tileset_step(editor, step),
-        Step::Sheet(step) => sheet_step(editor, step),
-        Step::World(step) => {
+        SceneStep::Bottom(tab) => editor.panels.bottom = *tab,
+        SceneStep::Model(step) => model_step(editor, step),
+        SceneStep::Tileset(step) => tileset_step(editor, step),
+        SceneStep::Sheet(step) => sheet_step(editor, step),
+        SceneStep::World(step) => {
             editor.open_tab(EditorTab::World);
             world_step(editor, step);
         }
-        Step::Import(step) => editor.jobs.script.push_back(step.clone()),
-        Step::Section(section) => editor.views.character.section = *section,
-        Step::Tree { key, node } => {
-            editor.open_tab(EditorTab::for_row(class::TABLE, key));
+        SceneStep::Import(step) => editor.jobs.script.push_back(step.clone()),
+        SceneStep::Section(section) => editor.views.character.section = *section,
+        SceneStep::Tree { key, node } => {
+            editor.open_tab(EditorTab::for_row(ClassDef::TABLE, key));
             editor
                 .views
                 .class
@@ -379,19 +384,19 @@ fn open_one(editor: &mut Editor, step: &Step) {
                 .insert(key.clone(), class::ClassPage::Tree);
             class::select_node(editor, key, node.as_deref());
         }
-        Step::Save => {
+        SceneStep::Save => {
             editor.save();
         }
-        Step::Game => {
+        SceneStep::Game => {
             editor.select(RowSelection::game());
             editor.open_tab(EditorTab::Game);
         }
-        Step::Asset(path) => {
+        SceneStep::Asset(path) => {
             editor.select(RowSelection::row("asset", path));
             editor.open_tab(EditorTab::Asset { path: path.clone() });
         }
-        Step::Dialog(DialogName::Keys) => editor.dialogs.push(ModalDialog::Keys),
-        Step::Dialog(DialogName::Binaries) => editor.dialogs.push(ModalDialog::Binaries),
+        SceneStep::Dialog(DialogName::Keys) => editor.dialogs.push(ModalDialog::Keys),
+        SceneStep::Dialog(DialogName::Binaries) => editor.dialogs.push(ModalDialog::Binaries),
     }
 }
 
@@ -411,7 +416,7 @@ fn fold(editor: &mut Editor, table: &str, modules: &[usize], folded: bool) {
 fn open_script(editor: &mut Editor, target: &ScriptTarget) {
     match target {
         ScriptTarget::Shared { key } => {
-            editor.select(RowSelection::row("script", key));
+            editor.select(RowSelection::row(ScriptDef::TABLE, key));
             editor.open_tab(EditorTab::Script(ScriptOwner::Shared { key: key.clone() }));
         }
         ScriptTarget::Inline {
@@ -498,13 +503,13 @@ fn sheet_step(editor: &mut Editor, step: &SheetStep) {
 
 fn model_step(editor: &mut Editor, step: &ModelStep) {
     if let ModelStep::Open(key) = step {
-        editor.select(RowSelection::row("model", key));
+        editor.select(RowSelection::row(ModelDef::TABLE, key));
         editor.open_tab(EditorTab::Model { key: key.clone() });
         return;
     }
     let key = match ui::active_tab(editor) {
         Some(EditorTab::Model { key }) => key,
-        _ if editor.selection.table == "model" && !editor.selection.keys.is_empty() => {
+        _ if editor.selection.table == ModelDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
         _ => return,
@@ -521,13 +526,13 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
             view.page = ModelPage::Busts;
             if let Some(face) = face {
                 view.face = Some(face.clone());
-                if let Some(row) = editor.row_value("model", &key)
+                if let Some(row) = editor.row_value(ModelDef::TABLE, &key)
                     && let Some(found) = busts::faces(&row)
                         .into_iter()
                         .find(|found| found.name == *face)
                 {
                     editor.select(RowSelection {
-                        table: "model".to_owned(),
+                        table: ModelDef::TABLE.to_owned(),
                         keys: vec![key.clone()],
                         parts: vec![found.pointer],
                     });
@@ -567,13 +572,13 @@ fn show_strip(editor: &mut Editor, key: &str, page: ModelPage, step: &StripView)
 
 fn tileset_step(editor: &mut Editor, step: &TilesetStep) {
     if let TilesetStep::Open(key) = step {
-        editor.select(RowSelection::row("tileset", key));
+        editor.select(RowSelection::row(TilesetDef::TABLE, key));
         editor.open_tab(EditorTab::Tileset { key: key.clone() });
         return;
     }
     let key = match ui::active_tab(editor) {
         Some(EditorTab::Tileset { key }) => key,
-        _ if editor.selection.table == "tileset" && !editor.selection.keys.is_empty() => {
+        _ if editor.selection.table == TilesetDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
         _ => return,
@@ -585,9 +590,9 @@ fn tileset_step(editor: &mut Editor, step: &TilesetStep) {
         TilesetStep::Brush(brush) => {
             let view = editor.views.tileset.view_mut(&key);
             match brush {
-                TileBrush::Walk(walk) => view.walk = *walk,
-                TileBrush::Surface(surface) => view.surface = Some(surface.clone()),
-                TileBrush::NoSurface => view.surface = None,
+                SceneBrush::Walk(walk) => view.walk = *walk,
+                SceneBrush::Surface(surface) => view.surface = Some(surface.clone()),
+                SceneBrush::NoSurface => view.surface = None,
             }
         }
         TilesetStep::Select(selection) => {

@@ -19,7 +19,7 @@ use crate::core::platform::ClientPlatform;
 use crate::core::render::tile_to_window;
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::tiling::{CellPos, TilePos, Tiles};
-use crate::core::time::Seconds;
+use crate::core::time::{self, Seconds};
 use crate::core::vfx::{VfxId, VfxInstance, VfxSite};
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
@@ -36,9 +36,9 @@ use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro, pop};
 use crate::systems::npc::{Npc, NpcId};
-use crate::systems::player::{Owner, commands_locked, session};
+use crate::systems::player::{PlayedBy, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
-use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
+use crate::systems::script::{OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
 use crate::systems::skill::{self, Rank, SkillId, bar::SlotReport};
 use crate::systems::stat::{StatKind, Stats};
@@ -77,9 +77,9 @@ pub struct ProbeSnapshot {
     pub area: Option<AreaId>,
     pub me: Option<ProbeBody>,
     pub actors: Vec<ProbeBody>,
-    pub props: Vec<ProbeFixture>,
+    pub objects: Vec<ProbeObject>,
     pub items: Vec<ProbeGroundItem>,
-    pub portals: Vec<ProbeExit>,
+    pub warps: Vec<ProbeWarp>,
     /// What the interface shows: text, icons, fields and sliders, less what is scrolled or clipped
     /// out of sight.
     pub ui: Vec<ProbeUiElement>,
@@ -167,7 +167,7 @@ pub struct ProbeBody {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeFixture {
+pub struct ProbeObject {
     pub id: Entity,
     pub name: Option<String>,
     pub label: Option<String>,
@@ -186,7 +186,7 @@ pub struct ProbeGroundItem {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeExit {
+pub struct ProbeWarp {
     pub name: String,
     pub to: AreaId,
     pub at: Pos<Tiles>,
@@ -616,7 +616,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         statuses: me
             .and_then(|seen| world.get::<status::Statuses>(seen).cloned())
             .map(|statuses| {
-                let now = session::server_now(world);
+                let now = time::server_now(world);
                 statuses
                     .0
                     .iter()
@@ -636,9 +636,9 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         skills: me.and_then(|me| skills(world, me)),
         me: me.and_then(|me| body(world, me)),
         actors: actors(world, me, area),
-        props: props(world, area),
+        objects: objects(world, area),
         items: items(world, area),
-        portals: portals(world, area),
+        warps: warps(world, area),
         ui: ui(world),
         covered: covered(world),
         soundscape: soundscape(world),
@@ -801,7 +801,7 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
             .map_or_else(String::new, |name| name.name.clone()),
         model,
         flies,
-        player: entity.contains::<Owner>(),
+        player: entity.contains::<PlayedBy>(),
         at,
         drawn: entity.get::<RenderPosition>().map_or(at, |drawn| drawn.0),
         aim: hitbox.center(),
@@ -845,19 +845,19 @@ fn actors(world: &mut World, me: Option<Entity>, area: Option<AreaId>) -> Vec<Pr
         .collect()
 }
 
-fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
+fn objects(world: &mut World, area: Option<AreaId>) -> Vec<ProbeObject> {
     let viewer = session::me(world);
     let attention = viewer
         .and_then(|viewer| world.get::<Attention>(viewer))
         .cloned();
-    let fixtures: Vec<(Entity, ProbeFixture)> = world
+    let objects: Vec<(Entity, ProbeObject)> = world
         .query::<(Entity, &AreaObject, &Position, &Hitbox, &AreaTag)>()
         .iter(world)
         .filter(|(.., tag)| area.is_none_or(|area| tag.area == area))
         .filter(|(_, object, ..)| object.look.is_some())
         .map(|(entity, object, at, hitbox, _)| {
             let hitbox = at.pos.hitbox(hitbox.size);
-            let fixture = ProbeFixture {
+            let seen = ProbeObject {
                 id: entity,
                 name: object.name.clone(),
                 label: object.label.clone(),
@@ -869,14 +869,14 @@ fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
                     .map(|attention| attention.of(entity).to_vec())
                     .unwrap_or_default(),
             };
-            (entity, fixture)
+            (entity, seen)
         })
         .collect();
-    fixtures
+    objects
         .into_iter()
-        .map(|(entity, fixture)| ProbeFixture {
-            aim: aim(world, entity, fixture.hitbox),
-            ..fixture
+        .map(|(entity, seen)| ProbeObject {
+            aim: aim(world, entity, seen.hitbox),
+            ..seen
         })
         .collect()
 }
@@ -922,19 +922,15 @@ fn items(world: &mut World, area: Option<AreaId>) -> Vec<ProbeGroundItem> {
         .collect()
 }
 
-fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
+fn warps(world: &World, area: Option<AreaId>) -> Vec<ProbeWarp> {
     let Some(area) = area else {
         return Vec::new();
     };
     let content = world.resource::<Content>();
     let scripts = world.resource::<RiftScripts>();
-    let mut exits: Vec<ProbeExit> = area::objects(area::placed(content, area))
+    let mut warps: Vec<ProbeWarp> = area::objects(area::placed(content, area))
         .filter_map(|(index, object)| {
-            let owner = OwnerRow {
-                kind: OwnerKind::Object,
-                row: area.raw(),
-                object: Some(index),
-            };
+            let owner = OwnerRow::of_object(area, index);
             let warp = scripts
                 .may_do(owner)
                 .reaches
@@ -943,7 +939,7 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
                     Reach::Warp(place) => Some(*place),
                     _ => None,
                 })?;
-            Some(ProbeExit {
+            Some(ProbeWarp {
                 name: object.name.clone().unwrap_or_default(),
                 to: warp.area,
                 at: object.shape.center(),
@@ -951,8 +947,8 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
             })
         })
         .collect();
-    exits.sort_by(|a, b| a.name.cmp(&b.name));
-    exits
+    warps.sort_by(|a, b| a.name.cmp(&b.name));
+    warps
 }
 
 fn ui(world: &mut World) -> Vec<ProbeUiElement> {
@@ -1118,7 +1114,7 @@ fn remember_vfx(
 }
 
 fn vfx_seen(world: &mut World) -> Vec<ProbeVfx> {
-    let now = session::server_now(world);
+    let now = time::server_now(world);
     let mut seen = world.resource_mut::<VfxSeen>();
     if let Some(now) = now {
         seen.0

@@ -1,16 +1,15 @@
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
-use engine::core::content::ModuleRule;
+use engine::core::content::{ModuleRule, row_file};
+use engine::core::script::ScriptModuleKind;
 use engine::systems::registry;
 use serde_json::Value;
 
-use super::{LEFT_COLUMN, act, add_module_popup};
-use super::{theme, widgets};
+use super::{LEFT_COLUMN, act, add_module_popup, theme, widgets};
 use crate::app::Editor;
-use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
 use crate::value::RowValue;
 
@@ -154,7 +153,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                                 }
                             }
                         }
-                    } else if tag == "shared_script" {
+                    } else if ScriptModuleKind::of(tag) == Some(ScriptModuleKind::Shared) {
                         let mut by_script: BTreeMap<String, Vec<String>> = BTreeMap::new();
                         for (key, _, module) in &firsts {
                             by_script
@@ -242,12 +241,8 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
         let tag = template.kind_or("module").to_owned();
         let mut skipped: Vec<String> = Vec::new();
         for (key, value) in &values {
-            let present = value["modules"]
-                .as_array()
-                .is_some_and(|list| list.iter().any(|m| m["type"] == template["type"]));
-            let blocked =
-                present && registry.module_rule(&table, &template) == Some(ModuleRule::AtMostOne);
-            if blocked {
+            let modules = value["modules"].as_array().map_or(&[][..], Vec::as_slice);
+            if !registry.takes_module(&table, modules, &template) {
                 skipped.push(key.clone());
                 continue;
             }
@@ -346,32 +341,30 @@ pub(super) fn shared_field(
             })
             .collect();
         let id = ui.id().with(path).with("set-all");
-        let mut draft = draft_of(ui, id).unwrap_or_default();
-        let response = egui::Frame::new()
-            .fill(theme::INPUT)
-            .stroke(egui::Stroke::new(1.0, theme::BORDER))
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(6, 2))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width() - 12.0);
-                ui.add(
-                    egui::TextEdit::singleline(&mut draft)
-                        .frame(egui::Frame::NONE)
-                        .hint_text(RichText::new(format!("{} values", distinct.len())).italics())
-                        .desired_width(f32::INFINITY),
-                )
-            });
-        let response = response.inner.on_hover_text(listing.join("\n"));
-        if response.changed() {
-            set_draft(ui, id, &draft.clone());
-        }
-        if forms::committed(ui, &response) {
-            clear_draft(ui, id);
-            if !draft.trim().is_empty() {
-                let parsed: Value = serde_json::from_str(draft.trim())
-                    .unwrap_or(Value::String(draft.trim().to_owned()));
-                rows.set_all(path, &parsed);
-            }
+        let typed = forms::drafted(ui, id, "", |ui, draft| {
+            egui::Frame::new()
+                .fill(theme::INPUT)
+                .stroke(egui::Stroke::new(1.0, theme::BORDER))
+                .corner_radius(4.0)
+                .inner_margin(egui::Margin::symmetric(6, 2))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width() - 12.0);
+                    ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .frame(egui::Frame::NONE)
+                            .hint_text(
+                                RichText::new(format!("{} values", distinct.len())).italics(),
+                            )
+                            .desired_width(f32::INFINITY),
+                    )
+                })
+                .inner
+                .on_hover_text(listing.join("\n"))
+        });
+        if let Some(draft) = typed.filter(|draft| !draft.trim().is_empty()) {
+            let parsed: Value = serde_json::from_str(draft.trim())
+                .unwrap_or(Value::String(draft.trim().to_owned()));
+            rows.set_all(path, &parsed);
         }
     });
 }
@@ -396,9 +389,7 @@ pub(super) fn free_singles(
         .filter(|variant| {
             let template = schema::variant_template(cx.root, variant);
             registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne)
-                && !list
-                    .iter()
-                    .any(|module| module.kind() == variant.tag.as_str())
+                && registry.takes_module(table, &list, &template)
         })
         .map(|variant| variant.tag.replace('_', " "))
         .collect()

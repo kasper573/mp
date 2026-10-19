@@ -5,10 +5,11 @@ use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
 use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::motion::SheetPose;
 use design_tokens::sheet::{self, Sheet};
-use design_tokens::{TextRole, ink, slip};
+use design_tokens::{ink, slip};
 use egui::{
     Align, Align2, Color32, Id, LayerId, Layout, Pos2, Rect, Sense, Ui, UiBuilder, Vec2,
     WidgetInfo, WidgetType,
@@ -18,21 +19,20 @@ use super::{
     ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, RefusedPick,
     Speaker, SpokenLine,
 };
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
 use crate::core::gui::{self, Afterimage, Band, Tier};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece, Typewriter};
-use crate::systems::actor::model::{BustFigure, Busts, Face, GenericExpression, ModelId};
+use crate::systems::actor::model::{BustFigure, Busts, Expression, GenericExpression, ModelId};
 use crate::systems::actor::{ActorModel, Name};
 use crate::systems::hud;
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemId, card};
 use crate::systems::npc::Npc;
-use crate::systems::player;
-use crate::systems::player::session;
+use crate::systems::player::{self, session};
 use crate::systems::screen::ClientScreen;
 
 const CHOICE_SHORTCUTS: [InputAction; 9] = [
@@ -69,9 +69,9 @@ const SLIDE: f32 = 70.0;
 const BUST_EASE: f32 = 0.3;
 const UNLIT: Color32 = Color32::from_rgb(128, 128, 143);
 
-pub struct StagePlugin;
+pub struct DialogueStagePlugin;
 
-impl Plugin for StagePlugin {
+impl Plugin for DialogueStagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Stage>()
             .init_resource::<StageDrawn>()
@@ -167,10 +167,6 @@ pub fn dialogue_rect(world: &World) -> Option<Rect> {
     world.resource::<StageDrawn>().dialogue
 }
 
-pub fn box_right(world: &World) -> Option<f32> {
-    dialogue_rect(world).map(|dialogue| dialogue.right())
-}
-
 pub fn rects(world: &World) -> Vec<Rect> {
     let drawn = world.resource::<StageDrawn>();
     drawn
@@ -225,7 +221,7 @@ struct Shown {
     choices: Vec<ChoiceView>,
     picked: bool,
     typed_since: Option<Duration>,
-    faces: HashMap<Speaker, Face>,
+    faces: HashMap<Speaker, Expression>,
     remark: Option<SpokenLine>,
     remarks_seen: u32,
     refusals_seen: u32,
@@ -259,7 +255,7 @@ enum Depth {
 struct CastMember {
     who: Speaker,
     since: Duration,
-    bust: AssetRef,
+    bust: ImageRef,
     model: ModelId,
     side: Side,
     depth: Depth,
@@ -338,7 +334,7 @@ fn follow_conversation(world: &mut World) {
 }
 
 impl Shown {
-    fn of(now: Conversation, faces: HashMap<Speaker, Face>) -> Shown {
+    fn of(now: Conversation, faces: HashMap<Speaker, Expression>) -> Shown {
         Shown {
             step: now.step,
             node: now.node,
@@ -1136,7 +1132,9 @@ fn busts(ui: &mut Ui, world: &mut World, dialogue: Rect, screen: Rect) {
                 Side::Right => 1.0,
             };
             let rect = rect.translate(Vec2::new(away * SLIDE * (1.0 - shown), 0.0));
-            let tint = lerp_color(UNLIT, Color32::WHITE, lit).gamma_multiply(shown);
+            let tint = UNLIT
+                .lerp_to_gamma(Color32::WHITE, lit)
+                .gamma_multiply(shown);
             ui.put(rect, image.widget(size).tint(tint));
         }
     }
@@ -1167,15 +1165,6 @@ fn bust_rect(
     };
     let bottom = screen.bottom() - screen.height() * lift;
     Rect::from_min_size(Pos2::new(left, bottom - size.y), size)
-}
-
-fn lerp_color(from: Color32, to: Color32, t: f32) -> Color32 {
-    let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
-    Color32::from_rgb(
-        mix(from.r(), to.r()),
-        mix(from.g(), to.g()),
-        mix(from.b(), to.b()),
-    )
 }
 
 fn cast_members(world: &World, now: Duration, before: &[CastMember]) -> Vec<CastMember> {
@@ -1219,7 +1208,7 @@ fn cast_members(world: &World, now: Duration, before: &[CastMember]) -> Vec<Cast
                 .faces
                 .get(&who)
                 .cloned()
-                .unwrap_or(Face::Generic(GenericExpression::Neutral));
+                .unwrap_or(Expression::Generic(GenericExpression::Neutral));
             let bust = busts
                 .face(&face)
                 .unwrap_or_else(|| busts.generic.of(GenericExpression::Neutral));

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use design_tokens::ink::Ground;
-use design_tokens::{TextRole, face, ink, sheet};
+use design_tokens::face::{self, TextRole};
+use design_tokens::ink::{self, Ground};
+use design_tokens::sheet;
 use egui::{Color32, Id, Rect, Ui, Vec2};
 use strum::{IntoStaticStr, VariantArray};
 

@@ -1,7 +1,6 @@
 {
   "name": "The chapel",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 24,
       "height": 16

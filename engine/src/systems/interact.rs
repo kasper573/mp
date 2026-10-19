@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bevy_app::App;
 use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
@@ -8,16 +10,13 @@ use strum::IntoStaticStr;
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::systems::actor;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
-use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
 use crate::systems::player::{player_requests, session};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
-use crate::systems::script::{self, EventKind, RiftEvent, RiftInstances};
-use crate::systems::stat;
-use crate::systems::visibility;
+use crate::systems::script::{self, EventKind, Procedure, RiftEvent, RiftInstances};
+use crate::systems::{actor, dialogue, stat, visibility};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -53,6 +52,22 @@ impl Verb {
 pub struct Interactive {
     pub verb: Verb,
     pub reach: Tiles,
+}
+
+impl Interactive {
+    /// How the first of `procedures` that answers an interaction is reached, if any does.
+    pub fn of(procedures: &[Arc<Procedure>]) -> Option<Interactive> {
+        procedures
+            .iter()
+            .flat_map(|procedure| procedure.entry(EventKind::Interacted))
+            .find_map(|(_, event)| match event {
+                RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
+                    verb: *verb,
+                    reach: *reach,
+                }),
+                _ => None,
+            })
+    }
 }
 
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Copy, Debug, PartialEq)]

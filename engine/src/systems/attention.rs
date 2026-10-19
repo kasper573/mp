@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{ContentId, ContentRow, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
@@ -12,8 +12,7 @@ use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::interact::{self, Interactive};
 use crate::systems::movement::Position;
 use crate::systems::player::Players;
-use crate::systems::stat;
-use crate::systems::visibility;
+use crate::systems::{stat, visibility};
 
 const REFRESH_ROUNDS: u32 = 3;
 const MARKED_RANGE: Tiles = Tiles(visibility::VIEW_DISTANCE.0 + 4.0);
@@ -27,7 +26,7 @@ pub type AttentionId = ContentId<AttentionDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct AttentionDef {
-    pub icon: AssetRef,
+    pub icon: ImageRef,
 }
 
 impl ContentRow for AttentionDef {

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use super::ParamValue;
 use crate::core::content::{
     ContentId, ContentProblem, ContentRow, ErrorPlace, Loading, RowCheck, asset_file,
 };
+use crate::core::math::Rgba;
 
 pub type VfxShaderId = ContentId<VfxShaderDef>;
 
@@ -58,7 +59,7 @@ impl ParamKind {
         match self {
             ParamKind::Number => ParamValue::Number(1.0),
             ParamKind::Bool => ParamValue::Bool(false),
-            ParamKind::Color => ParamValue::Color(crate::core::math::Rgba::WHITE),
+            ParamKind::Color => ParamValue::Color(Rgba::WHITE),
         }
     }
 }
@@ -379,7 +380,7 @@ impl BodyShape {
 }
 
 impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.place {
             ErrorPlace::Text { line, column } => write!(f, "{line}:{column}: {}", self.message),
             _ => write!(f, "{}", self.message),

@@ -3,7 +3,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{RenderTarget, ScalingMode};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, TextureFormat};
+use bevy::render::render_resource::{AsBindGroup, ShaderType, TextureFormat};
 use bevy::shader::ShaderRef;
 use bevy::sprite_render::Material2d;
 use bevy::window::PrimaryWindow;
@@ -61,13 +61,28 @@ impl WorldTargets {
     }
 }
 
+/// Window pixels per pixel of the world's render target.
 #[derive(Resource, Default, Clone, Copy)]
-pub struct Viewport {
-    pub scale: f32,
+pub struct PresentScale(pub f32);
+
+#[derive(Resource, ShaderType, Clone, Copy, PartialEq, Debug)]
+pub struct ScreenGrade {
+    pub scale: Vec3,
+    pub offset: Vec3,
 }
 
-#[derive(Resource, Default)]
-pub struct ScreenTint(pub Vec4);
+impl ScreenGrade {
+    pub const NONE: ScreenGrade = ScreenGrade {
+        scale: Vec3::ONE,
+        offset: Vec3::ZERO,
+    };
+}
+
+impl Default for ScreenGrade {
+    fn default() -> ScreenGrade {
+        ScreenGrade::NONE
+    }
+}
 
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 pub(super) struct Present {
@@ -75,7 +90,7 @@ pub(super) struct Present {
     #[sampler(1)]
     world: Handle<Image>,
     #[uniform(2)]
-    tint: Vec4,
+    grade: ScreenGrade,
     #[texture(3)]
     snapshot: Handle<Image>,
     #[uniform(4)]
@@ -101,7 +116,7 @@ pub(super) fn setup(
     let targets = WorldTargets::new(&mut images, (target_w, target_h));
     let screen = materials.add(Present {
         world: Handle::default(),
-        tint: Vec4::ZERO,
+        grade: ScreenGrade::NONE,
         snapshot: Handle::default(),
         cut: CutUniform::IDLE,
     });
@@ -165,11 +180,11 @@ pub(super) fn fit(
     mut camera: Query<(&mut RenderTarget, &mut Projection), With<WorldCamera>>,
     mut quad: Query<(&mut Transform, &MeshMaterial2d<Present>), With<Screen>>,
     mut materials: ResMut<Assets<Present>>,
-    mut viewport: ResMut<Viewport>,
+    mut scale: ResMut<PresentScale>,
 ) {
     let (width, height) = (window.resolution.width(), window.resolution.height());
     let (target_w, target_h) = target_size(&window);
-    viewport.scale = height / target_h as f32;
+    scale.0 = height / target_h as f32;
     if targets.size != (target_w, target_h) {
         // A fresh live texture rather than a resized one: the screen's bind group would keep the old
         // texture otherwise. The held frame keeps its size and is stretched over the window, so a
@@ -190,7 +205,7 @@ pub(super) fn fit(
 
 pub(super) fn apply_present(
     time: Res<Time>,
-    tint: Res<ScreenTint>,
+    grade: Res<ScreenGrade>,
     mut transition: ResMut<ActiveTransition>,
     camera: Query<(&Camera, &GlobalTransform), With<WorldCamera>>,
     screen: Query<&MeshMaterial2d<Present>, With<Screen>>,
@@ -202,12 +217,12 @@ pub(super) fn apply_present(
     };
     let unchanged = materials
         .get(&handle)
-        .is_some_and(|material| material.tint == tint.0 && material.cut == cut);
+        .is_some_and(|material| material.grade == *grade && material.cut == cut);
     if unchanged {
         return;
     }
     if let Some(mut material) = materials.get_mut(&handle) {
-        material.tint = tint.0;
+        material.grade = *grade;
         material.cut = cut;
     }
 }

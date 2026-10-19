@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 
+use super::files;
 use crate::app::ChannelInbox;
 
 pub struct FolderWatcher {
@@ -16,6 +17,14 @@ pub struct FolderWatcher {
 }
 
 pub const QUIET: Duration = Duration::from_millis(500);
+
+/// What changed in a watched folder, once it has kept quiet a moment.
+pub enum FolderChange {
+    /// These files, relative to the folder.
+    Files(Vec<String>),
+    /// Anything: the watcher lost track of what.
+    Unknown,
+}
 
 impl FolderWatcher {
     pub fn on(root: &Path) -> FolderWatcher {
@@ -38,7 +47,7 @@ impl FolderWatcher {
         }
     }
 
-    pub fn poll(&mut self) -> Option<Option<Vec<String>>> {
+    pub fn poll(&mut self) -> Option<FolderChange> {
         for event in self.events.drain() {
             match event {
                 Ok(event) => {
@@ -59,7 +68,7 @@ impl FolderWatcher {
         if self.lost {
             self.lost = false;
             self.pending.clear();
-            return Some(None);
+            return Some(FolderChange::Unknown);
         }
         let mut paths: Vec<String> = self
             .pending
@@ -68,20 +77,11 @@ impl FolderWatcher {
             .collect();
         paths.sort();
         paths.dedup();
-        (!paths.is_empty()).then_some(Some(paths))
+        (!paths.is_empty()).then_some(FolderChange::Files(paths))
     }
 }
 
 fn relative(root: &Path, path: &Path) -> Option<String> {
-    let rest = path.strip_prefix(root).ok()?;
-    let name = rest.file_name()?.to_str()?;
-    if name.starts_with('.') || name.ends_with(".tmp") {
-        return None;
-    }
-    Some(
-        rest.components()
-            .map(|part| part.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/"),
-    )
+    let name = path.file_name()?.to_str()?;
+    (!files::hidden(name)).then(|| files::folder_file(root, path))?
 }

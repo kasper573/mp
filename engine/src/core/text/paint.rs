@@ -2,8 +2,8 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bevy::prelude::World;
+use design_tokens::face::{Face, TextRole};
 use design_tokens::ink::Ground;
-use design_tokens::{Face, TextRole};
 use egui::emath::TSTransform;
 use egui::epaint::TextShape;
 use egui::text::{LayoutJob, TextFormat};
@@ -314,19 +314,19 @@ impl Plan {
     }
 }
 
-fn span_format(voice: TextVoice, color: Color32, look: TextLook) -> TextFormat {
+fn span_format(voice: Option<TextVoice>, color: Color32, look: TextLook) -> TextFormat {
     let (normal, whisper, shout) = match look.hand {
         Hand::Book => (Face::Book, Face::BookItalic, Face::BookBold),
         Hand::Bold => (Face::BookBold, Face::BookItalic, Face::BookBold),
         Hand::Quill => (Face::Quill, Face::Quill, Face::Quill),
     };
     let format = match voice {
-        TextVoice::Normal => TextFormat::simple(normal.id(look.size), color),
-        TextVoice::Whisper => TextFormat::simple(
+        None => TextFormat::simple(normal.id(look.size), color),
+        Some(TextVoice::Whisper) => TextFormat::simple(
             whisper.id(look.size * WHISPER_SCALE),
             color.gamma_multiply(WHISPER_ALPHA),
         ),
-        TextVoice::Shout => TextFormat::simple(shout.id(look.size * SHOUT_SCALE), color),
+        Some(TextVoice::Shout) => TextFormat::simple(shout.id(look.size * SHOUT_SCALE), color),
     };
     TextFormat {
         line_height: look.line_height,

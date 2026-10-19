@@ -24,7 +24,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck,
@@ -37,7 +37,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::area::AreaTag;
 use crate::systems::class::{self, NodeKey, SkillPoints, SkillTree};
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment::{self, Equipment};
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
 use crate::systems::npc::{Npc, NpcDef};
@@ -79,7 +79,7 @@ pub type SkillId = ContentId<SkillDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SkillDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     #[serde(default, skip_serializing_if = "SkillKind::is_active")]
     pub kind: SkillKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -89,7 +89,7 @@ pub struct SkillDef {
     pub range: Option<Tiles>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area: Option<Shape>,
-    #[serde(default, skip_serializing_if = "is_no_time")]
+    #[serde(default, skip_serializing_if = "Seconds::is_zero")]
     pub cooldown: Seconds,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
@@ -141,6 +141,20 @@ impl ContentRow for SkillDef {
                     "passive basic attack",
                     "true",
                     "false: a basic attack is used on a click",
+                );
+            }
+        }
+        if self.basic_attack {
+            let answers = "nothing: a click on an enemy must always answer";
+            if !self.cost.is_empty() {
+                check.error("/cost", "basic attack with a cost", "a cost", answers);
+            }
+            if self.cooldown.0 > 0.0 {
+                check.error(
+                    "/cooldown",
+                    "basic attack with a cooldown",
+                    self.cooldown.0,
+                    answers,
                 );
             }
         }
@@ -271,10 +285,6 @@ pub enum Targeting {
 impl Targeting {
     pub fn aimed_at_point(self) -> bool {
         matches!(self, Targeting::AreaAlly | Targeting::AreaEnemy)
-    }
-
-    pub fn aimed_at_actor(self) -> bool {
-        matches!(self, Targeting::SingleAlly | Targeting::SingleEnemy)
     }
 
     pub fn hostile(self) -> bool {
@@ -530,16 +540,6 @@ impl SkillDef {
         self.area
             .map(|shape| shape.grown(Tiles(self.stat(rank, SkillStat::Radius))))
     }
-
-    pub fn answers_used(&self, scripts: &RiftScripts, id: SkillId) -> bool {
-        scripts
-            .may_do(OwnerRow {
-                kind: OwnerKind::Skill,
-                row: id.raw(),
-                object: None,
-            })
-            .answers(EventKind::Used)
-    }
 }
 
 /// The one complaint about a row holding a skill at a rank outside its ranks.
@@ -574,10 +574,7 @@ pub fn check_rank(
 pub fn known(world: &World, actor: Entity) -> BTreeMap<SkillId, Rank> {
     let content = world.resource::<Content>();
     let tree = class::of(world, actor).map(|class| &class.get(content).tree);
-    let worn = world
-        .get::<Equipment>(actor)
-        .into_iter()
-        .flat_map(|equipment| equipment.slots.values().copied());
+    let worn = equipment::worn(world, actor);
     known_from(
         content,
         tree,
@@ -610,6 +607,23 @@ pub fn known_from(
         }
     }
     known
+}
+
+/// Why an actor could not use the skill at all, whatever its aim or readiness.
+pub fn unusable(world: &World, actor: Entity, skill: SkillId) -> Option<String> {
+    let def = skill.get(world.resource::<Content>());
+    if rank_of(world, actor, skill) == Rank::NONE {
+        Some(format!("You don't know {}", def.name))
+    } else if def.kind == SkillKind::Passive {
+        Some(format!("{} is passive: it holds on its own", def.name))
+    } else {
+        None
+    }
+}
+
+/// Why a passive skill takes no hotbar slot.
+pub fn unslotted(def: &SkillDef) -> String {
+    format!("{} is passive: it holds without a slot", def.name)
 }
 
 pub fn rank_of(world: &World, actor: Entity, skill: SkillId) -> Rank {
@@ -738,11 +752,7 @@ pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
     let scripts = content.built::<RiftScripts>();
     for (id, def) in loading.rows::<SkillDef>(&content) {
-        let may_do = scripts.may_do(OwnerRow {
-            kind: OwnerKind::Skill,
-            row: id.raw(),
-            object: None,
-        });
+        let may_do = scripts.may_do(OwnerRow::of_row(id));
         let aspect_events = [
             EventKind::Activated,
             EventKind::Deactivated,
@@ -769,8 +779,4 @@ pub fn check_all(loading: &mut Loading) {
             ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
         );
     }
-}
-
-fn is_no_time(seconds: &Seconds) -> bool {
-    seconds.0 == 0.0
 }

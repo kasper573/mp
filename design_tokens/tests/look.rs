@@ -5,6 +5,7 @@ use design_tokens::motion::{self, Clock};
 use design_tokens::sheet::{Depth, Sheet};
 use design_tokens::{controls, ink};
 use egui::{Context, Pos2, Rect, Vec2};
+use strum::VariantArray;
 
 fn context() -> Context {
     let ctx = Context::default();
@@ -30,7 +31,7 @@ fn pass(ctx: &Context, add: impl FnOnce(&mut egui::Ui)) {
 fn every_face_lays_out_text_in_its_own_font() {
     let ctx = context();
     pass(&ctx, |_| {});
-    for face in Face::ALL {
+    for &face in Face::VARIANTS {
         let width = ctx.fonts_mut(|fonts| {
             fonts
                 .layout_no_wrap("Rusty Sword".to_owned(), face.id(15.0), ink::INK)
@@ -78,15 +79,16 @@ fn a_kinds_word_and_ground_agree_with_the_table() {
     assert_eq!(Kind::Active.word(), "active skill");
     assert_eq!(Kind::Active.ground(), Kind::Usable.ground());
     assert_eq!(Kind::Passive.word(), "passive skill");
-    let words: std::collections::HashSet<&str> = Kind::ALL.iter().map(|kind| kind.word()).collect();
-    assert_eq!(words.len(), Kind::ALL.len());
+    let words: std::collections::HashSet<&str> =
+        Kind::VARIANTS.iter().map(|kind| kind.word()).collect();
+    assert_eq!(words.len(), Kind::VARIANTS.len());
 }
 
 #[test]
 fn every_kind_glyph_decodes_into_a_texture() {
     let ctx = context();
     pass(&ctx, |_| {});
-    for kind in Kind::ALL {
+    for &kind in Kind::VARIANTS {
         let texture = kind.texture(&ctx);
         assert_eq!(texture, kind.texture(&ctx), "{kind:?} is loaded once");
     }

@@ -1,91 +1,173 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, RichText, Stroke, Ui};
+use engine::core::script::{ExprKind, ValueType};
+use engine::systems::script::RiftQueryKind;
 use serde_json::Value;
+use strum::VariantArray;
 
 use crate::forms::{self, FormChange, FormCx};
 use crate::schema::{self, SchemaKind, SchemaVariant};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 
-const COMPARE: [(&str, &str); 6] = [
-    ("equal", "="),
-    ("not_equal", "≠"),
-    ("less", "<"),
-    ("at_most", "≤"),
-    ("more", ">"),
-    ("at_least", "≥"),
-];
-const ARITHMETIC: [(&str, &str); 6] = [
-    ("add", "+"),
-    ("subtract", "−"),
-    ("multiply", "×"),
-    ("divide", "÷"),
-    ("min", "min"),
-    ("max", "max"),
-];
-
-fn sign_of(tag: &str) -> Option<&'static str> {
-    COMPARE
-        .iter()
-        .chain(ARITHMETIC.iter())
-        .find(|(op, _)| *op == tag)
-        .map(|(_, sign)| *sign)
+#[derive(Clone, Copy, PartialEq, Eq, VariantArray)]
+enum QueryGroup {
+    Character,
+    Gear,
+    Quests,
+    Memories,
+    Places,
+    Actors,
+    Ground,
+    Skill,
 }
 
-fn is_operator(tag: &str) -> bool {
-    matches!(tag, "all" | "any" | "not" | "round") || sign_of(tag).is_some()
+impl QueryGroup {
+    fn of(kind: RiftQueryKind) -> QueryGroup {
+        match kind {
+            RiftQueryKind::Level
+            | RiftQueryKind::IsClass
+            | RiftQueryKind::Stat
+            | RiftQueryKind::HasStatus
+            | RiftQueryKind::StatusCount
+            | RiftQueryKind::StatusPower
+            | RiftQueryKind::SkillRank
+            | RiftQueryKind::SkillStat
+            | RiftQueryKind::SpentSkillPoints => QueryGroup::Character,
+            RiftQueryKind::Holding | RiftQueryKind::FreeSlots | RiftQueryKind::Wearing => {
+                QueryGroup::Gear
+            }
+            RiftQueryKind::OnQuest
+            | RiftQueryKind::QuestDone
+            | RiftQueryKind::QuestCooling
+            | RiftQueryKind::TaskDone
+            | RiftQueryKind::QuestResetsIn => QueryGroup::Quests,
+            RiftQueryKind::Memory | RiftQueryKind::SetWithin => QueryGroup::Memories,
+            RiftQueryKind::Inside | RiftQueryKind::InArea | RiftQueryKind::KnowsArea => {
+                QueryGroup::Places
+            }
+            RiftQueryKind::Nearest
+            | RiftQueryKind::Count
+            | RiftQueryKind::Distance
+            | RiftQueryKind::Health
+            | RiftQueryKind::Present
+            | RiftQueryKind::IsNpc
+            | RiftQueryKind::Walking
+            | RiftQueryKind::Hostile
+            | RiftQueryKind::Subject
+            | RiftQueryKind::Target => QueryGroup::Actors,
+            RiftQueryKind::GroundItems => QueryGroup::Ground,
+            RiftQueryKind::SkillTargets | RiftQueryKind::SkillArea | RiftQueryKind::AimedPoint => {
+                QueryGroup::Skill
+            }
+        }
+    }
+
+    fn title(self) -> &'static str {
+        match self {
+            QueryGroup::Character => "The character",
+            QueryGroup::Gear => "Bag and gear",
+            QueryGroup::Quests => "Quests",
+            QueryGroup::Memories => "Memories",
+            QueryGroup::Places => "Places",
+            QueryGroup::Actors => "Actors",
+            QueryGroup::Ground => "Ground",
+            QueryGroup::Skill => "The skill",
+        }
+    }
 }
 
-const GROUPS: [(&str, &[&str]); 7] = [
-    (
-        "The character",
-        &[
-            "level",
-            "is_class",
-            "stat",
-            "has_status",
-            "status_count",
-            "status_power",
-            "skill_rank",
-            "skill_stat",
-            "spent_skill_points",
-        ],
-    ),
-    ("Bag and gear", &["holding", "free_slots", "wearing"]),
-    (
-        "Quests",
-        &[
-            "on_quest",
-            "quest_done",
-            "quest_cooling",
-            "task_done",
-            "quest_resets_in",
-        ],
-    ),
-    ("Memories", &["memory", "set_within"]),
-    ("Places", &["inside", "in_area", "knows_area"]),
-    (
-        "Actors",
-        &[
-            "nearest", "count", "distance", "health", "present", "is_npc", "walking", "hostile",
-            "subject", "target",
-        ],
-    ),
-    ("Ground", &["ground_items"]),
-];
+fn sign(kind: ExprKind) -> Option<&'static str> {
+    Some(match kind {
+        ExprKind::Equal => "=",
+        ExprKind::NotEqual => "≠",
+        ExprKind::Less => "<",
+        ExprKind::AtMost => "≤",
+        ExprKind::More => ">",
+        ExprKind::AtLeast => "≥",
+        ExprKind::Add => "+",
+        ExprKind::Subtract => "−",
+        ExprKind::Multiply => "×",
+        ExprKind::Divide => "÷",
+        ExprKind::Min => "min",
+        ExprKind::Max => "max",
+        ExprKind::Local
+        | ExprKind::State
+        | ExprKind::Event
+        | ExprKind::All
+        | ExprKind::Any
+        | ExprKind::Join
+        | ExprKind::Not
+        | ExprKind::Round
+        | ExprKind::Bool
+        | ExprKind::Int
+        | ExprKind::Num
+        | ExprKind::Text
+        | ExprKind::Var
+        | ExprKind::Query => return None,
+    })
+}
+
+const KEPT: [ExprKind; 3] = [ExprKind::Local, ExprKind::State, ExprKind::Event];
+
+fn is_kept(tag: &str) -> bool {
+    tag.parse().is_ok_and(|kind| KEPT.contains(&kind))
+}
+
+/// What a block yields when its kind alone says; a kept value's or a memory's comes from where it
+/// is kept.
+fn yields(tag: &str) -> Option<ValueType> {
+    if let Ok(query) = tag.parse::<RiftQueryKind>() {
+        return query.value_type();
+    }
+    match tag.parse::<ExprKind>().ok()? {
+        ExprKind::All
+        | ExprKind::Any
+        | ExprKind::Not
+        | ExprKind::Equal
+        | ExprKind::NotEqual
+        | ExprKind::Less
+        | ExprKind::AtMost
+        | ExprKind::More
+        | ExprKind::AtLeast
+        | ExprKind::Bool => Some(ValueType::Boolean),
+        ExprKind::Add
+        | ExprKind::Subtract
+        | ExprKind::Multiply
+        | ExprKind::Divide
+        | ExprKind::Min
+        | ExprKind::Max
+        | ExprKind::Num => Some(ValueType::Number),
+        ExprKind::Round | ExprKind::Int => Some(ValueType::Integer),
+        ExprKind::Join | ExprKind::Text => Some(ValueType::Text),
+        ExprKind::Local | ExprKind::State | ExprKind::Event | ExprKind::Var | ExprKind::Query => {
+            None
+        }
+    }
+}
 
 fn type_word(tag: &str) -> &'static str {
-    match tag {
-        "all" | "any" | "not" => "yes or no",
-        _ if COMPARE.iter().any(|(op, _)| *op == tag) => "yes or no",
-        _ if ARITHMETIC.iter().any(|(op, _)| *op == tag) || tag == "round" => "number",
-        "join" | "quest_resets_in" => "text",
-        "level" | "holding" | "free_slots" | "count" | "ground_items" => "number",
-        "stat" | "distance" | "health" => "number",
-        "memory" => "its type",
-        "nearest" | "subject" | "target" => "actor",
-        "local" | "state" | "event" => "its type",
-        _ => "yes or no",
+    match yields(tag) {
+        Some(ValueType::Boolean) => "yes or no",
+        Some(ValueType::Integer | ValueType::Number) => "number",
+        Some(ValueType::Text) => "text",
+        Some(ValueType::Actor) => "actor",
+        Some(ValueType::Actors) => "actors",
+        Some(ValueType::Point) => "point",
+        Some(ValueType::Area) => "area",
+        None => "its type",
+    }
+}
+
+fn fits(slot: Slot, tag: &str) -> bool {
+    slot == Slot::Any || matches!(yields(tag), None | Some(ValueType::Boolean))
+}
+
+fn title(tag: &str) -> String {
+    match tag.parse() {
+        Ok(ExprKind::All) => "all of".to_owned(),
+        Ok(ExprKind::Any) => "any of".to_owned(),
+        _ => tag.replace('_', " "),
     }
 }
 
@@ -235,16 +317,18 @@ fn block(
         }
         Value::Object(_) => {
             let tag = value.kind().to_owned();
-            match tag.as_str() {
-                "all" | "any" => changed = list_block(ui, cx, palette, value, path, &tag, slot),
-                "not" | "round" => {
+            match tag.parse::<ExprKind>() {
+                Ok(ExprKind::All | ExprKind::Any) => {
+                    changed = list_block(ui, cx, palette, value, path, &tag, slot)
+                }
+                Ok(kind @ (ExprKind::Not | ExprKind::Round)) => {
                     ui.horizontal_wrapped(|ui| {
                         let response = tag_chip(ui, &tag);
                         changed |= picker_popup(ui, cx, &response, palette, slot, value, path)
                             .unwrap_or_default();
                         if changed.0.is_none() {
                             let mut inner = value.get("of").cloned().unwrap_or(Value::Null);
-                            let inner_slot = if tag == "not" {
+                            let inner_slot = if kind == ExprKind::Not {
                                 Slot::YesOrNo
                             } else {
                                 Slot::Any
@@ -265,7 +349,7 @@ fn block(
                         }
                     });
                 }
-                _ if sign_of(&tag).is_some() => {
+                Ok(kind) if let Some(shown) = sign(kind) => {
                     ui.horizontal_wrapped(|ui| {
                         let mut a = value.get("a").cloned().unwrap_or(Value::Null);
                         if block(ui, cx, palette, &mut a, &format!("{path}/a"), Slot::Any).is_some()
@@ -273,17 +357,17 @@ fn block(
                             value["a"] = a;
                             changed = FormChange::at(path);
                         }
-                        let sign = sign_of(&tag).unwrap_or("?");
-                        let response = chip(ui, sign, theme::INPUT, theme::CODE);
+                        let response = chip(ui, shown, theme::INPUT, theme::CODE);
                         egui::Popup::from_toggle_button_response(&response)
                             .id(ui.id().with(path).with("op"))
                             .show(|ui| {
-                                for (op, sign) in COMPARE.iter().chain(ARITHMETIC.iter()) {
+                                for &op in ExprKind::VARIANTS {
+                                    let Some(sign) = sign(op) else { continue };
                                     if ui
-                                        .button(format!("{sign}  {}", schema::title(op)))
+                                        .button(format!("{sign}  {}", schema::title(op.name())))
                                         .clicked()
                                     {
-                                        value["type"] = Value::String((*op).to_owned());
+                                        value["type"] = Value::from(op.name());
                                         changed = FormChange::at(path);
                                         ui.close();
                                     }
@@ -297,7 +381,7 @@ fn block(
                         }
                     });
                 }
-                "local" | "state" | "event" => {
+                Ok(kind) if KEPT.contains(&kind) => {
                     ui.horizontal_wrapped(|ui| {
                         let response = tag_chip(ui, &tag);
                         changed |= picker_popup(ui, cx, &response, palette, slot, value, path)
@@ -494,12 +578,7 @@ fn query_block(
 }
 
 fn tag_chip(ui: &mut Ui, tag: &str) -> egui::Response {
-    let title = match tag {
-        "all" => "all of".to_owned(),
-        "any" => "any of".to_owned(),
-        other => other.replace('_', " "),
-    };
-    let response = chip(ui, &title, theme::RAISED, theme::TEXT);
+    let response = chip(ui, &title(tag), theme::RAISED, theme::TEXT);
     ui.label(
         RichText::new(type_word(tag).to_uppercase())
             .size(10.0)
@@ -552,41 +631,23 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
     egui::ScrollArea::vertical()
         .max_height(420.0)
         .show(ui, |ui| {
-            let mut listed: Vec<&str> = Vec::new();
-            for (group, tags) in GROUPS {
-                let members: Vec<&SchemaVariant> = tags
+            for &group in QueryGroup::VARIANTS {
+                let members: Vec<&SchemaVariant> = palette
+                    .variants
                     .iter()
-                    .filter_map(|tag| palette.variant(tag))
                     .filter(|variant| {
-                        slot == Slot::Any
-                            || type_word(&variant.tag) != "number"
-                                && type_word(&variant.tag) != "actor"
-                                && type_word(&variant.tag) != "text"
+                        variant
+                            .tag
+                            .parse()
+                            .is_ok_and(|kind| QueryGroup::of(kind) == group)
+                            && fits(slot, &variant.tag)
                     })
                     .collect();
                 if members.is_empty() {
                     continue;
                 }
-                widgets::section(ui, group);
+                widgets::section(ui, group.title());
                 for variant in members {
-                    listed.push(&variant.tag);
-                    if entry(ui, &variant.tag) {
-                        picked = Some(schema::variant_template(cx.root, variant));
-                    }
-                }
-            }
-            let others: Vec<&SchemaVariant> = palette
-                .variants
-                .iter()
-                .filter(|variant| {
-                    !listed.contains(&variant.tag.as_str())
-                        && !is_operator(&variant.tag)
-                        && !matches!(variant.tag.as_str(), "local" | "state" | "event" | "join")
-                })
-                .collect();
-            if !others.is_empty() {
-                widgets::section(ui, "Other");
-                for variant in others {
                     if entry(ui, &variant.tag) {
                         picked = Some(schema::variant_template(cx.root, variant));
                     }
@@ -594,9 +655,9 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
             }
             widgets::section(ui, "Kept values");
             ui.horizontal_wrapped(|ui| {
-                for tag in ["local", "state", "event"] {
-                    if let Some(variant) = palette.variant(tag)
-                        && chip(ui, tag, theme::INPUT, theme::TEXT).clicked()
+                for kind in KEPT {
+                    if let Some(variant) = palette.variant(kind.name())
+                        && chip(ui, kind.name(), theme::INPUT, theme::TEXT).clicked()
                     {
                         picked = Some(schema::variant_template(cx.root, variant));
                     }
@@ -610,14 +671,14 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
             ui.add_space(6.0);
             ui.separator();
             ui.horizontal_wrapped(|ui| {
-                for (tag, label) in [("all", "all of"), ("any", "any of"), ("not", "not")] {
-                    if let Some(variant) = palette.variant(tag)
-                        && chip(ui, label, theme::INPUT, theme::TEXT).clicked()
+                for kind in [ExprKind::All, ExprKind::Any, ExprKind::Not] {
+                    if let Some(variant) = palette.variant(kind.name())
+                        && chip(ui, &title(kind.name()), theme::INPUT, theme::TEXT).clicked()
                     {
                         picked = Some(schema::variant_template(cx.root, variant));
                     }
                 }
-                if let Some(variant) = palette.variant("equal")
+                if let Some(variant) = palette.variant(ExprKind::Equal.name())
                     && chip(ui, "compare", theme::INPUT, theme::TEXT).clicked()
                 {
                     let mut fresh = schema::variant_template(cx.root, variant);
@@ -626,7 +687,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     picked = Some(fresh);
                 }
                 if slot == Slot::Any {
-                    if let Some(variant) = palette.variant("add")
+                    if let Some(variant) = palette.variant(ExprKind::Add.name())
                         && chip(ui, "arithmetic", theme::INPUT, theme::TEXT).clicked()
                     {
                         let mut fresh = schema::variant_template(cx.root, variant);
@@ -686,9 +747,7 @@ pub fn describe(value: &Value) -> String {
                 return format!("variable {name}");
             }
             match object.get("type").and_then(Value::as_str) {
-                Some("local") => format!("local {}", object.text("local")),
-                Some("state") => format!("state {}", object.text("state")),
-                Some("event") => format!("event {}", object.text("event")),
+                Some(tag) if is_kept(tag) => format!("{tag} {}", object.text(tag)),
                 Some(tag) => schema::title(tag),
                 None => "block".to_owned(),
             }
@@ -709,35 +768,20 @@ pub fn summary(value: &Value) -> String {
             }
             Value::Object(object) => {
                 let tag = object.get("type").and_then(Value::as_str).unwrap_or("");
-                match tag {
-                    "all" | "any" | "join" => {
-                        let word = match tag {
-                            "all" => " and ",
-                            "any" => " or ",
-                            _ => " + ",
-                        };
-                        out.push('(');
-                        for (index, item) in
-                            object["of"].as_array().into_iter().flatten().enumerate()
-                        {
-                            if index > 0 {
-                                out.push_str(word);
-                            }
-                            go(item, out, depth + 1);
-                        }
-                        out.push(')');
-                    }
-                    "not" => {
+                match tag.parse::<ExprKind>() {
+                    Ok(ExprKind::All) => joined(&object["of"], " and ", out, depth),
+                    Ok(ExprKind::Any) => joined(&object["of"], " or ", out, depth),
+                    Ok(ExprKind::Join) => joined(&object["of"], " + ", out, depth),
+                    Ok(ExprKind::Not) => {
                         out.push_str("not ");
                         go(&object["of"], out, depth + 1);
                     }
-                    _ if sign_of(tag).is_some() => {
-                        let sign = sign_of(tag).unwrap_or(tag);
+                    Ok(kind) if let Some(shown) = sign(kind) => {
                         go(&object["a"], out, depth + 1);
-                        out.push_str(&format!(" {sign} "));
+                        out.push_str(&format!(" {shown} "));
                         go(&object["b"], out, depth + 1);
                     }
-                    "local" | "state" | "event" => {
+                    Ok(kind) if KEPT.contains(&kind) => {
                         out.push_str(object[tag].as_str().unwrap_or(""));
                     }
                     _ => {
@@ -756,6 +800,16 @@ pub fn summary(value: &Value) -> String {
             }
             other => out.push_str(&describe(other)),
         }
+    }
+    fn joined(list: &Value, word: &str, out: &mut String, depth: usize) {
+        out.push('(');
+        for (index, item) in list.as_array().into_iter().flatten().enumerate() {
+            if index > 0 {
+                out.push_str(word);
+            }
+            go(item, out, depth + 1);
+        }
+        out.push(')');
     }
     let mut out = String::new();
     go(value, &mut out, 0);

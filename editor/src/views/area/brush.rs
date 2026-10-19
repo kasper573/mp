@@ -11,10 +11,10 @@ use super::{AreaFrame, AreaTool, grid, pins, select, terrain};
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
+use crate::thumbs;
 use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
-use crate::{thumbs, user};
 
 #[derive(Clone, Default, Debug)]
 pub struct TilePick {
@@ -67,7 +67,6 @@ pub struct BrushStroke {
     pub draft: grid::GridDraft,
     pub kind: BrushStrokeKind,
     pub cells: HashSet<CellPos>,
-    pub seed: u64,
     pub anchor: CellPos,
     pub rng: Rng,
 }
@@ -109,7 +108,6 @@ pub(super) fn grid_stroke(
             draft,
             kind,
             cells: HashSet::new(),
-            seed,
             anchor: cell,
             rng: Rng::new(seed),
         });
@@ -127,7 +125,7 @@ pub(super) fn apply_brush(
     view_key: &str,
     frame: &AreaFrame,
     center: CellPos,
-    brush: &user::BrushSettings,
+    brush: &BrushSettings,
 ) {
     let content = frame.content.clone();
     let view = editor.views.area.view_mut(view_key);

@@ -12,21 +12,22 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use engine::core::script::OwnerKindDef;
-use engine::systems::script::OwnerKind;
+use engine::core::content::{ContentRow, row_file};
+use engine::core::script::{OwnerKindDef, ScriptModuleKind};
+use engine::systems::script::{OwnerKind, ScriptDef};
+use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
+use nodes::{LineSpeaker, NodeCatalogue};
 use serde_json::{Map, Value};
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, Project, RowSelection, catalogue_of, row_file};
+use crate::project::{ContentEdit, Project, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::thumbs;
 use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
 use crate::value::RowValue;
-use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
-use nodes::{LineSpeaker, NodeCatalogue};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ScriptPath {
@@ -387,7 +388,6 @@ pub struct ScriptViews {
     pub shown_rect: Option<Rect>,
     pub run: Option<run::ScriptRun>,
     setups: HashMap<ScriptSessionId, run::RunSetup>,
-    focus: Option<ScriptSessionId>,
     fire: Option<ScriptSessionId>,
     pending: Option<(ScriptSessionId, PendingScriptAction)>,
     pub callout: Option<ScriptCallout>,
@@ -411,13 +411,6 @@ impl ScriptViews {
             .iter()
             .find(|session| session.owner == *owner)
             .map(|session| session.id)
-    }
-
-    pub fn owner(&self, id: ScriptSessionId) -> Option<&ScriptOwner> {
-        self.sessions
-            .iter()
-            .find(|session| session.id == id)
-            .map(|session| &session.owner)
     }
 
     pub fn relocate(&mut self, from: &ScriptOwner, to: ScriptOwner) {
@@ -483,14 +476,6 @@ impl ScriptViews {
         self.setups.insert(id, setup);
     }
 
-    pub fn focus_on(&mut self, owner: &ScriptOwner) {
-        self.focus = Some(self.session(owner));
-    }
-
-    pub fn focused(&self) -> Option<ScriptOwner> {
-        self.owner(self.focus?).cloned()
-    }
-
     pub fn fire(&mut self, owner: &ScriptOwner) {
         self.fire = Some(self.session(owner));
     }
@@ -517,7 +502,6 @@ impl ScriptViews {
         self.views.clear();
         self.setups.clear();
         self.run = None;
-        self.focus = None;
         self.fire = None;
         self.pending = None;
     }
@@ -600,7 +584,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
         ui.label(RichText::new(format!("{} is gone", owner.title())).weak());
         return;
     };
-    editor.views.script.focus_on(owner);
     editor.views.script.shown_rect = Some(ui.max_rect());
     if let Some(pending) = editor.views.script.take_pending(owner) {
         match pending {
@@ -866,7 +849,7 @@ pub fn chip_title(editor: &Editor, doc: &ScriptDoc) -> String {
     match &doc.owner {
         ScriptOwner::Shared { key } => {
             let mut text = format!("script/{key} · owner {} · {nodes}", doc.kind.name());
-            if editor.shapes.is_fixture("script", key) {
+            if editor.shapes.is_fixture(ScriptDef::TABLE, key) {
                 text.push_str(" · from New Game");
             }
             text
@@ -1074,7 +1057,6 @@ fn callout_card(ui: &Ui, painter: &egui::Painter, anchor: Rect, callout: &Script
 }
 
 pub fn select_nodes(editor: &mut Editor, doc: &ScriptDoc, names: &[String]) {
-    editor.views.script.focus_on(&doc.owner);
     editor.select(RowSelection::parts(
         doc.owner.table(),
         doc.owner.key(),
@@ -1378,7 +1360,7 @@ pub fn add_node(
     link: Option<(String, String)>,
 ) {
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let Some(mut node) = nodes::template(root, kind) else {
         editor.toast(format!("No node kind {kind}"));
         return;
@@ -1567,7 +1549,7 @@ pub fn link_node_dialog(
         widgets::default_focus(ui, &response);
         let needle = dialog.search.to_lowercase();
         if ports.len() > 1 {
-            widgets::combo_box("link-port")
+            widgets::combo("link-port")
                 .selected_text(
                     ports
                         .get(dialog.port)
@@ -1654,7 +1636,7 @@ pub fn open_inline_or_row(editor: &mut Editor, table: &str, key: &str, pointer: 
     let inline = editor
         .row_value(table, key)
         .and_then(|row| row.pointer(pointer).cloned())
-        .is_some_and(|module| module["type"] == "inline_script");
+        .is_some_and(|module| module.script_kind() == Some(ScriptModuleKind::Inline));
     if inline {
         open_inline(editor, table, key, pointer);
     } else {

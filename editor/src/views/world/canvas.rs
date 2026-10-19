@@ -1,18 +1,19 @@
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink;
 use std::collections::{BTreeMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
+use design_tokens::ink;
 use egui::epaint::QuadraticBezierShape;
 use egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
     Vec2,
 };
 use engine::core::math::Pos;
+use engine::core::render::TILE;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
 use engine::systems::area::{self, AreaId};
 
-use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
+use super::atlas::{AtlasSource, AtlasWarp, WorldAtlas};
 use super::filters::{self, ColorRanges};
 use super::interact::{self, MapDrag};
 use super::{
@@ -21,7 +22,7 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
-use crate::views::area::{TILE_PX, scene};
+use crate::views::area::scene;
 use crate::views::navigation::{self, Viewport};
 
 const LABEL: f32 = 28.0;
@@ -237,7 +238,7 @@ pub fn viridis(t: f32) -> Color32 {
 }
 
 struct Overlays<'a> {
-    lit: Option<BTreeMap<AreaId, Vec<RowSource>>>,
+    lit: Option<BTreeMap<AreaId, Vec<AtlasSource>>>,
     colors: Option<ColorRanges>,
     route: Option<Vec<&'a AtlasWarp>>,
 }
@@ -309,7 +310,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         width: (card.art.width() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         height: (card.art.height() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         center: Pos::new(info.size.width / 2.0, info.size.height / 2.0),
-        zoom: px_per_tile / TILE_PX * drawing.ppp,
+        zoom: px_per_tile / TILE.0 * drawing.ppp,
         generation: atlas.generation,
         live: false,
     });
@@ -395,7 +396,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         glyph::paint(
             painter,
             Mark::Pin,
-            egui::Rect::from_min_size(
+            Rect::from_min_size(
                 card.art.right_top() + Vec2::new(-14.0, 2.0),
                 Vec2::splat(11.0),
             ),
@@ -755,7 +756,7 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
             view.zoom = navigation::fit_zoom(
                 rect.size() - Vec2::splat(80.0),
                 Vec2::new(bounds.width(), bounds.height()),
-                TILE_PX,
+                TILE.0,
             )
             .clamp(MIN_ZOOM, MAX_ZOOM);
         }

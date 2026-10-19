@@ -7,7 +7,7 @@ use bevy_ecs::prelude::*;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
@@ -17,7 +17,7 @@ use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::interact::Interactive;
 use crate::systems::movement::Position;
 use crate::systems::npc::Npc;
-use crate::systems::player::Owner as PlayerOwner;
+use crate::systems::player::PlayedBy;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
     self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Place, RiftEvent, RiftInstances,
@@ -39,7 +39,7 @@ pub struct ObjectDef {
     pub label: Option<String>,
     pub shape: ObjectShape,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub look: Option<AssetRef>,
+    pub look: Option<ImageRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shown: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -218,23 +218,10 @@ pub fn spawn_all(world: &mut World) {
     let scripts = world.resource::<script::RiftScripts>().clone();
     for (index, object) in area::objects(area::placed(&content, zone)) {
         let index = index as usize;
-        let owner_row = OwnerRow {
-            kind: OwnerKind::Object,
-            row: zone.raw(),
-            object: Some(index as u32),
-        };
+        let owner_row = OwnerRow::of_object(zone, index as u32);
         let procedures = scripts.of(owner_row).to_vec();
         let may_do = scripts.may_do(owner_row);
-        let interactive = procedures
-            .iter()
-            .flat_map(|procedure| procedure.entry(EventKind::Interacted))
-            .find_map(|(_, event)| match event {
-                RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
-                    verb: *verb,
-                    reach: *reach,
-                }),
-                _ => None,
-            });
+        let interactive = Interactive::of(&procedures);
         let warp = may_do.reaches.iter().find_map(|reach| match reach {
             script::Reach::Warp(place) => Some(*place),
             _ => None,
@@ -308,7 +295,7 @@ pub fn shape_of(world: &World, object: Entity) -> Option<ObjectShape> {
 }
 
 type Actors =
-    QueryState<(Entity, &'static Position, &'static AreaTag), Or<(With<PlayerOwner>, With<Npc>)>>;
+    QueryState<(Entity, &'static Position, &'static AreaTag), Or<(With<PlayedBy>, With<Npc>)>>;
 
 pub fn track(
     world: &mut World,

@@ -1,6 +1,7 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
+use engine::core::assets::AssetKind;
 use engine::systems::area::tileset::TileData;
 use serde_json::Value;
 use strum::VariantArray;
@@ -15,7 +16,6 @@ use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
 use crate::picker;
 use crate::project::{ContentEdit, RowSelection};
-use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
@@ -58,25 +58,23 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
     widgets::kv(ui, "image", |ui| {
         let mut file = value["image"].as_str().unwrap_or_default().to_owned();
-        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/image") {
+        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/image") {
             value["image"] = Value::String(file);
             changed = FormChange::at("/image");
         }
     });
-    let tile = value["tile"].as_u64().unwrap_or(16);
     let ctx = ui.ctx().clone();
-    let columns = value["image"]
-        .as_str()
-        .and_then(|image| cx.state.thumbnails.image(&ctx, cx.files, image))
-        .map(|thumb| thumb.size[0] as u64 / tile.max(1));
-    widgets::kv_text(
-        ui,
-        "tile",
+    let tile = super::tile_size(value).map(|tile| {
+        let columns = value["image"]
+            .as_str()
+            .and_then(|image| cx.state.thumbnails.image(&ctx, cx.files, image))
+            .map(|thumb| thumb.size[0] as u32 / tile);
         match columns {
             Some(columns) => format!("{tile} × {tile} px · {columns} columns, imported"),
             None => format!("{tile} × {tile} px, imported"),
-        },
-    );
+        }
+    });
+    widgets::kv_text(ui, "tile", tile.unwrap_or_else(|error| error));
     let tiles = value["tiles"].as_object().map_or(0, |tiles| tiles.len());
     widgets::kv_text(ui, "tiles", format!("{tiles} with data"));
     if let Some(sets) = value["terrains"]
@@ -110,7 +108,7 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
         ui.add_space(4.0);
         if mode == TilesetMode::Surface {
             widgets::kv(ui, "surface", |ui| {
-                widgets::combo_box(("tile-surface", key, tile))
+                widgets::combo(("tile-surface", key, tile))
                     .selected_text(theme::mono(surface.unwrap_or("none")))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -132,7 +130,7 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
             widgets::kv_text(ui, "walk", walk_label(walk));
         } else {
             widgets::kv(ui, "walk", |ui| {
-                widgets::combo_box(("tile-walk", key, tile))
+                widgets::combo(("tile-walk", key, tile))
                     .selected_text(theme::mono(walk_label(walk)))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -303,7 +301,7 @@ fn corners_grid(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     || terrains.first().cloned().unwrap_or_default(),
                     |corners| corners[corner.index()].clone(),
                 );
-                widgets::combo_box(("corner", key, tile, corner.index()))
+                widgets::combo(("corner", key, tile, corner.index()))
                     .selected_text(theme::mono(&current))
                     .width(90.0)
                     .show_ui(ui, |ui| {

@@ -1,11 +1,13 @@
 use egui::{Sense, Ui};
-use engine::systems::area::AreaModuleKind;
+use engine::core::content::{ContentRow, TABLES_DIR, row_file, row_of};
+use engine::systems::area::{AreaDef, AreaModuleKind};
+use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::script::{Fill, RiftEffectKind, ScriptDef};
+use serde::Deserialize;
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::{RowSelection, row_file, row_of};
-use crate::tabs::EditorTab;
 use crate::value::RowValue;
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
@@ -25,26 +27,24 @@ pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &s
         }
         for party in rows {
             ui.horizontal(|ui| {
-                widgets::badge(ui, &party.table);
-                let (owner_key, rest) = party
-                    .owner
-                    .split_once(" · ")
-                    .map(|(key, rest)| (key.to_owned(), Some(rest.to_owned())))
-                    .unwrap_or((party.owner.clone(), None));
+                widgets::badge(
+                    ui,
+                    if party.object.is_some() {
+                        "object"
+                    } else {
+                        &party.table
+                    },
+                );
+                let row = format!("{}/{}", party.table, party.key);
                 if ui
-                    .add(egui::Label::new(theme::mono(&owner_key).size(13.0)).sense(Sense::click()))
+                    .add(egui::Label::new(theme::mono(&row).size(13.0)).sense(Sense::click()))
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .clicked()
                 {
-                    open = Some(
-                        owner_key
-                            .split_once('/')
-                            .map(|(t, k)| (t.to_owned(), k.to_owned()))
-                            .unwrap_or_default(),
-                    );
+                    open = Some((party.table.clone(), party.key.clone()));
                 }
-                if let Some(rest) = rest {
-                    ui.label(theme::muted(rest).size(13.0));
+                if let Some(object) = &party.object {
+                    ui.label(theme::muted(object).size(13.0));
                 }
                 ui.label(
                     theme::faint(format!("{} · {}", party.script, party.node))
@@ -54,15 +54,17 @@ pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &s
             });
         }
     }
-    if let Some((table, key)) = open.filter(|(table, _)| !table.is_empty()) {
-        editor.select(RowSelection::row(&table, &key));
-        editor.open_tab(EditorTab::for_row(&table, &key));
+    if let Some((table, key)) = open {
+        editor.open_row(&table, &key);
     }
 }
 
+/// A row whose script offers, takes or turns in a quest: an object of an area's when `object`
+/// names one.
 struct Party {
     table: String,
-    owner: String,
+    key: String,
+    object: Option<String>,
     script: String,
     node: String,
 }
@@ -74,7 +76,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
         return (givers, turn_ins);
     };
     let files = &project.files;
-    let mut scan = |table: &str, owner: String, module: &Value| {
+    let mut scan = |table: &str, key: &str, object: Option<&str>, module: &Value| {
         let (script_label, nodes) = match module.module_kind() {
             Some(AreaModuleKind::InlineScript) => {
                 ("inline script".to_owned(), module["nodes"].clone())
@@ -84,7 +86,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
                 (
                     format!("script/{name}"),
                     files
-                        .json(&row_file("script", &name))
+                        .json(&row_file(ScriptDef::TABLE, &name))
                         .map(|row| row["nodes"].clone())
                         .unwrap_or(Value::Null),
                 )
@@ -92,50 +94,51 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
             _ => return,
         };
         for (name, node) in nodes.as_object().into_iter().flatten() {
-            let named = match &node["quest"] {
-                Value::String(key) => Some(key.clone()),
-                Value::Object(var) => var
-                    .get("var")
-                    .and_then(Value::as_str)
-                    .and_then(|var| module["values"][var].as_str().map(str::to_owned)),
-                _ => None,
+            let named = match Fill::<String>::deserialize(&node["quest"]) {
+                Ok(Fill::Const(quest)) => Some(quest),
+                Ok(Fill::Var { var }) => module["values"][&var].as_str().map(str::to_owned),
+                Err(_) => None,
             };
             if named.as_deref() != Some(quest) {
                 continue;
             }
             let entry = Party {
                 table: table.to_owned(),
-                owner: owner.clone(),
+                key: key.to_owned(),
+                object: object.map(str::to_owned),
                 script: script_label.clone(),
                 node: name.clone(),
             };
-            match node["type"].as_str() {
-                Some("offer_quest") | Some("accept_quest") => givers.push(entry),
-                Some("turn_in") => turn_ins.push(entry),
+            match node.kind().parse() {
+                Ok(RiftEffectKind::OfferQuest | RiftEffectKind::AcceptQuest) => givers.push(entry),
+                Ok(RiftEffectKind::TurnIn) => turn_ins.push(entry),
                 _ => {}
             }
         }
     };
-    let paths: Vec<String> = files.paths_under("tables/").cloned().collect();
+    let paths: Vec<String> = files
+        .paths_under(&format!("{TABLES_DIR}/"))
+        .cloned()
+        .collect();
     for path in paths {
         let Some((table, key)) = row_of(&path) else {
             continue;
         };
-        if table == "script" || table == "test_character" {
+        if table == ScriptDef::TABLE || table == CharacterSnapshot::TABLE {
             continue;
         }
         let Some(row) = files.json(&path) else {
             continue;
         };
         for module in row["modules"].as_array().into_iter().flatten() {
-            scan(table, format!("{table}/{key}"), module);
-            if table == "area" {
+            scan(table, key, None, module);
+            if table == AreaDef::TABLE {
                 let object = module["name"]
                     .as_str()
                     .or(module["label"].as_str())
                     .unwrap_or("object");
                 for script in module["scripts"].as_array().into_iter().flatten() {
-                    scan("object", format!("{table}/{key} · {object}"), script);
+                    scan(table, key, Some(object), script);
                 }
             }
         }

@@ -1,6 +1,7 @@
 use std::sync::{Arc, LazyLock};
 
 use bevy_ecs::prelude::*;
+use engine::core::content::id::Leaf;
 use engine::core::content::{Content, ContentScope, with_content};
 use engine::core::math::{Offset, Pos};
 use engine::core::script::compile::compile_owner;
@@ -31,7 +32,8 @@ pub fn parse<T: DeserializeOwned>(value: Value) -> T {
     let (result, scope) = with_content(ContentScope::of(content()), || {
         serde_json::from_value::<T>(value.clone())
     });
-    assert!(!scope.has_problems(), "unknown rows in {value}");
+    let problems: Vec<_> = scope.leaves().iter().filter_map(Leaf::reported).collect();
+    assert!(problems.is_empty(), "{problems:?} in {value}");
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 

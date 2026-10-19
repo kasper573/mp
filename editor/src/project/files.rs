@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
 use std::io;
+use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use engine::core::content::MemoryFolder;
+use engine::core::content::{MemoryFolder, row_of, table_folder};
 use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;
@@ -24,25 +24,9 @@ struct Stored {
 impl ProjectFiles {
     pub fn read_dir(root: &Path) -> io::Result<ProjectFiles> {
         let mut files = ProjectFiles::default();
-        let entries = WalkDir::new(root)
-            .min_depth(1)
-            .follow_links(true)
-            .into_iter()
-            .filter_entry(|entry| !hidden(entry.file_name()));
-        for entry in entries {
-            let entry = entry?;
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let relative = entry
-                .path()
-                .strip_prefix(root)
-                .expect("a walked file lies under its root")
-                .components()
-                .map(|part| part.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/");
-            files.insert(relative, FileBytes::from(std::fs::read(entry.path())?));
+        for file in content_files(root)? {
+            let bytes = std::fs::read(root.join(&file))?;
+            files.insert(file, FileBytes::from(bytes));
         }
         Ok(files)
     }
@@ -129,12 +113,9 @@ impl ProjectFiles {
     }
 
     pub fn keys_of(&self, table: &str) -> impl Iterator<Item = &str> {
-        let prefix = format!("tables/{table}/");
+        let prefix = format!("{}/", table_folder(table));
         self.map
-            .range::<str, _>((
-                std::ops::Bound::Included(prefix.as_str()),
-                std::ops::Bound::Unbounded,
-            ))
+            .range::<str, _>((Bound::Included(prefix.as_str()), Bound::Unbounded))
             .map(|(path, _)| path.as_str())
             .take_while(move |path| path.starts_with(&prefix))
             .filter_map(|path| row_of(path).map(|(_, key)| key))
@@ -142,10 +123,7 @@ impl ProjectFiles {
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {
         self.map
-            .range::<str, _>((
-                std::ops::Bound::Included(prefix),
-                std::ops::Bound::Unbounded,
-            ))
+            .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
             .map(|(path, _)| path)
             .take_while(move |path| path.starts_with(prefix))
     }
@@ -165,19 +143,6 @@ pub fn text_bytes(text: String) -> FileBytes {
     FileBytes::from(text.into_bytes())
 }
 
-pub const GAME_FILE: &str = "game.json";
-
-pub fn row_file(table: &str, key: &str) -> String {
-    format!("tables/{table}/{key}.json")
-}
-
-pub fn row_of(file: &str) -> Option<(&str, &str)> {
-    let rest = file.strip_prefix("tables/")?;
-    let (table, name) = rest.split_once('/')?;
-    let key = name.strip_suffix(".json")?;
-    (!key.contains('/')).then_some((table, key))
-}
-
 #[derive(Clone, Debug)]
 pub struct FileChange {
     pub file: String,
@@ -195,7 +160,36 @@ impl PartialEq for FileChange {
     }
 }
 
-fn hidden(name: &OsStr) -> bool {
-    name.to_str()
-        .is_some_and(|name| name.starts_with('.') || name.ends_with(".tmp"))
+/// The folder-relative names of the files under `root` that make up its content.
+pub fn content_files(root: &Path) -> io::Result<Vec<String>> {
+    let mut files = Vec::new();
+    let entries = WalkDir::new(root)
+        .min_depth(1)
+        .follow_links(true)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_type().is_file() {
+            files.push(folder_file(root, entry.path()).expect("a walked file lies under its root"));
+        }
+    }
+    Ok(files)
+}
+
+/// Whether a file or folder of that name is kept out of the game folder's content: dotfiles, and
+/// the temporary files saving writes.
+pub fn hidden(name: &str) -> bool {
+    name.starts_with('.') || name.ends_with(".tmp")
+}
+
+/// The folder-relative, slash-separated name of a file under `root`.
+pub fn folder_file(root: &Path, path: &Path) -> Option<String> {
+    let parts: Vec<_> = path
+        .strip_prefix(root)
+        .ok()?
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect();
+    Some(parts.join("/"))
 }

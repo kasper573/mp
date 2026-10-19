@@ -6,23 +6,22 @@ pub mod terrain;
 
 use std::collections::{BTreeSet, HashMap};
 
+use animation::OffsetUnit;
 use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
-use engine::core::content::Content;
-use engine::systems::area::tileset::{TileData, TilesetDef, TilesetGrid, Walk};
+use engine::core::content::{Content, ContentRow, row_file};
+use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
+use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
-use crate::views::area;
 use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
 use crate::{import, value};
-use animation::OffsetUnit;
 
-pub const TABLE: &str = "tileset";
 pub const TERRAINS_PART: &str = "/terrains";
 const TILES_PART: &str = "/tiles/";
 pub const ANIMATION_PART: &str = "/animation";
@@ -51,20 +50,12 @@ impl TilesetViews {
             .and_then(|counts| counts.surfaces.get(surface).cloned())
             .unwrap_or_default()
     }
-
-    pub fn areas_using(&self, tileset: &str) -> Vec<String> {
-        self.counts
-            .as_ref()
-            .and_then(|counts| counts.areas_using.get(tileset).cloned())
-            .unwrap_or_default()
-    }
 }
 
 pub struct TilesetCounts {
     pub generation: u64,
     pub surfaces: HashMap<String, SurfaceUse>,
     pub with_surface: usize,
-    pub areas_using: HashMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Default)]
@@ -489,12 +480,19 @@ pub fn try_change_tileset(
     change(&mut def);
     def.tiles.retain(|_, data| !is_blank(data));
     let json = value::untyped(&content, &def).ok_or("the tileset does not write")?;
-    edit.write_json(row_file(TABLE, key), &json);
+    edit.write_json(row_file(TilesetDef::TABLE, key), &json);
     editor.try_apply(edit)
 }
 
 pub fn tile_mut(def: &mut TilesetDef, tile: u32) -> &mut TileData {
     def.tiles.entry(tile).or_default()
+}
+
+pub fn tile_size(row: &Value) -> Result<u32, String> {
+    u32::deserialize(&row["tile"])
+        .ok()
+        .filter(|tile| (1..=MAX_TILE_PX).contains(tile))
+        .ok_or_else(|| format!("the tileset's tile is not 1 to {MAX_TILE_PX} px"))
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {
@@ -517,7 +515,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     refresh_counts(editor);
     let ctx = ui.ctx().clone();
     sidebar::row(ui, "tileset", |ui| {
-        row_form::show_row(editor, ui, TABLE, key)
+        row_form::show_row(editor, ui, TilesetDef::TABLE, key)
     });
     let Some(tileset) = OpenTileset::read(editor, &ctx, key) else {
         ui.label(theme::muted(unreadable(editor, key)));
@@ -526,7 +524,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let reimporting = editor.views.tileset.reimports.contains_key(key);
     let selection = editor.selection.clone();
     sidebar::inspector(ui, "tileset", |ui| {
-        if selection.table == TABLE
+        if selection.table == TilesetDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()
         {
@@ -569,7 +567,7 @@ pub fn set_mode(editor: &mut Editor, key: &str, mode: TilesetMode) {
     match (mode.part(), tile) {
         (Some(part), _) => select_part(editor, key, part),
         (None, Some(tile)) => select_tile(editor, key, tile),
-        (None, None) => editor.select(RowSelection::row(TABLE, key)),
+        (None, None) => editor.select(RowSelection::row(TilesetDef::TABLE, key)),
     }
 }
 
@@ -583,7 +581,11 @@ pub fn tile_of_part(part: &str) -> Option<u32> {
 }
 
 pub fn select_part(editor: &mut Editor, key: &str, part: &str) {
-    editor.select(RowSelection::parts(TABLE, key, vec![part.to_owned()]));
+    editor.select(RowSelection::parts(
+        TilesetDef::TABLE,
+        key,
+        vec![part.to_owned()],
+    ));
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
@@ -626,7 +628,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
 }
 
 fn typed_def(editor: &Editor, content: &Content, key: &str) -> Option<TilesetDef> {
-    value::typed(content, editor.row_value(TABLE, key)?)
+    value::typed(content, editor.row_value(TilesetDef::TABLE, key)?)
 }
 
 fn is_blank(data: &TileData) -> bool {
@@ -637,7 +639,7 @@ fn is_blank(data: &TileData) -> bool {
 }
 
 fn unreadable(editor: &Editor, key: &str) -> String {
-    if editor.row(TABLE, key).is_none() {
+    if editor.row(TilesetDef::TABLE, key).is_none() {
         format!("tileset/{key} is gone")
     } else {
         format!("tileset/{key} does not read as a tileset; its row on the left shows why")
@@ -728,24 +730,10 @@ fn refresh_counts(editor: &mut Editor) {
             entry.tilesets.insert(tileset.to_owned());
         }
     }
-    let mut areas_using: HashMap<String, Vec<String>> = HashMap::new();
-    for (area, rows) in area::grid::palettes(&project.files) {
-        let seen: BTreeSet<&str> = rows.iter().map(|row| row.tileset.as_str()).collect();
-        for tileset in seen {
-            areas_using
-                .entry(tileset.to_owned())
-                .or_default()
-                .push(area.clone());
-        }
-    }
-    for areas in areas_using.values_mut() {
-        areas.sort();
-    }
     editor.views.tileset.counts = Some(TilesetCounts {
         generation: project.generation,
         surfaces,
         with_surface,
-        areas_using,
     });
 }
 

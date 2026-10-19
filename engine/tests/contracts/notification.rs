@@ -3,7 +3,6 @@ use engine::core::content::Content;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::core::vfx::{VfxParams, VfxShaderDef, VfxShaderId};
-use engine::systems::area::transition::{self, Crossing};
 use engine::systems::area::{self, AreaDef};
 use engine::systems::combat::{self, Attitude};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
@@ -537,20 +536,9 @@ fn area(game: &Content, key: &str) -> Sim {
     sim
 }
 
-/// Hands `player` over from one area's server to the other's, the way a crossing does.
+/// Hands `player` over from one area's server to the other's, and lets it settle in.
 fn travel(from: &mut Sim, player: Entity, to: &mut Sim) -> Entity {
-    let dest_area = *to.world.resource::<engine::systems::WorldArea>();
-    to.connect(1);
-    from.world.entity_mut(player).insert(Crossing {
-        dest_area: dest_area.0,
-        dest: Pos::new(3.0, 3.0),
-    });
-    let traveler = transition::departing(&mut from.world)
-        .pop()
-        .expect("a traveler");
-    let arrived = transition::arrive(&mut to.world, traveler);
-    let conn = to.conn(1);
-    to.send(conn, AreaDrawn);
+    let arrived = from.cross(player, to, Pos::new(3.0, 3.0));
     to.run(0.5);
     arrived
 }

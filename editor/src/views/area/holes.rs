@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
-use engine::core::content::locate;
+use engine::core::content::{ContentRow, locate};
 use engine::core::script::VariableType;
+use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::{self, hole_name};
 use engine::systems::script::Variable;
 use serde_json::Value;
@@ -185,8 +186,8 @@ pub struct HoleableField {
 }
 
 pub fn holeable_fields(shapes: &SchemaShapes, part: &Value) -> Vec<HoleableField> {
-    let root = shapes.shape_of("area");
-    let variants = shapes.module_variants("area");
+    let root = shapes.shape_of(AreaDef::TABLE);
+    let variants = shapes.module_variants(AreaDef::TABLE);
     let Some(variant) = schema::variant_of(&variants, part) else {
         return Vec::new();
     };

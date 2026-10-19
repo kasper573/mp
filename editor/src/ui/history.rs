@@ -1,14 +1,15 @@
-use design_tokens::glyph::{self, Mark};
 use std::time::SystemTime;
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align2, FontId, Sense, Ui};
+use engine::core::content::row_of;
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::FileBytes;
 use crate::project::history::EditStep;
-use crate::project::{FileBytes, row_of};
 
 const ROW: f32 = 28.0;
 
@@ -94,18 +95,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             });
         }
     });
-    if let Some(index) = jump
-        && let Some(project) = &mut editor.project
-    {
+    if let Some(index) = jump {
         editor.history_focus = Some(index);
-        match project.jump(index) {
-            Ok(Some(applied)) => {
-                editor.selection = applied.viewpoint.selection;
-                editor.views.restore_camera(applied.viewpoint.camera);
-                editor.views.content_changed();
-            }
-            Ok(None) => {}
-            Err(refusal) => editor.refused("History", &refusal),
+        if let Some(applied) = editor
+            .project
+            .as_mut()
+            .and_then(|project| project.jump(index))
+        {
+            editor.return_to(applied);
         }
     }
 }
@@ -290,17 +287,9 @@ fn restores(step: &EditStep) -> String {
     if let Some(camera) = &step.camera {
         parts.push(format!("the camera on {}", camera.area));
     }
-    match parts.len() {
-        1 => parts.remove(0),
-        2 => format!("{} and {}", parts[0], parts[1]),
-        _ => format!("{}, {} and {}", parts[0], parts[1], parts[2]),
-    }
+    widgets::join_and(&parts)
 }
 
 fn clock(at: SystemTime) -> String {
-    let unix = at
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    widgets::clock(unix, true)
+    widgets::clock(at.into(), true)
 }

@@ -24,14 +24,14 @@ mod windows;
 use crate::shoot::Shoot;
 
 pub struct Chapter {
-    // Names the chapter's video, and picks it on the command line.
+    /// Names the chapter's video, and picks it on the command line.
     pub name: &'static str,
     pub title: &'static str,
     pub summary: &'static str,
     pub play: fn(&mut Shoot),
 }
 
-// In the showcase's order.
+/// In the showcase's order.
 pub const CHAPTERS: &[Chapter] = &[
     sign_in::CHAPTER,
     explore::CHAPTER,

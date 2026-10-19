@@ -12,7 +12,7 @@ use bevy::render::pipelined_rendering::PipelinedRenderingPlugin;
 use bevy::window::Window;
 use engine::core::content::store::ContentStore;
 use engine::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, SocketState};
-use engine::core::time::{LocalClock, Seconds, UnixMillis};
+use engine::core::time::{LocalClock, Seconds};
 use engine::systems::probe::ProbeChannel;
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
@@ -112,11 +112,8 @@ impl Platform for DesktopPlatform {
     }
 
     fn local_clock(&self) -> LocalClock {
-        let since_epoch = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default();
         LocalClock {
-            now: UnixMillis(since_epoch.as_millis() as u64),
+            now: SystemTime::now().into(),
             utc_offset: Seconds(chrono::Local::now().offset().local_minus_utc() as f32),
         }
     }

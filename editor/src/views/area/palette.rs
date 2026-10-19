@@ -10,8 +10,7 @@ use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
-use crate::views::tileset::terrain::MixCompleteness;
-use crate::views::tileset::terrain::TileCorner;
+use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 use crate::views::tileset::{SheetLayout, SheetRect, TilesetSheet};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

@@ -206,7 +206,7 @@ RIFT_GAME_SERVER_AUTH=fake</code></pre></li>
             connect.</dd>
           <dt><code>RIFT_GAME_SERVER_MAX_CLIENTS</code></dt>
           <dd>The most players at once.</dd>
-          <dt><code>RIFT_GAME_SERVER_PLAYER_SPAWN_TYPE</code></dt>
+          <dt><code>RIFT_GAME_SERVER_PLAYER_SPAWN_POLICY</code></dt>
           <dd><code>map</code>: new players start where the game says. <code>dist</code>: new players start
             spread over every area, for load tests.</dd>
           <dt><code>RIFT_GAME_SERVER_PLAYER_IMMORTAL</code></dt>
@@ -214,8 +214,8 @@ RIFT_GAME_SERVER_AUTH=fake</code></pre></li>
           <dt><code>RIFT_GAME_SERVER_DAILY_RESET_UTC_HOUR</code></dt>
           <dd>The hour, 0 to 23 in UTC, when the game's daily limits reset.</dd>
           <dt><code>RIFT_GAME_SERVER_TEST_CHARACTERS</code></dt>
-          <dd><code>on</code>: players can join as one of the game's test characters, as <code>editor</code>'s
-            <em>▸ Play</em> does. Otherwise <code>off</code>.</dd>
+          <dd><code>true</code>: players can join as one of the game's test characters, as <code>editor</code>'s
+            <em>▸ Play</em> does. Otherwise <code>false</code>.</dd>
           <dt><code>RIFT_GAME_SERVER_EXIT_ON_STDIN_EOF</code></dt>
           <dd><code>true</code> quits <code>game-server</code> when the program that started it closes its
             input, as <code>editor</code> does. Otherwise <code>false</code>.</dd>
@@ -245,7 +245,7 @@ RIFT_GAME_SERVER_AUTH=fake</code></pre></li>
       <section id="editor-options">
         <h2>editor options</h2>
         <p><code>editor</code> takes these options when you start it from a terminal:</p>
-        <pre><code>editor [FOLDER] [--user-folder PATH] [--scene JSON] [--frame-log PATH]</code></pre>
+        <pre><code>editor [FOLDER] [--user-folder PATH] [--scene JSON] [--frame-log PATH] [--build-info] [--shapes]</code></pre>
         <dl class="values">
           <dt><code>FOLDER</code></dt>
           <dd>Opens this game folder right away.</dd>

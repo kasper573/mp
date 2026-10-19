@@ -1,7 +1,6 @@
 {
   "name": "The lord's estate",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 38,
       "height": 28

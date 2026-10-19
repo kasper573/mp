@@ -2,18 +2,17 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{StatusEffectId, Statuses, boost};
+use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::core::vfx::{VfxParams, VfxSite};
+use crate::core::vfx::VfxSite;
 use crate::systems::actor::Actor;
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{Inventory, ItemId, ItemKind};
 use crate::systems::notification;
 use crate::systems::script::effect::Audience;
 use crate::systems::script::event::RiftEvent;
-use crate::systems::script::{
-    EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, RiftInstances, RiftScripts,
-};
+use crate::systems::script::{EventKind, Owner, OwnerRow, RiftInstances, RiftScripts};
 use crate::systems::skill::{self, Learned, Rank, SkillId, SkillKind};
 use crate::systems::vfx::{self, VfxShaderFixture};
 
@@ -30,21 +29,16 @@ pub enum AspectSource {
 }
 
 impl AspectSource {
-    pub fn owner(self) -> ScriptOwner {
+    pub fn owner(self) -> Owner {
         let row = self.row();
-        ScriptOwner::Row(row.kind, row.row)
+        Owner::Row(row.kind, row.row)
     }
 
     pub fn row(self) -> OwnerRow {
-        let (kind, row) = match self {
-            AspectSource::Status(id) => (OwnerKind::StatusEffect, id.raw()),
-            AspectSource::Item(id) => (OwnerKind::Item, id.raw()),
-            AspectSource::Skill(id) => (OwnerKind::Skill, id.raw()),
-        };
-        OwnerRow {
-            kind,
-            row,
-            object: None,
+        match self {
+            AspectSource::Status(id) => OwnerRow::of_row(id),
+            AspectSource::Item(id) => OwnerRow::of_row(id),
+            AspectSource::Skill(id) => OwnerRow::of_row(id),
         }
     }
 }
@@ -217,13 +211,7 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_activate {
-            vfx::spawn(
-                world,
-                shown,
-                VfxSite::Actor(actor),
-                VfxParams::default(),
-                vfx::Delivery::default(),
-            );
+            vfx::show(world, shown, VfxSite::Actor(actor));
         }
         if let Some(heard) = def.sfx.on_activate {
             sound(world, actor, heard);
@@ -264,13 +252,7 @@ fn deactivate(world: &mut World, actor: Entity, source: AspectSource) {
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_expire {
-            vfx::spawn(
-                world,
-                shown,
-                VfxSite::Actor(actor),
-                VfxParams::default(),
-                vfx::Delivery::default(),
-            );
+            vfx::show(world, shown, VfxSite::Actor(actor));
         }
         if let Some(heard) = def.sfx.on_expire {
             sound(world, actor, heard);
@@ -302,13 +284,7 @@ fn play_during(world: &mut World, actor: Entity, source: AspectSource, now: Unix
     }
     let shown = def.vfx.during.and_then(|shown| {
         let lasts = shown.get(&content).lasts();
-        let entity = vfx::spawn(
-            world,
-            shown,
-            VfxSite::Actor(actor),
-            VfxParams::default(),
-            vfx::Delivery::default(),
-        )?;
+        let entity = vfx::show(world, shown, VfxSite::Actor(actor))?;
         Some((entity, lasts))
     });
     if let Some(heard) = def.sfx.during {
@@ -349,6 +325,6 @@ fn advance(
     }
 }
 
-fn sound(world: &mut World, actor: Entity, sfx: crate::core::audio::playback::SfxId) {
+fn sound(world: &mut World, actor: Entity, sfx: SfxId) {
     notification::play_sound(world, Some(actor), Some(actor), sfx, Audience::Everyone);
 }

@@ -1,7 +1,10 @@
-use design_tokens::glyph::{self, Mark};
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Color32, FontId, Sense, Ui};
+use engine::core::content::ContentRow;
+use engine::systems::npc::NpcDef;
 use serde_json::Value;
 
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
@@ -225,7 +228,7 @@ fn draw(
     }
     let mono = FontId::monospace(13.0);
     let small = FontId::monospace(12.0);
-    let x = std::cell::Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
+    let x = Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
     let y = rect.center().y;
     let put = |ui: &Ui, text: &str, font: &FontId, ink: Color32| {
         let drawn = ui.painter().text(
@@ -323,7 +326,7 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
         .map(|line| match LineSpeaker::of(&line["by"]) {
             Some(LineSpeaker::Npc { npc, face }) => {
                 let name = editor
-                    .row_value("npc", &npc)
+                    .row_value(NpcDef::TABLE, &npc)
                     .map(|row| row.text_or("name", &npc).to_owned())
                     .unwrap_or(npc);
                 match face {
@@ -344,7 +347,6 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
 fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
-            editor.views.script.focus_on(&doc.owner);
             editor.select(RowSelection::parts(
                 doc.owner.table(),
                 doc.owner.key(),

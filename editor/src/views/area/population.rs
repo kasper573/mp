@@ -1,5 +1,5 @@
 use egui::{Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
@@ -12,15 +12,15 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
-use crate::project::row_file;
 use crate::thumbs;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
         return;
     };
-    let Some(row) = cx.files.json(&row_file("npc", &npc)) else {
+    let Some(row) = cx.files.json(&row_file(NpcDef::TABLE, &npc)) else {
         return;
     };
     widgets::section(ui, &format!("From npc/{npc}"));
@@ -36,7 +36,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     );
     let scripts: Vec<String> = modules
         .iter()
-        .filter(|m| m["type"].as_str().is_some_and(|t| t.ends_with("_script")))
+        .filter(|module| module.script_kind().is_some())
         .map(|m| match m["script"].as_str() {
             Some(script) => {
                 let values: Vec<String> = m["values"]
@@ -79,7 +79,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     ui.add_space(4.0);
     if widgets::chip_colored(ui, &format!("npc/ {npc} →"), theme::INPUT, theme::CODE).clicked() {
         cx.actions.push(FormAction::OpenRow {
-            table: "npc".to_owned(),
+            table: NpcDef::TABLE.to_owned(),
             key: npc.clone(),
         });
     }

@@ -1,109 +1,55 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use engine::core::content::{Content, ContentScope, with_content};
-use engine::core::script::{EffectDef, EventDef, OwnerKindDef};
-use engine::systems::actor::model::Face;
+use engine::core::script::node::MAX_CALL_DEPTH;
+use engine::core::script::{EffectDef, EventDef, NodeKind, OwnerKindDef, REFUSED};
+use engine::systems::actor::model::Expression;
 use engine::systems::area::blueprint::hole_name;
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{Node, OwnerKind};
+use engine::systems::script::{
+    EventKind, Node, OwnerKind, RiftEffectKind, RiftQuery, RiftQueryKind,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::keymap::EditorKey;
-use crate::project::{ProjectFiles, row_of};
+use crate::project::ProjectFiles;
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
 use crate::value::RowValue;
 use crate::{condition, rows, spans};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
-#[strum(serialize_all = "snake_case")]
-pub enum FlowKind {
-    On,
-    If,
-    Random,
-    Repeat,
-    Wait,
-    Set,
-    Run,
-    Return,
-    Dialogue,
-}
-
-impl FlowKind {
-    pub fn of(node: &Value) -> Option<FlowKind> {
-        node.kind().parse().ok()
-    }
-
-    pub fn name(self) -> &'static str {
-        self.into()
-    }
-
-    pub fn arrows(self) -> &'static [&'static str] {
-        match self {
-            FlowKind::On | FlowKind::Wait | FlowKind::Set | FlowKind::Run => &["next"],
-            FlowKind::If => &["yes", "no"],
-            FlowKind::Repeat => &["each", "then"],
-            FlowKind::Random => &["outputs"],
-            FlowKind::Dialogue => &["choices", "next", "left"],
-            FlowKind::Return => &[],
-        }
-    }
-
-    pub fn pauses(self) -> bool {
-        matches!(self, FlowKind::Wait | FlowKind::Dialogue)
-    }
-
-    pub fn system(self) -> &'static str {
-        match self {
-            FlowKind::Dialogue => "dialogue",
-            _ => "flow",
-        }
-    }
-
-    pub fn blurb(self) -> &'static str {
-        match self {
-            FlowKind::On => "Starts a flow at an event; its cause is the subject",
-            FlowKind::If => "Takes yes when the test holds, else no",
-            FlowKind::Random => "Picks an output by weight",
-            FlowKind::Repeat => "Runs each a number of times, then goes on",
-            FlowKind::Wait => "Pauses for seconds, or one tick at 0",
-            FlowKind::Set => "Writes locals and owner state in order",
-            FlowKind::Run => "Calls another script and goes on when it ends",
-            FlowKind::Return => "Ends a called script, handing back a value",
-            FlowKind::Dialogue => "Lines and choices spoken to the subject",
-        }
-    }
+/// A node's kind as its tag names it; any tag no flow node takes is an effect's.
+pub fn kind_of(node: &Value) -> NodeKind {
+    node.kind().parse().unwrap_or(NodeKind::Effect)
 }
 
 pub fn is_dialogue(node: &Value) -> bool {
-    FlowKind::of(node) == Some(FlowKind::Dialogue)
+    kind_of(node) == NodeKind::Dialogue
 }
 
 pub fn is_event(node: &Value) -> bool {
-    FlowKind::of(node) == Some(FlowKind::On)
+    kind_of(node) == NodeKind::On
 }
 
 pub fn hint(node: &Value) -> String {
-    match FlowKind::of(node) {
-        Some(FlowKind::Dialogue) => format!(
+    match kind_of(node) {
+        NodeKind::Dialogue => format!(
             "{} adds a line · {} a choice · select text to style it",
             EditorKey::Confirm.name(),
             EditorKey::AddChoice.name()
         ),
-        Some(FlowKind::If) => {
+        NodeKind::If => {
             "each slot takes one type · the same builder edits every condition".to_owned()
         }
-        Some(FlowKind::Repeat | FlowKind::Wait | FlowKind::Random) => {
+        NodeKind::Repeat | NodeKind::Wait | NodeKind::Random => {
             "a loop may come back only through a node that pauses".to_owned()
         }
-        Some(FlowKind::Run) => "calls nest 8 deep and never loop back".to_owned(),
-        Some(FlowKind::On) => "a flow starts here; its cause is the subject".to_owned(),
-        Some(FlowKind::Set | FlowKind::Return) | None => match node.kind() {
-            "remember" | "forget" => "two arrows may lead into one node".to_owned(),
-            _ => "an output without an arrow ends the flow".to_owned(),
-        },
+        NodeKind::Run => format!("calls nest {MAX_CALL_DEPTH} deep and never loop back"),
+        NodeKind::On => "a flow starts here; its cause is the subject".to_owned(),
+        NodeKind::Set | NodeKind::Return | NodeKind::Effect => {
+            "an output without an arrow ends the flow".to_owned()
+        }
     }
 }
 
@@ -203,7 +149,7 @@ pub fn bust_file(content: Option<&Content>, speaker: &LineSpeaker) -> Option<Str
         .busts()?;
     let face = face
         .as_deref()
-        .map(|face| serde_json::from_value::<Face>(Value::String(face.to_owned())))
+        .map(|face| serde_json::from_value::<Expression>(Value::String(face.to_owned())))
         .transpose()
         .ok()?;
     let file = match face {
@@ -226,27 +172,23 @@ pub struct NodeEntry {
     pub system: String,
     pub blurb: String,
     pub owners: Vec<OwnerKind>,
-    pub outputs: Vec<String>,
+    pub outputs: Vec<NodeOutput>,
     pub fields: Vec<(String, Option<String>)>,
     pub pauses: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct NodeOutput {
+    pub name: String,
+    /// When the node takes the output, as its definition says.
+    pub meaning: Option<String>,
+    /// Whether the node takes the output when what it does fails.
+    pub fails: bool,
+}
+
 impl NodeEntry {
     pub fn fits(&self, linking: bool) -> bool {
-        (self.kind == FlowKind::On.name()) != linking
-    }
-
-    pub fn badge(&self) -> &str {
-        match self.system.as_str() {
-            "flow" | "dialogue" => "script",
-            "memory" => "quest",
-            "area" => "object",
-            "npc body" | "notification" | "chat" | "actor" => "npc",
-            "audio" => "sfx",
-            "vfx" => "skill",
-            "stat" | "class" => "respawn",
-            other => other,
-        }
+        (self.kind == NodeKind::On.name()) != linking
     }
 }
 
@@ -284,68 +226,58 @@ pub struct NodeCatalogue {
 }
 
 impl NodeCatalogue {
-    pub fn build(root: &Value, content: Option<&Content>) -> NodeCatalogue {
-        let mut entries: Vec<NodeEntry> = FlowKind::VARIANTS
+    pub fn build(root: &Value) -> NodeCatalogue {
+        let parse = |template: Option<Value>| -> Option<Node> {
+            let (parsed, _) = with_content(ContentScope::new(), || {
+                serde_json::from_value::<Node>(template?).ok()
+            });
+            parsed
+        };
+        let entries = variants(root)
             .iter()
-            .map(|&kind| NodeEntry {
-                kind: kind.name().to_owned(),
-                system: kind.system().to_owned(),
-                blurb: kind.blurb().to_owned(),
-                owners: Vec::new(),
-                outputs: kind.arrows().iter().map(|&s| s.to_owned()).collect(),
-                fields: Vec::new(),
-                pauses: kind.pauses(),
+            .map(|variant| {
+                let (outputs, fields): (Vec<_>, Vec<_>) = schema::properties(variant.schema)
+                    .into_iter()
+                    .filter(|(name, _)| *name != "type")
+                    .partition(|(_, field)| leads_out(field));
+                let node = parse(fresh(root, variant));
+                NodeEntry {
+                    kind: variant.tag.clone(),
+                    system: schema::system_of(variant.schema)
+                        .unwrap_or("other")
+                        .to_owned(),
+                    blurb: schema::description(variant.schema)
+                        .map(first_sentence)
+                        .unwrap_or_default(),
+                    owners: match &node {
+                        Some(Node::Effect(effect)) => effect.owners().to_vec(),
+                        _ => Vec::new(),
+                    },
+                    outputs: outputs
+                        .into_iter()
+                        .map(|(name, field)| NodeOutput {
+                            name: name.clone(),
+                            meaning: schema::description(field).map(first_sentence),
+                            fails: field["x-fails"] == true,
+                        })
+                        .collect(),
+                    fields: fields
+                        .into_iter()
+                        .map(|(name, field)| {
+                            (
+                                name.clone(),
+                                schema::table_of(schema::resolve(root, field)).map(str::to_owned),
+                            )
+                        })
+                        .collect(),
+                    pauses: node.as_ref().is_some_and(Node::pauses),
+                }
             })
             .collect();
-        let scope = content.map(ContentScope::of);
-        let parse = |template: Value| -> Option<Node> {
-            let scope = scope.clone()?;
-            let (parsed, _) = with_content(scope, || serde_json::from_value::<Node>(template));
-            parsed.ok()
-        };
-        for variant in variants(root) {
-            if variant.tag.parse::<FlowKind>().is_ok() {
-                continue;
-            }
-            let outputs: Vec<String> = schema::properties(variant.schema)
-                .into_iter()
-                .filter(|(name, field)| *name != "type" && is_arrow(field))
-                .map(|(name, _)| name.clone())
-                .collect();
-            let fields: Vec<(String, Option<String>)> = schema::properties(variant.schema)
-                .into_iter()
-                .filter(|(name, field)| *name != "type" && !is_arrow(field))
-                .map(|(name, field)| {
-                    (
-                        name.clone(),
-                        schema::table_of(schema::resolve(root, field)).map(str::to_owned),
-                    )
-                })
-                .collect();
-            let (owners, pauses) = match parse(schema::variant_template(root, &variant)) {
-                Some(Node::Effect(effect)) => (effect.owners().to_vec(), effect.pauses()),
-                _ => (Vec::new(), false),
-            };
-            entries.push(NodeEntry {
-                kind: variant.tag.clone(),
-                system: schema::system_of(variant.schema)
-                    .unwrap_or("other")
-                    .to_owned(),
-                blurb: schema::description(variant.schema)
-                    .map(first_sentence)
-                    .unwrap_or_default(),
-                owners,
-                outputs,
-                fields,
-                pauses,
-            });
-        }
         let events = event_variants(root)
             .into_iter()
             .map(|variant| {
-                let mut template = schema::variant_template(root, &variant);
-                template["type"] = Value::String(FlowKind::On.name().to_owned());
-                let owners = match parse(template) {
+                let owners = match parse(template_event(root, &variant.tag)) {
                     Some(Node::On { event, .. }) => event.owners().to_vec(),
                     _ => Vec::new(),
                 };
@@ -357,6 +289,21 @@ impl NodeCatalogue {
 
     pub fn entry(&self, kind: &str) -> Option<&NodeEntry> {
         self.entries.iter().find(|entry| entry.kind == kind)
+    }
+
+    /// What becomes of a flow that takes the output while no arrow leaves it.
+    pub fn unwired(&self, kind: &str, output: &str) -> String {
+        let meaning = self
+            .entry(kind)
+            .and_then(|entry| entry.outputs.iter().find(|known| known.name == output))
+            .and_then(|known| known.meaning.as_deref());
+        match meaning {
+            Some(meaning) => format!("{meaning} · no arrow ends the flow"),
+            None if output == REFUSED => {
+                "no arrow: the flow ends and the player is told why".to_owned()
+            }
+            None => "no arrow · ends the flow".to_owned(),
+        }
     }
 
     pub fn refusal(&self, kind: &str, owner: OwnerKind) -> Option<OwnerRefusal> {
@@ -395,8 +342,8 @@ pub fn ports(node: &Value, catalogue: &NodeCatalogue) -> Vec<NodePort> {
             target: node[field].as_str().map(str::to_owned),
         }
     };
-    match FlowKind::of(node) {
-        Some(FlowKind::Random) => {
+    match kind_of(node) {
+        NodeKind::Random => {
             let weights = node["weights"].as_array().cloned().unwrap_or_default();
             let outputs = node["outputs"].as_array().cloned().unwrap_or_default();
             (0..weights.len().max(outputs.len()))
@@ -413,7 +360,7 @@ pub fn ports(node: &Value, catalogue: &NodeCatalogue) -> Vec<NodePort> {
                 })
                 .collect()
         }
-        Some(FlowKind::Dialogue) => {
+        NodeKind::Dialogue => {
             let choices = node["choices"].as_array().cloned().unwrap_or_default();
             let mut ports: Vec<NodePort> = choices
                 .iter()
@@ -430,10 +377,22 @@ pub fn ports(node: &Value, catalogue: &NodeCatalogue) -> Vec<NodePort> {
             ports.push(arrow("left"));
             ports
         }
-        Some(flow) => flow.arrows().iter().map(|field| arrow(field)).collect(),
-        None => catalogue
+        NodeKind::On
+        | NodeKind::If
+        | NodeKind::Repeat
+        | NodeKind::Wait
+        | NodeKind::Set
+        | NodeKind::Run
+        | NodeKind::Return
+        | NodeKind::Effect => catalogue
             .entry(node.kind())
-            .map(|entry| entry.outputs.iter().map(|name| arrow(name)).collect())
+            .map(|entry| {
+                entry
+                    .outputs
+                    .iter()
+                    .map(|output| arrow(&output.name))
+                    .collect()
+            })
             .unwrap_or_default(),
     }
 }
@@ -567,31 +526,37 @@ pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
 }
 
 pub fn template(root: &Value, kind: &str) -> Option<Value> {
-    let flow = kind.parse::<FlowKind>().ok();
-    if flow == Some(FlowKind::On) {
-        return template_event(root, "started");
+    fresh(
+        root,
+        variants(root).iter().find(|variant| variant.tag == kind)?,
+    )
+}
+
+/// A node as the editor first places it: the schema's least, with a start a writer can see work.
+fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
+    let kind: NodeKind = variant.tag.parse().unwrap_or(NodeKind::Effect);
+    if kind == NodeKind::On {
+        return template_event(root, EventKind::Started.name());
     }
-    let variants = variants(root);
-    let variant = variants.iter().find(|variant| variant.tag == kind)?;
     let mut value = schema::variant_template(root, variant);
-    match flow {
-        Some(FlowKind::Dialogue) => {
+    match kind {
+        NodeKind::Dialogue => {
             value["lines"] = serde_json::json!([LineSpeaker::Narrator.blank_line()]);
         }
-        Some(FlowKind::Random) => {
+        NodeKind::Random => {
             value["weights"] = serde_json::json!([1, 1]);
             value["outputs"] = serde_json::json!([null, null]);
         }
-        Some(FlowKind::Repeat) => {
+        NodeKind::Repeat => {
             value["times"] = Value::from(2);
             value["at_most"] = Value::from(10);
         }
-        Some(FlowKind::Wait) => {
+        NodeKind::Wait => {
             value["seconds"] = Value::from(1.0);
             value["at_most"] = Value::from(60.0);
         }
-        Some(FlowKind::If) => value["test"] = Value::Bool(true),
-        _ => {}
+        NodeKind::If => value["test"] = Value::Bool(true),
+        NodeKind::On | NodeKind::Set | NodeKind::Run | NodeKind::Return | NodeKind::Effect => {}
     }
     Some(value)
 }
@@ -600,12 +565,9 @@ pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &
     let schema = schema::resolve(root, schema);
     if let Some(table) = schema::table_of(schema) {
         if value.as_str().is_some_and(str::is_empty)
-            && let Some(key) = files
-                .paths_under(&format!("tables/{table}/"))
-                .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-                .min()
+            && let Some(key) = files.keys_of(table).min()
         {
-            *value = Value::String(key);
+            *value = Value::from(key);
         }
         return;
     }
@@ -639,13 +601,14 @@ pub fn template_event(root: &Value, event: &str) -> Option<Value> {
         .into_iter()
         .find(|variant| variant.tag == event)?;
     let mut node = schema::variant_template(root, &variant);
-    node["type"] = Value::String(FlowKind::On.name().to_owned());
-    if event == "interacted" {
-        node["verb"] = Value::String("talk".to_owned());
-        node["reach"] = Value::from(1.5);
-    }
-    if event == "came_near" || event == "heard" {
-        node["within"] = Value::from(4.0);
+    node["type"] = Value::from(NodeKind::On.name());
+    match event.parse() {
+        Ok(EventKind::Interacted) => {
+            node["verb"] = Value::from("talk");
+            node["reach"] = Value::from(1.5);
+        }
+        Ok(EventKind::CameNear | EventKind::Heard) => node["within"] = Value::from(4.0),
+        _ => {}
     }
     Some(node)
 }
@@ -678,7 +641,7 @@ pub fn variant_schema<'a>(root: &'a Value, kind: &str) -> Option<&'a Value> {
 }
 
 pub fn event_variants(root: &Value) -> Vec<SchemaVariant<'_>> {
-    let Some(on) = variant_schema(root, FlowKind::On.name()) else {
+    let Some(on) = variant_schema(root, NodeKind::On.name()) else {
         return Vec::new();
     };
     let mut found = Vec::new();
@@ -710,32 +673,17 @@ pub fn event_variant<'a>(root: &'a Value, event: &str) -> Option<&'a Value> {
 
 pub fn form_fields<'a>(root: &'a Value, node: &Value) -> Option<(&'a Value, Vec<String>)> {
     let schema = variant_schema(root, node.kind())?;
-    let mut hidden: Vec<String> = vec!["type".to_owned()];
-    match FlowKind::of(node) {
-        Some(flow) => {
-            hidden.extend(flow.arrows().iter().map(|&s| s.to_owned()));
-            match flow {
-                FlowKind::On => hidden.push("event".to_owned()),
-                FlowKind::Dialogue => hidden.extend(["lines".to_owned()]),
-                _ => {}
-            }
-        }
-        None => hidden.extend(
-            schema::properties(schema)
-                .into_iter()
-                .filter(|(_, field)| is_arrow(field))
-                .map(|(name, _)| name.clone()),
-        ),
-    }
+    let hidden = schema::properties(schema)
+        .into_iter()
+        .filter(|(name, field)| *name == "type" || leads_out(field))
+        .map(|(name, _)| name.clone())
+        .collect();
     Some((schema, hidden))
 }
 
-fn is_arrow(field: &Value) -> bool {
-    let types = schema::type_names(field);
-    types.len() == 2
-        && types.contains(&"string")
-        && types.contains(&"null")
-        && schema::marker(field).is_none()
+fn leads_out(field: &Value) -> bool {
+    let is_arrow = |schema: &Value| schema::marker(schema) == Some("x-arrow");
+    is_arrow(field) || field.get("items").is_some_and(is_arrow)
 }
 
 pub fn summary(node: &Value, catalogue: &NodeCatalogue) -> String {
@@ -876,17 +824,28 @@ pub struct NodeReads {
 }
 
 impl NodeReads {
-    pub fn of(nodes: &Map<String, Value>) -> NodeReads {
-        let mut reads = NodeReads::default();
+    /// What the nodes' tests and choice requirements ask of the world.
+    pub fn of(content: &Content, nodes: &Map<String, Value>) -> NodeReads {
+        let mut asked = Vec::new();
         for node in nodes.values() {
-            if let Some(test) = node.get("test") {
-                reads.walk(test);
+            let requires = node["choices"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|choice| choice.get("requires"));
+            for test in node.get("test").into_iter().chain(requires) {
+                queries_in(test, &mut asked);
             }
-            for choice in node["choices"].as_array().into_iter().flatten() {
-                if let Some(requires) = choice.get("requires") {
-                    reads.walk(requires);
-                }
-            }
+        }
+        let (queries, _) = with_content(ContentScope::of(content), || {
+            asked
+                .into_iter()
+                .filter_map(|query| serde_json::from_value::<RiftQuery>(query.clone()).ok())
+                .collect::<Vec<_>>()
+        });
+        let mut reads = NodeReads::default();
+        for query in &queries {
+            reads.note(content, query);
         }
         for list in [
             &mut reads.memories,
@@ -911,42 +870,48 @@ impl NodeReads {
         parts.join(" · ")
     }
 
-    fn walk(&mut self, value: &Value) {
-        match value {
-            Value::Object(map) => {
-                match map.kind() {
-                    "memory" | "set_within" => {
-                        if let Some(name) = map.get("memory").and_then(Value::as_str) {
-                            self.memories.push(name.to_owned());
-                        }
-                    }
-                    "holding" | "wearing" => {
-                        if let Some(item) = map.get("item").and_then(Value::as_str) {
-                            self.items.push(format!("holding {item}"));
-                        }
-                    }
-                    "inside" | "in_area" | "knows_area" => {
-                        let area = map.text_or("area", "?");
-                        let object = map
-                            .get("object")
-                            .and_then(Value::as_str)
-                            .map(|o| format!(" · {o}"))
-                            .unwrap_or_default();
-                        self.places.push(format!("inside area/{area}{object}"));
-                    }
-                    "on_quest" | "quest_done" | "task_done" => {
-                        if let Some(quest) = map.get("quest").and_then(Value::as_str) {
-                            self.other.push(format!("quest/{quest}"));
-                        }
-                    }
-                    "level" => self.other.push("the level".to_owned()),
-                    _ => {}
-                }
-                map.values().for_each(|child| self.walk(child));
+    fn note(&mut self, content: &Content, query: &RiftQuery) {
+        match query {
+            RiftQuery::Memory { memory, .. } | RiftQuery::SetWithin { memory, .. } => {
+                self.memories.push(memory.key(content).to_owned());
             }
-            Value::Array(list) => list.iter().for_each(|child| self.walk(child)),
+            RiftQuery::Holding { item, .. } => {
+                self.items.push(format!("holding {}", item.key(content)));
+            }
+            RiftQuery::Wearing { item, .. } => {
+                self.items.push(format!("wearing {}", item.key(content)));
+            }
+            RiftQuery::Inside { object, .. } => self.places.push(format!("inside {object}")),
+            RiftQuery::InArea { area, .. } => {
+                self.places.push(format!("in area/{}", area.key(content)));
+            }
+            RiftQuery::KnowsArea { area, .. } => {
+                self.places
+                    .push(format!("knows area/{}", area.key(content)));
+            }
+            RiftQuery::OnQuest { quest, .. }
+            | RiftQuery::QuestDone { quest, .. }
+            | RiftQuery::QuestCooling { quest, .. }
+            | RiftQuery::TaskDone { quest, .. }
+            | RiftQuery::QuestResetsIn { quest, .. } => {
+                self.other.push(format!("quest/{}", quest.key(content)));
+            }
+            RiftQuery::Level { .. } => self.other.push("the level".to_owned()),
             _ => {}
         }
+    }
+}
+
+fn queries_in<'a>(value: &'a Value, found: &mut Vec<&'a Value>) {
+    match value {
+        Value::Object(map) => {
+            if map.kind().parse::<RiftQueryKind>().is_ok() {
+                found.push(value);
+            }
+            map.values().for_each(|child| queries_in(child, found));
+        }
+        Value::Array(list) => list.iter().for_each(|child| queries_in(child, found)),
+        _ => {}
     }
 }
 
@@ -954,20 +919,6 @@ impl NodeReads {
 fn first_sentence(text: &str) -> String {
     let first = text.split_once(". ").map_or(text, |(first, _)| first);
     first.trim_end_matches('.').to_owned()
-}
-
-pub fn arrow_meaning(kind: &str, label: &str) -> &'static str {
-    match (kind, label) {
-        ("items", "refused") => "no arrow: the flow ends and the player is told why",
-        ("walk_to", "arrived") => "there",
-        ("walk_to", "blocked") => "no way there",
-        (_, "interrupted") => "another flow took the body",
-        ("wait", "next") => "ends the pass",
-        ("turn_in", "refused") => "objectives unmet: the flow ends",
-        ("turn_in", "cancelled") => "the card was closed: the flow ends",
-        (_, "left") => "the subject walked away: the flow ends",
-        _ => "no arrow · ends the flow",
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1005,10 +956,10 @@ fn var(text: impl Into<String>) -> SummaryPiece {
 }
 
 pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
-    match FlowKind::of(node) {
-        Some(FlowKind::On) => vec![event_pieces(node)],
-        Some(FlowKind::If) => vec![expression_pieces(&node["test"])],
-        Some(FlowKind::Random) => {
+    match kind_of(node) {
+        NodeKind::On => vec![event_pieces(node)],
+        NodeKind::If => vec![expression_pieces(&node["test"])],
+        NodeKind::Random => {
             let weights: Vec<String> = node["weights"]
                 .as_array()
                 .into_iter()
@@ -1017,7 +968,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 .collect();
             vec![vec![muted("weights "), strong(weights.join(" : "))]]
         }
-        Some(FlowKind::Repeat) => {
+        NodeKind::Repeat => {
             let mut line = expression_pieces(&node["times"]);
             line.push(muted(" times"));
             if let Some(at_most) = node["at_most"].as_f64() {
@@ -1026,7 +977,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
             }
             vec![line]
         }
-        Some(FlowKind::Wait) => {
+        NodeKind::Wait => {
             let mut line = expression_pieces(&node["seconds"]);
             line.push(muted(" s"));
             if node["seconds"].as_f64() == Some(0.0) {
@@ -1037,7 +988,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
             }
             vec![line]
         }
-        Some(FlowKind::Set) => node["values"]
+        NodeKind::Set => node["values"]
             .as_array()
             .into_iter()
             .flatten()
@@ -1051,7 +1002,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 line
             })
             .collect(),
-        Some(FlowKind::Run) => {
+        NodeKind::Run => {
             let mut lines = vec![vec![muted("script/"), strong(node.text_or("script", "?"))]];
             if let Some(values) = node["values"].as_object().filter(|v| !v.is_empty()) {
                 let mut line = Vec::new();
@@ -1066,13 +1017,13 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
             }
             lines
         }
-        Some(FlowKind::Return) => match node.get("value") {
+        NodeKind::Return => match node.get("value") {
             Some(value) if !value.is_null() => vec![expression_pieces(value)],
             _ => vec![vec![muted("back to the caller")]],
         },
-        Some(FlowKind::Dialogue) => vec![dialogue_pieces(node)],
-        None => match node.kind() {
-            "remember" => {
+        NodeKind::Dialogue => vec![dialogue_pieces(node)],
+        NodeKind::Effect => match node.kind().parse() {
+            Ok(RiftEffectKind::Remember) => {
                 let mut line = vec![strong(node.text_or("memory", "?")), muted(" = ")];
                 match node.get("to") {
                     Some(to) if !to.is_null() => line.extend(expression_pieces(to)),
@@ -1080,7 +1031,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 }
                 vec![line]
             }
-            "forget" => vec![vec![
+            Ok(RiftEffectKind::Forget) => vec![vec![
                 strong(
                     node["memories"]
                         .as_array()
@@ -1092,7 +1043,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 ),
                 muted(" back to zero"),
             ]],
-            "items" => {
+            Ok(RiftEffectKind::Items) => {
                 let mut lines = Vec::new();
                 for (field, word) in [("take", "take "), ("give", "give ")] {
                     if let Some(list) = node[field].as_array().filter(|l| !l.is_empty()) {
@@ -1106,7 +1057,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 }
                 lines
             }
-            "warp" => {
+            Ok(RiftEffectKind::Warp) => {
                 let who = node["who"]
                     .as_str()
                     .map(actor_word)
@@ -1119,7 +1070,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 }
                 vec![line, vec![muted("sets its spawn point")]]
             }
-            other => effect_pieces(node, other, catalogue),
+            _ => effect_pieces(node, catalogue),
         },
     }
 }
@@ -1158,8 +1109,8 @@ fn stack_pieces(list: &[Value]) -> Vec<SummaryPiece> {
 
 fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
     let mut line = Vec::new();
-    match event_of(node) {
-        Some("interacted") => {
+    match event_of(node).and_then(|event| event.parse().ok()) {
+        Some(EventKind::Interacted) => {
             line.push(muted("verb "));
             line.push(strong(node.text_or("verb", "use")));
             if let Some(reach) = node["reach"].as_f64() {
@@ -1168,20 +1119,20 @@ fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
                 line.push(muted(" tiles"));
             }
         }
-        Some("came_near") | Some("entered") | Some("left") => {
+        Some(EventKind::CameNear | EventKind::Entered | EventKind::Left) => {
             line.push(strong(node.text_or("by", "characters")));
             if let Some(within) = node["within"].as_f64() {
                 line.push(muted(" within "));
                 line.push(strong(within.to_string()));
             }
         }
-        Some("stood_on") => {
+        Some(EventKind::StoodOn) => {
             line.push(strong(node.text_or("by", "characters")));
             line.push(muted(" on "));
             line.push(strong(node.text_or("object", "?")));
         }
-        Some("started") => line.push(muted("the owner spawned")),
-        Some("run") => line.push(muted("started by a run node")),
+        Some(EventKind::Started) => line.push(muted("the owner spawned")),
+        Some(EventKind::Run) => line.push(muted("started by a run node")),
         Some(_) | None => {
             for (field, value) in node.as_object().into_iter().flatten() {
                 if matches!(field.as_str(), "type" | "event" | "next") {
@@ -1198,9 +1149,9 @@ fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
     line
 }
 
-fn effect_pieces(node: &Value, kind: &str, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
+fn effect_pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
     let fields: Vec<(String, Option<String>)> = catalogue
-        .entry(kind)
+        .entry(node.kind())
         .map(|entry| entry.fields.clone())
         .unwrap_or_else(|| {
             node.as_object()

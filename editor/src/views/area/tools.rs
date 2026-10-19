@@ -1,7 +1,9 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::{AreaDef, AreaModuleKind};
+use strum::VariantArray;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
 use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
@@ -9,8 +11,10 @@ use super::select::{
     copy_selection, delete_selection, duplicate_selection, move_selection, paste_anchor,
     paste_in_place, select_input, selected_indices, snapped_delta, start_paste,
 };
-use super::{AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, shapes};
-use super::{placement, scenery, stamp};
+use super::{
+    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, placement, scenery, shapes,
+    stamp,
+};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;
@@ -22,7 +26,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let view = editor.views.area.view_mut(view_key);
     let mut switched = None;
     ui.add_space(6.0);
-    for tool in AreaTool::ALL {
+    for &tool in AreaTool::VARIANTS {
         let selected = view.tool == tool;
         let (rect, response) = ui.allocate_exact_size(Vec2::new(32.0, 34.0), egui::Sense::click());
         let painter = ui.painter();
@@ -51,7 +55,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
             theme::MUTED,
         );
         if response
-            .on_hover_text(format!("{} ({})", tool.label(), tool.key().name()))
+            .on_hover_text(format!("{} ({})", tool.as_ref(), tool.key().name()))
             .clicked()
         {
             view.set_tool(tool);
@@ -393,7 +397,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     let mut switched = None;
     {
         let view = editor.views.area.view_mut(view_key);
-        for tool in AreaTool::ALL {
+        for &tool in AreaTool::VARIANTS {
             if pressed(tool.key()) {
                 view.set_tool(tool);
                 switched = tool.bottom_tab();
@@ -500,7 +504,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         } else {
             1.0
         };
-        if !editor.selection.parts.is_empty() && editor.selection.table == "area" {
+        if !editor.selection.parts.is_empty() && editor.selection.table == AreaDef::TABLE {
             move_selection(editor, frame, x as f32 * step, y as f32 * step);
         } else {
             let view = editor.views.area.view_mut(view_key);
@@ -514,7 +518,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let tile = cursor.center();
         if let Some(hit) = frame.hit(tile) {
             editor.selection = RowSelection {
-                table: "area".to_owned(),
+                table: AreaDef::TABLE.to_owned(),
                 keys: vec![frame.area_key.clone()],
                 parts: vec![super::module_part(hit)],
             };

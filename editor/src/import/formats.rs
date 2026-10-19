@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
+use engine::systems::actor::model::MAX_FRAME_PX;
 use image::codecs::gif::GifDecoder;
 use image::codecs::png::PngDecoder;
 use image::{AnimationDecoder, GenericImage, ImageDecoder, RgbaImage};
 use serde::Deserialize;
 
-pub const MAX_FRAME_PX: u32 = 1024;
 pub const MAX_IMAGE_PX: u32 = 16384;
 pub const DEFAULT_MS: u32 = 100;
 
@@ -45,16 +46,6 @@ pub struct ExportFrame {
 }
 
 impl ExportFormat {
-    pub fn label(self) -> &'static str {
-        match self {
-            ExportFormat::SheetJson => "sheet + JSON",
-            ExportFormat::Grid => "grid",
-            ExportFormat::Sequence => "sequence",
-            ExportFormat::Gif => "GIF",
-            ExportFormat::Apng => "APNG",
-        }
-    }
-
     pub fn sentence(self) -> &'static str {
         match self {
             ExportFormat::SheetJson => "a sheet and its JSON",
@@ -171,13 +162,39 @@ pub fn is_blank(image: &RgbaImage) -> bool {
     image.pixels().all(|pixel| pixel[3] == 0)
 }
 
+pub fn cell(sheet: &RgbaImage, size: (u32, u32), index: u32) -> Option<RgbaImage> {
+    let (width, height) = size;
+    let columns = sheet
+        .width()
+        .checked_div(width)
+        .filter(|columns| *columns > 0)?;
+    let (x, y) = ((index % columns) * width, (index / columns) * height);
+    (y + height <= sheet.height())
+        .then(|| image::imageops::crop_imm(sheet, x, y, width, height).to_image())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DroppedFiles {
-    Sheet { image: PathBuf, json: PathBuf },
+    Sheet {
+        image: Option<PathBuf>,
+        json: PathBuf,
+    },
     Png(PathBuf),
     Apng(PathBuf),
     Gif(PathBuf),
     Sequence(Vec<PathBuf>),
+}
+
+impl DroppedFiles {
+    pub fn files(&self) -> Vec<PathBuf> {
+        match self {
+            DroppedFiles::Sheet { image, json } => image.iter().chain([json]).cloned().collect(),
+            DroppedFiles::Png(file) | DroppedFiles::Apng(file) | DroppedFiles::Gif(file) => {
+                vec![file.clone()]
+            }
+            DroppedFiles::Sequence(files) => files.clone(),
+        }
+    }
 }
 
 pub const FORMATS: &str = "a sheet with its JSON (Aseprite or TexturePacker), a sheet on a grid, a numbered PNG sequence, an animated GIF or APNG; a tileset is a grid; a bust is one PNG";
@@ -205,13 +222,8 @@ pub fn sort_out(files: &[PathBuf]) -> Result<DroppedFiles, String> {
         ));
     }
     match (jsons.len(), pngs.len(), gifs.len()) {
-        (1, 0, 0) => {
-            let json = jsons.remove(0);
-            let image = sheet_image_of(&json)?;
-            Ok(DroppedFiles::Sheet { image, json })
-        }
-        (1, 1, 0) => Ok(DroppedFiles::Sheet {
-            image: pngs.remove(0),
+        (1, 0 | 1, 0) => Ok(DroppedFiles::Sheet {
+            image: pngs.pop(),
             json: jsons.remove(0),
         }),
         (0, 0, 1) => Ok(DroppedFiles::Gif(gifs.remove(0))),
@@ -236,7 +248,7 @@ pub fn sort_out(files: &[PathBuf]) -> Result<DroppedFiles, String> {
 
 pub fn decode(dropped: &DroppedFiles) -> Result<AnimationExport, String> {
     match dropped {
-        DroppedFiles::Sheet { image, json } => decode_sheet(image, json),
+        DroppedFiles::Sheet { image, json } => decode_sheet(image.as_deref(), json),
         DroppedFiles::Png(file) => decode_grid(file),
         DroppedFiles::Apng(file) => decode_apng(file),
         DroppedFiles::Gif(file) => decode_gif(file),
@@ -282,6 +294,16 @@ pub fn names(files: &[PathBuf]) -> String {
         .join(", ")
 }
 
+pub fn export_name(files: &[PathBuf]) -> String {
+    match files {
+        [image, json] if json.extension().is_some_and(|ext| ext == "json") => {
+            format!("{} and .json", name(image))
+        }
+        [one] => name(one),
+        many => format!("{} files", many.len()),
+    }
+}
+
 pub fn stem(file: &Path) -> String {
     file.file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
@@ -320,26 +342,11 @@ fn header_of(file: &Path) -> Header {
 }
 
 fn is_apng(file: &Path) -> bool {
-    std::fs::File::open(file)
+    File::open(file)
         .ok()
         .and_then(|file| PngDecoder::new(BufReader::new(file)).ok())
         .and_then(|decoder| decoder.is_apng().ok())
         .unwrap_or(false)
-}
-
-fn sheet_image_of(json: &Path) -> Result<PathBuf, String> {
-    let text = std::fs::read_to_string(json).map_err(|error| format!("{}: {error}", name(json)))?;
-    let sheet: SheetJson =
-        serde_json::from_str(&text).map_err(|error| format!("{}: {error}", name(json)))?;
-    let image = sheet
-        .meta
-        .image
-        .ok_or_else(|| format!("{} names no image; drop the sheet with it", name(json)))?;
-    let beside = json.parent().unwrap_or(Path::new("")).join(&image);
-    if !beside.exists() {
-        return Err(format!("{} is not beside {}", image, name(json)));
-    }
-    Ok(beside)
 }
 
 #[derive(Deserialize)]
@@ -352,11 +359,11 @@ struct SheetJson {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum FramesJson {
-    Map(serde_json::Map<String, serde_json::Value>),
+    Map(BTreeMap<String, FrameJson>),
     List(Vec<FrameJson>),
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct FrameJson {
     #[serde(default)]
     filename: String,
@@ -400,31 +407,25 @@ struct TagJson {
     to: usize,
 }
 
-fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, String> {
+fn decode_sheet(image_file: Option<&Path>, json_file: &Path) -> Result<AnimationExport, String> {
     let text = std::fs::read_to_string(json_file)
         .map_err(|error| format!("{}: {error}", name(json_file)))?;
     let sheet: SheetJson =
         serde_json::from_str(&text).map_err(|error| format!("{}: {error}", name(json_file)))?;
-    let image = decode_image(image_file)?;
+    let image_file = match image_file {
+        Some(image_file) => image_file.to_path_buf(),
+        None => image_beside(json_file, &sheet.meta)?,
+    };
+    let image = decode_image(&image_file)?;
     let frames: Vec<FrameJson> = match sheet.frames {
         FramesJson::List(list) => list,
         FramesJson::Map(map) => {
-            let mut entries: Vec<(String, FrameJson)> = map
+            let mut frames: Vec<FrameJson> = map
                 .into_iter()
-                .map(|(filename, value)| {
-                    let shown = filename.clone();
-                    serde_json::from_value::<FrameJson>(value)
-                        .map(|mut frame| {
-                            frame.filename = filename.clone();
-                            (filename, frame)
-                        })
-                        .map_err(|error| format!("{}: {shown}: {error}", name(json_file)))
-                })
-                .collect::<Result<_, _>>()?;
-            entries.sort_by(|a, b| {
-                natural(&stem(Path::new(&a.0))).cmp(&natural(&stem(Path::new(&b.0))))
-            });
-            entries.into_iter().map(|(_, frame)| frame).collect()
+                .map(|(filename, frame)| FrameJson { filename, ..frame })
+                .collect();
+            frames.sort_by_cached_key(|frame| natural(&stem(Path::new(&frame.filename))));
+            frames
         }
     };
     if frames.is_empty() {
@@ -443,7 +444,7 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, 
             return Err(format!(
                 "{} lies outside {}",
                 frame.filename,
-                name(image_file)
+                name(&image_file)
             ));
         }
         let mut sprite =
@@ -472,26 +473,13 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, 
         decoded.push(ExportFrame::new(canvas, frame.duration));
     }
     let tags: Vec<(String, Vec<usize>)> = if sheet.meta.frame_tags.is_empty() {
-        let mut groups: BTreeMap<String, Vec<(u64, usize)>> = BTreeMap::new();
-        let mut order = Vec::new();
-        for (index, frame) in frames.iter().enumerate() {
+        by_tag(frames.iter().enumerate().map(|(index, frame)| {
             let (tag, number) = split_number(&stem(Path::new(&frame.filename)));
-            if !groups.contains_key(&tag) {
-                order.push(tag.clone());
-            }
-            groups
-                .entry(tag)
-                .or_default()
-                .push((number.unwrap_or(index as u64), index));
-        }
-        order
-            .into_iter()
-            .map(|tag| {
-                let mut members = groups.remove(&tag).unwrap_or_default();
-                members.sort();
-                (tag, members.into_iter().map(|(_, index)| index).collect())
-            })
-            .collect()
+            (tag, number.unwrap_or(index as u64), index)
+        }))
+        .into_iter()
+        .map(|(tag, members)| (tag, members.into_iter().map(|(_, index)| index).collect()))
+        .collect()
     } else {
         let mut seen = vec![None; frames.len()];
         let mut tags = Vec::new();
@@ -526,7 +514,7 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, 
         })
         .collect();
     let mut export = AnimationExport::new(
-        vec![image_file.to_path_buf(), json_file.to_path_buf()],
+        vec![image_file, json_file.to_path_buf()],
         ExportFormat::SheetJson,
         strips,
     );
@@ -543,25 +531,18 @@ fn decode_grid(file: &Path) -> Result<AnimationExport, String> {
 }
 
 fn decode_sequence(files: &[PathBuf]) -> Result<AnimationExport, String> {
-    let mut groups: BTreeMap<String, Vec<(u64, PathBuf)>> = BTreeMap::new();
-    let mut order = Vec::new();
-    for file in files {
-        let (tag, number) = split_number(&stem(file));
-        let Some(number) = number else {
-            return Err(format!(
+    let numbered = files
+        .iter()
+        .map(|file| match split_number(&stem(file)) {
+            (tag, Some(number)) => Ok((tag, number, file)),
+            (_, None) => Err(format!(
                 "{} has no frame number; a sequence is named <tag>_<number>.png",
                 name(file)
-            ));
-        };
-        if !groups.contains_key(&tag) {
-            order.push(tag.clone());
-        }
-        groups.entry(tag).or_default().push((number, file.clone()));
-    }
+            )),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut strips = Vec::new();
-    for tag in order {
-        let mut members = groups.remove(&tag).unwrap_or_default();
-        members.sort();
+    for (tag, members) in by_tag(numbered) {
         for pair in members.windows(2) {
             if pair[1].0 != pair[0].0 + 1 {
                 return Err(format!(
@@ -572,7 +553,7 @@ fn decode_sequence(files: &[PathBuf]) -> Result<AnimationExport, String> {
         }
         let frames = members
             .into_iter()
-            .map(|(_, file)| decode_image(&file).map(ExportFrame::untimed))
+            .map(|(_, file)| decode_image(file).map(ExportFrame::untimed))
             .collect::<Result<Vec<_>, _>>()?;
         strips.push(ExportStrip { tag, frames });
     }
@@ -582,7 +563,7 @@ fn decode_sequence(files: &[PathBuf]) -> Result<AnimationExport, String> {
 }
 
 fn decode_gif(file: &Path) -> Result<AnimationExport, String> {
-    let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
+    let handle = File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = GifDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
     decoder
@@ -599,7 +580,7 @@ fn decode_gif(file: &Path) -> Result<AnimationExport, String> {
 }
 
 fn decode_apng(file: &Path) -> Result<AnimationExport, String> {
-    let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
+    let handle = File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = PngDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
     decoder
@@ -705,4 +686,30 @@ pub fn split_number(stem: &str) -> (String, Option<u64>) {
 fn natural(text: &str) -> (String, u64) {
     let (tag, number) = split_number(text);
     (tag, number.unwrap_or(0))
+}
+
+fn image_beside(json: &Path, meta: &MetaJson) -> Result<PathBuf, String> {
+    let image = meta
+        .image
+        .as_deref()
+        .ok_or_else(|| format!("{} names no image; drop the sheet with it", name(json)))?;
+    let beside = json.parent().unwrap_or(Path::new("")).join(image);
+    if !beside.exists() {
+        return Err(format!("{image} is not beside {}", name(json)));
+    }
+    Ok(beside)
+}
+
+fn by_tag<T>(items: impl IntoIterator<Item = (String, u64, T)>) -> Vec<(String, Vec<(u64, T)>)> {
+    let mut groups: Vec<(String, Vec<(u64, T)>)> = Vec::new();
+    for (tag, number, item) in items {
+        match groups.iter_mut().find(|(seen, _)| *seen == tag) {
+            Some((_, members)) => members.push((number, item)),
+            None => groups.push((tag, vec![(number, item)])),
+        }
+    }
+    for (_, members) in &mut groups {
+        members.sort_by_key(|(number, _)| *number);
+    }
+    groups
 }

@@ -1,22 +1,23 @@
 use design_tokens::controls;
 use design_tokens::glyph::Mark;
 use egui::Ui;
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
-use engine::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
+use engine::systems::area::{self, AreaDef, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
+use super::grid::GridDraft;
 use super::inspect::Followups;
-use super::modules;
-use super::placement::warp_destinations;
+use super::placement::{self, warp_destinations};
 use super::stamp::object_names;
-use super::{AreaFrame, AreaSnapshot, shapes};
-use crate::forms::FormCx;
+use super::{AreaFrame, AreaSnapshot, modules, shapes};
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, row_file};
+use crate::project::ContentEdit;
 use crate::ui::widgets;
-use crate::value::RowValue;
-use crate::{app::Editor, forms, rows, value};
+use crate::value::{self, RowValue};
+use crate::{app::Editor, rows};
 
 pub struct PlacedTile {
     pub column: usize,
@@ -171,7 +172,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     };
     let tileset = module.text("tileset").to_owned();
     let grids = frame.area().grids.clone();
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
+    let mut draft = GridDraft::of(&frame.area_key, &grids);
     let layer = editor
         .views
         .area
@@ -236,10 +237,10 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(here_id) = content.by_key::<area::AreaDef>(area_key) else {
+    let Some(here_id) = content.by_key::<AreaDef>(area_key) else {
         return;
     };
-    let Some(there_id) = content.by_key::<area::AreaDef>(&target_area) else {
+    let Some(there_id) = content.by_key::<AreaDef>(&target_area) else {
         return;
     };
     let here = area::load(&content, here_id);
@@ -270,20 +271,25 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
+    let mut scripts = module["scripts"].clone();
+    placement::redirect_places(
+        &mut scripts,
+        &serde_json::json!({ "area": area_key, "x": back_to.x, "y": back_to.y }),
+    );
     let door = serde_json::json!({
         "type": "object",
         "name": name,
         "shape": { "type": "point", "x": cell.x as f32, "y": cell.y as f32 },
-        "scripts": [{ "type": "shared_script", "script": "warp", "values": { "to": { "area": area_key, "x": back_to.x, "y": back_to.y } } }]
+        "scripts": scripts,
     });
-    let Some(mut there_row) = editor.row_value("area", &target_area) else {
+    let Some(mut there_row) = editor.row_value(AreaDef::TABLE, &target_area) else {
         return;
     };
     if let Some(m) = there_row["modules"].as_array_mut() {
         m.push(door);
     }
     let mut edit = ContentEdit::new(format!("Return door from {target_area} to {area_key}"));
-    edit.write_json(row_file("area", &target_area), &there_row);
+    edit.write_json(row_file(AreaDef::TABLE, &target_area), &there_row);
     if editor.apply(edit) {
         editor.toast(format!(
             "Added a door back in {target_area} at {}, {}",
@@ -385,7 +391,7 @@ pub(super) fn scenery_extras(
 
 pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Option<usize> {
     let content = cx.content.clone()?;
-    let area_id = content.by_key::<area::AreaDef>(area_key)?;
+    let area_id = content.by_key::<AreaDef>(area_key)?;
     let grids = area::load(&content, area_id).grids.clone();
     let rect = shapes::scenery_rect(module)?;
     let size = grids.size;
@@ -399,7 +405,7 @@ pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Opti
     )
 }
 
-pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usize) {
+pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = super::shapes::scenery_rect(module) else {
         return;
@@ -408,7 +414,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usi
         return;
     };
     let grids = frame.area().grids.clone();
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
+    let mut draft = GridDraft::of(&frame.area_key, &grids);
     let mut adopted: Vec<Value> = module["blocks"].as_array().cloned().unwrap_or_default();
     let mut count = 0;
     for cell in rect.tiles() {
@@ -438,7 +444,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usi
     editor.apply(edit);
 }
 
-pub fn selected_scenery(editor: &Editor, frame: &super::AreaFrame) -> Option<usize> {
+pub fn selected_scenery(editor: &Editor, frame: &AreaFrame) -> Option<usize> {
     let parts = super::selected_parts(editor, &frame.area_key);
     if parts.len() != 1 {
         return None;

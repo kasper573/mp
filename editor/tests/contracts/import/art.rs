@@ -55,7 +55,6 @@ pub fn walker_row() -> Value {
     json!({
         "hitbox": { "width": 0.8, "height": 1.6 },
         "sprites": {
-            "type": "sheet",
             "image": "models/walker.png",
             "frame_size": { "width": FRAME.0, "height": FRAME.1 },
             "actions": actions,

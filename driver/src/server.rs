@@ -8,15 +8,16 @@ use std::time::Duration;
 
 use engine::core::time::UtcHour;
 use engine::systems::launch::{
-    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
-    TEST_CHARACTER_ROUTE, TestCharacterRequest,
+    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE,
+    TestCharacterRequest,
 };
 use engine::systems::player::SpawnPolicy;
 use engine::systems::script::Place;
 
 use crate::content::to_json;
 
-// The game server binary, run natively on fake auth, where an unsigned token names the account that signs in.
+/// The game server binary, run natively on fake auth, where an unsigned token names the account
+/// that signs in.
 pub struct Server {
     process: Child,
     binary: PathBuf,
@@ -33,14 +34,14 @@ impl Server {
             ws_port: 0,
             max_clients: 8,
             content_dir: content.to_path_buf(),
-            player_spawn_type: SpawnPolicy::Map,
+            player_spawn_policy: SpawnPolicy::Map,
             // A playtest plays its story through: monsters met on the way wear players down, never
             // out.
             player_immortal: true,
             rng_seed: seed,
             daily_reset_utc_hour: UtcHour::MIDNIGHT,
             auth: AuthMode::Fake,
-            test_characters: Switch::On,
+            test_characters: true,
             exit_on_stdin_eof: true,
             pyroscope_enabled: false,
             pyroscope_sample_hz: 100,
@@ -63,7 +64,8 @@ impl Server {
         format!("ws://{LOCALHOST}:{}", self.ready.ws)
     }
 
-    // The account's next sign-in plays the test character, starting where it says or where it would.
+    /// The account's next sign-in plays the test character, starting where it says or where it
+    /// would.
     pub fn hand_over(&self, account: &str, character: &str, start: Option<Place>) {
         let request = TestCharacterRequest {
             test_character: character.to_owned(),
@@ -75,8 +77,8 @@ impl Server {
             .unwrap_or_else(|error| panic!("the game server refused {character}: {error}"));
     }
 
-    // A deploy: the same ports, so connected clients find the server again, on the content in `folder`.
-    // `while_down` runs while there is no server to find.
+    /// A deploy: the same ports, so connected clients find the server again, on the content in
+    /// `folder`. `while_down` runs while there is no server to find.
     pub fn restart_on(&mut self, folder: &Path, while_down: impl FnOnce()) {
         self.stop();
         while_down();

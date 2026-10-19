@@ -1,9 +1,5 @@
 pub mod bindings;
 pub mod preview;
-
-use self::preview::PreviewPlace;
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -12,34 +8,44 @@ pub mod usages;
 
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::ModuleRule;
+use engine::core::content::{ContentRow, ModuleRule, row_file};
+use engine::core::script::ScriptModuleKind;
+use engine::core::vfx::VfxShaderDef;
+use engine::systems::actor::ModelDef;
+use engine::systems::area::AreaDef;
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::class::ClassDef;
+use engine::systems::input::map::InputDef;
+use engine::systems::quest::{ObjectiveKind, QuestDef};
 use engine::systems::registry;
+use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
+use self::preview::PreviewPlace;
 use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{
-    is_objective, module_lines, outline_block, script_extras, script_summary, script_values,
-    speaker_of, summary_of,
+    module_lines, outline_block, script_extras, script_summary, script_values, speaker_of,
+    summary_of,
 };
 use super::{theme, widgets};
 use crate::app::{
     Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
 };
 use crate::drafts::{clear_draft, draft_of, set_draft};
-use crate::forms;
-use crate::forms::{FormAction, FormChange, FormCx};
+use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
-use crate::schema;
-use crate::stage;
 use crate::tabs::EditorTab;
-use crate::ui::browser::{self, BrowserAction};
+use crate::ui::browser::{self};
 use crate::value::RowValue;
-use crate::views::script::{PendingScriptAction, ScriptOwner};
-use crate::views::{class, model, script, skill, tileset, vfx};
+use crate::views::script::{self, PendingScriptAction, ScriptOwner};
+use crate::views::{class, model, skill, tileset, vfx};
+use crate::{schema, stage};
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
@@ -119,7 +125,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         .get("properties")
         .and_then(|p| p.get("modules"))
         .is_some();
-    let second_column = has_modules || table == "input";
+    let second_column = has_modules || table == InputDef::TABLE;
     if fixture {
         editor.status.left.push(format!("{table}/{key}"));
         editor
@@ -152,7 +158,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.add_space(16.0);
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
-                        if table == "input" {
+                        if table == InputDef::TABLE {
                             changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                         } else {
                             changed |= modules_column(
@@ -172,7 +178,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.set_max_width(SINGLE_COLUMN);
                 }
                 changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
-                if table == "input" {
+                if table == InputDef::TABLE {
                     ui.add_space(10.0);
                     changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                 }
@@ -207,7 +213,6 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
             ModuleOp::Copy(index) => {
                 let module = value["modules"][index].clone();
                 editor.clipboard = Some(Clipboard {
-                    table: table.to_owned(),
                     from: key.to_owned(),
                     modules: vec![module],
                     origin: None,
@@ -258,63 +263,36 @@ fn row_card(
                         .copy_text(serde_json::to_string_pretty(&*value).unwrap_or_default());
                     ui.close();
                 }
-                if ui.button("Duplicate").clicked() {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Duplicate));
-                    ui.close();
-                }
-                if !fixture
-                    && ui
-                        .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
-                        .clicked()
-                {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Rename));
-                    ui.close();
-                }
-                if ui.button("Show usages").clicked() {
-                    cx.actions
-                        .push(FormAction::RowAction(BrowserAction::Usages));
-                    ui.close();
-                }
-                if !fixture {
-                    ui.separator();
-                    if ui
-                        .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
-                        .clicked()
-                    {
-                        cx.actions
-                            .push(FormAction::RowAction(BrowserAction::Delete));
-                        ui.close();
-                    }
+                if let Some(action) = browser::row_menu(ui, fixture, false) {
+                    cx.actions.push(FormAction::RowAction(action));
                 }
             },
         );
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
-        if table == model::TABLE {
+        if table == ModelDef::TABLE {
             changed = model::inspect::row_body(ui, cx, value);
             return;
         }
-        if table == tileset::TABLE {
+        if table == TilesetDef::TABLE {
             changed = tileset::inspect::row_body(ui, cx, value);
             return;
         }
         let hidden: &[&str] = match table {
-            "input" => &["modules", "bindings"],
-            class::TABLE => &["modules", "levels", "tree", "backdrop"],
-            skill::TABLE => &["modules", "levels"],
-            vfx::SHADER_TABLE => &["modules", "params"],
+            InputDef::TABLE => &["modules", "bindings"],
+            ClassDef::TABLE => &["modules", "levels", "tree", "backdrop"],
+            SkillDef::TABLE => &["modules", "levels"],
+            VfxShaderDef::TABLE => &["modules", "params"],
             _ => &["modules"],
         };
         changed = forms::object_without(ui, cx, schema, value, "", hidden);
-        if table == class::TABLE {
+        if table == ClassDef::TABLE {
             changed |= class::levels(ui, cx, value);
         }
-        if table == skill::TABLE {
+        if table == SkillDef::TABLE {
             changed |= skill::ranks(ui, cx, value);
         }
-        if table == vfx::SHADER_TABLE {
+        if table == VfxShaderDef::TABLE {
             changed |= vfx::shader_params(ui, cx, value);
         }
     });
@@ -340,12 +318,12 @@ fn modules_column(
         value["modules"] = Value::Array(Vec::new());
     }
     let mut changed = FormChange::default();
-    let scripts_only = table == "area";
+    let scripts_only = table == AreaDef::TABLE;
     let count = value["modules"].as_array().map_or(0, Vec::len);
     let shown = if scripts_only {
         value["modules"].as_array().map_or(0, |list| {
             list.iter()
-                .filter(|m| m["type"].as_str().is_some_and(|t| t.ends_with("_script")))
+                .filter(|module| module.script_kind().is_some())
                 .count()
         })
     } else {
@@ -406,13 +384,14 @@ fn modules_column(
         let path = format!("/modules/{index}");
         let module = &mut value["modules"][index];
         let tag = module.kind_or("module").to_owned();
-        if scripts_only && !tag.ends_with("_script") {
+        let script_kind = module.script_kind();
+        let is_script = script_kind.is_some();
+        if scripts_only && !is_script {
             continue;
         }
-        let is_script = tag.ends_with("_script");
         let summary = if is_script {
             script_summary(module)
-        } else if table == "quest" && is_objective(&tag) {
+        } else if table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some() {
             objectives += 1;
             format!("objective {objectives}")
         } else if let Some(condition) = module.get("condition") {
@@ -420,10 +399,7 @@ fn modules_column(
                 .iter()
                 .find_map(|op| condition[op].as_array().map(Vec::len))
                 .unwrap_or(1);
-            format!(
-                "condition · {blocks} {}",
-                if blocks == 1 { "block" } else { "blocks" }
-            )
+            format!("condition · {blocks} block{}", widgets::plural(blocks))
         } else {
             summary_of(cx.root, module)
         };
@@ -452,14 +428,7 @@ fn modules_column(
                                 ui.close();
                             }
                             ui.separator();
-                            if index > 0 && ui.button("Move up").clicked() {
-                                swap = Some((index, index - 1));
-                                ui.close();
-                            }
-                            if index + 1 < count && ui.button("Move down").clicked() {
-                                swap = Some((index, index + 1));
-                                ui.close();
-                            }
+                            swap = widgets::move_entries(ui, index, count).or(swap);
                             ui.separator();
                             if ui.button("Remove").clicked() {
                                 remove = Some(index);
@@ -513,7 +482,7 @@ fn modules_column(
                 changed |= card_body(ui, cx, table, &variants, module, &path);
             }
         });
-        if !folded && tag == "inline_script" {
+        if !folded && script_kind == Some(ScriptModuleKind::Inline) {
             outline_block(ui, cx, &value["modules"][index]);
         }
         ui.add_space(2.0);
@@ -546,10 +515,11 @@ pub(super) fn card_body(
     ui.add_space(4.0);
     let mut changed = FormChange::default();
     if let Some(variant) = schema::variant_of(variants, module) {
-        let hidden: &[&str] = match variant.tag.as_str() {
-            "inline_script" => &["nodes"],
-            "shared_script" => &["values"],
-            _ => &[],
+        let script_kind = ScriptModuleKind::of(&variant.tag);
+        let hidden: &[&str] = match script_kind {
+            Some(ScriptModuleKind::Inline) => &["nodes"],
+            Some(ScriptModuleKind::Shared) => &["values"],
+            None => &[],
         };
         let fieldless = variant.schema["properties"]
             .as_object()
@@ -563,7 +533,7 @@ pub(super) fn card_body(
         } else {
             changed |= forms::object_without(ui, cx, variant.schema, module, path, hidden);
         }
-        if variant.tag == "shared_script" {
+        if script_kind == Some(ScriptModuleKind::Shared) {
             changed |= script_values(ui, cx, module, path);
         }
     } else {
@@ -576,10 +546,10 @@ pub(super) fn card_body(
 fn module_counts(ui: &mut Ui, value: &Value) {
     let mut counts: BTreeMap<String, usize> = Default::default();
     for module in value["modules"].as_array().into_iter().flatten() {
-        let kind = module.kind_or("module");
-        if kind.ends_with("_script") {
+        if module.script_kind().is_some() {
             continue;
         }
+        let kind = module.kind_or("module");
         *counts.entry(kind.to_owned()).or_default() += 1;
     }
     let text: Vec<String> = counts
@@ -624,17 +594,15 @@ pub(super) fn add_module_popup(
         .max_height(360.0)
         .show(ui, |ui| {
             for variant in variants {
-                if scripts_only && !variant.tag.ends_with("_script") {
+                let script_kind = ScriptModuleKind::of(&variant.tag);
+                if scripts_only && script_kind.is_none() {
                     continue;
                 }
                 offered += 1;
                 let template = schema::variant_template(cx.root, variant);
-                let rule = registry.module_rule(table, &template);
-                let present = list
-                    .iter()
-                    .any(|module| module.kind() == variant.tag.as_str());
-                let at_most_one = rule == Some(ModuleRule::AtMostOne);
-                let blocked = present && at_most_one;
+                let at_most_one =
+                    registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne);
+                let blocked = !registry.takes_module(table, list, &template);
                 if blocked {
                     blocked_count += 1;
                 }
@@ -646,11 +614,15 @@ pub(super) fn add_module_popup(
                 let description = variant.schema["description"]
                     .as_str()
                     .map(str::to_owned)
-                    .unwrap_or_else(|| match variant.tag.as_str() {
-                        "inline_script" => "any number · nodes in this row".to_owned(),
-                        "shared_script" => "any number · names a script row".to_owned(),
-                        _ if at_most_one => "at most one".to_owned(),
-                        _ => "any number".to_owned(),
+                    .unwrap_or_else(|| match script_kind {
+                        Some(ScriptModuleKind::Inline) => {
+                            "any number · nodes in this row".to_owned()
+                        }
+                        Some(ScriptModuleKind::Shared) => {
+                            "any number · names a script row".to_owned()
+                        }
+                        None if at_most_one => "at most one".to_owned(),
+                        None => "any number".to_owned(),
                     });
                 let line = if blocked {
                     "at most one · already added".to_owned()
@@ -731,9 +703,9 @@ pub fn with_row_form(
 pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
     match action {
         FormAction::OpenRow { table, key } => {
-            editor.select(RowSelection::row(&table, &key));
-            editor.open_tab(EditorTab::for_row(&table, &key));
+            editor.open_row(&table, &key);
         }
+        FormAction::OpenNode { .. } => {}
         FormAction::OpenScript { pointer } => {
             script::open_inline(editor, table, key, &pointer);
         }

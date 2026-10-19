@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::Face;
+use design_tokens::face::Face;
+use design_tokens::ink::{Ground, Prose};
 use egui::emath::{GuiRounding, TSTransform};
 use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 
@@ -19,15 +20,14 @@ use crate::systems::attention;
 use crate::systems::combat::Attitude;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
-use crate::systems::player::Owner;
-use crate::systems::player::session;
+use crate::systems::player::{PlayedBy, session};
 use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
 const ICON_GAP: f32 = 2.0;
 const TEXT_SIZE: f32 = 12.0;
-const HOSTILE: Color32 = Color32::from_rgb(233, 117, 120);
+const HOSTILE: Color32 = Prose::Danger.on(Ground::Dusk);
 const PLAYER: Color32 = Color32::from_rgb(104, 168, 235);
 const SHADOW: TextShadow = TextShadow {
     offset: egui::vec2(1.0, 1.0),
@@ -98,7 +98,7 @@ pub fn label_of(world: &World, content: &Content, actor: Entity) -> Option<Plate
         content,
         world.get::<Name>(actor),
         world.get::<Npc>(actor),
-        world.get::<Owner>(actor),
+        world.get::<PlayedBy>(actor),
         world.get::<Attitude>(actor),
         world.get::<AreaObject>(actor).is_some(),
     )
@@ -151,7 +151,7 @@ pub fn draw_plates(world: &mut World) {
             Entity,
             Option<&Name>,
             Option<&Npc>,
-            Option<&Owner>,
+            Option<&PlayedBy>,
             Option<&Attitude>,
             Has<AreaObject>,
             Option<&RenderPosition>,
@@ -284,7 +284,7 @@ fn label(
     content: &Content,
     name: Option<&Name>,
     npc: Option<&Npc>,
-    owner: Option<&Owner>,
+    owner: Option<&PlayedBy>,
     attitude: Option<&Attitude>,
     object: bool,
 ) -> Option<PlateLabel> {

@@ -1,6 +1,7 @@
 use bevy_ecs::entity::Entity;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::geometry::Footprint;
 use crate::core::math::Pos;
@@ -18,8 +19,11 @@ pub enum Value {
     Area(Option<Footprint>),
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq, Hash,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ValueType {
     Boolean,
     Integer,
@@ -53,16 +57,7 @@ impl ValueType {
     }
 
     pub fn name(self) -> &'static str {
-        match self {
-            ValueType::Boolean => "boolean",
-            ValueType::Integer => "integer",
-            ValueType::Number => "number",
-            ValueType::Text => "text",
-            ValueType::Actor => "actor",
-            ValueType::Actors => "actors",
-            ValueType::Point => "point",
-            ValueType::Area => "area",
-        }
+        self.into()
     }
 }
 

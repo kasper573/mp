@@ -1,8 +1,10 @@
 use std::time::Duration;
 
-use driver::{UiTarget, WaitBudget, arrived_in, in_world, resident_home};
+use driver::{DeployEdit, UiTarget, WaitBudget, arrived_in, in_world, resident_home};
+use engine::core::content::ContentRow;
 use engine::core::math::Offset;
-use serde_json::{Value, json};
+use engine::systems::npc::NpcDef;
+use serde_json::json;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -37,10 +39,14 @@ fn play(shoot: &mut Shoot) {
     );
     let changed = shoot.deploy(
         &[
-            ("game.json", &|game: &mut Value| game["name"] = json!(EDITION)),
-            ("tables/npc/mara.json", &|npc: &mut Value| npc["name"] = json!("Mara the Harbourmaster")),
-            ("tables/npc/tobb.json", &|npc: &mut Value| npc["name"] = json!("Tobb, town crier")),
-            ("tables/npc/grisha.json", &|npc: &mut Value| npc["name"] = json!("Grisha of the quay")),
+            DeployEdit::game(&|game| game["name"] = json!(EDITION)),
+            DeployEdit::row(NpcDef::TABLE, "mara", &|npc| {
+                npc["name"] = json!("Mara the Harbourmaster")
+            }),
+            DeployEdit::row(NpcDef::TABLE, "tobb", &|npc| npc["name"] = json!("Tobb, town crier")),
+            DeployEdit::row(NpcDef::TABLE, "grisha", &|npc| {
+                npc["name"] = json!("Grisha of the quay")
+            }),
         ],
         || {
             me.wait_within("the client to lose the server", REJOINING, |snapshot| {

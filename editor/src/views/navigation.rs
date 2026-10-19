@@ -1,7 +1,7 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
 use engine::core::math::{Offset, Pos, Rect as TileRect};
+use engine::core::render::TILE;
 
-use super::area::TILE_PX;
 use crate::keymap::EditorKey;
 
 #[derive(Clone, Copy)]
@@ -13,7 +13,7 @@ pub struct Viewport<U> {
 
 impl<U> Viewport<U> {
     pub fn scale(&self) -> f32 {
-        self.zoom * TILE_PX
+        self.zoom * TILE.0
     }
 
     pub fn to_screen(&self, p: Pos<U>) -> Pos2 {

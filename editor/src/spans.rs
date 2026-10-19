@@ -1,15 +1,21 @@
-use design_tokens::ink;
+use std::collections::HashMap;
+
+use design_tokens::ink::{self, Ground};
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
-use engine::systems::text::{Ink, Motion, Voice};
-use serde_json::{Map, Value};
+use engine::core::content::ContentRow;
+use engine::core::text::{TextMotion, TextVoice};
+use engine::systems::input::map::InputDef;
+use engine::systems::text::Ink;
+use serde::Deserialize;
+use serde_json::{Map, Value, json};
 use strum::VariantArray;
 
 use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
-use crate::forms::{FormChange, FormCx, committed};
+use crate::forms::{self, FormChange, FormCx, committed};
 use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
-use crate::{condition, forms, picker};
+use crate::{condition, picker};
 
 fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
     T::VARIANTS
@@ -155,13 +161,14 @@ pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) ->
     for span in spans_of(spans).as_array().into_iter().flatten() {
         let mut format = TextFormat::simple(font.clone(), ink);
         match span {
-            Value::Object(map) if map.contains_key("value") || map.contains_key("input") => {
+            span if is_atom(span) => {
                 format.color = theme::CODE;
                 format.background = theme::INPUT;
             }
             Value::Object(map) => {
-                if let Some(ink) = map.get("ink").and_then(Value::as_str) {
-                    format.color = ink_color(ink);
+                if let Some(ink) = map.get("ink") {
+                    format.color = Ink::deserialize(ink)
+                        .map_or(theme::TEXT, |ink| ink.prose().on(Ground::Paper));
                 }
                 if map.contains_key("voice") || map.contains_key("motion") {
                     format.background = ink::gold_wash(0.2);
@@ -181,17 +188,6 @@ pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) ->
     job
 }
 
-pub fn ink_color(ink: &str) -> Color32 {
-    match ink {
-        "danger" => ink::DANGER,
-        "item" => ink::ITEM,
-        "place" => ink::PLACE,
-        "name" => ink::NAME,
-        "magic" => ink::MAGIC,
-        _ => theme::TEXT,
-    }
-}
-
 pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = after.chars().collect();
@@ -206,90 +202,18 @@ pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
         .zip(new[prefix..].iter().rev())
         .take_while(|(a, b)| a == b)
         .count();
+    let mut cells = Cells::of(spans);
     let removed = prefix..old.len() - suffix;
-    let inserted: String = new[prefix..new.len() - suffix].iter().collect();
-    let mut out: Vec<Value> = Vec::new();
-    let mut at = 0;
-    let mut placed = inserted.is_empty();
-    for span in spans_of(spans).as_array().into_iter().flatten() {
-        let text = token(span);
-        let len = text.chars().count();
-        let span_range = at..at + len;
-        let atomic = span
-            .as_object()
-            .is_some_and(|m| m.contains_key("value") || m.contains_key("input"));
-        let overlap = removed.start.max(span_range.start)..removed.end.min(span_range.end);
-        if atomic {
-            if overlap.start < overlap.end {
-                if overlap != span_range {
-                    return None;
-                }
-                if !placed && removed.start >= span_range.start {
-                    out.push(Value::String(inserted.clone()));
-                    placed = true;
-                }
-            } else {
-                if !placed && removed.start < span_range.start {
-                    out.push(Value::String(inserted.clone()));
-                    placed = true;
-                }
-                out.push(span.clone());
-            }
-            at += len;
-            continue;
-        }
-        let chars: Vec<char> = text.chars().collect();
-        let mut kept: String = chars[..overlap.start.saturating_sub(span_range.start).min(len)]
-            .iter()
-            .collect();
-        let tail: String = if overlap.start < overlap.end {
-            chars[(overlap.end - span_range.start)..].iter().collect()
-        } else {
-            chars[(overlap.start.max(span_range.start) - span_range.start).min(len)..]
-                .iter()
-                .collect()
-        };
-        if overlap.start >= overlap.end {
-            kept = text.clone();
-        }
-        let takes_insert =
-            !placed && removed.start >= span_range.start && removed.start <= span_range.end;
-        let mut rebuilt = String::new();
-        if overlap.start < overlap.end {
-            rebuilt.push_str(&kept);
-            if takes_insert {
-                rebuilt.push_str(&inserted);
-                placed = true;
-            }
-            rebuilt.push_str(&tail);
-        } else if takes_insert {
-            let cut = removed.start - span_range.start;
-            let head: String = chars[..cut].iter().collect();
-            let rest: String = chars[cut..].iter().collect();
-            rebuilt = format!("{head}{inserted}{rest}");
-            placed = true;
-        } else {
-            rebuilt = kept;
-        }
-        if !rebuilt.is_empty() {
-            out.push(with_text(span, rebuilt));
-        }
-        at += len;
+    if cells.cuts_atom(removed.start) || cells.cuts_atom(removed.end) {
+        return None;
     }
-    if !placed {
-        out.push(Value::String(inserted));
-    }
-    let mut merged: Vec<Value> = Vec::new();
-    for span in out {
-        match (merged.last_mut(), &span) {
-            (Some(Value::String(last)), Value::String(next)) => last.push_str(next),
-            _ => merged.push(span),
-        }
-    }
-    if merged.is_empty() {
-        merged.push(Value::String(String::new()));
-    }
-    Some(Value::Array(merged))
+    let run = cells.run_at(removed.start);
+    let inserted: Vec<Cell> = new[prefix..new.len() - suffix]
+        .iter()
+        .map(|&c| Cell::Char(c, run))
+        .collect();
+    cells.cells.splice(removed, inserted);
+    Some(cells.spans())
 }
 
 fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<Value> {
@@ -304,8 +228,8 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                 ui.spacing_mut().item_spacing.x = 4.0;
                 for (field, options) in [
                     ("ink", names::<Ink>()),
-                    ("voice", names::<Voice>()),
-                    ("motion", names::<Motion>()),
+                    ("voice", names::<TextVoice>()),
+                    ("motion", names::<TextMotion>()),
                 ] {
                     ui.menu_button(RichText::new(field).size(12.0), |ui| {
                         for option in options {
@@ -324,7 +248,10 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                         }
                     });
                 }
-                if ui.add(egui::Button::new(RichText::new("slow").size(12.0))).clicked() {
+                if ui
+                    .add(egui::Button::new(RichText::new("slow").size(12.0)))
+                    .clicked()
+                {
                     outcome = Some(restyle(spans, (start, end), |map| {
                         if map.get("slow").and_then(Value::as_bool).unwrap_or(false) {
                             map.remove("slow");
@@ -333,7 +260,11 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                         }
                     }));
                 }
-                if ui.add(egui::Button::new(RichText::new("pause").size(12.0))).on_hover_text("A 400 ms pause after the span").clicked() {
+                if ui
+                    .add(egui::Button::new(RichText::new("pause").size(12.0)))
+                    .on_hover_text("A 400 ms pause after the span")
+                    .clicked()
+                {
                     outcome = Some(restyle(spans, (start, end), |map| {
                         if map.contains_key("pause_after") {
                             map.remove("pause_after");
@@ -342,42 +273,12 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                         }
                     }));
                 }
-                if ui.add(egui::Button::new(RichText::new("value").size(12.0))).on_hover_text("Replace the selection with a value span showing an expression").clicked() {
-                    let mut replaced = retype(spans, &plain(spans), &{
-                        let chars: Vec<char> = plain(spans).chars().collect();
-                        let head: String = chars[..start.min(chars.len())].iter().collect();
-                        let tail: String = chars[end.min(chars.len())..].iter().collect();
-                        format!("{head}{tail}")
-                    })
-                    .unwrap_or_else(|| spans.clone());
-                    let mut rebuilt: Vec<Value> = Vec::new();
-                    let mut at = 0;
-                    let mut placed = false;
-                    for span in replaced.as_array_mut().into_iter().flatten() {
-                        let len = token(span).chars().count();
-                        if !placed && at + len >= start && !matches!(span, Value::Object(m) if m.contains_key("value") || m.contains_key("input")) {
-                            let text = token(span);
-                            let chars: Vec<char> = text.chars().collect();
-                            let cut = (start - at).min(len);
-                            let head: String = chars[..cut].iter().collect();
-                            let tail: String = chars[cut..].iter().collect();
-                            if !head.is_empty() {
-                                rebuilt.push(with_text(span, head));
-                            }
-                            rebuilt.push(serde_json::json!({ "value": 0 }));
-                            if !tail.is_empty() {
-                                rebuilt.push(with_text(span, tail));
-                            }
-                            placed = true;
-                        } else {
-                            rebuilt.push(span.clone());
-                        }
-                        at += len;
-                    }
-                    if !placed {
-                        rebuilt.push(serde_json::json!({ "value": 0 }));
-                    }
-                    outcome = Some(Value::Array(rebuilt));
+                if ui
+                    .add(egui::Button::new(RichText::new("value").size(12.0)))
+                    .on_hover_text("Replace the selection with a value span showing an expression")
+                    .clicked()
+                {
+                    outcome = with_value(spans, (start, end));
                 }
                 ui.label(theme::faint(format!("{} chars", end - start)).size(11.0));
             });
@@ -385,43 +286,39 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
     outcome
 }
 
+/// The line with the selection between `start` and `end` replaced by a value span.
+pub fn with_value(spans: &Value, (start, end): (usize, usize)) -> Option<Value> {
+    let mut cells = Cells::of(spans);
+    if cells.cuts_atom(start) || cells.cuts_atom(end) {
+        return None;
+    }
+    cells.cells.drain(start..end);
+    cells.insert_atom(start, json!({ "value": 0 }));
+    Some(cells.spans())
+}
+
 pub fn restyle(
     spans: &Value,
     (start, end): (usize, usize),
     apply: impl Fn(&mut Map<String, Value>),
 ) -> Value {
-    let mut out: Vec<Value> = Vec::new();
-    let mut at = 0;
-    for span in spans_of(spans).as_array().into_iter().flatten() {
-        let text = token(span);
-        let len = text.chars().count();
-        let atomic = span
-            .as_object()
-            .is_some_and(|m| m.contains_key("value") || m.contains_key("input"));
-        let a = start.max(at);
-        let b = end.min(at + len);
-        if atomic || a >= b {
-            out.push(span.clone());
-            at += len;
-            continue;
+    let Cells {
+        mut runs,
+        mut cells,
+    } = Cells::of(spans);
+    let mut restyled: HashMap<usize, usize> = HashMap::new();
+    let end = end.min(cells.len());
+    for cell in &mut cells[start.min(end)..end] {
+        if let Cell::Char(_, run) = cell {
+            *run = *restyled.entry(*run).or_insert_with(|| {
+                let mut style = runs[*run].clone();
+                apply(&mut style);
+                runs.push(style);
+                runs.len() - 1
+            });
         }
-        let chars: Vec<char> = text.chars().collect();
-        let head: String = chars[..a - at].iter().collect();
-        let middle: String = chars[a - at..b - at].iter().collect();
-        let tail: String = chars[b - at..].iter().collect();
-        if !head.is_empty() {
-            out.push(with_text(span, head));
-        }
-        let mut map = span.as_object().cloned().unwrap_or_default();
-        map.insert("text".to_owned(), Value::String(middle));
-        apply(&mut map);
-        out.push(normalise(Value::Object(map)));
-        if !tail.is_empty() {
-            out.push(with_text(span, tail));
-        }
-        at += len;
     }
-    Value::Array(out)
+    Cells { runs, cells }.spans()
 }
 
 pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
@@ -456,7 +353,13 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
             let mut input = object["input"].as_str().unwrap_or_default().to_owned();
             ui.horizontal(|ui| {
                 ui.label("key of");
-                if picker::row(ui, cx, "input", &mut input, &format!("{path}/input")) {
+                if picker::row(
+                    ui,
+                    cx,
+                    InputDef::TABLE,
+                    &mut input,
+                    &format!("{path}/input"),
+                ) {
                     object.insert("input".to_owned(), Value::String(input));
                     changed = FormChange::at(path);
                 }
@@ -484,8 +387,8 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
         ui.horizontal_wrapped(|ui| {
             for (field, options) in [
                 ("ink", names::<Ink>()),
-                ("voice", names::<Voice>()),
-                ("motion", names::<Motion>()),
+                ("voice", names::<TextVoice>()),
+                ("motion", names::<TextMotion>()),
             ] {
                 let current = object
                     .get(field)
@@ -493,7 +396,7 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
                     .unwrap_or("")
                     .to_owned();
                 let mut picked = current.clone();
-                widgets::combo_box(ui.id().with(path).with(field))
+                widgets::combo(ui.id().with(path).with(field))
                     .selected_text(if current.is_empty() {
                         field.to_owned()
                     } else {
@@ -633,20 +536,118 @@ fn token(span: &Value) -> String {
     }
 }
 
-fn with_text(span: &Value, text: String) -> Value {
-    match span {
-        Value::Object(map) => {
-            let mut map = map.clone();
-            map.insert("text".to_owned(), Value::String(text));
-            normalise(Value::Object(map))
-        }
-        _ => Value::String(text),
-    }
-}
-
 fn normalise(span: Value) -> Value {
     match span {
         Value::Object(map) if map.len() == 1 && map.contains_key("text") => map["text"].clone(),
         other => other,
+    }
+}
+
+fn is_atom(span: &Value) -> bool {
+    span.as_object()
+        .is_some_and(|map| map.contains_key("value") || map.contains_key("input"))
+}
+
+/// A line cut into the characters its plain text shows: a character keeps the run of style it
+/// was written in, and a value or input span sits whole on the first cell of its token.
+struct Cells {
+    runs: Vec<Map<String, Value>>,
+    cells: Vec<Cell>,
+}
+
+#[derive(Clone)]
+enum Cell {
+    Char(char, usize),
+    Atom(Value),
+    WithinAtom,
+}
+
+impl Cells {
+    fn of(spans: &Value) -> Cells {
+        let mut cells = Cells {
+            runs: Vec::new(),
+            cells: Vec::new(),
+        };
+        for span in spans_of(spans).as_array().into_iter().flatten() {
+            if is_atom(span) {
+                cells.insert_atom(cells.cells.len(), span.clone());
+                continue;
+            }
+            let mut style = span.as_object().cloned().unwrap_or_default();
+            style.remove("text");
+            cells.runs.push(style);
+            let run = cells.runs.len() - 1;
+            cells
+                .cells
+                .extend(token(span).chars().map(|c| Cell::Char(c, run)));
+        }
+        cells
+    }
+
+    fn insert_atom(&mut self, at: usize, span: Value) {
+        let width = token(&span).chars().count();
+        let cells = std::iter::once(Cell::Atom(span)).chain(std::iter::repeat_n(
+            Cell::WithinAtom,
+            width.saturating_sub(1),
+        ));
+        self.cells.splice(at..at, cells);
+    }
+
+    /// Whether a cut at `at` would split a value or input span.
+    fn cuts_atom(&self, at: usize) -> bool {
+        matches!(self.cells.get(at), Some(Cell::WithinAtom))
+    }
+
+    /// The run text typed at `at` joins: the one before it, else the one after, else plain text.
+    fn run_at(&mut self, at: usize) -> usize {
+        let neighbour = |index: Option<usize>| match index.and_then(|i| self.cells.get(i)) {
+            Some(Cell::Char(_, run)) => Some(*run),
+            _ => None,
+        };
+        neighbour(at.checked_sub(1))
+            .or(neighbour(Some(at)))
+            .unwrap_or_else(|| {
+                self.runs.push(Map::new());
+                self.runs.len() - 1
+            })
+    }
+
+    fn spans(&self) -> Value {
+        let mut spans: Vec<Value> = Vec::new();
+        let mut run: Option<(usize, String)> = None;
+        for cell in &self.cells {
+            match cell {
+                Cell::Char(c, of) => match &mut run {
+                    Some((current, text)) if current == of => text.push(*c),
+                    _ => {
+                        spans.extend(run.take().map(|run| self.span_of(run)));
+                        run = Some((*of, c.to_string()));
+                    }
+                },
+                Cell::Atom(span) => {
+                    spans.extend(run.take().map(|run| self.span_of(run)));
+                    spans.push(span.clone());
+                }
+                Cell::WithinAtom => {}
+            }
+        }
+        spans.extend(run.map(|run| self.span_of(run)));
+        let mut merged: Vec<Value> = Vec::new();
+        for span in spans {
+            match (merged.last_mut(), &span) {
+                (Some(Value::String(last)), Value::String(next)) => last.push_str(next),
+                _ => merged.push(span),
+            }
+        }
+        if merged.is_empty() {
+            merged.push(Value::String(String::new()));
+        }
+        Value::Array(merged)
+    }
+
+    fn span_of(&self, (run, text): (usize, String)) -> Value {
+        let mut span = Map::from_iter([("text".to_owned(), Value::String(text))]);
+        span.extend(self.runs[run].clone());
+        normalise(Value::Object(span))
     }
 }

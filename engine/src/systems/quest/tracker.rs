@@ -1,11 +1,12 @@
 use bevy::prelude::*;
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{TextRole, face, ink, sheet, slip};
+use design_tokens::{ink, sheet, slip};
 use egui::{Align, Color32, Label, Layout, Pos2, Rect, Ui};
 
 use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
 use crate::systems::hud::{self, HudWidget};
 use crate::systems::item::Inventory;
@@ -74,7 +75,7 @@ enum Tone {
 
 struct Entry {
     quest: QuestId,
-    mark: Option<AssetRef>,
+    mark: Option<ImageRef>,
     timed: bool,
     rows: Vec<(String, Count, Tone)>,
 }

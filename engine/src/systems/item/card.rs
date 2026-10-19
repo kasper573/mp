@@ -2,21 +2,22 @@ use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::card::{self, Art, Card, CardResponse, Plate};
 use design_tokens::controls::{self, Pill};
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::Kind;
+use design_tokens::ink;
 use design_tokens::sheet::Depth;
-use design_tokens::{TextRole, face, ink};
 use egui::{Rect, Response, TextureId, Ui};
 
 use crate::core::content::Content;
-use crate::core::gui::{self, Band};
+use crate::core::gui::{self, Band, ImageSource};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::hud::{self, Carried};
 use crate::systems::input::map::{self, InputAction, input};
-use crate::systems::item::{Inventory, ItemDef, ItemFlag, ItemId, ItemKind};
+use crate::systems::item::{Inventory, ItemDef, ItemId, ItemKind, ItemModuleKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::{Condition, condition};
-use crate::systems::skill::{self, SkillDef};
+use crate::systems::skill::{self, SkillDef, SkillId};
 use crate::systems::stat::StatKind;
 use crate::systems::status;
 
@@ -135,7 +136,7 @@ pub fn show(ui: &mut Ui, world: &mut World, item: ItemId, look: CardLook) -> Car
                 }
             })
         });
-        grants(ui, world, item);
+        grants(ui, world, &content, item);
         if let Some(verb) = use_verb(def) {
             let hint = StyledLine::new(vec![
                 input(InputAction::UseItem),
@@ -194,21 +195,30 @@ pub fn details(
     facts(ui, content, item, def, judge);
 }
 
-pub fn grant_line(ui: &mut Ui, def: &SkillDef, icon: impl FnOnce(&mut Ui)) -> Response {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
-        icon(ui);
-        ui.label(card::bold(&def.name));
-        ui.label(
-            TextRole::CardBody
-                .rich(def.target.describe())
-                .color(ink::INK2),
+/// The skills an item lends while worn. Answers each one's line, for a reader who may take the
+/// skill from it.
+pub fn grant_lines(
+    ui: &mut Ui,
+    images: &mut (impl ImageSource + ?Sized),
+    content: &Content,
+    item: ItemId,
+) -> Vec<(Response, SkillId)> {
+    let granted = skill::grants_of(content, item);
+    if granted.is_empty() {
+        return Vec::new();
+    }
+    card::heading(ui, "grants while worn");
+    let lines = granted
+        .iter()
+        .map(|&granted| (grant_line(ui, images, granted.get(content)), granted))
+        .collect();
+    if granted.iter().any(|skill| skill.get(content).basic_attack) {
+        card::foot(
+            ui,
+            "On the basic attack slot, it lends its first basic attack",
         );
-        if def.basic_attack {
-            controls::pill(ui, skill::card::BASIC_ATTACK_MARK, Pill::Gold);
-        }
-    })
-    .response
+    }
+    lines
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -246,19 +256,9 @@ fn draw_card(world: &mut World) {
     });
 }
 
-fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
-    let content = world.resource::<Content>().clone();
-    let granted = skill::grants_of(&content, item);
-    if granted.is_empty() {
-        return;
-    }
-    card::heading(ui, "grants while worn");
-    for &granted in granted {
-        let def = granted.get(&content);
-        let response = grant_line(ui, def, |ui| {
-            hud::icon(ui, world, &def.icon, card::GRANT_ICON);
-        })
-        .interact(egui::Sense::click_and_drag());
+fn grants(ui: &mut Ui, world: &mut World, content: &Content, item: ItemId) {
+    for (response, granted) in grant_lines(ui, world, content, item) {
+        let response = response.interact(egui::Sense::click_and_drag());
         if map::drag_started(world, InputAction::CarryItem, &response) {
             hud::carry(ui.ctx(), Carried::Skill(granted));
         } else if map::clicked(world, InputAction::PinToHotbar, &response) {
@@ -277,18 +277,29 @@ fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
             Some(&hint),
         );
     }
-    if granted.iter().any(|skill| skill.get(&content).basic_attack) {
-        card::foot(
-            ui,
-            "On the basic attack slot, it lends its first basic attack",
+}
+
+fn grant_line(ui: &mut Ui, images: &mut (impl ImageSource + ?Sized), def: &SkillDef) -> Response {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        hud::icon(ui, images, &def.icon, card::GRANT_ICON);
+        ui.label(face::bold(&def.name).size(TextRole::CardBody.size()));
+        ui.label(
+            TextRole::CardBody
+                .rich(def.target.describe())
+                .color(ink::INK2),
         );
-    }
+        if def.basic_attack {
+            controls::pill(ui, skill::card::BASIC_ATTACK_MARK, Pill::Gold);
+        }
+    })
+    .response
 }
 
 fn tags(def: &ItemDef) -> Vec<(&'static str, Pill)> {
     [
-        (ItemFlag::Bound, "Bound", Pill::Rubric),
-        (ItemFlag::Quest, "Quest item", Pill::Gold),
+        (ItemModuleKind::Bound, "Bound", Pill::Rubric),
+        (ItemModuleKind::QuestItem, "Quest item", Pill::Gold),
     ]
     .into_iter()
     .filter(|(flag, ..)| def.has(*flag))

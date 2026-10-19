@@ -1,13 +1,15 @@
 use std::collections::HashSet;
 
 use egui::{Pos2, Ui};
+use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};
-use super::placement::{self, PartView, Placement};
+use super::placement::{self, AreaPlacement, PartView};
 use super::{
     AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
     blueprint_part, module_index, module_part, pick, pins, shapes,
@@ -111,7 +113,7 @@ pub(super) fn select_input(
 enum SelectScope<'a> {
     Area,
     Blueprint {
-        place: &'a Placement,
+        place: &'a AreaPlacement,
         parts: Vec<PartView>,
     },
 }
@@ -205,7 +207,9 @@ impl SelectScope<'_> {
 
     fn clear_selection(&self, editor: &mut Editor, frame: &AreaFrame) {
         match self {
-            SelectScope::Area => editor.selection = RowSelection::row("area", &frame.area_key),
+            SelectScope::Area => {
+                editor.selection = RowSelection::row(AreaDef::TABLE, &frame.area_key)
+            }
             SelectScope::Blueprint { .. } => editor.selection.parts.clear(),
         }
     }
@@ -529,7 +533,6 @@ pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
         })
         .collect();
     editor.clipboard = Some(Clipboard {
-        table: "area".to_owned(),
         from: frame.area_key.clone(),
         modules,
         origin: Some(origin),
@@ -546,7 +549,6 @@ pub fn start_paste(editor: &mut Editor, view_key: &str) {
     view.set_tool(AreaTool::Select);
     view.paste = Some(PasteGhost {
         modules: clip.modules,
-        at: None,
     });
 }
 
@@ -635,7 +637,7 @@ pub fn duplicate_selection(editor: &mut Editor, frame: &AreaSnapshot) {
 }
 
 pub fn delete_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    if editor.selection.table == "blueprint"
+    if editor.selection.table == BlueprintDef::TABLE
         && let Some(place) = frame.in_place.last().cloned()
     {
         placement::delete_parts_in_place(editor, frame, &place);

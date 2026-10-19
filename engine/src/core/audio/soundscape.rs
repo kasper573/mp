@@ -6,10 +6,11 @@ use bevy_kira_audio::prelude::{Audio, AudioControl, AudioInstance, AudioSource, 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::AudioRef;
 use crate::core::audio::decibels;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::playback::{Listener, PositionalAudio};
+use crate::core::content::serial;
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
@@ -43,10 +44,24 @@ pub struct SoundscapeZone {
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(from = "ShapeRow", into = "ShapeRow")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum SoundscapeShape {
-    Rect(Rect<Tiles>),
-    Ellipse(Rect<Tiles>),
+    Rect(
+        #[schemars(with = "serial::RectRow")]
+        #[serde(
+            serialize_with = "serial::rect",
+            deserialize_with = "serial::rect_from"
+        )]
+        Rect<Tiles>,
+    ),
+    Ellipse(
+        #[schemars(with = "serial::RectRow")]
+        #[serde(
+            serialize_with = "serial::rect",
+            deserialize_with = "serial::rect_from"
+        )]
+        Rect<Tiles>,
+    ),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -54,7 +69,7 @@ pub struct SoundscapeChannel(pub u32);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeLayer {
-    pub src: AssetRef,
+    pub src: AudioRef,
     pub volume: f32,
     pub pan: f32,
     pub category: AudioCategory,
@@ -63,7 +78,7 @@ pub struct SoundscapeLayer {
 #[derive(Resource, Default)]
 pub struct SoundscapeMixer {
     clock_start: Duration,
-    sources: HashMap<AssetRef, Handle<AudioSource>>,
+    sources: HashMap<AudioRef, Handle<AudioSource>>,
     voices: Vec<SoundscapeVoice>,
     refused: Option<Vec<WantedLayer>>,
 }
@@ -71,7 +86,7 @@ pub struct SoundscapeMixer {
 pub struct SoundscapeVoice {
     pub channel: SoundscapeChannel,
     pub category: AudioCategory,
-    pub src: AssetRef,
+    pub src: AudioRef,
     instance: Handle<AudioInstance>,
     share: f32,
     volume: f32,
@@ -154,7 +169,7 @@ impl SoundscapeVoice {
 struct WantedLayer {
     channel: SoundscapeChannel,
     category: AudioCategory,
-    src: AssetRef,
+    src: AudioRef,
     share: f32,
     volume: f32,
     pan: f32,
@@ -184,7 +199,7 @@ fn load_sources(
         .collect();
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn mix(
     soundscape: Res<Soundscape>,
     listener: Res<Listener>,
@@ -299,45 +314,4 @@ fn unit_circle(bounds: Rect<Tiles>, at: Pos<Tiles>) -> euclid::Vector2D<f32, Til
 
 fn toward(from: f32, to: f32, step: f32) -> f32 {
     from + (to - from).clamp(-step, step)
-}
-
-#[derive(JsonSchema, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum ShapeRow {
-    #[schemars(extend("x-rect" = true))]
-    Rect { x: f32, y: f32, w: f32, h: f32 },
-    #[schemars(extend("x-rect" = true))]
-    Ellipse { x: f32, y: f32, w: f32, h: f32 },
-}
-
-impl From<ShapeRow> for SoundscapeShape {
-    fn from(row: ShapeRow) -> SoundscapeShape {
-        match row {
-            ShapeRow::Rect { x, y, w, h } => {
-                SoundscapeShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-            ShapeRow::Ellipse { x, y, w, h } => {
-                SoundscapeShape::Ellipse(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-        }
-    }
-}
-
-impl From<SoundscapeShape> for ShapeRow {
-    fn from(shape: SoundscapeShape) -> ShapeRow {
-        match shape {
-            SoundscapeShape::Rect(r) => ShapeRow::Rect {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-            SoundscapeShape::Ellipse(r) => ShapeRow::Ellipse {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-        }
-    }
 }

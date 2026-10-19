@@ -4,9 +4,9 @@ mod exports;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use editor::import::formats::{self, ExportFormat};
+use editor::import::formats::{self, ExportFormat, ExportStrip};
 use editor::import::model::{self, CuePlacement};
-use editor::import::records::ImportRecord;
+use editor::import::records::{ImportMapping, ImportRecord};
 use editor::import::tileset;
 use engine::systems::area::grid::{self, PaletteRow};
 use image::RgbaImage;
@@ -264,9 +264,11 @@ fn importing_again_asks_before_replacing_lengths_edited_here() {
     let attack = plan.strips.iter().find(|s| s.name == "attack_s").unwrap();
     let retimed = attack.retimed.as_ref().expect("asks which lengths win");
     assert_eq!(retimed.here[4], 90);
-    assert_eq!(retimed.export[4], 60);
     assert!(retimed.keep_here);
     assert_eq!(attack.final_lengths()[4], 90);
+    let mut export_wins = attack.clone();
+    export_wins.retimed.as_mut().unwrap().keep_here = false;
+    assert_eq!(export_wins.final_lengths()[4], 60);
     let untouched = plan.strips.iter().find(|s| s.name == "walk_s").unwrap();
     assert!(untouched.retimed.is_none());
     let same = model::plan(
@@ -330,7 +332,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     fill(&mut wide, old.width(), 0, 64, 16, [200, 90, 120, 255]);
     let island = art::island_palette();
     let palettes = vec![("island".to_owned(), palette(&island))];
-    let plan = tileset::tile_plan(&old, &row, &wide, "beach", &palettes);
+    let plan = tileset::tile_plan(&old, &row, &wide, "beach", &palettes).expect("plans");
     assert_eq!(
         (plan.old_columns, plan.new_columns),
         (art::COLUMNS, art::COLUMNS + 4)
@@ -355,7 +357,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
         let old_index: u32 = index.parse().unwrap();
         let Some(target) = plan.matches.get(&old_index) else {
             assert!(
-                tileset::tile_image(&old, TILE, old_index).is_some_and(|t| formats::is_blank(&t))
+                formats::cell(&old, (TILE, TILE), old_index).is_some_and(|t| formats::is_blank(&t))
             );
             continue;
         };
@@ -425,7 +427,7 @@ fn a_gone_tile_still_painted_blocks_until_replaced() {
             art::PAVED + 1
         )),
     )];
-    let mut plan = tileset::tile_plan(&old, &row, &changed, "beach", &palettes);
+    let mut plan = tileset::tile_plan(&old, &row, &changed, "beach", &palettes).expect("plans");
     assert_eq!(plan.gone, vec![art::PAVED]);
     assert!(plan.gone_used.contains_key(&art::PAVED));
     assert!(plan.ready().is_err());
@@ -491,6 +493,77 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     assert_eq!(
         new_row["tiles"][first.to_string()]["animation"][1]["tile"],
         Value::from(art::COLUMNS * art::ROWS)
+    );
+}
+
+#[test]
+fn import_records_written_by_earlier_editors_still_read() {
+    let written = serde_json::json!([
+        {
+            "export": "/art/walker.png",
+            "files": ["/art/walker.png", "/art/walker.json"],
+            "table": "model",
+            "key": "walker",
+            "mapping": { "idle": "idle_s", "flourish": "skip" },
+            "size": 10,
+            "hash": "0011",
+            "strips": { "idle_s": [100, 120] },
+            "part": ""
+        },
+        {
+            "export": "/art/beach.png",
+            "files": ["/art/beach.png"],
+            "table": "tileset",
+            "key": "beach",
+            "mapping": { "grid": { "tile": 16, "margin": 2, "spacing": 1, "extruded": 1 } },
+            "size": 4,
+            "hash": "2233",
+            "strips": {},
+            "part": ""
+        },
+        {
+            "export": "/art/water.gif",
+            "files": ["/art/water.gif"],
+            "table": "tileset",
+            "key": "beach",
+            "mapping": { "animation": { "column": 3, "row": 4 } },
+            "size": 4,
+            "hash": "4455",
+            "strips": {},
+            "part": "animation 3,4"
+        }
+    ]);
+    let records: Vec<ImportRecord> = serde_json::from_value(written).expect("reads");
+    assert_eq!(
+        records[1].mapping,
+        ImportMapping::Grid {
+            grid: tileset::TileGridSettings {
+                tile: 16,
+                margin: 2,
+                spacing: 1,
+                extruded: 1,
+            }
+        }
+    );
+    assert_eq!(
+        records.iter().map(ImportRecord::block).collect::<Vec<_>>(),
+        vec![None, None, Some(tileset::TileBlock { column: 3, row: 4 })]
+    );
+    let strips = ["idle", "flourish"].map(|tag| ExportStrip {
+        tag: tag.to_owned(),
+        frames: Vec::new(),
+    });
+    let export = formats::AnimationExport::new(Vec::new(), ExportFormat::SheetJson, strips.into());
+    let mapping = model::recorded_mapping(&records[0], &export);
+    assert_eq!(mapping["idle"], Some("idle_s".to_owned()));
+    assert_eq!(mapping["flourish"], None, "a skipped tag stays skipped");
+    let rewritten: Vec<ImportRecord> =
+        serde_json::from_value(serde_json::to_value(&records).unwrap()).expect("reads back");
+    assert!(
+        rewritten
+            .iter()
+            .zip(&records)
+            .all(|(again, record)| again.mapping == record.mapping && again.files == record.files)
     );
 }
 

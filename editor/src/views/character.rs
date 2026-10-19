@@ -1,34 +1,37 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
+use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
+use engine::core::render::TILE;
+use engine::core::time::Seconds;
 use engine::systems::GameSettings;
-use engine::systems::area::{self, AreaDef, AreaModule};
+use engine::systems::area::{self, AreaDef};
 use engine::systems::class::{ClassDef, SkillTree};
-use engine::systems::npc::NpcId;
+use engine::systems::item::ItemDef;
+use engine::systems::memory::MemoryDef;
+use engine::systems::player::snapshot::{CharacterSnapshot, QuestState};
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
-use engine::systems::skill::{HOTBAR_SLOTS, Rank};
+use engine::systems::skill::{HOTBAR_SLOTS, Rank, SkillDef};
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use strum::{AsRefStr, VariantArray};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use crate::app::{Editor, PlacePick};
-use crate::forms::{FormAction, FormChange, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::forms::{self, FormAction, FormChange, FormCx};
+use crate::project::ContentEdit;
 use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::AreaViews;
-use crate::{condition, forms, picker, play, schema, stage};
+use crate::{condition, picker, play, schema, stage};
 
-pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;
 const MAP: Vec2 = Vec2::new(272.0, 96.0);
@@ -42,11 +45,12 @@ pub struct CharacterView {
     pub more_memories: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize, VariantArray, AsRefStr)]
 #[serde(rename_all = "snake_case")]
 pub enum CharacterSection {
     #[default]
     Identity,
+    #[strum(serialize = "Stats and effects")]
     Stats,
     Bag,
     Equipment,
@@ -54,32 +58,18 @@ pub enum CharacterSection {
     Hotbar,
     Start,
     #[serde(rename = "areas")]
+    #[strum(serialize = "Areas known")]
     AreasKnown,
     Quests,
     Memories,
     #[serde(rename = "lines")]
+    #[strum(serialize = "Lines heard")]
     LinesHeard,
     Shops,
     History,
 }
 
 impl CharacterSection {
-    const ALL: [CharacterSection; 13] = [
-        CharacterSection::Identity,
-        CharacterSection::Stats,
-        CharacterSection::Bag,
-        CharacterSection::Equipment,
-        CharacterSection::Skills,
-        CharacterSection::Hotbar,
-        CharacterSection::Start,
-        CharacterSection::AreasKnown,
-        CharacterSection::Quests,
-        CharacterSection::Memories,
-        CharacterSection::LinesHeard,
-        CharacterSection::Shops,
-        CharacterSection::History,
-    ];
-
     fn page(self) -> (&'static [CharacterSection], &'static [CharacterSection]) {
         match self {
             CharacterSection::Identity
@@ -104,34 +94,16 @@ impl CharacterSection {
             ),
         }
     }
-
-    fn label(self) -> &'static str {
-        match self {
-            CharacterSection::Identity => "Identity",
-            CharacterSection::Stats => "Stats and effects",
-            CharacterSection::Bag => "Bag",
-            CharacterSection::Equipment => "Equipment",
-            CharacterSection::Skills => "Skills",
-            CharacterSection::Hotbar => "Hotbar",
-            CharacterSection::Start => "Start",
-            CharacterSection::AreasKnown => "Areas known",
-            CharacterSection::Quests => "Quests",
-            CharacterSection::Memories => "Memories",
-            CharacterSection::LinesHeard => "Lines heard",
-            CharacterSection::Shops => "Shops",
-            CharacterSection::History => "History",
-        }
-    }
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let file = row_file(TABLE, key);
-    let Some(mut value) = editor.row_value(TABLE, key) else {
+    let file = row_file(CharacterSnapshot::TABLE, key);
+    let Some(mut value) = editor.row_value(CharacterSnapshot::TABLE, key) else {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(TABLE);
+    let root = shapes.shape_of(CharacterSnapshot::TABLE);
     let section = editor.views.character.section;
     let characters: Vec<String> = editor
         .project
@@ -139,14 +111,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .map(|project| {
             project
                 .files
-                .keys_of("test_character")
+                .keys_of(CharacterSnapshot::TABLE)
                 .map(str::to_owned)
                 .collect()
         })
         .unwrap_or_default();
     let mut switch: Option<String> = None;
     let mut changed = FormChange::default();
-    let mut label = format!("Edit {TABLE}/{key}");
+    let mut label = format!("Edit {}/{key}", CharacterSnapshot::TABLE);
     let mut actions = Vec::new();
     let mut pick: Option<PlacePick> = None;
     ui.horizontal_top(|ui| {
@@ -168,7 +140,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             });
             ui.add_space(6.0);
-            for candidate in CharacterSection::ALL {
+            for &candidate in CharacterSection::VARIANTS {
                 let selected = candidate == section;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
@@ -180,7 +152,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui.painter().text(
                     rect.left_center() + egui::vec2(10.0, 0.0),
                     egui::Align2::LEFT_CENTER,
-                    candidate.label(),
+                    candidate.as_ref(),
                     egui::FontId::proportional(13.5),
                     if selected { theme::TEXT } else { theme::MUTED },
                 );
@@ -201,8 +173,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
-            let mut cx =
-                FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
+            let mut cx = FormCx::new(project, root, shapes, form, &mut actions)
+                .owned_by(CharacterSnapshot::TABLE, Some(key));
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
                 ui.horizontal_top(|ui| {
@@ -281,12 +253,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            row_form::preview::show(editor, ui, TABLE, key);
+            row_form::preview::show(editor, ui, CharacterSnapshot::TABLE, key);
         });
     });
     editor.status.left.push(format!(
         "test character {key} › {}",
-        section.label().to_lowercase()
+        section.as_ref().to_lowercase()
     ));
     editor.status.left.push(match section {
         CharacterSection::Quests => {
@@ -316,17 +288,20 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, TABLE, key);
+        row_form::act(editor, action, CharacterSnapshot::TABLE, key);
     }
     if let Some(other) = switch {
-        editor.select(RowSelection::row(TABLE, &other));
-        editor.open_tab(EditorTab::for_row(TABLE, &other));
+        editor.open_row(CharacterSnapshot::TABLE, &other);
     }
 }
 
 fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
-    let classes: Vec<String> = cx.files.keys_of("class").map(str::to_owned).collect();
+    let classes: Vec<String> = cx
+        .files
+        .keys_of(ClassDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
     let level = level_of(cx, value.text("class"), xp);
     card(ui, "Identity", |ui| {
@@ -336,7 +311,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::kv(ui, "class", |ui| {
             let current = value.text("class").to_owned();
             let mut picked = current.clone();
-            widgets::combo_box("character-class")
+            widgets::combo("character-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current).size(13.0))
                 .show_ui(ui, |ui| {
@@ -394,7 +369,11 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     if !value["bag"].is_array() {
         value["bag"] = Value::Array(Vec::new());
     }
-    let items: Vec<String> = cx.files.keys_of("item").map(str::to_owned).collect();
+    let items: Vec<String> = cx
+        .files
+        .keys_of(ItemDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let count = value["bag"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     card(ui, "Bag", |ui| {
@@ -414,7 +393,7 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                 let mut key = item_key.clone();
                 ui.scope(|ui| {
                     ui.set_width(200.0);
-                    if picker::row(ui, cx, "item", &mut key, &format!("{path}/item")) {
+                    if picker::row(ui, cx, ItemDef::TABLE, &mut key, &format!("{path}/item")) {
                         stack["item"] = Value::String(key);
                         changed = FormChange::at(&path);
                     }
@@ -463,9 +442,9 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .map(|slot| {
             let items = cx
                 .files
-                .keys_of("item")
+                .keys_of(ItemDef::TABLE)
                 .filter_map(|key| {
-                    let row = cx.files.json(&row_file("item", key))?;
+                    let row = cx.files.json(&row_file(ItemDef::TABLE, key))?;
                     (row["kind"]["type"] == "equipment"
                         && row["kind"]["slot"].as_str() == Some(slot))
                     .then(|| key.to_owned())
@@ -479,7 +458,7 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             let current = value["equipment"][slot].as_str().map(str::to_owned);
             widgets::kv(ui, slot, |ui| {
                 let mut picked = current.clone();
-                widgets::combo_box(("equipment", slot))
+                widgets::combo(("equipment", slot))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
                         Some(item) => theme::mono(format!("item/ {item}")).size(13.0),
@@ -550,7 +529,7 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                     remove = Some(index);
                 }
                 let mut picked = node.clone();
-                widgets::combo_box(("learned-node", index))
+                widgets::combo(("learned-node", index))
                     .width(170.0)
                     .selected_text(if node.is_empty() {
                         theme::muted("pick a node…")
@@ -621,7 +600,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::card_title(ui, "Hotbar");
         widgets::kv(ui, "basic attack", |ui| {
             let mut skill = value.text("basic_attack").to_owned();
-            if picker::row(ui, cx, "skill", &mut skill, "/basic_attack") {
+            if picker::row(ui, cx, SkillDef::TABLE, &mut skill, "/basic_attack") {
                 if skill.is_empty() {
                     value.remove_field("basic_attack");
                 } else {
@@ -659,7 +638,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                 let response = ui
                     .allocate_ui_with_layout(
                         egui::vec2(SLOT_WIDTH, ui.spacing().interact_size.y),
-                        egui::Layout::left_to_right(egui::Align::Center),
+                        Layout::left_to_right(Align::Center),
                         |ui| {
                             ui.set_width(SLOT_WIDTH);
                             forms::boxed_input(ui, Some("slot"), |ui| {
@@ -735,7 +714,7 @@ fn start(
 ) -> FormChange {
     let mut changed = FormChange::default();
     let scene_key = format!("character:{key}");
-    let file = row_file(TABLE, key);
+    let file = row_file(CharacterSnapshot::TABLE, key);
     let texture = area
         .scenes
         .by_key
@@ -764,7 +743,7 @@ fn start(
                 ui.label(theme::faint("· the initial spawn").size(12.0));
             } else {
                 let mut draft = area_key.clone();
-                if picker::row(ui, cx, "area", &mut draft, "/start/area") {
+                if picker::row(ui, cx, AreaDef::TABLE, &mut draft, "/start/area") {
                     value["start"]["area"] = Value::String(draft);
                     changed = FormChange::at("/start");
                 }
@@ -821,7 +800,7 @@ fn start(
                 width: (MAP.x * ppp) as u32,
                 height: (MAP.y * ppp) as u32,
                 center,
-                zoom: px_per_tile / super::area::TILE_PX * ppp,
+                zoom: px_per_tile / TILE.0 * ppp,
                 generation,
                 live: true,
             });
@@ -881,7 +860,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .collect();
     let all: Vec<String> = cx
         .files
-        .keys_of("area")
+        .keys_of(AreaDef::TABLE)
         .map(str::to_owned)
         .filter(|key| !known.contains(key))
         .collect();
@@ -936,7 +915,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     changed
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, VariantArray)]
 pub enum Standing {
     NotTaken,
     Active,
@@ -945,13 +924,6 @@ pub enum Standing {
 }
 
 impl Standing {
-    pub const ALL: [Standing; 4] = [
-        Standing::NotTaken,
-        Standing::Active,
-        Standing::Completed,
-        Standing::Failed,
-    ];
-
     pub fn label(self) -> &'static str {
         match self {
             Standing::NotTaken => "not taken",
@@ -972,21 +944,21 @@ impl Standing {
         }
     }
 
-    fn of(state: Option<&str>) -> Standing {
-        match state {
-            Some("active") => Standing::Active,
-            Some("completed") => Standing::Completed,
-            Some("failed") => Standing::Failed,
-            _ => Standing::NotTaken,
+    fn of(state: &Value) -> Standing {
+        match QuestState::deserialize(state) {
+            Ok(QuestState::Active) => Standing::Active,
+            Ok(QuestState::Completed) => Standing::Completed,
+            Ok(QuestState::Failed) => Standing::Failed,
+            Err(_) => Standing::NotTaken,
         }
     }
 
-    fn state(self) -> Option<&'static str> {
+    fn state(self) -> Option<QuestState> {
         match self {
             Standing::NotTaken => None,
-            Standing::Active => Some("active"),
-            Standing::Completed => Some("completed"),
-            Standing::Failed => Some("failed"),
+            Standing::Active => Some(QuestState::Active),
+            Standing::Completed => Some(QuestState::Completed),
+            Standing::Failed => Some(QuestState::Failed),
         }
     }
 }
@@ -1053,7 +1025,11 @@ fn quests(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let all: Vec<String> = cx.files.keys_of("quest").map(str::to_owned).collect();
+    let all: Vec<String> = cx
+        .files
+        .keys_of(QuestDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let in_log: Vec<String> = value["quests"]
         .as_array()
         .into_iter()
@@ -1086,8 +1062,9 @@ fn quests(
                 let entry_index = value["quests"]
                     .as_array()
                     .and_then(|list| list.iter().position(|q| q["quest"].as_str() == Some(quest)));
-                let standing =
-                    Standing::of(entry_index.and_then(|i| value["quests"][i]["state"].as_str()));
+                let standing = Standing::of(
+                    entry_index.map_or(&Value::Null, |i| &value["quests"][i]["state"]),
+                );
                 let giver =
                     cx.content
                         .as_ref()
@@ -1097,14 +1074,17 @@ fn quests(
                                 .by_key::<QuestDef>(quest)
                                 .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
                         });
-                let requires = cx.files.json(&row_file("quest", quest)).and_then(|row| {
-                    row["modules"].as_array().and_then(|modules| {
-                        modules
-                            .iter()
-                            .find(|m| m["type"] == "requires")
-                            .map(|m| condition::summary(&m["condition"]))
-                    })
-                });
+                let requires = cx
+                    .files
+                    .json(&row_file(QuestDef::TABLE, quest))
+                    .and_then(|row| {
+                        row["modules"].as_array().and_then(|modules| {
+                            modules
+                                .iter()
+                                .find(|m| m["type"] == "requires")
+                                .map(|m| condition::summary(&m["condition"]))
+                        })
+                    });
                 let subtitle = match standing {
                     Standing::NotTaken => requires
                         .map(|r| format!("needs {r}"))
@@ -1126,10 +1106,10 @@ fn quests(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            widgets::combo_box(("quest-state", quest))
+                            widgets::combo(("quest-state", quest))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
-                                    for option in Standing::ALL {
+                                    for &option in Standing::VARIANTS {
                                         ui.selectable_value(&mut picked, option, option.label());
                                     }
                                 });
@@ -1354,7 +1334,10 @@ fn apply_moment(
     parties: Option<&Parties>,
 ) {
     let objectives = objectives_of(cx, quest);
-    let giver_place = giver_of(cx, parties, quest).and_then(|party| npc_place(cx, party.npc?));
+    let giver_place = cx.content.as_ref().and_then(|content| {
+        let home = area::residence(content, giver_of(cx, parties, quest)?.npc?)?;
+        Some((home.area.key(content).to_owned(), home.at))
+    });
     match &moment {
         Moment::JustOffered => set_standing(value, quest, Standing::NotTaken),
         Moment::ObjectivesMet | Moment::ReadyToHandIn | Moment::Decided(_) => {
@@ -1404,20 +1387,6 @@ fn give(value: &mut Value, item: &str, count: u32) {
     }
 }
 
-fn npc_place(cx: &FormCx, npc: NpcId) -> Option<(String, Pos<Tiles>)> {
-    let content = cx.content.clone()?;
-    content.ids::<AreaDef>().find_map(|area| {
-        area::placed(&content, area)
-            .iter()
-            .find_map(|placed| match &placed.module {
-                AreaModule::Resident(resident) if resident.npc == npc => {
-                    Some((area.key(&content).to_owned(), resident.at))
-                }
-                _ => None,
-            })
-    })
-}
-
 fn memories(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -1425,12 +1394,12 @@ fn memories(
     view: &mut CharacterView,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let defs: Vec<MemoryDef> = cx
+    let defs: Vec<MemoryEntry> = cx
         .files
-        .keys_of("memory")
+        .keys_of(MemoryDef::TABLE)
         .filter_map(|key| {
-            let row = cx.files.json(&row_file("memory", key))?;
-            Some(MemoryDef {
+            let row = cx.files.json(&row_file(MemoryDef::TABLE, key))?;
+            Some(MemoryEntry {
                 key: key.to_owned(),
                 ty: row.kind_or("boolean").to_owned(),
                 label: row.text("label").to_owned(),
@@ -1438,8 +1407,8 @@ fn memories(
         })
         .collect();
     let set: Vec<Value> = value["memories"].as_array().cloned().unwrap_or_default();
-    let is_set = |def: &&MemoryDef| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
-    let mut order: Vec<&MemoryDef> = defs.iter().filter(is_set).collect();
+    let is_set = |def: &&MemoryEntry| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
+    let mut order: Vec<&MemoryEntry> = defs.iter().filter(is_set).collect();
     order.extend(defs.iter().filter(|def| !is_set(def)));
     let mut updates: Vec<(String, Option<Value>)> = Vec::new();
     widgets::section_count(ui, "Memories", defs.len());
@@ -1457,13 +1426,13 @@ fn memories(
             ui.label("");
             ui.label(theme::faint("LAST SET").size(11.0).monospace());
             ui.end_row();
-            for MemoryDef { key, ty, label } in order.iter().take(order.len() - hidden) {
+            for MemoryEntry { key, ty, label } in order.iter().take(order.len() - hidden) {
                 let entry = set.iter().find(|m| m["memory"].as_str() == Some(key));
                 ui.label(theme::mono(key).size(13.0)).on_hover_text(label);
                 match ty.as_str() {
                     "boolean" => {
                         let mut on = entry.and_then(|m| m["value"].as_bool()).unwrap_or(false);
-                        if widgets::toggle(ui, &mut on).changed() {
+                        if ui.checkbox(&mut on, "").changed() {
                             updates.push((key.clone(), Some(Value::Bool(on))));
                         }
                     }
@@ -1507,7 +1476,7 @@ fn memories(
                 ui.label(
                     theme::muted(ago.map_or_else(
                         || "never".to_owned(),
-                        |seconds| widgets::ago(seconds as u64),
+                        |seconds| widgets::ago(Seconds(seconds as f32)),
                     ))
                     .size(12.5)
                     .monospace(),
@@ -1550,7 +1519,7 @@ fn memories(
     changed
 }
 
-struct MemoryDef {
+struct MemoryEntry {
     key: String,
     ty: String,
     label: String,
@@ -1565,7 +1534,7 @@ fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
 }
 
 fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
-    let row = cx.files.json(&row_file("item", item))?;
+    let row = cx.files.json(&row_file(ItemDef::TABLE, item))?;
     row["modules"]
         .as_array()?
         .iter()
@@ -1579,7 +1548,7 @@ pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(TABLE, key) else {
+    let Some(row) = editor.row_value(CharacterSnapshot::TABLE, key) else {
         return;
     };
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
@@ -1640,7 +1609,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     );
     widgets::kv_text(ui, "health", format!("{} of {}", health, health));
     widgets::kv_text(ui, "starts", starts);
-    widgets::kv_code(ui, "file", row_file(TABLE, key));
+    widgets::kv_code(ui, "file", row_file(CharacterSnapshot::TABLE, key));
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if controls::marked_primary(ui, Mark::Play, format!("Play as {key}")).clicked() {
@@ -1652,7 +1621,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             row_form::act(
                 editor,
                 FormAction::RowAction(BrowserAction::Duplicate),
-                TABLE,
+                CharacterSnapshot::TABLE,
                 key,
             );
         }

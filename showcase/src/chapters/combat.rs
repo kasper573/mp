@@ -243,7 +243,7 @@ fn in_town(snapshot: &ProbeSnapshot) -> Pos<Tiles> {
     grid.nodes()
         .iter()
         .copied()
-        .filter(|node| grid.component(*node) == grid.component(me) && deep(*node))
+        .filter(|node| grid.region(*node) == grid.region(me) && deep(*node))
         .min_by(|a, b| a.distance_to(me).total_cmp(&b.distance_to(me)))
         .expect("ground in town")
 }

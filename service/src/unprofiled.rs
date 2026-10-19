@@ -1,18 +1,7 @@
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-
 pub use std::alloc::System as ServiceAllocator;
 
-#[macro_export]
-macro_rules! heap_profiling {
-    () => {
-        $crate::heap_profiling!($crate::ServiceAllocator, $crate::ServiceAllocator);
-    };
-    ($allocator:ty, $init:expr) => {
-        #[global_allocator]
-        static GLOBAL_ALLOCATOR: $allocator = $init;
-    };
-}
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 
 pub enum CpuProfiler {}
 

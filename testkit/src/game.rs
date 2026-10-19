@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 
-use engine::core::content::{Content, ContentRegistry, LoadReport, MemoryFolder, version};
+use engine::core::content::{
+    Content, ContentRegistry, GAME_FILE, LoadReport, MemoryFolder, asset_file, row_file,
+    row_folder, version,
+};
 use engine::core::math::Direction;
 use engine::systems::actor::Action;
 use serde_json::{Value, json};
@@ -34,18 +37,18 @@ impl Game {
             settings: None,
             whole: false,
         };
-        game.put("game.json", b"{}".to_vec());
+        game.put(GAME_FILE, b"{}".to_vec());
         game
     }
 
     pub fn row(mut self, table: &str, key: &str, row: Value) -> Game {
-        self.put(&format!("tables/{table}/{key}.json"), json_bytes(&row));
+        self.put(&row_file(table, key), json_bytes(&row));
         self
     }
 
     /// A file under the folder's `assets/`.
     pub fn asset(mut self, path: &str, bytes: Vec<u8>) -> Game {
-        self.put(&format!("assets/{path}"), bytes);
+        self.put(&asset_file(path), bytes);
         self
     }
 
@@ -162,7 +165,7 @@ impl Game {
 
     /// Changes a row declared before.
     pub fn edit(mut self, table: &str, key: &str, change: impl FnOnce(&mut Value)) -> Game {
-        let path = format!("tables/{table}/{key}.json");
+        let path = row_file(table, key);
         let bytes = self
             .files
             .get(&path)
@@ -300,7 +303,6 @@ impl Game {
             json!({
                 "hitbox": { "width": 1.0, "height": height },
                 "sprites": {
-                    "type": "sheet",
                     "image": image,
                     "frame_size": { "width": 1, "height": 1 },
                     "actions": actions,
@@ -327,11 +329,14 @@ impl Game {
             })
             .collect();
         self.put(
-            &format!("tables/area/{key}/palette.csv"),
+            &format!("{}/palette.csv", row_folder("area", key)),
             format!("tileset,tile,flip\n{tileset},0,\n").into_bytes(),
         );
-        self.put(&format!("tables/area/{key}/ground.csv"), csv(&ground));
-        self.put(&format!("tables/area/{key}/walk.csv"), csv(&walk));
+        self.put(
+            &format!("{}/ground.csv", row_folder("area", key)),
+            csv(&ground),
+        );
+        self.put(&format!("{}/walk.csv", row_folder("area", key)), csv(&walk));
         self.row(
             "tileset",
             &tileset,
@@ -344,7 +349,6 @@ impl Game {
             json!({
                 "name": key,
                 "map": {
-                    "type": "tilemap",
                     "size": { "width": width, "height": height },
                     "tile": TILE,
                     "ground": ["ground"],
@@ -401,7 +405,7 @@ impl Game {
             if settings.get("content_version").is_none() {
                 settings["content_version"] = json!(self.registry().version().0);
             }
-            files.insert("game.json".to_owned(), json_bytes(&settings).into());
+            files.insert(GAME_FILE.to_owned(), json_bytes(&settings).into());
         }
         MemoryFolder {
             name: "test game".to_owned(),

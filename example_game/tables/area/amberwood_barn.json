@@ -1,7 +1,6 @@
 {
   "name": "The farm's barn",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 24,
       "height": 14

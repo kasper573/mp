@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::card::{self, Art, Card, CardResponse};
+use design_tokens::face::{self, TextRole};
 use design_tokens::glyph::Kind;
+use design_tokens::ink;
 use design_tokens::sheet::Depth;
-use design_tokens::{TextRole, face, ink};
 use egui::{Rect, Response, Ui};
 
 use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};

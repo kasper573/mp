@@ -1,9 +1,11 @@
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Color32, FontFamily, FontId, RichText, WidgetText};
+use strum::{IntoStaticStr, VariantArray};
 
 use crate::ink;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
 pub enum Face {
     Book,
     BookMedium,
@@ -18,19 +20,6 @@ pub enum Face {
 }
 
 impl Face {
-    pub const ALL: [Face; 10] = [
-        Face::Book,
-        Face::BookMedium,
-        Face::BookBold,
-        Face::BookItalic,
-        Face::SmallCaps,
-        Face::SmallCapsBold,
-        Face::Quill,
-        Face::Numerals,
-        Face::Mono,
-        Face::MonoBold,
-    ];
-
     pub fn family(self) -> FontFamily {
         match self {
             Face::Book => FontFamily::Proportional,
@@ -44,18 +33,7 @@ impl Face {
     }
 
     pub(crate) fn key(self) -> &'static str {
-        match self {
-            Face::Book => "book",
-            Face::BookMedium => "book-medium",
-            Face::BookBold => "book-bold",
-            Face::BookItalic => "book-italic",
-            Face::SmallCaps => "small-caps",
-            Face::SmallCapsBold => "small-caps-bold",
-            Face::Quill => "quill",
-            Face::Numerals => "numerals",
-            Face::Mono => "mono",
-            Face::MonoBold => "mono-bold",
-        }
+        self.into()
     }
 }
 

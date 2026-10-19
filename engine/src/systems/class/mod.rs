@@ -10,18 +10,18 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetRef;
+use crate::core::assets::ImageRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
-use crate::core::script::{Compiler, EffectDef, EffectStep, NEXT, Name, ScriptFault, ValueType};
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::notification;
 use crate::systems::player::Xp;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
+    effect as effects,
 };
 use crate::systems::skill::{self, Learned, SkillDef};
-use crate::systems::stat::{Stat, StatMap};
+use crate::systems::stat::{Stat, Stats};
 use crate::systems::vfx::{self, VfxFixture, VfxShaderFixture};
 
 pub fn register(app: &mut App) {
@@ -34,7 +34,7 @@ pub type ClassId = ContentId<ClassDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ClassDef {
     pub name: String,
-    pub icon: AssetRef,
+    pub icon: ImageRef,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub flavour: String,
     pub levels: Vec<ClassLevel>,
@@ -109,8 +109,8 @@ impl ContentRow for ClassDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ClassLevel {
     pub xp: u32,
-    #[serde(default, skip_serializing_if = "StatMap::is_empty")]
-    pub stats: StatMap,
+    #[serde(default, skip_serializing_if = "Stats::is_empty")]
+    pub stats: Stats,
     #[serde(default, skip_serializing_if = "SkillPoints::is_zero")]
     pub skill_points: SkillPoints,
 }
@@ -249,9 +249,9 @@ pub fn check_all(loading: &mut Loading) {
 #[schemars(extend("x-system" = "class"))]
 pub struct GrantXp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub xp: Condition,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -259,8 +259,8 @@ impl EffectDef<RiftScripting> for GrantXp {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![(NEXT, self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

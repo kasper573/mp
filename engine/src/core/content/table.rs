@@ -124,6 +124,8 @@ impl<Row: ContentRow> Table<Row> {
 pub trait AnyTable: Any + Send + Sync {
     fn name(&self) -> &'static str;
     fn keys(&self) -> &[String];
+    /// The raw id of the row keyed `key`, for code that names a table only by its name.
+    fn raw_of(&self, key: &str) -> Option<u32>;
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -134,6 +136,10 @@ impl<Row: ContentRow> AnyTable for Table<Row> {
 
     fn keys(&self) -> &[String] {
         &self.keys
+    }
+
+    fn raw_of(&self, key: &str) -> Option<u32> {
+        self.id_of(key).map(ContentId::raw)
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -10,6 +10,7 @@ authors = ["kasper573"]
 ab_glyph = "0.2"
 egui.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
+strum = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

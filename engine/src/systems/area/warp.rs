@@ -4,23 +4,22 @@ use serde::{Deserialize, Serialize};
 
 use super::AreaTag;
 use super::transition::Crossing;
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
-use crate::systems::dialogue;
-use crate::systems::movement;
+use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault};
 use crate::systems::npc::Npc;
 use crate::systems::player::SpawnPoint;
-use crate::systems::reach;
-use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
-use crate::systems::script::{EffectCall, Fill, Place, Reach, RiftScripting};
+use crate::systems::script::{
+    Condition, EffectCall, Fill, Place, Reach, RiftScripting, effect as effects,
+};
+use crate::systems::{dialogue, movement, reach};
 
 /// Moves an actor to a place, setting its spawn point.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "area"))]
 pub struct Warp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Aim,
+    pub who: Option<Condition>,
     pub to: Fill<Place>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
 }
 
@@ -28,8 +27,8 @@ impl EffectDef<RiftScripting> for Warp {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
+        vec![(NEXT, &self.next)]
     }
     fn compile<'c>(
         &'c self,

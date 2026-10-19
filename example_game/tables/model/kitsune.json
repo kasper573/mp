@@ -4,7 +4,6 @@
     "height": 2.75
   },
   "sprites": {
-    "type": "sheet",
     "image": "models/kitsune.png",
     "frame_size": {
       "width": 64,

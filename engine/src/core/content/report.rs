@@ -87,6 +87,15 @@ impl ContentProblem {
     pub fn near(self, nearest: Option<String>) -> ContentProblem {
         ContentProblem { nearest, ..self }
     }
+
+    pub fn unknown_row(table: &str, key: &str, nearest: Option<&str>) -> ContentProblem {
+        ContentProblem::new(
+            "unknown row",
+            format!("{key:?}"),
+            format!("the key of {} {table} row", article(table)),
+        )
+        .near(nearest.map(|near| format!("{near:?}")))
+    }
 }
 
 impl Display for ContentProblem {
@@ -110,6 +119,14 @@ impl ErrorPlace {
             ErrorPlace::Json { line, column, .. }
             | ErrorPlace::Csv { row: line, column }
             | ErrorPlace::Text { line, column } => format!("{file}:{line}:{column}"),
+        }
+    }
+
+    /// The JSON pointer to where the problem is, the whole document's when it has no finer place.
+    pub fn pointer(&self) -> &str {
+        match self {
+            ErrorPlace::Json { pointer, .. } => pointer,
+            _ => "",
         }
     }
 
@@ -148,7 +165,7 @@ fn sort_key(error: &LoadError) -> SortKey<'_> {
     (rank, &error.file, line, column, within, error.problem.rule)
 }
 
-impl fmt::Display for LoadReport {
+impl Display for LoadReport {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "# Rift content load report")?;
         writeln!(f, "folder   {}", self.folder)?;
@@ -228,5 +245,12 @@ fn plural(count: usize, what: &str) -> String {
         format!("1 {what}")
     } else {
         format!("{count} {what}s")
+    }
+}
+
+pub(super) fn article(word: &str) -> &'static str {
+    match word.chars().next() {
+        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
     }
 }

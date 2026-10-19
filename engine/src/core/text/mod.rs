@@ -1,5 +1,7 @@
 mod paint;
 
+pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -7,8 +9,9 @@ use std::time::Duration;
 use bevy::prelude::*;
 use design_tokens::ink::Prose;
 use egui::Color32;
-
-pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
 const SLOW_PACE: f32 = 2.5;
 
@@ -44,7 +47,7 @@ impl KeyCap {
 pub struct StyledSpan {
     pub text: Cow<'static, str>,
     pub ink: Option<SpanInk>,
-    pub voice: TextVoice,
+    pub voice: Option<TextVoice>,
     pub motion: Option<TextMotion>,
     pub slow: bool,
 }
@@ -55,15 +58,39 @@ pub enum SpanInk {
     Fixed(Color32),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TextVoice {
-    #[default]
-    Normal,
     Whisper,
     Shout,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TextMotion {
     Wave,
     Shake,
@@ -82,12 +109,21 @@ impl KeyNames {
     }
 }
 
-#[derive(Resource, Clone, Copy, Debug, PartialEq)]
-pub struct TypewriterSpeed(pub Option<f32>);
+#[derive(Resource, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct LettersPerSecond(pub f32);
 
-impl Default for TypewriterSpeed {
-    fn default() -> TypewriterSpeed {
-        TypewriterSpeed(Some(45.0))
+impl LettersPerSecond {
+    pub(crate) const SLOWEST: LettersPerSecond = LettersPerSecond(15.0);
+    pub(crate) const FASTEST: LettersPerSecond = LettersPerSecond(120.0);
+
+    pub(crate) fn clamped(self) -> LettersPerSecond {
+        LettersPerSecond(self.0.clamp(Self::SLOWEST.0, Self::FASTEST.0))
+    }
+}
+
+impl Default for LettersPerSecond {
+    fn default() -> LettersPerSecond {
+        LettersPerSecond(45.0)
     }
 }
 
@@ -158,7 +194,7 @@ impl StyledSpan {
         StyledSpan {
             text: text.into(),
             ink: None,
-            voice: TextVoice::Normal,
+            voice: None,
             motion: None,
             slow: false,
         }
@@ -175,7 +211,7 @@ impl StyledSpan {
     }
 
     pub fn voice(mut self, voice: TextVoice) -> StyledSpan {
-        self.voice = voice;
+        self.voice = Some(voice);
         self
     }
 
@@ -196,20 +232,8 @@ impl From<StyledSpan> for TextPiece {
     }
 }
 
-pub fn reveal_times(pieces: &[TextPiece], speed: TypewriterSpeed) -> Vec<Duration> {
-    let Some(per_second) = speed.0.filter(|rate| *rate > 0.0) else {
-        return pieces
-            .iter()
-            .flat_map(|piece| match piece {
-                TextPiece::Span(span) => vec![Duration::ZERO; span.text.chars().count()],
-                TextPiece::Pause(_) => Vec::new(),
-                TextPiece::Key(_) => vec![Duration::ZERO],
-            })
-            .collect();
-    };
-    let step = |pace: f32| {
-        Duration::from_nanos((f64::from(pace) / f64::from(per_second) * 1e9).round() as u64)
-    };
+pub fn reveal_times(pieces: &[TextPiece], speed: LettersPerSecond) -> Vec<Duration> {
+    let step = |pace: f32| Duration::from_secs_f64(f64::from(pace) / f64::from(speed.0));
     let mut clock = Duration::ZERO;
     let mut times = Vec::new();
     for piece in pieces {
@@ -231,26 +255,26 @@ pub fn reveal_times(pieces: &[TextPiece], speed: TypewriterSpeed) -> Vec<Duratio
     times
 }
 
-pub fn revealed(pieces: &[TextPiece], speed: TypewriterSpeed, elapsed: Duration) -> usize {
+pub fn revealed(pieces: &[TextPiece], speed: LettersPerSecond, elapsed: Duration) -> usize {
     reveal_times(pieces, speed)
         .iter()
         .take_while(|time| **time <= elapsed)
         .count()
 }
 
-pub fn reveal_duration(pieces: &[TextPiece], speed: TypewriterSpeed) -> Duration {
+pub fn reveal_duration(pieces: &[TextPiece], speed: LettersPerSecond) -> Duration {
     reveal_times(pieces, speed)
         .last()
         .copied()
         .unwrap_or(Duration::ZERO)
 }
 
-pub struct TextPlugin;
+pub struct StyledTextPlugin;
 
-impl Plugin for TextPlugin {
+impl Plugin for StyledTextPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyNames>()
-            .init_resource::<TypewriterSpeed>()
+            .init_resource::<LettersPerSecond>()
             .add_message::<TypewriterReveal>()
             .add_systems(Update, advance_typewriters);
     }
@@ -258,7 +282,7 @@ impl Plugin for TextPlugin {
 
 pub(crate) fn advance_typewriters(
     time: Res<Time>,
-    speed: Res<TypewriterSpeed>,
+    speed: Res<LettersPerSecond>,
     mut lines: Query<(Entity, Ref<StyledLine>, &mut Typewriter)>,
     mut reveals: MessageWriter<TypewriterReveal>,
 ) {

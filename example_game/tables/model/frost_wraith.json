@@ -4,7 +4,6 @@
     "height": 2.75
   },
   "sprites": {
-    "type": "sheet",
     "image": "models/frost-wraith.png",
     "frame_size": {
       "width": 48,

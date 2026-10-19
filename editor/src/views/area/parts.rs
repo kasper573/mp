@@ -1,25 +1,27 @@
 use std::str::FromStr;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
+use engine::core::content::{ContentRow, row_file};
 use engine::core::math::Pos;
 use engine::core::script::VariableType;
 use engine::core::tiling::{CellPos, Tiles};
-use engine::systems::area::{self, AreaModuleKind};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::inspect::hidden_fields;
 use super::{holes, modules, placement};
 use crate::app::Editor;
-use crate::forms::FormCx;
+use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::project::{ContentEdit, RowSelection};
+use crate::schema;
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
-use crate::{forms, schema};
 
 /// The blueprint itself: its parts to pick from, where it is placed, its variables and modules.
 pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
-    let Some(mut row) = editor.row_value("blueprint", key) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, key) else {
         return;
     };
     let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
@@ -91,7 +93,7 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
     });
     if let Some(next) = pick {
         editor.selection = RowSelection {
-            table: "blueprint".to_owned(),
+            table: BlueprintDef::TABLE.to_owned(),
             keys: vec![key.to_owned()],
             parts: next.iter().copied().map(super::blueprint_part).collect(),
         };
@@ -101,10 +103,10 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
         row["parts"].as_array_mut().expect("parts").push(part);
         let index = row["parts"].as_array().map_or(0, Vec::len) - 1;
         let mut edit = ContentEdit::new(format!("Add part {label} · blueprint/{key}"));
-        edit.write_json(row_file("blueprint", key), &row);
+        edit.write_json(row_file(BlueprintDef::TABLE, key), &row);
         if editor.apply(edit) {
             editor.selection = RowSelection {
-                table: "blueprint".to_owned(),
+                table: BlueprintDef::TABLE.to_owned(),
                 keys: vec![key.to_owned()],
                 parts: vec![super::blueprint_part(index)],
             };
@@ -118,7 +120,7 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
 
 /// The blueprint window's inspector: the cards of the selected parts.
 pub fn selected_parts(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
-    let Some(mut row) = editor.row_value("blueprint", key) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, key) else {
         return;
     };
     let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
@@ -200,8 +202,8 @@ pub(super) fn part_cards(
     selected: &[usize],
 ) {
     let shapes = editor.shapes.clone();
-    let shape = shapes.shape_of("area");
-    let variants = shapes.module_variants("area");
+    let shape = shapes.shape_of(AreaDef::TABLE);
+    let variants = shapes.module_variants(AreaDef::TABLE);
     let variables: Vec<(String, VariableType)> = row["variables"]
         .as_object()
         .map(|vars| {
@@ -226,7 +228,7 @@ pub(super) fn part_cards(
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by("blueprint", Some(key));
+            .owned_by(BlueprintDef::TABLE, Some(key));
         for &index in selected {
             let path = super::blueprint_part(index);
             let Some(part) = row["parts"].get_mut(index) else {
@@ -294,7 +296,12 @@ pub(super) fn part_cards(
                 }
                 if module_kind == Some(AreaModuleKind::Object) {
                     changed |= crate::ui::row_form::scripts::script_cards(
-                        ui, &mut cx, "area", part, "scripts", &path,
+                        ui,
+                        &mut cx,
+                        AreaDef::TABLE,
+                        part,
+                        "scripts",
+                        &path,
                     )
                     .is_some();
                 }
@@ -315,7 +322,7 @@ pub(super) fn part_cards(
     if let Some(index) = remove {
         row["parts"].as_array_mut().map(|list| list.remove(index));
         let mut edit = ContentEdit::new(format!("Remove part {index} · blueprint/{key}"));
-        edit.write_json(row_file("blueprint", key), row);
+        edit.write_json(row_file(BlueprintDef::TABLE, key), row);
         if editor.apply(edit) {
             editor.selection.parts.clear();
         }
@@ -343,14 +350,14 @@ pub(super) fn part_cards(
                 widgets::plural(kept),
             ));
             for (area_key, area_row) in keeping {
-                edit.write_json(row_file("area", &area_key), &area_row);
+                edit.write_json(row_file(AreaDef::TABLE, &area_key), &area_row);
             }
         }
-        edit.write_json(row_file("blueprint", key), row);
+        edit.write_json(row_file(BlueprintDef::TABLE, key), row);
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, "blueprint", key);
+        row_form::act(editor, action, BlueprintDef::TABLE, key);
     }
 }
 
@@ -358,7 +365,7 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(key) else {
+    let Some(id) = content.by_key::<BlueprintDef>(key) else {
         return;
     };
     let editing: Option<(String, usize)> = editor.views.area.views.values().find_map(|view| {
@@ -367,29 +374,23 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let innermost = chain.last()?;
         (innermost.blueprint == key).then(|| (view.area.clone(), innermost.module))
     });
-    let mut placed: Vec<PlacedAt> = Vec::new();
-    let mut nested = 0;
-    for area_id in content.ids::<area::AreaDef>() {
-        let area_key = area_id.key(&content).to_owned();
-        for placement in area::placements(&content, area_id) {
-            if placement.blueprint != id {
-                continue;
-            }
-            if placement.chain.len() > 1 {
-                nested += 1;
-                continue;
-            }
-            let this = editing
-                .as_ref()
-                .is_some_and(|(a, m)| *a == area_key && *m == placement.origin);
-            placed.push(PlacedAt {
-                area: area_key.clone(),
+    let placements = placement::placements_of(&content, id);
+    let nested = placements.nested;
+    let placed: Vec<PlacedAt> = placements
+        .direct
+        .iter()
+        .map(|(area_id, placement)| {
+            let area = area_id.key(&content).to_owned();
+            PlacedAt {
+                this: editing
+                    .as_ref()
+                    .is_some_and(|(a, m)| *a == area && *m == placement.origin),
+                area,
                 at: placement.at,
-                this,
                 origin: placement.origin,
-            });
-        }
-    }
+            }
+        })
+        .collect();
     let mut areas: Vec<&String> = placed.iter().map(|placed| &placed.area).collect();
     areas.sort();
     areas.dedup();
@@ -457,14 +458,14 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
         .and_then(|p| p.content.clone())
         .map(|content| {
             content
-                .ids::<area::AreaDef>()
+                .ids::<AreaDef>()
                 .map(|id| id.key(&content).to_owned())
                 .collect()
         })
         .unwrap_or_default();
     let placements: Vec<Value> = area_keys
         .iter()
-        .filter_map(|area_key| editor.row_value("area", area_key))
+        .filter_map(|area_key| editor.row_value(AreaDef::TABLE, area_key))
         .flat_map(|row| row["modules"].as_array().cloned().unwrap_or_default())
         .filter(|module| module.is_module(AreaModuleKind::Blueprint) && module["blueprint"] == key)
         .collect();
@@ -512,18 +513,25 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
 
 pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row: &mut Value) {
     let shapes = editor.shapes.clone();
-    let shape = shapes.shape_of("blueprint");
+    let shape = shapes.shape_of(BlueprintDef::TABLE);
     let count = row["modules"].as_array().map_or(0, Vec::len);
     widgets::section_count(ui, "Modules", count);
     let changed = editor
-        .with_form("blueprint", Some(key), shape, |cx| {
-            crate::ui::row_form::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
-                .is_some()
+        .with_form(BlueprintDef::TABLE, Some(key), shape, |cx| {
+            crate::ui::row_form::scripts::script_cards(
+                ui,
+                cx,
+                BlueprintDef::TABLE,
+                row,
+                "modules",
+                "",
+            )
+            .is_some()
         })
         .unwrap_or(false);
     if changed {
         let mut edit = ContentEdit::new(format!("Edit modules · blueprint/{key}"));
-        edit.write_json(row_file("blueprint", key), row);
+        edit.write_json(row_file(BlueprintDef::TABLE, key), row);
         editor.apply(edit);
     }
 }
@@ -553,9 +561,9 @@ fn placements_keeping(
         return Vec::new();
     };
     let mut out = Vec::new();
-    for area_id in content.ids::<area::AreaDef>() {
+    for area_id in content.ids::<AreaDef>() {
         let area_key = area_id.key(&content).to_owned();
-        let Some(mut row) = editor.row_value("area", &area_key) else {
+        let Some(mut row) = editor.row_value(AreaDef::TABLE, &area_key) else {
             continue;
         };
         let mut touched = false;

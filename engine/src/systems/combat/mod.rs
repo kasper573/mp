@@ -15,7 +15,7 @@ use crate::core::time::Seconds;
 use crate::core::vfx::VfxSite;
 use crate::systems::actor::{self, Actor};
 use crate::systems::npc::Pack;
-use crate::systems::player::{self, Owner, player_requests, session};
+use crate::systems::player::{self, PlayedBy, player_requests, session};
 use crate::systems::reach;
 use crate::systems::skill::{self, BasicAttack, CastAim, Targeting};
 use crate::systems::stat::{self, Stats};
@@ -72,7 +72,7 @@ enum Side {
 }
 
 fn side(world: &World, entity: Entity) -> Side {
-    if world.get::<Owner>(entity).is_some() {
+    if world.get::<PlayedBy>(entity).is_some() {
         Side::Character
     } else if world.get::<Attitude>(entity) == Some(&Attitude::Friendly) {
         Side::Friendly
@@ -136,7 +136,7 @@ pub fn regen(world: &mut World) {
         last.0 = now;
     }
     let players: Vec<Entity> = world
-        .query_filtered::<Entity, With<Owner>>()
+        .query_filtered::<Entity, With<PlayedBy>>()
         .iter(world)
         .collect();
     for player in players {

@@ -9,7 +9,7 @@ use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::prelude::*;
 use bevy::shader::Shader;
 use bevy_egui::EguiUserTextures;
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
@@ -29,9 +29,8 @@ use engine::systems::item::ItemId;
 use engine::systems::item::render::drop_sprite;
 
 use super::{SIZE, ZOOM};
-use crate::project::{ProjectFiles, hash, row_file};
+use crate::project::{ProjectFiles, hash};
 use crate::views::area::scene;
-use crate::views::vfx::SHADER_TABLE;
 
 const FIRST_LAYER: usize = 500;
 const SPRITE_DEPTH_ABOVE_GROUND: f32 = 0.001;
@@ -311,32 +310,29 @@ impl Stage {
     }
 
     fn sync_vfx(&mut self, world: &mut World, scenes: &mut scene::AreaScenes, frame: &Frame) {
-        let wanted: HashSet<Source> = frame.vfx.iter().map(|pose| pose.owner).collect();
-        let gone: Vec<Source> = self
-            .pieces
-            .keys()
-            .filter(|owner| !wanted.contains(owner))
-            .copied()
+        let wanted: HashMap<Source, String> = frame
+            .vfx
+            .iter()
+            .map(|pose| (pose.owner, layers_signature(&pose.layers)))
             .collect();
-        for owner in gone {
-            if let Some((_, pieces)) = self.pieces.remove(&owner) {
-                for piece in pieces {
-                    world.despawn(piece);
-                }
+        let outdated: Vec<Source> = self
+            .pieces
+            .iter()
+            .filter(|(owner, (known, _))| wanted.get(*owner) != Some(known))
+            .map(|(owner, _)| *owner)
+            .collect();
+        for owner in outdated {
+            for piece in self
+                .pieces
+                .remove(&owner)
+                .into_iter()
+                .flat_map(|(_, pieces)| pieces)
+            {
+                world.despawn(piece);
             }
         }
         let mut overdrawn = HashSet::new();
         for pose in &frame.vfx {
-            let signature = layers_signature(&pose.layers);
-            let stale = self
-                .pieces
-                .get(&pose.owner)
-                .is_some_and(|(known, _)| *known != signature);
-            if stale && let Some((_, pieces)) = self.pieces.remove(&pose.owner) {
-                for piece in pieces {
-                    world.despawn(piece);
-                }
-            }
             if !self.pieces.contains_key(&pose.owner) {
                 let files = frame.files;
                 let pieces = vfx_render::pieces_for(world, &pose.layers, &mut |world, sheet| {
@@ -345,7 +341,8 @@ impl Stage {
                 for piece in &pieces {
                     world.entity_mut(*piece).insert(self.layer.clone());
                 }
-                self.pieces.insert(pose.owner, (signature, pieces));
+                self.pieces
+                    .insert(pose.owner, (wanted[&pose.owner].clone(), pieces));
             }
             let pieces = self.pieces[&pose.owner].1.clone();
             let site = self.frame_of(world, &pose.site, pose.heading, frame);
@@ -431,10 +428,10 @@ impl Stage {
         drafts: &HashMap<String, String>,
     ) -> Result<Handle<Shader>, String> {
         let row = files
-            .json(&row_file(SHADER_TABLE, key))
+            .json(&row_file(VfxShaderDef::TABLE, key))
             .ok_or_else(|| format!("no shader row {key}"))?;
         let def: VfxShaderDef = serde_json::from_value((*row).clone())
-            .map_err(|_| format!("{SHADER_TABLE}/{key} does not parse"))?;
+            .map_err(|_| format!("{}/{key} does not parse", VfxShaderDef::TABLE))?;
         let source = drafts
             .get(key)
             .cloned()

@@ -7,8 +7,7 @@ use std::time::Duration;
 use bevy::tasks::futures_lite::future;
 use bevy_ecs::prelude::Resource;
 use futures_timer::Delay;
-use futures_util::StreamExt;
-use futures_util::stream;
+use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 
 use super::load::{ContentFolder, FileHashes, MemoryFolder};
@@ -68,7 +67,7 @@ impl ServedContent {
         let mut rows: Vec<(String, Vec<u8>)> = Vec::new();
         for (path, stamp) in &hashes.0 {
             let bytes = folder.read(path)?;
-            if path.starts_with("assets/") {
+            if super::is_asset_file(path) {
                 index.files.push(IndexedFile {
                     path: path.clone(),
                     hash: stamp.hash.clone(),
