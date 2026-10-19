@@ -48,7 +48,7 @@ struct Followed {
     jumps: Jumps,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn track_player(
     time: Res<Time>,
     viewpoint: Res<MyCharacter>,

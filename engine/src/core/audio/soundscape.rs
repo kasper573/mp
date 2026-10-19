@@ -199,7 +199,7 @@ fn load_sources(
         .collect();
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn mix(
     soundscape: Res<Soundscape>,
     listener: Res<Listener>,

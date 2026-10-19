@@ -249,7 +249,7 @@ fn release_unshown_images(world: &mut World) {
         .retain(|image| shown.contains(&image.id()));
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn spawn_area_tiles(
     viewpoint: Res<MyCharacter>,
     areas: Query<&AreaTag>,
