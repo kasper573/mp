@@ -983,7 +983,7 @@ fn bounds(points: &[Pos<Tiles>]) -> (Vec2, Vec2) {
     ((min + max) / 2.0, max - min)
 }
 
-/// Every layer of a widget or screen site draws through the interface rather than the world.
+/// Every layer of a widget site draws through the interface rather than the world.
 fn draw_overlays(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
@@ -1002,7 +1002,7 @@ fn draw_overlays(world: &mut World) {
     for (entity, instance) in instances {
         let def = instance.vfx.get(&content);
         let elapsed = now.since(instance.started);
-        let Some(rect) = overlay_rect(world, &gui, &instance.site) else {
+        let Some(rect) = widget_rect(world, &instance.site) else {
             continue;
         };
         for (index, layer) in def.layers.iter().enumerate() {
@@ -1058,10 +1058,9 @@ fn draw_overlays(world: &mut World) {
     }
 }
 
-/// Where a widget or screen site lies in the window; a world site draws in the world instead.
-fn overlay_rect(world: &World, gui: &egui::Context, site: &VfxSite) -> Option<egui::Rect> {
+/// Where a widget site lies in the window; every other site draws in the world instead.
+fn widget_rect(world: &World, site: &VfxSite) -> Option<egui::Rect> {
     match site {
-        VfxSite::Screen => Some(gui.content_rect()),
         VfxSite::Widget(name) => world.resource::<WidgetRects>().0.get(&name.0).copied(),
         _ => None,
     }
