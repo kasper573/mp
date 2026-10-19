@@ -1,7 +1,6 @@
 {
   "name": "The jarl's longhouse",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 20,
       "height": 16

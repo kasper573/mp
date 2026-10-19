@@ -1,7 +1,6 @@
 {
   "name": "The druid's tree",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 18,
       "height": 14

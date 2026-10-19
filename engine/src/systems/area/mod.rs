@@ -94,7 +94,7 @@ pub fn same_area(world: &World, a: Entity, b: Entity) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct AreaDef {
     pub name: String,
-    pub map: AreaMap,
+    pub map: Tilemap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<AreaModule>,
 }
@@ -104,7 +104,7 @@ impl ContentRow for AreaDef {
 
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);
-        let map = self.map();
+        let map = &self.map;
         cx.range(
             "/map/size/width",
             map.size.width,
@@ -193,12 +193,6 @@ impl ScriptedRow for AreaDef {
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum AreaMap {
-    Tilemap(Tilemap),
-}
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tilemap {
     pub size: MapSize,
@@ -220,13 +214,6 @@ impl MapSize {
 
     pub fn tiles(self) -> Size<Tiles> {
         Size::new(self.width as f32, self.height as f32)
-    }
-}
-
-impl AreaDef {
-    pub fn map(&self) -> &Tilemap {
-        let AreaMap::Tilemap(map) = &self.map;
-        map
     }
 }
 
@@ -687,7 +674,7 @@ fn read_grids(loading: &mut Loading) {
     let sizes = content.built::<ImageSizes>();
     let mut grids: Vec<Option<Arc<AreaGrids>>> = content.ids::<AreaDef>().map(|_| None).collect();
     for (id, def) in loading.rows::<AreaDef>(&content) {
-        let map = def.map();
+        let map = &def.map;
         let folder = grid::folder(id.key(&content));
         let files = loading.row_folder(id);
         let mut expected: Vec<String> =
@@ -944,7 +931,7 @@ fn build_all(loading: &mut Loading) {
             continue;
         };
         let modules = placed(&content, id);
-        let map = def.map();
+        let map = &def.map;
         let mut check = RowCheck::default();
         check_bounds(&content, map, modules, sizes, &mut check);
         let safe_zones: Vec<Rect<Tiles>> = modules

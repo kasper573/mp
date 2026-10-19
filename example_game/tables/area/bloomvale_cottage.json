@@ -1,7 +1,6 @@
 {
   "name": "The baker's cottage",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 18,
       "height": 13

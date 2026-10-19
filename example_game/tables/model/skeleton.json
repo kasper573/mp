@@ -4,7 +4,6 @@
     "height": 1.5
   },
   "sprites": {
-    "type": "sheet",
     "image": "models/skeleton.png",
     "frame_size": {
       "width": 48,

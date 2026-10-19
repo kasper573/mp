@@ -1,7 +1,6 @@
 {
   "name": "The fisher's stilt house",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 14,
       "height": 12

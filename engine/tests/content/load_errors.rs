@@ -26,11 +26,17 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
             "cove",
             json!({
                 "name": "Cove",
-                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+                "map": { "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
             }),
         )
-        .file("tables/area/cove/palette.csv", "tileset,tile,flip\nstart_ground,0,\n")
-        .file("tables/area/cove/ground.csv", "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n")
+        .file(
+            "tables/area/cove/palette.csv",
+            "tileset,tile,flip\nstart_ground,0,\n",
+        )
+        .file(
+            "tables/area/cove/ground.csv",
+            "0,0,0,0\n0,0,7,0\n0,0,0,0\n0,0,0,0\n",
+        )
         .file("tables/area/cove/walk.csv", "1,1,1,1\n".repeat(4))
         .row(
             "test_character",
@@ -66,7 +72,7 @@ fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
             "cove",
             json!({
                 "name": "Cove",
-                "map": { "type": "tilemap", "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
+                "map": { "size": { "width": 4, "height": 4 }, "tile": 16, "ground": ["ground"] },
             }),
         )
         .file(

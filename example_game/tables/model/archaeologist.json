@@ -4,7 +4,6 @@
     "height": 2.0
   },
   "sprites": {
-    "type": "sheet",
     "image": "models/archaeologist.png",
     "frame_size": {
       "width": 48,

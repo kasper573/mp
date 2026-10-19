@@ -1,7 +1,6 @@
 {
   "name": "The crossroads inn",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 40,
       "height": 22

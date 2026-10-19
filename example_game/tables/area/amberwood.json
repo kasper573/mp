@@ -1,7 +1,6 @@
 {
   "name": "Amberwood",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 52,
       "height": 84

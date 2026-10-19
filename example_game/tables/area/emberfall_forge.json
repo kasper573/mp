@@ -1,7 +1,6 @@
 {
   "name": "The forge",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 25,
       "height": 15

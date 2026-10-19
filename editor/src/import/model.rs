@@ -589,7 +589,6 @@ pub fn build(
         .unwrap_or_else(|| format!("models/{}.png", key.replace('_', "-")));
     let mut row = row.cloned().unwrap_or_else(|| json!({}));
     row["sprites"] = json!({
-        "type": "sheet",
         "image": image,
         "frame_size": { "width": fw, "height": fh },
         "actions": Value::Object(actions),

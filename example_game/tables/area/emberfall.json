@@ -1,7 +1,6 @@
 {
   "name": "Emberfall",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 86,
       "height": 60

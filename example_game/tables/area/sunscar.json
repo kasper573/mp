@@ -1,7 +1,6 @@
 {
   "name": "Sunscar",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 72,
       "height": 56

@@ -1,7 +1,6 @@
 {
   "name": "Glimmercap",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 66,
       "height": 62

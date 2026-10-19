@@ -300,7 +300,6 @@ impl Game {
             json!({
                 "hitbox": { "width": 1.0, "height": height },
                 "sprites": {
-                    "type": "sheet",
                     "image": image,
                     "frame_size": { "width": 1, "height": 1 },
                     "actions": actions,
@@ -344,7 +343,6 @@ impl Game {
             json!({
                 "name": key,
                 "map": {
-                    "type": "tilemap",
                     "size": { "width": width, "height": height },
                     "tile": TILE,
                     "ground": ["ground"],

@@ -23,7 +23,7 @@ pub type ModelId = ContentId<ModelDef>;
 #[serde(deny_unknown_fields)]
 pub struct ModelDef {
     pub hitbox: HitboxSize,
-    pub sprites: Sprites,
+    pub sprites: Sheet,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<ModelModule>,
 }
@@ -34,7 +34,7 @@ impl ContentRow for ModelDef {
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");
         cx.range("/hitbox/height", self.hitbox.height, 0.1, 8.0, "tiles");
-        let sheet = self.sheet();
+        let sheet = &self.sprites;
         cx.range(
             "/sprites/frame_size/width",
             sheet.frame_size.width,
@@ -86,12 +86,6 @@ impl HitboxSize {
     pub fn tiles(self) -> Size<Tiles> {
         Size::new(self.width, self.height)
     }
-}
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Sprites {
-    Sheet(Sheet),
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -148,12 +142,6 @@ impl ModelDef {
         self.modules
             .iter()
             .any(|module| matches!(module, ModelModule::Airborne))
-    }
-
-    pub fn sheet(&self) -> &Sheet {
-        match &self.sprites {
-            Sprites::Sheet(sheet) => sheet,
-        }
     }
 }
 
@@ -300,7 +288,7 @@ pub fn build_all(loading: &mut Loading) {
     let mut cast = CastWeight::default();
     for ((id, def), busts) in rows.into_iter().zip(files) {
         let mut check = RowCheck::default();
-        let sheet = def.sheet();
+        let sheet = &def.sprites;
         let image = sizes.0.get(sheet.image.as_str()).copied();
         if let Some((width, height)) = image
             && (width % sheet.frame_size.width.max(1) != 0
@@ -468,7 +456,7 @@ impl ActorModel {
 
     // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
     fn new(def: &ModelDef, image: Option<(u32, u32)>, figure: Option<BustFigure>) -> ActorModel {
-        let sheet = def.sheet();
+        let sheet = &def.sprites;
         let columns = image
             .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
             .max(1);
@@ -498,7 +486,7 @@ impl ActorModel {
     }
 
     pub fn sheet(&self) -> &crate::core::assets::AssetRef {
-        &self.def.sheet().image
+        &self.def.sprites.image
     }
 
     pub fn airborne(&self) -> bool {
@@ -585,7 +573,7 @@ impl ActorModel {
     }
 
     fn region(&self, frame: u32) -> Rect<WorldPx> {
-        let size = self.def.sheet().frame_size;
+        let size = self.def.sprites.frame_size;
         let frame_size = Size::new(size.width as f32, size.height as f32);
         Rect::new(
             Pos::new(

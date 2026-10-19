@@ -1,7 +1,6 @@
 {
   "name": "Mirefen",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 96,
       "height": 58

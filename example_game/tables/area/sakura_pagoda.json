@@ -1,7 +1,6 @@
 {
   "name": "The temple",
   "map": {
-    "type": "tilemap",
     "size": {
       "width": 16,
       "height": 14
