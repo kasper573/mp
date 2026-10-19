@@ -557,13 +557,7 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
         match op {
             Op::Spawn { owner, procedures } => {
                 close_instance(world, owner);
-                let mut may_do = MayDo::default();
-                for procedure in &procedures {
-                    may_do.absorb(&procedure.may_do);
-                    may_do
-                        .answers
-                        .extend(procedure.may_do.answers.iter().copied());
-                }
+                let may_do = MayDo::owned(procedures.iter().map(|procedure| &procedure.may_do));
                 let mut instances = world.resource_mut::<Instances<V>>();
                 for kind in &may_do.answers {
                     let owners = instances.answering.entry(*kind).or_default();

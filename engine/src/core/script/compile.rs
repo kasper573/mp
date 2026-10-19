@@ -55,12 +55,7 @@ impl<V: Vocabulary> Scripts<V> {
     }
 
     pub fn may_do(&self, owner: OwnerRow<V>) -> MayDo<V> {
-        let mut all = MayDo::default();
-        for procedure in self.of(owner) {
-            all.absorb(&procedure.may_do);
-            all.answers.extend(procedure.may_do.answers.iter().copied());
-        }
-        all
+        MayDo::owned(self.of(owner).iter().map(|procedure| &procedure.may_do))
     }
 
     pub fn owners(&self) -> impl Iterator<Item = (&OwnerRow<V>, &Vec<Arc<Procedure<V>>>)> {
@@ -919,7 +914,7 @@ fn compile_source<'c, V: Vocabulary>(
     for (index, (name, _)) in source.state.iter().enumerate() {
         if !cx.read_slots.contains(&Slot::State(index)) {
             return Err(fail(
-                "unused local",
+                "unused state",
                 None,
                 format!("state {name} is never read"),
             ));

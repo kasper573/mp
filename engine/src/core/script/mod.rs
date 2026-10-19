@@ -18,7 +18,7 @@ use strum::{EnumString, IntoStaticStr, VariantArray};
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
 pub use expr::Expr;
-pub use may_do::{MayDo, Reach};
+pub use may_do::MayDo;
 pub use node::{Assignment, Node, Target};
 pub use run::{
     Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
@@ -179,7 +179,7 @@ pub trait EffectDef<V: Vocabulary> {
         false
     }
     fn compile<'c>(&'c self, cx: &mut Compiler<'c, V>) -> Result<EffectCall<V>, ScriptFault>;
-    fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
+    fn reach(&self, cx: &Compiler<V>) -> Vec<V::Reach>;
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
