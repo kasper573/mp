@@ -11,7 +11,7 @@ use strum::VariantArray;
 use super::card;
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
-    HotbarEntry, HotbarSlot, Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
+    HotbarEntry, HotbarSlot, Rank, SkillId, Targeting, UseSkillRequest, casting,
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::gui;
@@ -889,20 +889,13 @@ fn use_skill(world: &mut World, skill: SkillId) -> bool {
     let Some(me) = session::me(world) else {
         return false;
     };
+    if let Some(refusal) = super::unusable(world, me, skill) {
+        notification::local_error(world, refusal);
+        return false;
+    }
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
     let rank = super::rank_of(world, me, skill);
-    if rank == Rank::NONE {
-        notification::local_error(world, format!("You don't know {}", def.name));
-        return false;
-    }
-    if def.kind == SkillKind::Passive {
-        notification::local_error(
-            world,
-            format!("{} is passive: it holds on its own", def.name),
-        );
-        return false;
-    }
     match def.target {
         Targeting::Caster => {
             world.write_message(UseSkillRequest {

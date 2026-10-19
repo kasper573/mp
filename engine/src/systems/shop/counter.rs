@@ -18,6 +18,7 @@ use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_ve
 use crate::systems::item::{self, Inventory, ItemCategory, ItemId, ItemStack};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
+use crate::systems::text::duration;
 
 const COUNTER_WIDTH: f32 = 620.0;
 const COUNTER_HEIGHT: f32 = 400.0;
@@ -373,10 +374,7 @@ impl Shelf {
 fn stock_note(view: &OfferView) -> Option<String> {
     let left = view.left?;
     Some(match view.restocks_in {
-        Some(restocks) => format!(
-            "{left} left · restocks in {} min",
-            (restocks.0 / 60.0).ceil() as u32
-        ),
+        Some(restocks) => format!("{left} left · restocks in {}", duration(restocks)),
         None => format!("{left} left"),
     })
 }

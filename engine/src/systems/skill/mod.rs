@@ -605,6 +605,23 @@ pub fn known_from(
     known
 }
 
+/// Why an actor could not use the skill at all, whatever its aim or readiness.
+pub fn unusable(world: &World, actor: Entity, skill: SkillId) -> Option<String> {
+    let def = skill.get(world.resource::<Content>());
+    if rank_of(world, actor, skill) == Rank::NONE {
+        Some(format!("You don't know {}", def.name))
+    } else if def.kind == SkillKind::Passive {
+        Some(format!("{} is passive: it holds on its own", def.name))
+    } else {
+        None
+    }
+}
+
+/// Why a passive skill takes no hotbar slot.
+pub fn unslotted(def: &SkillDef) -> String {
+    format!("{} is passive: it holds without a slot", def.name)
+}
+
 pub fn rank_of(world: &World, actor: Entity, skill: SkillId) -> Rank {
     known(world, actor)
         .get(&skill)

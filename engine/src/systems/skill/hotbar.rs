@@ -59,7 +59,7 @@ pub fn assign(
                 return Err(format!("You don't know {}", def.name));
             }
             if def.kind == SkillKind::Passive {
-                return Err(format!("{} is passive: it holds without a slot", def.name));
+                return Err(super::unslotted(def));
             }
         }
         HotbarEntry::Item(item) => {

@@ -669,7 +669,7 @@ impl FinishedQuest {
     pub fn resets_in(&self, now: UnixMillis) -> Option<Seconds> {
         self.resets_at
             .filter(|at| now < *at)
-            .map(|at| Seconds((at.since(now).0 / 60.0).ceil() * 60.0))
+            .map(|at| at.since(now).up_to_minute())
     }
 }
 

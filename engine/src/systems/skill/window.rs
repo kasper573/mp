@@ -404,13 +404,8 @@ fn node_input(
         }
     } else if map::clicked(world, InputAction::PinToHotbar, response) {
         if passive {
-            notification::local_error(
-                world,
-                format!(
-                    "{} is passive: it holds without a slot",
-                    skill.get(world.resource::<Content>()).name
-                ),
-            );
+            let refusal = super::unslotted(skill.get(world.resource::<Content>()));
+            notification::local_error(world, refusal);
         } else if held > Rank::NONE {
             bar::pin(world, super::HotbarEntry::Skill(skill));
         } else {

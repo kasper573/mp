@@ -28,7 +28,6 @@ use crate::systems::script::{
 pub type ShopId = ContentId<ShopDef>;
 
 const BUYBACK_KEPT: usize = 12;
-const MINUTE: f32 = 60.0;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -731,10 +730,10 @@ fn stock(
         .and_then(|ledger| ledger.stock.get(&(shop, index)).copied())
         .filter(|restock| now < restock.full_at);
     Some(match restock {
-        Some(restock) => {
-            let minutes = (restock.full_at.since(now).0 / MINUTE).ceil();
-            (restock.left, Some(Seconds(minutes * MINUTE)))
-        }
+        Some(restock) => (
+            restock.left,
+            Some(restock.full_at.since(now).up_to_minute()),
+        ),
         None => (count, None),
     })
 }

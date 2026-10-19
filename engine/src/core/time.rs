@@ -93,6 +93,11 @@ impl Hash for Seconds {
 }
 
 impl Seconds {
+    /// Rounded up to whole minutes, for a countdown shown by the minute.
+    pub fn up_to_minute(self) -> Seconds {
+        Seconds((self.0 / 60.0).ceil() * 60.0)
+    }
+
     pub fn is_zero(&self) -> bool {
         self.0 == 0.0
     }

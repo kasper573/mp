@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Cooldowns, Rank, SkillId, SkillKind, Targeting};
+use super::{Cooldowns, Rank, SkillId, Targeting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
@@ -71,14 +71,11 @@ pub fn cast(
     aim: CastAim,
     repeat: bool,
 ) -> Result<(), String> {
+    if let Some(refusal) = super::unusable(world, caster, skill) {
+        return Err(refusal);
+    }
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
-    if super::rank_of(world, caster, skill) == Rank::NONE {
-        return Err(format!("You don't know {}", def.name));
-    }
-    if def.kind == SkillKind::Passive {
-        return Err(format!("{} is passive: it holds on its own", def.name));
-    }
     ready(world, caster, skill)?;
     let target = match (def.target, aim) {
         (Targeting::Caster, _) => ReachTarget::Actor(caster),
@@ -254,7 +251,7 @@ impl EffectDef<RiftScripting> for UseSkill {
     ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let skill = self.skill;
-        let at: Option<(Eval, ValueType)> = match &self.at {
+        let at: Option<Eval> = match &self.at {
             Some(at) => {
                 let (eval, ty) = cx.typed(at)?;
                 if !matches!(ty, ValueType::Actor | ValueType::Point) {
@@ -263,7 +260,7 @@ impl EffectDef<RiftScripting> for UseSkill {
                         format!("at is {}, expected an actor or a point", ty.name()),
                     ));
                 }
-                Some((eval, ty))
+                Some(eval)
             }
             None => None,
         };
@@ -273,7 +270,7 @@ impl EffectDef<RiftScripting> for UseSkill {
             };
             let aim = match &at {
                 None => CastAim::None,
-                Some((eval, _)) => match eval(world, cx) {
+                Some(eval) => match eval(world, cx) {
                     Value::Actor(Some(actor)) => CastAim::Actor(actor),
                     Value::Point(Some(point)) => CastAim::Point(point),
                     _ => CastAim::None,
