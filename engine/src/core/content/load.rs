@@ -567,13 +567,10 @@ impl Loading {
             .map(|(index, key)| {
                 let loader = &registry.row_loaders()[index];
                 let file = super::row_file(loader.name(), &key);
-                let parsed = parse_file(
-                    root.as_ref(),
-                    &file,
-                    &scope,
-                    &registry.list_kinds,
-                    |text| loader.parse(text),
-                );
+                let parsed =
+                    parse_file(root.as_ref(), &file, &scope, &registry.list_kinds, |text| {
+                        loader.parse(text)
+                    });
                 (index, key, parsed)
             })
             .collect();

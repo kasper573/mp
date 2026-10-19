@@ -98,6 +98,7 @@ impl Plugin for WorldRenderPlugin {
             .init_resource::<RowDepths>()
             .init_resource::<transition::ActiveTransition>()
             .init_resource::<transition::ScreenTransitionPreference>()
+            .init_resource::<icons::ResidentIcons>()
             .configure_sets(
                 PreUpdate,
                 transition::WorldViewSystems.run_if(not(transition::covering)),
@@ -109,16 +110,20 @@ impl Plugin for WorldRenderPlugin {
                     .after(RenderValueSystems),
             )
             .add_systems(Startup, present::setup)
-            .add_systems(Update, (present::match_display, present::fit).chain())
-            .init_resource::<icons::ResidentIcons>()
+            .add_systems(
+                Update,
+                (
+                    (present::match_display, present::fit).chain(),
+                    icons::keep_icons_resident,
+                ),
+            )
             .add_systems(
                 PostUpdate,
                 (
                     order_rows.before(bevy::transform::TransformSystems::Propagate),
                     present::apply_present.after(bevy::transform::TransformSystems::Propagate),
                 ),
-            )
-            .add_systems(Update, icons::keep_icons_resident);
+            );
     }
 }
 

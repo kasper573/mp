@@ -205,7 +205,7 @@ impl EffectDef<RiftScripting> for PlayVfx {
             }
             None => cx.actor(None)?,
         };
-        let def = self.vfx.get(cx.content());
+        let def = self.vfx.get(cx.content);
         let mut fillers: Vec<(String, ParamFiller)> = Vec::new();
         for (name, expr) in &self.params {
             let filler = match def.declares(name) {

@@ -48,12 +48,18 @@ pub struct SoundscapeZone {
 pub enum SoundscapeShape {
     Rect(
         #[schemars(with = "serial::RectRow")]
-        #[serde(serialize_with = "serial::rect", deserialize_with = "serial::rect_from")]
+        #[serde(
+            serialize_with = "serial::rect",
+            deserialize_with = "serial::rect_from"
+        )]
         Rect<Tiles>,
     ),
     Ellipse(
         #[schemars(with = "serial::RectRow")]
-        #[serde(serialize_with = "serial::rect", deserialize_with = "serial::rect_from")]
+        #[serde(
+            serialize_with = "serial::rect",
+            deserialize_with = "serial::rect_from"
+        )]
         Rect<Tiles>,
     ),
 }
