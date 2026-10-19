@@ -23,7 +23,7 @@ use crate::project::AreaCameraState;
 use crate::stage::Stages;
 use crate::tabs::EditorTab;
 use crate::ui::assets::AssetsState;
-use crate::ui::browser::BrowserState;
+use crate::ui::content_list::ContentLists;
 use crate::ui::row_form::preview::RowPreviewState;
 use crate::ui::row_form::usages;
 use crate::ui::{self, theme};
@@ -33,7 +33,7 @@ pub struct EditorCamera;
 
 #[derive(Default)]
 pub struct EditorViews {
-    pub browser: BrowserState,
+    pub content: ContentLists,
     pub area: area::AreaViews,
     pub world: world::WorldView,
     pub script: script::ScriptViews,

@@ -1,23 +1,38 @@
 use std::collections::{BTreeMap, HashSet};
 
+use design_tokens::face::Face;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{controls, face};
-use egui::{Align, Layout, Modifiers, Sense, Ui};
+use design_tokens::{controls, face, ink};
+use egui::{Align, Event, Layout, Modifiers, RichText, Sense, Ui};
 
 use super::theme;
+use crate::keymap::EditorKey;
 use crate::picker::{self, Dragged};
 
 pub struct TreeNode<A> {
     pub id: String,
     pub label: String,
+    pub style: TreeStyle,
     pub icon: TreeIcon,
     pub children: Option<Vec<TreeNode<A>>>,
+    /// For a folder: whether a line inside is selected, shown while it is folded.
     pub selected: bool,
+    /// For a folder: whether a line inside is unsaved, shown while it is folded.
     pub unsaved: bool,
+    pub count: Option<String>,
     pub note: Option<String>,
+    /// What assistive tech reads for the line, when more than its label.
+    pub spoken: Option<String>,
     pub actions: Vec<TreeAction<A>>,
     /// What the pointer carries away when the leaf is dragged.
     pub drag: Option<Dragged>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TreeStyle {
+    Plain,
+    Mono,
+    Heading,
 }
 
 pub struct TreeAction<A> {
@@ -43,12 +58,22 @@ pub struct IconImage {
 #[derive(Default)]
 pub struct TreeState {
     pub open: HashSet<String>,
+    /// The line the keys move and act on.
+    pub cursor: Option<String>,
+    /// A line to scroll into view the next time it is drawn.
+    pub reveal: Option<String>,
+    typed: String,
+    typed_at: f64,
 }
 
 pub struct TreeOutput<A> {
     pub clicked: Option<(String, Modifiers)>,
     pub double_clicked: Option<String>,
     pub action: Option<(String, A)>,
+    /// Folders folded or unfolded this frame.
+    pub toggled: Vec<String>,
+    /// A folder Enter was pressed on.
+    pub entered: Option<String>,
 }
 
 impl<A> Default for TreeOutput<A> {
@@ -57,6 +82,8 @@ impl<A> Default for TreeOutput<A> {
             clicked: None,
             double_clicked: None,
             action: None,
+            toggled: Vec::new(),
+            entered: None,
         }
     }
 }
@@ -75,11 +102,14 @@ impl<A> TreeNode<A> {
         TreeNode {
             id: id.into(),
             label: label.into(),
+            style: TreeStyle::Mono,
             icon: TreeIcon::None,
             children: None,
             selected: false,
             unsaved: false,
+            count: None,
             note: None,
+            spoken: None,
             actions: Vec::new(),
             drag: None,
         }
@@ -92,6 +122,7 @@ impl<A> TreeNode<A> {
     ) -> TreeNode<A> {
         TreeNode {
             children: Some(children),
+            style: TreeStyle::Plain,
             ..TreeNode::leaf(id, label)
         }
     }
@@ -117,28 +148,36 @@ pub fn from_paths<'a, A>(
     root.into_nodes("", leaf, folder)
 }
 
+/// Draws the tree. With `keys`, the arrows, Home, End, Enter and typed letters move through and
+/// act on its lines: the caller passes it while the tree is what the keyboard is meant for.
 pub fn show<A: Clone>(
     ui: &mut Ui,
     state: &mut TreeState,
     nodes: &[TreeNode<A>],
     open_all: bool,
+    keys: bool,
     mut hooks: TreeHooks<'_, '_>,
 ) -> TreeOutput<A> {
+    let mut out = TreeOutput::default();
+    if keys && !ui.ctx().text_edit_focused() {
+        let lines = visible_lines(nodes, state, open_all);
+        navigate(ui, state, &lines, &mut out);
+    }
     let mut walk = Walk {
         state,
         open_all,
-        out: TreeOutput::default(),
+        out,
         toggle: Vec::new(),
         hooks: &mut hooks,
     };
     for node in nodes {
         node_line(ui, &mut walk, node, 0);
     }
-    let Walk { out, toggle, .. } = walk;
+    let Walk {
+        mut out, toggle, ..
+    } = walk;
     for id in toggle {
-        if !state.open.remove(&id) {
-            state.open.insert(id);
-        }
+        toggle_open(state, &id, &mut out);
     }
     out
 }
@@ -146,9 +185,143 @@ pub fn show<A: Clone>(
 const LINE: f32 = 26.0;
 const INDENT: f32 = 14.0;
 const BUTTON: f32 = 18.0;
+const TYPING_PAUSE: f64 = 0.8;
+
+struct Line<'n> {
+    id: &'n str,
+    label: &'n str,
+    parent: Option<&'n str>,
+    folder: bool,
+    open: bool,
+}
+
+fn visible_lines<'n, A>(
+    nodes: &'n [TreeNode<A>],
+    state: &TreeState,
+    open_all: bool,
+) -> Vec<Line<'n>> {
+    fn walk<'n, A>(
+        nodes: &'n [TreeNode<A>],
+        parent: Option<&'n str>,
+        state: &TreeState,
+        open_all: bool,
+        lines: &mut Vec<Line<'n>>,
+    ) {
+        for node in nodes {
+            let open = open_all || state.open.contains(&node.id);
+            lines.push(Line {
+                id: &node.id,
+                label: &node.label,
+                parent,
+                folder: node.children.is_some(),
+                open,
+            });
+            if let (Some(children), true) = (&node.children, open) {
+                walk(children, Some(&node.id), state, open_all, lines);
+            }
+        }
+    }
+    let mut lines = Vec::new();
+    walk(nodes, None, state, open_all, &mut lines);
+    lines
+}
+
+fn navigate<A>(ui: &Ui, state: &mut TreeState, lines: &[Line], out: &mut TreeOutput<A>) {
+    if lines.is_empty() {
+        return;
+    }
+    let at = state
+        .cursor
+        .as_deref()
+        .and_then(|cursor| lines.iter().position(|line| line.id == cursor));
+    let (arrow, first, last, enter, typed, now) = ui.input_mut(|i| {
+        let typed: String = i
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                Event::Text(text) => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        (
+            EditorKey::Move.take_arrow(i),
+            EditorKey::FirstLine.consume(i),
+            EditorKey::LastLine.consume(i),
+            EditorKey::Confirm.consume(i),
+            typed,
+            i.time,
+        )
+    });
+    let mut moved_to = None;
+    match (arrow, at) {
+        (Some([0, step]), Some(at)) => {
+            moved_to = Some((at as i32 + step).clamp(0, lines.len() as i32 - 1) as usize);
+        }
+        (Some([0, _]), None) => moved_to = Some(0),
+        (Some([1, 0]), Some(at)) if lines[at].folder => {
+            if lines[at].open {
+                moved_to = (at + 1 < lines.len() && lines[at + 1].parent == Some(lines[at].id))
+                    .then_some(at + 1);
+            } else {
+                toggle_open(state, lines[at].id, out);
+            }
+        }
+        (Some([-1, 0]), Some(at)) => {
+            if lines[at].folder && lines[at].open {
+                toggle_open(state, lines[at].id, out);
+            } else if let Some(parent) = lines[at].parent {
+                moved_to = lines.iter().position(|line| line.id == parent);
+            }
+        }
+        _ => {}
+    }
+    if first {
+        moved_to = Some(0);
+    }
+    if last {
+        moved_to = Some(lines.len() - 1);
+    }
+    if !typed.trim().is_empty() {
+        if now - state.typed_at > TYPING_PAUSE {
+            state.typed.clear();
+        }
+        state.typed.push_str(&typed.to_lowercase());
+        state.typed_at = now;
+        let from = at.map_or(0, |at| {
+            if state.typed.len() == typed.len() {
+                at + 1
+            } else {
+                at
+            }
+        });
+        moved_to = (0..lines.len())
+            .map(|step| (from + step) % lines.len())
+            .find(|index| lines[*index].label.to_lowercase().starts_with(&state.typed))
+            .or(moved_to);
+    }
+    if let Some(index) = moved_to {
+        state.cursor = Some(lines[index].id.to_owned());
+        state.reveal = state.cursor.clone();
+    }
+    if enter && let Some(at) = at {
+        let line = &lines[at];
+        if line.folder {
+            out.entered = Some(line.id.to_owned());
+        } else {
+            out.clicked = Some((line.id.to_owned(), Modifiers::NONE));
+        }
+    }
+}
+
+fn toggle_open<A>(state: &mut TreeState, id: &str, out: &mut TreeOutput<A>) {
+    if !state.open.remove(id) {
+        state.open.insert(id.to_owned());
+    }
+    out.toggled.push(id.to_owned());
+}
 
 struct Walk<'a, 'b, 'c, A> {
-    state: &'a TreeState,
+    state: &'a mut TreeState,
     open_all: bool,
     out: TreeOutput<A>,
     toggle: Vec<String>,
@@ -169,8 +342,25 @@ fn node_line<A: Clone>(
     };
     let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), sense);
     let visible = ui.clip_rect().intersects(rect);
-    ui.painter()
-        .add(controls::row_marks(rect, response.hovered(), node.selected));
+    let at_cursor = walk.state.cursor.as_deref() == Some(node.id.as_str());
+    if walk.state.reveal.as_deref() == Some(node.id.as_str()) {
+        response.scroll_to_me(None);
+        walk.state.reveal = None;
+    }
+    let open = walk.open_all || walk.state.open.contains(&node.id);
+    let folded = node.children.is_some() && !open;
+    ui.painter().add(controls::row_marks(
+        rect,
+        response.hovered() || at_cursor,
+        node.selected && node.children.is_none(),
+    ));
+    if folded && node.selected {
+        ui.painter().rect_filled(
+            egui::Rect::from_min_size(rect.min, egui::vec2(3.0, rect.height())),
+            0.0,
+            theme::ACCENT,
+        );
+    }
     let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)
@@ -179,9 +369,16 @@ fn node_line<A: Clone>(
     child.add_space(6.0 + INDENT * depth as f32);
     match &node.children {
         Some(children) => {
-            let open = walk.open_all || walk.state.open.contains(&node.id);
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::CollapsingHeader,
+                    true,
+                    spoken_folder(node, open),
+                )
+            });
             folder_line(&mut child, node, open, &mut walk.out);
             if response.clicked() {
+                walk.state.cursor = Some(node.id.clone());
                 walk.toggle.push(node.id.clone());
             }
             if !node.actions.is_empty() {
@@ -194,17 +391,22 @@ fn node_line<A: Clone>(
             }
         }
         None => {
+            response.widget_info(|| {
+                egui::WidgetInfo::selected(
+                    egui::WidgetType::SelectableLabel,
+                    true,
+                    node.selected,
+                    node.spoken.as_deref().unwrap_or(&node.label),
+                )
+            });
             if visible {
                 leaf_line(&mut child, node, &mut walk.hooks.thumbs);
             }
             if node.unsaved {
-                ui.painter().circle_filled(
-                    egui::pos2(rect.max.x - 10.0, rect.center().y),
-                    3.5,
-                    theme::WARN,
-                );
+                unsaved_dot(ui, rect);
             }
             if response.clicked() {
+                walk.state.cursor = Some(node.id.clone());
                 walk.out.clicked = Some((node.id.clone(), ui.input(|i| i.modifiers)));
             }
             if response.double_clicked() {
@@ -220,6 +422,26 @@ fn node_line<A: Clone>(
     }
 }
 
+fn spoken_folder<A>(node: &TreeNode<A>, open: bool) -> String {
+    let mut parts = vec![node.label.clone()];
+    if node.style == TreeStyle::Heading {
+        parts.push("category".to_owned());
+    }
+    parts.push(if open { "expanded" } else { "folded" }.to_owned());
+    if let Some(count) = &node.count {
+        parts.push(format!("{count} rows"));
+    }
+    parts.join(", ")
+}
+
+fn unsaved_dot(ui: &Ui, rect: egui::Rect) {
+    ui.painter().circle_filled(
+        egui::pos2(rect.max.x - 10.0, rect.center().y),
+        3.5,
+        theme::WARN,
+    );
+}
+
 fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut TreeOutput<A>) {
     glyph::show(
         ui,
@@ -231,20 +453,45 @@ fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut 
         11.0,
         theme::FAINT,
     );
-    let label = ui.label(face::body(&node.label).color(if node.note.is_some() {
-        theme::MUTED
-    } else {
-        theme::TEXT
-    }));
+    let label = ui.label(match node.style {
+        TreeStyle::Heading => RichText::new(&node.label)
+            .font(Face::SmallCapsBold.id(13.0))
+            .color(ink::RUBRIC),
+        TreeStyle::Mono => theme::mono(&node.label).size(13.0).color(theme::TEXT),
+        TreeStyle::Plain => face::body(&node.label).color(if node.note.is_some() {
+            theme::MUTED
+        } else {
+            theme::TEXT
+        }),
+    });
     if let Some(note) = &node.note {
         label.on_hover_text(note);
     }
+    let rule_from = ui.cursor().min.x + 6.0;
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 4.0;
         for action in &node.actions {
             if line_button(ui, action.mark, &action.tip).clicked() {
                 out.action = Some((node.id.clone(), action.action.clone()));
+            }
+        }
+        if let Some(count) = &node.count {
+            ui.label(theme::faint(count).size(12.5));
+        }
+        if !open && node.unsaved {
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), Sense::hover());
+            ui.painter().circle_filled(rect.center(), 3.5, theme::WARN);
+        }
+        if node.style == TreeStyle::Heading {
+            let y = ui.max_rect().center().y;
+            let rule_to = ui.cursor().max.x - 6.0;
+            if rule_to > rule_from {
+                ui.painter().hline(
+                    rule_from..=rule_to,
+                    y,
+                    egui::Stroke::new(1.0, theme::alpha(ink::RUBRIC, 110)),
+                );
             }
         }
     });
@@ -301,6 +548,12 @@ fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeTh
         ui.add_space(18.0);
     }
     ui.label(theme::mono(&node.label).size(13.0).color(color));
+    if let Some(note) = &node.note {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.add_space(20.0);
+            ui.label(theme::faint(note).size(12.0));
+        });
+    }
 }
 
 #[derive(Default)]

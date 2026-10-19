@@ -815,7 +815,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         }
         ModalDialog::NewRow(mut dialog) => {
             let mut outcome = None;
-            window(ctx, &format!("New {}", dialog.table), |ui| {
+            let title = match &dialog.owner {
+                Some(owner) => format!("New local {} in {owner}", dialog.table),
+                None => format!("New {}", dialog.table),
+            };
+            window(ctx, &title, |ui| {
                 rows::new_row_body(editor, ui, &mut dialog);
                 ui.horizontal(|ui| {
                     if ui.button("Create").clicked() {

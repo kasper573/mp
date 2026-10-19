@@ -1,4 +1,5 @@
 mod area_actions;
+mod categories;
 mod drafts;
 mod fixtures;
 mod import;

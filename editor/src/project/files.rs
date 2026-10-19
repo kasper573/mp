@@ -4,7 +4,9 @@ use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use engine::core::content::{MemoryFolder, row_of, table_folder};
+use engine::core::content::{
+    ContentOwners, MemoryFolder, OWNER_FIELD, RowName, TABLES_DIR, row_of, table_folder,
+};
 use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;
@@ -12,6 +14,7 @@ pub type FileBytes = Arc<[u8]>;
 #[derive(Clone, Default)]
 pub struct ProjectFiles {
     map: BTreeMap<String, Stored>,
+    owners: OnceLock<Arc<ContentOwners>>,
 }
 
 #[derive(Clone)]
@@ -44,6 +47,7 @@ impl ProjectFiles {
     }
 
     pub fn insert(&mut self, path: String, bytes: FileBytes) {
+        self.owners = OnceLock::new();
         let hash = hash(&bytes);
         self.map.insert(
             path,
@@ -56,7 +60,24 @@ impl ProjectFiles {
     }
 
     pub fn remove(&mut self, path: &str) {
+        self.owners = OnceLock::new();
         self.map.remove(path);
+    }
+
+    /// Which row each local row belongs to, as the files name it now, saved or not.
+    pub fn owners(&self) -> Arc<ContentOwners> {
+        self.owners
+            .get_or_init(|| {
+                Arc::new(ContentOwners::new(self.paths_under(TABLES_DIR).filter_map(
+                    |path| {
+                        let (table, key) = row_of(path)?;
+                        let owner = self.json(path)?.get(OWNER_FIELD)?.clone();
+                        let owner: RowName = serde_json::from_value(owner).ok()?;
+                        Some((RowName::new(table, key), owner))
+                    },
+                )))
+            })
+            .clone()
     }
 
     pub fn paths(&self) -> impl Iterator<Item = &String> {

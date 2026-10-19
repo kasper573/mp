@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use egui::{RichText, Ui};
 use engine::core::content::id::LeafKind;
-use engine::core::content::{ContentRow, ModuleRule, load, locate, row_file, row_folder, row_of};
+use engine::core::content::{
+    ContentRow, ModuleRule, OWNER_FIELD, RowName, load, locate, row_file, row_folder, row_of,
+};
 use engine::core::vfx::{VfxShaderDef, shader_file};
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -58,6 +60,18 @@ fn key_problem_besides(
         .map(|other| format!("{table}/{other} already exists (keys ignore case)"))
 }
 
+/// `row` with an owner line naming `owner` first, as a local row's file is written.
+pub fn owned_row(owner: &RowName, row: &Value) -> Value {
+    let mut fields = serde_json::Map::new();
+    fields.insert(OWNER_FIELD.to_owned(), Value::String(owner.to_string()));
+    for (name, value) in row.as_object().into_iter().flatten() {
+        if name != OWNER_FIELD {
+            fields.insert(name.clone(), value.clone());
+        }
+    }
+    Value::Object(fields)
+}
+
 pub fn key_from_name(name: &str) -> String {
     name.trim().to_lowercase().replace(' ', "_")
 }
@@ -82,11 +96,20 @@ pub fn free_name(name: &str, taken: &HashSet<String>) -> String {
         .expect("a free name")
 }
 
-pub fn new_row_dialog(editor: &mut Editor, table: &str) {
-    new_row_into(editor, table, None);
+pub fn new_row_dialog(editor: &mut Editor, table: &str, owner: Option<RowName>) {
+    new_row(editor, table, owner, None);
 }
 
 pub fn new_row_into(editor: &mut Editor, table: &str, into: Option<(String, String)>) {
+    new_row(editor, table, None, into);
+}
+
+fn new_row(
+    editor: &mut Editor,
+    table: &str,
+    owner: Option<RowName>,
+    into: Option<(String, String)>,
+) {
     let Some(project) = &editor.project else {
         return;
     };
@@ -101,6 +124,7 @@ pub fn new_row_into(editor: &mut Editor, table: &str, into: Option<(String, Stri
         value,
         error: None,
         into,
+        owner,
     }));
 }
 
@@ -127,6 +151,16 @@ pub fn new_row_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut NewRowDialog)
             }
         });
     }
+    if let Some(owner) = &dialog.owner {
+        ui.label(
+            RichText::new(format!(
+                "File {} · owner {owner}",
+                row_file(&dialog.table, dialog.key.trim())
+            ))
+            .weak()
+            .small(),
+        );
+    }
     if let Some((file, pointer)) = &dialog.into {
         ui.label(
             RichText::new(format!("Written into {file} at {pointer}"))
@@ -146,7 +180,11 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
         return Err(problem);
     }
     let mut edit = ContentEdit::new(format!("New {} {key}", dialog.table));
-    edit.write_json(row_file(&dialog.table, &key), &dialog.value);
+    let row = match &dialog.owner {
+        Some(owner) => owned_row(owner, &dialog.value),
+        None => dialog.value.clone(),
+    };
+    edit.write_json(row_file(&dialog.table, &key), &row);
     if let Some(file) = companion_file(&dialog.table, &key) {
         edit.write(file, Arc::from(NEW_SHADER.as_bytes()));
     }

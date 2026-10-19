@@ -107,6 +107,15 @@ pub struct EditorSettings {
     pub listeners: BTreeMap<String, [f32; 2]>,
     pub views: BTreeMap<String, SpreadsheetView>,
     pub last_play: Option<String>,
+    pub content_folds: BTreeMap<String, ContentFolds>,
+}
+
+/// What a content list folded: categories folded or unfolded by hand, and the tables unfolded.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ContentFolds {
+    pub categories: BTreeMap<String, bool>,
+    pub tables: std::collections::BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

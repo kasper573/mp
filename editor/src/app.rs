@@ -11,7 +11,7 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, row_file, version};
+use engine::core::content::{Content, RowName, row_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
@@ -299,6 +299,7 @@ pub struct NewRowDialog {
     pub value: Value,
     pub error: Option<String>,
     pub into: Option<(String, String)>,
+    pub owner: Option<RowName>,
 }
 
 pub struct ConfirmDialog {

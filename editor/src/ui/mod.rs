@@ -1,5 +1,7 @@
 pub mod assets;
 pub mod browser;
+pub mod categories;
+pub mod content_list;
 pub mod dialogs;
 pub mod history;
 pub mod levels;
@@ -128,7 +130,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     }
     if search {
         editor.panels.left = LeftTab::Content;
-        browser::focus_search(editor);
+        content_list::focus_search(editor, &content_list::ContentSource::Global);
     }
     if quit {
         request_close(editor, CloseThen::Quit);
@@ -303,7 +305,9 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))
                     .show(ui, |ui| match editor.panels.left {
-                        LeftTab::Content => browser::show(editor, ui),
+                        LeftTab::Content => {
+                            content_list::show(editor, ui, &content_list::ContentSource::Global)
+                        }
                         LeftTab::Assets => assets::show(editor, ui),
                     });
             });

@@ -37,6 +37,10 @@ pub enum EditorKey {
     Pan,
     Zoom,
     ContextMenu,
+    FirstLine,
+    LastLine,
+    OpenOwner,
+    SwitchPanelTab,
     SelectTool,
     PaintTool,
     TerrainTool,
@@ -219,7 +223,9 @@ impl EditorKey {
             | StopPlay | PlayedCharacter | Rename | Usages | Duplicate | Delete | Confirm
             | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste | SelectAll
             | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
-            | ContextMenu => KeyScope::Everywhere,
+            | ContextMenu | FirstLine | LastLine | OpenOwner | SwitchPanelTab => {
+                KeyScope::Everywhere
+            }
             SelectTool | PaintTool | TerrainTool | FillTool | EraseTool | EyedropperTool
             | StampTool | ModuleTool | BrushSmaller | BrushBigger | FlipHorizontal
             | FlipVertical | WalkOverlay | Layers | SelectAtCursor | PasteInPlace | JoinScenery
@@ -268,6 +274,10 @@ impl EditorKey {
             Pan => "held while dragging: pan",
             Zoom => "held while scrolling: zoom a tileset sheet",
             ContextMenu => "the menu at the cursor",
+            FirstLine => "the first line of a list",
+            LastLine => "the last line of a list",
+            OpenOwner => "open the owner of the row in the active tab",
+            SwitchPanelTab => "switch the right panel between Inspector and Local content",
             SelectTool => "select",
             PaintTool => "paint",
             TerrainTool => "terrain",
@@ -354,6 +364,10 @@ impl EditorKey {
             Unsnapped | Listen | Topmost | Route => Binding::Hold(Modifiers::ALT),
             Pan => Binding::HoldKey(Key::Space),
             ContextMenu => press(Modifiers::SHIFT, Key::F10),
+            FirstLine => press(plain, Key::Home),
+            LastLine => press(plain, Key::End),
+            OpenOwner => press(Modifiers::ALT, Key::ArrowUp),
+            SwitchPanelTab => press(command, Key::Tab),
             SelectTool => press(plain, Key::V),
             PaintTool => press(plain, Key::B),
             TerrainTool => press(plain, Key::T),

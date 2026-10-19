@@ -57,6 +57,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         &mut |_| {},
     );
     let mut budget = ICON_DECODES_PER_FRAME;
+    let keys = ui.ui_contains_pointer();
     let out = egui::ScrollArea::vertical()
         .id_salt("assets")
         .show(ui, |ui| {
@@ -75,6 +76,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
                 &mut views.assets.tree,
                 &nodes,
                 !needle.is_empty(),
+                keys,
                 tree::TreeHooks {
                     menu: None,
                     thumbs: Some(&mut |ctx, path| {
