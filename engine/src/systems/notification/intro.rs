@@ -117,7 +117,13 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
             .as_ref()
             .map(|emblem| gui::image(world, emblem));
         let shift = title_motion(appearance.motion, now);
-        let shown = rows::column_area(gui, &format!("intro-{key}"), top).show(gui, |ui| {
+        let shown = rows::column_area(
+            gui,
+            &format!("intro-{key}"),
+            top,
+            rows::Stacking::UnderWindows,
+        )
+        .show(gui, |ui| {
             ui.set_width(width);
             ui.vertical_centered(|ui| {
                 ui.multiply_opacity(look.opacity);
