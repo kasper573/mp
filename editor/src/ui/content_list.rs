@@ -9,7 +9,7 @@ use engine::core::content::{
 };
 use engine::systems::area::world_map::WorldMapDef;
 
-use super::browser::{self, BrowserAction};
+use super::browser::{self, BrowserAction, RowMenu};
 use super::categories::CATEGORIES;
 use super::tree::{self, TreeAction, TreeIcon, TreeNode, TreeState, TreeStyle};
 use super::{theme, widgets};
@@ -313,8 +313,13 @@ fn categories(editor: &mut Editor, ui: &mut Ui, source: &ContentSource, list: &m
                 tree::TreeHooks {
                     menu: Some(&mut |ui, id| {
                         if let Some((table, key)) = row_of(id) {
-                            let fixture = shapes.is_fixture(table, key);
-                            if let Some(picked) = browser::row_menu(ui, fixture, true) {
+                            let menu = RowMenu::of(
+                                &project.files,
+                                &project.usages,
+                                shapes.is_fixture(table, key),
+                                &RowName::new(table, key),
+                            );
+                            if let Some(picked) = browser::row_menu(ui, &menu, true) {
                                 menu_action = Some((table.to_owned(), key.to_owned(), picked));
                             }
                         }
@@ -752,7 +757,16 @@ fn results(
                         }
                         let fixture = editor.shapes.is_fixture(table, key);
                         response.context_menu(|ui| {
-                            if let Some(picked) = browser::row_menu(ui, fixture, true) {
+                            let Some(project) = &editor.project else {
+                                return;
+                            };
+                            let menu = RowMenu::of(
+                                &project.files,
+                                &project.usages,
+                                fixture,
+                                &RowName::new(table, key),
+                            );
+                            if let Some(picked) = browser::row_menu(ui, &menu, true) {
                                 action = Some((table.clone(), key.clone(), picked));
                             }
                         });

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
-use engine::core::content::{ContentRow, row_file, row_of};
+use engine::core::content::{ContentRow, RowName, row_file, row_of};
 use engine::core::script::{NodeKind, RunnerKindDef};
 use engine::systems::area::blueprint::holes;
 use engine::systems::memory::MemoryDef;
@@ -17,6 +17,7 @@ use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
+use crate::ui::browser::{self, RowMenu};
 use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::{condition, picker, spans, thumbs};
@@ -110,12 +111,17 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     } else {
         "script"
     };
+    let mut picked = None;
     let changed = {
         let mut cx = doc.form_cx(editor, root, &mut actions);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &key, what, |_| {});
+                widgets::card_header(ui, &key, what, |ui| {
+                    let row = RowName::new(ScriptDef::TABLE, &key);
+                    let menu = RowMenu::of(cx.files, cx.usages, false, &row);
+                    picked = browser::row_menu(ui, &menu, false);
+                });
                 let mut changed = FormChange::default();
                 widgets::kv(ui, "runs on", |ui| {
                     let mut runner = script["runs_on"].clone();
@@ -154,6 +160,9 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     }
     if changed.is_some() {
         write(editor, doc, script, format!("Edit script/{key}"));
+    }
+    if let Some(action) = picked {
+        browser::act(editor, ScriptDef::TABLE, &key, action);
     }
     events_section(editor, ui, doc);
     variables_section(editor, ui, doc);

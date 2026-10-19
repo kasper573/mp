@@ -1,4 +1,4 @@
-use engine::core::content::{LoadReport, RowName, write};
+use engine::core::content::{ContentOwners, LoadReport, RowName, write};
 use engine::systems::actor::model::ModelDef;
 use serde_json::json;
 
@@ -150,6 +150,26 @@ fn a_written_local_row_names_its_owner_first() {
         written.starts_with("{\n  \"owner\": \"npc/wren\",\n"),
         "{written}"
     );
+}
+
+#[test]
+fn an_owner_set_after_loading_moves_the_row_and_what_it_holds() {
+    let island = RowName::new("area", "island");
+    let forest = RowName::new("area", "forest");
+    let wren = RowName::new("npc", "wren");
+    let quest = RowName::new("quest", "bone_tithe");
+    let mut owners = ContentOwners::new([
+        (wren.clone(), island.clone()),
+        (quest.clone(), wren.clone()),
+    ]);
+    owners.set(&wren, Some(forest.clone()));
+    assert_eq!(owners.held_by(&island), []);
+    assert_eq!(owners.held_within(&forest), [wren.clone(), quest.clone()]);
+    assert!(!owners.in_reach(Some(&forest), "quest", "bone_tithe"));
+    assert!(owners.in_reach(Some(&quest), "npc", "wren"));
+    owners.set(&wren, None);
+    assert_eq!(owners.owner("npc", "wren"), None);
+    assert_eq!(owners.len(), 1);
 }
 
 fn only_error_in<'a>(report: &'a LoadReport, file: &str) -> (&'a str, &'a str, &'a str) {

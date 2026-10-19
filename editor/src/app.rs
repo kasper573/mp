@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -241,6 +242,11 @@ pub enum ModalDialog {
     Conflicts(Vec<FileConflict>),
     Rename(RenameDialog),
     Delete(DeleteDialog),
+    Duplicate(DuplicateDialog),
+    MakeLocal(MakeLocalDialog),
+    MakeGlobal(MakeGlobalDialog),
+    MoveTo(MoveToDialog),
+    Gather(GatherDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
@@ -358,6 +364,8 @@ impl ConfirmAction {
 pub struct RenameDialog {
     pub target: RenameTarget,
     pub draft: String,
+    /// Whether a row's local rows keyed after it follow its new key.
+    pub local_keys: bool,
     pub error: Option<String>,
 }
 
@@ -369,7 +377,44 @@ pub enum RenameTarget {
 pub struct DeleteDialog {
     pub table: String,
     pub keys: Vec<String>,
+    /// The rows local to the deleted ones, at any depth, which go with them.
+    pub along: Vec<RowName>,
     pub groups: Vec<rows::UsageGroup>,
+    pub error: Option<String>,
+}
+
+pub struct DuplicateDialog {
+    pub row: RowName,
+    pub draft: String,
+    pub error: Option<String>,
+}
+
+pub struct MakeLocalDialog {
+    pub row: RowName,
+    pub owner: RowName,
+    /// Rows the user unticked, which stay where they are.
+    pub kept: BTreeSet<RowName>,
+    pub error: Option<String>,
+}
+
+pub struct MakeGlobalDialog {
+    pub row: RowName,
+    pub kept: BTreeSet<RowName>,
+    pub error: Option<String>,
+}
+
+pub struct MoveToDialog {
+    pub row: RowName,
+    pub draft: String,
+    pub error: Option<String>,
+}
+
+pub struct GatherDialog {
+    pub ticks: BTreeMap<RowName, bool>,
+    pub open: BTreeSet<RowName>,
+    pub table: Option<String>,
+    /// The rows gathering would make local, worked out again whenever a tick changes.
+    pub plan: Option<Vec<crate::moves::Gathered>>,
     pub error: Option<String>,
 }
 

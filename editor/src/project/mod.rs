@@ -75,16 +75,21 @@ impl ContentEdit {
         file: &str,
         update: impl FnOnce(&mut serde_json::Value) -> Option<()>,
     ) -> Option<()> {
-        let mut json = match self.changes.iter().find(|change| change.file == file) {
-            Some(FileChange {
-                bytes: Some(bytes), ..
-            }) => serde_json::from_slice(bytes).ok()?,
-            Some(FileChange { bytes: None, .. }) => return None,
-            None => files.json_owned(file)?,
-        };
+        let mut json = self.pending_json(files, file)?;
         update(&mut json)?;
         self.write_json(file, &json);
         Some(())
+    }
+
+    /// The file as it stands once this edit is applied, or `None` when the edit removes it.
+    pub fn pending_json(&self, files: &ProjectFiles, file: &str) -> Option<serde_json::Value> {
+        match self.changes.iter().find(|change| change.file == file) {
+            Some(FileChange {
+                bytes: Some(bytes), ..
+            }) => serde_json::from_slice(bytes).ok(),
+            Some(FileChange { bytes: None, .. }) => None,
+            None => files.json_owned(file),
+        }
     }
 
     pub fn write_row<T: serde::Serialize>(

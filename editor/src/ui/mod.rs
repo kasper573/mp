@@ -6,6 +6,7 @@ pub mod content_list;
 pub mod dialogs;
 pub mod history;
 pub mod levels;
+pub mod move_dialogs;
 pub mod output;
 pub mod patterns;
 pub mod report;
@@ -244,6 +245,13 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         ui.close();
                     }
                     ui.separator();
+                    if ui
+                        .add_enabled(has_project, egui::Button::new("Gather local content…"))
+                        .clicked()
+                    {
+                        move_dialogs::gather(editor);
+                        ui.close();
+                    }
                     if ui.button("Game binaries…").clicked() {
                         editor.dialogs.push(ModalDialog::Binaries);
                         ui.close();

@@ -168,6 +168,7 @@ pub fn popover(
                     layer: name.clone(),
                 },
                 draft: name,
+                local_keys: false,
                 error: None,
             }));
         }

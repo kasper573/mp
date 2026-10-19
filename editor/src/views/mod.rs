@@ -11,8 +11,11 @@ pub mod tileset;
 pub mod vfx;
 pub mod world;
 
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 use egui::Ui;
+use engine::core::content::RowName;
 use engine::core::tiling::TilePos;
 use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
@@ -49,6 +52,8 @@ pub struct EditorViews {
     pub assets: AssetsState,
     pub preview: RowPreviewState,
     pub stage: Stages,
+    /// Rows whose suggestion to become local was turned down, with the users they had then.
+    pub declined: HashMap<RowName, Vec<RowName>>,
 }
 
 impl EditorViews {

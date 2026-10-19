@@ -87,6 +87,27 @@ impl ContentOwners {
         owners
     }
 
+    /// Gives `row` the owner `owner`, or makes it global.
+    pub fn set(&mut self, row: &RowName, owner: Option<RowName>) {
+        if let Some(old) = self
+            .owners
+            .get_mut(&row.table)
+            .and_then(|keys| keys.remove(&row.key))
+            && let Some(held) = self.held.get_mut(&old)
+        {
+            held.retain(|held| held != row);
+        }
+        if let Some(owner) = owner {
+            let held = self.held.entry(owner.clone()).or_default();
+            held.push(row.clone());
+            held.sort();
+            self.owners
+                .entry(row.table.clone())
+                .or_default()
+                .insert(row.key.clone(), owner);
+        }
+    }
+
     pub fn empty() -> &'static ContentOwners {
         static EMPTY: LazyLock<ContentOwners> = LazyLock::new(ContentOwners::default);
         &EMPTY
@@ -157,7 +178,7 @@ impl ContentOwners {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.owners.is_empty()
+        self.len() == 0
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (RowName, &RowName)> {

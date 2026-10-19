@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, ModuleRule, row_file};
+use engine::core::content::{ContentRow, ModuleRule, RowName, row_file};
 use engine::core::vfx::VfxShaderDef;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::AreaDef;
@@ -37,7 +37,7 @@ use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_row_into;
-use crate::ui::browser::{self};
+use crate::ui::browser::{self, RowMenu};
 use crate::value::RowValue;
 use crate::views::{class, model, skill, tileset, vfx};
 use crate::{schema, stage};
@@ -260,7 +260,8 @@ fn row_card(
                         .copy_text(serde_json::to_string_pretty(&*value).unwrap_or_default());
                     ui.close();
                 }
-                if let Some(action) = browser::row_menu(ui, fixture, false) {
+                let menu = RowMenu::of(cx.files, cx.usages, fixture, &RowName::new(table, key));
+                if let Some(action) = browser::row_menu(ui, &menu, false) {
                     cx.actions.push(FormAction::RowAction(action));
                 }
             },

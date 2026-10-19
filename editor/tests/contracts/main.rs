@@ -4,6 +4,7 @@ mod drafts;
 mod fixtures;
 mod import;
 mod keymap;
+mod moves;
 mod new_game;
 mod opening;
 mod palette;

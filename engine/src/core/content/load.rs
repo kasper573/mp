@@ -211,6 +211,14 @@ impl ContentRegistry {
             .any(|row| row.name() == table && row.sees_all_rows())
     }
 
+    /// Whether code names the row through a fixture, which keeps it global.
+    pub fn is_fixture(&self, row: &RowName) -> bool {
+        self.fixtures.iter().any(|fixture| {
+            fixture.table == row.table
+                && (fixture.whole_table || fixture.keys.iter().any(|(key, _)| *key == row.key))
+        })
+    }
+
     pub fn version(&self) -> ContentVersion {
         self.version
             .get_or_init(|| super::version::compute(self))
@@ -712,7 +720,7 @@ impl Loading {
                 .find(|loader| loader.name() == owner.table)
                 .map(|loader| self.listing.keys_of(loader.name()));
             let problem = match keys {
-                Some(keys) if keys.contains(&owner.key) => is_fixture(registry, &row).then(|| {
+                Some(keys) if keys.contains(&owner.key) => registry.is_fixture(&row).then(|| {
                     ContentProblem::new(
                         "fixture with an owner",
                         format!("{row} owned by {owner}"),
@@ -1583,13 +1591,6 @@ impl Listing {
             self.tables.insert(table, listing);
         }
     }
-}
-
-fn is_fixture(registry: &ContentRegistry, row: &RowName) -> bool {
-    registry.fixtures.iter().any(|fixture| {
-        fixture.table == row.table
-            && (fixture.whole_table || fixture.keys.iter().any(|(key, _)| *key == row.key))
-    })
 }
 
 fn table_name(registry: &ContentRegistry, table: &str) -> &'static str {

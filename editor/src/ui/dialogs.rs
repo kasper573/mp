@@ -5,14 +5,15 @@ use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
 use engine::core::content::{
-    ASSETS_DIR, ContentRow, GAME_FILE, TABLES_DIR, is_asset_file, row_file, row_of, version,
+    ASSETS_DIR, ContentRow, GAME_FILE, RowName, TABLES_DIR, is_asset_file, row_file, row_of,
+    version,
 };
 use engine::systems::area::AreaDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
-use super::{theme, widgets};
+use super::{move_dialogs, theme, widgets};
 use crate::app::{
     CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, RenameDialog,
     RenameTarget,
@@ -468,6 +469,29 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
                         }
                     });
             }
+            let prefixed = editor.project.as_ref().map_or_else(Vec::new, |project| {
+                rows::prefixed_local_keys(
+                    &project.files,
+                    &RowName::new(table, key),
+                    dialog.draft.trim(),
+                )
+            });
+            if let Some((first, to)) = prefixed.first() {
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.checkbox(
+                        &mut dialog.local_keys,
+                        format!("Also rename local keys that start with {key}_"),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            theme::mono(format!("{} → {to} · {}", first.key, prefixed.len()))
+                                .color(theme::MUTED)
+                                .size(12.5),
+                        );
+                    });
+                });
+            }
         }
         if let Some(error) = &dialog.error {
             ui.colored_label(theme::DANGER, error);
@@ -500,7 +524,7 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
                     layers::rename_layer(editor, area, layer, dialog.draft.trim())
                 }
                 RenameTarget::Row { table, key } => {
-                    rows::rename(editor, table, key, dialog.draft.trim())
+                    rows::rename(editor, table, key, dialog.draft.trim(), dialog.local_keys)
                 }
             };
             match renamed {
@@ -778,8 +802,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                         .filter(|group| group.decision == UsageDecision::Unpack)
                         .map(|group| group.usages.len())
                         .sum();
-                    let label = if edits == 0 {
+                    let deleted = dialog.keys.len() + dialog.along.len();
+                    let label = if edits == 0 && dialog.along.is_empty() {
                         "Delete".to_owned()
+                    } else if edits == 0 {
+                        format!("Delete {deleted} rows")
                     } else if unpacked == edits {
                         format!(
                             "Delete and unpack {edits} placement{}",
@@ -813,6 +840,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 None => Some(ModalDialog::Delete(dialog)),
             }
         }
+        ModalDialog::Duplicate(dialog) => move_dialogs::duplicate_dialog(editor, ctx, dialog),
+        ModalDialog::MakeLocal(dialog) => move_dialogs::make_local_dialog(editor, ctx, dialog),
+        ModalDialog::MakeGlobal(dialog) => move_dialogs::make_global_dialog(editor, ctx, dialog),
+        ModalDialog::MoveTo(dialog) => move_dialogs::move_to_dialog(editor, ctx, dialog),
+        ModalDialog::Gather(dialog) => move_dialogs::gather_dialog(editor, ctx, dialog),
         ModalDialog::NewRow(mut dialog) => {
             let mut outcome = None;
             let title = match &dialog.owner {

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, ContentRow, GAME_FILE, Reference, asset_of, row_file};
+use engine::core::content::{
+    Content, ContentRow, GAME_FILE, OWNER_FIELD, Reference, asset_of, row_file,
+};
 use engine::core::vfx::{VfxShaderDef, shader_file};
 use engine::systems::registry;
 use rayon::prelude::*;
@@ -13,6 +15,13 @@ pub struct ContentUsage {
     pub file: String,
     pub pointer: String,
     pub known: bool,
+}
+
+impl ContentUsage {
+    /// Whether the use is a local row's owner line, naming the row that holds it.
+    pub fn is_owner_line(&self) -> bool {
+        self.pointer.strip_prefix('/') == Some(OWNER_FIELD)
+    }
 }
 
 #[derive(Default)]
@@ -56,6 +65,17 @@ impl ContentUsages {
                 }
             }
             usages.by_file.insert(file, references);
+        }
+        for (row, owner) in files.owners().iter() {
+            usages
+                .rows
+                .entry((owner.table.clone(), owner.key.clone()))
+                .or_default()
+                .push(ContentUsage {
+                    file: row_file(&row.table, &row.key),
+                    pointer: format!("/{OWNER_FIELD}"),
+                    known: files.contains(&row_file(&owner.table, &owner.key)),
+                });
         }
         for key in files.keys_of(VfxShaderDef::TABLE) {
             usages

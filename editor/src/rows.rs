@@ -12,7 +12,7 @@ use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::registry;
 use serde_json::Value;
 
-use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog};
+use crate::app::{DeleteDialog, DuplicateDialog, Editor, ModalDialog, NewRowDialog};
 use crate::project::{ContentEdit, Project, ProjectFiles};
 use crate::schema::{self, SchemaShapes};
 use crate::tabs::EditorTab;
@@ -23,6 +23,8 @@ use crate::views::world;
 
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
+    /// The table of the deleted rows the group's uses name.
+    pub target: String,
     pub table: String,
     pub kind: String,
     pub usages: Vec<ContentUsage>,
@@ -206,30 +208,122 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
     Ok(())
 }
 
+/// Duplicates a row on the spot, or asks for the copy's key first when rows local to it are copied
+/// along under new keys.
 pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
     let Some(project) = &editor.project else {
         return;
     };
-    let Some(value) = project.files.json(&row_file(table, key)) else {
-        return;
-    };
+    let row = RowName::new(table, key);
     let copy = free_key(&project.files, table, &format!("{key}_2"));
-    let mut edit = ContentEdit::new(format!("Duplicate {table}/{key} as {copy}"));
-    edit.write_json(row_file(table, &copy), &value);
-    for (from, to) in beside_row(project, table, key, &copy) {
-        if let Some(bytes) = project.files.get(&from) {
-            edit.write(to, bytes.clone());
+    if project.files.owners().held_by(&row).is_empty() {
+        if let Err(error) = duplicate_as(editor, &row, &copy) {
+            editor.toast(error);
         }
-    }
-    if table == AreaDef::TABLE {
-        world::card_beside(project, &mut edit, key, &copy);
-    }
-    if editor.apply(edit) {
-        editor.open_row(table, &copy);
+    } else {
+        editor.dialogs.push(ModalDialog::Duplicate(DuplicateDialog {
+            row,
+            draft: copy,
+            error: None,
+        }));
     }
 }
 
-pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Result<(), String> {
+pub fn duplicate_as(editor: &mut Editor, row: &RowName, copy: &str) -> Result<(), String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    if let Some(problem) = key_problem(&project.files, &row.table, copy) {
+        return Err(problem);
+    }
+    let copies = copied_keys(&project.files, row, copy);
+    let mut label = format!("Duplicate {row} as {copy}");
+    if copies.len() > 1 {
+        label.push_str(&format!(
+            " with {} local row{}",
+            copies.len() - 1,
+            widgets::plural(copies.len() - 1)
+        ));
+    }
+    let mut edit = ContentEdit::new(label);
+    let new_name = |name: &RowName| {
+        copies
+            .iter()
+            .find(|(old, _)| old == name)
+            .map(|(_, key)| RowName::new(&name.table, key))
+    };
+    for (old, key) in &copies {
+        let Some(mut value) = project.files.json_owned(&row_file(&old.table, &old.key)) else {
+            continue;
+        };
+        let file = row_file(&old.table, &old.key);
+        let mut references: Vec<_> = project
+            .usages
+            .in_file(&file)
+            .iter()
+            .filter_map(|reference| match reference.kind {
+                LeafKind::Row(table) => Some((
+                    ContentUsage {
+                        file: file.clone(),
+                        pointer: reference.pointer.clone(),
+                        known: reference.known,
+                    },
+                    new_name(&RowName::new(table, &reference.value))?,
+                )),
+                LeafKind::Asset => None,
+            })
+            .collect();
+        references.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
+        for (usage, to) in &references {
+            rewrite(&mut value, usage, &project.usages, &file, to);
+        }
+        if let Some(owner) = project.files.owners().owner(&old.table, &old.key)
+            && let Some(copied) = new_name(owner)
+        {
+            value = owned_row(&copied, &value);
+        }
+        edit.write_json(row_file(&old.table, key), &value);
+        for (from, to) in beside_row(project, &old.table, &old.key, key) {
+            if let Some(bytes) = project.files.get(&from) {
+                edit.write(to, bytes.clone());
+            }
+        }
+        if old.table == AreaDef::TABLE {
+            world::card_beside(project, &mut edit, &old.key, key);
+        }
+    }
+    editor.try_apply(edit)?;
+    editor.open_row(&row.table, copy);
+    Ok(())
+}
+
+/// `row` and every row local to it, at any depth, each with the key its copy gets when `row`'s
+/// copy is keyed `copy`: a key starting with `row`'s takes `copy` in its place, any other gets
+/// `copy` in front, and either is made free in its table.
+pub fn copied_keys(files: &ProjectFiles, row: &RowName, copy: &str) -> Vec<(RowName, String)> {
+    let prefix = format!("{}_", row.key);
+    let mut taken: BTreeMap<String, HashSet<String>> = BTreeMap::new();
+    let mut copies = vec![(row.clone(), copy.to_owned())];
+    for local in files.owners().held_within(row) {
+        let wanted = match local.key.strip_prefix(&prefix) {
+            Some(rest) => format!("{copy}_{rest}"),
+            None => format!("{copy}_{}", local.key),
+        };
+        let taken = taken
+            .entry(local.table.clone())
+            .or_insert_with(|| files.keys_of(&local.table).map(str::to_owned).collect());
+        let key = free_name(&wanted, taken);
+        taken.insert(key.clone());
+        copies.push((local, key));
+    }
+    copies
+}
+
+pub fn rename(
+    editor: &mut Editor,
+    table: &str,
+    key: &str,
+    new_key: &str,
+    local_keys: bool,
+) -> Result<(), String> {
     if new_key == key {
         return Ok(());
     }
@@ -237,67 +331,119 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         return Err("fixtures keep their key".to_owned());
     }
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = key_problem_besides(&project.files, table, new_key, Some(key)) {
-        return Err(problem);
+    let row = RowName::new(table, key);
+    let mut renames = vec![(row.clone(), new_key.to_owned())];
+    if local_keys {
+        renames.extend(prefixed_local_keys(&project.files, &row, new_key));
     }
-    let mut edit = ContentEdit::new(format!("Rename {table}/{key} to {new_key}"));
-    let usages = project.usages.of_row(table, key).to_vec();
-    let mut by_file: BTreeMap<String, Vec<ContentUsage>> = Default::default();
-    for usage in usages {
-        by_file.entry(usage.file.clone()).or_default().push(usage);
-    }
-    let own = row_file(table, key);
-    for (file, usages) in by_file {
-        let Some(mut value) = project.files.json_owned(&file) else {
-            continue;
-        };
-        for usage in usages {
-            rewrite(&mut value, &usage.pointer, &project.usages, &file, new_key);
+    for (index, (row, to)) in renames.iter().enumerate() {
+        if let Some(problem) = key_problem_besides(&project.files, &row.table, to, Some(&row.key)) {
+            return Err(problem);
         }
-        if file == own {
-            edit.write_json(row_file(table, new_key), &value);
-        } else {
-            edit.write_json(file, &value);
+        if renames[..index]
+            .iter()
+            .any(|(other, other_to)| other.table == row.table && other_to == to)
+        {
+            return Err(format!("{}/{to} would be named twice", row.table));
         }
     }
-    if !edit
-        .changes
-        .iter()
-        .any(|change| change.file == row_file(table, new_key))
-    {
-        let value = project.files.json(&own).ok_or("the row is gone")?;
-        edit.write_json(row_file(table, new_key), &value);
-    }
-    edit.remove(own);
-    for (from, to) in beside_row(project, table, key, new_key) {
-        if let Some(bytes) = project.files.get(&from) {
-            edit.write(to, bytes.clone());
-            edit.remove(from);
-        }
-    }
+    let edit = rename_edit(
+        project,
+        &renames,
+        format!("Rename {table}/{key} to {new_key}"),
+    )?;
     let count = edit.changes.len();
     editor.try_apply(edit)?;
     editor.toast(format!(
         "Renamed {table}/{key} to {new_key}: {count} files rewritten"
     ));
-    retarget_tabs(editor, table, key, new_key);
-    if editor.selection.table == table {
-        for selected in &mut editor.selection.keys {
-            if selected == key {
-                *selected = new_key.to_owned();
+    for (row, to) in &renames {
+        retarget_tabs(editor, &row.table, &row.key, to);
+        if editor.selection.table == row.table {
+            for selected in &mut editor.selection.keys {
+                if *selected == row.key {
+                    selected.clone_from(to);
+                }
             }
         }
     }
     Ok(())
 }
 
+/// The rows local to `row`, at any depth, whose keys start with its key and an underscore, each
+/// with the key it gets when `row` is keyed `new_key`.
+pub fn prefixed_local_keys(
+    files: &ProjectFiles,
+    row: &RowName,
+    new_key: &str,
+) -> Vec<(RowName, String)> {
+    let prefix = format!("{}_", row.key);
+    files
+        .owners()
+        .held_within(row)
+        .into_iter()
+        .filter_map(|local| {
+            let rest = local.key.strip_prefix(&prefix)?.to_owned();
+            Some((local, format!("{new_key}_{rest}")))
+        })
+        .collect()
+}
+
+/// Renames each row to its new key in one edit: its file and the files beside it move, and every
+/// use of it, owner lines included, is rewritten.
+fn rename_edit(
+    project: &Project,
+    renames: &[(RowName, String)],
+    label: String,
+) -> Result<ContentEdit, String> {
+    let mut edit = ContentEdit::new(label);
+    let mut by_file: BTreeMap<String, Vec<(ContentUsage, RowName)>> = Default::default();
+    for (row, to) in renames {
+        for usage in project.usages.of_row(&row.table, &row.key) {
+            by_file
+                .entry(usage.file.clone())
+                .or_default()
+                .push((usage.clone(), RowName::new(&row.table, to)));
+        }
+    }
+    for (file, mut uses) in by_file {
+        uses.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
+        edit.update_json(&project.files, &file, |value| {
+            for (usage, to) in &uses {
+                rewrite(value, usage, &project.usages, &file, to);
+            }
+            Some(())
+        });
+    }
+    for (row, to) in renames {
+        let own = row_file(&row.table, &row.key);
+        let value = edit
+            .pending_json(&project.files, &own)
+            .ok_or("the row is gone")?;
+        edit.write_json(row_file(&row.table, to), &value);
+        edit.remove(own);
+        for (from, moved) in beside_row(project, &row.table, &row.key, to) {
+            if let Some(bytes) = project.files.get(&from) {
+                edit.write(moved, bytes.clone());
+                edit.remove(from);
+            }
+        }
+    }
+    Ok(edit)
+}
+
 fn rewrite(
     value: &mut Value,
-    pointer: &str,
+    usage: &ContentUsage,
     usages: &usages::ContentUsages,
     file: &str,
-    new_key: &str,
+    to: &RowName,
 ) {
+    if usage.is_owner_line() {
+        value[OWNER_FIELD] = Value::String(to.to_string());
+        return;
+    }
+    let pointer = usage.pointer.as_str();
     let is_key = usages
         .in_file(file)
         .iter()
@@ -307,10 +453,10 @@ fn rewrite(
         if let Some(map) = value.pointer_mut(parent).and_then(Value::as_object_mut)
             && let Some(entry) = map.remove(&name)
         {
-            map.insert(new_key.to_owned(), entry);
+            map.insert(to.key.clone(), entry);
         }
     } else if let Some(slot) = value.pointer_mut(pointer) {
-        *slot = Value::String(new_key.to_owned());
+        *slot = Value::String(to.key.clone());
     }
 }
 
@@ -379,10 +525,24 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
     let Some(project) = &editor.project else {
         return;
     };
-    let own: Vec<String> = keys.iter().map(|key| row_file(table, key)).collect();
+    let owners = project.files.owners();
+    let named: Vec<RowName> = keys.iter().map(|key| RowName::new(table, key)).collect();
+    let mut along: Vec<RowName> = Vec::new();
+    for row in &named {
+        for local in owners.held_within(row) {
+            if !named.contains(&local) && !along.contains(&local) {
+                along.push(local);
+            }
+        }
+    }
+    let own: Vec<String> = named
+        .iter()
+        .chain(&along)
+        .map(|row| row_file(&row.table, &row.key))
+        .collect();
     let mut groups: Vec<UsageGroup> = Vec::new();
-    for key in &keys {
-        for usage in project.usages.of_row(table, key) {
+    for row in named.iter().chain(&along) {
+        for usage in project.usages.of_row(&row.table, &row.key) {
             if own.contains(&usage.file) {
                 continue;
             }
@@ -393,7 +553,8 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
             } = kind_of(project, &usage.file, &usage.pointer);
             let removable = entry.is_some();
             let same_group = |group: &&mut UsageGroup| {
-                group.table == other_table
+                group.target == row.table
+                    && group.table == other_table
                     && group.removable == removable
                     && if removable {
                         group.kind == kind
@@ -404,6 +565,7 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
             match groups.iter_mut().find(same_group) {
                 Some(group) => group.usages.push(usage.clone()),
                 None => groups.push(UsageGroup {
+                    target: row.table.clone(),
                     table: other_table,
                     kind,
                     usages: vec![usage.clone()],
@@ -421,6 +583,7 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
     editor.dialogs.push(ModalDialog::Delete(DeleteDialog {
         table: table.to_owned(),
         keys,
+        along,
         groups,
         error: None,
     }));
@@ -593,12 +756,22 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         );
         ui.label(theme::muted(used));
     }
-    let candidates: Vec<String> = project
-        .files
-        .keys_of(&dialog.table)
-        .filter(|key| !dialog.keys.iter().any(|deleted| deleted == key))
-        .map(str::to_owned)
-        .collect();
+    if !dialog.along.is_empty() {
+        ui.add_space(4.0);
+        widgets::section_count(ui, "Deleted with it", dialog.along.len());
+        ui.add(egui::Label::new(theme::muted(along_summary(&dialog.along)).size(12.5)).wrap());
+    }
+    let candidates = |target: &str| -> Vec<String> {
+        project
+            .files
+            .keys_of(target)
+            .filter(|key| {
+                !(target == dialog.table && dialog.keys.iter().any(|deleted| deleted == key))
+                    && !dialog.along.iter().any(|row| row.is(target, key))
+            })
+            .map(str::to_owned)
+            .collect()
+    };
     let details: Vec<Vec<(String, String)>> = dialog
         .groups
         .iter()
@@ -664,14 +837,8 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
                         widgets::badge(ui, badge);
                         ui.label(theme::strong(&title));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            decision_picker(
-                                ui,
-                                &project.shapes,
-                                &dialog.table,
-                                index,
-                                group,
-                                &candidates,
-                            );
+                            let candidates = candidates(&group.target);
+                            decision_picker(ui, &project.shapes, index, group, &candidates);
                         });
                     });
                     ui.add_space(2.0);
@@ -680,7 +847,7 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
                 ui.add_space(4.0);
             }
         });
-    let files_removed = dialog.keys.len();
+    let files_removed = dialog.keys.len() + dialog.along.len();
     let assets_named = dialog.keys.iter().any(|key| {
         project
             .usages
@@ -743,11 +910,11 @@ fn group_title(project: &Project, group: &UsageGroup) -> String {
 fn decision_picker(
     ui: &mut Ui,
     shapes: &SchemaShapes,
-    table: &str,
     index: usize,
     group: &mut UsageGroup,
     candidates: &[String],
 ) {
+    let table = group.target.as_str();
     let mut repoint = matches!(group.decision, UsageDecision::Repoint(_)) || !group.removable;
     if group.removable {
         let remove_label = if group.whole_modules {
@@ -867,18 +1034,22 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     {
         return Err(format!("decide what happens to {}", group.kind));
     }
-    let mut edit = ContentEdit::new(format!(
-        "Delete {} {}",
-        dialog.table,
-        dialog.keys.join(", ")
-    ));
-    let mut by_file: BTreeMap<String, Vec<(&ContentUsage, &UsageDecision)>> = Default::default();
+    let mut label = format!("Delete {} {}", dialog.table, dialog.keys.join(", "));
+    if !dialog.along.is_empty() {
+        label.push_str(&format!(
+            " with {} local row{}",
+            dialog.along.len(),
+            widgets::plural(dialog.along.len())
+        ));
+    }
+    let mut edit = ContentEdit::new(label.clone());
+    let mut by_file: BTreeMap<String, Vec<(&ContentUsage, &UsageGroup)>> = Default::default();
     for group in &dialog.groups {
         for usage in &group.usages {
             by_file
                 .entry(usage.file.clone())
                 .or_default()
-                .push((usage, &group.decision));
+                .push((usage, group));
         }
     }
     for (file, mut entries) in by_file {
@@ -886,11 +1057,15 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
             continue;
         };
         entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
-        for (usage, decision) in entries {
-            match decision {
-                UsageDecision::Repoint(key) => {
-                    rewrite(&mut value, &usage.pointer, &project.usages, &file, key)
-                }
+        for (usage, group) in entries {
+            match &group.decision {
+                UsageDecision::Repoint(key) => rewrite(
+                    &mut value,
+                    usage,
+                    &project.usages,
+                    &file,
+                    &RowName::new(&group.target, key),
+                ),
                 UsageDecision::Remove => remove_entry(&mut value, &usage.pointer),
                 UsageDecision::Unpack => unpack_entry(project, &mut value, &usage.pointer),
                 UsageDecision::Undecided => {}
@@ -898,33 +1073,51 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         }
         edit.write_json(file, &value);
     }
-    for key in &dialog.keys {
-        edit.remove(row_file(&dialog.table, key));
-        if let Some(file) = companion_file(&dialog.table, key)
+    let deleted: Vec<RowName> = dialog
+        .keys
+        .iter()
+        .map(|key| RowName::new(&dialog.table, key))
+        .chain(dialog.along.iter().cloned())
+        .collect();
+    for row in &deleted {
+        edit.remove(row_file(&row.table, &row.key));
+        if let Some(file) = companion_file(&row.table, &row.key)
             && project.files.contains(&file)
         {
             edit.remove(file);
         }
-        for file in folder_files(project, &dialog.table, key) {
+        for file in folder_files(project, &row.table, &row.key) {
             edit.remove(file);
         }
     }
     editor.try_apply(edit)?;
-    for key in &dialog.keys {
-        close_tabs(editor, &dialog.table, key);
+    for row in &deleted {
+        close_tabs(editor, &row.table, &row.key);
+        if editor.selection.table == row.table {
+            editor.selection.keys.retain(|key| *key != row.key);
+        }
     }
-    if editor.selection.table == dialog.table {
-        editor
-            .selection
-            .keys
-            .retain(|key| !dialog.keys.contains(key));
-    }
-    editor.toast(format!(
-        "Deleted {} {}",
-        dialog.table,
-        dialog.keys.join(", ")
-    ));
+    editor.toast(label.replacen("Delete", "Deleted", 1));
     Ok(())
+}
+
+/// The rows going along with an owner, by table: "npc bram, wren · memory 5".
+pub fn along_summary(rows: &[RowName]) -> String {
+    let mut by_table: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for row in rows {
+        by_table.entry(&row.table).or_default().push(&row.key);
+    }
+    by_table
+        .into_iter()
+        .map(|(table, keys)| {
+            if keys.len() <= 6 {
+                format!("{table} {}", keys.join(", "))
+            } else {
+                format!("{table} {}", keys.len())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
 fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {

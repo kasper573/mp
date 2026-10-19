@@ -1,12 +1,15 @@
 use egui::Ui;
+use engine::core::content::RowName;
 
 use super::tree::IconImage;
-use super::widgets;
+use super::{move_dialogs, widgets};
 use crate::app::{BottomTab, Editor, ModalDialog, RenameDialog, RenameTarget};
 use crate::keymap::EditorKey;
+use crate::moves::ScopeMoves;
 use crate::picker::{self, PictureFrame};
-use crate::project::{Project, RowSelection};
+use crate::project::{Project, ProjectFiles, RowSelection};
 use crate::tabs::EditorTab;
+use crate::usages::ContentUsages;
 use crate::{forms, rows, thumbs};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,22 +19,58 @@ pub enum BrowserAction {
     Duplicate,
     Rename,
     Usages,
+    MakeLocal,
+    MakeGlobal,
+    MoveTo,
     Delete,
+}
+
+/// What a row's menu offers: a fixture keeps its key and stays global, a local row can go global
+/// or move, and a global row can become local unless its uses are spread over several rows.
+pub struct RowMenu {
+    fixture: bool,
+    local: bool,
+    stays_global: Option<String>,
+}
+
+impl RowMenu {
+    pub fn of(
+        files: &ProjectFiles,
+        usages: &ContentUsages,
+        fixture: bool,
+        row: &RowName,
+    ) -> RowMenu {
+        let moves = ScopeMoves::new(files, usages);
+        let local = moves.owner(row).is_some();
+        RowMenu {
+            fixture,
+            local,
+            stays_global: (!local)
+                .then(|| moves.home(row).err())
+                .flatten()
+                .map(|reason| move_dialogs::stays_global_text(row, &reason)),
+        }
+    }
 }
 
 /// The menu of what can be done to one row, each with its shortcut; `opening` adds the ways to
 /// open it. Answers the one picked.
-pub fn row_menu(ui: &mut Ui, fixture: bool, opening: bool) -> Option<BrowserAction> {
+pub fn row_menu(ui: &mut Ui, menu: &RowMenu, opening: bool) -> Option<BrowserAction> {
     use BrowserAction::*;
     let opens: &[BrowserAction] = if opening { &[Open, OpenTab] } else { &[] };
-    let groups = [opens, &[Duplicate, Rename, Usages], &[Delete]];
+    let scope: &[BrowserAction] = match (menu.fixture, menu.local) {
+        (true, _) => &[],
+        (false, true) => &[MakeGlobal, MoveTo],
+        (false, false) => &[MakeLocal],
+    };
+    let groups = [opens, &[Duplicate, Rename, Usages], scope, &[Delete]];
     let mut picked = None;
     let mut drawn = false;
     for group in groups {
         let allowed: Vec<BrowserAction> = group
             .iter()
             .copied()
-            .filter(|action| !fixture || action.suits_fixtures())
+            .filter(|action| !menu.fixture || action.suits_fixtures())
             .collect();
         if allowed.is_empty() {
             continue;
@@ -41,10 +80,20 @@ pub fn row_menu(ui: &mut Ui, fixture: bool, opening: bool) -> Option<BrowserActi
         }
         drawn = true;
         for action in allowed {
-            if ui
-                .add(widgets::shortcut_button(action.label(), action.key()))
-                .clicked()
-            {
+            let refusal = match action {
+                MakeLocal => menu.stays_global.as_deref(),
+                _ => None,
+            };
+            let button = match action.key() {
+                Some(key) => widgets::shortcut_button(action.label(), key),
+                None => egui::Button::new(action.label()),
+            };
+            let response = ui.add_enabled(refusal.is_none(), button);
+            let response = match refusal {
+                Some(refusal) => response.on_disabled_hover_text(refusal),
+                None => response,
+            };
+            if response.clicked() {
                 picked = Some(action);
                 ui.close();
             }
@@ -108,7 +157,7 @@ pub fn row_keys(editor: &mut Editor, ui: &mut Ui) {
             BrowserAction::OpenTab,
         ]
         .into_iter()
-        .find(|action| action.key().consume(i))
+        .find(|action| action.key().is_some_and(|key| key.consume(i)))
     });
     if let Some(action) = pressed {
         act(editor, &selection.table, &selection.keys[0], action);
@@ -123,18 +172,22 @@ impl BrowserAction {
             BrowserAction::Duplicate => "Duplicate",
             BrowserAction::Rename => "Rename key…",
             BrowserAction::Usages => "Show usages",
+            BrowserAction::MakeLocal => "Make local…",
+            BrowserAction::MakeGlobal => "Make global…",
+            BrowserAction::MoveTo => "Move to…",
             BrowserAction::Delete => "Delete…",
         }
     }
 
-    fn key(self) -> EditorKey {
+    fn key(self) -> Option<EditorKey> {
         match self {
-            BrowserAction::Open => EditorKey::Confirm,
-            BrowserAction::OpenTab => EditorKey::OpenInNewTab,
-            BrowserAction::Duplicate => EditorKey::Duplicate,
-            BrowserAction::Rename => EditorKey::Rename,
-            BrowserAction::Usages => EditorKey::Usages,
-            BrowserAction::Delete => EditorKey::Delete,
+            BrowserAction::Open => Some(EditorKey::Confirm),
+            BrowserAction::OpenTab => Some(EditorKey::OpenInNewTab),
+            BrowserAction::Duplicate => Some(EditorKey::Duplicate),
+            BrowserAction::Rename => Some(EditorKey::Rename),
+            BrowserAction::Usages => Some(EditorKey::Usages),
+            BrowserAction::Delete => Some(EditorKey::Delete),
+            BrowserAction::MakeLocal | BrowserAction::MakeGlobal | BrowserAction::MoveTo => None,
         }
     }
 
@@ -197,6 +250,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
                         key: key.to_owned(),
                     },
                     draft: key.to_owned(),
+                    local_keys: false,
                     error: None,
                 }));
             }
@@ -206,6 +260,9 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
             editor.preview_row(table, key);
             editor.panels.bottom = BottomTab::UsedBy;
         }
+        BrowserAction::MakeLocal => move_dialogs::make_local(editor, RowName::new(table, key)),
+        BrowserAction::MakeGlobal => move_dialogs::make_global(editor, RowName::new(table, key)),
+        BrowserAction::MoveTo => move_dialogs::move_to(editor, RowName::new(table, key)),
         BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
     }
 }
