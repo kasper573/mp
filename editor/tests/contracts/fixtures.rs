@@ -1,4 +1,6 @@
 use editor::schema::SchemaShapes;
+use engine::core::content::ContentRow;
+use engine::core::vfx::VfxShaderDef;
 use serde_json::json;
 
 #[test]
@@ -6,7 +8,7 @@ fn a_table_of_fixtures_alone_takes_no_rows_of_its_own_and_a_mixed_one_does() {
     let shapes = SchemaShapes::load();
 
     assert!(shapes.is_closed("input"));
-    assert!(shapes.is_fixture("vfx_shader", "skill_area"));
+    assert!(shapes.is_fixture(VfxShaderDef::TABLE, "skill_area"));
     assert!(!shapes.is_closed("vfx_shader"));
     assert!(!shapes.is_closed("vfx"));
 }

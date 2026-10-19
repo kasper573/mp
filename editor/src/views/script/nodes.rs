@@ -224,10 +224,9 @@ pub struct NodeCatalogue {
 }
 
 impl NodeCatalogue {
-    pub fn build(root: &Value, content: Option<&Content>) -> NodeCatalogue {
-        let scope = content.map_or_else(ContentScope::new, ContentScope::of);
+    pub fn build(root: &Value) -> NodeCatalogue {
         let parse = |template: Option<Value>| -> Option<Node> {
-            let (parsed, _) = with_content(scope.clone(), || {
+            let (parsed, _) = with_content(ContentScope::new(), || {
                 serde_json::from_value::<Node>(template?).ok()
             });
             parsed

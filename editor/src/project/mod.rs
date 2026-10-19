@@ -207,7 +207,6 @@ struct Loading {
 struct Loaded {
     content: Content,
     usages: ContentUsages,
-    catalogue: NodeCatalogue,
     took: Duration,
     usages_took: Duration,
 }
@@ -231,7 +230,7 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
-        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE), None);
+        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE));
         let mut project = Project {
             root: root.to_path_buf(),
             loading: None,
@@ -270,7 +269,7 @@ impl Project {
         self.stale = false;
         match load(&self.files, &self.root.display().to_string()) {
             Ok((content, took)) => {
-                let loaded = Loaded::build(content, &self.files, &self.shapes, took);
+                let loaded = Loaded::build(content, &self.files, took);
                 self.report = None;
                 self.install(loaded);
             }
@@ -440,14 +439,13 @@ impl Project {
         }
         let files = self.files.clone();
         let name = self.root.display().to_string();
-        let shapes = self.shapes.clone();
         let (sender, receiver) = mpsc::channel();
         self.loading = Some(Loading {
             receiver: ChannelInbox::new(receiver),
         });
         std::thread::spawn(move || {
-            let outcome = load(&files, &name)
-                .map(|(content, took)| Loaded::build(content, &files, &shapes, took));
+            let outcome =
+                load(&files, &name).map(|(content, took)| Loaded::build(content, &files, took));
             let _ = sender.send(outcome);
         });
     }
@@ -456,7 +454,6 @@ impl Project {
         self.last_load = Some(loaded.took);
         self.last_usages = Some(loaded.usages_took);
         self.usages = loaded.usages;
-        self.catalogue = loaded.catalogue;
         self.content = Some(loaded.content);
         self.generation += 1;
     }
@@ -549,19 +546,12 @@ impl Project {
 }
 
 impl Loaded {
-    fn build(
-        content: Content,
-        files: &ProjectFiles,
-        shapes: &SchemaShapes,
-        took: Duration,
-    ) -> Loaded {
+    fn build(content: Content, files: &ProjectFiles, took: Duration) -> Loaded {
         let started = Instant::now();
         let usages = ContentUsages::build(&content, files);
-        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE), Some(&content));
         Loaded {
             content,
             usages,
-            catalogue,
             took,
             usages_took: started.elapsed(),
         }
