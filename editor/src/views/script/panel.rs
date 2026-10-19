@@ -5,16 +5,10 @@ use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::item::ItemDef;
-use engine::systems::npc::NpcDef;
-use engine::systems::quest::QuestDef;
 use engine::systems::script::{
     OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts, ScriptDef,
 };
-use engine::systems::shop::ShopDef;
-use engine::systems::skill::SkillDef;
 use engine::systems::stat::StatKind;
-use engine::systems::status::StatusEffectDef;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};
@@ -143,24 +137,10 @@ pub fn owner_row(
             format!("{table}/{key}"),
             OwnerRow {
                 kind,
-                row: raw_of(content, kind, key)?,
+                row: content.table_named(table)?.raw_of(key)?,
                 object: None,
             },
         ),
-    })
-}
-
-fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
-    Some(match kind {
-        OwnerKind::Npc => content.by_key::<NpcDef>(key)?.raw(),
-        OwnerKind::Item => content.by_key::<ItemDef>(key)?.raw(),
-        OwnerKind::Quest => content.by_key::<QuestDef>(key)?.raw(),
-        OwnerKind::Shop => content.by_key::<ShopDef>(key)?.raw(),
-        OwnerKind::Skill => content.by_key::<SkillDef>(key)?.raw(),
-        OwnerKind::StatusEffect => content.by_key::<StatusEffectDef>(key)?.raw(),
-        OwnerKind::Area | OwnerKind::Object => content.by_key::<AreaDef>(key)?.raw(),
-        OwnerKind::Blueprint => content.by_key::<BlueprintDef>(key)?.raw(),
-        OwnerKind::Any => return None,
     })
 }
 
@@ -689,7 +669,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 return;
             };
             let mut rows: Vec<NamedBy> = Vec::new();
-            for (file, pointers) in project.usages.files_naming("script", key) {
+            for (file, pointers) in project.usages.files_naming(ScriptDef::TABLE, key) {
                 let row = project.files.json(&file);
                 let Some((table, row_key)) = row_of(&file) else {
                     continue;
