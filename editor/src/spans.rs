@@ -1,16 +1,18 @@
 use design_tokens::ink;
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
+use engine::core::content::ContentRow;
 use engine::core::text::{TextMotion, TextVoice};
+use engine::systems::input::map::InputDef;
 use engine::systems::text::Ink;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
 use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
-use crate::forms::{FormChange, FormCx, committed};
+use crate::forms::{self, FormChange, FormCx, committed};
 use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
-use crate::{condition, forms, picker};
+use crate::{condition, picker};
 
 fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
     T::VARIANTS
@@ -457,7 +459,13 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
             let mut input = object["input"].as_str().unwrap_or_default().to_owned();
             ui.horizontal(|ui| {
                 ui.label("key of");
-                if picker::row(ui, cx, "input", &mut input, &format!("{path}/input")) {
+                if picker::row(
+                    ui,
+                    cx,
+                    InputDef::TABLE,
+                    &mut input,
+                    &format!("{path}/input"),
+                ) {
                     object.insert("input".to_owned(), Value::String(input));
                     changed = FormChange::at(path);
                 }

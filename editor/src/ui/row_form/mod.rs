@@ -736,6 +736,7 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         FormAction::OpenRow { table, key } => {
             editor.open_row(&table, &key);
         }
+        FormAction::OpenNode { .. } => {}
         FormAction::OpenScript { pointer } => {
             script::open_inline(editor, table, key, &pointer);
         }

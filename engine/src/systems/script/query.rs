@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::query::Has;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use super::{Condition, RiftScripting};
 use crate::core::content::Content;
@@ -152,8 +153,13 @@ pub enum Among {
     Anyone,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(
+    name(RiftQueryKind),
+    derive(EnumString, IntoStaticStr, VariantArray),
+    strum(serialize_all = "snake_case")
+)]
 pub enum RiftQuery {
     Level {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -305,29 +311,58 @@ pub enum RiftQuery {
     AimedPoint,
 }
 
+impl RiftQueryKind {
+    /// What a query of this kind yields; a memory's is none of its own, but whatever its memory
+    /// row holds.
+    pub fn value_type(self) -> Option<ValueType> {
+        Some(match self {
+            RiftQueryKind::Level
+            | RiftQueryKind::SkillRank
+            | RiftQueryKind::SpentSkillPoints
+            | RiftQueryKind::Holding
+            | RiftQueryKind::FreeSlots
+            | RiftQueryKind::Count
+            | RiftQueryKind::StatusCount
+            | RiftQueryKind::GroundItems => ValueType::Integer,
+            RiftQueryKind::Stat
+            | RiftQueryKind::SkillStat
+            | RiftQueryKind::StatusPower
+            | RiftQueryKind::Distance
+            | RiftQueryKind::Health => ValueType::Number,
+            RiftQueryKind::QuestResetsIn => ValueType::Text,
+            RiftQueryKind::Nearest | RiftQueryKind::Target | RiftQueryKind::Subject => {
+                ValueType::Actor
+            }
+            RiftQueryKind::SkillTargets => ValueType::Actors,
+            RiftQueryKind::SkillArea => ValueType::Area,
+            RiftQueryKind::AimedPoint => ValueType::Point,
+            RiftQueryKind::IsClass
+            | RiftQueryKind::HasStatus
+            | RiftQueryKind::Wearing
+            | RiftQueryKind::SetWithin
+            | RiftQueryKind::OnQuest
+            | RiftQueryKind::QuestDone
+            | RiftQueryKind::QuestCooling
+            | RiftQueryKind::TaskDone
+            | RiftQueryKind::Inside
+            | RiftQueryKind::InArea
+            | RiftQueryKind::KnowsArea
+            | RiftQueryKind::Present
+            | RiftQueryKind::IsNpc
+            | RiftQueryKind::Walking
+            | RiftQueryKind::Hostile => ValueType::Boolean,
+            RiftQueryKind::Memory => return None,
+        })
+    }
+}
+
 impl QueryDef<RiftScripting> for RiftQuery {
     fn value_type(&self, cx: &Compiler<RiftScripting>) -> ValueType {
         match self {
-            RiftQuery::Level { .. }
-            | RiftQuery::SkillRank { .. }
-            | RiftQuery::SpentSkillPoints { .. }
-            | RiftQuery::Holding { .. }
-            | RiftQuery::FreeSlots { .. }
-            | RiftQuery::Count { .. }
-            | RiftQuery::StatusCount { .. }
-            | RiftQuery::GroundItems { .. } => ValueType::Integer,
-            RiftQuery::Stat { .. }
-            | RiftQuery::SkillStat { .. }
-            | RiftQuery::StatusPower
-            | RiftQuery::Distance { .. }
-            | RiftQuery::Health { .. } => ValueType::Number,
             RiftQuery::Memory { memory, .. } => memory.get(cx.content).ty,
-            RiftQuery::QuestResetsIn { .. } => ValueType::Text,
-            RiftQuery::Nearest { .. } | RiftQuery::Target | RiftQuery::Subject => ValueType::Actor,
-            RiftQuery::SkillTargets => ValueType::Actors,
-            RiftQuery::SkillArea => ValueType::Area,
-            RiftQuery::AimedPoint => ValueType::Point,
-            _ => ValueType::Boolean,
+            query => RiftQueryKind::from(query)
+                .value_type()
+                .expect("every query but a memory yields a type of its own"),
         }
     }
 

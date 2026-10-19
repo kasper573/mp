@@ -9,7 +9,7 @@ use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::prelude::*;
 use bevy::shader::Shader;
 use bevy_egui::EguiUserTextures;
-use engine::core::content::Content;
+use engine::core::content::{Content, ContentRow, row_file};
 use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
@@ -31,7 +31,6 @@ use engine::systems::item::render::drop_sprite;
 use super::{SIZE, ZOOM};
 use crate::project::{ProjectFiles, hash};
 use crate::views::area::scene;
-use engine::core::content::{ContentRow, row_file};
 
 const FIRST_LAYER: usize = 500;
 const SPRITE_DEPTH_ABOVE_GROUND: f32 = 0.001;

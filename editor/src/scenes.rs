@@ -351,7 +351,6 @@ fn open_one(editor: &mut Editor, step: &Step) {
         Step::Script(target) => open_script(editor, target),
         Step::Node(names) => {
             if let Some(owner) = last_script_owner(editor) {
-                editor.views.script.focus_on(&owner);
                 let parts = names.iter().map(|name| format!("node:{name}")).collect();
                 editor.select(RowSelection::parts(owner.table(), owner.key(), parts));
             }

@@ -1,7 +1,9 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::{HashMap, HashSet};
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Color32, FontId, Sense, Ui};
+use engine::core::content::ContentRow;
+use engine::systems::npc::NpcDef;
 use serde_json::Value;
 
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
@@ -323,7 +325,7 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
         .map(|line| match LineSpeaker::of(&line["by"]) {
             Some(LineSpeaker::Npc { npc, face }) => {
                 let name = editor
-                    .row_value("npc", &npc)
+                    .row_value(NpcDef::TABLE, &npc)
                     .map(|row| row.text_or("name", &npc).to_owned())
                     .unwrap_or(npc);
                 match face {
@@ -344,7 +346,6 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
 fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
-            editor.views.script.focus_on(&doc.owner);
             editor.select(RowSelection::parts(
                 doc.owner.table(),
                 doc.owner.key(),

@@ -334,10 +334,13 @@ pub struct WalkTo {
     pub to: WalkTarget,
     pub within: Condition,
     pub priority: u8,
+    /// Taken on getting there.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub arrived: Arrow,
+    /// Taken when no way leads there.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub blocked: Arrow,
+    /// Taken when another act of at least its priority takes the body.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }
@@ -361,6 +364,7 @@ pub struct Attack {
     pub defeated: Arrow,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub lost: Arrow,
+    /// Taken when another act of at least its priority takes the body.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }

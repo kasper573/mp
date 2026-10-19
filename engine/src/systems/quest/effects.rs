@@ -57,6 +57,7 @@ pub struct TurnIn {
     pub done: Arrow,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub refused: Arrow,
+    /// Taken when the card is closed without handing in.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub cancelled: Arrow,
 }

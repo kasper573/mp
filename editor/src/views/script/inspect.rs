@@ -1,26 +1,28 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
+use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::script::{OwnerKindDef, ScriptModuleKind, VariableType};
+use engine::core::content::{ContentRow, row_file, row_of};
+use engine::core::script::{NodeKind, OwnerKindDef, ScriptModuleKind, VariableType};
 use engine::systems::area::blueprint::holes;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::script::OwnerKind;
+use engine::systems::memory::MemoryDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::{OwnerKind, RiftEffectKind, ScriptDef};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
 use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
-use crate::forms::{FormAction, FormChange, FormCx};
+use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
-use crate::{condition, forms, picker, rows, schema, spans, thumbs};
-use engine::core::content::{row_file, row_of};
+use crate::{condition, picker, rows, schema, spans, thumbs};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
     let owner = doc.owner.clone();
@@ -173,8 +175,7 @@ fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     owner_section(editor, ui, doc);
     action_buttons(editor, ui, doc);
     if open_owner {
-        editor.select(RowSelection::row(doc.owner.table(), doc.owner.key()));
-        editor.open_tab(EditorTab::for_row(doc.owner.table(), doc.owner.key()));
+        editor.open_row(doc.owner.table(), doc.owner.key());
     }
     if make {
         make_shared_dialog(editor, doc);
@@ -185,7 +186,7 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let key = doc.owner.key().to_owned();
     breadcrumb(ui, &format!("script/{key}"));
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let owner_schema = root
         .pointer("/properties/owner")
         .cloned()
@@ -227,7 +228,8 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
                 widgets::kv_text(ui, "locals", names_of(&script["locals"]));
                 let returns = doc.nodes().values().any(|node| {
-                    node.kind() == "return" && node.get("value").is_some_and(|v| !v.is_null())
+                    nodes::kind_of(node) == NodeKind::Return
+                        && node.get("value").is_some_and(|v| !v.is_null())
                 });
                 widgets::kv_text(ui, "returns", if returns { "a value" } else { "nothing" });
                 widgets::kv_text(ui, "nodes", nodes_line(doc));
@@ -495,8 +497,7 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         None => {}
     }
     if open {
-        editor.select(RowSelection::row(table, key));
-        editor.open_tab(EditorTab::for_row(table, key));
+        editor.open_row(table, key);
     }
 }
 
@@ -513,7 +514,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     }
     widgets::section_count(ui, "Variables", variables.len());
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let variable_schema = root
         .pointer("/properties/variables/additionalProperties")
         .cloned()
@@ -524,7 +525,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|project| {
             project
                 .usages
-                .of_row("script", &key)
+                .of_row(ScriptDef::TABLE, &key)
                 .iter()
                 .filter(|u| ScriptRef::parse(&u.pointer).node.is_none())
                 .count()
@@ -654,7 +655,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     };
     let callers: Vec<Caller> = project
         .usages
-        .of_row("script", &key)
+        .of_row(ScriptDef::TABLE, &key)
         .iter()
         .filter_map(|usage| {
             let (table, row_key) = row_of(&usage.file)?;
@@ -699,8 +700,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         if let Some((table, row_key)) = open.as_deref().and_then(|owner| owner.split_once('/')) {
-            editor.select(RowSelection::row(table, row_key));
-            editor.open_tab(EditorTab::for_row(table, row_key));
+            editor.open_row(table, row_key);
         }
     }
     let speakers: BTreeSet<String> = doc
@@ -792,9 +792,9 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     let kind = node.kind().to_owned();
     breadcrumb(ui, &format!("{} › {name}", owner_short(editor, doc)));
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let (outs, ins, blurb) = {
+    let (outs, unwired, ins, blurb) = {
         let catalogue = catalogue_of(editor.project.as_ref());
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
             .into_iter()
@@ -804,8 +804,14 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             })
             .collect();
         let entry = catalogue.entry(&kind);
+        let outs = nodes::ports(&node, catalogue);
+        let unwired = outs
+            .iter()
+            .map(|port| catalogue.unwired(&kind, &port.label))
+            .collect::<Vec<_>>();
         (
-            nodes::ports(&node, catalogue),
+            outs,
+            unwired,
             ins,
             entry.map_or(String::new(), |e| e.blurb.clone()),
         )
@@ -846,11 +852,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                     }
                 });
                 let mut changed = FormChange::default();
-                match nodes::FlowKind::of(&draft) {
-                    Some(nodes::FlowKind::On) => {
+                match nodes::kind_of(&draft) {
+                    NodeKind::On => {
                         changed = on_form(ui, &mut cx, root, &mut draft, &path);
                     }
-                    Some(nodes::FlowKind::Dialogue) => {}
+                    NodeKind::Dialogue => {}
                     _ => {
                         if let Some((schema, hidden)) = nodes::form_fields(root, &draft) {
                             let hidden: Vec<&str> = hidden.iter().map(String::as_str).collect();
@@ -861,22 +867,13 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                     }
                 }
                 if !nodes::is_dialogue(&node) {
-                    arrows_rows(ui, &mut cx, &outs, &kind);
+                    arrows_rows(ui, &mut cx, &outs, &unwired);
                 }
                 changed
             })
             .inner
     };
-    let mut go_to: Option<String> = None;
-    for action in actions {
-        if let FormAction::OpenRow { table, key } = &action
-            && table == "node"
-        {
-            go_to = Some(key.clone());
-            continue;
-        }
-        act(editor, action, doc);
-    }
+    let mut go_to = act_but_go(editor, actions, doc);
     if nodes::is_dialogue(&node) {
         let mut draft_dialogue = draft.clone();
         let mut dialogue_actions = Vec::new();
@@ -892,15 +889,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                 &mut label,
             )
         };
-        for action in dialogue_actions {
-            if let FormAction::OpenRow { table, key } = &action
-                && table == "node"
-            {
-                go_to = Some(key.clone());
-                continue;
-            }
-            act(editor, action, doc);
-        }
+        go_to = act_but_go(editor, dialogue_actions, doc).or(go_to);
         if dialogue_changed.is_some() {
             let mut script = doc.script.clone();
             script["nodes"][name] = draft_dialogue;
@@ -962,9 +951,9 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     }
 }
 
-fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], kind: &str) {
+fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], unwired: &[String]) {
     let mut go: Option<String> = None;
-    for port in outs {
+    for (port, unwired) in outs.iter().zip(unwired) {
         widgets::kv(ui, &port.label, |ui| match &port.target {
             Some(target) => {
                 ui.label(theme::muted("→").size(13.0));
@@ -980,16 +969,12 @@ fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], kind: &st
                 }
             }
             None => {
-                let meaning = nodes::arrow_meaning(kind, &port.label);
-                ui.add(egui::Label::new(theme::muted(meaning).size(13.0)).wrap());
+                ui.add(egui::Label::new(theme::muted(unwired).size(13.0)).wrap());
             }
         });
     }
-    if let Some(target) = go {
-        cx.actions.push(FormAction::OpenRow {
-            table: "node".to_owned(),
-            key: target,
-        });
+    if let Some(name) = go {
+        cx.actions.push(FormAction::OpenNode { name });
     }
 }
 
@@ -1009,8 +994,9 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
         ins,
         blurb,
     } = shown;
-    match kind {
-        "remember" | "forget" => {
+    match (nodes::kind_of(node), kind.parse()) {
+        (NodeKind::Repeat, _) => bounds_card(editor, ui, doc, name, node),
+        (NodeKind::Effect, Ok(RiftEffectKind::Remember | RiftEffectKind::Forget)) => {
             let memory = node["memory"]
                 .as_str()
                 .map(str::to_owned)
@@ -1020,7 +1006,6 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
             }
             keeps_cards(ui, doc);
         }
-        "repeat" => bounds_card(editor, ui, doc, name, node),
         _ => {
             if !blurb.is_empty() {
                 widgets::hint(ui, blurb);
@@ -1039,11 +1024,11 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
 }
 
 fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &str) {
-    let Some(mut row) = editor.row_value("memory", memory) else {
+    let Some(mut row) = editor.row_value(MemoryDef::TABLE, memory) else {
         return;
     };
     let shapes = editor.shapes.clone();
-    let schema = shapes.shape_of("memory");
+    let schema = shapes.shape_of(MemoryDef::TABLE);
     let mut actions = Vec::new();
     let changed = {
         let mut cx = doc.form_cx(editor, schema, &mut actions);
@@ -1053,7 +1038,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
                 widgets::card_header(ui, &format!("memory/{memory}"), "row", |ui| {
                     if ui.button("Open the row").clicked() {
                         cx.actions.push(FormAction::OpenRow {
-                            table: "memory".to_owned(),
+                            table: MemoryDef::TABLE.to_owned(),
                             key: memory.to_owned(),
                         });
                         ui.close();
@@ -1068,7 +1053,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
     }
     if changed.is_some() {
         let mut edit = ContentEdit::new(format!("Edit memory/{memory}"));
-        edit.write_json(row_file("memory", memory), &row);
+        edit.write_json(row_file(MemoryDef::TABLE, memory), &row);
         editor.apply(edit);
     }
 }
@@ -1125,7 +1110,7 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, no
     let waits: Vec<f64> = body
         .iter()
         .filter_map(|n| doc.nodes().get(n))
-        .filter(|n| n.kind() == "wait")
+        .filter(|n| nodes::kind_of(n) == NodeKind::Wait)
         .map(|n| {
             n["at_most"]
                 .as_f64()
@@ -1202,7 +1187,7 @@ fn dialogue_form(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let Some(schema) = nodes::variant_schema(root, "dialogue") else {
+    let Some(schema) = nodes::variant_schema(root, NodeKind::Dialogue.name()) else {
         return changed;
     };
     let line_schema = schema
@@ -1227,14 +1212,7 @@ fn dialogue_form(
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
             widgets::card_header(ui, &format!("line {}", index + 1), "", |ui| {
-                if index > 0 && ui.button("Move up").clicked() {
-                    swap_line = Some((index, index - 1));
-                    ui.close();
-                }
-                if index + 1 < count && ui.button("Move down").clicked() {
-                    swap_line = Some((index, index + 1));
-                    ui.close();
-                }
+                swap_line = widgets::move_entries(ui, index, count).or(swap_line);
                 if count > 1 && ui.button("Remove the line").clicked() {
                     remove_line = Some(index);
                     ui.close();
@@ -1315,11 +1293,8 @@ fn dialogue_form(
         changed = FormChange::at(path);
         *label = format!("Add a choice in {}", doc.owner.title());
     }
-    if let Some(target) = go {
-        cx.actions.push(FormAction::OpenRow {
-            table: "node".to_owned(),
-            key: target,
-        });
+    if let Some(name) = go {
+        cx.actions.push(FormAction::OpenNode { name });
     }
     changed
 }
@@ -1550,9 +1525,9 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &st
         ),
     );
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let choice_schema = nodes::variant_schema(root, "dialogue")
+    let choice_schema = nodes::variant_schema(root, NodeKind::Dialogue.name())
         .and_then(|schema| schema.pointer("/properties/choices/items").cloned())
         .unwrap_or(Value::Null);
     let mut draft = node.clone();
@@ -1632,7 +1607,7 @@ fn speaker_rows(
         return changed;
     };
     widgets::kv(ui, "  npc", |ui| {
-        if picker::row(ui, cx, "npc", &mut npc, &format!("{path}/npc")) {
+        if picker::row(ui, cx, NpcDef::TABLE, &mut npc, &format!("{path}/npc")) {
             by["npc"] = Value::String(npc.clone());
             changed = FormChange::at(path);
         }
@@ -1690,6 +1665,19 @@ fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
     row_form::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
+/// Carries out what a node's card asked for, but for the node it asks to go to, which the card
+/// goes to once it is done with the node it shows.
+fn act_but_go(editor: &mut Editor, actions: Vec<FormAction>, doc: &ScriptDoc) -> Option<String> {
+    let mut go_to = None;
+    for action in actions {
+        match action {
+            FormAction::OpenNode { name } => go_to = Some(name),
+            other => act(editor, other, doc),
+        }
+    }
+    go_to
+}
+
 #[derive(Clone, Debug)]
 pub struct ScriptConstant {
     pub node: String,
@@ -1726,7 +1714,7 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &ScriptDoc) {
         return;
     }
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of("script");
+    let root = shapes.shape_of(ScriptDef::TABLE);
     let mut constants = Vec::new();
     let mut taken: BTreeMap<String, usize> = BTreeMap::new();
     for (name, node) in doc.nodes() {
@@ -1806,7 +1794,7 @@ pub fn make_shared_body(
     let problem = editor
         .project
         .as_ref()
-        .and_then(|project| rows::key_problem(&project.files, "script", &dialog.key));
+        .and_then(|project| rows::key_problem(&project.files, ScriptDef::TABLE, &dialog.key));
     let valid = problem
         .as_deref()
         .is_none_or(|problem| problem.contains("already exists"));
@@ -1990,29 +1978,24 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         dialog.owner.title(),
         dialog.key
     ));
-    edit.write_json(row_file("script", &dialog.key), &script);
+    edit.write_json(row_file(ScriptDef::TABLE, &dialog.key), &script);
     edit.write_json(doc.file.clone(), &row);
-    if editor.apply(edit) {
-        let shared = ScriptOwner::Shared {
-            key: dialog.key.clone(),
-        };
-        editor.views.script.relocate(&dialog.owner, shared.clone());
-        let from = EditorTab::Script(dialog.owner.clone());
-        for (_, tab) in editor.dock.iter_all_tabs_mut() {
-            if *tab == from {
-                *tab = EditorTab::Script(shared.clone());
-            }
-        }
-        for tab in editor.open_tabs.iter_mut() {
-            if *tab == from {
-                *tab = EditorTab::Script(shared.clone());
-            }
-        }
-        editor.select(RowSelection::row("script", &dialog.key));
-        Ok(())
-    } else {
-        Err("refused; see the message".to_owned())
+    editor.try_apply(edit)?;
+    let shared = ScriptOwner::Shared {
+        key: dialog.key.clone(),
+    };
+    editor.views.script.relocate(&dialog.owner, shared.clone());
+    let from = EditorTab::Script(dialog.owner.clone());
+    let tabs = editor
+        .dock
+        .iter_all_tabs_mut()
+        .map(|(_, tab)| tab)
+        .chain(&mut editor.open_tabs);
+    for tab in tabs.filter(|tab| **tab == from) {
+        *tab = EditorTab::Script(shared.clone());
     }
+    editor.select(RowSelection::row(ScriptDef::TABLE, &dialog.key));
+    Ok(())
 }
 
 pub fn make_inline_dialog(editor: &mut Editor, doc: &ScriptDoc) {
@@ -2023,12 +2006,15 @@ pub fn make_inline_dialog(editor: &mut Editor, doc: &ScriptDoc) {
         return;
     };
     let mut users = Vec::new();
-    for usage in project.usages.of_row("script", key) {
+    for usage in project.usages.of_row(ScriptDef::TABLE, key) {
         let Some((table, row_key)) = row_of(&usage.file) else {
             continue;
         };
         let at = ScriptRef::parse(&usage.pointer);
-        let Some(module) = at.module.filter(|_| table != "script" && at.node.is_none()) else {
+        let Some(module) = at
+            .module
+            .filter(|_| table != ScriptDef::TABLE && at.node.is_none())
+        else {
             continue;
         };
         users.push(InlineScriptTarget {
@@ -2057,11 +2043,13 @@ pub fn make_inline_body(
 ) -> Option<MakeInlineDialog> {
     let mut outcome = None;
     let count = editor
-        .row_value("script", &dialog.key)
+        .row_value(ScriptDef::TABLE, &dialog.key)
         .map_or(0, |script| script["nodes"].as_object().map_or(0, Map::len));
-    let variables = editor.row_value("script", &dialog.key).map_or(0, |script| {
-        script["variables"].as_object().map_or(0, Map::len)
-    });
+    let variables = editor
+        .row_value(ScriptDef::TABLE, &dialog.key)
+        .map_or(0, |script| {
+            script["variables"].as_object().map_or(0, Map::len)
+        });
     let names: Vec<String> = dialog
         .users
         .iter()
@@ -2166,7 +2154,7 @@ fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
         return;
     };
     let (table, key, pointer) = (&target.table, &target.key, target.module.pointer());
-    let Some(script) = editor.row_value("script", &dialog.key) else {
+    let Some(script) = editor.row_value(ScriptDef::TABLE, &dialog.key) else {
         return;
     };
     let Some(mut row) = editor.row_value(table, key) else {

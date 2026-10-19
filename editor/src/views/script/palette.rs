@@ -1,12 +1,12 @@
-use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 
+use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Pos2, Ui};
 use engine::core::script::OwnerKindDef;
 
 use super::graph::NodePaletteOpen;
-use super::nodes::{NodeCatalogue, NodeEntry};
-use super::{ScriptDoc, add_node, nodes};
+use super::nodes::{self, NodeCatalogue, NodeEntry};
+use super::{ScriptDoc, add_node};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::catalogue_of;
@@ -389,7 +389,12 @@ fn entry_of(entry: &NodeEntry) -> Row<'_> {
             detail.push(' ');
         }
         detail.push_str("→ ");
-        detail.push_str(&entry.outputs.join(" · "));
+        let outputs: Vec<&str> = entry
+            .outputs
+            .iter()
+            .map(|output| output.name.as_str())
+            .collect();
+        detail.push_str(&outputs.join(" · "));
     }
     if detail.is_empty() {
         detail = entry.blurb.to_owned();

@@ -37,7 +37,7 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     for owner in OWNERS {
         for value in &capabilities {
             let parsed = effect(value.clone());
-            let kind = parsed.kind();
+            let kind = parsed.kind().name();
             let allowed = parsed.owners().contains(&owner);
             let script = inline(json!({
                 "on": entry(owner, "do"),

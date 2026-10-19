@@ -142,7 +142,7 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
         }
         Expr::Less { a, b } => format!("{} < {}", describe(content, a), describe(content, b)),
         Expr::AtMost { a, b } => format!("{} ≤ {}", describe(content, a), describe(content, b)),
-        other => other.kind().to_owned(),
+        other => other.kind().name().to_owned(),
     }
 }
 
