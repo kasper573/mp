@@ -43,12 +43,7 @@ pub struct SheetParts {
 
 impl Sheet<'_> {
     pub fn paint(&self, painter: &Painter, rect: Rect) -> SheetParts {
-        self.paint_at(
-            painter,
-            rect,
-            shadow(self.depth),
-            ink::wash(Color32::WHITE, 1.0),
-        )
+        self.paint_at(painter, rect, shadow(self.depth), Color32::WHITE)
     }
 
     pub fn paint_at(
@@ -58,7 +53,7 @@ impl Sheet<'_> {
         shadow: Shadow,
         tint: Color32,
     ) -> SheetParts {
-        let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
+        let small = is_small(rect);
         painter.add(shadow.as_shape(rect, CornerRadius::ZERO));
         vellum(painter, rect);
         let inset = if small { SMALL_RULE_INSET } else { RULE_INSET };
@@ -102,7 +97,7 @@ impl Sheet<'_> {
 }
 
 pub fn body(rect: Rect, titled: bool) -> Rect {
-    let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
+    let small = is_small(rect);
     let margin = if small { SMALL_RULE_INSET } else { RULE_INSET } + 4.0;
     let top = if titled {
         rect.min.y + TITLE_BAND
@@ -212,7 +207,7 @@ pub fn groove(painter: &Painter, top: Pos2, bottom: Pos2) {
 
 /// Where the title of a sheet standing in `rect` starts, as its band draws it.
 pub fn title_origin(ctx: &egui::Context, rect: Rect, title: &str) -> Pos2 {
-    let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
+    let small = is_small(rect);
     let band = Rect::from_min_size(rect.min, Vec2::new(rect.width(), TITLE_BAND));
     let galley = ctx.fonts_mut(|fonts| fonts.layout_job(TextRole::Title.job(title, ink::RUBRIC)));
     title_at(title_room(band, small), galley.size())
@@ -502,8 +497,8 @@ fn vignette(rect: Rect, texture: TextureId, uv: impl Fn(Vec2) -> Pos2) -> Mesh {
     }
 }
 
-/// The vignette's grid of tones over a unit square, worked out once, since every vellum surface lays
-/// it over its rect each frame.
+/// The vignette's grid of tones over a unit square, worked out once, since every vellum surface
+/// lays it over its rect each frame.
 struct VignetteGrid {
     points: Vec<(Vec2, Color32)>,
     indices: Vec<u32>,
@@ -566,10 +561,6 @@ fn paint_curl(painter: &Painter, corner: Rect) {
     ));
 }
 
-pub fn hover_wash(painter: &Painter, rect: Rect) {
-    painter.rect_filled(rect, 3.0, ink::ink_wash(0.1));
-}
-
 pub fn label(ui: &mut Ui, role: TextRole, text: &str, color: Color32) -> Response {
     ui.add(egui::Label::new(role.widget_text(text, color)).selectable(false))
 }
@@ -586,6 +577,10 @@ pub fn text(
     let rect = anchor.anchor_size(at, galley.size());
     painter.galley(rect.min, galley, color);
     rect
+}
+
+fn is_small(rect: Rect) -> bool {
+    rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET
 }
 
 fn title_room(band: Rect, small: bool) -> Rect {

@@ -167,7 +167,7 @@ fn paint_card(
             changed |= brush_size_field(ui, &mut brush, true);
         });
         widgets::kv(ui, "random", |ui| {
-            changed |= widgets::toggle(ui, &mut brush.random).changed();
+            changed |= ui.checkbox(&mut brush.random, "").changed();
             ui.label(
                 theme::muted(if brush.random {
                     format!("from the {picked} selected tiles")
@@ -417,7 +417,7 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
             changed |= brush_size_field(ui, &mut brush, true);
         });
         widgets::kv(ui, "overlay", |ui| {
-            widgets::toggle(ui, &mut view.walk_overlay);
+            ui.checkbox(&mut view.walk_overlay, "");
             widgets::key_hint_text(ui, EditorKey::WalkOverlay, "toggles");
         });
     });
@@ -1096,7 +1096,7 @@ fn module_inspector(
                         .or_default();
                     widgets::kv(ui, "preview", |ui| {
                         let mut shown = !preview.hidden;
-                        if widgets::toggle(ui, &mut shown).changed() {
+                        if ui.checkbox(&mut shown, "").changed() {
                             preview.hidden = !shown;
                         }
                         if controls::marked(ui, Mark::Reload, "Re-roll").clicked() {

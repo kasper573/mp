@@ -199,7 +199,7 @@ fn decision(ui: &mut Ui, world: &World, quest: QuestId) {
     let paths = def.decision().unwrap_or_default();
     ui.columns(paths.len().max(1), |columns| {
         for (column, path) in columns.iter_mut().zip(paths) {
-            column.label(card::bold(&path.choice));
+            column.label(face::bold(&path.choice).size(TextRole::CardBody.size()));
             for mean in &path.means {
                 column.horizontal_wrapped(|ui| {
                     glyph::show(ui, Mark::Dot, 8.0, ink::INK2);

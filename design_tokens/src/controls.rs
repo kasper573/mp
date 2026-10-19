@@ -51,10 +51,6 @@ pub fn marked_danger(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Re
     button_look(ui, text.into(), Some(mark), Look::Danger)
 }
 
-pub fn checkbox(ui: &mut Ui, on: &mut bool, text: impl Into<WidgetText>) -> Response {
-    ui.checkbox(on, text)
-}
-
 pub fn slider(ui: &mut Ui, value: &mut f32, range: RangeInclusive<f32>) -> Response {
     let width = ui.spacing().slider_width;
     let (rect, mut response) =
@@ -330,20 +326,6 @@ pub fn slot_count(painter: &Painter, rect: Rect, count: u32) {
     );
 }
 
-pub fn slot_pill(painter: &Painter, rect: Rect, text: &str) {
-    let galley = painter.layout_no_wrap(text.to_owned(), Face::BookBold.id(9.0), ink::GOLD);
-    let size = galley.size() + Vec2::new(6.0, 1.0);
-    let pill = Rect::from_min_size(rect.min + Vec2::new(1.0, 1.0), size);
-    painter.rect(
-        pill,
-        size.y / 2.0,
-        ink::wash(ink::CREAM, 0.9),
-        Stroke::new(1.0, ink::GOLD),
-        StrokeKind::Inside,
-    );
-    painter.galley(pill.center() - galley.size() / 2.0, galley, ink::GOLD);
-}
-
 pub fn slot_lozenge(painter: &Painter, rect: Rect) {
     let centre = rect.right_top() + Vec2::new(-6.0, 6.0);
     painter.add(Shape::convex_polygon(
@@ -431,7 +413,8 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
         TextRole::Button.font_id().into(),
         Align::Center,
     ));
-    // The look decides the text's ink: a primary's cream would vanish under any ink the text brings.
+    // The look decides the text's ink: a primary's cream would vanish under any ink the text
+    // brings.
     for section in &mut job.sections {
         section.format.color = Color32::PLACEHOLDER;
     }

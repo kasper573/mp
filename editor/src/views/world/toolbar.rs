@@ -96,7 +96,7 @@ pub fn layer_rows(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
         ),
     ] {
         ui.horizontal(|ui| {
-            widgets::toggle(ui, on);
+            ui.checkbox(on, "");
             ui.label(RichText::new(label).size(13.0));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.label(theme::faint(count.to_string()).monospace().size(12.0));

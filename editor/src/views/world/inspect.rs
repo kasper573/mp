@@ -552,7 +552,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         });
         widgets::kv(ui, "pinned", |ui| {
             let mut pinned = cards.iter().all(|area| map.layout.cards[area].pinned);
-            if widgets::toggle(ui, &mut pinned).changed() {
+            if ui.checkbox(&mut pinned, "").changed() {
                 for area in cards {
                     if let Some(pin) = next.cards.get_mut(area) {
                         pin.pinned = pinned;

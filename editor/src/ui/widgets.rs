@@ -24,10 +24,6 @@ pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
     controls::combo(id_salt)
 }
 
-pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
-    controls::checkbox(ui, on, "")
-}
-
 pub fn chip(ui: &mut Ui, text: &str) -> Response {
     chip_colored(ui, text, theme::RAISED, theme::TEXT)
 }
