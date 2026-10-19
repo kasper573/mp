@@ -273,10 +273,6 @@ impl Targeting {
         matches!(self, Targeting::AreaAlly | Targeting::AreaEnemy)
     }
 
-    pub fn aimed_at_actor(self) -> bool {
-        matches!(self, Targeting::SingleAlly | Targeting::SingleEnemy)
-    }
-
     pub fn hostile(self) -> bool {
         matches!(self, Targeting::SingleEnemy | Targeting::AreaEnemy)
     }
@@ -529,12 +525,6 @@ impl SkillDef {
     pub fn area_at(&self, rank: Rank) -> Option<Shape> {
         self.area
             .map(|shape| shape.grown(Tiles(self.stat(rank, SkillStat::Radius))))
-    }
-
-    pub fn answers_used(&self, scripts: &RiftScripts, id: SkillId) -> bool {
-        scripts
-            .may_do(OwnerRow::of_row(id))
-            .answers(EventKind::Used)
     }
 }
 

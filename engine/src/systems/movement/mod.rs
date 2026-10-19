@@ -182,10 +182,6 @@ pub fn moving(world: &World, entity: Entity) -> bool {
     world.get::<MoveTarget>(entity).is_some()
 }
 
-pub fn on_tile(world: &World, entity: Entity) -> bool {
-    position(world, entity).is_some_and(|p| p.on_center())
-}
-
 /// Sends the actor walking to `pos`, exactly there, and claims its tile. A walk already headed there
 /// carries on untouched, and one heading elsewhere turns toward it without dropping the step it's on.
 pub fn goto(world: &mut World, entity: Entity, pos: Pos<Tiles>) {

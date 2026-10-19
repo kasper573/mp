@@ -168,10 +168,6 @@ pub fn dialogue_rect(world: &World) -> Option<Rect> {
     world.resource::<StageDrawn>().dialogue
 }
 
-pub fn box_right(world: &World) -> Option<f32> {
-    dialogue_rect(world).map(|dialogue| dialogue.right())
-}
-
 pub fn rects(world: &World) -> Vec<Rect> {
     let drawn = world.resource::<StageDrawn>();
     drawn

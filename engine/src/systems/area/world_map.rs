@@ -3,12 +3,8 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{
-    ContentId, ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial,
-};
+use crate::core::content::{ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial};
 use crate::core::math::Pos;
-
-pub type WorldMapId = ContentId<WorldMapDef>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
 #[strum(serialize_all = "snake_case")]

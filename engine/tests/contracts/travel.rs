@@ -7,7 +7,7 @@ use engine::systems::area::{self, AreaDef};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::interact::{self, InteractRequest};
 use engine::systems::memory::{self, MemoryDef};
-use engine::systems::movement::{self, MoveRequest, MoveSeq, Position, moving, on_tile, position};
+use engine::systems::movement::{self, MoveRequest, MoveSeq, Position, moving, position};
 use engine::systems::player::{self, ARRIVAL_PATIENCE, AreaDrawn, JoinRequest, commands_locked};
 use engine::systems::script::{self, Place};
 use engine::systems::{npc, stat};
@@ -50,7 +50,9 @@ fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
 
     walk(&mut sim, away);
     assert!(
-        sim.run_until(5.0, |world| !on_tile(world, player)),
+        sim.run_until(5.0, |world| {
+            !position(world, player).is_some_and(|at| at.on_center())
+        }),
         "you never set off"
     );
     let to = Place {
