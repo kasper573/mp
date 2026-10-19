@@ -1,7 +1,7 @@
 {
-  "image": "icons/cursors/cross006.png",
+  "image": "icons/crosshairs/outline/crosshair061.png",
   "hotspot": {
-    "x": 32,
-    "y": 32
+    "x": 36,
+    "y": 36
   }
 }
