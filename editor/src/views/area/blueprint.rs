@@ -1,4 +1,7 @@
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui, Vec2};
@@ -19,7 +22,7 @@ use crate::{forms, rows, value};
 use engine::core::content::row_file;
 
 pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
     let modules = selected_modules(&row, &indices);
@@ -195,7 +198,7 @@ pub fn make_blueprint_dialog(
 ) -> Option<MakeBlueprintDialog> {
     let mut outcome = None;
     let row = editor
-        .row_value("area", &dialog.area)
+        .row_value(AreaDef::TABLE, &dialog.area)
         .unwrap_or(Value::Null);
     let modules = selected_modules(&row, &dialog.indices);
     let origin = selection_origin(&modules);
@@ -370,7 +373,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
     }
     let row = project
         .files
-        .json(&row_file("area", &dialog.area))
+        .json(&row_file(AreaDef::TABLE, &dialog.area))
         .ok_or("the area is gone")?;
     let modules = selected_modules(&row, &dialog.indices);
     let origin = selection_origin(&modules).ok_or("the selection has no place")?;
@@ -384,7 +387,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         modules.len(),
         dialog.area
     ));
-    edit.write_json(row_file("blueprint", &key), &blueprint);
+    edit.write_json(row_file(BlueprintDef::TABLE, &key), &blueprint);
     let mut groups: Vec<BlueprintMatch> = vec![BlueprintMatch {
         area: dialog.area.clone(),
         indices: dialog.indices.clone(),
@@ -402,7 +405,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
     for (area, groups) in by_area {
         let mut row = project
             .files
-            .json_owned(&row_file("area", &area))
+            .json_owned(&row_file(AreaDef::TABLE, &area))
             .ok_or("an area is gone")?;
         let mut list: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
         let mut remove: Vec<usize> = groups
@@ -437,7 +440,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
             first_placement = Some(first - before);
         }
         row["modules"] = Value::Array(list);
-        edit.write_json(row_file("area", &area), &row);
+        edit.write_json(row_file(AreaDef::TABLE, &area), &row);
     }
     editor.try_apply(edit)?;
     editor.selection = RowSelection {
@@ -621,8 +624,8 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
     for (file, json) in files {
         edit.write_json(file, &json);
     }
-    edit.remove(row_file("blueprint", &dialog.blueprint));
+    edit.remove(row_file(BlueprintDef::TABLE, &dialog.blueprint));
     editor.try_apply(edit)?;
-    rows::close_tabs(editor, "blueprint", &dialog.blueprint);
+    rows::close_tabs(editor, BlueprintDef::TABLE, &dialog.blueprint);
     Ok(())
 }

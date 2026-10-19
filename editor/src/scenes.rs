@@ -1,3 +1,8 @@
+use engine::core::content::ContentRow;
+use engine::systems::actor::model::ModelDef;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::script::ScriptDef;
 use std::path::PathBuf;
 
 use engine::systems::area::world_map::{Note, Region};
@@ -276,11 +281,11 @@ pub fn open(editor: &mut Editor, steps: &[Step]) {
 fn open_one(editor: &mut Editor, step: &Step) {
     match step {
         Step::Area(key) => {
-            editor.select(RowSelection::row("area", key));
+            editor.select(RowSelection::row(AreaDef::TABLE, key));
             editor.open_tab(EditorTab::Area { key: key.clone() });
         }
         Step::Blueprint(key) => {
-            editor.select(RowSelection::row("blueprint", key));
+            editor.select(RowSelection::row(BlueprintDef::TABLE, key));
             editor.open_tab(EditorTab::Blueprint { key: key.clone() });
         }
         Step::Part {
@@ -413,7 +418,7 @@ fn fold(editor: &mut Editor, table: &str, modules: &[usize], folded: bool) {
 fn open_script(editor: &mut Editor, target: &ScriptTarget) {
     match target {
         ScriptTarget::Shared { key } => {
-            editor.select(RowSelection::row("script", key));
+            editor.select(RowSelection::row(ScriptDef::TABLE, key));
             editor.open_tab(EditorTab::Script(ScriptOwner::Shared { key: key.clone() }));
         }
         ScriptTarget::Inline {
@@ -500,13 +505,13 @@ fn sheet_step(editor: &mut Editor, step: &SheetStep) {
 
 fn model_step(editor: &mut Editor, step: &ModelStep) {
     if let ModelStep::Open(key) = step {
-        editor.select(RowSelection::row("model", key));
+        editor.select(RowSelection::row(ModelDef::TABLE, key));
         editor.open_tab(EditorTab::Model { key: key.clone() });
         return;
     }
     let key = match ui::active_tab(editor) {
         Some(EditorTab::Model { key }) => key,
-        _ if editor.selection.table == "model" && !editor.selection.keys.is_empty() => {
+        _ if editor.selection.table == ModelDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
         _ => return,
@@ -523,7 +528,7 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
             view.page = ModelPage::Busts;
             if let Some(face) = face {
                 view.face = Some(face.clone());
-                if let Some(row) = editor.row_value("model", &key)
+                if let Some(row) = editor.row_value(ModelDef::TABLE, &key)
                     && let Some(found) = busts::faces(&row)
                         .into_iter()
                         .find(|found| found.name == *face)
@@ -569,13 +574,13 @@ fn show_strip(editor: &mut Editor, key: &str, page: ModelPage, step: &StripView)
 
 fn tileset_step(editor: &mut Editor, step: &TilesetStep) {
     if let TilesetStep::Open(key) = step {
-        editor.select(RowSelection::row("tileset", key));
+        editor.select(RowSelection::row(TilesetDef::TABLE, key));
         editor.open_tab(EditorTab::Tileset { key: key.clone() });
         return;
     }
     let key = match ui::active_tab(editor) {
         Some(EditorTab::Tileset { key }) => key,
-        _ if editor.selection.table == "tileset" && !editor.selection.keys.is_empty() => {
+        _ if editor.selection.table == TilesetDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
         _ => return,

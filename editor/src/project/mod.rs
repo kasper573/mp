@@ -8,6 +8,8 @@ pub mod watch;
 pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_bytes};
 pub use history::{EditHistory, EditStep, RowSelection};
 
+use engine::core::content::ContentRow;
+use engine::systems::script::ScriptDef;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -232,7 +234,7 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
-        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), None);
+        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE), None);
         let mut project = Project {
             root: root.to_path_buf(),
             loading: None,
@@ -570,7 +572,7 @@ impl Loaded {
     ) -> Loaded {
         let started = Instant::now();
         let usages = ContentUsages::build(&content, files);
-        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), Some(&content));
+        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE), Some(&content));
         Loaded {
             content,
             usages,

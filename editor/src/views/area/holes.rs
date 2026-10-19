@@ -1,3 +1,5 @@
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
 use std::collections::{BTreeMap, HashSet};
 
 use engine::core::content::locate;
@@ -185,8 +187,8 @@ pub struct HoleableField {
 }
 
 pub fn holeable_fields(shapes: &SchemaShapes, part: &Value) -> Vec<HoleableField> {
-    let root = shapes.shape_of("area");
-    let variants = shapes.module_variants("area");
+    let root = shapes.shape_of(AreaDef::TABLE);
+    let variants = shapes.module_variants(AreaDef::TABLE);
     let Some(variant) = schema::variant_of(&variants, part) else {
         return Vec::new();
     };

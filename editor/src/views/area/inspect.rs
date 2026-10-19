@@ -1,5 +1,8 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -61,7 +64,7 @@ pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
 /// or a pick under way, or else the card of the tool in hand.
 pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let selection = editor.selection.clone();
-    if selection.table == "blueprint" && !selection.parts.is_empty() {
+    if selection.table == BlueprintDef::TABLE && !selection.parts.is_empty() {
         super::inspect_parts(editor, ui, &selection);
     } else if selected_parts(editor, key) {
         show_parts(editor, ui, &selection);
@@ -73,13 +76,13 @@ pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
 fn selected_parts(editor: &Editor, key: &str) -> bool {
     let selection = &editor.selection;
     let of_this_area =
-        selection.table == "area" && selection.keys.first().is_some_and(|k| k == key);
+        selection.table == AreaDef::TABLE && selection.keys.first().is_some_and(|k| k == key);
     (of_this_area
         && selection
             .parts
             .iter()
             .any(|part| super::module_index(part).is_some()))
-        || (selection.table == "blueprint" && !selection.parts.is_empty())
+        || (selection.table == BlueprintDef::TABLE && !selection.parts.is_empty())
 }
 
 fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -616,7 +619,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
 }
 
 fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, area_id: AreaId) {
-    let Some(mut row) = editor.row_value("area", key) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, key) else {
         return;
     };
     let area = area::load(content, area_id);
@@ -708,7 +711,7 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
     if let Some(name) = rename {
         row["name"] = Value::String(name);
         let mut edit = ContentEdit::new(format!("Rename area {key}"));
-        edit.write_json(row_file("area", key), &row);
+        edit.write_json(row_file(AreaDef::TABLE, key), &row);
         editor.apply(edit);
     }
     match menu_action {
@@ -827,7 +830,7 @@ fn ways_in(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .filter(|arrival| !arrival.initial_spawn)
         .collect();
     let name = editor
-        .row_value("area", key)
+        .row_value(AreaDef::TABLE, key)
         .and_then(|row| row["name"].as_str().map(str::to_owned))
         .unwrap_or_else(|| key.to_owned());
     widgets::section_count(ui, &format!("Ways into {name}"), arrivals.len());
@@ -880,7 +883,7 @@ fn ways_in(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
-    let Some(row) = editor.row_value("area", key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, key) else {
         return;
     };
     let mut counts: Vec<(String, usize)> = Vec::new();
@@ -929,7 +932,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(area_key) = selection.keys.first().cloned() else {
         return;
     };
-    let Some(mut row) = editor.row_value("area", &area_key) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, &area_key) else {
         return;
     };
     let indices: Vec<usize> = selection
@@ -941,7 +944,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         return;
     }
     let shapes = editor.shapes.clone();
-    let shape = shapes.shape_of("area");
+    let shape = shapes.shape_of(AreaDef::TABLE);
     let mut changed = false;
     let mut actions = Vec::new();
     let mut out = Followups::default();
@@ -1007,7 +1010,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     }
     if changed {
         let mut edit = ContentEdit::new(format!("Edit {label} of {area_key}"));
-        edit.write_json(row_file("area", &area_key), &row);
+        edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
         editor.apply(edit);
     }
     for action in actions {
@@ -1033,7 +1036,7 @@ fn module_inspector(
     index: usize,
     out: &mut Followups,
 ) -> bool {
-    let variants = cx.shapes.module_variants("area");
+    let variants = cx.shapes.module_variants(AreaDef::TABLE);
     let path = super::module_part(index);
     let kind = row["modules"][index]["type"]
         .as_str()

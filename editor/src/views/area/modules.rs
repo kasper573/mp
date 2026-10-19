@@ -1,6 +1,8 @@
 use egui::{Pos2, RichText, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::Pos;
 use engine::core::tiling::{CellPos, TilePos, Tiles};
+use engine::systems::area::AreaDef;
 use engine::systems::area::AreaModuleKind;
 use engine::systems::script::Place;
 use serde_json::Value;
@@ -327,10 +329,10 @@ pub fn variant_template(editor: &Editor, kind: &str) -> Option<Value> {
 }
 
 pub fn module_variants(editor: &Editor) -> Vec<(String, Value)> {
-    let root = editor.shapes.shape_of("area");
+    let root = editor.shapes.shape_of(AreaDef::TABLE);
     editor
         .shapes
-        .module_variants("area")
+        .module_variants(AreaDef::TABLE)
         .iter()
         .map(|variant| (variant.tag.clone(), schema::variant_template(root, variant)))
         .collect()
@@ -552,7 +554,7 @@ pub fn change_modules(
 
 pub fn area_modules(editor: &Editor, area_key: &str) -> Vec<Value> {
     editor
-        .row_value("area", area_key)
+        .row_value(AreaDef::TABLE, area_key)
         .and_then(|row| row["modules"].as_array().cloned())
         .unwrap_or_default()
 }
@@ -562,11 +564,11 @@ pub fn module_edit(
     area_key: &str,
     change: impl FnOnce(&mut Vec<Value>) -> Option<String>,
 ) -> Option<ContentEdit> {
-    let mut row = editor.row_value("area", area_key)?;
+    let mut row = editor.row_value(AreaDef::TABLE, area_key)?;
     let mut modules = area_modules(editor, area_key);
     let label = change(&mut modules)?;
     row["modules"] = Value::Array(modules);
     let mut edit = ContentEdit::new(label);
-    edit.write_json(row_file("area", area_key), &row);
+    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
     Some(edit)
 }

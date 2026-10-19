@@ -1,3 +1,6 @@
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::HashSet;
 
 use egui::{Pos2, Ui};
@@ -205,7 +208,9 @@ impl SelectScope<'_> {
 
     fn clear_selection(&self, editor: &mut Editor, frame: &AreaFrame) {
         match self {
-            SelectScope::Area => editor.selection = RowSelection::row("area", &frame.area_key),
+            SelectScope::Area => {
+                editor.selection = RowSelection::row(AreaDef::TABLE, &frame.area_key)
+            }
             SelectScope::Blueprint { .. } => editor.selection.parts.clear(),
         }
     }
@@ -635,7 +640,7 @@ pub fn duplicate_selection(editor: &mut Editor, frame: &AreaSnapshot) {
 }
 
 pub fn delete_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    if editor.selection.table == "blueprint"
+    if editor.selection.table == BlueprintDef::TABLE
         && let Some(place) = frame.in_place.last().cloned()
     {
         placement::delete_parts_in_place(editor, frame, &place);

@@ -30,6 +30,9 @@ pub use blueprint::{
 pub use resize::ResizeDialog;
 
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::World;
@@ -411,7 +414,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
 }
 
 pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
-    let Some(mut row) = editor.row_value("area", area) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, area) else {
         return;
     };
     let Some(layers) = row["map"]["ground"].as_array_mut() else {
@@ -421,7 +424,7 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
     layers.retain(|name| name.as_str() != Some(layer));
     let remaining = layers.len();
     let mut edit = ContentEdit::new(format!("Remove layer {layer} of {area}"));
-    edit.write_json(row_file("area", area), &row);
+    edit.write_json(row_file(AreaDef::TABLE, area), &row);
     edit.remove(format!(
         "{}/{}",
         area::grid::folder(area),
@@ -501,16 +504,17 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let selection = editor.selection.clone();
-    let indices: Vec<usize> =
-        if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
-            selection
-                .parts
-                .iter()
-                .filter_map(|p| blueprint_part_index(p))
-                .collect()
-        } else {
-            Vec::new()
-        };
+    let indices: Vec<usize> = if selection.table == BlueprintDef::TABLE
+        && selection.keys.first().is_some_and(|k| k == key)
+    {
+        selection
+            .parts
+            .iter()
+            .filter_map(|p| blueprint_part_index(p))
+            .collect()
+    } else {
+        Vec::new()
+    };
     sidebar::row(ui, "blueprint", |ui| {
         parts::blueprint_row(editor, ui, key, &indices)
     });
@@ -892,7 +896,9 @@ impl AreaSnapshot {
         area_key: &str,
         in_place: Vec<placement::Placement>,
     ) -> Self {
-        let own = editor.row_value("area", area_key).unwrap_or(Value::Null);
+        let own = editor
+            .row_value(AreaDef::TABLE, area_key)
+            .unwrap_or(Value::Null);
         Self {
             content: content.clone(),
             area_id,
@@ -985,7 +991,9 @@ fn origin_of(center: Pos<Tiles>, in_place: &[placement::Placement]) -> (Pos<Tile
 }
 
 pub fn selected_parts(editor: &Editor, area_key: &str) -> HashSet<String> {
-    if editor.selection.table == "area" && editor.selection.keys.iter().any(|k| k == area_key) {
+    if editor.selection.table == AreaDef::TABLE
+        && editor.selection.keys.iter().any(|k| k == area_key)
+    {
         editor.selection.parts.iter().cloned().collect()
     } else {
         HashSet::new()
@@ -1017,7 +1025,7 @@ fn remember_camera(editor: &mut Editor, view_key: &str) {
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    if selection.table == "blueprint" {
+    if selection.table == BlueprintDef::TABLE {
         let Some(key) = selection.keys.first().cloned() else {
             return;
         };
@@ -1056,7 +1064,7 @@ pub fn run_action(editor: &mut Editor, frame: &AreaSnapshot, action: AreaAction)
         AreaAction::Duplicate => select::duplicate_selection(editor, frame),
         AreaAction::Delete => select::delete_selection(editor, frame),
         AreaAction::OpenBlueprint(key) => {
-            editor.select(RowSelection::row("blueprint", &key));
+            editor.select(RowSelection::row(BlueprintDef::TABLE, &key));
             editor.open_tab(EditorTab::Blueprint { key });
         }
         AreaAction::MakeBlueprint => blueprint::make_blueprint_from_selection(editor, frame),

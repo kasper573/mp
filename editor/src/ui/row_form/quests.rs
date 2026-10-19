@@ -1,5 +1,9 @@
 use egui::{Sense, Ui};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
 use engine::systems::area::AreaModuleKind;
+use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::script::ScriptDef;
 use serde_json::Value;
 
 use super::{theme, widgets};
@@ -85,7 +89,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
                 (
                     format!("script/{name}"),
                     files
-                        .json(&row_file("script", &name))
+                        .json(&row_file(ScriptDef::TABLE, &name))
                         .map(|row| row["nodes"].clone())
                         .unwrap_or(Value::Null),
                 )
@@ -122,7 +126,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
         let Some((table, key)) = row_of(&path) else {
             continue;
         };
-        if table == "script" || table == "test_character" {
+        if table == ScriptDef::TABLE || table == CharacterSnapshot::TABLE {
             continue;
         }
         let Some(row) = files.json(&path) else {
@@ -130,7 +134,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
         };
         for module in row["modules"].as_array().into_iter().flatten() {
             scan(table, format!("{table}/{key}"), module);
-            if table == "area" {
+            if table == AreaDef::TABLE {
                 let object = module["name"]
                     .as_str()
                     .or(module["label"].as_str())

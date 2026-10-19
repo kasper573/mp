@@ -1,7 +1,9 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
 use engine::core::content::Content;
+use engine::core::content::ContentRow;
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
+use engine::systems::area::AreaDef;
 use engine::systems::area::{self, AreaId, ObjectShape};
 
 use super::AreaFrame;
@@ -31,7 +33,7 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for usage in project.usages.of_row("area", area_key) {
+    for usage in project.usages.of_row(AreaDef::TABLE, area_key) {
         let Some(parent) = usage.pointer.strip_suffix("/area") else {
             continue;
         };

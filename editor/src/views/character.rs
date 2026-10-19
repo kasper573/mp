@@ -1,5 +1,9 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::item::ItemDef;
+use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::skill::SkillDef;
 use std::collections::BTreeMap;
 
 use egui::{Align, Layout, Ui, Vec2};
@@ -9,6 +13,7 @@ use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::class::{ClassDef, SkillTree};
+use engine::systems::memory::MemoryDef;
 use engine::systems::npc::NpcId;
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
@@ -140,7 +145,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .map(|project| {
             project
                 .files
-                .keys_of("test_character")
+                .keys_of(CharacterSnapshot::TABLE)
                 .map(str::to_owned)
                 .collect()
         })
@@ -327,7 +332,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
 
 fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
-    let classes: Vec<String> = cx.files.keys_of("class").map(str::to_owned).collect();
+    let classes: Vec<String> = cx
+        .files
+        .keys_of(ClassDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
     let level = level_of(cx, value.text("class"), xp);
     card(ui, "Identity", |ui| {
@@ -395,7 +404,11 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     if !value["bag"].is_array() {
         value["bag"] = Value::Array(Vec::new());
     }
-    let items: Vec<String> = cx.files.keys_of("item").map(str::to_owned).collect();
+    let items: Vec<String> = cx
+        .files
+        .keys_of(ItemDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let count = value["bag"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     card(ui, "Bag", |ui| {
@@ -415,7 +428,7 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
                 let mut key = item_key.clone();
                 ui.scope(|ui| {
                     ui.set_width(200.0);
-                    if picker::row(ui, cx, "item", &mut key, &format!("{path}/item")) {
+                    if picker::row(ui, cx, ItemDef::TABLE, &mut key, &format!("{path}/item")) {
                         stack["item"] = Value::String(key);
                         changed = FormChange::at(&path);
                     }
@@ -464,9 +477,9 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .map(|slot| {
             let items = cx
                 .files
-                .keys_of("item")
+                .keys_of(ItemDef::TABLE)
                 .filter_map(|key| {
-                    let row = cx.files.json(&row_file("item", key))?;
+                    let row = cx.files.json(&row_file(ItemDef::TABLE, key))?;
                     (row["kind"]["type"] == "equipment"
                         && row["kind"]["slot"].as_str() == Some(slot))
                     .then(|| key.to_owned())
@@ -622,7 +635,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::card_title(ui, "Hotbar");
         widgets::kv(ui, "basic attack", |ui| {
             let mut skill = value.text("basic_attack").to_owned();
-            if picker::row(ui, cx, "skill", &mut skill, "/basic_attack") {
+            if picker::row(ui, cx, SkillDef::TABLE, &mut skill, "/basic_attack") {
                 if skill.is_empty() {
                     value.remove_field("basic_attack");
                 } else {
@@ -765,7 +778,7 @@ fn start(
                 ui.label(theme::faint("· the initial spawn").size(12.0));
             } else {
                 let mut draft = area_key.clone();
-                if picker::row(ui, cx, "area", &mut draft, "/start/area") {
+                if picker::row(ui, cx, AreaDef::TABLE, &mut draft, "/start/area") {
                     value["start"]["area"] = Value::String(draft);
                     changed = FormChange::at("/start");
                 }
@@ -882,7 +895,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .collect();
     let all: Vec<String> = cx
         .files
-        .keys_of("area")
+        .keys_of(AreaDef::TABLE)
         .map(str::to_owned)
         .filter(|key| !known.contains(key))
         .collect();
@@ -1054,7 +1067,11 @@ fn quests(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let all: Vec<String> = cx.files.keys_of("quest").map(str::to_owned).collect();
+    let all: Vec<String> = cx
+        .files
+        .keys_of(QuestDef::TABLE)
+        .map(str::to_owned)
+        .collect();
     let in_log: Vec<String> = value["quests"]
         .as_array()
         .into_iter()
@@ -1098,14 +1115,17 @@ fn quests(
                                 .by_key::<QuestDef>(quest)
                                 .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
                         });
-                let requires = cx.files.json(&row_file("quest", quest)).and_then(|row| {
-                    row["modules"].as_array().and_then(|modules| {
-                        modules
-                            .iter()
-                            .find(|m| m["type"] == "requires")
-                            .map(|m| condition::summary(&m["condition"]))
-                    })
-                });
+                let requires = cx
+                    .files
+                    .json(&row_file(QuestDef::TABLE, quest))
+                    .and_then(|row| {
+                        row["modules"].as_array().and_then(|modules| {
+                            modules
+                                .iter()
+                                .find(|m| m["type"] == "requires")
+                                .map(|m| condition::summary(&m["condition"]))
+                        })
+                    });
                 let subtitle = match standing {
                     Standing::NotTaken => requires
                         .map(|r| format!("needs {r}"))
@@ -1426,12 +1446,12 @@ fn memories(
     view: &mut CharacterView,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let defs: Vec<MemoryDef> = cx
+    let defs: Vec<MemoryEntry> = cx
         .files
-        .keys_of("memory")
+        .keys_of(MemoryDef::TABLE)
         .filter_map(|key| {
-            let row = cx.files.json(&row_file("memory", key))?;
-            Some(MemoryDef {
+            let row = cx.files.json(&row_file(MemoryDef::TABLE, key))?;
+            Some(MemoryEntry {
                 key: key.to_owned(),
                 ty: row.kind_or("boolean").to_owned(),
                 label: row.text("label").to_owned(),
@@ -1439,8 +1459,8 @@ fn memories(
         })
         .collect();
     let set: Vec<Value> = value["memories"].as_array().cloned().unwrap_or_default();
-    let is_set = |def: &&MemoryDef| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
-    let mut order: Vec<&MemoryDef> = defs.iter().filter(is_set).collect();
+    let is_set = |def: &&MemoryEntry| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
+    let mut order: Vec<&MemoryEntry> = defs.iter().filter(is_set).collect();
     order.extend(defs.iter().filter(|def| !is_set(def)));
     let mut updates: Vec<(String, Option<Value>)> = Vec::new();
     widgets::section_count(ui, "Memories", defs.len());
@@ -1458,7 +1478,7 @@ fn memories(
             ui.label("");
             ui.label(theme::faint("LAST SET").size(11.0).monospace());
             ui.end_row();
-            for MemoryDef { key, ty, label } in order.iter().take(order.len() - hidden) {
+            for MemoryEntry { key, ty, label } in order.iter().take(order.len() - hidden) {
                 let entry = set.iter().find(|m| m["memory"].as_str() == Some(key));
                 ui.label(theme::mono(key).size(13.0)).on_hover_text(label);
                 match ty.as_str() {
@@ -1551,7 +1571,7 @@ fn memories(
     changed
 }
 
-struct MemoryDef {
+struct MemoryEntry {
     key: String,
     ty: String,
     label: String,
@@ -1566,7 +1586,7 @@ fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
 }
 
 fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
-    let row = cx.files.json(&row_file("item", item))?;
+    let row = cx.files.json(&row_file(ItemDef::TABLE, item))?;
     row["modules"]
         .as_array()?
         .iter()

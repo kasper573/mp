@@ -1,8 +1,10 @@
 use design_tokens::controls;
 use design_tokens::glyph::Mark;
 use egui::Ui;
+use engine::core::content::ContentRow;
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
+use engine::systems::area::AreaDef;
 use engine::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
@@ -282,14 +284,14 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         "shape": { "type": "point", "x": cell.x as f32, "y": cell.y as f32 },
         "scripts": scripts,
     });
-    let Some(mut there_row) = editor.row_value("area", &target_area) else {
+    let Some(mut there_row) = editor.row_value(AreaDef::TABLE, &target_area) else {
         return;
     };
     if let Some(m) = there_row["modules"].as_array_mut() {
         m.push(door);
     }
     let mut edit = ContentEdit::new(format!("Return door from {target_area} to {area_key}"));
-    edit.write_json(row_file("area", &target_area), &there_row);
+    edit.write_json(row_file(AreaDef::TABLE, &target_area), &there_row);
     if editor.apply(edit) {
         editor.toast(format!(
             "Added a door back in {target_area} at {}, {}",

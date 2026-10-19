@@ -4,6 +4,10 @@ pub mod preview;
 use self::preview::PreviewPlace;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::input::map::InputDef;
+use engine::systems::quest::QuestDef;
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -121,7 +125,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         .get("properties")
         .and_then(|p| p.get("modules"))
         .is_some();
-    let second_column = has_modules || table == "input";
+    let second_column = has_modules || table == InputDef::TABLE;
     if fixture {
         editor.status.left.push(format!("{table}/{key}"));
         editor
@@ -154,7 +158,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.add_space(16.0);
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
-                        if table == "input" {
+                        if table == InputDef::TABLE {
                             changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                         } else {
                             changed |= modules_column(
@@ -174,7 +178,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.set_max_width(SINGLE_COLUMN);
                 }
                 changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
-                if table == "input" {
+                if table == InputDef::TABLE {
                     ui.add_space(10.0);
                     changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                 }
@@ -342,7 +346,7 @@ fn modules_column(
         value["modules"] = Value::Array(Vec::new());
     }
     let mut changed = FormChange::default();
-    let scripts_only = table == "area";
+    let scripts_only = table == AreaDef::TABLE;
     let count = value["modules"].as_array().map_or(0, Vec::len);
     let shown = if scripts_only {
         value["modules"].as_array().map_or(0, |list| {
@@ -415,7 +419,7 @@ fn modules_column(
         }
         let summary = if is_script {
             script_summary(module)
-        } else if table == "quest" && is_objective(&tag) {
+        } else if table == QuestDef::TABLE && is_objective(&tag) {
             objectives += 1;
             format!("objective {objectives}")
         } else if let Some(condition) = module.get("condition") {

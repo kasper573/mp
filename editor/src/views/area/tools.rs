@@ -1,6 +1,8 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
+use engine::systems::area::AreaDef;
 use engine::systems::area::AreaModuleKind;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
@@ -500,7 +502,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         } else {
             1.0
         };
-        if !editor.selection.parts.is_empty() && editor.selection.table == "area" {
+        if !editor.selection.parts.is_empty() && editor.selection.table == AreaDef::TABLE {
             move_selection(editor, frame, x as f32 * step, y as f32 * step);
         } else {
             let view = editor.views.area.view_mut(view_key);

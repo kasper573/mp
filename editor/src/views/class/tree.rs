@@ -1,3 +1,5 @@
+use engine::core::content::ContentRow;
+use engine::systems::skill::SkillDef;
 use std::collections::BTreeSet;
 
 use design_tokens::{glyph, ink};
@@ -166,7 +168,7 @@ fn toolbar(
             ui.label(theme::muted("add node").size(12.5));
             ui.scope(|ui| {
                 ui.set_width(220.0);
-                picker::row(ui, cx, "skill", &mut picked, "/tree/new/skill");
+                picker::row(ui, cx, SkillDef::TABLE, &mut picked, "/tree/new/skill");
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let line = format!(

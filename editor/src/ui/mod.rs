@@ -12,6 +12,8 @@ pub mod theme;
 pub mod tree;
 pub mod widgets;
 
+use engine::core::content::ContentRow;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use std::mem;
 use std::path::Path;
 use std::time::Duration;
@@ -209,8 +211,8 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         views::play_here(editor);
     }
     if played && let Some(key) = play::current_character(editor) {
-        editor.select(RowSelection::row("test_character", &key));
-        editor.open_tab(EditorTab::for_row("test_character", &key));
+        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &key));
+        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &key));
     }
     if editor.play.running.is_some() {
         ctx.request_repaint_after(Duration::from_millis(100));

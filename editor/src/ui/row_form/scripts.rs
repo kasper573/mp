@@ -1,4 +1,7 @@
 use design_tokens::glyph;
+use engine::core::content::ContentRow;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::ScriptDef;
 use std::str::FromStr;
 
 use egui::{Align, Layout, Ui};
@@ -317,7 +320,7 @@ pub(super) fn script_values(
     let Some(script) = module["script"].as_str().map(str::to_owned) else {
         return FormChange::default();
     };
-    let Some(row) = cx.files.json(&row_file("script", &script)) else {
+    let Some(row) = cx.files.json(&row_file(ScriptDef::TABLE, &script)) else {
         return FormChange::default();
     };
     let Some(variables) = row["variables"].as_object() else {
@@ -351,7 +354,7 @@ pub(super) fn script_values(
 }
 
 pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
-    (table == "npc").then(|| key.to_owned())
+    (table == NpcDef::TABLE).then(|| key.to_owned())
 }
 
 pub(super) fn is_objective(tag: &str) -> bool {

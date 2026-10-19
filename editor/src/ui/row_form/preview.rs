@@ -5,6 +5,7 @@ use design_tokens::glyph::{self, Kind, Mark};
 use design_tokens::ink;
 use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::content::Content;
+use engine::core::content::ContentRow;
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
@@ -14,6 +15,7 @@ use engine::systems::actor::plate::PlateLabel;
 use engine::systems::dialogue::ChoiceReveal;
 use engine::systems::item::card::CardLook;
 use engine::systems::item::{self, ItemDef};
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::quest::{self, ActiveQuest, Parties, QuestDef};
 use engine::systems::script::{Reach, RiftScripts};
 use engine::systems::skill::{self, SkillDef};
@@ -99,10 +101,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
         playing: state.playing,
     };
     draw_preview(editor, ui, table, key, &value, &pose);
-    if table == "quest" {
+    if table == QuestDef::TABLE {
         quest_parties_sections(editor, ui, key);
     }
-    if table == "test_character" {
+    if table == CharacterSnapshot::TABLE {
         character::preview_extras(editor, ui, key);
     }
     if matches!(table, "npc" | "player" | "model") {
@@ -255,7 +257,7 @@ pub(super) fn draw_preview(
     let Some(content) = editor.loaded() else {
         return;
     };
-    if table == "quest" {
+    if table == QuestDef::TABLE {
         let width = ui.available_width();
         let Editor { project, form, .. } = editor;
         let project = project.as_ref().expect("a project");
@@ -265,13 +267,13 @@ pub(super) fn draw_preview(
         });
         return;
     }
-    if table == "item" {
+    if table == ItemDef::TABLE {
         item_card(editor, ui, &content, key);
         ui.add_space(12.0);
     }
     let center = stage::center(&content);
     let mut posed = Posed::default();
-    if table == "item" {
+    if table == ItemDef::TABLE {
         posed.items.extend(content.by_key::<ItemDef>(key));
     } else {
         let model_key = match table {

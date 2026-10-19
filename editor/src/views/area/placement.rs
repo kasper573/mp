@@ -1,5 +1,8 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
@@ -48,11 +51,11 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
     let project = editor.project.as_ref()?;
     project
         .usages
-        .of_row("blueprint", blueprint)
+        .of_row(BlueprintDef::TABLE, blueprint)
         .iter()
         .find_map(|usage| {
             row_of(&usage.file)
-                .filter(|(table, _)| *table == "area")
+                .filter(|(table, _)| *table == AreaDef::TABLE)
                 .map(|(_, key)| key.to_owned())
         })
 }
@@ -417,7 +420,7 @@ pub(super) fn nested_bounds(
 }
 
 pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index: usize) {
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
     let module = &row["modules"][index];
@@ -428,7 +431,7 @@ pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index
     let view = editor.views.area.ensure_view(view_key, area_key);
     view.in_place = vec![index];
     view.set_tool(super::AreaTool::Select);
-    editor.selection = RowSelection::row("blueprint", &blueprint);
+    editor.selection = RowSelection::row(BlueprintDef::TABLE, &blueprint);
 }
 
 pub fn edit_in_place(editor: &mut Editor, view_key: &str, frame: &AreaFrame, index: usize) {
@@ -437,11 +440,11 @@ pub fn edit_in_place(editor: &mut Editor, view_key: &str, frame: &AreaFrame, ind
 
 pub fn enter_nested(editor: &mut Editor, view_key: &str, part: usize, blueprint: &str) {
     editor.views.area.view_mut(view_key).in_place.push(part);
-    editor.selection = RowSelection::row("blueprint", blueprint);
+    editor.selection = RowSelection::row(BlueprintDef::TABLE, blueprint);
 }
 
 pub fn selected_part_indices(editor: &Editor, blueprint: &str) -> Vec<usize> {
-    if editor.selection.table != "blueprint"
+    if editor.selection.table != BlueprintDef::TABLE
         || !editor.selection.keys.iter().any(|k| k == blueprint)
     {
         return Vec::new();
@@ -524,7 +527,7 @@ pub fn move_parts_in_place(
     dx: f32,
     dy: f32,
 ) {
-    let Some(mut row) = editor.row_value("blueprint", &place.blueprint) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, &place.blueprint) else {
         return;
     };
     let (bx, by) = (
@@ -542,7 +545,7 @@ pub fn move_parts_in_place(
         indices.len(),
         place.blueprint
     ));
-    edit.write_json(row_file("blueprint", &place.blueprint), &row);
+    edit.write_json(row_file(BlueprintDef::TABLE, &place.blueprint), &row);
     editor.apply(edit);
 }
 
@@ -551,7 +554,7 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
     if indices.is_empty() {
         return;
     }
-    let Some(mut row) = editor.row_value("blueprint", &place.blueprint) else {
+    let Some(mut row) = editor.row_value(BlueprintDef::TABLE, &place.blueprint) else {
         return;
     };
     if let Some(parts) = row["parts"].as_array_mut() {
@@ -563,7 +566,7 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
         indices.len(),
         place.blueprint
     ));
-    edit.write_json(row_file("blueprint", &place.blueprint), &row);
+    edit.write_json(row_file(BlueprintDef::TABLE, &place.blueprint), &row);
     if editor.apply(edit) {
         editor.selection.parts.clear();
     }
@@ -666,7 +669,7 @@ pub fn replace_with(
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(row) = editor.row_value("area", area_key) else {
+    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
     let old = row["modules"][index]["blueprint"]
@@ -685,7 +688,7 @@ pub fn replace_with(
     let mut dropped = 0;
     let mut swapped = 0;
     for area in areas {
-        let Some(mut row) = editor.row_value("area", &area) else {
+        let Some(mut row) = editor.row_value(AreaDef::TABLE, &area) else {
             continue;
         };
         let mut changed = false;
@@ -708,7 +711,7 @@ pub fn replace_with(
             changed = true;
         }
         if changed {
-            edit.write_json(row_file("area", &area), &row);
+            edit.write_json(row_file(AreaDef::TABLE, &area), &row);
         }
     }
     if editor.apply(edit) {

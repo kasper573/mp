@@ -1,4 +1,8 @@
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::actor::model::ModelDef;
+use engine::systems::area::AreaDef;
+use engine::systems::npc::NpcDef;
 use std::collections::{HashMap, HashSet};
 
 use egui::Ui;
@@ -1534,9 +1538,9 @@ fn asset(
 fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let mut faces: Vec<String> = busts::generic().map(str::to_owned).collect();
     if let Some(speaker) = &cx.speaker
-        && let Some(npc) = cx.files.json(&row_file("npc", speaker))
+        && let Some(npc) = cx.files.json(&row_file(NpcDef::TABLE, speaker))
         && let Some(model) = npc["model"].as_str()
-        && let Some(model) = cx.files.json(&row_file("model", model))
+        && let Some(model) = cx.files.json(&row_file(ModelDef::TABLE, model))
     {
         for module in model["modules"].as_array().into_iter().flatten() {
             if module["type"] == "bust" {
@@ -1563,7 +1567,7 @@ fn place(
     }
     let mut changed = FormChange::default();
     let mut area = value["area"].as_str().unwrap_or_default().to_owned();
-    if picker::row(ui, cx, "area", &mut area, &format!("{path}/area")) {
+    if picker::row(ui, cx, AreaDef::TABLE, &mut area, &format!("{path}/area")) {
         value["area"] = Value::String(area);
         changed = FormChange::at(path);
     }

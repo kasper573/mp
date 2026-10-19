@@ -1,3 +1,5 @@
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -263,7 +265,7 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
 }
 
 fn soundscape_name(editor: &Editor, area: &str, module: usize) -> String {
-    let row = editor.row_value("area", area);
+    let row = editor.row_value(AreaDef::TABLE, area);
     let soundscape = row
         .as_ref()
         .and_then(|row| row["modules"].as_array())

@@ -1,3 +1,6 @@
+use engine::core::content::ContentRow;
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
@@ -179,7 +182,7 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
             edit.write(to, bytes.clone());
         }
     }
-    if table == "area" {
+    if table == AreaDef::TABLE {
         world::card_beside(project, &mut edit, key, &copy);
     }
     if editor.apply(edit) {
@@ -719,7 +722,7 @@ fn decision_picker(
         } else {
             format!("Remove {}", usage_phrase(shapes, &group.table, &group.kind))
         };
-        let unpackable = table == "blueprint" && group.whole_modules;
+        let unpackable = table == BlueprintDef::TABLE && group.whole_modules;
         let label = match group.decision {
             UsageDecision::Repoint(_) => "Replace with…".to_owned(),
             UsageDecision::Unpack => "Unpack into scenery".to_owned(),

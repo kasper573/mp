@@ -1,6 +1,8 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
+use engine::core::content::ContentRow;
 use engine::core::content::fixture::FixtureLock;
+use engine::systems::input::map::InputDef;
 use serde_json::Value;
 
 use super::{theme, widgets};
@@ -285,14 +287,16 @@ pub(super) fn key_code_name(key: egui::Key) -> String {
 /// The other inputs that carry this same binding.
 fn also_bound(files: &ProjectFiles, key: &str, binding: &Value) -> Vec<String> {
     files
-        .keys_of("input")
+        .keys_of(InputDef::TABLE)
         .filter(|other| *other != key)
         .filter(|other| {
-            files.json(&row_file("input", other)).is_some_and(|row| {
-                row["bindings"]
-                    .as_array()
-                    .is_some_and(|list| list.contains(binding))
-            })
+            files
+                .json(&row_file(InputDef::TABLE, other))
+                .is_some_and(|row| {
+                    row["bindings"]
+                        .as_array()
+                        .is_some_and(|list| list.contains(binding))
+                })
         })
         .map(|other| format!("input/{other}"))
         .collect()

@@ -1,7 +1,9 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
 use engine::core::content::Content;
+use engine::core::content::ContentRow;
 use engine::systems::class::{NodeKey, SkillTree};
+use engine::systems::skill::SkillDef;
 use serde_json::{Map, Value};
 
 use super::tree::{self, CarriedNode};
@@ -68,7 +70,13 @@ fn fields(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, node: &str) -> FormChan
     let path = format!("{}{node}", super::TREE_PART);
     widgets::kv(ui, "skill", |ui| {
         let mut skill = row["tree"][node].text("skill").to_owned();
-        if picker::row(ui, cx, "skill", &mut skill, &format!("{path}/skill")) {
+        if picker::row(
+            ui,
+            cx,
+            SkillDef::TABLE,
+            &mut skill,
+            &format!("{path}/skill"),
+        ) {
             row["tree"][node]["skill"] = Value::String(skill);
             changed = FormChange::at(&path);
         }

@@ -1,5 +1,8 @@
 use design_tokens::controls::{self, Pill};
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::core::content::table_folder;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -426,8 +429,8 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         start(editor, None);
     }
     if edit && let Some(key) = current_character(editor) {
-        editor.select(RowSelection::row("test_character", &key));
-        editor.open_tab(EditorTab::for_row("test_character", &key));
+        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &key));
+        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &key));
     }
     if stop_now {
         stop(editor);
@@ -574,7 +577,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     });
     let mut characters: Vec<TestCharacter> = project
         .files
-        .paths_under("tables/test_character/")
+        .paths_under(&format!("{}/", table_folder(CharacterSnapshot::TABLE)))
         .filter_map(|file| {
             let (_, key) = row_of(file)?;
             let row = project.files.json(file)?;

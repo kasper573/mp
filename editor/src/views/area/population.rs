@@ -1,5 +1,6 @@
 use egui::{Ui, Vec2};
 use engine::core::content::Content;
+use engine::core::content::ContentRow;
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
@@ -21,7 +22,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
         return;
     };
-    let Some(row) = cx.files.json(&row_file("npc", &npc)) else {
+    let Some(row) = cx.files.json(&row_file(NpcDef::TABLE, &npc)) else {
         return;
     };
     widgets::section(ui, &format!("From npc/{npc}"));
