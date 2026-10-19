@@ -5,22 +5,6 @@ use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgent
 
 pub use tikv_jemallocator::Jemalloc as ServiceAllocator;
 
-#[macro_export]
-macro_rules! heap_profiling {
-    () => {
-        $crate::heap_profiling!($crate::ServiceAllocator, $crate::ServiceAllocator);
-    };
-    ($allocator:ty, $init:expr) => {
-        #[global_allocator]
-        static GLOBAL_ALLOCATOR: $allocator = $init;
-
-        // SAFETY: jemalloc reads its options from this one symbol at startup, and nothing else
-        // exports it.
-        #[unsafe(export_name = "malloc_conf")]
-        pub static MALLOC_CONF: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:19\0";
-    };
-}
-
 pub struct CpuProfiler {
     _agent: PyroscopeAgent<PyroscopeAgentRunning>,
 }
