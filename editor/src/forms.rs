@@ -782,21 +782,21 @@ fn geometry(
             number("h")
         ),
     };
-    let mut draft = drafts::draft_or(ui, id, current.clone());
-    let response = boxed_input(ui, Some("tiles"), |ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut draft)
-                .frame(egui::Frame::NONE)
-                .font(egui::TextStyle::Monospace)
-                .desired_width(f32::INFINITY),
-        )
+    let typed = typed(ui, id, &current, |ui, draft| {
+        boxed_input(ui, Some("tiles"), |ui| {
+            ui.add(
+                egui::TextEdit::singleline(draft)
+                    .frame(egui::Frame::NONE)
+                    .font(egui::TextStyle::Monospace)
+                    .desired_width(f32::INFINITY),
+            )
+        })
     });
-    if response.changed() {
-        drafts::set_draft(ui, id, &draft.clone());
-    }
     let mut changed = FormChange::default();
-    if committed(ui, &response) {
-        drafts::clear_draft(ui, id);
+    if let Typed::Cancelled = typed {
+        cx.state.errors.remove(path);
+    }
+    if let Typed::Committed(draft) = typed {
         let numbers: Vec<f64> = draft
             .split(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
             .filter(|part| !part.is_empty())
@@ -1001,14 +1001,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                 remove = Some(index);
                             }
                             response.context_menu(|ui| {
-                                if index > 0 && ui.button("Move up").clicked() {
-                                    swap = Some((index, index - 1));
-                                    ui.close();
-                                }
-                                if index + 1 < count && ui.button("Move down").clicked() {
-                                    swap = Some((index, index + 1));
-                                    ui.close();
-                                }
+                                swap = widgets::move_entries(ui, index, count).or(swap);
                             });
                         });
                     });
@@ -1034,14 +1027,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                     remove = Some(index);
                 }
                 response.context_menu(|ui| {
-                    if index > 0 && ui.button("Move up").clicked() {
-                        swap = Some((index, index - 1));
-                        ui.close();
-                    }
-                    if index + 1 < count && ui.button("Move down").clicked() {
-                        swap = Some((index, index + 1));
-                        ui.close();
-                    }
+                    swap = widgets::move_entries(ui, index, count).or(swap);
                 });
                 if inline {
                     if !item.is_object() {
@@ -1182,16 +1168,11 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                     remove = Some(key.clone());
                 }
                 let id = ui.id().with(&item_path).with("key");
-                let mut draft = drafts::draft_or(ui, id, key.clone());
-                let response = ui.add(egui::TextEdit::singleline(&mut draft).desired_width(110.0));
-                if response.changed() {
-                    drafts::set_draft(ui, id, &draft.clone());
-                }
-                if committed(ui, &response) {
-                    drafts::clear_draft(ui, id);
-                    if draft != *key && !draft.is_empty() {
-                        rename = Some((key.clone(), draft));
-                    }
+                let typed = drafted(ui, id, key, |ui, draft| {
+                    ui.add(egui::TextEdit::singleline(draft).desired_width(110.0))
+                });
+                if let Some(draft) = typed.filter(|draft| !draft.is_empty()) {
+                    rename = Some((key.clone(), draft));
                 }
                 ui.vertical(|ui| {
                     changed |= self::value(ui, cx, values, item, &item_path);
@@ -1217,7 +1198,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                     .desired_width(110.0),
             );
             if response.changed() {
-                drafts::set_draft(ui, id, &draft.clone());
+                drafts::set_draft(ui, id, &draft);
             }
             let add = ui.small_button("+ add").clicked()
                 || (response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i)));
@@ -1234,39 +1215,35 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
 pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("text");
     let current = value.as_str().unwrap_or_default().to_owned();
-    let mut draft = drafts::draft_or(ui, id, current.clone());
     let multiline = current.len() > 60 || current.contains('\n');
-    let response = boxed_input(ui, None, |ui| {
-        if multiline {
-            ui.add(
-                egui::TextEdit::multiline(&mut draft)
-                    .frame(egui::Frame::NONE)
-                    .desired_rows(2)
-                    .desired_width(f32::INFINITY),
-            )
-        } else {
-            ui.add(
-                egui::TextEdit::singleline(&mut draft)
-                    .frame(egui::Frame::NONE)
-                    .desired_width(f32::INFINITY),
-            )
-        }
+    let typed = typed(ui, id, &current, |ui, draft| {
+        boxed_input(ui, None, |ui| {
+            if multiline {
+                ui.add(
+                    egui::TextEdit::multiline(draft)
+                        .frame(egui::Frame::NONE)
+                        .desired_rows(2)
+                        .desired_width(f32::INFINITY),
+                )
+            } else {
+                ui.add(
+                    egui::TextEdit::singleline(draft)
+                        .frame(egui::Frame::NONE)
+                        .desired_width(f32::INFINITY),
+                )
+            }
+        })
     });
-    if response.changed() {
-        drafts::set_draft(ui, id, &draft.clone());
-    }
-    if ui.input(|i| EditorKey::Cancel.pressed(i)) && response.has_focus() {
-        drafts::clear_draft(ui, id);
-        cx.state.errors.remove(path);
-        return FormChange::default();
-    }
     let mut changed = FormChange::default();
-    if committed(ui, &response) {
-        drafts::clear_draft(ui, id);
-        if draft != current {
+    match typed {
+        Typed::Cancelled => {
+            cx.state.errors.remove(path);
+        }
+        Typed::Committed(draft) => {
             *value = Value::String(draft);
             changed = FormChange::at(path);
         }
+        Typed::Pending => {}
     }
     error_line(ui, cx, path);
     changed
@@ -1297,32 +1274,29 @@ fn number_field(
         .as_f64()
         .map(|number| number.to_string())
         .unwrap_or_default();
-    let mut draft = drafts::draft_or(ui, id, current.clone());
     let unit = schema["x-unit"].as_str().map(str::to_owned);
-    let response = boxed_input(ui, unit.as_deref(), |ui| {
-        let mut edit = egui::TextEdit::singleline(&mut draft)
-            .frame(egui::Frame::NONE)
-            .font(egui::TextStyle::Monospace)
-            .desired_width(f32::INFINITY);
-        if let Some(blank) = blank {
-            edit = edit.hint_text(theme::muted(blank));
+    let autofocus = std::mem::take(&mut cx.autofocus);
+    let typed = typed(ui, id, &current, |ui, draft| {
+        let response = boxed_input(ui, unit.as_deref(), |ui| {
+            let mut edit = egui::TextEdit::singleline(draft)
+                .frame(egui::Frame::NONE)
+                .font(egui::TextStyle::Monospace)
+                .desired_width(f32::INFINITY);
+            if let Some(blank) = blank {
+                edit = edit.hint_text(theme::muted(blank));
+            }
+            ui.add(edit)
+        });
+        if autofocus {
+            response.request_focus();
         }
-        ui.add(edit)
+        response
     });
-    if std::mem::take(&mut cx.autofocus) {
-        response.request_focus();
-    }
-    if response.changed() {
-        drafts::set_draft(ui, id, &draft.clone());
-    }
-    if ui.input(|i| EditorKey::Cancel.pressed(i)) && response.has_focus() {
-        drafts::clear_draft(ui, id);
-        cx.state.errors.remove(path);
-        return FormChange::default();
-    }
     let mut changed = FormChange::default();
-    if committed(ui, &response) {
-        drafts::clear_draft(ui, id);
+    if let Typed::Cancelled = typed {
+        cx.state.errors.remove(path);
+    }
+    if let Typed::Committed(draft) = typed {
         if blank.is_some() && draft.trim().is_empty() {
             if !value.is_null() {
                 *value = Value::Null;
@@ -1469,28 +1443,27 @@ pub fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("json");
     let current = serde_json::to_string(value).unwrap_or_default();
-    let mut draft = drafts::draft_or(ui, id, current.clone());
-    let response = ui.add(
-        egui::TextEdit::singleline(&mut draft)
-            .desired_width(f32::INFINITY)
-            .font(egui::TextStyle::Monospace),
-    );
-    if response.changed() {
-        drafts::set_draft(ui, id, &draft.clone());
-    }
-    if committed(ui, &response) {
-        drafts::clear_draft(ui, id);
-        if draft != current {
-            match serde_json::from_str::<Value>(&draft) {
-                Ok(parsed) => {
-                    *value = parsed;
-                    return FormChange::at(path);
-                }
-                Err(error) => {
-                    cx.state.errors.insert(path.to_owned(), error.to_string());
-                }
-            }
+    let typed = typed(ui, id, &current, |ui, draft| {
+        ui.add(
+            egui::TextEdit::singleline(draft)
+                .desired_width(f32::INFINITY)
+                .font(egui::TextStyle::Monospace),
+        )
+    });
+    match typed {
+        Typed::Cancelled => {
+            cx.state.errors.remove(path);
         }
+        Typed::Committed(draft) => match serde_json::from_str::<Value>(&draft) {
+            Ok(parsed) => {
+                *value = parsed;
+                return FormChange::at(path);
+            }
+            Err(error) => {
+                cx.state.errors.insert(path.to_owned(), error.to_string());
+            }
+        },
+        Typed::Pending => {}
     }
     error_line(ui, cx, path);
     FormChange::default()
@@ -1589,24 +1562,48 @@ fn place(
     changed
 }
 
+/// How a text input over a draft of `current` ended this frame: still pending, committed to a
+/// different text, or cancelled back to `current`.
+pub enum Typed {
+    Pending,
+    Committed(String),
+    Cancelled,
+}
+
+pub fn typed(
+    ui: &mut Ui,
+    id: egui::Id,
+    current: &str,
+    input: impl FnOnce(&mut Ui, &mut String) -> egui::Response,
+) -> Typed {
+    let mut draft = drafts::draft_or(ui, id, current.to_owned());
+    let response = input(ui, &mut draft);
+    let cancelled = ui.input(|i| EditorKey::Cancel.pressed(i));
+    if response.has_focus() && !cancelled {
+        drafts::set_draft(ui, id, &draft);
+        return Typed::Pending;
+    }
+    drafts::clear_draft(ui, id);
+    if cancelled && (response.has_focus() || response.lost_focus()) {
+        Typed::Cancelled
+    } else if response.lost_focus() && draft != current {
+        Typed::Committed(draft)
+    } else {
+        Typed::Pending
+    }
+}
+
+/// The text a drafted input of `current` was committed to, when it changed.
 pub fn drafted(
     ui: &mut Ui,
     id: egui::Id,
     current: &str,
     input: impl FnOnce(&mut Ui, &mut String) -> egui::Response,
 ) -> Option<String> {
-    let mut draft = drafts::draft_or(ui, id, current.to_owned());
-    let response = input(ui, &mut draft);
-    if committed(ui, &response) {
-        drafts::clear_draft(ui, id);
-        return (draft != current).then_some(draft);
+    match typed(ui, id, current, input) {
+        Typed::Committed(text) => Some(text),
+        Typed::Pending | Typed::Cancelled => None,
     }
-    if response.has_focus() {
-        drafts::set_draft(ui, id, &draft);
-    } else {
-        drafts::clear_draft(ui, id);
-    }
-    None
 }
 
 pub fn committed(ui: &Ui, response: &egui::Response) -> bool {

@@ -20,7 +20,6 @@ use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
 use super::{AreaTool, AreaViewState, brush, grid, resize, stamp, terrain};
 use crate::app::{Editor, ModalDialog, PlacePick};
-use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
@@ -624,11 +623,6 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
     };
     let area = area::load(content, area_id);
     let name_id = ui.id().with(("area-name", key));
-    let mut draft = draft_or(
-        ui,
-        name_id,
-        row["name"].as_str().unwrap_or_default().to_owned(),
-    );
     let mut rename = None;
     let mut menu_action: Option<AreaMenu> = None;
     widgets::card_frame(false).show(ui, |ui| {
@@ -652,22 +646,16 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
         });
         ui.add_space(4.0);
         widgets::kv(ui, "name", |ui| {
-            let response = forms::boxed_input(ui, None, |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut draft)
-                        .frame(egui::Frame::NONE)
-                        .desired_width(f32::INFINITY),
-                )
+            let name = row["name"].as_str().unwrap_or_default();
+            rename = forms::drafted(ui, name_id, name, |ui, draft| {
+                forms::boxed_input(ui, None, |ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .frame(egui::Frame::NONE)
+                            .desired_width(f32::INFINITY),
+                    )
+                })
             });
-            if response.changed() {
-                set_draft(ui, name_id, &draft.clone());
-            }
-            if forms::committed(ui, &response) {
-                clear_draft(ui, name_id);
-                if row["name"].as_str() != Some(draft.as_str()) {
-                    rename = Some(draft.clone());
-                }
-            }
         });
         widgets::kv(ui, "size", |ui| {
             forms::boxed_input(ui, Some("tiles"), |ui| {

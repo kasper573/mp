@@ -8,7 +8,6 @@ use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup, theme, widgets};
 use crate::app::Editor;
-use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
@@ -346,32 +345,30 @@ pub(super) fn shared_field(
             })
             .collect();
         let id = ui.id().with(path).with("set-all");
-        let mut draft = draft_of(ui, id).unwrap_or_default();
-        let response = egui::Frame::new()
-            .fill(theme::INPUT)
-            .stroke(egui::Stroke::new(1.0, theme::BORDER))
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(6, 2))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width() - 12.0);
-                ui.add(
-                    egui::TextEdit::singleline(&mut draft)
-                        .frame(egui::Frame::NONE)
-                        .hint_text(RichText::new(format!("{} values", distinct.len())).italics())
-                        .desired_width(f32::INFINITY),
-                )
-            });
-        let response = response.inner.on_hover_text(listing.join("\n"));
-        if response.changed() {
-            set_draft(ui, id, &draft.clone());
-        }
-        if forms::committed(ui, &response) {
-            clear_draft(ui, id);
-            if !draft.trim().is_empty() {
-                let parsed: Value = serde_json::from_str(draft.trim())
-                    .unwrap_or(Value::String(draft.trim().to_owned()));
-                rows.set_all(path, &parsed);
-            }
+        let typed = forms::drafted(ui, id, "", |ui, draft| {
+            egui::Frame::new()
+                .fill(theme::INPUT)
+                .stroke(egui::Stroke::new(1.0, theme::BORDER))
+                .corner_radius(4.0)
+                .inner_margin(egui::Margin::symmetric(6, 2))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width() - 12.0);
+                    ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .frame(egui::Frame::NONE)
+                            .hint_text(
+                                RichText::new(format!("{} values", distinct.len())).italics(),
+                            )
+                            .desired_width(f32::INFINITY),
+                    )
+                })
+                .inner
+                .on_hover_text(listing.join("\n"))
+        });
+        if let Some(draft) = typed.filter(|draft| !draft.trim().is_empty()) {
+            let parsed: Value = serde_json::from_str(draft.trim())
+                .unwrap_or(Value::String(draft.trim().to_owned()));
+            rows.set_all(path, &parsed);
         }
     });
 }

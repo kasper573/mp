@@ -460,14 +460,7 @@ fn modules_column(
                                 ui.close();
                             }
                             ui.separator();
-                            if index > 0 && ui.button("Move up").clicked() {
-                                swap = Some((index, index - 1));
-                                ui.close();
-                            }
-                            if index + 1 < count && ui.button("Move down").clicked() {
-                                swap = Some((index, index + 1));
-                                ui.close();
-                            }
+                            swap = widgets::move_entries(ui, index, count).or(swap);
                             ui.separator();
                             if ui.button("Remove").clicked() {
                                 remove = Some(index);

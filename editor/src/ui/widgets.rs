@@ -222,6 +222,22 @@ pub fn badge(ui: &mut Ui, kind: &str) {
     );
 }
 
+/// An open menu's "Move up" and "Move down" entries for the entry at `index` of `count`: the two
+/// indices to swap, once one is picked.
+pub fn move_entries(ui: &mut Ui, index: usize, count: usize) -> Option<(usize, usize)> {
+    let mut swap = None;
+    if index > 0 && ui.button("Move up").clicked() {
+        swap = Some((index, index - 1));
+    }
+    if index + 1 < count && ui.button("Move down").clicked() {
+        swap = Some((index, index + 1));
+    }
+    if swap.is_some() {
+        ui.close();
+    }
+    swap
+}
+
 pub fn card_header(
     ui: &mut Ui,
     title: &str,
