@@ -9,7 +9,7 @@ use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
-use crate::systems::movement::position;
+use crate::systems::movement::{self, position};
 use crate::systems::npc::NpcId;
 use crate::systems::player::{ClientId, Owner};
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
@@ -205,7 +205,12 @@ pub fn summon(
     let pack = super::next_pack(world);
     let mut spawned = Vec::with_capacity(count as usize);
     for index in 0..count {
-        let spot = ring(region, at, index, count);
+        let spot = movement::place_beside(
+            world,
+            tag.area,
+            &region.grid,
+            ring(region, at, index, count),
+        );
         let summon = super::spawn(world, npc, spot, tag.area, pack);
         world
             .entity_mut(summon)

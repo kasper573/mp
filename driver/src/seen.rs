@@ -2,7 +2,7 @@ use bevy_ecs::entity::Entity;
 use engine::core::content::Fixture;
 use engine::core::math::{Offset, Pos, Rect, WindowPx};
 use engine::core::render::transition::ScreenTransitionPhase;
-use engine::core::tiling::{TilePos, Tiles};
+use engine::core::tiling::{CellPos, TilePos, Tiles};
 use engine::core::vfx::{VfxDef, VfxSite};
 use engine::systems::actor::Action;
 use engine::systems::area::AreaDef;
@@ -63,6 +63,26 @@ pub fn nearest_npc<'a>(snapshot: &'a ProbeSnapshot, npc: &str) -> Option<&'a Pro
 
 pub fn npc_is(body: &ProbeBody, npc: &str) -> bool {
     body.npc == Some(id::<NpcDef>(npc))
+}
+
+/// Whether at least `count` living `npc`s stand still on the tiles around the player, each on a
+/// tile of its own.
+pub fn surrounded_by(snapshot: &ProbeSnapshot, npc: &str, count: usize) -> bool {
+    let Some(mine) = snapshot.me.as_ref().and_then(|me| me.resting) else {
+        return false;
+    };
+    let around: Vec<CellPos> = snapshot
+        .actors
+        .iter()
+        .filter(|actor| actor.health > 0.0 && npc_is(actor, npc))
+        .filter_map(|actor| actor.resting)
+        .filter(|tile| (tile.x - mine.x).abs().max((tile.y - mine.y).abs()) <= 1)
+        .collect();
+    let mut tiles = around.clone();
+    tiles.push(mine);
+    tiles.sort_by_key(|tile| (tile.x, tile.y));
+    tiles.dedup();
+    around.len() >= count && tiles.len() == around.len() + 1
 }
 
 pub fn marked(snapshot: &ProbeSnapshot, npc: &str, mark: AttentionMark) -> bool {

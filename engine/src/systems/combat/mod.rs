@@ -195,9 +195,9 @@ pub fn defeats(world: &mut World) {
 
 pub fn revive(world: &mut World, entity: Entity, at: Pos<Tiles>) {
     reach::forget(world, entity);
-    crate::systems::movement::relocate(world, entity, at);
     stat::revive(world, entity);
     world.entity_mut(entity).remove::<Dead>();
+    crate::systems::movement::relocate_beside(world, entity, at);
 }
 
 fn add_attacker(world: &mut World, target: Entity, by: Entity) {

@@ -3,9 +3,9 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::core::math::Pos;
-use crate::core::tiling::{TilePos, Tiles};
+use crate::core::tiling::{Cell, TilePos, Tiles};
 use crate::systems::area::{self, AreaId, AreaTag};
-use crate::systems::movement::{self, approach, position};
+use crate::systems::movement::{self, Aim, Approach, position};
 use crate::systems::skill::SkillId;
 use crate::systems::stat;
 use crate::systems::visibility;
@@ -187,25 +187,33 @@ pub fn intent(world: &World, actor: Entity, act: ReachAct) -> Option<Entity> {
         .and_then(|intent| intent.target.actor())
 }
 
+/// Walks the actor into reach of what it intends to act on, by way of [`movement::approach`], and
+/// tells whether it's there. Two actors coming for each other meet between them, each covering the
+/// share of the gap its pace allows, rather than both heading for the other's tile.
 pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
-    let Some(target) = current(world, actor).map(|intent| intent.target) else {
+    let Some(target) = pursued(world, actor) else {
         return Pursuit::Lost;
     };
-    if stat::is_dead(world, actor) {
-        return Pursuit::Lost;
-    }
+    let reach = range + DIAGONAL_MARGIN;
     if let ReachTarget::Actor(target) = target
-        && !pursuable(world, actor, target)
+        && let Some(meeting) = meeting_point(world, actor, target, reach)
     {
-        return Pursuit::Lost;
+        movement::goto(world, actor, meeting);
+        return Pursuit::Approaching;
     }
-    let Some(target_at) = target.position(world) else {
-        return Pursuit::Lost;
-    };
-    if approach(world, actor, target_at, range + DIAGONAL_MARGIN) {
-        Pursuit::Arrived
-    } else {
-        Pursuit::Approaching
+    match movement::approach(world, actor, aim(world, actor, target), reach) {
+        Approach::Arrived => Pursuit::Arrived,
+        Approach::Approaching => Pursuit::Approaching,
+        Approach::Unreachable => Pursuit::Lost,
+    }
+}
+
+/// Spreads an actor that has arrived out over the tiles in reach, by way of
+/// [`movement::settle`], while it waits to act again.
+pub fn settle(world: &mut World, actor: Entity, range: Tiles) {
+    if let Some(target) = pursued(world, actor) {
+        let aim = aim(world, actor, target);
+        movement::settle(world, actor, aim, range + DIAGONAL_MARGIN);
     }
 }
 
@@ -224,4 +232,53 @@ pub fn forget(world: &mut World, actor: Entity) {
 /// Gives up reaching for anything, leaving the actor's walk as it is.
 pub fn drop_intent(world: &mut World, actor: Entity) {
     world.entity_mut(actor).remove::<ReachIntent>();
+}
+
+fn pursued(world: &World, actor: Entity) -> Option<ReachTarget> {
+    let target = current(world, actor)?.target;
+    if stat::is_dead(world, actor) {
+        return None;
+    }
+    match target {
+        ReachTarget::Actor(target) => {
+            pursuable(world, actor, target).then_some(ReachTarget::Actor(target))
+        }
+        ReachTarget::Point(_) => Some(target),
+    }
+}
+
+fn aim(world: &World, actor: Entity, target: ReachTarget) -> Aim {
+    match target {
+        ReachTarget::Point(point) => Aim::Point(point),
+        ReachTarget::Actor(target) if coming_for(world, target, actor) => Aim::Meeting(target),
+        ReachTarget::Actor(target) => Aim::Actor(target),
+    }
+}
+
+fn coming_for(world: &World, actor: Entity, target: Entity) -> bool {
+    current(world, actor).is_some_and(|intent| intent.target.actor() == Some(target))
+}
+
+/// Where an actor out of reach of one coming for it heads while neither has set out yet: the tile
+/// on the line between them that each reaches at once, going at their own paces.
+fn meeting_point(world: &World, actor: Entity, target: Entity, reach: Tiles) -> Option<Pos<Tiles>> {
+    if !coming_for(world, target, actor)
+        || movement::moving(world, actor)
+        || movement::moving(world, target)
+    {
+        return None;
+    }
+    let at = position(world, actor)?;
+    let there = position(world, target)?;
+    if at.distance(there) <= reach {
+        return None;
+    }
+    let pace = movement::speed_of(world, actor).0.0;
+    let theirs = movement::speed_of(world, target).0.0;
+    if pace + theirs <= 0.0 {
+        return None;
+    }
+    let meeting = at.lerp(there, pace / (pace + theirs)).cell();
+    (meeting != there.cell() && meeting != at.cell() && movement::reachable(world, actor, meeting))
+        .then(|| meeting.center())
 }

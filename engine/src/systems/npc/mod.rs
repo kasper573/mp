@@ -16,7 +16,7 @@ use crate::core::content::{
     Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
 };
 use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
-use crate::core::tiling::{TilePos, Tiles};
+use crate::core::tiling::{CellPos, TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
@@ -25,7 +25,7 @@ use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
-use crate::systems::movement::{Position, position};
+use crate::systems::movement::{self, Position, TileClaims, position};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
@@ -284,7 +284,9 @@ pub fn spawn_all(world: &mut World) {
             }
             AreaModule::Resident(resident) => {
                 let pack = next_pack(world);
-                let entity = spawn(world, resident.npc, resident.at, area_id, pack);
+                let grid = &area::load(&content, area_id).grid;
+                let at = movement::place_beside(world, area_id, grid, resident.at);
+                let entity = spawn(world, resident.npc, at, area_id, pack);
                 world.entity_mut(entity).insert(Home(resident.at));
                 if let Some(shown) = &resident.shown {
                     let shown = CompiledCondition::new(&content, shown);
@@ -304,15 +306,17 @@ fn spawn_wild(
     roams: Option<Rect<Tiles>>,
     pack: Pack,
 ) {
-    let area = area::load(content, area_id);
-    let at = {
-        let mut rng = world.resource_mut::<Rng>();
-        match roams {
-            Some(bounds) => area.wild_grid.random_node_within(&mut rng, bounds),
-            None => area.wild_grid.random_node(&mut rng),
-        }
-    }
-    .expect("validated at startup: populations have ground outside the safe zones");
+    let grid = &area::load(content, area_id).wild_grid;
+    let at = world
+        .resource_scope(|world, mut rng: Mut<Rng>| {
+            let claims = world.resource::<TileClaims>();
+            let mut draw = |fits: &dyn Fn(CellPos) -> bool| match roams {
+                Some(bounds) => grid.random_node_within(&mut rng, bounds, fits),
+                None => grid.random_node(&mut rng, fits),
+            };
+            draw(&|cell| claims.on(area_id, cell) == 0).or_else(|| draw(&|_| true))
+        })
+        .expect("validated at startup: populations have ground outside the safe zones");
     let entity = spawn(world, npc, at, area_id, pack);
     match roams {
         Some(bounds) => world.entity_mut(entity).insert((Wild, Roams(bounds))),
@@ -575,10 +579,18 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 continue;
             };
             let grid = region.grid_for(area::wild(world, id));
-            let at = match (world.get::<Home>(id), world.get::<Roams>(id)) {
+            let roams = world.get::<Roams>(id).map(|roams| roams.0);
+            let claims = world.resource::<TileClaims>();
+            let area_id = world.get::<AreaTag>(id).map(|tag| tag.area);
+            let free = |cell| area_id.is_none_or(|area| claims.on(area, cell) == 0);
+            let at = match (world.get::<Home>(id), roams) {
                 (Some(&Home(home)), _) => Some(home),
-                (None, Some(&Roams(bounds))) => grid.random_node_within(&mut rng, bounds),
-                (None, None) => grid.random_node(&mut rng),
+                (None, Some(bounds)) => grid
+                    .random_node_within(&mut rng, bounds, free)
+                    .or_else(|| grid.random_node_within(&mut rng, bounds, |_| true)),
+                (None, None) => grid
+                    .random_node(&mut rng, free)
+                    .or_else(|| grid.random_node(&mut rng, |_| true)),
             }
             .unwrap_or_else(|| region.fallback_spawn());
             crate::systems::combat::revive(world, id, at);
