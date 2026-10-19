@@ -24,10 +24,10 @@ use crate::Sessions;
 const PING_INTERVAL: Duration = Duration::from_secs(5);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Drives renet2's transport-agnostic core directly over plain WebSockets, with no netcode layer.
-/// There is therefore no fixed connection cap (renetcode's was 1024); the only bound is `max_clients`,
-/// a soft resource limit. TLS is terminated by the reverse proxy and the user is already authenticated
-/// by the ticket, so netcode's encryption and anti-spoof challenge would add nothing here.
+/// Drives renet2's transport-agnostic core directly over plain WebSockets, with no netcode layer,
+/// so no connection cap but `max_clients`, a soft resource limit. TLS is terminated by the reverse
+/// proxy and the user is already authenticated by the ticket, so netcode's encryption and
+/// anti-spoof challenge would add nothing here.
 ///
 /// Each renet packet is one binary WebSocket frame; renet still owns channels and reliability. The
 /// accept loop and per-connection reader/writer tasks run on the shared tokio runtime and reach the

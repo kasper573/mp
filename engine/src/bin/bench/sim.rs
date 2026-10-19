@@ -6,6 +6,7 @@ use bevy_replicon::prelude::ConnectedClient;
 use bevy_replicon::shared::backend::channels::{ClientChannel, ServerChannel};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use engine::core::content::Content;
+use engine::core::net::MAX_MESSAGE_BYTES;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::systems::area::AreaModule;
 use engine::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
@@ -91,9 +92,9 @@ pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
     for (app, roster) in worlds.iter_mut().zip(rosters) {
         let world = app.world_mut();
         for &conn in roster {
-            world
-                .entity_mut(conn)
-                .insert(ConnectedClient { max_size: 1200 });
+            world.entity_mut(conn).insert(ConnectedClient {
+                max_size: MAX_MESSAGE_BYTES,
+            });
         }
     }
 }

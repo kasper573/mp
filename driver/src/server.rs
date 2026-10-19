@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use engine::core::time::UtcHour;
 use engine::systems::launch::{
-    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
-    TEST_CHARACTER_ROUTE, TestCharacterRequest,
+    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE,
+    TestCharacterRequest,
 };
 use engine::systems::player::SpawnPolicy;
 use engine::systems::script::Place;
@@ -41,7 +41,7 @@ impl Server {
             rng_seed: seed,
             daily_reset_utc_hour: UtcHour::MIDNIGHT,
             auth: AuthMode::Fake,
-            test_characters: Switch::On,
+            test_characters: true,
             exit_on_stdin_eof: true,
             pyroscope_enabled: false,
             pyroscope_sample_hz: 100,

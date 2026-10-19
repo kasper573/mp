@@ -3740,7 +3740,6 @@ dependencies = [
  "postcard",
  "pprof",
  "proc-macro2",
- "rand 0.10.3",
  "rayon",
  "renet2",
  "schemars 1.2.3",

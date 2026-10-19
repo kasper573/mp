@@ -150,7 +150,6 @@ opener = "0.9"
 tiny_http = "0.12"
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 metrics = "0.24"
-rand = "0.10"
 service = { path = "../service" }
 tokio.workspace = true
 ureq = { workspace = true, features = ["rustls", "platform-verifier"] }

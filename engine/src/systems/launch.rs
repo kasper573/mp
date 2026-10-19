@@ -130,7 +130,7 @@ pub struct ServerConfig {
     pub rng_seed: Option<u64>,
     pub daily_reset_utc_hour: UtcHour,
     pub auth: AuthMode,
-    pub test_characters: Switch,
+    pub test_characters: bool,
     pub exit_on_stdin_eof: bool,
     pub pyroscope_enabled: bool,
     pub pyroscope_sample_hz: u32,
@@ -150,13 +150,6 @@ pub struct OidcConfig {
     pub audience: String,
     pub jwks_uri: String,
     pub token_uri: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Switch {
-    On,
-    Off,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

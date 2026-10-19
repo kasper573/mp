@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use engine::core::time::UtcHour;
 use engine::systems::launch::{
     AuthMode, CLIENT_ENV_PREFIX, ClientConfig, LaunchSettings, SERVER_ENV_PREFIX, SETTINGS_FILE,
-    ServerConfig, Switch, env_of,
+    ServerConfig, env_of,
 };
 use engine::systems::player::SpawnPolicy;
 
@@ -20,7 +20,7 @@ fn server_config(rng_seed: Option<u64>) -> ServerConfig {
         rng_seed,
         daily_reset_utc_hour: UtcHour::try_from(5).expect("an hour of the day"),
         auth: AuthMode::Fake,
-        test_characters: Switch::On,
+        test_characters: true,
         exit_on_stdin_eof: true,
         pyroscope_enabled: false,
         pyroscope_sample_hz: 100,

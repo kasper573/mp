@@ -114,9 +114,7 @@ impl Rng {
     }
 
     pub fn random_seed() -> u64 {
-        let mut seed = [0u8; 8];
-        getrandom::fill(&mut seed).expect("os entropy for rng seed");
-        u64::from_le_bytes(seed)
+        getrandom::u64().expect("os entropy for rng seed")
     }
 
     pub fn rand_float(&mut self) -> f32 {

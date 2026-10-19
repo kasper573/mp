@@ -872,7 +872,7 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         rng_seed: None,
         daily_reset_utc_hour: UtcHour::MIDNIGHT,
         auth: launch::AuthMode::Fake,
-        test_characters: launch::Switch::On,
+        test_characters: true,
         exit_on_stdin_eof: true,
         pyroscope_enabled: false,
         pyroscope_sample_hz: 100,
