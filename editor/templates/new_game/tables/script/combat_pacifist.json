@@ -1,5 +1,5 @@
 {
-  "owner": "npc",
+  "runs_on": "npc",
   "nodes": {
     "hostile": {
       "type": "set_attitude",

@@ -5,6 +5,7 @@ pub mod key;
 pub mod load;
 pub mod locate;
 pub mod media;
+pub mod owner;
 pub mod report;
 pub mod serial;
 pub mod store;
@@ -14,12 +15,13 @@ pub mod version;
 
 pub use check::RowCheck;
 pub use fixture::Fixture;
-pub use id::{ContentId, ContentScope, with_content};
+pub use id::{ContentId, ContentScope, ScopeReader, with_content};
 pub use key::key_of;
 pub use load::{
     ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
     LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
 };
+pub use owner::{ContentOwners, OWNER_FIELD, RowName};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 pub use version::ContentVersion;

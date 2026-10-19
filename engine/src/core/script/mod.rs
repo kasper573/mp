@@ -50,7 +50,7 @@ impl Arrow {
 
 /// What kind of thing owns a script, which decides the events raised for it and the effects it
 /// may use.
-pub trait OwnerKindDef:
+pub trait RunnerKindDef:
     Copy
     + Eq
     + std::hash::Hash
@@ -73,7 +73,7 @@ pub trait OwnerKindDef:
 pub trait Vocabulary:
     Copy + Eq + std::hash::Hash + fmt::Debug + Sized + Send + Sync + 'static
 {
-    type OwnerKind: OwnerKindDef;
+    type RunnerKind: RunnerKindDef;
     type Event: EventDef<Self>
         + Clone
         + Serialize
@@ -136,7 +136,7 @@ pub trait EventDef<V: Vocabulary>: Clone {
     type Kind: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 'static;
 
     fn kind(&self) -> Self::Kind;
-    fn owners(&self) -> &'static [V::OwnerKind];
+    fn owners(&self) -> &'static [V::RunnerKind];
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
     fn fields(&self) -> &'static [(&'static str, ValueType)];
@@ -167,8 +167,8 @@ pub trait QueryDef<V: Vocabulary> {
 }
 
 pub trait EffectDef<V: Vocabulary> {
-    fn owners(&self) -> &'static [V::OwnerKind] {
-        V::OwnerKind::VARIANTS
+    fn owners(&self) -> &'static [V::RunnerKind] {
+        V::RunnerKind::VARIANTS
     }
     fn needs_subject(&self) -> bool;
     fn outputs(&self) -> Vec<(&'static str, &Arrow)>;
@@ -186,7 +186,7 @@ pub trait EffectDef<V: Vocabulary> {
 #[serde(bound = "", deny_unknown_fields)]
 #[schemars(bound = "")]
 pub struct ScriptDef<V: Vocabulary> {
-    pub owner: V::OwnerKind,
+    pub runs_on: V::RunnerKind,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variables: BTreeMap<String, Variable<V>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

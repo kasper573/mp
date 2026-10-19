@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Pos2, Ui};
-use engine::core::script::OwnerKindDef;
+use engine::core::script::RunnerKindDef;
 
 use super::graph::NodePaletteOpen;
 use super::nodes::{self, NodeCatalogue, NodeEntry};

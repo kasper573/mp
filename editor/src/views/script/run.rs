@@ -12,7 +12,7 @@ use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentRow, row_file, row_of};
 use engine::core::math::Pos;
 use engine::core::script::{
-    FlowSteering, NodeKind, OwnerKindDef, Pause, Value as ScriptValue, ValueType,
+    FlowSteering, NodeKind, Pause, RunnerKindDef, Value as ScriptValue, ValueType,
 };
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
@@ -31,7 +31,7 @@ use engine::systems::quest::{
     ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
 };
 use engine::systems::script::{
-    EventKind, FlowKey, FlowTrace, Owner, OwnerKind, Place, Reach, RiftInstances, RiftScripts,
+    EventKind, FlowKey, FlowTrace, Owner, Place, Reach, RiftInstances, RiftScripts, RunnerKind,
     TraceStep,
 };
 use engine::systems::{self, GameSettings, TICK_HZ};
@@ -1117,22 +1117,22 @@ fn start_run(
 fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(AreaId, Pos<Tiles>)> {
     let spawn = content.built::<GameSettings>().initial_spawn;
     match owner.row.kind {
-        OwnerKind::Area | OwnerKind::Object | OwnerKind::Blueprint => {
+        RunnerKind::Area | RunnerKind::Object | RunnerKind::Blueprint => {
             let area: AreaId = owner.row.id();
             let placed = area::placed(content, area);
             let near = match (owner.row.kind, owner.row.object) {
-                (OwnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
+                (RunnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
                     AreaModule::Object(object) => object.shape.bounds().center(),
                     _ => area::load(content, area).center(),
                 },
-                (OwnerKind::Blueprint, Some(ordinal)) => {
+                (RunnerKind::Blueprint, Some(ordinal)) => {
                     area::placements(content, area).get(ordinal as usize)?.at
                 }
                 _ => area::load(content, area).center(),
             };
             Some((area, near))
         }
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let home = area::residence(content, owner.row.id()).unwrap_or(spawn);
             Some((home.area, home.at))
         }
@@ -1147,8 +1147,8 @@ fn locate_owner(
     at: Pos<Tiles>,
 ) -> Result<Owner, String> {
     Ok(match owner.row.kind {
-        OwnerKind::Area => Owner::Row(OwnerKind::Area, area_id.raw()),
-        OwnerKind::Object => {
+        RunnerKind::Area => Owner::Row(RunnerKind::Area, area_id.raw()),
+        RunnerKind::Object => {
             let index = owner.row.object.ok_or("an object without an index")?;
             let entity = world
                 .query::<(Entity, &AreaObject)>()
@@ -1156,9 +1156,9 @@ fn locate_owner(
                 .find(|(_, object)| object.index == index)
                 .map(|(entity, _)| entity)
                 .ok_or("the object is not in its area")?;
-            Owner::Entity(OwnerKind::Object, entity)
+            Owner::Entity(RunnerKind::Object, entity)
         }
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let def: NpcId = owner.row.id();
             let found = world
                 .query::<(Entity, &Npc)>()
@@ -1172,10 +1172,10 @@ fn locate_owner(
                     npc::spawn(world, def, at, area_id, pack)
                 }
             };
-            Owner::Entity(OwnerKind::Npc, entity)
+            Owner::Entity(RunnerKind::Npc, entity)
         }
-        OwnerKind::Blueprint => {
-            Owner::Row(OwnerKind::Blueprint, owner.row.object.unwrap_or_default())
+        RunnerKind::Blueprint => {
+            Owner::Row(RunnerKind::Blueprint, owner.row.object.unwrap_or_default())
         }
         kind => Owner::Row(kind, owner.row.row),
     })

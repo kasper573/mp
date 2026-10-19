@@ -14,7 +14,7 @@ use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Players};
 use crate::systems::script::event::OBJECT_OR_NPC;
-use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, RunnerKind};
 use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility::{self, VIEW_DISTANCE};
 
@@ -50,7 +50,7 @@ pub struct Say {
 }
 
 impl EffectDef<RiftScripting> for Say {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         OBJECT_OR_NPC
     }
     fn needs_subject(&self) -> bool {

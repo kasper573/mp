@@ -6,7 +6,7 @@ use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::script::{
-    OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts, ScriptDef,
+    OwnerRow, Place, Reach, RiftScripting, RiftScripts, RunnerKind, ScriptDef,
 };
 use engine::systems::stat::StatKind;
 use serde_json::Value;
@@ -75,7 +75,7 @@ pub fn owner_row(
     key: &str,
     pointer: &str,
 ) -> Option<ScriptBinding> {
-    let kind: OwnerKind = table.parse().ok()?;
+    let kind: RunnerKind = table.parse().ok()?;
     let file = row_file(table, key);
     let bound = |label: String, row: OwnerRow| ScriptBinding {
         label,
@@ -83,7 +83,7 @@ pub fn owner_row(
         file: file.clone(),
     };
     Some(match kind {
-        OwnerKind::Area => {
+        RunnerKind::Area => {
             let area = content.by_key::<AreaDef>(key)?;
             match ScriptPath::parse(pointer).and_then(ScriptPath::object) {
                 Some(module) => {
@@ -98,7 +98,7 @@ pub fn owner_row(
                     bound(
                         format!("area/{key} › {name}"),
                         OwnerRow {
-                            kind: OwnerKind::Object,
+                            kind: RunnerKind::Object,
                             row: area.raw(),
                             object: Some(index as u32),
                         },
@@ -107,14 +107,14 @@ pub fn owner_row(
                 None => bound(
                     format!("area/{key}"),
                     OwnerRow {
-                        kind: OwnerKind::Area,
+                        kind: RunnerKind::Area,
                         row: area.raw(),
                         object: None,
                     },
                 ),
             }
         }
-        OwnerKind::Blueprint => {
+        RunnerKind::Blueprint => {
             let blueprint = content.by_key::<BlueprintDef>(key)?;
             content.ids::<AreaDef>().find_map(|area| {
                 let ordinal = area::placements(content, area)
@@ -125,14 +125,14 @@ pub fn owner_row(
                 Some(bound(
                     format!("blueprint/{key} in {} {ordinal}", area.key(content)),
                     OwnerRow {
-                        kind: OwnerKind::Blueprint,
+                        kind: RunnerKind::Blueprint,
                         row: area.raw(),
                         object: Some(ordinal as u32),
                     },
                 ))
             })?
         }
-        OwnerKind::Object | OwnerKind::Any => return None,
+        RunnerKind::Object | RunnerKind::Any => return None,
         kind => bound(
             format!("{table}/{key}"),
             OwnerRow {

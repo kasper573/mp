@@ -24,7 +24,7 @@ use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::PlayedBy;
 use crate::systems::script::query::TickRoster;
-use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, RunnerKind};
 use crate::systems::skill::{self, SkillDef};
 use crate::systems::visibility::Presence;
 
@@ -231,7 +231,7 @@ impl EffectDef<RiftScripting> for PlayVfx {
         let (vfx, target) = (self.vfx, self.site.clone());
         let cast = cx
             .owner_row()
-            .filter(|row| row.kind == OwnerKind::Skill)
+            .filter(|row| row.kind == RunnerKind::Skill)
             .map(|row| row.id::<SkillDef>());
         Ok(Box::new(move |world, _, cx| {
             let filled = VfxParams(

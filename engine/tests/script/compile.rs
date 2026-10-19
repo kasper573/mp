@@ -11,7 +11,7 @@ use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
 use engine::systems::quest::QuestDef;
 use engine::systems::script::{
-    EventKind, OwnerKind, Place, Procedure, Reach, RiftScripting, ScriptDef, ScriptModule,
+    EventKind, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptDef, ScriptModule,
 };
 use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
@@ -19,13 +19,13 @@ use strum::VariantArray;
 
 use crate::game::{content, effect, inline, inline_with, parse};
 
-const OWNERS: [OwnerKind; 6] = [
-    OwnerKind::Object,
-    OwnerKind::Npc,
-    OwnerKind::Item,
-    OwnerKind::Area,
-    OwnerKind::Quest,
-    OwnerKind::Shop,
+const OWNERS: [RunnerKind; 6] = [
+    RunnerKind::Object,
+    RunnerKind::Npc,
+    RunnerKind::Item,
+    RunnerKind::Area,
+    RunnerKind::Quest,
+    RunnerKind::Shop,
 ];
 
 const FUNCTIONS: [&str; 2] = ["helper", "loops"];
@@ -65,7 +65,7 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         at: Pos::new(3.0, 18.0),
     };
     let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "hello"),
+        "on": entry(RunnerKind::Npc, "hello"),
         "hello": {
             "type": "dialogue",
             "lines": [{ "by": { "type": "narrator" }, "text": ["Pay or go."] }],
@@ -86,7 +86,7 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         "shop": { "type": "open_shop", "shop": "box" },
     }));
 
-    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
+    let procedures = compile(RunnerKind::Npc, &[&script]).expect("compiles");
     let may_do = &procedures[0].may_do;
 
     assert_eq!(may_do.answers, vec![EventKind::Interacted]);
@@ -109,12 +109,12 @@ fn may_do_lists_exactly_what_a_script_reaches() {
 #[test]
 fn a_loop_without_a_wait_is_refused() {
     let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
+        "on": entry(RunnerKind::Npc, "a"),
         "a": { "type": "if", "test": true, "yes": "b" },
         "b": { "type": "if", "test": true, "yes": "a" },
     }));
 
-    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+    let error = compile(RunnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "loop without a wait");
     assert_eq!(error.expected, "a → b → a");
@@ -123,13 +123,13 @@ fn a_loop_without_a_wait_is_refused() {
 #[test]
 fn too_many_steps_between_pauses_are_refused() {
     let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "outer"),
+        "on": entry(RunnerKind::Npc, "outer"),
         "outer": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "inner" },
         "inner": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "check" },
         "check": { "type": "if", "test": true },
     }));
 
-    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+    let error = compile(RunnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "too many steps");
 }
@@ -137,7 +137,7 @@ fn too_many_steps_between_pauses_are_refused() {
 #[test]
 fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
     let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "decide"),
+        "on": entry(RunnerKind::Npc, "decide"),
         "decide": {
             "type": "decide",
             "quest": "plea",
@@ -145,7 +145,7 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
         },
     }));
 
-    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
+    let procedures = compile(RunnerKind::Npc, &[&script]).expect("compiles");
     let reaches = &procedures[0].may_do.reaches;
 
     assert!(
@@ -161,11 +161,11 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
 #[test]
 fn an_effect_or_query_refuses_by_its_own_rule() {
     let effect = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
+        "on": entry(RunnerKind::Npc, "a"),
         "a": { "type": "complete_task", "quest": "x_marks", "task": "no_such_task" },
     }));
     let query = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
+        "on": entry(RunnerKind::Npc, "a"),
         "a": {
             "type": "if",
             "test": { "type": "task_done", "quest": "x_marks", "task": "no_such_task" },
@@ -173,7 +173,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
     }));
 
     for script in [effect, query] {
-        let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+        let error = compile(RunnerKind::Npc, &[&script]).err().expect("refused");
 
         assert_eq!(error.rule, "unknown task");
         assert_eq!(error.node.as_deref(), Some("a"));
@@ -182,7 +182,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
 
 #[test]
 fn a_script_that_runs_itself_is_refused() {
-    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("loops")])
+    let error = compile_owner(&functions(), RunnerKind::Npc, "test", &[&calling("loops")])
         .err()
         .expect("refused")
         .remove(0)
@@ -194,7 +194,7 @@ fn a_script_that_runs_itself_is_refused() {
 
 #[test]
 fn may_do_names_the_functions_a_script_calls() {
-    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("helper")])
+    let procedures = compile_owner(&functions(), RunnerKind::Npc, "test", &[&calling("helper")])
         .expect("compiles");
 
     let may_do = &procedures[0].may_do;
@@ -207,13 +207,13 @@ fn may_do_names_the_functions_a_script_calls() {
 #[test]
 fn an_if_always_taken_still_compiles_both_arrows() {
     let script = inline(json!({
-        "on": entry(OwnerKind::Area, "check"),
+        "on": entry(RunnerKind::Area, "check"),
         "check": { "type": "if", "test": { "type": "not", "of": true }, "yes": "yes", "no": "no" },
         "yes": { "type": "notify", "notification": "gulls" },
         "no": { "type": "notify", "notification": "intro" },
     }));
 
-    let procedures = compile(OwnerKind::Area, &[&script]).expect("compiles");
+    let procedures = compile(RunnerKind::Area, &[&script]).expect("compiles");
 
     assert_eq!(procedures[0].may_do.reaches.len(), 2);
 }
@@ -246,7 +246,7 @@ fn every_expression_shape_serializes_back_to_the_json_it_was_read_from() {
 #[test]
 fn a_shared_script_row_reads_back_as_written() {
     let def: ScriptDef = parse(json!({
-        "owner": "npc",
+        "runs_on": "npc",
         "variables": { "aggro": { "type": "number", "default": 4 } },
         "locals": { "target": "actor" },
         "nodes": {
@@ -258,7 +258,7 @@ fn a_shared_script_row_reads_back_as_written() {
         }
     }));
 
-    assert_eq!(def.owner, OwnerKind::Npc);
+    assert_eq!(def.runs_on, RunnerKind::Npc);
     assert_eq!(def.variables.len(), 1);
     assert_eq!(def.nodes.len(), 2);
 }
@@ -270,25 +270,25 @@ fn id<Row: ContentRow>(key: &str) -> ContentId<Row> {
 }
 
 fn compile(
-    owner: OwnerKind,
+    owner: RunnerKind,
     modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
     compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).error)
 }
 
-fn entry(owner: OwnerKind, next: &str) -> Value {
+fn entry(owner: RunnerKind, next: &str) -> Value {
     match owner {
-        OwnerKind::Object | OwnerKind::Npc => json!({
+        RunnerKind::Object | RunnerKind::Npc => json!({
             "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next
         }),
-        OwnerKind::Item | OwnerKind::Skill => {
+        RunnerKind::Item | RunnerKind::Skill => {
             json!({ "type": "on", "event": "used", "next": next })
         }
-        OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
-        OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
-        OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
-        OwnerKind::StatusEffect => json!({ "type": "on", "event": "activated", "next": next }),
-        OwnerKind::Blueprint | OwnerKind::Any => unreachable!("no entry for {owner:?}"),
+        RunnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
+        RunnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
+        RunnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
+        RunnerKind::StatusEffect => json!({ "type": "on", "event": "activated", "next": next }),
+        RunnerKind::Blueprint | RunnerKind::Any => unreachable!("no entry for {owner:?}"),
     }
 }
 
@@ -346,14 +346,14 @@ fn functions() -> Content {
         parsed.expect("a script row")
     };
     let helper = parse(json!({
-        "owner": "any",
+        "runs_on": "any",
         "nodes": {
             "run": { "type": "on", "event": "run", "next": "done" },
             "done": { "type": "return" }
         }
     }));
     let loops = parse(json!({
-        "owner": "any",
+        "runs_on": "any",
         "nodes": {
             "run": { "type": "on", "event": "run", "next": "again" },
             "again": { "type": "run", "script": "loops" }
@@ -393,7 +393,7 @@ fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
         }),
     );
 
-    compile(OwnerKind::Shop, &[&script]).expect("compiles");
+    compile(RunnerKind::Shop, &[&script]).expect("compiles");
 }
 
 #[test]
@@ -407,7 +407,7 @@ fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
         }),
     );
 
-    let error = compile(OwnerKind::Object, &[&script])
+    let error = compile(RunnerKind::Object, &[&script])
         .err()
         .expect("refused");
 

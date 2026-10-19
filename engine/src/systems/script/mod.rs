@@ -22,7 +22,7 @@ use crate::core::content::{
 };
 use crate::core::math::Pos;
 use crate::core::script::{
-    self, BoxEnding, DialogueView, Expr, Instances, LineDef, OwnerKindDef, ScriptError, Scripts,
+    self, BoxEnding, DialogueView, Expr, Instances, LineDef, RunnerKindDef, ScriptError, Scripts,
     TextDef, Vocabulary, compile::compile_row,
 };
 use crate::core::tiling::Tiles;
@@ -62,7 +62,7 @@ pub struct RiftScripting;
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub enum OwnerKind {
+pub enum RunnerKind {
     Object,
     Npc,
     Item,
@@ -75,17 +75,17 @@ pub enum OwnerKind {
     Any,
 }
 
-impl OwnerKindDef for OwnerKind {
-    const ANY: OwnerKind = OwnerKind::Any;
+impl RunnerKindDef for RunnerKind {
+    const ANY: RunnerKind = RunnerKind::Any;
 
     fn keeps_state(self) -> bool {
         !matches!(
             self,
-            OwnerKind::Item
-                | OwnerKind::Quest
-                | OwnerKind::Shop
-                | OwnerKind::Skill
-                | OwnerKind::StatusEffect
+            RunnerKind::Item
+                | RunnerKind::Quest
+                | RunnerKind::Shop
+                | RunnerKind::Skill
+                | RunnerKind::StatusEffect
         )
     }
 
@@ -281,7 +281,7 @@ pub enum Reach {
 }
 
 impl Vocabulary for RiftScripting {
-    type OwnerKind = OwnerKind;
+    type RunnerKind = RunnerKind;
     type Event = RiftEvent;
     type Query = RiftQuery;
     type Reveal = ChoiceReveal;
@@ -329,7 +329,7 @@ impl Vocabulary for RiftScripting {
 pub type RiftInstances = Instances<RiftScripting>;
 pub type RiftScripts = Scripts<RiftScripting>;
 
-pub fn owner_label(kind: OwnerKind, key: &str, object: Option<&str>) -> String {
+pub fn owner_label(kind: RunnerKind, key: &str, object: Option<&str>) -> String {
     match object {
         Some(object) => format!("{}/{key} › {object}", kind.name()),
         None => format!("{}/{key}", kind.name()),
@@ -338,16 +338,16 @@ pub fn owner_label(kind: OwnerKind, key: &str, object: Option<&str>) -> String {
 
 pub fn owner_of(world: &World, entity: Entity) -> Option<Owner> {
     if world.get::<Npc>(entity).is_some() {
-        return Some(Owner::Entity(OwnerKind::Npc, entity));
+        return Some(Owner::Entity(RunnerKind::Npc, entity));
     }
     if world.get::<AreaObject>(entity).is_some() {
-        return Some(Owner::Entity(OwnerKind::Object, entity));
+        return Some(Owner::Entity(RunnerKind::Object, entity));
     }
     None
 }
 
 pub trait ScriptedRow: ModuleSet {
-    const OWNER: OwnerKind;
+    const OWNER: RunnerKind;
 
     fn script(module: &Self::Module) -> Option<&ScriptModule>;
 }
@@ -363,7 +363,7 @@ impl OwnerRow {
 
     pub fn of_object(area: AreaId, index: u32) -> OwnerRow {
         OwnerRow {
-            kind: OwnerKind::Object,
+            kind: RunnerKind::Object,
             row: area.raw(),
             object: Some(index),
         }
@@ -371,7 +371,7 @@ impl OwnerRow {
 
     pub fn of_placement(area: AreaId, ordinal: u32) -> OwnerRow {
         OwnerRow {
-            kind: OwnerKind::Blueprint,
+            kind: RunnerKind::Blueprint,
             row: area.raw(),
             object: Some(ordinal),
         }
@@ -437,7 +437,7 @@ pub fn build_all(loading: &mut Loading) {
                 .collect();
             bind(
                 OwnerRow::of_object(id, index),
-                owner_label(OwnerKind::Object, key, Some(name)),
+                owner_label(RunnerKind::Object, key, Some(name)),
                 modules,
             );
         }
@@ -460,7 +460,7 @@ pub fn build_all(loading: &mut Loading) {
             bind(
                 OwnerRow::of_placement(id, ordinal as u32),
                 owner_label(
-                    OwnerKind::Blueprint,
+                    RunnerKind::Blueprint,
                     blueprint,
                     Some(&format!("{key} {ordinal}")),
                 ),
@@ -519,7 +519,7 @@ fn bind_table<Row: ScriptedRow>(
 
 fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
     let (table, key) = match row.kind {
-        OwnerKind::Area | OwnerKind::Object => {
+        RunnerKind::Area | RunnerKind::Object => {
             let area: AreaId = row.id();
             if let Some(index) = row.object {
                 let (file, pointer) =
@@ -528,16 +528,16 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
             }
             (AreaDef::TABLE, area.key(content))
         }
-        OwnerKind::Npc => (NpcDef::TABLE, row.id::<NpcDef>().key(content)),
-        OwnerKind::Item => (ItemDef::TABLE, row.id::<ItemDef>().key(content)),
-        OwnerKind::Quest => (QuestDef::TABLE, row.id::<QuestDef>().key(content)),
-        OwnerKind::Shop => (ShopDef::TABLE, row.id::<ShopDef>().key(content)),
-        OwnerKind::Skill => (SkillDef::TABLE, row.id::<SkillDef>().key(content)),
-        OwnerKind::StatusEffect => (
+        RunnerKind::Npc => (NpcDef::TABLE, row.id::<NpcDef>().key(content)),
+        RunnerKind::Item => (ItemDef::TABLE, row.id::<ItemDef>().key(content)),
+        RunnerKind::Quest => (QuestDef::TABLE, row.id::<QuestDef>().key(content)),
+        RunnerKind::Shop => (ShopDef::TABLE, row.id::<ShopDef>().key(content)),
+        RunnerKind::Skill => (SkillDef::TABLE, row.id::<SkillDef>().key(content)),
+        RunnerKind::StatusEffect => (
             StatusEffectDef::TABLE,
             row.id::<StatusEffectDef>().key(content),
         ),
-        OwnerKind::Blueprint => {
+        RunnerKind::Blueprint => {
             let area: AreaId = row.id();
             let placement = row
                 .object
@@ -547,7 +547,7 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
                 placement.map_or("", |placement| placement.blueprint.key(content)),
             )
         }
-        OwnerKind::Any => (ScriptDef::TABLE, ""),
+        RunnerKind::Any => (ScriptDef::TABLE, ""),
     };
     ScriptSite {
         file: row_file(table, key),
@@ -557,7 +557,7 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
 
 /// The owner of the scripts of the area this world serves.
 pub fn area_owner(world: &World) -> Owner {
-    Owner::Row(OwnerKind::Area, world.resource::<WorldArea>().0.raw())
+    Owner::Row(RunnerKind::Area, world.resource::<WorldArea>().0.raw())
 }
 
 pub fn run_tick(world: &mut World) {
@@ -570,21 +570,24 @@ pub fn spawn_stateless(world: &mut World) {
     let mut instances = world.resource_mut::<RiftInstances>();
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
-            OwnerKind::Area if row.row == area.raw() => Owner::Row(OwnerKind::Area, row.row),
-            OwnerKind::Blueprint if row.row == area.raw() => Owner::Row(
-                OwnerKind::Blueprint,
+            RunnerKind::Area if row.row == area.raw() => Owner::Row(RunnerKind::Area, row.row),
+            RunnerKind::Blueprint if row.row == area.raw() => Owner::Row(
+                RunnerKind::Blueprint,
                 row.object
                     .expect("a placement's owner row names its ordinal"),
             ),
-            OwnerKind::Item
-            | OwnerKind::Quest
-            | OwnerKind::Shop
-            | OwnerKind::Skill
-            | OwnerKind::StatusEffect => Owner::Row(row.kind, row.row),
+            RunnerKind::Item
+            | RunnerKind::Quest
+            | RunnerKind::Shop
+            | RunnerKind::Skill
+            | RunnerKind::StatusEffect => Owner::Row(row.kind, row.row),
             _ => continue,
         };
         instances.spawn_owner(owner, procedures.clone());
-        if matches!(owner, Owner::Row(OwnerKind::Area | OwnerKind::Blueprint, _)) {
+        if matches!(
+            owner,
+            Owner::Row(RunnerKind::Area | RunnerKind::Blueprint, _)
+        ) {
             instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
         }
     }
@@ -633,8 +636,8 @@ pub fn check_all(loading: &mut Loading) {
                         );
                     }
                     let placed = match row.kind {
-                        OwnerKind::Npc => row.row == npc.raw(),
-                        OwnerKind::Object | OwnerKind::Area | OwnerKind::Blueprint => {
+                        RunnerKind::Npc => row.row == npc.raw(),
+                        RunnerKind::Object | RunnerKind::Area | RunnerKind::Blueprint => {
                             let area: AreaId = row.id();
                             area::residents(area::placed(&content, area))
                                 .any(|resident| resident == *npc)
@@ -656,7 +659,7 @@ pub fn check_all(loading: &mut Loading) {
                 _ => {}
             }
         }
-        if row.kind == OwnerKind::Npc {
+        if row.kind == RunnerKind::Npc {
             let npc: NpcId = row.id();
             let watched = procedures
                 .iter()
@@ -684,7 +687,7 @@ pub fn check_all(loading: &mut Loading) {
                 }
             }
         }
-        if row.kind == OwnerKind::Object && may_do.answers(EventKind::Interacted) {
+        if row.kind == RunnerKind::Object && may_do.answers(EventKind::Interacted) {
             let area: AreaId = row.id();
             let labelled = area::objects(area::placed(&content, area))
                 .any(|(index, object)| Some(index) == row.object && object.label.is_some());

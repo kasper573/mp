@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 
+use super::owner::RowName;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadError {
     pub file: String,
@@ -95,6 +97,31 @@ impl ContentProblem {
             format!("the key of {} {table} row", article(table)),
         )
         .near(nearest.map(|near| format!("{near:?}")))
+    }
+
+    pub fn out_of_reach(
+        table: &str,
+        key: &str,
+        owner: &RowName,
+        reach: &[RowName],
+    ) -> ContentProblem {
+        let global = format!("a global {table} row");
+        let expected = match reach {
+            [] => global,
+            reach => format!(
+                "{global} or one local to {}",
+                reach
+                    .iter()
+                    .map(RowName::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            ),
+        };
+        ContentProblem::new(
+            "out of reach",
+            format!("{key:?}, local to {owner}"),
+            expected,
+        )
     }
 }
 

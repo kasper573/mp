@@ -4,7 +4,7 @@ use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::combat::{AttackRequest, Attitude};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{Home, body};
-use engine::systems::script::{EventKind, Owner, OwnerKind, RiftInstances};
+use engine::systems::script::{EventKind, Owner, RiftInstances, RunnerKind};
 use engine::systems::stat::{self, StatKind};
 use serde_json::json;
 use testkit::Sim;
@@ -163,7 +163,7 @@ fn brawling_npc(sim: &mut Sim, near: Entity, offset: Offset<Tiles>, pack: u32) -
         }),
     );
     let npc = spawn(sim, "fighter", near, offset, pack);
-    let owner = Owner::Entity(OwnerKind::Npc, npc);
+    let owner = Owner::Entity(RunnerKind::Npc, npc);
     let mut instances = sim.world.resource_mut::<RiftInstances>();
     instances.remove_owner(owner);
     instances.spawn_owner(owner, compiled("test/brawler", &[&script]));

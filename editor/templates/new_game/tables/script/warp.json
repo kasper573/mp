@@ -1,5 +1,5 @@
 {
-  "owner": "object",
+  "runs_on": "object",
   "variables": {
     "to": {
       "type": "place"

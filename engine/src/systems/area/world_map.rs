@@ -33,6 +33,7 @@ pub struct WorldMapDef {
 
 impl ContentRow for WorldMapDef {
     const TABLE: &'static str = "world_map";
+    const SEES_ALL_ROWS: bool = true;
 
     fn check(&self, cx: &mut RowCheck) {
         let mut placed: Vec<&super::AreaId> = Vec::new();

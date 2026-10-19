@@ -14,6 +14,7 @@ use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
 use super::ASSETS_DIR;
+use super::owner::{ContentOwners, RowName};
 use super::report::ContentProblem;
 use super::table::{Content, ContentRow};
 
@@ -167,6 +168,15 @@ impl Leaf {
                     nearest.as_deref(),
                 ));
             }
+            (LeafKind::Row(table), LeafProblem::OutOfReach { owner, reach }) => {
+                return Some(ContentProblem::out_of_reach(
+                    table,
+                    &self.value,
+                    owner,
+                    reach,
+                ));
+            }
+            (LeafKind::Asset, LeafProblem::OutOfReach { .. }) => return None,
             (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
                 "missing file",
                 format!("a file under {ASSETS_DIR}/"),
@@ -195,8 +205,24 @@ pub enum LeafKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LeafProblem {
-    Unknown { nearest: Option<String> },
+    Unknown {
+        nearest: Option<String>,
+    },
+    /// A row local to `owner`, which the reading row can't reach; `reach` is the owners whose
+    /// local rows it can.
+    OutOfReach {
+        owner: RowName,
+        reach: Vec<RowName>,
+    },
     Unsafe,
+}
+
+/// The row a scope reads for, to check that every row it names is in its reach. `row` is `None` for
+/// what sits above every row, such as the game's settings.
+#[derive(Clone)]
+pub struct ScopeReader {
+    pub row: Option<RowName>,
+    pub owners: Arc<ContentOwners>,
 }
 
 type ScopeKeys = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
@@ -207,6 +233,7 @@ type ScopeKeys = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
 pub struct ContentScope {
     keys: Arc<ScopeKeys>,
     assets: Option<Arc<Vec<String>>>,
+    reader: Option<ScopeReader>,
     leaves: Vec<Leaf>,
 }
 
@@ -215,6 +242,7 @@ impl ContentScope {
         ContentScope {
             keys: Arc::new(HashMap::default()),
             assets: None,
+            reader: None,
             leaves: Vec::new(),
         }
     }
@@ -238,6 +266,12 @@ impl ContentScope {
     pub fn assets(&mut self, mut files: Vec<String>) {
         files.sort_unstable();
         self.assets = Some(Arc::new(files));
+    }
+
+    /// Checks every row read from here on against what `reader` may reach.
+    pub fn reading(mut self, reader: ScopeReader) -> ContentScope {
+        self.reader = Some(reader);
+        self
     }
 
     pub fn leaves(&self) -> &[Leaf] {
@@ -279,7 +313,7 @@ impl ContentScope {
     fn resolve<Row: ContentRow>(&mut self, key: String) -> ContentId<Row> {
         let keys = self.keys.get(&TypeId::of::<Row>()).map(|(_, keys)| keys);
         let (id, problem) = match keys.and_then(|keys| keys.binary_search(&key).ok()) {
-            Some(index) => (ContentId::new(index as u32), None),
+            Some(index) => (ContentId::new(index as u32), self.reach::<Row>(&key)),
             None => (
                 ContentId::new(u32::MAX),
                 Some(LeafProblem::Unknown {
@@ -293,6 +327,29 @@ impl ContentScope {
             problem,
         });
         id
+    }
+}
+
+impl ContentScope {
+    fn reach<Row: ContentRow>(&self, key: &str) -> Option<LeafProblem> {
+        let reader = self.reader.as_ref()?;
+        if reader.owners.in_reach(reader.row.as_ref(), Row::TABLE, key) {
+            return None;
+        }
+        let owner = reader.owners.owner(Row::TABLE, key)?.clone();
+        let reach = reader
+            .row
+            .iter()
+            .cloned()
+            .chain(reader.row.iter().flat_map(|row| {
+                reader
+                    .owners
+                    .chain(&row.table, &row.key)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            }))
+            .collect();
+        Some(LeafProblem::OutOfReach { owner, reach })
     }
 }
 

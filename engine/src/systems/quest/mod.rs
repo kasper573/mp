@@ -36,7 +36,7 @@ use crate::systems::player::{PlayedBy, player_requests};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition::{self, CompiledCondition};
 use crate::systems::script::{
-    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftInstances, RiftScripts,
+    self, Condition, EventKind, Owner, OwnerRow, Reach, RiftInstances, RiftScripts, RunnerKind,
     ScriptModule, ScriptedRow,
 };
 use crate::systems::text::{LineText, Span};
@@ -86,7 +86,7 @@ impl ModuleSet for QuestDef {
 }
 
 impl ScriptedRow for QuestDef {
-    const OWNER: OwnerKind = OwnerKind::Quest;
+    const OWNER: RunnerKind = RunnerKind::Quest;
 
     fn script(module: &QuestModule) -> Option<&ScriptModule> {
         match module {
@@ -534,7 +534,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
         })
     };
     Some(match owner.kind {
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let npc: NpcId = owner.id();
             if !placed(npc) {
                 return None;
@@ -545,7 +545,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
                 npc: Some(npc),
             }
         }
-        OwnerKind::Object => {
+        RunnerKind::Object => {
             let area: AreaId = owner.id();
             let (_, object) = area::objects(area::placed(content, area))
                 .find(|(index, _)| Some(*index) == owner.object)?;
@@ -555,7 +555,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
                 npc: None,
             }
         }
-        OwnerKind::Item => {
+        RunnerKind::Item => {
             let item: ItemId = owner.id();
             Party {
                 name: item.get(content).name.to_owned(),
@@ -896,7 +896,7 @@ pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
 
 fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Quest, quest.raw()),
+        Owner::Row(RunnerKind::Quest, quest.raw()),
         kind,
         Some(player),
         Vec::new(),

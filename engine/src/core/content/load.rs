@@ -14,8 +14,9 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::fixture::{Fixture, FixtureLock};
-use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
+use super::id::{ContentId, ContentScope, Leaf, LeafKind, ScopeReader, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
+use super::owner::{ContentOwners, OWNER_FIELD, RowName};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
@@ -591,15 +592,45 @@ impl Loading {
             })
             .collect();
         let root = self.folder.clone();
-        let parsed: Vec<(usize, String, ParsedFile)> = jobs
+        let read: Vec<(usize, String, ReadFile)> = jobs
             .into_par_iter()
             .map(|(index, key)| {
+                let file = super::row_file(registry.row_loaders()[index].name(), &key);
+                (index, key, read_file(root.as_ref(), &file, true))
+            })
+            .collect();
+
+        let mut owned: Vec<(RowName, RowName)> = Vec::new();
+        for (loader, key, file) in &read {
+            if let Some(owner) = &file.owner {
+                owned.push((
+                    RowName::new(registry.row_loaders()[*loader].name(), key.clone()),
+                    owner.clone(),
+                ));
+            }
+        }
+        for (_, _, file) in &read {
+            if let Some(index) = &file.index {
+                self.indexes.insert(file.file.clone(), index.clone());
+            }
+        }
+        let owners = Arc::new(self.check_owners(registry, owned));
+
+        let parsed: Vec<(usize, String, ParsedFile)> = read
+            .into_par_iter()
+            .map(|(index, key, file)| {
                 let loader = &registry.row_loaders()[index];
-                let file = super::row_file(loader.name(), &key);
-                let parsed =
-                    parse_file(root.as_ref(), &file, &scope, &registry.list_kinds, |text| {
-                        loader.parse(text)
-                    });
+                let reader = (!loader.sees_all_rows()).then(|| ScopeReader {
+                    row: Some(RowName::new(loader.name(), key.clone())),
+                    owners: owners.clone(),
+                });
+                let scope = match reader {
+                    Some(reader) => scope.clone().reading(reader),
+                    None => scope.clone(),
+                };
+                let parsed = parse_read(file, &scope, &registry.list_kinds, |value| {
+                    loader.parse_value(value)
+                });
                 (index, key, parsed)
             })
             .collect();
@@ -612,9 +643,6 @@ impl Loading {
                 self.failed.insert((table, key.clone()));
             }
             self.errors.extend(parsed.errors);
-            if let Some(index) = parsed.index {
-                self.indexes.insert(parsed.file, Arc::new(index));
-            }
             if let Some(row) = parsed.row {
                 rows[loader].push((key, row));
             }
@@ -622,23 +650,23 @@ impl Loading {
         for (loader, rows) in registry.row_loaders().iter().zip(rows) {
             loader.finish(self.listing.keys_of(loader.name()), rows, &mut self.builder);
         }
+        self.builder.built(ContentOwners::clone(&owners));
         self.snapshot = None;
 
-        let settings = parse_file(
-            root.as_ref(),
-            GAME_FILE,
-            &scope,
+        let settings = parse_read(
+            read_file(root.as_ref(), GAME_FILE, false),
+            &scope.clone().reading(ScopeReader { row: None, owners }),
             &registry.list_kinds,
-            |text| {
+            |value| {
                 registry
                     .settings_loader()
-                    .map(|loader| loader.parse(text))
+                    .map(|loader| loader.parse_value(value))
                     .unwrap_or_else(|| Ok(Box::new(())))
             },
         );
         self.errors.extend(settings.errors);
         if let Some(index) = settings.index {
-            self.indexes.insert(GAME_FILE.to_owned(), Arc::new(index));
+            self.indexes.insert(GAME_FILE.to_owned(), index);
         }
         match settings.row {
             Some(settings) => {
@@ -658,6 +686,97 @@ impl Loading {
             None => {}
         }
         self.snapshot = None;
+    }
+
+    /// Keeps every owner that names a row and leads up to a global one; reports the others, whose
+    /// rows then load as global.
+    fn check_owners(
+        &mut self,
+        registry: &ContentRegistry,
+        owned: Vec<(RowName, RowName)>,
+    ) -> ContentOwners {
+        let mut kept: Vec<(RowName, RowName)> = Vec::new();
+        for (row, owner) in owned {
+            let file = row_file(&row.table, &row.key);
+            let keys = registry
+                .row_loaders()
+                .iter()
+                .find(|loader| loader.name() == owner.table)
+                .map(|loader| self.listing.keys_of(loader.name()));
+            let problem = match keys {
+                Some(keys) if keys.contains(&owner.key) => is_fixture(registry, &row).then(|| {
+                    ContentProblem::new(
+                        "fixture with an owner",
+                        format!("{row} owned by {owner}"),
+                        format!(
+                            "no owner: {} rows are fixtures, which code names, so they stay global",
+                            row.table
+                        ),
+                    )
+                }),
+                keys => {
+                    let candidates: Vec<String> = match keys {
+                        Some(keys) => keys
+                            .iter()
+                            .map(|key| format!("{}/{key}", owner.table))
+                            .collect(),
+                        None => registry
+                            .table_names()
+                            .iter()
+                            .map(|table| format!("{table}/{}", owner.key))
+                            .collect(),
+                    };
+                    let wanted = owner.to_string();
+                    Some(
+                        ContentProblem::new(
+                            "unknown owner",
+                            format!("{wanted:?}"),
+                            "the table/key of a row",
+                        )
+                        .near(nearest(&candidates, &wanted).map(|near| format!("{near:?}"))),
+                    )
+                }
+            };
+            match problem {
+                Some(problem) => {
+                    self.json_error(file, &format!("/{OWNER_FIELD}"), problem);
+                    self.failed
+                        .insert((table_name(registry, &row.table), row.key));
+                }
+                None => kept.push((row, owner)),
+            }
+        }
+        let owners = ContentOwners::new(kept.clone());
+        let mut looped: Vec<RowName> = Vec::new();
+        for (row, _) in &kept {
+            let mut path = vec![row.clone()];
+            let mut at = row.clone();
+            while let Some(owner) = owners.owner(&at.table, &at.key) {
+                if owner == row {
+                    path.push(owner.clone());
+                    let names: Vec<String> = path.iter().map(RowName::to_string).collect();
+                    self.json_error(
+                        row_file(&row.table, &row.key),
+                        &format!("/{OWNER_FIELD}"),
+                        ContentProblem::new(
+                            "owner loop",
+                            names.join(" → "),
+                            "owners that lead up to a global row",
+                        ),
+                    );
+                    self.failed
+                        .insert((table_name(registry, &row.table), row.key.clone()));
+                    looped.push(row.clone());
+                    break;
+                }
+                if path.contains(owner) {
+                    break;
+                }
+                path.push(owner.clone());
+                at = owner.clone();
+            }
+        }
+        ContentOwners::new(kept.into_iter().filter(|(row, _)| !looped.contains(row)))
     }
 
     fn check_rows(&mut self, registry: &ContentRegistry) {
@@ -771,9 +890,8 @@ pub struct FileHash {
 pub struct FileHashes(pub BTreeMap<String, FileHash>);
 
 struct ParsedFile {
-    file: String,
     row: Option<Box<dyn Any + Send + Sync>>,
-    index: Option<JsonIndex>,
+    index: Option<Arc<JsonIndex>>,
     errors: Vec<LoadError>,
 }
 
@@ -792,16 +910,20 @@ impl From<serde_path_to_error::Error<serde_json::Error>> for ParseError {
 }
 type ParseResult = Result<Box<dyn Any + Send + Sync>, ParseError>;
 
-fn parse_file(
-    root: &dyn ContentFolder,
-    file: &str,
-    scope: &ContentScope,
-    list_kinds: &[ListKind],
-    parse: impl FnOnce(&str) -> ParseResult,
-) -> ParsedFile {
-    let mut parsed = ParsedFile {
+/// A file read and parsed as JSON, with a row's owner taken off it, before any row type reads it.
+struct ReadFile {
+    file: String,
+    value: Option<serde_json::Value>,
+    owner: Option<RowName>,
+    index: Option<Arc<JsonIndex>>,
+    errors: Vec<LoadError>,
+}
+
+fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
+    let mut read = ReadFile {
         file: file.to_owned(),
-        row: None,
+        value: None,
+        owner: None,
         index: None,
         errors: Vec::new(),
     };
@@ -809,40 +931,85 @@ fn parse_file(
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(text) => text,
             Err(_) => {
-                parsed.errors.push(whole_file(
+                read.errors.push(whole_file(
                     file,
                     "unreadable file",
                     "not UTF-8",
                     "a UTF-8 JSON file",
                 ));
-                return parsed;
+                return read;
             }
         },
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return parsed,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return read,
         Err(error) => {
-            parsed.errors.push(whole_file(
+            read.errors.push(whole_file(
                 file,
                 "unreadable file",
                 error,
                 "a readable file",
             ));
-            return parsed;
+            return read;
         }
     };
-    let index = JsonIndex::of(&text);
-    let (result, scope) = with_content(scope.clone(), || parse(&text));
+    let index = Arc::new(JsonIndex::of(&text));
+    let split = if row {
+        split_owner(&text)
+    } else {
+        parse_json(&text).map(|value| (value, None))
+    };
+    match split {
+        Ok((value, owner)) => {
+            read.value = Some(value);
+            read.owner = owner;
+        }
+        Err(error) => read.errors.push(shape_error(file, &error, &index, &[])),
+    }
+    read.index = Some(index);
+    read
+}
+
+/// A row file's JSON without its owner field, and the owner it names.
+pub fn split_owner(text: &str) -> Result<(serde_json::Value, Option<RowName>), ParseError> {
+    let mut value: serde_json::Value = parse_json(text)?;
+    let owner = value
+        .as_object_mut()
+        .and_then(|fields| fields.shift_remove(OWNER_FIELD))
+        .map(|owner| {
+            serde_path_to_error::deserialize::<_, RowName>(owner).map_err(|error| ParseError {
+                pointer: format!("/{OWNER_FIELD}"),
+                inner: error.into_inner(),
+            })
+        })
+        .transpose()?;
+    Ok((value, owner))
+}
+
+fn parse_read(
+    read: ReadFile,
+    scope: &ContentScope,
+    list_kinds: &[ListKind],
+    parse: impl FnOnce(serde_json::Value) -> ParseResult,
+) -> ParsedFile {
+    let mut parsed = ParsedFile {
+        row: None,
+        index: read.index,
+        errors: read.errors,
+    };
+    let (Some(value), Some(index)) = (read.value, parsed.index.clone()) else {
+        return parsed;
+    };
+    let (result, scope) = with_content(scope.clone(), || parse(value));
     match result {
         Ok(row) => {
             parsed.row = Some(row);
             parsed
                 .errors
-                .extend(reference_errors(file, scope.leaves(), &index));
+                .extend(reference_errors(&read.file, scope.leaves(), &index));
         }
         Err(error) => parsed
             .errors
-            .push(shape_error(file, &error, &index, list_kinds)),
+            .push(shape_error(&read.file, &error, &index, list_kinds)),
     }
-    parsed.index = Some(index);
     parsed
 }
 
@@ -1050,7 +1217,12 @@ pub(super) trait TableLoader: Send + Sync {
     fn row_type(&self) -> TypeId;
     fn folders(&self) -> bool;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
-    fn parse(&self, text: &str) -> ParseResult;
+    fn sees_all_rows(&self) -> bool;
+    fn parse(&self, text: &str) -> ParseResult {
+        let (value, _) = split_owner(text)?;
+        self.parse_value(value)
+    }
+    fn parse_value(&self, value: serde_json::Value) -> ParseResult;
     fn finish(
         &self,
         keys: Vec<String>,
@@ -1091,8 +1263,12 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         shape_of::<Row>(settings)
     }
 
-    fn parse(&self, text: &str) -> ParseResult {
-        parse_json::<Row>(text).map(|row| Box::new(row) as Box<dyn Any + Send + Sync>)
+    fn sees_all_rows(&self) -> bool {
+        Row::SEES_ALL_ROWS
+    }
+
+    fn parse_value(&self, value: serde_json::Value) -> ParseResult {
+        parse_value::<Row>(value).map(|row| Box::new(row) as Box<dyn Any + Send + Sync>)
     }
 
     fn finish(
@@ -1123,10 +1299,26 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
 
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         for (id, row) in content.table::<Row>().iter() {
-            writer.json(&super::row_file(Row::TABLE, id.key(content)), row)?;
+            let key = id.key(content);
+            let file = super::row_file(Row::TABLE, key);
+            match content.owners().owner(Row::TABLE, key) {
+                Some(owner) => writer.json(&file, &Owned { owner, row })?,
+                None => writer.json(&file, row)?,
+            }
         }
         Ok(())
     }
+}
+
+#[derive(Serialize)]
+struct Owned<'a, Row> {
+    owner: &'a RowName,
+    #[serde(flatten)]
+    row: &'a Row,
+}
+
+pub fn parse_value<T: DeserializeOwned>(value: serde_json::Value) -> Result<T, ParseError> {
+    Ok(serde_path_to_error::deserialize(value)?)
 }
 
 pub fn parse_json<T: DeserializeOwned>(text: &str) -> Result<T, ParseError> {
@@ -1141,6 +1333,7 @@ pub fn parse_json<T: DeserializeOwned>(text: &str) -> Result<T, ParseError> {
 
 pub(super) trait SettingsLoader: Send + Sync {
     fn parse(&self, text: &str) -> ParseResult;
+    fn parse_value(&self, value: serde_json::Value) -> ParseResult;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn store(&self, settings: Box<dyn Any + Send + Sync>, builder: &mut ContentBuilder);
     fn built(&self, content: &Content) -> bool;
@@ -1157,6 +1350,10 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
 
     fn parse(&self, text: &str) -> ParseResult {
         parse_json::<G>(text).map(|settings| Box::new(settings) as Box<dyn Any + Send + Sync>)
+    }
+
+    fn parse_value(&self, value: serde_json::Value) -> ParseResult {
+        parse_value::<G>(value).map(|settings| Box::new(settings) as Box<dyn Any + Send + Sync>)
     }
 
     fn store(&self, settings: Box<dyn Any + Send + Sync>, builder: &mut ContentBuilder) {
@@ -1378,6 +1575,21 @@ impl Listing {
             self.tables.insert(table, listing);
         }
     }
+}
+
+fn is_fixture(registry: &ContentRegistry, row: &RowName) -> bool {
+    registry.fixtures.iter().any(|fixture| {
+        fixture.table == row.table
+            && (fixture.whole_table || fixture.keys.iter().any(|(key, _)| *key == row.key))
+    })
+}
+
+fn table_name(registry: &ContentRegistry, table: &str) -> &'static str {
+    registry
+        .table_names()
+        .into_iter()
+        .find(|name| *name == table)
+        .expect("a row's own table is registered")
 }
 
 pub const KEY_RULE: &str =

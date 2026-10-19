@@ -1,1 +1,22 @@
-../../../editor/templates/new_game/tables/script/warp.json
+{
+  "runs_on": "object",
+  "variables": {
+    "to": {
+      "type": "place"
+    }
+  },
+  "nodes": {
+    "entered": {
+      "type": "on",
+      "event": "entered",
+      "by": "characters",
+      "next": "warp"
+    },
+    "warp": {
+      "type": "warp",
+      "to": {
+        "var": "to"
+      }
+    }
+  }
+}

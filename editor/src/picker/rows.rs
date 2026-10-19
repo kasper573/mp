@@ -10,7 +10,7 @@ use engine::systems::item::ItemDef;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::player::PlayerDef;
 use engine::systems::quest::QuestDef;
-use engine::systems::script::{OwnerKind, RiftScripts, ScriptDef};
+use engine::systems::script::{RiftScripts, RunnerKind, ScriptDef};
 use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
@@ -32,7 +32,7 @@ const PICTURE_TABLES: [&str; 6] = [
 ];
 
 /// Rows of one or more tables. Several tables become the popover's category chips; a single
-/// script table offers its owner kinds instead.
+/// script table offers the kinds of row a script runs on instead.
 pub struct RowSource {
     tables: Vec<String>,
     path: String,
@@ -218,9 +218,9 @@ pub fn picture_of(files: &ProjectFiles, table: &str, key: &str) -> Option<Pictur
 fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     match table {
         ScriptDef::TABLE => {
-            let kind = owner_kind(cx.owner_table.as_deref()?);
+            let kind = runner_kind(cx.owner_table.as_deref()?);
             let owner = script_owner(cx, key);
-            (owner_kind(&owner) != kind).then(|| format!("owner {owner}"))
+            (runner_kind(&owner) != kind).then(|| format!("owner {owner}"))
         }
         SkillDef::TABLE if path.ends_with("/basic_attack") => {
             let row = cx.files.json(&row_file(SkillDef::TABLE, key))?;
@@ -251,14 +251,14 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     }
 }
 
-fn owner_kind(owner: &str) -> OwnerKind {
-    owner.parse().unwrap_or(OwnerKind::Any)
+fn runner_kind(owner: &str) -> RunnerKind {
+    owner.parse().unwrap_or(RunnerKind::Any)
 }
 
 fn script_owner(cx: &FormCx, key: &str) -> String {
     cx.files
         .json(&row_file(ScriptDef::TABLE, key))
-        .map(|row| row.text("owner").to_owned())
+        .map(|row| row.text("runs_on").to_owned())
         .unwrap_or_default()
 }
 

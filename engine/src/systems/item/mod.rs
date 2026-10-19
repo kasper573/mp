@@ -30,7 +30,7 @@ use crate::systems::npc::Npc;
 use crate::systems::player::{ClientId, PlayedBy, Players, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
-    Condition, EventKind, Owner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
+    Condition, EventKind, Owner, RiftInstances, RunnerKind, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
@@ -352,7 +352,7 @@ impl ModuleSet for ItemDef {
 }
 
 impl ScriptedRow for ItemDef {
-    const OWNER: OwnerKind = OwnerKind::Item;
+    const OWNER: RunnerKind = RunnerKind::Item;
 
     fn script(module: &ItemModule) -> Option<&ScriptModule> {
         match module {
@@ -515,7 +515,7 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
 
 pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Item, item.raw()),
+        Owner::Row(RunnerKind::Item, item.raw()),
         kind,
         Some(actor),
         Vec::new(),

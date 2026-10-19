@@ -14,7 +14,7 @@ use engine::systems::memory::MemoryDef;
 use engine::systems::npc::{self, NpcDef, NpcId};
 use engine::systems::quest::{Objective, QuestDef, QuestId};
 use engine::systems::script::{
-    Condition, OwnerKind, OwnerRow, Reach, RiftQuery, RiftScripts, ScriptDef, condition,
+    Condition, OwnerRow, Reach, RiftQuery, RiftScripts, RunnerKind, ScriptDef, condition,
 };
 use engine::systems::shop::ShopDef;
 use strum::VariantArray;
@@ -72,7 +72,7 @@ pub struct AtlasWarp {
 
 pub struct AtlasOwner {
     pub area: AreaId,
-    pub kind: OwnerKind,
+    pub kind: RunnerKind,
     pub name: String,
     pub label: String,
     pub at: Option<Pos<Tiles>>,
@@ -485,7 +485,7 @@ impl WorldAtlas {
         let placed = area::placed(content, id);
         let mut seeds = vec![AtlasOwner {
             area: id,
-            kind: OwnerKind::Area,
+            kind: RunnerKind::Area,
             name: key.to_owned(),
             label: format!("area/{key}"),
             at: None,
@@ -496,7 +496,7 @@ impl WorldAtlas {
             },
         }];
         let mut rows = vec![OwnerRow {
-            kind: OwnerKind::Area,
+            kind: RunnerKind::Area,
             row: id.raw(),
             object: None,
         }];
@@ -508,7 +508,7 @@ impl WorldAtlas {
                 .unwrap_or_else(|| format!("object {index}"));
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Object,
+                kind: RunnerKind::Object,
                 label: format!("area/{key} › {name}"),
                 name,
                 at: Some(match object.shape {
@@ -522,7 +522,7 @@ impl WorldAtlas {
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Object,
+                kind: RunnerKind::Object,
                 row: id.raw(),
                 object: Some(index),
             });
@@ -534,7 +534,7 @@ impl WorldAtlas {
             let blueprint = placement.blueprint.key(content);
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Blueprint,
+                kind: RunnerKind::Blueprint,
                 name: blueprint.to_owned(),
                 label: format!("blueprint/{blueprint} in {key} {ordinal}"),
                 at: Some(placement.at),
@@ -545,7 +545,7 @@ impl WorldAtlas {
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Blueprint,
+                kind: RunnerKind::Blueprint,
                 row: id.raw(),
                 object: Some(ordinal as u32),
             });
@@ -565,7 +565,7 @@ impl WorldAtlas {
             let npc_key = npc.key(content);
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Npc,
+                kind: RunnerKind::Npc,
                 name: npc.get(content).name.clone(),
                 label: format!("npc/{npc_key}"),
                 at,
@@ -576,7 +576,7 @@ impl WorldAtlas {
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Npc,
+                kind: RunnerKind::Npc,
                 row: npc.raw(),
                 object: None,
             });

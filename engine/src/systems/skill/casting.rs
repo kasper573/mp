@@ -18,7 +18,7 @@ use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::{
-    Condition, EffectCall, EventKind, Owner, OwnerKind, Reach, RiftInstances, RiftScripting,
+    Condition, EffectCall, EventKind, Owner, Reach, RiftInstances, RiftScripting, RunnerKind,
     condition, event,
 };
 use crate::systems::{notification, stat};
@@ -230,7 +230,7 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
         notification::play_sound(world, Some(caster), Some(caster), sfx, Audience::Everyone);
     }
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Skill, skill.raw()),
+        Owner::Row(RunnerKind::Skill, skill.raw()),
         EventKind::Used,
         Some(caster),
         event::used_payload(target.actor(), target.point(), i64::from(rank.0)),

@@ -12,7 +12,7 @@ use crate::systems::attention::AttentionId;
 use crate::systems::interact::Verb;
 use crate::systems::item::ItemId;
 use crate::systems::npc::NpcId;
-use crate::systems::script::{OwnerKind, RiftScripting};
+use crate::systems::script::{RiftScripting, RunnerKind};
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -84,23 +84,26 @@ pub enum RiftEvent {
     },
 }
 
-pub(crate) const PLACED: &[OwnerKind] = &[
-    OwnerKind::Object,
-    OwnerKind::Npc,
-    OwnerKind::Area,
-    OwnerKind::Blueprint,
+pub(crate) const PLACED: &[RunnerKind] = &[
+    RunnerKind::Object,
+    RunnerKind::Npc,
+    RunnerKind::Area,
+    RunnerKind::Blueprint,
 ];
-pub(crate) const OBJECT_OR_AREA: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Area];
-pub(crate) const OBJECT_OR_NPC: &[OwnerKind] = &[OwnerKind::Object, OwnerKind::Npc];
-pub(crate) const AREA: &[OwnerKind] = &[OwnerKind::Area];
-pub(crate) const NPC: &[OwnerKind] = &[OwnerKind::Npc];
-pub(crate) const ITEM: &[OwnerKind] = &[OwnerKind::Item];
-pub(crate) const ITEM_OR_SKILL: &[OwnerKind] = &[OwnerKind::Item, OwnerKind::Skill];
-pub(crate) const ASPECT: &[OwnerKind] =
-    &[OwnerKind::Item, OwnerKind::Skill, OwnerKind::StatusEffect];
-pub(crate) const QUEST: &[OwnerKind] = &[OwnerKind::Quest];
-pub(crate) const SHOP: &[OwnerKind] = &[OwnerKind::Shop];
-pub(crate) const ANY: &[OwnerKind] = &[OwnerKind::Any];
+pub(crate) const OBJECT_OR_AREA: &[RunnerKind] = &[RunnerKind::Object, RunnerKind::Area];
+pub(crate) const OBJECT_OR_NPC: &[RunnerKind] = &[RunnerKind::Object, RunnerKind::Npc];
+pub(crate) const AREA: &[RunnerKind] = &[RunnerKind::Area];
+pub(crate) const NPC: &[RunnerKind] = &[RunnerKind::Npc];
+pub(crate) const ITEM: &[RunnerKind] = &[RunnerKind::Item];
+pub(crate) const ITEM_OR_SKILL: &[RunnerKind] = &[RunnerKind::Item, RunnerKind::Skill];
+pub(crate) const ASPECT: &[RunnerKind] = &[
+    RunnerKind::Item,
+    RunnerKind::Skill,
+    RunnerKind::StatusEffect,
+];
+pub(crate) const QUEST: &[RunnerKind] = &[RunnerKind::Quest];
+pub(crate) const SHOP: &[RunnerKind] = &[RunnerKind::Shop];
+pub(crate) const ANY: &[RunnerKind] = &[RunnerKind::Any];
 
 const TRADE_FIELDS: &[(&str, ValueType)] =
     &[("item", ValueType::Integer), ("count", ValueType::Integer)];
@@ -132,7 +135,7 @@ impl EventDef<RiftScripting> for RiftEvent {
         self.into()
     }
 
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         match self {
             RiftEvent::Started => PLACED,
             RiftEvent::Run => ANY,

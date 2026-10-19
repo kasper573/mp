@@ -2,12 +2,12 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use engine::core::content::{Content, ContentScope, with_content};
 use engine::core::script::node::MAX_CALL_DEPTH;
-use engine::core::script::{EffectDef, EventDef, NodeKind, OwnerKindDef, REFUSED};
+use engine::core::script::{EffectDef, EventDef, NodeKind, REFUSED, RunnerKindDef};
 use engine::systems::actor::model::Expression;
 use engine::systems::area::blueprint::hole_name;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{
-    EventKind, Node, OwnerKind, RiftEffectKind, RiftQuery, RiftQueryKind,
+    EventKind, Node, RiftEffectKind, RiftQuery, RiftQueryKind, RunnerKind,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -83,9 +83,9 @@ impl LineSpeaker {
         }
     }
 
-    pub fn options(owner: OwnerKind) -> &'static [&'static str] {
+    pub fn options(owner: RunnerKind) -> &'static [&'static str] {
         match owner {
-            OwnerKind::Object => &["npc", "object", "narrator"],
+            RunnerKind::Object => &["npc", "object", "narrator"],
             _ => &["npc", "narrator"],
         }
     }
@@ -171,7 +171,7 @@ pub struct NodeEntry {
     pub kind: String,
     pub system: String,
     pub blurb: String,
-    pub owners: Vec<OwnerKind>,
+    pub owners: Vec<RunnerKind>,
     pub outputs: Vec<NodeOutput>,
     pub fields: Vec<(String, Option<String>)>,
     pub pauses: bool,
@@ -193,8 +193,8 @@ impl NodeEntry {
 }
 
 pub struct OwnerRefusal {
-    pub owner: OwnerKind,
-    pub allowed: Vec<OwnerKind>,
+    pub owner: RunnerKind,
+    pub allowed: Vec<RunnerKind>,
 }
 
 impl OwnerRefusal {
@@ -222,7 +222,7 @@ impl OwnerRefusal {
 #[derive(Default)]
 pub struct NodeCatalogue {
     pub entries: Vec<NodeEntry>,
-    pub events: Vec<(String, Vec<OwnerKind>)>,
+    pub events: Vec<(String, Vec<RunnerKind>)>,
 }
 
 impl NodeCatalogue {
@@ -306,21 +306,21 @@ impl NodeCatalogue {
         }
     }
 
-    pub fn refusal(&self, kind: &str, owner: OwnerKind) -> Option<OwnerRefusal> {
+    pub fn refusal(&self, kind: &str, owner: RunnerKind) -> Option<OwnerRefusal> {
         allowed(&self.entry(kind)?.owners, owner)
     }
 
-    pub fn event_refusal(&self, event: &str, owner: OwnerKind) -> Option<OwnerRefusal> {
+    pub fn event_refusal(&self, event: &str, owner: RunnerKind) -> Option<OwnerRefusal> {
         let (_, owners) = self.events.iter().find(|(name, _)| name == event)?;
         allowed(owners, owner)
     }
 }
 
-fn allowed(owners: &[OwnerKind], owner: OwnerKind) -> Option<OwnerRefusal> {
+fn allowed(owners: &[RunnerKind], owner: RunnerKind) -> Option<OwnerRefusal> {
     if owners.is_empty()
-        || owner == OwnerKind::Any
+        || owner == RunnerKind::Any
         || owners.contains(&owner)
-        || owners.contains(&OwnerKind::Any)
+        || owners.contains(&RunnerKind::Any)
     {
         return None;
     }

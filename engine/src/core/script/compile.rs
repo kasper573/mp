@@ -13,7 +13,7 @@ use super::node::{
 use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, OwnerKindDef, QueryDef, ScriptError,
+    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, QueryDef, RunnerKindDef, ScriptError,
     ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::id::nearest;
@@ -33,7 +33,7 @@ pub enum EffectStep {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerRow<V: Vocabulary> {
-    pub kind: V::OwnerKind,
+    pub kind: V::RunnerKind,
     pub row: u32,
     pub object: Option<u32>,
 }
@@ -71,7 +71,7 @@ pub struct ProcedureId(u64);
 
 pub struct Procedure<V: Vocabulary> {
     pub id: ProcedureId,
-    pub owner: V::OwnerKind,
+    pub owner: V::RunnerKind,
     pub label: String,
     pub names: Vec<String>,
     pub steps: Vec<Step<V>>,
@@ -199,7 +199,7 @@ impl<'c, V: Vocabulary> Call<'c, V> {
 }
 
 pub struct Binding<'c, V: Vocabulary> {
-    pub owner: V::OwnerKind,
+    pub owner: V::RunnerKind,
     pub row: Option<OwnerRow<V>>,
     pub label: String,
     pub call: Call<'c, V>,
@@ -227,7 +227,7 @@ pub struct ModuleError {
 
 pub fn compile_owner<'c, V: Vocabulary>(
     content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     label: &str,
     modules: &[&'c ScriptModule<V>],
 ) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
@@ -246,7 +246,7 @@ pub fn compile_row<'c, V: Vocabulary>(
 
 fn compile_modules<'c, V: Vocabulary>(
     content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     row: Option<OwnerRow<V>>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
@@ -388,21 +388,21 @@ fn compile_source<'c, V: Vocabulary>(
             let def = script.get(content);
             let called = !stack.is_empty();
             if called {
-                if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
+                if def.runs_on != V::RunnerKind::ANY && def.runs_on != binding.owner {
                     return Err(at_call(
-                        "owners of another kind",
+                        "run by another kind",
                         format!(
                             "script/{} is {}'s, run by {}",
                             script.key(content),
-                            def.owner.name(),
+                            def.runs_on.name(),
                             binding.owner.name()
                         ),
                     ));
                 }
-            } else if def.owner != binding.owner {
+            } else if def.runs_on != binding.owner {
                 return Err(at_call(
-                    "owners of another kind",
-                    format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                    "run by another kind",
+                    format!("script/{} is {}'s", script.key(content), def.runs_on.name()),
                 ));
             }
             (
@@ -552,7 +552,7 @@ fn compile_source<'c, V: Vocabulary>(
         let step = match node {
             Node::On { event, next } => {
                 let function =
-                    event.is_run() && (binding.owner == V::OwnerKind::ANY || !cx.stack.is_empty());
+                    event.is_run() && (binding.owner == V::RunnerKind::ANY || !cx.stack.is_empty());
                 if !event.owners().contains(&binding.owner) && !function {
                     return Err(node_fail(
                         "event not raised here",
@@ -566,7 +566,7 @@ fn compile_source<'c, V: Vocabulary>(
                 if let Err(fault) = event.check() {
                     return Err(node_fail(fault.rule, fault.expected));
                 }
-                if cx.stack.is_empty() && event.is_run() && binding.owner != V::OwnerKind::ANY {
+                if cx.stack.is_empty() && event.is_run() && binding.owner != V::RunnerKind::ANY {
                     return Err(node_fail(
                         "event not raised here",
                         "run starts only a script another runs".to_owned(),
@@ -843,7 +843,8 @@ fn compile_source<'c, V: Vocabulary>(
                 }
             }
             Node::Effect(effect) => {
-                if !effect.owners().contains(&binding.owner) && binding.owner != V::OwnerKind::ANY {
+                if !effect.owners().contains(&binding.owner) && binding.owner != V::RunnerKind::ANY
+                {
                     return Err(node_fail(
                         "not for this owner",
                         format!("not for {} owners", binding.owner.name()),
@@ -1165,7 +1166,7 @@ impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Wa
 
 pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     row: Option<OwnerRow<V>>,
     label: String,
     variables: HashMap<&'c str, (VariableType, Option<Bound<'c, V>>)>,
@@ -1185,7 +1186,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
     pub fn standalone(content: &'c Content) -> Compiler<'c, V> {
         Compiler {
             content,
-            owner: V::OwnerKind::ANY,
+            owner: V::RunnerKind::ANY,
             row: None,
             label: "condition".to_owned(),
             variables: HashMap::new(),
@@ -1200,7 +1201,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         }
     }
 
-    pub fn owner(&self) -> V::OwnerKind {
+    pub fn owner(&self) -> V::RunnerKind {
         self.owner
     }
 

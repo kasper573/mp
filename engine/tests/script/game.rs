@@ -13,7 +13,7 @@ use engine::systems::interact::{self, InteractRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::script::{
-    self, EventKind, Owner, OwnerKind, Procedure, RiftEffect, RiftInstances, ScriptModule,
+    self, EventKind, Owner, Procedure, RiftEffect, RiftInstances, RunnerKind, ScriptModule,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, skill};
@@ -96,7 +96,7 @@ pub fn spawn(sim: &mut Sim, key: &str, near: Entity, offset: Offset<Tiles>, pack
 /// A plain fighter beside `beside`, running only `modules`.
 pub fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[&ScriptModule]) -> (Entity, Owner) {
     let npc = spawn(sim, "fighter", beside, Offset::new(1.0, 0.0), u32::MAX);
-    let owner = Owner::Entity(OwnerKind::Npc, npc);
+    let owner = Owner::Entity(RunnerKind::Npc, npc);
     let procedures = compiled("test/npc", modules);
     let mut instances = sim.world.resource_mut::<RiftInstances>();
     instances.remove_owner(owner);
@@ -107,7 +107,7 @@ pub fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[&ScriptModule]) ->
 }
 
 pub fn compiled(name: &str, modules: &[&ScriptModule]) -> Vec<Arc<Procedure>> {
-    compile_owner(content(), OwnerKind::Npc, name, modules).expect("compiles")
+    compile_owner(content(), RunnerKind::Npc, name, modules).expect("compiles")
 }
 
 pub fn health(sim: &Sim, who: Entity) -> f32 {
@@ -144,7 +144,7 @@ fn game() -> Game {
             "script",
             "flees",
             json!({
-                "owner": "npc",
+                "runs_on": "npc",
                 "nodes": {
                     "spawned": { "type": "on", "event": "started", "next": "hostile" },
                     "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "roam" },
@@ -157,7 +157,7 @@ fn game() -> Game {
             "script",
             "strolls",
             json!({
-                "owner": "npc",
+                "runs_on": "npc",
                 "nodes": {
                     "spawned": { "type": "on", "event": "started", "next": "roam" },
                     "roam": { "type": "wander", "leash": 3, "priority": 1, "next": "rest" },
@@ -260,7 +260,7 @@ fn game() -> Game {
 /// A temperament that fights the nearest of `among` within its aggro, and roams while none is.
 fn fights_nearest(among: &str) -> Value {
     json!({
-        "owner": "npc",
+        "runs_on": "npc",
         "variables": { "aggro": { "type": "number" } },
         "locals": { "target": "actor" },
         "nodes": {

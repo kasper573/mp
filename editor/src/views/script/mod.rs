@@ -13,8 +13,8 @@ use egui::emath::TSTransform;
 use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
 use engine::core::content::{ContentRow, row_file};
-use engine::core::script::{OwnerKindDef, ScriptModuleKind};
-use engine::systems::script::{OwnerKind, ScriptDef};
+use engine::core::script::{RunnerKindDef, ScriptModuleKind};
+use engine::systems::script::{RunnerKind, ScriptDef};
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{LineSpeaker, NodeCatalogue};
 use serde_json::{Map, Value};
@@ -160,13 +160,13 @@ impl ScriptOwner {
         }
     }
 
-    pub fn kind(&self) -> OwnerKind {
+    pub fn kind(&self) -> RunnerKind {
         match self {
-            ScriptOwner::Shared { .. } => OwnerKind::Any,
+            ScriptOwner::Shared { .. } => RunnerKind::Any,
             ScriptOwner::Inline { table, module, .. } => match table.parse() {
-                Ok(OwnerKind::Area) if module.object().is_some() => OwnerKind::Object,
+                Ok(RunnerKind::Area) if module.object().is_some() => RunnerKind::Object,
                 Ok(kind) => kind,
-                Err(_) => OwnerKind::Any,
+                Err(_) => RunnerKind::Any,
             },
         }
     }
@@ -204,7 +204,7 @@ pub struct ScriptDoc {
     pub file: String,
     pub row: Value,
     pub script: Value,
-    pub kind: OwnerKind,
+    pub kind: RunnerKind,
 }
 
 impl ScriptDoc {
@@ -218,7 +218,7 @@ impl ScriptDoc {
             return None;
         }
         let kind = match owner {
-            ScriptOwner::Shared { .. } => script.text("owner").parse().unwrap_or(OwnerKind::Any),
+            ScriptOwner::Shared { .. } => script.text("runs_on").parse().unwrap_or(RunnerKind::Any),
             ScriptOwner::Inline { .. } => owner.kind(),
         };
         Some(ScriptDoc {
@@ -253,11 +253,11 @@ impl ScriptDoc {
 
     pub fn default_speaker(&self) -> LineSpeaker {
         match (self.kind, &self.owner) {
-            (OwnerKind::Npc, ScriptOwner::Inline { key, .. }) => LineSpeaker::Npc {
+            (RunnerKind::Npc, ScriptOwner::Inline { key, .. }) => LineSpeaker::Npc {
                 npc: key.clone(),
                 face: None,
             },
-            (OwnerKind::Object, _) => LineSpeaker::Object,
+            (RunnerKind::Object, _) => LineSpeaker::Object,
             _ => LineSpeaker::Narrator,
         }
     }

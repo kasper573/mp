@@ -40,7 +40,7 @@ use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
 use crate::systems::npc::NpcId;
 use crate::systems::script::{
-    self, Condition, OwnerKind, OwnerRow, Reach, RiftScripts, ScriptModule, ScriptedRow,
+    self, Condition, OwnerRow, Reach, RiftScripts, RunnerKind, ScriptModule, ScriptedRow,
 };
 
 pub type AreaId = ContentId<AreaDef>;
@@ -181,7 +181,7 @@ impl ModuleSet for AreaDef {
 }
 
 impl ScriptedRow for AreaDef {
-    const OWNER: OwnerKind = OwnerKind::Area;
+    const OWNER: RunnerKind = RunnerKind::Area;
 
     fn script(module: &AreaModule) -> Option<&ScriptModule> {
         match module {

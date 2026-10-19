@@ -21,7 +21,7 @@ use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, NpcId, Pack, body};
 use crate::systems::player::{ArrivalHold, PlayedBy};
 use crate::systems::quest::{self, Objective, QuestId};
-use crate::systems::script::OwnerKind;
+use crate::systems::script::RunnerKind;
 use crate::systems::skill::{self, SkillDef, SkillId, SkillStat};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::status::{self, StatusCategory, StatusEffectDef, StatusEffectId};
@@ -781,7 +781,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
 
 fn status_of(cx: &Compiler<RiftScripting>) -> Result<StatusEffectId, ScriptFault> {
     cx.owner_row()
-        .filter(|row| row.kind == OwnerKind::StatusEffect)
+        .filter(|row| row.kind == RunnerKind::StatusEffect)
         .map(|row| row.id::<StatusEffectDef>())
         .ok_or_else(|| {
             ScriptFault::new(
@@ -793,7 +793,7 @@ fn status_of(cx: &Compiler<RiftScripting>) -> Result<StatusEffectId, ScriptFault
 
 fn skill_of(cx: &Compiler<RiftScripting>) -> Result<SkillId, ScriptFault> {
     cx.owner_row()
-        .filter(|row| row.kind == OwnerKind::Skill)
+        .filter(|row| row.kind == RunnerKind::Skill)
         .map(|row| row.id::<SkillDef>())
         .ok_or_else(|| {
             ScriptFault::new(

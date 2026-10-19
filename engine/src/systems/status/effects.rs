@@ -10,7 +10,7 @@ use crate::core::script::{
 use crate::core::time::Seconds;
 use crate::systems::item::ItemId;
 use crate::systems::script::{
-    Condition, EffectCall, OwnerKind, OwnerRow, Reach, RiftScripting, RiftScripts,
+    Condition, EffectCall, OwnerRow, Reach, RiftScripting, RiftScripts, RunnerKind,
     effect as effects,
 };
 use crate::systems::skill::{SkillId, SkillKind};
@@ -170,9 +170,9 @@ fn source_of(cx: &Compiler<RiftScripting>) -> Result<AspectSource, ScriptFault> 
         return Err(ScriptFault::new("boost without an aspect", expected));
     };
     match row.kind {
-        OwnerKind::StatusEffect => Ok(AspectSource::Status(row.id())),
-        OwnerKind::Item => Ok(AspectSource::Item(row.id())),
-        OwnerKind::Skill => {
+        RunnerKind::StatusEffect => Ok(AspectSource::Status(row.id())),
+        RunnerKind::Item => Ok(AspectSource::Item(row.id())),
+        RunnerKind::Skill => {
             let skill: SkillId = row.id();
             if skill.get(cx.content).kind == SkillKind::Passive {
                 Ok(AspectSource::Skill(skill))

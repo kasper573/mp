@@ -14,7 +14,7 @@ use crate::systems::npc::NpcId;
 use crate::systems::player::{ClientId, PlayedBy};
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
-    Condition, EffectCall, OwnerKind, Reach, RiftScripting, effect as effects,
+    Condition, EffectCall, Reach, RiftScripting, RunnerKind, effect as effects,
 };
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
@@ -77,7 +77,7 @@ pub struct Summoned {
 }
 
 impl EffectDef<RiftScripting> for SetAttitude {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {

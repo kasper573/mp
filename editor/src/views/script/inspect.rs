@@ -3,12 +3,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
 use engine::core::content::{ContentRow, row_file, row_of};
-use engine::core::script::{NodeKind, OwnerKindDef, ScriptModuleKind, VariableType};
+use engine::core::script::{NodeKind, RunnerKindDef, ScriptModuleKind, VariableType};
 use engine::systems::area::blueprint::holes;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::memory::MemoryDef;
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{OwnerKind, RiftEffectKind, ScriptDef};
+use engine::systems::script::{RiftEffectKind, RunnerKind, ScriptDef};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
@@ -188,8 +188,8 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     breadcrumb(ui, &format!("script/{key}"));
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
-    let owner_schema = root
-        .pointer("/properties/owner")
+    let runner_schema = root
+        .pointer("/properties/runs_on")
         .cloned()
         .unwrap_or(Value::Null);
     let mut script = doc.script.clone();
@@ -207,11 +207,12 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     }
                 });
                 let mut changed = FormChange::default();
-                widgets::kv(ui, "owner", |ui| {
-                    let mut owner = script["owner"].clone();
-                    if forms::value(ui, &mut cx, &owner_schema, &mut owner, "/owner").is_some() {
-                        script["owner"] = owner;
-                        changed = FormChange::at("/owner");
+                widgets::kv(ui, "runs on", |ui| {
+                    let mut runner = script["runs_on"].clone();
+                    if forms::value(ui, &mut cx, &runner_schema, &mut runner, "/runs_on").is_some()
+                    {
+                        script["runs_on"] = runner;
+                        changed = FormChange::at("/runs_on");
                     }
                 });
                 let variables = script["variables"].as_object().map_or(0, |v| v.len());
@@ -394,8 +395,8 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             widgets::badge(ui, "script");
             ui.label(theme::strong("none").monospace().size(13.0));
             let stands = match doc.kind {
-                OwnerKind::Npc => "stands where it spawns",
-                OwnerKind::Object => "does nothing else",
+                RunnerKind::Npc => "stands where it spawns",
+                RunnerKind::Object => "does nothing else",
                 _ => "nothing else",
             };
             ui.label(theme::muted(stands).monospace().size(12.5));
@@ -444,7 +445,7 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 open = true;
             }
         }
-        None if doc.kind == OwnerKind::Npc => {
+        None if doc.kind == RunnerKind::Npc => {
             let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
                 return;
             };
@@ -1834,7 +1835,7 @@ pub fn make_shared_body(
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&dialog.kind).size(13.0))
                 .show_ui(ui, |ui| {
-                    for kind in OwnerKind::VARIANTS {
+                    for kind in RunnerKind::VARIANTS {
                         ui.selectable_value(&mut dialog.kind, kind.name().to_owned(), kind.name());
                     }
                 });
@@ -1954,7 +1955,7 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         variables.insert(name.to_owned(), declared);
         values.insert(name.to_owned(), constant.value.clone());
     }
-    let mut script = serde_json::json!({ "owner": dialog.kind });
+    let mut script = serde_json::json!({ "runs_on": dialog.kind });
     for field in ["state", "locals"] {
         if let Some(value) = doc.script.get(field) {
             script[field] = value.clone();

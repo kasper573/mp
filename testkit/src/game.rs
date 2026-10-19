@@ -3,8 +3,8 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock};
 
 use engine::core::content::{
-    Content, ContentRegistry, GAME_FILE, LoadReport, MemoryFolder, asset_file, row_file,
-    row_folder, version,
+    Content, ContentRegistry, GAME_FILE, LoadReport, MemoryFolder, OWNER_FIELD, asset_file,
+    row_file, row_folder, version,
 };
 use engine::core::math::Direction;
 use engine::systems::actor::Action;
@@ -44,6 +44,29 @@ impl Game {
     pub fn row(mut self, table: &str, key: &str, row: Value) -> Game {
         self.put(&row_file(table, key), json_bytes(&row));
         self
+    }
+
+    /// A row local to `owner`, named `table/key`: its file names the owner first, as the editor
+    /// writes it.
+    pub fn owned(self, table: &str, key: &str, owner: &str, row: Value) -> Game {
+        let mut fields = serde_json::Map::new();
+        fields.insert(OWNER_FIELD.to_owned(), Value::String(owner.to_owned()));
+        if let Value::Object(row) = row {
+            fields.extend(row);
+        }
+        self.row(table, key, Value::Object(fields))
+    }
+
+    /// Makes a row declared before local to `owner`.
+    pub fn own(self, table: &str, key: &str, owner: &str) -> Game {
+        let path = row_file(table, key);
+        let row: Value = serde_json::from_slice(
+            self.files
+                .get(&path)
+                .unwrap_or_else(|| panic!("no row `{path}` declared")),
+        )
+        .expect("a declared row is JSON");
+        self.owned(table, key, owner, row)
     }
 
     /// A file under the folder's `assets/`.

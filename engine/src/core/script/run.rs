@@ -21,12 +21,12 @@ const MAX_ROUNDS_PER_TICK: u32 = 100_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Owner<V: Vocabulary> {
-    Entity(V::OwnerKind, Entity),
-    Row(V::OwnerKind, u32),
+    Entity(V::RunnerKind, Entity),
+    Row(V::RunnerKind, u32),
 }
 
 impl<V: Vocabulary> Owner<V> {
-    pub fn kind(self) -> V::OwnerKind {
+    pub fn kind(self) -> V::RunnerKind {
         match self {
             Owner::Entity(kind, _) | Owner::Row(kind, _) => kind,
         }

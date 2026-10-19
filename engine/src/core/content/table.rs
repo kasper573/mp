@@ -10,9 +10,13 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::id::ContentId;
+use super::owner::ContentOwners;
 
 pub trait ContentRow: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 'static {
     const TABLE: &'static str;
+    /// Whether this row records or lays out the whole game rather than building one part of it, so
+    /// it may name any row of a table, local or not.
+    const SEES_ALL_ROWS: bool = false;
 
     fn check(&self, _cx: &mut RowCheck) {}
 }
@@ -192,6 +196,15 @@ impl Content {
                     std::any::type_name::<T>()
                 )
             })
+    }
+
+    /// Which rows are local to which. Content put together without the loader has no local rows.
+    pub fn owners(&self) -> &ContentOwners {
+        self.0
+            .built
+            .get(&TypeId::of::<ContentOwners>())
+            .and_then(|built| built.downcast_ref())
+            .unwrap_or(ContentOwners::empty())
     }
 
     pub fn has_built<T: Any + Send + Sync>(&self) -> bool {

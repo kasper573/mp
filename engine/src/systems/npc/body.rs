@@ -15,7 +15,7 @@ use crate::systems::movement::{self, Approach};
 use crate::systems::npc::{Home, Npc, Roams};
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
-    Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
+    Condition, EffectCall, FlowKey, Place, Reach, RiftInstances, RiftScripting, RunnerKind, query,
 };
 use crate::systems::{dialogue, reach, skill, stat};
 
@@ -404,7 +404,7 @@ pub enum FaceTarget {
 type Aimed<T> = Box<dyn Fn(&World, &FlowCx) -> Option<T> + Send + Sync>;
 
 impl EffectDef<RiftScripting> for Wander {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
@@ -435,7 +435,7 @@ impl EffectDef<RiftScripting> for Wander {
 }
 
 impl EffectDef<RiftScripting> for WalkTo {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
@@ -492,7 +492,7 @@ impl EffectDef<RiftScripting> for WalkTo {
 }
 
 impl EffectDef<RiftScripting> for Attack {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
@@ -539,7 +539,7 @@ impl EffectDef<RiftScripting> for Attack {
 }
 
 impl EffectDef<RiftScripting> for Stop {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {

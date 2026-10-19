@@ -20,7 +20,7 @@ use crate::systems::npc::Npc;
 use crate::systems::player::PlayedBy;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
-    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Place, RiftEvent, RiftInstances,
+    self, Condition, EventKind, Owner, OwnerRow, Place, RiftEvent, RiftInstances, RunnerKind,
     ScriptModule,
 };
 use crate::systems::visibility::Presence;
@@ -263,7 +263,7 @@ pub fn spawn_all(world: &mut World) {
             entity.insert(Presence::When(CompiledCondition::new(&content, shown)));
         }
         let id = entity.id();
-        let owner = Owner::Entity(OwnerKind::Object, id);
+        let owner = Owner::Entity(RunnerKind::Object, id);
         let mut instances = world.resource_mut::<RiftInstances>();
         instances.spawn_owner(owner, procedures);
         instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
@@ -309,7 +309,7 @@ pub fn track(
         [EventKind::Entered, EventKind::Left].iter().any(|kind| {
             instances
                 .owners_answering(*kind)
-                .contains(&Owner::Entity(OwnerKind::Object, object))
+                .contains(&Owner::Entity(RunnerKind::Object, object))
         })
     };
     let watched = |object: &AreaObject, area: AreaId| {
@@ -404,7 +404,7 @@ fn watchers(world: &World) -> Vec<Watcher> {
     let instances = world.resource::<RiftInstances>();
     let mut watchers = Vec::new();
     for owner in instances.owners_answering(EventKind::StoodOn) {
-        let Owner::Entity(OwnerKind::Npc, npc) = *owner else {
+        let Owner::Entity(RunnerKind::Npc, npc) = *owner else {
             continue;
         };
         let Some(area) = world.get::<AreaTag>(npc).map(|tag| tag.area) else {
@@ -444,7 +444,7 @@ fn raise_standing(
     {
         let name = name.clone();
         instances.raise(
-            Owner::Entity(OwnerKind::Npc, watcher.npc),
+            Owner::Entity(RunnerKind::Npc, watcher.npc),
             EventKind::StoodOn,
             Some(actor),
             Vec::new(),
@@ -458,7 +458,7 @@ fn raise_standing(
 
 fn raise_crossing(world: &mut World, object: Entity, kind: EventKind, actor: Entity, is_npc: bool) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Entity(OwnerKind::Object, object),
+        Owner::Entity(RunnerKind::Object, object),
         kind,
         Some(actor),
         Vec::new(),

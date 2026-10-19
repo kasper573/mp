@@ -18,8 +18,8 @@ use crate::systems::item::{
 };
 use crate::systems::player::sender_player;
 use crate::systems::script::{
-    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, OwnerKind, Reach, RiftEvent,
-    RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition, effect as effects,
+    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, Reach, RiftEvent, RiftInstances,
+    RiftScripting, RunnerKind, ScriptModule, ScriptedRow, condition, effect as effects,
 };
 use crate::systems::{dialogue, drain_requests, notification};
 
@@ -63,7 +63,7 @@ impl ModuleSet for ShopDef {
 }
 
 impl ScriptedRow for ShopDef {
-    const OWNER: OwnerKind = OwnerKind::Shop;
+    const OWNER: RunnerKind = RunnerKind::Shop;
 
     fn script(module: &ShopModule) -> Option<&ScriptModule> {
         match module {
@@ -516,7 +516,7 @@ pub(crate) fn marks(
 
 fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Shop, shop.raw()),
+        Owner::Row(RunnerKind::Shop, shop.raw()),
         kind,
         Some(player),
         vec![

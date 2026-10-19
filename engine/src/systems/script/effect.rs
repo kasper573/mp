@@ -23,7 +23,7 @@ use crate::systems::npc::summon::{Despawn, SetAttitude, SpawnNpcs};
 use crate::systems::quest::effects::{
     AcceptQuest, CompleteTask, Decide, FailQuest, OfferQuest, TurnIn,
 };
-use crate::systems::script::{EffectCall, OwnerKind};
+use crate::systems::script::{EffectCall, RunnerKind};
 use crate::systems::shop::OpenShop;
 use crate::systems::skill::{ResetSkills, UseSkill};
 use crate::systems::status::{ApplyStatus, Boost, RemoveStatus};
@@ -43,7 +43,7 @@ macro_rules! effects {
         }
 
         impl EffectDef<RiftScripting> for RiftEffect {
-            fn owners(&self) -> &'static [OwnerKind] {
+            fn owners(&self) -> &'static [RunnerKind] {
                 match self { $(RiftEffect::$variant(e) => e.owners(),)* }
             }
             fn needs_subject(&self) -> bool {

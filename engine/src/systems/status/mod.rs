@@ -18,7 +18,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
-use crate::systems::script::{OwnerKind, ScriptModule, ScriptedRow};
+use crate::systems::script::{RunnerKind, ScriptModule, ScriptedRow};
 
 pub type StatusEffectId = ContentId<StatusEffectDef>;
 
@@ -253,7 +253,7 @@ impl ModuleSet for StatusEffectDef {
 }
 
 impl ScriptedRow for StatusEffectDef {
-    const OWNER: OwnerKind = OwnerKind::StatusEffect;
+    const OWNER: RunnerKind = RunnerKind::StatusEffect;
 
     fn script(module: &StatusModule) -> Option<&ScriptModule> {
         match module {

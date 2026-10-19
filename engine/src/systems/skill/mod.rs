@@ -44,7 +44,7 @@ use crate::systems::npc::{Npc, NpcDef};
 use crate::systems::script::event::{USED_POINT, USED_RANK, USED_TARGET};
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
-    Condition, EventKind, OwnerKind, OwnerRow, RiftScripts, ScriptModule, ScriptedRow,
+    Condition, EventKind, OwnerRow, RiftScripts, RunnerKind, ScriptModule, ScriptedRow,
 };
 use crate::systems::stat::{self, StatKind};
 
@@ -207,7 +207,7 @@ impl ModuleSet for SkillDef {
 }
 
 impl ScriptedRow for SkillDef {
-    const OWNER: OwnerKind = OwnerKind::Skill;
+    const OWNER: RunnerKind = RunnerKind::Skill;
 
     fn script(module: &SkillModule) -> Option<&ScriptModule> {
         match module {

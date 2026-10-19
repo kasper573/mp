@@ -28,7 +28,7 @@ use crate::systems::movement::{self, Position, TileClaims, position};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
-    EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
+    EventKind, Owner, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts, RunnerKind,
     ScriptModule, ScriptedRow, area_owner,
 };
 use crate::systems::skill::{self, Rank, SkillId};
@@ -154,7 +154,7 @@ impl ModuleSet for NpcDef {
 }
 
 impl ScriptedRow for NpcDef {
-    const OWNER: OwnerKind = OwnerKind::Npc;
+    const OWNER: RunnerKind = RunnerKind::Npc;
 
     fn script(module: &NpcModule) -> Option<&ScriptModule> {
         match module {
@@ -346,7 +346,7 @@ pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: 
 pub fn despawn(world: &mut World, npc: Entity) {
     world
         .resource_mut::<RiftInstances>()
-        .remove_owner(Owner::Entity(OwnerKind::Npc, npc));
+        .remove_owner(Owner::Entity(RunnerKind::Npc, npc));
     world.despawn(npc);
 }
 
@@ -355,7 +355,7 @@ pub fn attacked(world: &mut World, target: Entity, attacker: Entity) {
         return;
     }
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Entity(OwnerKind::Npc, target),
+        Owner::Entity(RunnerKind::Npc, target),
         EventKind::Attacked,
         Some(attacker),
         Vec::new(),
@@ -387,7 +387,7 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
         }
         let credited = crate::systems::item::credited(world, died.entity, now);
         world.resource_mut::<RiftInstances>().raise(
-            Owner::Entity(OwnerKind::Npc, died.entity),
+            Owner::Entity(RunnerKind::Npc, died.entity),
             EventKind::Defeated,
             credited,
             Vec::new(),
@@ -412,7 +412,7 @@ pub fn approach(world: &mut World) {
         .owners_answering(EventKind::CameNear)
         .iter()
         .filter_map(|&owner| {
-            let Owner::Entity(OwnerKind::Npc, npc) = owner else {
+            let Owner::Entity(RunnerKind::Npc, npc) = owner else {
                 return None;
             };
             let listed = roster.iter().find(|listed| listed.entity == npc)?;
@@ -471,7 +471,7 @@ pub fn approach(world: &mut World) {
             let distance =
                 position(world, other).map_or(Tiles(f32::MAX), |there| there.distance(at));
             world.resource_mut::<RiftInstances>().raise(
-                Owner::Entity(OwnerKind::Npc, npc),
+                Owner::Entity(RunnerKind::Npc, npc),
                 EventKind::CameNear,
                 Some(other),
                 Vec::new(),
@@ -512,7 +512,7 @@ fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
         .resource::<RiftScripts>()
         .of(OwnerRow::of_row(def))
         .to_vec();
-    let owner = Owner::Entity(OwnerKind::Npc, entity);
+    let owner = Owner::Entity(RunnerKind::Npc, entity);
     let interactive = Interactive::of(&procedures);
     match interactive {
         Some(interactive) => {
@@ -555,7 +555,7 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
             };
             world
                 .resource_mut::<RiftInstances>()
-                .remove_owner(Owner::Entity(OwnerKind::Npc, id));
+                .remove_owner(Owner::Entity(RunnerKind::Npc, id));
             let Some(npc) = world.get::<Npc>(id).map(|npc| npc.def) else {
                 continue;
             };
