@@ -1,6 +1,7 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::audio::playback::{SfxRoleDef, SfxScalar};
 use engine::core::content::ContentRow;
+use engine::systems::actor::ModelDef;
 
 use crate::app::Editor;
 use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
@@ -209,7 +210,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let current_sound = selected_cue
         .filter(|(_, kind)| *kind == super::FrameCueKind::Sound)
         .and_then(|(index, _)| {
-            let row = editor.row_value(super::TABLE, key)?;
+            let row = editor.row_value(ModelDef::TABLE, key)?;
             super::strip_of(&row, strip).get(index)?.sound.clone()
         });
     let mut play = None;
@@ -250,7 +251,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let view = editor.views.model.view_mut(key);
         view.last_sound = Some(sfx.clone());
         if let Some((index, super::FrameCueKind::Sound)) = selected_cue
-            && let Some(row) = editor.row_value(super::TABLE, key)
+            && let Some(row) = editor.row_value(ModelDef::TABLE, key)
         {
             let mut frames = super::strip_of(&row, strip);
             if let Some(frame) = frames.get_mut(index) {

@@ -280,12 +280,12 @@ pub fn row_icon(
 ) -> Option<IconImage> {
     let picture = picker::picture_of(&project.files, table, key)?;
     match picture.frame {
-        PictureFrame::Sprite(model) => {
+        PictureFrame::Sprite { size, frame } => {
             let thumb = form
                 .thumbnails
                 .image_within(ctx, &project.files, &picture.path, budget)?;
-            let frame = thumbs::model_frame(&model, &thumb);
-            let scale = 18.0 / frame.size.y.max(1.0);
+            let frame = thumbs::sprite_frame(size, frame, &thumb);
+            let scale = 18.0 / frame.size.y;
             Some(IconImage {
                 texture: thumb.texture.id(),
                 uv: frame.uv,

@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
-use engine::systems::actor::Action;
+use engine::core::content::ContentRow;
+use engine::systems::actor::model::MAX_FRAME_MS;
+use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
 use serde_json::Value;
 
-use super::{FrameCueKind, MAX_FRAME_MS, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
+use super::{FrameCueKind, ModelStrip, StripFrame, strip::TimingSetBy, strip_of};
 use crate::app::Editor;
 use crate::forms::FormChange;
 use crate::keymap::EditorKey;
@@ -23,7 +25,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(part) = selection.parts.first().cloned() else {
         return;
     };
-    let Some(row) = editor.row_value(super::TABLE, &key) else {
+    let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
         return;
     };
     super::ensure_view(editor, &key);
@@ -640,7 +642,7 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
         picker::row(ui, cx, "sfx", sound, path)
     })
 }
@@ -652,7 +654,7 @@ fn asset_picker(
     file: &mut String,
     path: &str,
 ) -> bool {
-    row_form::with_row_form(editor, super::TABLE, key, |cx| {
+    row_form::with_row_form(editor, ModelDef::TABLE, key, |cx| {
         picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
     })
 }
@@ -835,7 +837,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         return;
     };
     let faces = editor
-        .row_value(super::TABLE, key)
+        .row_value(ModelDef::TABLE, key)
         .map(|row| super::busts::faces(&row))
         .unwrap_or_default();
     let mut decision = None;
@@ -889,7 +891,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     if apply && super::busts::remove(editor, key, &removing.face, &replacement) {
         let view = editor.views.model.view_mut(key);
         view.face = None;
-        editor.select(RowSelection::row(super::TABLE, key));
+        editor.select(RowSelection::row(ModelDef::TABLE, key));
     }
 }
 

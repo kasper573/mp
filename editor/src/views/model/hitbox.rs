@@ -1,4 +1,5 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use engine::core::content::ContentRow;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
@@ -85,7 +86,7 @@ pub fn airborne(row: &Value) -> bool {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let model = RowSelection::row(super::TABLE, key);
+    let model = RowSelection::row(ModelDef::TABLE, key);
     if editor.selection != model {
         editor.select(model);
     }

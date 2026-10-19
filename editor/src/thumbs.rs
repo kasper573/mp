@@ -103,22 +103,18 @@ impl Thumbnails {
     }
 }
 
-pub struct ModelFrame {
+pub struct SpriteFrame {
     pub uv: egui::Rect,
     pub size: egui::Vec2,
 }
 
-pub fn model_frame(model: &serde_json::Value, thumb: &Thumbnail) -> ModelFrame {
-    let sprites = &model["sprites"];
-    let w = sprites["frame_size"]["width"].as_f64().unwrap_or(16.0) as f32;
-    let h = sprites["frame_size"]["height"].as_f64().unwrap_or(16.0) as f32;
-    let frame = sprites["actions"]["idle"]["s"][0]["frame"]
-        .as_u64()
-        .unwrap_or(0) as f32;
+pub fn sprite_frame(size: (u32, u32), frame: u32, thumb: &Thumbnail) -> SpriteFrame {
+    let (w, h) = (size.0 as f32, size.1 as f32);
+    let frame = frame as f32;
     let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
     let x = (frame % columns) * w;
     let y = (frame / columns).floor() * h;
-    ModelFrame {
+    SpriteFrame {
         uv: uv(thumb.size, x, y, w, h),
         size: egui::vec2(w, h),
     }

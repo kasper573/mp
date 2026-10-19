@@ -63,20 +63,18 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             changed = FormChange::at("/image");
         }
     });
-    let tile = value["tile"].as_u64().unwrap_or(16);
     let ctx = ui.ctx().clone();
-    let columns = value["image"]
-        .as_str()
-        .and_then(|image| cx.state.thumbnails.image(&ctx, cx.files, image))
-        .map(|thumb| thumb.size[0] as u64 / tile.max(1));
-    widgets::kv_text(
-        ui,
-        "tile",
+    let tile = super::tile_size(value).map(|tile| {
+        let columns = value["image"]
+            .as_str()
+            .and_then(|image| cx.state.thumbnails.image(&ctx, cx.files, image))
+            .map(|thumb| thumb.size[0] as u32 / tile);
         match columns {
             Some(columns) => format!("{tile} × {tile} px · {columns} columns, imported"),
             None => format!("{tile} × {tile} px, imported"),
-        },
-    );
+        }
+    });
+    widgets::kv_text(ui, "tile", tile.unwrap_or_else(|error| error));
     let tiles = value["tiles"].as_object().map_or(0, |tiles| tiles.len());
     widgets::kv_text(ui, "tiles", format!("{tiles} with data"));
     if let Some(sets) = value["terrains"]

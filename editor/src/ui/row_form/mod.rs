@@ -13,8 +13,10 @@ pub mod usages;
 use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::ModuleRule;
+use engine::core::content::{ContentRow, ModuleRule};
 use engine::core::script::ScriptModuleKind;
+use engine::systems::actor::ModelDef;
+use engine::systems::area::tileset::TilesetDef;
 use engine::systems::registry;
 use serde_json::Value;
 
@@ -294,11 +296,11 @@ fn row_card(
         );
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
-        if table == model::TABLE {
+        if table == ModelDef::TABLE {
             changed = model::inspect::row_body(ui, cx, value);
             return;
         }
-        if table == tileset::TABLE {
+        if table == TilesetDef::TABLE {
             changed = tileset::inspect::row_body(ui, cx, value);
             return;
         }

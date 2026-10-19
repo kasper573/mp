@@ -1,5 +1,7 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::actor::ModelDef;
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
@@ -122,9 +124,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     }
                 });
             });
-            if let Some(record) = editor.imports.record_for(super::TABLE, key).cloned() {
+            if let Some(record) = editor.imports.record_for(ModelDef::TABLE, key)
+                && let Some(file) = record.files.first()
+            {
                 ui.horizontal(|ui| {
-                    let export = import::show_path(editor, &record.export);
+                    let export = import::show_path(editor, file);
                     if record.missing() {
                         glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                         ui.label(theme::muted(format!(

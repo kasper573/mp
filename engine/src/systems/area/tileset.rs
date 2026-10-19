@@ -14,6 +14,8 @@ pub type TilesetId = ContentId<TilesetDef>;
 pub type SurfaceId = ContentId<SurfaceDef>;
 
 pub const MAX_TILE_PX: u32 = 512;
+pub const MAX_TILE_FRAMES: usize = 256;
+pub const MAX_TILE_FRAME_MS: u32 = 60_000;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -54,7 +56,7 @@ impl ContentRow for TilesetDef {
                     format!("{pointer}/animation"),
                     data.animation.len(),
                     2,
-                    256,
+                    MAX_TILE_FRAMES,
                     "frames",
                 );
                 for (index, frame) in data.animation.iter().enumerate() {
@@ -62,7 +64,7 @@ impl ContentRow for TilesetDef {
                         format!("{pointer}/animation/{index}/ms"),
                         frame.ms,
                         1,
-                        60_000,
+                        MAX_TILE_FRAME_MS,
                         "whole milliseconds",
                     );
                     if self

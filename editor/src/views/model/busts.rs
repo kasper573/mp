@@ -1,3 +1,5 @@
+use engine::core::content::ContentRow;
+use engine::systems::actor::ModelDef;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -150,7 +152,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     if let Some(face) = pick {
         let view = editor.views.model.view_mut(key);
         view.face = Some(face.name.clone());
-        editor.select(RowSelection::parts(super::TABLE, key, vec![face.pointer]));
+        editor.select(RowSelection::parts(
+            ModelDef::TABLE,
+            key,
+            vec![face.pointer],
+        ));
     }
     if let Some((face, path)) = replace {
         replace_file(editor, key, &face, &path);
@@ -291,7 +297,7 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
         .push(serde_json::json!({ "name": name, "file": file }));
     let mut edit = ContentEdit::new(format!("Add expression {name} to {key}'s bust"));
     edit.write(format!("assets/{file}"), bytes.into());
-    edit.write_json(row_file(super::TABLE, key), &changed);
+    edit.write_json(row_file(ModelDef::TABLE, key), &changed);
     if editor.apply(edit) {
         let view = editor.views.model.view_mut(key);
         view.face = Some(name.clone());
@@ -299,7 +305,7 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
             .as_array()
             .map_or(0, |own| own.len().saturating_sub(1));
         editor.select(RowSelection::parts(
-            super::TABLE,
+            ModelDef::TABLE,
             key,
             vec![format!("/modules/{index}/own/{j}")],
         ));
@@ -394,7 +400,7 @@ fn find_nodes(row: &Value) -> Vec<(String, Value)> {
 }
 
 pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -> bool {
-    let Some(mut row) = editor.row_value(super::TABLE, key) else {
+    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
         return false;
     };
     let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
@@ -412,12 +418,12 @@ pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -
         new_name,
         format!("Rename face {} of {key} to {new_name}", face.name),
     );
-    edit.write_json(row_file(super::TABLE, key), &row);
+    edit.write_json(row_file(ModelDef::TABLE, key), &row);
     editor.apply(edit)
 }
 
 pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str) -> bool {
-    let Some(mut row) = editor.row_value(super::TABLE, key) else {
+    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
         return false;
     };
     let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
@@ -435,7 +441,7 @@ pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str
         replacement,
         format!("Remove face {} of {key}", face.name),
     );
-    edit.write_json(row_file(super::TABLE, key), &row);
+    edit.write_json(row_file(ModelDef::TABLE, key), &row);
     edit.remove(format!("assets/{}", face.file));
     editor.apply(edit)
 }
