@@ -23,10 +23,6 @@ impl UserFolder {
         UserFolder::at(base.join("rift-editor"))
     }
 
-    pub fn root(&self) -> &Path {
-        &self.root
-    }
-
     pub fn settings_file(&self) -> PathBuf {
         self.root.join("settings.json")
     }

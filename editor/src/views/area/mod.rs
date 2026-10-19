@@ -24,9 +24,7 @@ pub mod status;
 pub mod terrain;
 pub mod tools;
 
-pub use blueprint::{
-    DeleteBlueprintDialog, MakeBlueprintDialog, delete_blueprint_dialog, make_blueprint_dialog,
-};
+pub use blueprint::{MakeBlueprintDialog, make_blueprint_dialog};
 pub use resize::ResizeDialog;
 
 use std::collections::{HashMap, HashSet};
@@ -341,7 +339,6 @@ pub enum ResizeCorner {
 #[derive(Clone, Debug)]
 pub struct PasteGhost {
     pub modules: Vec<Value>,
-    pub at: Option<Pos<Tiles>>,
 }
 
 impl AreaViews {

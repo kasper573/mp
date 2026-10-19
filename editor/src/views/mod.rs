@@ -31,7 +31,6 @@ pub struct EditorCamera;
 #[derive(Default)]
 pub struct EditorViews {
     pub browser: BrowserState,
-    pub show_usages: bool,
     pub area: area::AreaViews,
     pub world: world::WorldView,
     pub script: script::ScriptViews,

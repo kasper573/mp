@@ -45,7 +45,7 @@ fn an_update_that_finds_no_place_writes_nothing() {
         Some(())
     });
     assert!(applied.is_none());
-    assert!(edit.is_empty());
+    assert!(edit.changes.is_empty());
 }
 
 #[test]

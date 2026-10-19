@@ -106,7 +106,6 @@ fn switching_tools_ends_the_stroke_held_across_it() {
         draft,
         kind: BrushStrokeKind::Paint,
         cells: HashSet::new(),
-        seed: 1,
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
     });
@@ -160,7 +159,6 @@ fn hold_a_stroke(editor: &mut Editor) {
         draft,
         kind: BrushStrokeKind::Paint,
         cells: HashSet::new(),
-        seed: 1,
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
     });

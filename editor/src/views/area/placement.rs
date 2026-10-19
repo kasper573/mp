@@ -628,13 +628,6 @@ pub fn unpack(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReplaceScope {
-    Here,
-    ThisArea,
-    Everywhere,
-}
-
 pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
         title: format!(
@@ -650,69 +643,32 @@ pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         then: PickRowThen::ReplaceBlueprint {
             area: frame.area_key.clone(),
             index,
-            scope: ReplaceScope::Here,
         },
     }));
 }
 
-pub fn replace_with(
-    editor: &mut Editor,
-    area_key: &str,
-    index: usize,
-    replacement: &str,
-    scope: ReplaceScope,
-) {
+pub fn replace_with(editor: &mut Editor, area_key: &str, index: usize, replacement: &str) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(row) = editor.row_value(AreaDef::TABLE, area_key) else {
+    let Some(mut row) = editor.row_value(AreaDef::TABLE, area_key) else {
         return;
     };
-    let old = row["modules"][index]["blueprint"]
-        .as_str()
-        .unwrap_or("")
-        .to_owned();
     let Some(new_id) = content.by_key::<area::blueprint::BlueprintDef>(replacement) else {
         return;
     };
-    let new_def = new_id.get(&content);
-    let areas: Vec<String> = match scope {
-        ReplaceScope::Here | ReplaceScope::ThisArea => vec![area_key.to_owned()],
-        ReplaceScope::Everywhere => content.table::<area::AreaDef>().keys().to_vec(),
-    };
-    let mut edit = ContentEdit::new(format!("Replace {old} with {replacement}"));
-    let mut dropped = 0;
-    let mut swapped = 0;
-    for area in areas {
-        let Some(mut row) = editor.row_value(AreaDef::TABLE, &area) else {
-            continue;
-        };
-        let mut changed = false;
-        for (i, module) in row["modules"]
-            .as_array_mut()
-            .into_iter()
-            .flatten()
-            .enumerate()
-        {
-            if !module.is_module(AreaModuleKind::Blueprint)
-                || module["blueprint"].as_str() != Some(old.as_str())
-            {
-                continue;
-            }
-            if scope == ReplaceScope::Here && (area != area_key || i != index) {
-                continue;
-            }
-            dropped += retarget(module, replacement, &new_def.variables);
-            swapped += 1;
-            changed = true;
-        }
-        if changed {
-            edit.write_json(row_file(AreaDef::TABLE, &area), &row);
-        }
+    let module = &mut row["modules"][index];
+    if !module.is_module(AreaModuleKind::Blueprint) {
+        return;
     }
+    let old = module.text("blueprint").to_owned();
+    let dropped = retarget(module, replacement, &new_id.get(&content).variables);
+    let mut edit = ContentEdit::new(format!("Replace {old} with {replacement}"));
+    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
     if editor.apply(edit) {
         editor.toast(format!(
-            "Replaced {swapped} placements; {dropped} values didn't carry"
+            "Replaced {old} with {replacement}; {dropped} value{} didn't carry",
+            widgets::plural(dropped)
         ));
     }
 }

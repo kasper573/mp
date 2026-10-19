@@ -520,16 +520,6 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
 
 fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalDialog> {
     match dialog {
-        ModalDialog::Error(title, text) => {
-            let mut open = true;
-            window(ctx, &title, |ui| {
-                ui.label(&text);
-                if ui.button("OK").clicked() {
-                    open = false;
-                }
-            });
-            open.then(|| ModalDialog::Error(title, text))
-        }
         ModalDialog::Confirm(confirm) => {
             let mut outcome = None;
             let mut pressed = DialogKeys::default();
@@ -906,9 +896,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         }
         ModalDialog::Resize(dialog) => {
             resize::resize_dialog(editor, ctx, dialog).map(ModalDialog::Resize)
-        }
-        ModalDialog::DeleteBlueprint(dialog) => {
-            area::delete_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::DeleteBlueprint)
         }
         ModalDialog::Arrange(dialog) => {
             world::arrange_dialog(editor, ctx, dialog).map(ModalDialog::Arrange)

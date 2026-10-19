@@ -343,7 +343,6 @@ fn open_one(editor: &mut Editor, step: &Step) {
             let mut relative = module_value;
             shapes::shift(&mut relative, -origin.x, -origin.y);
             editor.clipboard = Some(Clipboard {
-                table: table.clone(),
                 from: key.clone(),
                 modules: vec![relative],
                 origin: Some(origin),

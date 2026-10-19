@@ -32,8 +32,7 @@ use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
-use crate::views::area::placement::ReplaceScope;
-use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
+use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
 use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
@@ -236,7 +235,6 @@ pub enum ModalDialog {
     NewRow(NewRowDialog),
     Confirm(ConfirmDialog),
     Conflicts(Vec<FileConflict>),
-    Error(String, String),
     Rename(RenameDialog),
     Delete(DeleteDialog),
     Close(CloseDialog),
@@ -244,7 +242,6 @@ pub enum ModalDialog {
     Keys,
     MakeBlueprint(MakeBlueprintDialog),
     Resize(ResizeDialog),
-    DeleteBlueprint(DeleteBlueprintDialog),
     Arrange(ArrangeDialog),
     Import(Box<import::ImportDialog>),
     PickRow(PickRowDialog),
@@ -272,13 +269,11 @@ pub enum PickRowThen {
     ReplaceBlueprint {
         area: String,
         index: usize,
-        scope: ReplaceScope,
     },
 }
 
 #[derive(Clone)]
 pub struct Clipboard {
-    pub table: String,
     pub from: String,
     pub modules: Vec<Value>,
     pub origin: Option<Pos<Tiles>>,
@@ -355,15 +350,6 @@ pub struct RenameDialog {
 pub enum RenameTarget {
     Row { table: String, key: String },
     Layer { area: String, layer: String },
-}
-
-impl RenameTarget {
-    pub fn name(&self) -> &str {
-        match self {
-            RenameTarget::Row { key, .. } => key,
-            RenameTarget::Layer { layer, .. } => layer,
-        }
-    }
 }
 
 pub struct DeleteDialog {

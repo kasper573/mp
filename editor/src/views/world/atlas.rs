@@ -58,7 +58,6 @@ pub struct PlacedNpc {
 
 pub struct AtlasDoor {
     pub at: Pos<Tiles>,
-    pub to: AreaId,
     pub owner: usize,
 }
 
@@ -75,7 +74,6 @@ pub struct AtlasOwner {
     pub kind: OwnerKind,
     pub name: String,
     pub label: String,
-    pub npc: Option<NpcId>,
     pub at: Option<Pos<Tiles>>,
     pub reaches: Vec<Reach>,
     pub opens: OpenTarget,
@@ -489,7 +487,6 @@ impl WorldAtlas {
             kind: OwnerKind::Area,
             name: key.to_owned(),
             label: format!("area/{key}"),
-            npc: None,
             at: None,
             reaches: Vec::new(),
             opens: OpenTarget::Area {
@@ -513,7 +510,6 @@ impl WorldAtlas {
                 kind: OwnerKind::Object,
                 label: format!("area/{key} › {name}"),
                 name,
-                npc: None,
                 at: Some(match object.shape {
                     ObjectShape::Point(at) => at,
                     ObjectShape::Rect(rect) => rect.center(),
@@ -540,7 +536,6 @@ impl WorldAtlas {
                 kind: OwnerKind::Blueprint,
                 name: blueprint.to_owned(),
                 label: format!("blueprint/{blueprint} in {key} {ordinal}"),
-                npc: None,
                 at: Some(placement.at),
                 reaches: Vec::new(),
                 opens: OpenTarget::Area {
@@ -572,7 +567,6 @@ impl WorldAtlas {
                 kind: OwnerKind::Npc,
                 name: npc.get(content).name.clone(),
                 label: format!("npc/{npc_key}"),
-                npc: Some(npc),
                 at,
                 reaches: Vec::new(),
                 opens: OpenTarget::Row {
@@ -601,11 +595,7 @@ impl WorldAtlas {
                     owner: index,
                 });
                 if let (Some(at), Some(info)) = (owner.at, self.areas.get_mut(&id)) {
-                    info.doors.push(AtlasDoor {
-                        at,
-                        to: place.area,
-                        owner: index,
-                    });
+                    info.doors.push(AtlasDoor { at, owner: index });
                 }
             }
             self.owners.push(owner);

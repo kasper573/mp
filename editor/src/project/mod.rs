@@ -100,10 +100,6 @@ impl ContentEdit {
         self.changes.push(FileChange { file, bytes: None });
         self
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.changes.is_empty()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -256,18 +252,6 @@ impl Project {
         };
         project.reload();
         Ok(project)
-    }
-
-    pub fn name(&self) -> String {
-        self.files
-            .json(GAME_FILE)
-            .and_then(|game| game["name"].as_str().map(str::to_owned))
-            .unwrap_or_else(|| {
-                self.root
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default()
-            })
     }
 
     pub fn loads(&self) -> bool {

@@ -533,7 +533,6 @@ pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
         })
         .collect();
     editor.clipboard = Some(Clipboard {
-        table: AreaDef::TABLE.to_owned(),
         from: frame.area_key.clone(),
         modules,
         origin: Some(origin),
@@ -550,7 +549,6 @@ pub fn start_paste(editor: &mut Editor, view_key: &str) {
     view.set_tool(AreaTool::Select);
     view.paste = Some(PasteGhost {
         modules: clip.modules,
-        at: None,
     });
 }
 

@@ -44,9 +44,7 @@ pub fn picked_row(editor: &mut Editor, then: PickRowThen, picked: &str) {
             let label = format!("Add {} to {area}", shapes::label(&module));
             modules::append_modules(editor, &area, vec![module], &label);
         }
-        PickRowThen::ReplaceBlueprint { area, index, scope } => {
-            replace_with(editor, &area, index, picked, scope)
-        }
+        PickRowThen::ReplaceBlueprint { area, index } => replace_with(editor, &area, index, picked),
     }
 }
 

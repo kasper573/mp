@@ -214,7 +214,6 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
             ModuleOp::Copy(index) => {
                 let module = value["modules"][index].clone();
                 editor.clipboard = Some(Clipboard {
-                    table: table.to_owned(),
                     from: key.to_owned(),
                     modules: vec![module],
                     origin: None,

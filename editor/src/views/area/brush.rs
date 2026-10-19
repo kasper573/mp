@@ -67,7 +67,6 @@ pub struct BrushStroke {
     pub draft: grid::GridDraft,
     pub kind: BrushStrokeKind,
     pub cells: HashSet<CellPos>,
-    pub seed: u64,
     pub anchor: CellPos,
     pub rng: Rng,
 }
@@ -109,7 +108,6 @@ pub(super) fn grid_stroke(
             draft,
             kind,
             cells: HashSet::new(),
-            seed,
             anchor: cell,
             rng: Rng::new(seed),
         });
