@@ -1,4 +1,5 @@
 {
+  "owner": "script/bog_water_used",
   "name": "Poisoned",
   "icon": "icons/potion/green_potion.png",
   "category": "debuff",

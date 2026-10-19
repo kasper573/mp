@@ -1,4 +1,5 @@
 {
+  "owner": "item/bow",
   "name": "Shoot",
   "icon": "icons/weapon_and_tool/arrow.png",
   "sfx": "slash03",

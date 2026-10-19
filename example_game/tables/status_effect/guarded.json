@@ -1,4 +1,5 @@
 {
+  "owner": "script/guard_used",
   "name": "Guarded",
   "icon": "icons/weapon_and_tool/iron_shield.png",
   "category": "buff",

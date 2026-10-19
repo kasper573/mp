@@ -1,4 +1,5 @@
 {
+  "owner": "script/tobb_came_near",
   "label": "Visits to Tobb",
   "type": "integer",
   "resets": "never"

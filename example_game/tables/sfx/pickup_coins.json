@@ -1,4 +1,5 @@
 {
+  "owner": "item/gold",
   "file": "audio/items/pickup/coins.wav",
   "role": "items",
   "volume": 0.14,

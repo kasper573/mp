@@ -1,4 +1,5 @@
 {
+  "owner": "npc/miller",
   "hitbox": {
     "width": 1.0,
     "height": 2.25

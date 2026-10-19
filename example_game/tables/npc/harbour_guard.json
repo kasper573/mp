@@ -1,4 +1,5 @@
 {
+  "owner": "script/pell_interacted",
   "name": "Harbour Guard",
   "model": "guard",
   "stats": {

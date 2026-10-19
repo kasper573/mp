@@ -1,4 +1,5 @@
 {
+  "owner": "area/island",
   "name": "Fish Steak",
   "icon": "icons/food/fish_steak.png",
   "sfx": {

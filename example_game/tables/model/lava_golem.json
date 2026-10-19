@@ -1,4 +1,5 @@
 {
+  "owner": "npc/lava_golem",
   "hitbox": {
     "width": 1.75,
     "height": 3.25

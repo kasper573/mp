@@ -1,4 +1,5 @@
 {
+  "owner": "npc/bog_lurker",
   "hitbox": {
     "width": 1.75,
     "height": 2.75

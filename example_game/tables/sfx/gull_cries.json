@@ -1,4 +1,5 @@
 {
+  "owner": "notification/gulls",
   "file": "audio/ambient/gulls.wav",
   "role": "ambient",
   "volume": 0.13,

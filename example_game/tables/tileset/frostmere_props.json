@@ -1,4 +1,5 @@
 {
+  "owner": "area/frostmere",
   "image": "tilesets/frostmere-props.png",
   "tile": 16,
   "tiles": {

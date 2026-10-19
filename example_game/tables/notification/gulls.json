@@ -1,4 +1,5 @@
 {
+  "owner": "script/ferry_pier",
   "kind": {
     "type": "narration",
     "label": "Gulls",

@@ -1,4 +1,5 @@
 {
+  "owner": "area/frostmere_longhouse",
   "image": "tilesets/frostmere-longhouse-props.png",
   "tile": 16,
   "tiles": {

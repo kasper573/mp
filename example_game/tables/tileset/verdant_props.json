@@ -1,4 +1,5 @@
 {
+  "owner": "area/verdant",
   "image": "tilesets/verdant-props.png",
   "tile": 16,
   "tiles": {

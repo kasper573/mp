@@ -1,4 +1,5 @@
 {
+  "owner": "area/emberfall",
   "name": "Dwarf Miner",
   "model": "dwarf_miner",
   "stats": {

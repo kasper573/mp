@@ -1,4 +1,5 @@
 {
+  "owner": "vfx/chain_lightning",
   "name": "Lightning",
   "params": [
     {

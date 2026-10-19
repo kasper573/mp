@@ -1,4 +1,5 @@
 {
+  "owner": "npc/panther",
   "hitbox": {
     "width": 1.75,
     "height": 3.0

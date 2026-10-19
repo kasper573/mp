@@ -1,4 +1,5 @@
 {
+  "owner": "npc/skeleton",
   "name": "Just a rock",
   "icon": "icons/misc/rune_stone.png",
   "sfx": {

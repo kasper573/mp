@@ -1,4 +1,5 @@
 {
+  "owner": "quest/low_tide",
   "name": "Fishing Bait",
   "icon": "icons/monster_part/monster_meat.png",
   "sfx": {

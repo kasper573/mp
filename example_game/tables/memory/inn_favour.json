@@ -1,4 +1,5 @@
 {
+  "owner": "script/grisha_interacted",
   "label": "Favour at the inn",
   "type": "integer",
   "resets": "never"

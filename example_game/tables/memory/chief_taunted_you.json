@@ -1,4 +1,5 @@
 {
+  "owner": "script/orc_chief_came_near",
   "label": "Taunted by an Orc Chief",
   "type": "boolean",
   "resets": "never"

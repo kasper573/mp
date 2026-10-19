@@ -1,4 +1,5 @@
 {
+  "owner": "npc/crypt_keeper",
   "hitbox": {
     "width": 1.0,
     "height": 2.25

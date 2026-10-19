@@ -1,4 +1,5 @@
 {
+  "owner": "script/pell_interacted",
   "kind": {
     "type": "speech",
     "speaker": "pell"

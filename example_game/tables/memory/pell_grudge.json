@@ -1,4 +1,5 @@
 {
+  "owner": "script/pell_interacted",
   "label": "Pell's grudge",
   "type": "boolean",
   "resets": "never"

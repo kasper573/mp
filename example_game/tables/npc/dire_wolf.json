@@ -1,4 +1,5 @@
 {
+  "owner": "area/frostmere",
   "name": "Dire Wolf",
   "model": "dire_wolf",
   "stats": {

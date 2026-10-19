@@ -1,4 +1,5 @@
 {
+  "owner": "npc/orc_chief",
   "runs_on": "npc",
   "variables": {
     "aggro": {

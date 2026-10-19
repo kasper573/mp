@@ -1,4 +1,5 @@
 {
+  "owner": "skill/spark",
   "file": "audio/skills/spark_zap.wav",
   "role": "combat",
   "volume": {

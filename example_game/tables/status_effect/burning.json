@@ -1,4 +1,5 @@
 {
+  "owner": "script/fireball_used",
   "name": "Burning",
   "icon": "icons/misc/candle.png",
   "category": "debuff",

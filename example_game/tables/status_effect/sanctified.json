@@ -1,4 +1,5 @@
 {
+  "owner": "script/sanctuary_used",
   "name": "Sanctified",
   "icon": "icons/ore_and_gem/cut_topaz.png",
   "category": "buff",

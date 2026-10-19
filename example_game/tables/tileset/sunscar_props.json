@@ -1,4 +1,5 @@
 {
+  "owner": "area/sunscar",
   "image": "tilesets/sunscar-props.png",
   "tile": 16,
   "tiles": {

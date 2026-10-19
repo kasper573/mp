@@ -1,4 +1,5 @@
 {
+  "owner": "quest/bats_in_the_belfry",
   "name": "Belfry Key",
   "icon": "icons/misc/iron_key.png",
   "sfx": {

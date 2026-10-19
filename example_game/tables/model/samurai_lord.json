@@ -1,4 +1,5 @@
 {
+  "owner": "npc/samurai_lord",
   "hitbox": {
     "width": 1.0,
     "height": 2.25

@@ -1,4 +1,5 @@
 {
+  "owner": "script/rally_used",
   "name": "Rallied",
   "icon": "icons/weapon_and_tool/hammer.png",
   "category": "buff",

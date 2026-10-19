@@ -1,4 +1,5 @@
 {
+  "owner": "area/mirefen",
   "image": "tilesets/mirefen-large-props.png",
   "tile": 16,
   "tiles": {

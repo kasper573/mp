@@ -1,4 +1,5 @@
 {
+  "owner": "npc/brown_bear",
   "hitbox": {
     "width": 2.25,
     "height": 3.25

@@ -1,4 +1,5 @@
 {
+  "owner": "area/glimmercap",
   "image": "tilesets/glimmercap-props.png",
   "tile": 16,
   "tiles": {

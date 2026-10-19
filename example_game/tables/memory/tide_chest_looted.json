@@ -1,4 +1,5 @@
 {
+  "owner": "script/tide_chest",
   "label": "Emptied the tide chest today",
   "type": "boolean",
   "resets": "daily"

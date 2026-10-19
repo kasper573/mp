@@ -1,4 +1,5 @@
 {
+  "owner": "script/tobb_came_near",
   "label": "Tobb's lucky lure",
   "type": "boolean",
   "resets": "never"

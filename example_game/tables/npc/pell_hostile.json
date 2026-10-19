@@ -1,4 +1,5 @@
 {
+  "owner": "script/pell_interacted",
   "name": "Pell",
   "model": "pell",
   "stats": {

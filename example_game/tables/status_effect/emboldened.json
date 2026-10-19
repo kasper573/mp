@@ -1,4 +1,5 @@
 {
+  "owner": "script/warcry_used",
   "name": "Emboldened",
   "icon": "icons/weapon_and_tool/torch.png",
   "category": "buff",

@@ -1,4 +1,5 @@
 {
+  "owner": "area/amberwood",
   "image": "tilesets/amberwood-props.png",
   "tile": 16,
   "tiles": {

@@ -1,4 +1,5 @@
 {
+  "owner": "script/ward_used",
   "name": "Warded",
   "icon": "icons/weapon_and_tool/wooden_shield.png",
   "category": "buff",

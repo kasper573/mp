@@ -1,4 +1,5 @@
 {
+  "owner": "area/island",
   "file": "audio/items/pickup/trinket.wav",
   "role": "items",
   "volume": 0.22,

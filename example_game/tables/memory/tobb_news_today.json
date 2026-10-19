@@ -1,4 +1,5 @@
 {
+  "owner": "script/tobb_came_near",
   "label": "Heard Tobb's news today",
   "type": "boolean",
   "resets": "daily"

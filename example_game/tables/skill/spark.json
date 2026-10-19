@@ -1,4 +1,5 @@
 {
+  "owner": "item/ash_wand",
   "name": "Spark",
   "icon": "icons/ore_and_gem/diamond.png",
   "sfx": "spark_zap",

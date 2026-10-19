@@ -1,4 +1,5 @@
 {
+  "owner": "script/quickstep_used",
   "name": "Quickened",
   "icon": "icons/food/green_apple.png",
   "category": "buff",

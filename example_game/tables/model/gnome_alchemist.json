@@ -1,4 +1,5 @@
 {
+  "owner": "npc/gnome_alchemist",
   "hitbox": {
     "width": 1.0,
     "height": 2.25

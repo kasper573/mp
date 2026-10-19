@@ -1,4 +1,5 @@
 {
+  "owner": "script/fish_steak_used",
   "name": "Well Fed",
   "icon": "icons/food/fish_steak.png",
   "category": "buff",

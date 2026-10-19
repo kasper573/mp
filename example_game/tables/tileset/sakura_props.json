@@ -1,4 +1,5 @@
 {
+  "owner": "area/sakura",
   "image": "tilesets/sakura-props.png",
   "tile": 16,
   "tiles": {

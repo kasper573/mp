@@ -1,4 +1,5 @@
 {
+  "owner": "area/island",
   "label": "Fighting Pell",
   "type": "boolean",
   "resets": "leaving_area"

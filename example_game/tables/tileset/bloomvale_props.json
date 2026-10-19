@@ -1,4 +1,5 @@
 {
+  "owner": "area/bloomvale",
   "image": "tilesets/bloomvale-props.png",
   "tile": 16,
   "tiles": {

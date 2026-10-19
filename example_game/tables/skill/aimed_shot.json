@@ -1,4 +1,5 @@
 {
+  "owner": "class/hunter",
   "name": "Aimed Shot",
   "icon": "icons/weapon_and_tool/bow.png",
   "sfx": "slash03",

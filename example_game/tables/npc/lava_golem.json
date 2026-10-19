@@ -1,4 +1,5 @@
 {
+  "owner": "area/emberfall",
   "name": "Lava Golem",
   "model": "lava_golem",
   "stats": {

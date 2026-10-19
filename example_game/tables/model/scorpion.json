@@ -1,4 +1,5 @@
 {
+  "owner": "npc/scorpion",
   "hitbox": {
     "width": 2.0,
     "height": 3.0

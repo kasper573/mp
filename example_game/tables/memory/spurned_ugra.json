@@ -1,4 +1,5 @@
 {
+  "owner": "script/ugra_interacted",
   "label": "Turned Ugra away",
   "type": "boolean",
   "resets": "never"

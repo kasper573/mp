@@ -1,4 +1,5 @@
 {
+  "owner": "class/fighter",
   "name": "Toughness",
   "icon": "icons/equipment/leather_armor.png",
   "kind": "passive",

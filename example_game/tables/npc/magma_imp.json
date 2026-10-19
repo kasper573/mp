@@ -1,4 +1,5 @@
 {
+  "owner": "area/emberfall",
   "name": "Magma Imp",
   "model": "magma_imp",
   "stats": {

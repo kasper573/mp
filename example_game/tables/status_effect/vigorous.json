@@ -1,4 +1,5 @@
 {
+  "owner": "script/greater_health_potion_used",
   "name": "Vigorous",
   "icon": "icons/potion/red_potion_3.png",
   "category": "buff",

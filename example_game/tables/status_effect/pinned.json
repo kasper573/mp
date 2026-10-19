@@ -1,4 +1,5 @@
 {
+  "owner": "script/pin_used",
   "name": "Pinned",
   "icon": "icons/material/string.png",
   "category": "debuff",

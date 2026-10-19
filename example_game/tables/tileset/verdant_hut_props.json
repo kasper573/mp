@@ -1,4 +1,5 @@
 {
+  "owner": "area/verdant_hut",
   "image": "tilesets/verdant-hut-props.png",
   "tile": 16,
   "tiles": {
