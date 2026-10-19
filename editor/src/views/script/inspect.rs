@@ -2,7 +2,7 @@ use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
-use engine::core::script::{OwnerKindDef, ScriptModuleKind, VariableType};
+use engine::core::script::{NodeKind, OwnerKindDef, ScriptModuleKind, VariableType};
 use engine::systems::area::blueprint::holes;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::script::OwnerKind;
@@ -11,7 +11,7 @@ use strum::VariantArray;
 
 use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
-use crate::app::{BottomTab, Editor, ModalDialog};
+use crate::app::{BottomTab, Editor, ModalDialog, REFUSED};
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
@@ -794,7 +794,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let (outs, ins, blurb) = {
+    let (outs, unwired, ins, blurb) = {
         let catalogue = catalogue_of(editor.project.as_ref());
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
             .into_iter()
@@ -804,8 +804,14 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             })
             .collect();
         let entry = catalogue.entry(&kind);
+        let outs = nodes::ports(&node, catalogue);
+        let unwired = outs
+            .iter()
+            .map(|port| catalogue.unwired(&kind, &port.label))
+            .collect::<Vec<_>>();
         (
-            nodes::ports(&node, catalogue),
+            outs,
+            unwired,
             ins,
             entry.map_or(String::new(), |e| e.blurb.clone()),
         )
@@ -846,11 +852,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                     }
                 });
                 let mut changed = FormChange::default();
-                match nodes::FlowKind::of(&draft) {
-                    Some(nodes::FlowKind::On) => {
+                match nodes::kind_of(&draft) {
+                    NodeKind::On => {
                         changed = on_form(ui, &mut cx, root, &mut draft, &path);
                     }
-                    Some(nodes::FlowKind::Dialogue) => {}
+                    NodeKind::Dialogue => {}
                     _ => {
                         if let Some((schema, hidden)) = nodes::form_fields(root, &draft) {
                             let hidden: Vec<&str> = hidden.iter().map(String::as_str).collect();
@@ -861,22 +867,13 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                     }
                 }
                 if !nodes::is_dialogue(&node) {
-                    arrows_rows(ui, &mut cx, &outs, &kind);
+                    arrows_rows(ui, &mut cx, &outs, &unwired);
                 }
                 changed
             })
             .inner
     };
-    let mut go_to: Option<String> = None;
-    for action in actions {
-        if let FormAction::OpenRow { table, key } = &action
-            && table == "node"
-        {
-            go_to = Some(key.clone());
-            continue;
-        }
-        act(editor, action, doc);
-    }
+    let mut go_to = act_but_go(editor, actions, doc);
     if nodes::is_dialogue(&node) {
         let mut draft_dialogue = draft.clone();
         let mut dialogue_actions = Vec::new();
@@ -892,15 +889,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                 &mut label,
             )
         };
-        for action in dialogue_actions {
-            if let FormAction::OpenRow { table, key } = &action
-                && table == "node"
-            {
-                go_to = Some(key.clone());
-                continue;
-            }
-            act(editor, action, doc);
-        }
+        go_to = act_but_go(editor, dialogue_actions, doc).or(go_to);
         if dialogue_changed.is_some() {
             let mut script = doc.script.clone();
             script["nodes"][name] = draft_dialogue;
@@ -962,9 +951,9 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     }
 }
 
-fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], kind: &str) {
+fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], unwired: &[String]) {
     let mut go: Option<String> = None;
-    for port in outs {
+    for (port, unwired) in outs.iter().zip(unwired) {
         widgets::kv(ui, &port.label, |ui| match &port.target {
             Some(target) => {
                 ui.label(theme::muted("→").size(13.0));
@@ -980,16 +969,12 @@ fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], kind: &st
                 }
             }
             None => {
-                let meaning = nodes::arrow_meaning(kind, &port.label);
-                ui.add(egui::Label::new(theme::muted(meaning).size(13.0)).wrap());
+                ui.add(egui::Label::new(theme::muted(unwired).size(13.0)).wrap());
             }
         });
     }
-    if let Some(target) = go {
-        cx.actions.push(FormAction::OpenRow {
-            table: "node".to_owned(),
-            key: target,
-        });
+    if let Some(name) = go {
+        cx.actions.push(FormAction::OpenNode { name });
     }
 }
 
@@ -1315,11 +1300,8 @@ fn dialogue_form(
         changed = FormChange::at(path);
         *label = format!("Add a choice in {}", doc.owner.title());
     }
-    if let Some(target) = go {
-        cx.actions.push(FormAction::OpenRow {
-            table: "node".to_owned(),
-            key: target,
-        });
+    if let Some(name) = go {
+        cx.actions.push(FormAction::OpenNode { name });
     }
     changed
 }
@@ -1690,6 +1672,19 @@ fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
     row_form::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
+/// Carries out what a node's card asked for, but for the node it asks to go to, which the card
+/// goes to once it is done with the node it shows.
+fn act_but_go(editor: &mut Editor, actions: Vec<FormAction>, doc: &ScriptDoc) -> Option<String> {
+    let mut go_to = None;
+    for action in actions {
+        match action {
+            FormAction::OpenNode { name } => go_to = Some(name),
+            other => act(editor, other, doc),
+        }
+    }
+    go_to
+}
+
 #[derive(Clone, Debug)]
 pub struct ScriptConstant {
     pub node: String,
@@ -1998,20 +1993,18 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         };
         editor.views.script.relocate(&dialog.owner, shared.clone());
         let from = EditorTab::Script(dialog.owner.clone());
-        for (_, tab) in editor.dock.iter_all_tabs_mut() {
-            if *tab == from {
-                *tab = EditorTab::Script(shared.clone());
-            }
-        }
-        for tab in editor.open_tabs.iter_mut() {
-            if *tab == from {
-                *tab = EditorTab::Script(shared.clone());
-            }
+        let tabs = editor
+            .dock
+            .iter_all_tabs_mut()
+            .map(|(_, tab)| tab)
+            .chain(&mut editor.open_tabs);
+        for tab in tabs.filter(|tab| **tab == from) {
+            *tab = EditorTab::Script(shared.clone());
         }
         editor.select(RowSelection::row("script", &dialog.key));
         Ok(())
     } else {
-        Err("refused; see the message".to_owned())
+        Err(REFUSED.to_owned())
     }
 }
 

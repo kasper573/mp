@@ -371,7 +371,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             .collect();
         rows.push(MayRow::present("runs", calls.join(" · ")));
     }
-    let reads = NodeReads::of(nodes).text();
+    let reads = NodeReads::of(content, nodes).text();
     if !reads.is_empty() {
         rows.push(MayRow::present("reads", reads));
     }

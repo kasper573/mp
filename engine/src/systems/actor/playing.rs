@@ -61,6 +61,7 @@ pub struct Animate {
     pub wait: Wait,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
+    /// Taken when the action can't play or is cut short.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub interrupted: Arrow,
 }

@@ -4,7 +4,7 @@ pub mod event;
 pub mod query;
 
 pub use crate::core::script::Fill;
-pub use effect::RiftEffect;
+pub use effect::{RiftEffect, RiftEffectKind};
 pub use event::{EventKind, RiftEvent, Who};
 pub use query::{RiftQuery, RiftQueryKind};
 

@@ -116,6 +116,7 @@ pub struct FormState {
 
 pub enum FormAction {
     OpenRow { table: String, key: String },
+    OpenNode { name: String },
     OpenScript { pointer: String },
     MakeShared { pointer: String },
     MakeInline { script: String },

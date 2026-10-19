@@ -14,7 +14,9 @@ use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use egui::{RichText, Ui};
 use engine::core::content::Content;
 use engine::core::math::Pos;
-use engine::core::script::{FlowSteering, OwnerKindDef, Pause, Value as ScriptValue, ValueType};
+use engine::core::script::{
+    FlowSteering, NodeKind, OwnerKindDef, Pause, Value as ScriptValue, ValueType,
+};
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
@@ -593,7 +595,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
         .or(bound.first())
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
-    let read_memories = NodeReads::of(doc.nodes()).memories;
+    let read_memories = NodeReads::of(&content, doc.nodes()).memories;
     let state_names = inspect::names_of(&doc.script["state"]);
     let mut open: Option<EditorTab> = None;
     let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
@@ -1025,12 +1027,12 @@ fn set_quest_standing(
 fn branch_taken(doc: &ScriptDoc, node: &str, next: Option<&RunLogLine>) -> Option<String> {
     let next = next?.node()?;
     let source = doc.nodes().get(node)?;
-    match nodes::FlowKind::of(source)? {
-        nodes::FlowKind::If => ["yes", "no"]
+    match nodes::kind_of(source) {
+        NodeKind::If => ["yes", "no"]
             .into_iter()
             .find(|arrow| source[arrow].as_str() == Some(next))
             .map(str::to_owned),
-        nodes::FlowKind::Random => source["outputs"]
+        NodeKind::Random => source["outputs"]
             .as_array()?
             .iter()
             .position(|arrow| arrow.as_str() == Some(next))

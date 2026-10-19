@@ -115,6 +115,12 @@ pub enum Target {
     State(String),
 }
 
+impl NodeKind {
+    pub fn name(self) -> &'static str {
+        self.into()
+    }
+}
+
 impl<V: Vocabulary> Node<V> {
     /// Whether a flow halts at the node until time passes or someone answers, the only way a
     /// loop may come back around.

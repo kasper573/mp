@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
@@ -30,8 +31,13 @@ use crate::systems::vfx::PlayVfx;
 
 macro_rules! effects {
     ($($variant:ident($ty:ty)),* $(,)?) => {
-        #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+        #[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
         #[serde(tag = "type", rename_all = "snake_case")]
+        #[strum_discriminants(
+            name(RiftEffectKind),
+            derive(EnumString, IntoStaticStr),
+            strum(serialize_all = "snake_case")
+        )]
         pub enum RiftEffect {
             $($variant($ty),)*
         }
@@ -57,12 +63,6 @@ macro_rules! effects {
             }
             fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
                 match self { $(RiftEffect::$variant(e) => e.reach(cx),)* }
-            }
-        }
-
-        impl RiftEffect {
-            pub fn kind(&self) -> &'static str {
-                match self { $(RiftEffect::$variant(_) => stringify!($variant),)* }
             }
         }
     };
@@ -108,6 +108,18 @@ effects! {
     SpawnNpcs(SpawnNpcs),
     Despawn(Despawn),
     PlaySound(PlaySound),
+}
+
+impl RiftEffect {
+    pub fn kind(&self) -> RiftEffectKind {
+        self.into()
+    }
+}
+
+impl RiftEffectKind {
+    pub fn name(self) -> &'static str {
+        self.into()
+    }
 }
 
 pub fn aim<'c>(
