@@ -34,7 +34,7 @@ impl Server {
             ws_port: 0,
             max_clients: 8,
             content_dir: content.to_path_buf(),
-            player_spawn_type: SpawnPolicy::Map,
+            player_spawn_policy: SpawnPolicy::Map,
             // A playtest plays its story through: monsters met on the way wear players down, never
             // out.
             player_immortal: true,

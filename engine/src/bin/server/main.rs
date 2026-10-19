@@ -26,7 +26,7 @@ use engine::core::time::{UtcHour, WallClock};
 use engine::systems::account::{AccountId, Identity};
 use engine::systems::area::{self, AreaDef, AreaId, transition};
 use engine::systems::launch::{
-    AuthMode, BUILD_INFO_FLAG, LaunchSettings, OIDC_ENV_PREFIX, OidcConfig, ReadyLine,
+    AuthMode, BUILD_INFO_FLAG, BuildInfo, LaunchSettings, OIDC_ENV_PREFIX, OidcConfig, ReadyLine,
     SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE, TestCharacterRequest,
     build_info_line,
 };
@@ -106,7 +106,7 @@ fn main() {
     let http_addr = listener.local_addr().expect("bound http address");
     let lobby = Lobby {
         spawn: settings.initial_spawn.area,
-        policy: config.player_spawn_type,
+        policy: config.player_spawn_policy,
         online,
         test_characters: http.test_characters.clone(),
         next_client: 1,
@@ -115,7 +115,7 @@ fn main() {
     let api = serve_http(listener, http, metrics);
 
     let rules = SpawnRules {
-        policy: config.player_spawn_type,
+        policy: config.player_spawn_policy,
         immortal: config.player_immortal,
     };
     let reset = config.daily_reset_utc_hour;
@@ -145,11 +145,10 @@ fn main() {
 
     let ready = ReadyLine {
         ready: ServerReady {
-            build: version::build().to_owned(),
-            content_version: content.built::<GameSettings>().content_version.0.clone(),
             http: http_addr.port(),
             ws: transport.local_addr().port(),
         },
+        build: BuildInfo::current(),
     };
     println!("{}", serde_json::to_string(&ready).expect("a ready line"));
     simulate(worlds, transport, lobby, reset, stdin);

@@ -15,7 +15,7 @@ fn server_config(rng_seed: Option<u64>) -> ServerConfig {
         ws_port: 4001,
         max_clients: 8,
         content_dir: PathBuf::from("/games/example"),
-        player_spawn_type: SpawnPolicy::Dist,
+        player_spawn_policy: SpawnPolicy::Dist,
         player_immortal: true,
         rng_seed,
         daily_reset_utc_hour: UtcHour::try_from(5).expect("an hour of the day"),

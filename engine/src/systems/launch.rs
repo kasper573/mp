@@ -101,12 +101,12 @@ impl BuildInfo {
 #[derive(Serialize, Deserialize)]
 pub struct ReadyLine {
     pub ready: ServerReady,
+    pub build: BuildInfo,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The ports a started server listens on, announced once players can connect.
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct ServerReady {
-    pub build: String,
-    pub content_version: String,
     pub http: u16,
     pub ws: u16,
 }
@@ -125,7 +125,7 @@ pub struct ServerConfig {
     pub ws_port: u16,
     pub max_clients: usize,
     pub content_dir: PathBuf,
-    pub player_spawn_type: SpawnPolicy,
+    pub player_spawn_policy: SpawnPolicy,
     pub player_immortal: bool,
     pub rng_seed: Option<u64>,
     pub daily_reset_utc_hour: UtcHour,

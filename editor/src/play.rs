@@ -14,7 +14,8 @@ use engine::systems::GameSettings;
 use engine::systems::class::ClassDef;
 use engine::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
-    SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest, fake_token,
+    SERVER_ENV_PREFIX, ServerConfig, ServerReady, TEST_CHARACTER_ROUTE, TestCharacterRequest,
+    fake_token,
 };
 use engine::systems::player::SpawnPolicy;
 use engine::systems::script::Place;
@@ -71,13 +72,7 @@ pub struct RunningPlayTest {
     client: Option<Process>,
     lines: ChannelInbox<OutputLine>,
     sender: Sender<OutputLine>,
-    ports: Option<ServerPorts>,
-}
-
-#[derive(Clone, Copy)]
-struct ServerPorts {
-    http: u16,
-    ws: u16,
+    ports: Option<ServerReady>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -124,7 +119,7 @@ impl GameBinaries {
 }
 
 struct SpawnJob {
-    ports: ServerPorts,
+    ports: ServerReady,
     character: String,
     start: Option<Place>,
     sender: Sender<OutputLine>,
@@ -867,7 +862,7 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         ws_port: 0,
         max_clients: 8,
         content_dir: folder.to_path_buf(),
-        player_spawn_type: SpawnPolicy::Map,
+        player_spawn_policy: SpawnPolicy::Map,
         player_immortal: false,
         rng_seed: None,
         daily_reset_utc_hour: UtcHour::MIDNIGHT,
@@ -884,7 +879,7 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
 
 fn spawn_client(
     editor: &Editor,
-    ports: ServerPorts,
+    ports: ServerReady,
     character: &str,
     sender: Sender<OutputLine>,
 ) -> io::Result<Process> {
@@ -946,12 +941,10 @@ fn spawn(
     })
 }
 
-fn ready_ports(line: &str) -> Option<ServerPorts> {
-    let line: ReadyLine = serde_json::from_str(line.trim()).ok()?;
-    Some(ServerPorts {
-        http: line.ready.http,
-        ws: line.ready.ws,
-    })
+fn ready_ports(line: &str) -> Option<ServerReady> {
+    serde_json::from_str::<ReadyLine>(line.trim())
+        .ok()
+        .map(|line| line.ready)
 }
 
 fn hand_over(
