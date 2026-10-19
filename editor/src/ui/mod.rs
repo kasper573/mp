@@ -24,12 +24,12 @@ use egui_dock::{DockArea, DockState, TabViewer};
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
 use crate::keymap::EditorKey;
-use crate::project::RowSelection;
+use crate::project::{self, EditRefusal, RowSelection};
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::ScriptKeys;
 use crate::views::{area, character, class, model, script, spreadsheet, tileset, vfx, world};
 use crate::{import, play, views};
-use engine::core::content::row_file;
+use engine::core::content::{LoadReport, row_file};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     editor.status.right.clear();
@@ -506,17 +506,15 @@ fn dock_style(egui_style: &egui::Style) -> egui_dock::Style {
     style
 }
 
-fn report_summary(report: &engine::core::content::LoadReport) -> String {
+fn report_summary(report: &LoadReport) -> String {
     const SHOWN: usize = 8;
     let mut lines: Vec<String> = report
         .errors
         .iter()
         .take(SHOWN)
-        .map(|error| match &error.at {
-            engine::core::content::ErrorPlace::Json { pointer, .. } if !pointer.is_empty() => {
-                format!("{} at {pointer}: {}", error.file, error.problem)
-            }
-            _ => format!("{}: {}", error.file, error.problem),
+        .map(|error| {
+            let place = project::problem_place(&error.file, error.at.pointer());
+            format!("{place}: {}", error.problem)
         })
         .collect();
     if report.errors.len() > SHOWN {
@@ -540,16 +538,8 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         .as_ref()
         .and_then(|project| project.report.as_ref())
     {
-        let first = crate::project::EditRefusal::of(report);
-        left = vec![
-            "does not load".to_owned(),
-            if first.pointer.is_empty() {
-                first.file.clone()
-            } else {
-                format!("{} at {}", first.file, first.pointer)
-            },
-            first.sentence(),
-        ];
+        let first = EditRefusal::of(report);
+        left = vec!["does not load".to_owned(), first.place(), first.sentence()];
     } else if left.is_empty() {
         let selection = &editor.selection;
         if selection.keys.len() == 1 && selection.parts.is_empty() {

@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, TryRecvError};
 use std::time::{Duration, Instant, SystemTime};
 
-use engine::core::content::ErrorPlace::{Json, WholeFile};
+use engine::core::content::ErrorPlace::WholeFile;
 use engine::core::content::{Content, ContentProblem, GAME_FILE, LoadError, LoadReport};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -119,13 +119,9 @@ impl EditRefusal {
             at: WholeFile,
             problem: ContentProblem::new("not loaded", "", "a folder that loads"),
         });
-        let pointer = match &first.at {
-            Json { pointer, .. } => pointer.clone(),
-            _ => String::new(),
-        };
         EditRefusal {
+            pointer: first.at.pointer().to_owned(),
             file: first.file,
-            pointer,
             problem: first.problem,
             errors,
         }
@@ -137,6 +133,19 @@ impl EditRefusal {
             text.push_str(&format!(" · {} errors in all", self.errors));
         }
         text
+    }
+
+    pub fn place(&self) -> String {
+        problem_place(&self.file, &self.pointer)
+    }
+}
+
+/// Where in the folder a problem is: its file, and the JSON pointer within it when it has one.
+pub fn problem_place(file: &str, pointer: &str) -> String {
+    if pointer.is_empty() {
+        file.to_owned()
+    } else {
+        format!("{file} at {pointer}")
     }
 }
 
@@ -211,13 +220,7 @@ pub fn errors_in(report: &LoadReport, file: &str) -> Vec<(String, String)> {
         .errors
         .iter()
         .filter(|error| error.file == file)
-        .map(|error| {
-            let pointer = match &error.at {
-                Json { pointer, .. } => pointer.clone(),
-                _ => String::new(),
-            };
-            (pointer, error.problem.to_string())
-        })
+        .map(|error| (error.at.pointer().to_owned(), error.problem.to_string()))
         .collect()
 }
 

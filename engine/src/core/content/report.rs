@@ -122,6 +122,14 @@ impl ErrorPlace {
         }
     }
 
+    /// The JSON pointer to where the problem is, the whole document's when it has no finer place.
+    pub fn pointer(&self) -> &str {
+        match self {
+            ErrorPlace::Json { pointer, .. } => pointer,
+            _ => "",
+        }
+    }
+
     pub fn within(&self) -> String {
         match self {
             ErrorPlace::WholeFile => "whole file".to_owned(),
