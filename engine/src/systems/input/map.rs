@@ -515,11 +515,17 @@ impl KeyModifiers {
 
     pub fn held(keys: &ButtonInput<KeyCode>) -> KeyModifiers {
         KeyModifiers {
-            ctrl: keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]),
-            shift: keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
-            alt: keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]),
-            super_key: keys.any_pressed([KeyCode::SuperLeft, KeyCode::SuperRight]),
+            ctrl: keys.any_pressed(CTRL),
+            shift: keys.any_pressed(SHIFT),
+            alt: keys.any_pressed(ALT),
+            super_key: keys.any_pressed(SUPER),
         }
+    }
+
+    pub fn is_modifier(key: KeyCode) -> bool {
+        [CTRL, SHIFT, ALT, SUPER]
+            .iter()
+            .any(|keys| keys.contains(&key))
     }
 
     fn egui(self) -> egui::Modifiers {
@@ -544,6 +550,11 @@ pub fn mouse_button_schema(_: &mut SchemaGenerator) -> Schema {
 fn publish(map: Res<InputMap>, mut names: ResMut<KeyNames>) {
     *names = map.key_names();
 }
+
+const CTRL: [KeyCode; 2] = [KeyCode::ControlLeft, KeyCode::ControlRight];
+const SHIFT: [KeyCode; 2] = [KeyCode::ShiftLeft, KeyCode::ShiftRight];
+const ALT: [KeyCode; 2] = [KeyCode::AltLeft, KeyCode::AltRight];
+const SUPER: [KeyCode; 2] = [KeyCode::SuperLeft, KeyCode::SuperRight];
 
 fn pointer_button(button: MouseButton) -> Option<egui::PointerButton> {
     match button {

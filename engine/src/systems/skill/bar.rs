@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 use design_tokens::face::TextRole;
-use design_tokens::glyph::{self, Mark};
+use design_tokens::glyph::{self, Halo, Mark};
 use design_tokens::{controls, ink, sheet, slip};
 use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
@@ -214,10 +214,7 @@ pub fn fire(world: &mut World, entry: HotbarEntry) -> HotbarPress {
 /// An entry let go of anywhere but a slot leaves the bar, once the player agrees. A slot that took
 /// the drop has cleared what was carried by now.
 pub fn drop_off_bar(world: &mut World) {
-    let Some(gui) = world
-        .get_resource::<crate::core::gui::GuiContext>()
-        .map(|gui| gui.0.clone())
-    else {
+    let Some(gui) = gui::context(world) else {
         return;
     };
     let Some(Carried::HotbarEntry { from, entry }) = hud::carried(&gui) else {
@@ -759,25 +756,14 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
             let wash = Rect::from_min_max(Pos2::new(rect.min.x, rect.max.y - height), rect.max);
             painter.rect_filled(wash.shrink(1.0), 2.0, ink::wash(ink::RUBRIC, 0.45));
             if fraction > 0.02 {
-                for offset in [
-                    Vec2::new(-1.0, 0.0),
-                    Vec2::new(1.0, 0.0),
-                    Vec2::new(0.0, 1.0),
-                ] {
-                    painter.text(
-                        rect.center() + offset,
-                        Align2::CENTER_CENTER,
-                        cooldown_text(left),
-                        TextRole::Count.font_id(),
-                        ink::CREAM,
-                    );
-                }
-                painter.text(
+                glyph::haloed(
+                    painter,
                     rect.center(),
                     Align2::CENTER_CENTER,
-                    cooldown_text(left),
+                    &cooldown_text(left),
                     TextRole::Count.font_id(),
                     ink::INK,
+                    CREAM_HALO,
                 );
             }
         }
@@ -832,28 +818,21 @@ fn drop_wash(ui: &Ui, rect: Rect) {
 }
 
 fn slot_key_mark(ui: &Ui, rect: Rect, key: &str) {
-    let at = rect.left_top() + Vec2::new(3.0, 1.0);
-    for offset in [
-        Vec2::new(-1.0, 0.0),
-        Vec2::new(1.0, 0.0),
-        Vec2::new(0.0, 1.0),
-    ] {
-        ui.painter().text(
-            at + offset,
-            Align2::LEFT_TOP,
-            key,
-            TextRole::Launcher.font_id(),
-            ink::CREAM,
-        );
-    }
-    ui.painter().text(
-        at,
+    glyph::haloed(
+        ui.painter(),
+        rect.left_top() + Vec2::new(3.0, 1.0),
         Align2::LEFT_TOP,
         key,
         TextRole::Launcher.font_id(),
         ink::INK2,
+        CREAM_HALO,
     );
 }
+
+const CREAM_HALO: Halo = Halo {
+    color: ink::CREAM,
+    width: 1.0,
+};
 
 fn uptime(world: &World) -> Seconds {
     Seconds(world.resource::<Time>().elapsed_secs())
@@ -1006,7 +985,10 @@ fn key_pressed(world: &World, slot: HotbarSlot) -> bool {
 /// another slot holds moves over.
 fn capture(world: &mut World, slot: HotbarSlot) {
     let keys = world.resource::<ButtonInput<KeyCode>>();
-    let Some(&key) = keys.get_just_pressed().find(|key| !is_modifier(**key)) else {
+    let Some(&key) = keys
+        .get_just_pressed()
+        .find(|key| !KeyModifiers::is_modifier(**key))
+    else {
         return;
     };
     let modifiers = KeyModifiers::held(keys);
@@ -1068,20 +1050,6 @@ fn capture(world: &mut World, slot: HotbarSlot) {
     } else {
         InterfaceSound::UiPick.play(world);
     }
-}
-
-fn is_modifier(key: KeyCode) -> bool {
-    matches!(
-        key,
-        KeyCode::ShiftLeft
-            | KeyCode::ShiftRight
-            | KeyCode::ControlLeft
-            | KeyCode::ControlRight
-            | KeyCode::AltLeft
-            | KeyCode::AltRight
-            | KeyCode::SuperLeft
-            | KeyCode::SuperRight
-    )
 }
 
 fn rebind_panel(ui: &mut Ui, world: &World, bar: Rect) {
