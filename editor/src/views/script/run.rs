@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 use std::time::Duration;
 
-use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
 use bevy::time::TimeUpdateStrategy;
@@ -18,7 +17,7 @@ use engine::core::script::{
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
-use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
+use engine::systems::area::{self, AreaId, AreaModule, AreaObject};
 use engine::systems::class::{self, Class, ClassDef, ClassId};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::input::map::InputMap;
@@ -26,10 +25,8 @@ use engine::systems::item::{Inventory, ItemDef, ItemStack};
 use engine::systems::memory::{self, Memory, MemoryDef};
 use engine::systems::notification::NotificationSent;
 use engine::systems::npc::{self, Npc, NpcId};
-use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs};
-use engine::systems::player::{
-    AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules, Xp,
-};
+use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::player::{AreaDrawn, ClientId, Xp};
 use engine::systems::quest::{
     ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
 };
@@ -46,6 +43,7 @@ use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ProjectFiles, RowSelection, catalogue_of};
+use crate::stage::live;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value;
@@ -1055,39 +1053,24 @@ fn start_run(
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
         reset: UtcHour::MIDNIGHT,
     };
-    let mut app = systems::server_app(area_id, 0, RUN_SEED, clock, &content);
-    app.insert_resource(SpawnRules {
-        policy: SpawnPolicy::Map,
-        immortal: true,
-    });
-    app.insert_resource(FlowTrace::default());
-    app.insert_resource(FlowSteering::default());
-    systems::start_server(&mut app);
-    let mut world = std::mem::take(app.world_mut());
+    let mut world = live::sandbox(&content, area_id, RUN_SEED, clock);
+    world.insert_resource(FlowTrace::default());
+    world.insert_resource(FlowSteering::default());
     let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.files)?;
     let area = area::load(&content, area_id);
     let at = area
         .grid
         .nearest_walkable(near)
         .unwrap_or_else(|| area.fallback_spawn());
-    let conn = world
-        .spawn((
-            ClientId(CLIENT),
-            JoinAs {
-                snapshot,
-                start: Place { area: area_id, at },
-            },
-        ))
-        .id();
-    systems::from_client(&mut world, conn, JoinRequest);
-    step(&mut world);
+    let joined = live::join(
+        &mut world,
+        snapshot,
+        Place { area: area_id, at },
+        ClientId(CLIENT),
+    )?;
+    let (conn, subject) = (joined.conn, joined.actor);
     systems::from_client(&mut world, conn, AreaDrawn);
-    step(&mut world);
-    let subject = *world
-        .resource::<Players>()
-        .0
-        .get(&ClientId(CLIENT))
-        .ok_or("the pretend character did not join")?;
+    live::tick(&mut world);
     let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
     let mut run = ScriptRun {
@@ -1150,17 +1133,8 @@ fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(AreaId, Pos<Til
             Some((area, near))
         }
         OwnerKind::Npc => {
-            let npc: NpcId = owner.row.id();
-            for area in content.ids::<AreaDef>() {
-                for placed in area::placed(content, area) {
-                    if let AreaModule::Resident(resident) = &placed.module
-                        && resident.npc == npc
-                    {
-                        return Some((area, resident.at));
-                    }
-                }
-            }
-            Some((spawn.area, spawn.at))
+            let home = area::residence(content, owner.row.id()).unwrap_or(spawn);
+            Some((home.area, home.at))
         }
         _ => Some((spawn.area, spawn.at)),
     }
@@ -1226,11 +1200,6 @@ fn snapshot_for(
     value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
 }
 
-fn step(world: &mut World) {
-    world.run_schedule(Main);
-    world.clear_trackers();
-}
-
 impl ScriptRun {
     pub fn world(&self) -> &World {
         &self.world
@@ -1254,7 +1223,7 @@ impl ScriptRun {
     }
 
     fn tick(&mut self) {
-        step(&mut self.world);
+        live::tick(&mut self.world);
     }
 
     pub fn go(&mut self) {

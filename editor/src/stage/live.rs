@@ -94,13 +94,7 @@ impl LiveWorld {
             now: SystemTime::now().into(),
             reset: UtcHour::MIDNIGHT,
         };
-        let mut app = server_app(spawn.area, 0, SEED, clock, content);
-        app.insert_resource(SpawnRules {
-            policy: SpawnPolicy::Map,
-            immortal: true,
-        });
-        start_server(&mut app);
-        let mut world = std::mem::take(app.world_mut());
+        let mut world = sandbox(content, spawn.area, SEED, clock);
         let setup = match scenario {
             Scenario::Status { model, effect, .. } => Setup::Status {
                 actor: spawn_sturdy(&mut world, content, *model, spawn.at, spawn.area),
@@ -129,8 +123,7 @@ impl LiveWorld {
             self.carry -= period;
             self.clock.now = self.clock.now.after(Seconds(period.as_secs_f32()));
             self.world.insert_resource(self.clock);
-            self.world.run_schedule(bevy::app::Main);
-            self.world.clear_trackers();
+            tick(&mut self.world);
             self.scenario_tick();
         }
     }
@@ -262,6 +255,46 @@ impl LiveWorld {
     }
 }
 
+/// A server world over `content` opened on `area`, where nobody dies and nobody has joined yet.
+pub fn sandbox(content: &Content, area: AreaId, seed: u64, clock: WallClock) -> World {
+    let mut app = server_app(area, 0, seed, clock, content);
+    app.insert_resource(SpawnRules {
+        policy: SpawnPolicy::Map,
+        immortal: true,
+    });
+    start_server(&mut app);
+    std::mem::take(app.world_mut())
+}
+
+pub struct Joined {
+    pub conn: Entity,
+    pub actor: Entity,
+}
+
+/// Joins a character as a player would, placed at `start`.
+pub fn join(
+    world: &mut World,
+    snapshot: CharacterSnapshot,
+    start: Place,
+    client: ClientId,
+) -> Result<Joined, String> {
+    let conn = world.spawn((client, JoinAs { snapshot, start })).id();
+    from_client(world, conn, JoinRequest);
+    tick(world);
+    let actor = world
+        .resource::<Players>()
+        .0
+        .get(&client)
+        .copied()
+        .ok_or("the character did not join")?;
+    Ok(Joined { conn, actor })
+}
+
+pub fn tick(world: &mut World) {
+    world.run_schedule(bevy::app::Main);
+    world.clear_trackers();
+}
+
 /// The scene a skill needs to be cast: a character who knows it, wearing and carrying what it
 /// asks, with whatever it targets standing before them.
 fn skill_setup(
@@ -302,7 +335,7 @@ fn skill_setup(
     }
     let area = area::load(content, spawn.area);
     let free = |at: Pos<Tiles>| area.grid.nearest_walkable_where(at, |_| true).unwrap_or(at);
-    let caster = join(world, snapshot.clone(), spawn, 1)?;
+    let caster = join(world, snapshot.clone(), spawn, ClientId(1))?.actor;
     let ally = || {
         let mut friend = CharacterSnapshot::fresh(content, "Friend", settings.player.get(content));
         friend.start = snapshot.start;
@@ -329,8 +362,9 @@ fn skill_setup(
                     at: free(beside),
                     ..spawn
                 },
-                2,
-            )?;
+                ClientId(2),
+            )?
+            .actor;
             (vec![friend], CastAim::Actor(friend))
         }
         Targeting::AreaEnemy | Targeting::AreaAlly => {
@@ -354,7 +388,13 @@ fn skill_setup(
                         spawn.area,
                     )
                 } else {
-                    join(world, ally(), Place { at, ..spawn }, 2 + index as u32)?
+                    join(
+                        world,
+                        ally(),
+                        Place { at, ..spawn },
+                        ClientId(2 + index as u32),
+                    )?
+                    .actor
                 });
             }
             (targets, CastAim::Point(point))
@@ -370,27 +410,6 @@ fn skill_setup(
         },
         casts: 0,
     })
-}
-
-/// Joins a character as a player would, placed at its start, and answers with its entity.
-fn join(
-    world: &mut World,
-    snapshot: CharacterSnapshot,
-    start: Place,
-    index: u32,
-) -> Result<Entity, String> {
-    let client = ClientId(index);
-    let conn = world.spawn(client).id();
-    world.entity_mut(conn).insert(JoinAs { snapshot, start });
-    from_client(world, conn, JoinRequest);
-    world.run_schedule(bevy::app::Main);
-    world.clear_trackers();
-    world
-        .resource::<Players>()
-        .0
-        .get(&client)
-        .copied()
-        .ok_or_else(|| "the character did not join".to_owned())
 }
 
 /// An actor of a model that no cast brings down, so the scene stands through every repeat.

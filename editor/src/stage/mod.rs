@@ -30,6 +30,7 @@ use self::live::LiveWorld;
 use self::mirror::{ActorPose, Site, Source, Stage, VfxPose};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
+use crate::thumbs;
 use crate::ui::theme;
 use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes, SceneryOf};
 
@@ -229,12 +230,7 @@ pub fn show(
             .map(|live| live.report.clone()),
     };
     if let Some(stage) = editor.views.stage.stages.get(key) {
-        painter.image(
-            stage.texture,
-            rect,
-            egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        painter.image(stage.texture, rect, thumbs::FULL_UV, Color32::WHITE);
         for (top, label) in &stage.plates {
             plate::draw_label(ui, shown.screen(*top), label);
         }

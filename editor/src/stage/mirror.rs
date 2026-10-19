@@ -310,32 +310,29 @@ impl Stage {
     }
 
     fn sync_vfx(&mut self, world: &mut World, scenes: &mut scene::AreaScenes, frame: &Frame) {
-        let wanted: HashSet<Source> = frame.vfx.iter().map(|pose| pose.owner).collect();
-        let gone: Vec<Source> = self
-            .pieces
-            .keys()
-            .filter(|owner| !wanted.contains(owner))
-            .copied()
+        let wanted: HashMap<Source, String> = frame
+            .vfx
+            .iter()
+            .map(|pose| (pose.owner, layers_signature(&pose.layers)))
             .collect();
-        for owner in gone {
-            if let Some((_, pieces)) = self.pieces.remove(&owner) {
-                for piece in pieces {
-                    world.despawn(piece);
-                }
+        let outdated: Vec<Source> = self
+            .pieces
+            .iter()
+            .filter(|(owner, (known, _))| wanted.get(*owner) != Some(known))
+            .map(|(owner, _)| *owner)
+            .collect();
+        for owner in outdated {
+            for piece in self
+                .pieces
+                .remove(&owner)
+                .into_iter()
+                .flat_map(|(_, pieces)| pieces)
+            {
+                world.despawn(piece);
             }
         }
         let mut overdrawn = HashSet::new();
         for pose in &frame.vfx {
-            let signature = layers_signature(&pose.layers);
-            let stale = self
-                .pieces
-                .get(&pose.owner)
-                .is_some_and(|(known, _)| *known != signature);
-            if stale && let Some((_, pieces)) = self.pieces.remove(&pose.owner) {
-                for piece in pieces {
-                    world.despawn(piece);
-                }
-            }
             if !self.pieces.contains_key(&pose.owner) {
                 let files = frame.files;
                 let pieces = vfx_render::pieces_for(world, &pose.layers, &mut |world, sheet| {
@@ -344,7 +341,8 @@ impl Stage {
                 for piece in &pieces {
                     world.entity_mut(*piece).insert(self.layer.clone());
                 }
-                self.pieces.insert(pose.owner, (signature, pieces));
+                self.pieces
+                    .insert(pose.owner, (wanted[&pose.owner].clone(), pieces));
             }
             let pieces = self.pieces[&pose.owner].1.clone();
             let site = self.frame_of(world, &pose.site, pose.heading, frame);

@@ -343,7 +343,7 @@ fn canvas(
                     painter.with_clip_rect(on_screen.intersect(rect)).image(
                         image.texture.id(),
                         drawn,
-                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                        thumbs::FULL_UV,
                         Color32::WHITE,
                     );
                 }
@@ -696,7 +696,7 @@ fn draw_node(
             painter.image(
                 icon.texture.id(),
                 Rect::from_center_size(center, Vec2::splat(ICON)),
-                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                thumbs::FULL_UV,
                 Color32::WHITE,
             );
         }
