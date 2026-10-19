@@ -34,7 +34,6 @@ use crate::views::area::AreaViews;
 use crate::{condition, forms, picker, play, schema, stage};
 use engine::core::content::row_file;
 
-pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;
 const MAP: Vec2 = Vec2::new(272.0, 96.0);
@@ -131,13 +130,13 @@ impl CharacterSection {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let file = row_file(TABLE, key);
-    let Some(mut value) = editor.row_value(TABLE, key) else {
+    let file = row_file(CharacterSnapshot::TABLE, key);
+    let Some(mut value) = editor.row_value(CharacterSnapshot::TABLE, key) else {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(TABLE);
+    let root = shapes.shape_of(CharacterSnapshot::TABLE);
     let section = editor.views.character.section;
     let characters: Vec<String> = editor
         .project
@@ -152,7 +151,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .unwrap_or_default();
     let mut switch: Option<String> = None;
     let mut changed = FormChange::default();
-    let mut label = format!("Edit {TABLE}/{key}");
+    let mut label = format!("Edit {}/{key}", CharacterSnapshot::TABLE);
     let mut actions = Vec::new();
     let mut pick: Option<PlacePick> = None;
     ui.horizontal_top(|ui| {
@@ -207,8 +206,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
-            let mut cx =
-                FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
+            let mut cx = FormCx::new(project, root, shapes, form, &mut actions)
+                .owned_by(CharacterSnapshot::TABLE, Some(key));
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
                 ui.horizontal_top(|ui| {
@@ -287,7 +286,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            row_form::preview::show(editor, ui, TABLE, key);
+            row_form::preview::show(editor, ui, CharacterSnapshot::TABLE, key);
         });
     });
     editor.status.left.push(format!(
@@ -322,11 +321,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, TABLE, key);
+        row_form::act(editor, action, CharacterSnapshot::TABLE, key);
     }
     if let Some(other) = switch {
-        editor.select(RowSelection::row(TABLE, &other));
-        editor.open_tab(EditorTab::for_row(TABLE, &other));
+        editor.select(RowSelection::row(CharacterSnapshot::TABLE, &other));
+        editor.open_tab(EditorTab::for_row(CharacterSnapshot::TABLE, &other));
     }
 }
 
@@ -749,7 +748,7 @@ fn start(
 ) -> FormChange {
     let mut changed = FormChange::default();
     let scene_key = format!("character:{key}");
-    let file = row_file(TABLE, key);
+    let file = row_file(CharacterSnapshot::TABLE, key);
     let texture = area
         .scenes
         .by_key
@@ -1600,7 +1599,7 @@ pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(TABLE, key) else {
+    let Some(row) = editor.row_value(CharacterSnapshot::TABLE, key) else {
         return;
     };
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
@@ -1661,7 +1660,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     );
     widgets::kv_text(ui, "health", format!("{} of {}", health, health));
     widgets::kv_text(ui, "starts", starts);
-    widgets::kv_code(ui, "file", row_file(TABLE, key));
+    widgets::kv_code(ui, "file", row_file(CharacterSnapshot::TABLE, key));
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if controls::marked_primary(ui, Mark::Play, format!("Play as {key}")).clicked() {
@@ -1673,7 +1672,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             row_form::act(
                 editor,
                 FormAction::RowAction(BrowserAction::Duplicate),
-                TABLE,
+                CharacterSnapshot::TABLE,
                 key,
             );
         }

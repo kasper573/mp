@@ -2,6 +2,8 @@ pub mod inspect;
 pub mod tree;
 
 use design_tokens::glyph::{self, Mark};
+use engine::core::content::ContentRow;
+use engine::systems::class::ClassDef;
 use std::collections::HashMap;
 
 use egui::Ui;
@@ -15,7 +17,6 @@ use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{self, row_form, sidebar, theme, widgets};
 use engine::core::content::row_file;
 
-pub const TABLE: &str = "class";
 pub const TREE_PART: &str = "/tree/";
 
 const LABEL: f32 = 110.0;
@@ -54,8 +55,11 @@ impl ClassViews {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    if editor.row_value(TABLE, key).is_none() {
-        ui.label(theme::muted(format!("{} is gone", row_file(TABLE, key))));
+    if editor.row_value(ClassDef::TABLE, key).is_none() {
+        ui.label(theme::muted(format!(
+            "{} is gone",
+            row_file(ClassDef::TABLE, key)
+        )));
         return;
     }
     let page = editor.views.class.page(key);
@@ -86,20 +90,20 @@ fn page_body(editor: &mut Editor, ui: &mut Ui, key: &str, page: ClassPage) {
             if widgets::mode_chip(ui, label, page == target).clicked() {
                 editor.views.class.pages.insert(key.to_owned(), target);
                 if target == ClassPage::Levels {
-                    editor.select(RowSelection::row(TABLE, key));
+                    editor.select(RowSelection::row(ClassDef::TABLE, key));
                 }
             }
         }
     });
     ui.add_space(4.0);
     match page {
-        ClassPage::Levels => row_form::show_row_tab(editor, ui, TABLE, key),
+        ClassPage::Levels => row_form::show_row_tab(editor, ui, ClassDef::TABLE, key),
         ClassPage::Tree => tree::show(editor, ui, key),
     }
 }
 
 pub fn node_of(selection: &RowSelection) -> Option<&str> {
-    if selection.table != TABLE || selection.keys.len() != 1 {
+    if selection.table != ClassDef::TABLE || selection.keys.len() != 1 {
         return None;
     }
     selection
@@ -112,17 +116,17 @@ pub fn node_of(selection: &RowSelection) -> Option<&str> {
 pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
     match node {
         Some(node) => editor.select(RowSelection::parts(
-            TABLE,
+            ClassDef::TABLE,
             key,
             vec![format!("{TREE_PART}{node}")],
         )),
-        None => editor.select(RowSelection::row(TABLE, key)),
+        None => editor.select(RowSelection::row(ClassDef::TABLE, key)),
     }
 }
 
 pub fn write(editor: &mut Editor, key: &str, label: &str, value: &Value) {
-    let mut edit = ContentEdit::new(format!("{label} · {TABLE}/{key}"));
-    edit.write_json(row_file(TABLE, key), value);
+    let mut edit = ContentEdit::new(format!("{label} · {}/{key}", ClassDef::TABLE));
+    edit.write_json(row_file(ClassDef::TABLE, key), value);
     editor.apply(edit);
 }
 

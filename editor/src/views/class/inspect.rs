@@ -2,12 +2,13 @@ use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
 use engine::core::content::Content;
 use engine::core::content::ContentRow;
+use engine::systems::class::ClassDef;
 use engine::systems::class::{NodeKey, SkillTree};
 use engine::systems::skill::SkillDef;
 use serde_json::{Map, Value};
 
 use super::tree::{self, CarriedNode};
-use super::{TABLE, node_of, select_node, write};
+use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::RowSelection;
@@ -22,7 +23,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         return;
     };
     let key = selection.keys[0].clone();
-    let Some(mut row) = editor.row_value(TABLE, &key) else {
+    let Some(mut row) = editor.row_value(ClassDef::TABLE, &key) else {
         return;
     };
     if !row["tree"][&node].is_object() {
@@ -37,25 +38,30 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let shapes = editor.shapes.clone();
     let mut changed = FormChange::default();
     let mut removed = false;
-    editor.with_form(TABLE, Some(&key), shapes.shape_of(TABLE), |cx| {
-        egui::ScrollArea::vertical()
-            .id_salt(("class-node", &key, &node))
-            .show(ui, |ui| {
-                ui.label(
-                    theme::mono(format!("{TABLE}/{key} › node {node}"))
-                        .color(theme::CODE)
-                        .size(12.0),
-                );
-                ui.add_space(6.0);
-                changed |= fields(ui, cx, &mut row, &node);
-                widgets::section(ui, "access requirements");
-                changed |= requirements(ui, cx, &content, &mut row, &tree, &node);
-                ui.add_space(10.0);
-                if widgets::danger(ui, "Remove node").clicked() {
-                    removed = true;
-                }
-            });
-    });
+    editor.with_form(
+        ClassDef::TABLE,
+        Some(&key),
+        shapes.shape_of(ClassDef::TABLE),
+        |cx| {
+            egui::ScrollArea::vertical()
+                .id_salt(("class-node", &key, &node))
+                .show(ui, |ui| {
+                    ui.label(
+                        theme::mono(format!("{}/{key} › node {node}", ClassDef::TABLE))
+                            .color(theme::CODE)
+                            .size(12.0),
+                    );
+                    ui.add_space(6.0);
+                    changed |= fields(ui, cx, &mut row, &node);
+                    widgets::section(ui, "access requirements");
+                    changed |= requirements(ui, cx, &content, &mut row, &tree, &node);
+                    ui.add_space(10.0);
+                    if widgets::danger(ui, "Remove node").clicked() {
+                        removed = true;
+                    }
+                });
+        },
+    );
     if removed {
         tree::remove_node(&mut row, &node);
         write(editor, &key, "Remove node", &row);

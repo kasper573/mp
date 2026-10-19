@@ -534,7 +534,7 @@ pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
         })
         .collect();
     editor.clipboard = Some(Clipboard {
-        table: "area".to_owned(),
+        table: AreaDef::TABLE.to_owned(),
         from: frame.area_key.clone(),
         modules,
         origin: Some(origin),

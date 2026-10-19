@@ -5,9 +5,14 @@ use self::preview::PreviewPlace;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use engine::core::content::ContentRow;
+use engine::core::vfx::shader::VfxShaderDef;
+use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::class::ClassDef;
 use engine::systems::input::map::InputDef;
 use engine::systems::quest::QuestDef;
+use engine::systems::skill::SkillDef;
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -298,29 +303,29 @@ fn row_card(
         );
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
-        if table == model::TABLE {
+        if table == ModelDef::TABLE {
             changed = model::inspect::row_body(ui, cx, value);
             return;
         }
-        if table == tileset::TABLE {
+        if table == TilesetDef::TABLE {
             changed = tileset::inspect::row_body(ui, cx, value);
             return;
         }
         let hidden: &[&str] = match table {
             "input" => &["modules", "bindings"],
-            class::TABLE => &["modules", "levels", "tree", "backdrop"],
-            skill::TABLE => &["modules", "levels"],
-            vfx::SHADER_TABLE => &["modules", "params"],
+            ClassDef::TABLE => &["modules", "levels", "tree", "backdrop"],
+            SkillDef::TABLE => &["modules", "levels"],
+            VfxShaderDef::TABLE => &["modules", "params"],
             _ => &["modules"],
         };
         changed = forms::object_without(ui, cx, schema, value, "", hidden);
-        if table == class::TABLE {
+        if table == ClassDef::TABLE {
             changed |= class::levels(ui, cx, value);
         }
-        if table == skill::TABLE {
+        if table == SkillDef::TABLE {
             changed |= skill::ranks(ui, cx, value);
         }
-        if table == vfx::SHADER_TABLE {
+        if table == VfxShaderDef::TABLE {
             changed |= vfx::shader_params(ui, cx, value);
         }
     });

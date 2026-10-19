@@ -2,6 +2,7 @@ use engine::core::content::ContentRow;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
+use engine::systems::class::ClassDef;
 use engine::systems::script::ScriptDef;
 use std::path::PathBuf;
 
@@ -378,7 +379,7 @@ fn open_one(editor: &mut Editor, step: &Step) {
         Step::Import(step) => editor.jobs.script.push_back(step.clone()),
         Step::Section(section) => editor.views.character.section = *section,
         Step::Tree { key, node } => {
-            editor.open_tab(EditorTab::for_row(class::TABLE, key));
+            editor.open_tab(EditorTab::for_row(ClassDef::TABLE, key));
             editor
                 .views
                 .class
@@ -534,7 +535,7 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
                         .find(|found| found.name == *face)
                 {
                     editor.select(RowSelection {
-                        table: "model".to_owned(),
+                        table: ModelDef::TABLE.to_owned(),
                         keys: vec![key.clone()],
                         parts: vec![found.pointer],
                     });

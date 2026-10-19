@@ -4,9 +4,9 @@ use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
 
-use crate::views::character;
 use crate::views::script::ScriptOwner;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -36,7 +36,7 @@ impl EditorTab {
     pub fn title(&self) -> String {
         match self {
             EditorTab::World => "World".to_owned(),
-            EditorTab::Row { table, .. } if table == character::TABLE => {
+            EditorTab::Row { table, .. } if table == CharacterSnapshot::TABLE => {
                 "Test characters".to_owned()
             }
             EditorTab::Row { table, key } => format!("{table}/{key}"),

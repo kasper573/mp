@@ -31,8 +31,7 @@ use engine::systems::item::render::drop_sprite;
 use super::{SIZE, ZOOM};
 use crate::project::{ProjectFiles, hash};
 use crate::views::area::scene;
-use crate::views::vfx::SHADER_TABLE;
-use engine::core::content::row_file;
+use engine::core::content::{ContentRow, row_file};
 
 const FIRST_LAYER: usize = 500;
 const SPRITE_DEPTH_ABOVE_GROUND: f32 = 0.001;
@@ -432,10 +431,10 @@ impl Stage {
         drafts: &HashMap<String, String>,
     ) -> Result<Handle<Shader>, String> {
         let row = files
-            .json(&row_file(SHADER_TABLE, key))
+            .json(&row_file(VfxShaderDef::TABLE, key))
             .ok_or_else(|| format!("no shader row {key}"))?;
         let def: VfxShaderDef = serde_json::from_value((*row).clone())
-            .map_err(|_| format!("{SHADER_TABLE}/{key} does not parse"))?;
+            .map_err(|_| format!("{}/{key} does not parse", VfxShaderDef::TABLE))?;
         let source = drafts
             .get(key)
             .cloned()

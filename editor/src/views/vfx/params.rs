@@ -4,11 +4,13 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Ui};
+use engine::core::content::ContentRow;
 use engine::core::math::Rgba;
+use engine::core::vfx::VfxDef;
+use engine::core::vfx::shader::VfxShaderDef;
 use engine::core::vfx::{ParamFill, ParamKind, ParamValue, ShaderParam, VfxParam};
 use serde_json::{Map, Value};
 
-use super::{SHADER_TABLE, TABLE};
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::ProjectFiles;
 use crate::ui::{theme, widgets};
@@ -60,11 +62,11 @@ pub fn params_of(files: &ProjectFiles, table: &str, key: &str) -> Vec<ParamSpec>
     };
     let declared = row["params"].as_array().into_iter().flatten();
     match table {
-        SHADER_TABLE => declared
+        VfxShaderDef::TABLE => declared
             .filter_map(|param| serde_json::from_value::<ShaderParam>(param.clone()).ok())
             .map(|param| ParamSpec::from(&param))
             .collect(),
-        TABLE => declared
+        VfxDef::TABLE => declared
             .filter_map(|param| serde_json::from_value::<VfxParam>(param.clone()).ok())
             .map(|param| ParamSpec::from(&param))
             .collect(),
@@ -128,11 +130,13 @@ pub fn param_fill(
         .get(&spec.name)
         .and_then(|fill| serde_json::from_value::<ParamFill>(fill.clone()).ok());
     let bindable: Vec<String> = match (&cx.owner_table, &cx.owner_key) {
-        (Some(table), Some(key)) if table == TABLE => params_of(cx.files, TABLE, key)
-            .into_iter()
-            .filter(|own| own.kind == spec.kind)
-            .map(|own| own.name)
-            .collect(),
+        (Some(table), Some(key)) if table == VfxDef::TABLE => {
+            params_of(cx.files, VfxDef::TABLE, key)
+                .into_iter()
+                .filter(|own| own.kind == spec.kind)
+                .map(|own| own.name)
+                .collect()
+        }
         _ => Vec::new(),
     };
     let mut changed = FormChange::default();

@@ -479,18 +479,23 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             } = editor;
             let project = project.as_ref().expect("project");
             let root = Value::Null;
-            let mut cx =
-                FormCx::new(project, &root, shapes, form, &mut actions).owned_by("area", None);
+            let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
+                .owned_by(AreaDef::TABLE, None);
             widgets::kv(ui, "blueprint", |ui| {
-                if picker::row(ui, &mut cx, "blueprint", &mut picked, "/stamp/blueprint")
-                    && !picked.is_empty()
+                if picker::row(
+                    ui,
+                    &mut cx,
+                    BlueprintDef::TABLE,
+                    &mut picked,
+                    "/stamp/blueprint",
+                ) && !picked.is_empty()
                 {
                     editor.views.area.view_mut(view_key).stamp = Some(picked.clone());
                 }
             });
         }
         for action in actions {
-            row_form::act(editor, action, "area", "");
+            row_form::act(editor, action, AreaDef::TABLE, "");
         }
         let Some(stamp) = editor.views.area.view(view_key).stamp.clone() else {
             widgets::hint(
@@ -574,8 +579,8 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 let project = project.as_ref().expect("project");
                 let mut actions = Vec::new();
                 let root = Value::Null;
-                let mut cx =
-                    FormCx::new(project, &root, shapes, form, &mut actions).owned_by("area", None);
+                let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
+                    .owned_by(AreaDef::TABLE, None);
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
@@ -726,7 +731,7 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
             })),
         Some(AreaMenu::Play) => views::play_here(editor),
         Some(AreaMenu::OpenRow) => editor.open_tab(EditorTab::Row {
-            table: "area".to_owned(),
+            table: AreaDef::TABLE.to_owned(),
             key: key.to_owned(),
         }),
         None => {}
@@ -806,7 +811,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
         pins::set_spawn(editor, &picked, middle);
     }
     for action in actions {
-        row_form::act(editor, action, "area", key);
+        row_form::act(editor, action, AreaDef::TABLE, key);
     }
     if pick {
         editor.pick = Some(PlacePick {
@@ -959,7 +964,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by("area", Some(&area_key));
+            .owned_by(AreaDef::TABLE, Some(&area_key));
         if indices.len() == 1 {
             let index = indices[0];
             let view = views.area.views.get_mut(&super::area_view_key(&area_key));
@@ -1014,7 +1019,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, "area", &area_key);
+        row_form::act(editor, action, AreaDef::TABLE, &area_key);
     }
     for action in out.actions {
         if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &area_key) {

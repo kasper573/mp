@@ -81,7 +81,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     ui.add_space(4.0);
     if widgets::chip_colored(ui, &format!("npc/ {npc} →"), theme::INPUT, theme::CODE).clicked() {
         cx.actions.push(FormAction::OpenRow {
-            table: "npc".to_owned(),
+            table: NpcDef::TABLE.to_owned(),
             key: npc.clone(),
         });
     }

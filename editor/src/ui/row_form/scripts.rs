@@ -213,7 +213,7 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
         } else if let Some(script) = module["script"].as_str() {
             if ui.button("→ Open script").clicked() {
                 cx.actions.push(FormAction::OpenRow {
-                    table: "script".to_owned(),
+                    table: ScriptDef::TABLE.to_owned(),
                     key: script.to_owned(),
                 });
             }

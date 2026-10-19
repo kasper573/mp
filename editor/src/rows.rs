@@ -1,4 +1,5 @@
 use engine::core::content::ContentRow;
+use engine::core::vfx::shader::VfxShaderDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use std::collections::{BTreeMap, HashSet};
@@ -18,7 +19,7 @@ use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
 use crate::views::area::placement;
-use crate::views::{vfx, world};
+use crate::views::world;
 use crate::{schema, usages};
 use engine::core::content::{load, locate, row_file, row_folder, row_of};
 
@@ -298,7 +299,7 @@ fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
 /// The file a row owns by convention besides its own, which follows the row through a copy, a
 /// rename and a deletion: a shader's WGSL.
 pub fn companion_file(table: &str, key: &str) -> Option<String> {
-    (table == vfx::SHADER_TABLE).then(|| shader_file(key))
+    (table == VfxShaderDef::TABLE).then(|| shader_file(key))
 }
 
 const NEW_SHADER: &str =

@@ -516,7 +516,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let tile = cursor.center();
         if let Some(hit) = frame.hit(tile) {
             editor.selection = RowSelection {
-                table: "area".to_owned(),
+                table: AreaDef::TABLE.to_owned(),
                 keys: vec![frame.area_key.clone()],
                 parts: vec![super::module_part(hit)],
             };

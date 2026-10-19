@@ -1051,7 +1051,7 @@ pub fn open_area_at(editor: &mut Editor, area: &str, at: Option<Pos<Tiles>>, par
     }
     if let Some(part) = part {
         editor.selection = RowSelection {
-            table: "area".to_owned(),
+            table: AreaDef::TABLE.to_owned(),
             keys: vec![area.to_owned()],
             parts: vec![part],
         };

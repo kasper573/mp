@@ -4,6 +4,7 @@ mod params;
 mod preview;
 mod shader_code;
 
+use engine::core::content::ContentRow;
 use std::sync::Arc;
 
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
@@ -21,9 +22,6 @@ use crate::project::ContentEdit;
 use crate::ui::{row_form, theme, widgets};
 use engine::core::content::row_file;
 
-pub const TABLE: &str = "vfx";
-pub const SHADER_TABLE: &str = "vfx_shader";
-
 const FORM_WIDTH: f32 = 440.0;
 const COLUMN_GAP: f32 = 16.0;
 const MIN_CODE_WIDTH: f32 = 260.0;
@@ -31,8 +29,11 @@ const HEADING_HEIGHT: f32 = 24.0;
 const MIN_TITLE_WIDTH: f32 = 60.0;
 
 pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(TABLE, key) else {
-        ui.label(theme::muted(format!("{} is gone", row_file(TABLE, key))));
+    let Some(row) = editor.row_value(VfxDef::TABLE, key) else {
+        ui.label(theme::muted(format!(
+            "{} is gone",
+            row_file(VfxDef::TABLE, key)
+        )));
         return;
     };
     let (layers, inside) = editor.loaded().map_or((Vec::new(), None), |content| {
@@ -51,7 +52,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let specs = editor
         .project
         .as_ref()
-        .map(|project| params_of(&project.files, TABLE, key))
+        .map(|project| params_of(&project.files, VfxDef::TABLE, key))
         .unwrap_or_default();
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
@@ -59,7 +60,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
             egui::ScrollArea::vertical()
                 .id_salt(("vfx-form", key))
                 .auto_shrink([false, false])
-                .show(ui, |ui| row_form::show_row(editor, ui, TABLE, key));
+                .show(ui, |ui| row_form::show_row(editor, ui, VfxDef::TABLE, key));
         });
         ui.add_space(16.0);
         ui.vertical(|ui| {
@@ -67,7 +68,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
             preview(
                 editor,
                 ui,
-                &format!("{TABLE}/{key}"),
+                &format!("{}/{key}", VfxDef::TABLE),
                 layers,
                 inside,
                 &specs,
@@ -78,10 +79,10 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(SHADER_TABLE, key) else {
+    let Some(row) = editor.row_value(VfxShaderDef::TABLE, key) else {
         ui.label(theme::muted(format!(
             "{} is gone",
-            row_file(SHADER_TABLE, key)
+            row_file(VfxShaderDef::TABLE, key)
         )));
         return;
     };
@@ -101,7 +102,9 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             egui::ScrollArea::vertical()
                 .id_salt(("shader-form", key))
                 .auto_shrink([false, false])
-                .show(ui, |ui| row_form::show_row(editor, ui, SHADER_TABLE, key));
+                .show(ui, |ui| {
+                    row_form::show_row(editor, ui, VfxShaderDef::TABLE, key)
+                });
         });
         ui.add_space(COLUMN_GAP);
         ui.vertical(|ui| {
@@ -145,7 +148,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             preview(
                 editor,
                 ui,
-                &format!("{SHADER_TABLE}/{key}"),
+                &format!("{}/{key}", VfxShaderDef::TABLE),
                 vec![layer],
                 None,
                 &specs,

@@ -43,7 +43,7 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
     ) else {
         return;
     };
-    let name = rows::free_key(&project.files, "blueprint", "new_blueprint");
+    let name = rows::free_key(&project.files, BlueprintDef::TABLE, "new_blueprint");
     let matches = matching_groups(&content, area_key, &modules, &indices);
     editor
         .dialogs
@@ -368,7 +368,7 @@ fn matches_card(ui: &mut Ui, dialog: &mut MakeBlueprintDialog) {
 fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder")?;
     let key = dialog.name.trim().to_owned();
-    if let Some(problem) = rows::key_problem(&project.files, "blueprint", &key) {
+    if let Some(problem) = rows::key_problem(&project.files, BlueprintDef::TABLE, &key) {
         return Err(problem);
     }
     let row = project
@@ -444,7 +444,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
     }
     editor.try_apply(edit)?;
     editor.selection = RowSelection {
-        table: "area".to_owned(),
+        table: AreaDef::TABLE.to_owned(),
         keys: vec![dialog.area.clone()],
         parts: first_placement
             .map(super::module_part)

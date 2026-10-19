@@ -1,6 +1,9 @@
 use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
+use engine::core::content::ContentRow;
+use engine::systems::player::PlayerDef;
+use engine::systems::script::ScriptDef;
 use std::path::{Path, PathBuf};
 
 use egui::{Context, RichText, Ui};
@@ -374,8 +377,8 @@ fn template_counts(template: &GameTemplate) -> String {
             .find(|(t, _)| t == table)
             .map_or(0, |(_, keys)| keys.len())
     };
-    let players = rows_in("player");
-    let scripts = rows_in("script");
+    let players = rows_in(PlayerDef::TABLE);
+    let scripts = rows_in(ScriptDef::TABLE);
     format!(
         "{} area{} · {players} player{} · {scripts} shared script{}",
         template.areas.len(),

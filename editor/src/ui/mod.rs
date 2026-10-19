@@ -13,6 +13,9 @@ pub mod tree;
 pub mod widgets;
 
 use engine::core::content::ContentRow;
+use engine::core::vfx::VfxDef;
+use engine::core::vfx::shader::VfxShaderDef;
+use engine::systems::class::ClassDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use std::mem;
 use std::path::Path;
@@ -609,7 +612,7 @@ impl TabViewer for Viewer<'_> {
             EditorTab::Script(owner) => script::show(self.editor, ui, owner),
             EditorTab::Model { key } => model::show(self.editor, ui, key),
             EditorTab::Tileset { key } => tileset::show(self.editor, ui, key),
-            EditorTab::Row { table, key } if table == class::TABLE => {
+            EditorTab::Row { table, key } if table == ClassDef::TABLE => {
                 class::show(self.editor, ui, key)
             }
             EditorTab::Spreadsheet { table } => spreadsheet::show(self.editor, ui, table),
@@ -622,13 +625,13 @@ impl TabViewer for Viewer<'_> {
                     .show(ui, |ui| {
                         ui.set_min_size(ui.available_size());
                         match tab {
-                            EditorTab::Row { table, key } if table == character::TABLE => {
+                            EditorTab::Row { table, key } if table == CharacterSnapshot::TABLE => {
                                 character::show(self.editor, ui, key)
                             }
-                            EditorTab::Row { table, key } if table == vfx::TABLE => {
+                            EditorTab::Row { table, key } if table == VfxDef::TABLE => {
                                 vfx::show_vfx(self.editor, ui, key)
                             }
-                            EditorTab::Row { table, key } if table == vfx::SHADER_TABLE => {
+                            EditorTab::Row { table, key } if table == VfxShaderDef::TABLE => {
                                 vfx::show_shader(self.editor, ui, key)
                             }
                             EditorTab::Row { table, key } => {
@@ -672,7 +675,7 @@ impl TabViewer for Viewer<'_> {
             | EditorTab::Model { .. }
             | EditorTab::Tileset { .. }
             | EditorTab::Spreadsheet { .. } => [false, false],
-            EditorTab::Row { table, key } if table == class::TABLE => [
+            EditorTab::Row { table, key } if table == ClassDef::TABLE => [
                 false,
                 self.editor.views.class.page(key) == class::ClassPage::Levels,
             ],

@@ -95,7 +95,7 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
     });
     if let Some(next) = pick {
         editor.selection = RowSelection {
-            table: "blueprint".to_owned(),
+            table: BlueprintDef::TABLE.to_owned(),
             keys: vec![key.to_owned()],
             parts: next.iter().copied().map(super::blueprint_part).collect(),
         };
@@ -108,7 +108,7 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
         edit.write_json(row_file(BlueprintDef::TABLE, key), &row);
         if editor.apply(edit) {
             editor.selection = RowSelection {
-                table: "blueprint".to_owned(),
+                table: BlueprintDef::TABLE.to_owned(),
                 keys: vec![key.to_owned()],
                 parts: vec![super::blueprint_part(index)],
             };
@@ -230,7 +230,7 @@ pub(super) fn part_cards(
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .owned_by("blueprint", Some(key));
+            .owned_by(BlueprintDef::TABLE, Some(key));
         for &index in selected {
             let path = super::blueprint_part(index);
             let Some(part) = row["parts"].get_mut(index) else {
@@ -298,7 +298,12 @@ pub(super) fn part_cards(
                 }
                 if module_kind == Some(AreaModuleKind::Object) {
                     changed |= crate::ui::row_form::scripts::script_cards(
-                        ui, &mut cx, "area", part, "scripts", &path,
+                        ui,
+                        &mut cx,
+                        AreaDef::TABLE,
+                        part,
+                        "scripts",
+                        &path,
                     )
                     .is_some();
                 }
@@ -354,7 +359,7 @@ pub(super) fn part_cards(
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, "blueprint", key);
+        row_form::act(editor, action, BlueprintDef::TABLE, key);
     }
 }
 
@@ -520,9 +525,16 @@ pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row
     let count = row["modules"].as_array().map_or(0, Vec::len);
     widgets::section_count(ui, "Modules", count);
     let changed = editor
-        .with_form("blueprint", Some(key), shape, |cx| {
-            crate::ui::row_form::scripts::script_cards(ui, cx, "blueprint", row, "modules", "")
-                .is_some()
+        .with_form(BlueprintDef::TABLE, Some(key), shape, |cx| {
+            crate::ui::row_form::scripts::script_cards(
+                ui,
+                cx,
+                BlueprintDef::TABLE,
+                row,
+                "modules",
+                "",
+            )
+            .is_some()
         })
         .unwrap_or(false);
     if changed {

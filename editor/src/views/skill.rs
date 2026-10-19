@@ -9,8 +9,6 @@ use strum::VariantArray;
 use crate::forms::{self, FormChange, FormCx};
 use crate::ui::{theme, widgets};
 
-pub const TABLE: &str = "skill";
-
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
 

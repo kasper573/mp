@@ -647,7 +647,7 @@ pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
                 .as_str()
                 .unwrap_or("the blueprint")
         ),
-        table: "blueprint".to_owned(),
+        table: BlueprintDef::TABLE.to_owned(),
         search: String::new(),
         picked: None,
         options: Vec::new(),

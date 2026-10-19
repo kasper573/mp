@@ -36,7 +36,7 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaF
         let part = super::module_part(hit);
         if !super::selected_parts(editor, &frame.area_key).contains(&part) {
             editor.selection = RowSelection {
-                table: "area".to_owned(),
+                table: AreaDef::TABLE.to_owned(),
                 keys: vec![frame.area_key.clone()],
                 parts: vec![part],
             };
