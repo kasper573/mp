@@ -17,13 +17,14 @@ use engine::systems;
 use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
+use strum::IntoStaticStr;
 
 use crate::forms::{FormCx, FormState};
 use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
 use crate::project::lock::ProjectLock;
 use crate::project::watch::FolderWatcher;
 use crate::project::{
-    ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
+    AppliedStep, ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection,
 };
 use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
@@ -185,7 +186,7 @@ pub enum LeftTab {
     Assets,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, IntoStaticStr)]
 #[serde(rename_all = "snake_case")]
 pub enum BottomTab {
     #[default]
@@ -193,7 +194,9 @@ pub enum BottomTab {
     Output,
     Palette,
     Blueprints,
+    #[strum(serialize = "May do")]
     MayDo,
+    #[strum(serialize = "Used by")]
     UsedBy,
     Run,
     Timeline,
@@ -206,21 +209,7 @@ pub enum BottomTab {
 
 impl BottomTab {
     pub fn title(self) -> &'static str {
-        match self {
-            BottomTab::History => "History",
-            BottomTab::Output => "Output",
-            BottomTab::Palette => "Palette",
-            BottomTab::Blueprints => "Blueprints",
-            BottomTab::MayDo => "May do",
-            BottomTab::UsedBy => "Used by",
-            BottomTab::Run => "Run",
-            BottomTab::Timeline => "Timeline",
-            BottomTab::Sheet => "Sheet",
-            BottomTab::Sounds => "Sounds",
-            BottomTab::Surfaces => "Surfaces",
-            BottomTab::Mixes => "Mixes",
-            BottomTab::Listen => "Listen",
-        }
+        self.into()
     }
 }
 
@@ -435,7 +424,7 @@ impl Editor {
 
     pub fn toast(&mut self, text: impl Into<String>) {
         let text = text.into();
-        self.output.say("editor", text.clone());
+        self.say(text.clone());
         self.toast = Some((text, Instant::now()));
     }
 
@@ -451,7 +440,7 @@ impl Editor {
             Err(error) => {
                 let reason = format!("{}: {error}", folder.display());
                 self.start.failed = Some((folder.to_path_buf(), reason.clone()));
-                self.output.say("editor", reason);
+                self.say(reason);
                 return;
             }
         };
@@ -474,14 +463,11 @@ impl Editor {
                     .as_ref()
                     .map(|report| report.to_string())
                     .unwrap_or_default();
-                self.output.say(
-                    "editor",
-                    format!(
-                        "{} did not load: {} errors",
-                        folder.display(),
-                        project.report.as_ref().map_or(0, |r| r.errors.len())
-                    ),
-                );
+                self.say(format!(
+                    "{} did not load: {} errors",
+                    folder.display(),
+                    project.report.as_ref().map_or(0, |r| r.errors.len())
+                ));
                 self.settings.remember(folder);
                 self.save_settings();
                 self.start.failed = None;
@@ -493,7 +479,7 @@ impl Editor {
                     Ok(lock) => Some(lock),
                     Err(reason) => {
                         project.read_only = Some(reason.clone());
-                        self.output.say("editor", format!("Read-only: {reason}"));
+                        self.say(format!("Read-only: {reason}"));
                         None
                     }
                 };
@@ -507,38 +493,26 @@ impl Editor {
                         };
                     }
                     if let Err(refusal) = project.apply(edit, EditViewpoint::default()) {
-                        self.output.say(
-                            "editor",
-                            format!("The journal did not apply: {}", refusal.sentence()),
-                        );
+                        self.say(format!("The journal did not apply: {}", refusal.sentence()));
                     } else {
-                        self.output.say(
-                            "editor",
-                            format!("Recovered {} unsaved rows", recovered.len()),
-                        );
+                        self.say(format!("Recovered {} unsaved rows", recovered.len()));
                     }
                 }
                 match (&project.report, project.last_load) {
                     (Some(report), _) => {
-                        self.output.say(
-                            "editor",
-                            format!(
-                                "{} did not load: {} errors",
-                                folder.display(),
-                                report.errors.len()
-                            ),
-                        );
+                        self.say(format!(
+                            "{} did not load: {} errors",
+                            folder.display(),
+                            report.errors.len()
+                        ));
                     }
                     (None, Some(took)) => {
                         let usages = project.last_usages.map_or(0, |d| d.as_millis());
-                        self.output.say(
-                            "editor",
-                            format!(
-                                "Opened {} in {} ms (load) + {usages} ms (usages)",
-                                folder.display(),
-                                took.as_millis()
-                            ),
-                        );
+                        self.say(format!(
+                            "Opened {} in {} ms (load) + {usages} ms (usages)",
+                            folder.display(),
+                            took.as_millis()
+                        ));
                     }
                     _ => {}
                 }
@@ -569,7 +543,7 @@ impl Editor {
             }
             Err(reason) => {
                 self.start.failed = Some((folder.to_path_buf(), reason.clone()));
-                self.output.say("editor", reason);
+                self.say(reason);
             }
         }
     }
@@ -586,9 +560,7 @@ impl Editor {
         self.journal = None;
         self.watcher = None;
         self.lock = None;
-        if let Some(project) = self.project.take() {
-            drop(project);
-        }
+        self.project = None;
         self.dock = DockState::new(Vec::new());
         self.panels = DockTabs::default();
     }
@@ -632,34 +604,24 @@ impl Editor {
     }
 
     pub fn undo(&mut self) {
-        let Some(project) = &mut self.project else {
-            return;
-        };
-        match project.undo() {
-            Ok(Some(applied)) => {
-                self.selection = applied.viewpoint.selection;
-                self.views.restore_camera(applied.viewpoint.camera);
-                self.views.content_changed();
-                self.toast(format!("Undid {}", applied.label));
-            }
-            Ok(None) => {}
-            Err(refusal) => self.refused("Undo", &refusal),
-        }
+        self.revisit(Project::undo, "Undid");
     }
 
     pub fn redo(&mut self) {
-        let Some(project) = &mut self.project else {
-            return;
-        };
-        match project.redo() {
-            Ok(Some(applied)) => {
-                self.selection = applied.viewpoint.selection;
-                self.views.restore_camera(applied.viewpoint.camera);
-                self.views.content_changed();
-                self.toast(format!("Redid {}", applied.label));
-            }
-            Ok(None) => {}
-            Err(refusal) => self.refused("Redo", &refusal),
+        self.revisit(Project::redo, "Redid");
+    }
+
+    pub fn return_to(&mut self, applied: AppliedStep) {
+        self.selection = applied.viewpoint.selection;
+        self.views.restore_camera(applied.viewpoint.camera);
+        self.views.content_changed();
+    }
+
+    fn revisit(&mut self, travel: fn(&mut Project) -> Option<AppliedStep>, verb: &str) {
+        if let Some(applied) = self.project.as_mut().and_then(travel) {
+            let label = applied.label.clone();
+            self.return_to(applied);
+            self.toast(format!("{verb} {label}"));
         }
     }
 

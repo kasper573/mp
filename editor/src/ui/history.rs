@@ -95,18 +95,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             });
         }
     });
-    if let Some(index) = jump
-        && let Some(project) = &mut editor.project
-    {
+    if let Some(index) = jump {
         editor.history_focus = Some(index);
-        match project.jump(index) {
-            Ok(Some(applied)) => {
-                editor.selection = applied.viewpoint.selection;
-                editor.views.restore_camera(applied.viewpoint.camera);
-                editor.views.content_changed();
-            }
-            Ok(None) => {}
-            Err(refusal) => editor.refused("History", &refusal),
+        if let Some(applied) = editor
+            .project
+            .as_mut()
+            .and_then(|project| project.jump(index))
+        {
+            editor.return_to(applied);
         }
     }
 }

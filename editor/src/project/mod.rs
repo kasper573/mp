@@ -158,6 +158,18 @@ pub struct AppliedStep {
     pub label: String,
 }
 
+impl AppliedStep {
+    fn of(step: &EditStep) -> AppliedStep {
+        AppliedStep {
+            viewpoint: EditViewpoint {
+                selection: step.selection.clone(),
+                camera: step.camera.clone(),
+            },
+            label: step.label.clone(),
+        }
+    }
+}
+
 pub struct Project {
     pub root: PathBuf,
     pub files: ProjectFiles,
@@ -381,51 +393,37 @@ impl Project {
         Ok(())
     }
 
-    pub fn undo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
-        let Some(step) = self.history.undo_step() else {
-            return Ok(None);
-        };
-        let viewpoint = EditViewpoint {
-            selection: step.selection.clone(),
-            camera: step.camera.clone(),
-        };
-        let label = step.label.clone();
-        let changes = step.before.clone();
+    pub fn undo(&mut self) -> Option<AppliedStep> {
+        let step = self.history.undo_step()?;
+        let (applied, changes) = (AppliedStep::of(step), step.before.clone());
         self.restore(&changes);
         self.history.undone();
-        Ok(Some(AppliedStep { viewpoint, label }))
+        Some(applied)
     }
 
-    pub fn redo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
-        let Some(step) = self.history.redo_step() else {
-            return Ok(None);
-        };
-        let viewpoint = EditViewpoint {
-            selection: step.selection.clone(),
-            camera: step.camera.clone(),
-        };
-        let label = step.label.clone();
-        let changes = step.after.clone();
+    pub fn redo(&mut self) -> Option<AppliedStep> {
+        let step = self.history.redo_step()?;
+        let (applied, changes) = (AppliedStep::of(step), step.after.clone());
         self.restore(&changes);
         self.history.redone();
-        Ok(Some(AppliedStep { viewpoint, label }))
+        Some(applied)
     }
 
-    pub fn jump(&mut self, index: usize) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
+    pub fn jump(&mut self, index: usize) -> Option<AppliedStep> {
         let mut last = None;
         while self.history.applied() > index {
-            match self.undo()? {
-                Some(applied) => last = Some(applied),
-                None => break,
-            }
+            let Some(applied) = self.undo() else {
+                break;
+            };
+            last = Some(applied);
         }
         while self.history.applied() < index {
-            match self.redo()? {
-                Some(applied) => last = Some(applied),
-                None => break,
-            }
+            let Some(applied) = self.redo() else {
+                break;
+            };
+            last = Some(applied);
         }
-        Ok(last)
+        last
     }
 
     fn restore(&mut self, changes: &[FileChange]) {
