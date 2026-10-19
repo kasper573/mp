@@ -120,19 +120,13 @@ fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Noti
         }
     }
     if now.level > before.level {
-        let granted = now.points.0.saturating_sub(before.points.0);
-        let text = match granted {
-            0 => format!("Level {}", now.level),
-            1 => format!("Level {} · 1 skill point", now.level),
-            _ => format!("Level {} · {granted} skill points", now.level),
-        };
         told.push(Notification::new(
             NotificationKind::Milestone {
                 label: "Level up".into(),
                 topic: HistoryTopic::Notification,
                 sfx: Some(InterfaceSound::RisingChime.id(content)),
             },
-            LineText::plain(text),
+            LineText::plain(format!("Level {}", now.level)),
         ));
     }
     if now.points > before.points {

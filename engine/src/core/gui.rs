@@ -49,6 +49,7 @@ pub enum Tier {
     Mid,
     Front,
     Top,
+    Peak,
 }
 
 impl Tier {

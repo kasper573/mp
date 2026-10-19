@@ -197,11 +197,11 @@ fn completing_a_quest_and_reaching_a_level_are_milestones() {
             _ => None,
         })
         .collect();
-    assert!(
-        milestones
-            .iter()
-            .any(|(label, _, topic)| label == "Level up" && *topic == HistoryTopic::Notification)
-    );
+    assert!(milestones.contains(&(
+        "Level up".to_owned(),
+        "Level 2".to_owned(),
+        HistoryTopic::Notification
+    )));
     assert!(milestones.contains(&(
         "Quest complete".to_owned(),
         "Tusks".to_owned(),

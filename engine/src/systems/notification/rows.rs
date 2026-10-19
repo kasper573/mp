@@ -265,7 +265,7 @@ pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) 
         return top;
     }
     let screen = gui.content_rect();
-    let shown = column_area(gui, "milestones", top, Stacking::UnderWindows).show(gui, |ui| {
+    let shown = column_area(gui, "milestones", top, Stacking::OverNotices).show(gui, |ui| {
         ui.set_width(screen.width());
         ui.vertical_centered(|ui| {
             ui.spacing_mut().item_spacing.y = MILESTONE_GAP;
@@ -404,17 +404,23 @@ pub(super) enum Stacking {
     OverWindows,
     /// Over the world, the HUD and the stage, but under the windows and cards the player has open.
     UnderWindows,
+    /// Under the windows too, but over every notice stacked `UnderWindows`: a milestone is never
+    /// hidden by what else is being told at the time.
+    OverNotices,
 }
 
 impl Stacking {
     pub(super) fn area(self, gui: &egui::Context, id: Id) -> egui::Area {
         match self {
             Stacking::OverWindows => egui::Area::new(id).order(Band::Notices.order()),
-            Stacking::UnderWindows => {
-                gui::stack(gui, Tier::Top, LayerId::new(Order::Background, id));
-                egui::Area::new(id).order(Order::Background)
-            }
+            Stacking::UnderWindows => Stacking::in_tier(gui, Tier::Top, id),
+            Stacking::OverNotices => Stacking::in_tier(gui, Tier::Peak, id),
         }
+    }
+
+    fn in_tier(gui: &egui::Context, tier: Tier, id: Id) -> egui::Area {
+        gui::stack(gui, tier, LayerId::new(Order::Background, id));
+        egui::Area::new(id).order(Order::Background)
     }
 }
 

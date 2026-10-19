@@ -143,7 +143,7 @@ fn play(shoot: &mut Shoot) {
     me.hold();
 
     me.caption(
-        "The orcs here are worth experience, and one more brings a new level: a milestone, in the middle of the screen",
+        "The orcs here are worth experience, and one more brings a new level: a milestone, drawn over every other notice",
     );
     fight_until(&mut me, "orc", |snapshot| told_by(snapshot, "Level up"));
     me.hold();
