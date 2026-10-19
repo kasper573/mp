@@ -68,7 +68,7 @@ impl ServedContent {
         let mut rows: Vec<(String, Vec<u8>)> = Vec::new();
         for (path, stamp) in &hashes.0 {
             let bytes = folder.read(path)?;
-            if path.starts_with("assets/") {
+            if super::is_asset_file(path) {
                 index.files.push(IndexedFile {
                     path: path.clone(),
                     hash: stamp.hash.clone(),

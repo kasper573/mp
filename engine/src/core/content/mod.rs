@@ -25,21 +25,46 @@ pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, Modul
 pub use version::ContentVersion;
 
 pub const GAME_FILE: &str = "game.json";
+pub const TABLES_DIR: &str = "tables";
+pub const ASSETS_DIR: &str = "assets";
+
+pub fn table_folder(table: &str) -> String {
+    format!("{TABLES_DIR}/{table}")
+}
+
+pub fn row_folder(table: &str, key: &str) -> String {
+    format!("{}/{key}", table_folder(table))
+}
 
 pub fn row_file(table: &str, key: &str) -> String {
     format!("{}.json", row_folder(table, key))
 }
 
-pub fn row_folder(table: &str, key: &str) -> String {
-    format!("tables/{table}/{key}")
+/// The table and key of the row `file` holds, if it is a row file.
+pub fn row_of(file: &str) -> Option<(&str, &str)> {
+    let (table, name) = file
+        .strip_prefix(TABLES_DIR)?
+        .strip_prefix('/')?
+        .split_once('/')?;
+    let key = name
+        .strip_suffix(".json")
+        .filter(|key| !key.contains('/'))?;
+    Some((table, key))
 }
 
 pub fn asset_file(path: &str) -> String {
-    format!("assets/{path}")
+    format!("{ASSETS_DIR}/{path}")
+}
+
+pub fn is_asset_file(file: &str) -> bool {
+    file.strip_prefix(ASSETS_DIR)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 pub fn asset_of(file: &str) -> &str {
-    file.strip_prefix("assets/").unwrap_or(file)
+    file.strip_prefix(ASSETS_DIR)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .unwrap_or(file)
 }
 
 pub fn named<Row: ContentRow>(

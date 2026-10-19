@@ -12,7 +12,6 @@ use schemars::generate::SchemaSettings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use super::GAME_FILE;
 use super::check::RowCheck;
 use super::fixture::{Fixture, FixtureLock};
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
@@ -20,6 +19,7 @@ use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
+use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_folder, table_folder};
 
 // The steps a load runs its hooks at, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -219,8 +219,8 @@ impl ContentRegistry {
             };
             &|text| loader.parse(text)
         } else {
-            let loader =
-                table_of(file).and_then(|table| self.rows.iter().find(|row| row.name() == table));
+            let loader = super::row_of(file)
+                .and_then(|(table, _)| self.rows.iter().find(|row| row.name() == table));
             let Some(loader) = loader else {
                 return Vec::new();
             };
@@ -270,12 +270,6 @@ pub struct Reference {
     pub key: bool,
     pub line: usize,
     pub column: usize,
-}
-
-fn table_of(file: &str) -> Option<&str> {
-    let rest = file.strip_prefix("tables/")?;
-    let (table, name) = rest.split_once('/')?;
-    name.ends_with(".json").then_some(table)
 }
 
 pub trait ContentFolder: Send + Sync {
@@ -669,7 +663,7 @@ impl Loading {
                 files.push(super::row_file(table, key));
             }
             for (key, names) in &listing.folders {
-                let folder = super::row_folder(table, key);
+                let folder = row_folder(table, key);
                 files.extend(names.iter().map(|name| format!("{folder}/{name}")));
             }
         }
@@ -1279,8 +1273,8 @@ impl Listing {
             match (name.as_str(), entry.dir) {
                 (GAME_FILE, false) => listing.game_json = true,
                 ("credits.md" | "README.md", false) => {}
-                ("tables", true) => listing.read_tables(registry, root, &mut errors),
-                ("assets", true) => collect_assets(root, "assets", "", &mut listing.assets),
+                (TABLES_DIR, true) => listing.read_tables(registry, root, &mut errors),
+                (ASSETS_DIR, true) => collect_assets(root, ASSETS_DIR, "", &mut listing.assets),
                 _ => errors.push(whole_file(
                     &name,
                     "unknown entry",
@@ -1300,14 +1294,14 @@ impl Listing {
         errors: &mut Vec<LoadError>,
     ) {
         let names: Vec<&'static str> = registry.table_names();
-        for entry in entries(root, "tables") {
+        for entry in entries(root, TABLES_DIR) {
             let Some(loader) = registry
                 .row_loaders()
                 .iter()
                 .find(|loader| entry.dir && loader.name() == entry.name)
             else {
                 errors.push(whole_file(
-                    &format!("tables/{}", entry.name),
+                    &table_folder(&entry.name),
                     "unknown entry",
                     describe(&entry),
                     expected_options(
@@ -1318,11 +1312,11 @@ impl Listing {
                 continue;
             };
             let table = loader.name();
-            let dir = format!("tables/{table}");
+            let dir = table_folder(table);
             let mut keyed: Vec<(String, String)> = Vec::new();
             let mut folders: Vec<(String, Vec<String>)> = Vec::new();
             for entry in entries(root, &dir) {
-                let file = format!("tables/{table}/{}", entry.name);
+                let file = format!("{dir}/{}", entry.name);
                 match (entry.dir, entry.name.strip_suffix(".json")) {
                     (false, Some(key)) => {
                         if valid_key(key) {
@@ -1382,7 +1376,7 @@ impl Listing {
                     listing.folders.insert(folder, files);
                 } else {
                     errors.push(whole_file(
-                        &format!("tables/{table}/{folder}"),
+                        &row_folder(table, &folder),
                         "unknown entry",
                         format!("a folder with no {table} row {folder}.json beside it"),
                         format!("tables/{table}/{folder}.json for its files"),

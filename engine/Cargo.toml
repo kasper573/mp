@@ -4,9 +4,6 @@ version.workspace = true
 edition.workspace = true
 description = "The engine: the isomorphic simulation library and its server, browser and desktop clients, bench, load test and lint binaries"
 
-[package.metadata.lint]
-game = true
-
 [[bin]]
 name = "game-server"
 path = "src/bin/server/main.rs"
