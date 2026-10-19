@@ -170,8 +170,8 @@ fn draw(world: &mut World) {
             ),
             size,
         );
-        let shown = egui::Area::new(Id::new(("feed", toast.key)))
-            .order(Band::Notices.order())
+        let shown = rows::Stacking::UnderWindows
+            .area(&gui, Id::new(("feed", toast.key)))
             .interactable(false)
             .fade_in(false)
             .fixed_pos(rect.min)

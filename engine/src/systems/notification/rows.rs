@@ -7,12 +7,13 @@ use design_tokens::ink::Ground;
 use design_tokens::{Face, dusk};
 use egui::emath::{TSTransform, easing};
 use egui::{
-    Align, Align2, Color32, FontId, Id, Layout, Rect, RichText, Sense, Ui, UiBuilder, Vec2,
+    Align, Align2, Color32, FontId, Id, LayerId, Layout, Order, Rect, RichText, Sense, Ui,
+    UiBuilder, Vec2,
 };
 use serde::{Deserialize, Serialize};
 
 use super::{NotificationSent, window_visible};
-use crate::core::gui::{self, Band};
+use crate::core::gui::{self, Band, Tier};
 use crate::core::text::{self, KeyNames, StyledLine, TextLook, TextPiece, TextShadow};
 use crate::core::time::Seconds;
 use crate::systems::input::map::{self, InputAction};
@@ -133,8 +134,8 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
     let mut drawn: Vec<Rect> = Vec::new();
     let next = |drawn: &[Rect]| drawn.last().map_or(top, |last| last.bottom() + ROW_GAP);
     for line in lines {
-        let area = egui::Area::new(Id::new(("alert", line.key)))
-            .order(Band::Notices.order())
+        let area = Stacking::OverWindows
+            .area(gui, Id::new(("alert", line.key)))
             .anchor(Align2::CENTER_TOP, Vec2::new(0.0, next(&drawn)));
         let shown = area.show(gui, |ui| {
             dusk::frame().show(ui, |ui| {
@@ -156,7 +157,14 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
     }
     if let Some(more) = more {
         let at = next(&drawn);
-        drawn.push(chip_area(world, gui, "alerts-more", at, more));
+        drawn.push(chip_area(
+            world,
+            gui,
+            "alerts-more",
+            at,
+            more,
+            Stacking::OverWindows,
+        ));
     }
     let bottom = drawn.last().map_or(top, Rect::bottom);
     world.resource_mut::<PlacedRows<Alerts>>().drawn = drawn;
@@ -177,7 +185,16 @@ pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) ->
     );
     let Some(&((), scrim)) = scrim.first() else {
         let drawn: Vec<Rect> = more
-            .map(|more| chip_area(world, gui, "captions-more", top, more))
+            .map(|more| {
+                chip_area(
+                    world,
+                    gui,
+                    "captions-more",
+                    top,
+                    more,
+                    Stacking::UnderWindows,
+                )
+            })
             .into_iter()
             .collect();
         let bottom = drawn.first().map_or(top, Rect::bottom);
@@ -202,7 +219,7 @@ pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) ->
         })
         .fold(0.0, f32::max)
         .min(room);
-    let shown = column_area(gui, "captions", top).show(gui, |ui| {
+    let shown = column_area(gui, "captions", top, Stacking::UnderWindows).show(gui, |ui| {
         ui.set_width(screen.width());
         ui.vertical_centered(|ui| {
             ui.spacing_mut().item_spacing.y = ROW_GAP;
@@ -248,7 +265,7 @@ pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) 
         return top;
     }
     let screen = gui.content_rect();
-    let shown = column_area(gui, "milestones", top).show(gui, |ui| {
+    let shown = column_area(gui, "milestones", top, Stacking::UnderWindows).show(gui, |ui| {
         ui.set_width(screen.width());
         ui.vertical_centered(|ui| {
             ui.spacing_mut().item_spacing.y = MILESTONE_GAP;
@@ -380,9 +397,35 @@ pub(super) fn label_font() -> FontId {
     Face::BookBold.id(LABEL)
 }
 
-pub(super) fn column_area(gui: &egui::Context, id: &str, top: f32) -> egui::Area {
-    egui::Area::new(Id::new(("notice", id)))
-        .order(Band::Notices.order())
+/// Where a notice stacks among what else is on screen.
+#[derive(Clone, Copy)]
+pub(super) enum Stacking {
+    /// Over every window and card: an error or an alert the player must not miss.
+    OverWindows,
+    /// Over the world, the HUD and the stage, but under the windows and cards the player has open.
+    UnderWindows,
+}
+
+impl Stacking {
+    pub(super) fn area(self, gui: &egui::Context, id: Id) -> egui::Area {
+        match self {
+            Stacking::OverWindows => egui::Area::new(id).order(Band::Notices.order()),
+            Stacking::UnderWindows => {
+                gui::stack(gui, Tier::Top, LayerId::new(Order::Background, id));
+                egui::Area::new(id).order(Order::Background)
+            }
+        }
+    }
+}
+
+pub(super) fn column_area(
+    gui: &egui::Context,
+    id: &str,
+    top: f32,
+    stacking: Stacking,
+) -> egui::Area {
+    stacking
+        .area(gui, Id::new(("notice", id)))
         .interactable(false)
         .fade_in(false)
         .fixed_pos(egui::pos2(gui.content_rect().left(), top))
@@ -699,9 +742,16 @@ fn lines_of<P: RowPlace>(world: &World) -> (Vec<LabelledLine>, Option<u32>) {
     (placed.rows.labelled_lines(), placed.rows.more())
 }
 
-fn chip_area(world: &mut World, gui: &egui::Context, id: &str, top: f32, more: u32) -> Rect {
+fn chip_area(
+    world: &mut World,
+    gui: &egui::Context,
+    id: &str,
+    top: f32,
+    more: u32,
+    stacking: Stacking,
+) -> Rect {
     let width = gui.content_rect().width();
-    column_area(gui, id, top)
+    column_area(gui, id, top, stacking)
         .show(gui, |ui| {
             ui.set_width(width);
             ui.vertical_centered(|ui| count_chip(ui, world, more).rect)

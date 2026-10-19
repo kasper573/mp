@@ -55,6 +55,7 @@ const SCREEN_MARGIN: f32 = 8.0;
 const HINT_ROOM: f32 = 22.0;
 const CONTINUE_MARK: f32 = 12.0;
 const CHOICE_ICON: f32 = 18.0;
+const LINE_MARGIN: egui::Margin = egui::Margin::symmetric(8, 4);
 const PILL_ICON: f32 = 14.0;
 const REFUSED: Duration = Duration::from_millis(320);
 const DIALOGUE: &str = "stage";
@@ -872,13 +873,15 @@ fn line(ui: &mut Ui, world: &mut World) {
             ))
         })
         .unwrap_or_else(|| (spoken.text.styled(), None));
-    text::show(
-        ui,
-        world,
-        &styled,
-        TextLook::role(TextRole::Line, ink::INK),
-        revealed,
-    );
+    egui::Frame::new().inner_margin(LINE_MARGIN).show(ui, |ui| {
+        text::show(
+            ui,
+            world,
+            &styled,
+            TextLook::role(TextRole::Line, ink::INK),
+            revealed,
+        );
+    });
 }
 
 fn choices(ui: &mut Ui, world: &mut World, before: &StageDrawn) {

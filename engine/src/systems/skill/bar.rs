@@ -9,14 +9,14 @@ use strum::VariantArray;
 
 use super::card;
 use super::{
-    AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, Cooldowns, Hotbar, HotbarEntry,
-    HotbarSlot, Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
+    AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
+    HotbarEntry, HotbarSlot, Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::Seconds;
-use crate::systems::equipment::Equipment;
+use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
 use crate::systems::input::map::{
     self, InputAction, InputBinding, InputMap, KeyGesture, KeyModifiers, input,
@@ -385,6 +385,12 @@ fn bag_item(world: &World, slot: u32) -> Option<ItemId> {
         .map(|stack| stack.item)
 }
 
+fn worn_item(world: &World, slot: EquipmentSlot) -> Option<ItemId> {
+    session::my_character(world)
+        .and_then(|me| me.get::<Equipment>())
+        .and_then(|equipment| equipment.slots.get(&slot).copied())
+}
+
 fn skill_fill(world: &World, me: Entity, skill: SkillId, rank: Rank) -> Fill {
     let content = world.resource::<Content>();
     let def = skill.get(content);
@@ -532,18 +538,17 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
         .and_then(|slot| slot.0);
     let entry = held.map_or(HotbarEntry::Empty, HotbarEntry::Skill);
     let view = SlotView::of(world, entry);
-    let carried =
-        hud::carried(ui.ctx()).and_then(|carried| carried_skill(world, &content, carried));
+    let carried = hud::carried(ui.ctx()).and_then(|carried| carried_pick(world, carried));
     let look = SlotLook {
         icon: view.icon.as_ref(),
         faded: view.dimmed,
         ..SlotLook::EMPTY
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
-    if let Some(skill) = carried
+    if let Some(pick) = carried
         && response.contains_pointer()
     {
-        if skill.get(&content).basic_attack {
+        if refusal(&content, pick).is_none() {
             drop_wash(ui, response.rect);
         } else {
             glyph::hatch(ui.painter(), response.rect.shrink(1.0), ink::ink_wash(0.45));
@@ -557,22 +562,20 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
         )
     });
     overlay(ui, response.rect, view.fill);
-    if let Some(skill) =
-        hud::dropped(&response).and_then(|dropped| carried_skill(world, &content, dropped))
-    {
-        if skill.get(&content).basic_attack {
-            world.write_message(AssignBasicAttackRequest { skill: Some(skill) });
-            InterfaceSound::UiPick.play(world);
-        } else {
-            notification::local_error(
-                world,
-                format!("{} can't be a basic attack", skill.get(&content).name),
-            );
+    if let Some(pick) = hud::dropped(&response).and_then(|dropped| carried_pick(world, dropped)) {
+        match refusal(&content, pick) {
+            None => {
+                world.write_message(AssignBasicAttackRequest { pick });
+                InterfaceSound::UiPick.play(world);
+            }
+            Some(refusal) => notification::local_error(world, refusal),
         }
     }
     if map::clicked(world, InputAction::PinToHotbar, &response) {
         if held.is_some() {
-            world.write_message(AssignBasicAttackRequest { skill: None });
+            world.write_message(AssignBasicAttackRequest {
+                pick: BasicAttackPick::Empty,
+            });
         }
     } else if map::drag_started(world, InputAction::CarryItem, &response)
         && let Some(skill) = held
@@ -585,7 +588,9 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
             .add_enabled(held.is_some(), egui::Button::new("Clear"))
             .clicked()
         {
-            world.write_message(AssignBasicAttackRequest { skill: None });
+            world.write_message(AssignBasicAttackRequest {
+                pick: BasicAttackPick::Empty,
+            });
             ui.close();
         }
     });
@@ -614,26 +619,34 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
     }
 }
 
-/// The skill a drag over the basic attack slot would put there: a skill carried as itself or on a
-/// hotbar entry, or the first flagged skill a carried weapon grants.
-fn carried_skill(world: &World, content: &Content, carried: Carried) -> Option<SkillId> {
+/// What a drag over the basic attack slot would put there: a skill carried as itself or on a
+/// hotbar entry, or a carried item as the weapon whose attack it is.
+fn carried_pick(world: &World, carried: Carried) -> Option<BasicAttackPick> {
     match carried {
-        Carried::Skill(skill) => Some(skill),
-        Carried::BagSlot(slot) => weapon_attack(content, bag_item(world, slot)?),
+        Carried::Skill(skill) => Some(BasicAttackPick::Skill(skill)),
+        Carried::BagSlot(slot) => bag_item(world, slot).map(BasicAttackPick::Weapon),
+        Carried::Worn(slot) => worn_item(world, slot).map(BasicAttackPick::Weapon),
         Carried::HotbarEntry { entry, .. } => match entry {
-            HotbarEntry::Skill(skill) => Some(skill),
-            HotbarEntry::Item(item) => weapon_attack(content, item),
+            HotbarEntry::Skill(skill) => Some(BasicAttackPick::Skill(skill)),
+            HotbarEntry::Item(item) => Some(BasicAttackPick::Weapon(item)),
             HotbarEntry::Empty => None,
         },
     }
 }
 
-fn weapon_attack(content: &Content, item: ItemId) -> Option<SkillId> {
-    super::grants_of(content, item)
-        .iter()
-        .copied()
-        .find(|skill| skill.get(content).basic_attack)
-        .or_else(|| super::grants_of(content, item).first().copied())
+/// Why the basic attack slot turns a pick away, judged from the content alone; whether the player
+/// knows the skill or holds the weapon is the server's to say.
+fn refusal(content: &Content, pick: BasicAttackPick) -> Option<String> {
+    match pick {
+        BasicAttackPick::Empty => None,
+        BasicAttackPick::Skill(skill) => {
+            let def = skill.get(content);
+            (!def.basic_attack).then(|| format!("{} can't be a basic attack", def.name))
+        }
+        BasicAttackPick::Weapon(item) => super::first_flagged_grant(content, std::iter::once(item))
+            .is_none()
+            .then(|| format!("{} has no basic attack", item.get(content).name)),
+    }
 }
 
 fn take_drop(world: &mut World, response: &egui::Response, index: HotbarSlot, held: HotbarEntry) {
@@ -649,6 +662,15 @@ fn take_drop(world: &mut World, response: &egui::Response, index: HotbarSlot, he
         }
         Carried::BagSlot(slot) => {
             let Some(item) = bag_item(world, slot) else {
+                return;
+            };
+            world.write_message(AssignHotbarRequest {
+                slot: index,
+                entry: HotbarEntry::Item(item),
+            });
+        }
+        Carried::Worn(slot) => {
+            let Some(item) = worn_item(world, slot) else {
                 return;
             };
             world.write_message(AssignHotbarRequest {

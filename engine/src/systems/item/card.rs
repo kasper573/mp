@@ -112,13 +112,7 @@ pub fn kind(def: &ItemDef) -> Kind {
     }
 }
 
-pub fn show(
-    ui: &mut Ui,
-    world: &mut World,
-    item: ItemId,
-    look: CardLook,
-    lead: impl FnOnce(&mut Ui, &mut World),
-) -> CardResponse {
+pub fn show(ui: &mut Ui, world: &mut World, item: ItemId, look: CardLook) -> CardResponse {
     let content = world.resource::<Content>().clone();
     let def = item.get(&content);
     let held = session::me(world)
@@ -130,7 +124,6 @@ pub fn show(
     card.numeral = numeral.as_deref();
     card.show(ui, |ui, plate| {
         summary(ui, &content, item, plate);
-        lead(ui, world);
         let viewer = session::me(world);
         details(ui, &content, item, |requirement| {
             let viewer = viewer?;
@@ -249,7 +242,7 @@ fn draw_card(world: &mut World) {
             depth,
             ..CardLook::PINNED
         };
-        show(ui, world, *item, look, |_, _| {})
+        show(ui, world, *item, look)
     });
 }
 

@@ -68,7 +68,13 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
     for ((key, notification), look) in toasts {
-        let shown = rows::column_area(gui, &format!("error-{key}"), top).show(gui, |ui| {
+        let shown = rows::column_area(
+            gui,
+            &format!("error-{key}"),
+            top,
+            rows::Stacking::OverWindows,
+        )
+        .show(gui, |ui| {
             ui.set_width(width);
             ui.vertical_centered(|ui| {
                 ui.multiply_opacity(look.opacity);

@@ -47,10 +47,11 @@ pub enum Tier {
     Back,
     Mid,
     Front,
+    Top,
 }
 
 impl Tier {
-    const ALL: [Tier; 3] = [Tier::Back, Tier::Mid, Tier::Front];
+    const ALL: [Tier; 4] = [Tier::Back, Tier::Mid, Tier::Front, Tier::Top];
 
     fn anchor(self) -> LayerId {
         LayerId::new(Order::Background, egui::Id::new(("tier", self)))

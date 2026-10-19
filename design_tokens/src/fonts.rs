@@ -35,17 +35,18 @@ pub(crate) fn bytes(face: Face) -> &'static [u8] {
     }
 }
 
-// Alegreya's ascender reaches well above its capitals, so its text rides high in a row centred on
-// the font's metrics; nudging it down puts the x-height on the row's middle, where the marks drawn
-// beside it sit.
+// In a row centred on Alegreya's metrics its capitals sit on the row's middle, but its x-height,
+// and the old-style figures that share it, sit a tenth of the size below it, so a line of mostly
+// lowercase text looks dropped in any box drawn around it. Lifting the glyphs halfway between
+// the two centres puts both within a hair of the middle.
 fn tweak(face: Face) -> FontTweak {
     match face {
         Face::Book | Face::BookMedium | Face::BookBold | Face::BookItalic => FontTweak {
-            y_offset_factor: 0.06,
+            y_offset_factor: -0.06,
             ..FontTweak::default()
         },
         Face::SmallCaps | Face::SmallCapsBold => FontTweak {
-            y_offset_factor: 0.08,
+            y_offset_factor: -0.05,
             ..FontTweak::default()
         },
         _ => FontTweak::default(),

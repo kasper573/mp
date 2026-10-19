@@ -10,7 +10,7 @@ pub mod reset;
 pub mod window;
 
 pub use casting::{CastAim, UseSkill, UseSkillRequest, cast};
-pub use hotbar::{AssignBasicAttackRequest, AssignHotbarRequest};
+pub use hotbar::{AssignBasicAttackRequest, AssignHotbarRequest, BasicAttackPick};
 pub use learn::LearnSkillsRequest;
 pub use reset::{ResetAnswerRequest, ResetPrompt, ResetSkills};
 
@@ -462,7 +462,16 @@ impl Hotbar {
         self.0.get(slot.index()).copied().unwrap_or_default()
     }
 
+    /// Puts `entry` in `slot`, taking it out of any other slot: the bar holds each skill or item
+    /// once, so slotting it again moves it.
     pub fn set(&mut self, slot: HotbarSlot, entry: HotbarEntry) {
+        if entry != HotbarEntry::Empty {
+            for held in &mut self.0 {
+                if *held == entry {
+                    *held = HotbarEntry::Empty;
+                }
+            }
+        }
         if self.0.len() <= slot.index() {
             self.0.resize(slot.index() + 1, HotbarEntry::Empty);
         }

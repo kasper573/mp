@@ -178,6 +178,26 @@ fn a_fixture_shader_without_the_parameter_the_engine_sets_is_refused() {
 }
 
 #[test]
+fn a_shader_parameter_named_with_a_leading_underscore_is_refused() {
+    let report = Game::new()
+        .shader("tint")
+        .edit("vfx_shader", "tint", |shader| {
+            shader["params"] =
+                json!([{ "name": "_color", "kind": "color", "default": [255, 255, 255, 255] }]);
+        })
+        .try_load()
+        .err()
+        .expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "tables/vfx_shader/tint.json")
+        .expect("the shader row is refused");
+    assert_eq!(error.problem.rule, "invalid parameter name");
+}
+
+#[test]
 fn a_shader_that_does_not_compile_is_refused_at_its_line() {
     let report = Game::new()
         .shader("tint")

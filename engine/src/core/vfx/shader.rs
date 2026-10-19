@@ -167,12 +167,10 @@ impl VfxShaderDef {
             composed.push_str(&format!("const SHAPE_{}: u32 = {index}u;\n", shape.name()));
         }
         composed.push_str("\nstruct Params {\n");
-        if self.params.is_empty() {
-            composed.push_str("    unused: f32,\n");
-        }
         for param in &self.params {
             composed.push_str(&format!("    {}: {},\n", param.name, param.kind.wgsl()));
         }
+        composed.push_str(&params_padding(&self.params));
         composed.push_str("}\n");
         composed
     }
@@ -319,17 +317,17 @@ impl ContentRow for VfxShaderDef {
 }
 
 /// A parameter is a field of the shader's `Params` struct, so it must be a WGSL identifier that
-/// is not a reserved word.
+/// is not a reserved word, nor one of the struct's padding fields, which alone start with `_`.
 pub fn check_param_name(check: &mut RowCheck, pointer: &str, name: &str) {
     let identifier = !name.is_empty()
-        && !name.starts_with(|c: char| c.is_ascii_digit())
+        && !name.starts_with(|c: char| c.is_ascii_digit() || c == '_')
         && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
     if !identifier || naga::keywords::wgsl::RESERVED.contains(&name) {
         check.error(
             pointer,
             "invalid parameter name",
             name,
-            "letters, digits and underscores, not starting with a digit, not a WGSL reserved word",
+            "letters, digits and underscores, starting with a letter, not a WGSL reserved word",
         );
     }
 }
@@ -409,6 +407,24 @@ fn layout(params: &[ShaderParam]) -> Vec<ParamSlot> {
             }
         })
         .collect()
+}
+
+// WebGL2 binds a uniform only in whole 16-byte rows, so `Params` is filled out to the full
+// PARAMS_BYTES the uniform buffer spans, however few bytes the shader's own parameters take.
+fn params_padding(params: &[ShaderParam]) -> String {
+    let mut end = layout(params)
+        .last()
+        .map_or(0, |slot| slot.offset + slot.kind.size());
+    let mut padding = String::new();
+    while !end.is_multiple_of(16) {
+        padding.push_str(&format!("    _pad{end}: f32,\n"));
+        end += 4;
+    }
+    if end < PARAMS_BYTES {
+        let rows = (PARAMS_BYTES - end) / 16;
+        padding.push_str(&format!("    _rows: array<vec4<f32>, {rows}>,\n"));
+    }
+    padding
 }
 
 /// Parses and validates a composed shader as the GPU driver would, headless.
