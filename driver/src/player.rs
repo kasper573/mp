@@ -302,13 +302,13 @@ impl Player {
         let seen = self.in_world();
         let grid = grid_of(&seen);
         let me = seen.me.as_ref().expect("the player").at;
-        let region = grid.nearest_walkable(me).and_then(|at| grid.component(at));
+        let region = grid.nearest_walkable(me).and_then(|at| grid.region(at));
         let ground = grid
             .nodes()
             .iter()
             .copied()
             .filter(|tile| {
-                grid.component(*tile) == region && !in_warp(&seen, *tile) && !taken(&seen, *tile)
+                grid.region(*tile) == region && !in_warp(&seen, *tile) && !taken(&seen, *tile)
             })
             .min_by(|a, b| a.distance_to(spot).total_cmp(&b.distance_to(spot)))
             .expect("ground the player can walk to");
@@ -964,11 +964,11 @@ fn in_the_way(seen: &ProbeSnapshot, target: Entity) -> bool {
 // The goal itself, or for a goal off the walkways (someone behind a counter), the ground the player
 // can walk to nearest it.
 fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos<Tiles>> {
-    let region = grid.component(grid.nearest_walkable(from)?)?;
+    let region = grid.region(grid.nearest_walkable(from)?)?;
     grid.nodes()
         .iter()
         .copied()
-        .filter(|node| grid.component(*node) == Some(region))
+        .filter(|node| grid.region(*node) == Some(region))
         .min_by(|a, b| a.distance_to(goal).total_cmp(&b.distance_to(goal)))
 }
 

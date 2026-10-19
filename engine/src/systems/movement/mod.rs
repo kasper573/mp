@@ -319,33 +319,36 @@ const LEAN_PER_TILE: f32 = 1024.0;
 pub struct Grid {
     size: GridSize,
     walkable: Vec<bool>,
-    components: Vec<u32>,
+    regions: Vec<Option<WalkRegion>>,
     nodes: Vec<Pos<Tiles>>,
-    nodes_by_component: Vec<Vec<Pos<Tiles>>>,
+    nodes_by_region: Vec<Vec<Pos<Tiles>>>,
 }
+
+/// A stretch of walkable ground, every tile of which can be walked to from every other.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WalkRegion(usize);
 
 impl Grid {
     pub fn new(size: GridSize, walkable: Vec<bool>) -> Grid {
-        let components = compute_components(size, &walkable);
+        let regions = regions(size, &walkable);
         let mut nodes = Vec::new();
-        let mut nodes_by_component: Vec<Vec<Pos<Tiles>>> = Vec::new();
-        for (index, cell) in size.cells().enumerate() {
-            let component = components[index] as usize;
-            if component == 0 {
+        let mut nodes_by_region: Vec<Vec<Pos<Tiles>>> = Vec::new();
+        for (cell, region) in size.cells().zip(&regions) {
+            let Some(WalkRegion(region)) = *region else {
                 continue;
-            }
-            if component >= nodes_by_component.len() {
-                nodes_by_component.resize(component + 1, Vec::new());
+            };
+            if region >= nodes_by_region.len() {
+                nodes_by_region.resize(region + 1, Vec::new());
             }
             nodes.push(cell.center());
-            nodes_by_component[component].push(cell.center());
+            nodes_by_region[region].push(cell.center());
         }
         Grid {
             size,
             walkable,
-            components,
+            regions,
             nodes,
-            nodes_by_component,
+            nodes_by_region,
         }
     }
 
@@ -353,8 +356,8 @@ impl Grid {
         self.cell_walkable(p.cell())
     }
 
-    pub fn component(&self, p: Pos<Tiles>) -> Option<u32> {
-        self.component_at_cell(p.cell())
+    pub fn region(&self, p: Pos<Tiles>) -> Option<WalkRegion> {
+        self.region_at_cell(p.cell())
     }
 
     pub fn nodes(&self) -> &[Pos<Tiles>] {
@@ -373,8 +376,8 @@ impl Grid {
         from: Pos<Tiles>,
         fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
-        let component = self.component(from)? as usize;
-        pick(rng, self.nodes_by_component.get(component)?, fits)
+        let WalkRegion(region) = self.region(from)?;
+        pick(rng, &self.nodes_by_region[region], fits)
     }
 
     pub fn random_node_within(
@@ -425,18 +428,15 @@ impl Grid {
         nodes: impl Iterator<Item = Pos<Tiles>>,
         fits: impl Fn(CellPos) -> bool,
     ) -> Option<Pos<Tiles>> {
-        let component = self.component(from)?;
+        let region = self.region(from)?;
         let reachable: Vec<Pos<Tiles>> = nodes
-            .filter(|&node| self.component(node) == Some(component))
+            .filter(|&node| self.region(node) == Some(region))
             .collect();
         pick(rng, &reachable, fits)
     }
 
-    fn component_at_cell(&self, c: CellPos) -> Option<u32> {
-        c.index(self.size).and_then(|i| {
-            let comp = self.components[i];
-            if comp == 0 { None } else { Some(comp) }
-        })
+    fn region_at_cell(&self, c: CellPos) -> Option<WalkRegion> {
+        c.index(self.size).and_then(|i| self.regions[i])
     }
 
     /// The cheapest walk between two cells, both ends included.
@@ -542,8 +542,8 @@ impl Grid {
     }
 
     fn connects(&self, from: CellPos, to: CellPos) -> bool {
-        self.component_at_cell(from)
-            .is_some_and(|component| self.component_at_cell(to) == Some(component))
+        self.region_at_cell(from)
+            .is_some_and(|region| self.region_at_cell(to) == Some(region))
     }
 }
 
@@ -694,12 +694,12 @@ fn pick(rng: &mut Rng, nodes: &[Pos<Tiles>], fits: impl Fn(CellPos) -> bool) -> 
 
 const PICK_DRAWS: usize = 8;
 
-fn compute_components(size: GridSize, walkable: &[bool]) -> Vec<u32> {
-    let mut components = vec![0u32; walkable.len()];
-    let mut next_id = 1u32;
+fn regions(size: GridSize, walkable: &[bool]) -> Vec<Option<WalkRegion>> {
+    let mut regions = vec![None; walkable.len()];
+    let mut next_id = 0;
 
     for (i, &is_walkable) in walkable.iter().enumerate() {
-        if !is_walkable || components[i] != 0 {
+        if !is_walkable || regions[i].is_some() {
             continue;
         }
 
@@ -707,25 +707,25 @@ fn compute_components(size: GridSize, walkable: &[bool]) -> Vec<u32> {
             (i % size.width as usize) as i32,
             (i / size.width as usize) as i32,
         );
-        let comp_id = next_id;
+        let region = Some(WalkRegion(next_id));
         next_id += 1;
 
         let mut queue = vec![start_cell];
-        components[i] = comp_id;
+        regions[i] = region;
 
         while let Some(c) = queue.pop() {
             for &(dx, dy) in &NEIGHBORS_8 {
                 let next = c.step((dx, dy));
                 if let Some(next_i) = next.index(size)
                     && walkable[next_i]
-                    && components[next_i] == 0
+                    && regions[next_i].is_none()
                 {
-                    components[next_i] = comp_id;
+                    regions[next_i] = region;
                     queue.push(next);
                 }
             }
         }
     }
 
-    components
+    regions
 }

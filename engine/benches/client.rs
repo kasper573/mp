@@ -197,5 +197,5 @@ fn foe(snapshot: &ProbeSnapshot, actor: &ProbeBody) -> bool {
         && !actor.friendly
         && actor.health > 0.0
         && grid.walkable(actor.at)
-        && grid.component(actor.at) == grid.component(me.at)
+        && grid.region(actor.at) == grid.region(me.at)
 }

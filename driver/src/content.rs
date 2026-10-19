@@ -148,12 +148,12 @@ pub fn open_ground_beside(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
 /// Nearest first, and only what can be walked to from the spot.
 pub fn ground_near(area: &str, at: Pos<Tiles>, within: RangeInclusive<Tiles>) -> Vec<Pos<Tiles>> {
     let grid = &area_named(area).grid;
-    let reach = grid.component(grid.nearest_walkable(at).expect("walkable ground near"));
+    let reach = grid.region(grid.nearest_walkable(at).expect("walkable ground near"));
     let mut ground: Vec<Pos<Tiles>> = grid
         .nodes()
         .iter()
         .copied()
-        .filter(|tile| grid.component(*tile) == reach && within.contains(&tile.distance(at)))
+        .filter(|tile| grid.region(*tile) == reach && within.contains(&tile.distance(at)))
         .collect();
     ground.sort_by(|a, b| a.distance_to(at).total_cmp(&b.distance_to(at)));
     ground
