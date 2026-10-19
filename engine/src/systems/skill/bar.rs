@@ -18,7 +18,7 @@ use crate::core::content::{Content, Fixture};
 use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::{self, Seconds};
-use crate::systems::equipment::{self, Equipment, EquipmentSlot};
+use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
 use crate::systems::input::map::{
     self, InputAction, InputBinding, InputMap, KeyGesture, KeyModifiers, input,
@@ -379,9 +379,7 @@ fn bag_item(world: &World, slot: u32) -> Option<ItemId> {
 }
 
 fn worn_item(world: &World, slot: EquipmentSlot) -> Option<ItemId> {
-    session::my_character(world)
-        .and_then(|me| me.get::<Equipment>())
-        .and_then(|equipment| equipment.slots.get(&slot).copied())
+    equipment::in_slot(world, session::me(world)?, slot)
 }
 
 fn skill_fill(world: &World, me: Entity, skill: SkillId, rank: Rank) -> Fill {
@@ -925,7 +923,7 @@ fn use_item(world: &mut World, item: ItemId) -> bool {
     }
     let bag_slot = world
         .get::<Inventory>(me)
-        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item));
+        .and_then(|inventory| inventory.slot_of(item));
     match bag_slot {
         Some(slot) => {
             world.write_message(UseItemRequest { slot: slot as u32 });

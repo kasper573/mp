@@ -528,9 +528,7 @@ fn draw_carried(world: &mut World) {
             stack.item.get(&content).icon.clone()
         }
         Carried::Worn(slot) => {
-            let Some(item) = session::my_character(world)
-                .and_then(|me| me.get::<equipment::Equipment>())
-                .and_then(|equipment| equipment.slots.get(&slot).copied())
+            let Some(item) = session::me(world).and_then(|me| equipment::in_slot(world, me, slot))
             else {
                 return;
             };

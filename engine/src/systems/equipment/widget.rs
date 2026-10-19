@@ -7,7 +7,7 @@ use strum::VariantArray;
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
-use crate::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
+use crate::systems::equipment::{EquipmentSlot, UnequipRequest};
 use crate::systems::hud::{self, Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceIcon;
@@ -57,13 +57,10 @@ impl HudWindow for EquipmentWindow {
 }
 
 fn worn(world: &World) -> Vec<(EquipmentSlot, Option<ItemId>)> {
-    let equipment = session::my_character(world).and_then(|me| me.get::<Equipment>());
+    let me = session::me(world);
     EquipmentSlot::VARIANTS
         .iter()
-        .map(|&slot| {
-            let item = equipment.and_then(|equipment| equipment.slots.get(&slot).copied());
-            (slot, item)
-        })
+        .map(|&slot| (slot, me.and_then(|me| super::in_slot(world, me, slot))))
         .collect()
 }
 

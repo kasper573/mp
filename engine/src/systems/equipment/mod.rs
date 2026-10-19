@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
-use crate::systems::item::{Inventory, ItemId, ItemKind, ItemStack};
+use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::player::player_requests;
 use crate::systems::script::condition;
 
@@ -70,16 +70,14 @@ pub fn worn(world: &World, actor: Entity) -> impl Iterator<Item = ItemId> + '_ {
         .flat_map(|equipment| equipment.slots.values().copied())
 }
 
+pub fn in_slot(world: &World, actor: Entity, slot: EquipmentSlot) -> Option<ItemId> {
+    world
+        .get::<Equipment>(actor)
+        .and_then(|equipment| equipment.slots.get(&slot).copied())
+}
+
 pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(), String> {
-    let slot = world
-        .get::<Inventory>(player)
-        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
-        .ok_or_else(|| {
-            format!(
-                "{} is not in your bag",
-                item.get(world.resource::<Content>()).name
-            )
-        })?;
+    let slot = item::held_slot(world, player, item)?;
     equip(world, player, slot)
 }
 
@@ -100,9 +98,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     if let Some(unmet) = condition::first_unmet(world, player, requires) {
         return Err(format!("{} needs {unmet}", item.get(&content).name));
     }
-    let occupant = world
-        .get::<Equipment>(player)
-        .and_then(|equipment| equipment.slots.get(into).copied());
+    let occupant = in_slot(world, player, *into);
     let returned: Vec<ItemStack> = occupant
         .map(|occupant| ItemStack::new(occupant, 1))
         .into_iter()
@@ -120,10 +116,8 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
 
 pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> Result<(), String> {
     let content = world.resource::<Content>().clone();
-    let item = world
-        .get::<Equipment>(player)
-        .and_then(|equipment| equipment.slots.get(&slot).copied())
-        .ok_or_else(|| format!("Nothing worn as {}", slot.label()))?;
+    let item =
+        in_slot(world, player, slot).ok_or_else(|| format!("Nothing worn as {}", slot.label()))?;
     let mut inventory = world
         .get_mut::<Inventory>(player)
         .ok_or_else(|| "Has no bag".to_owned())?;

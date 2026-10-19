@@ -163,6 +163,10 @@ impl Inventory {
             .fold(0, |total, slot| total.saturating_add(slot.count))
     }
 
+    pub fn slot_of(&self, item: ItemId) -> Option<usize> {
+        self.slots.iter().position(|stack| stack.item == item)
+    }
+
     pub fn free_slots(&self) -> u32 {
         self.max.saturating_sub(self.slots.len() as u32)
     }
@@ -476,16 +480,20 @@ pub fn use_item(world: &mut World) {
 }
 
 pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), String> {
-    let slot = world
+    let slot = held_slot(world, actor, item)?;
+    use_slot(world, actor, slot)
+}
+
+pub fn held_slot(world: &World, actor: Entity, item: ItemId) -> Result<usize, String> {
+    world
         .get::<Inventory>(actor)
-        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
+        .and_then(|inventory| inventory.slot_of(item))
         .ok_or_else(|| {
             format!(
                 "{} is not in your bag",
                 item.get(world.resource::<Content>()).name
             )
-        })?;
-    use_slot(world, actor, slot)
+        })
 }
 
 fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String> {
