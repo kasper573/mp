@@ -85,9 +85,9 @@ pub fn airborne(row: &Value) -> bool {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let hitbox = RowSelection::parts(super::TABLE, key, vec!["/hitbox".to_owned()]);
-    if editor.selection != hitbox {
-        editor.select(hitbox);
+    let model = RowSelection::row(super::TABLE, key);
+    if editor.selection != model {
+        editor.select(model);
     }
     let width = row["hitbox"]["width"].as_f64().unwrap_or(1.0) as f32;
     let height = row["hitbox"]["height"].as_f64().unwrap_or(1.0) as f32;

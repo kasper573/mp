@@ -528,7 +528,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
             .first()
             .is_some_and(|part| part.starts_with("#sheet/"))
     {
-        sidebar::right(ui, "sheet-column", |ui| inspect(editor, ui, &selection));
+        sidebar::inspector(ui, "sheet-column", |ui| inspect(editor, ui, &selection));
     }
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)

@@ -63,7 +63,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         && selection.keys.first().is_some_and(|k| k == key)
         && node_of(&selection).is_some()
     {
-        sidebar::right(ui, "class-node", |ui| inspect::show(editor, ui, &selection));
+        sidebar::inspector(ui, "class-node", |ui| inspect::show(editor, ui, &selection));
     }
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)

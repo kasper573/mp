@@ -2,9 +2,29 @@ use egui::Ui;
 
 use super::{Edge, divide, panel_body};
 
-/// A view's own inspector: a resizable column on the right of its window, scrolled as a whole.
-pub fn right(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
-    let column = egui::Panel::right(egui::Id::new(("sidebar", id)))
+/// A view's inspector of what is selected inside it: a resizable column on the right of its
+/// window, scrolled as a whole.
+pub fn inspector(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
+    column(ui, ("inspector", id), Side::Right, body);
+}
+
+/// The row a view works on, laid out on the left of its window.
+pub fn row(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
+    column(ui, ("row", id), Side::Left, body);
+}
+
+enum Side {
+    Left,
+    Right,
+}
+
+fn column(ui: &mut Ui, id: (&str, &str), side: Side, body: impl FnOnce(&mut Ui)) {
+    let id = egui::Id::new(("sidebar", id));
+    let (panel, divider) = match side {
+        Side::Left => (egui::Panel::left(id), Edge::Right),
+        Side::Right => (egui::Panel::right(id), Edge::Left),
+    };
+    let column = panel
         .resizable(true)
         .default_size(360.0)
         .size_range(260.0..=720.0)
@@ -22,5 +42,5 @@ pub fn right(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
                     });
             });
         });
-    divide(ui, column.response.rect, Edge::Left);
+    divide(ui, column.response.rect, divider);
 }

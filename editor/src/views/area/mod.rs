@@ -445,7 +445,10 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
-    sidebar::right(ui, "area", |ui| inspect::sidebar(editor, ui, key));
+    sidebar::row(ui, "area", |ui| inspect::row(editor, ui, key));
+    if inspect::has_inspector(editor, key) {
+        sidebar::inspector(ui, "area", |ui| inspect::sidebar(editor, ui, key));
+    }
     show_canvas(editor, ui, &view_key, key, None);
     play::banner(editor, ui);
 }
@@ -498,20 +501,25 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label("No area to preview the blueprint on");
         return;
     };
-    sidebar::right(ui, "blueprint", |ui| {
-        let selection = editor.selection.clone();
-        let indices: Vec<usize> =
-            if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
-                selection
-                    .parts
-                    .iter()
-                    .filter_map(|p| blueprint_part_index(p))
-                    .collect()
-            } else {
-                Vec::new()
-            };
-        parts::show_blueprint(editor, ui, key, &indices);
+    let selection = editor.selection.clone();
+    let indices: Vec<usize> =
+        if selection.table == "blueprint" && selection.keys.first().is_some_and(|k| k == key) {
+            selection
+                .parts
+                .iter()
+                .filter_map(|p| blueprint_part_index(p))
+                .collect()
+        } else {
+            Vec::new()
+        };
+    sidebar::row(ui, "blueprint", |ui| {
+        parts::blueprint_row(editor, ui, key, &indices)
     });
+    if !indices.is_empty() {
+        sidebar::inspector(ui, "blueprint", |ui| {
+            parts::selected_parts(editor, ui, key, &indices)
+        });
+    }
     show_canvas(editor, ui, &view_key, &preview, Some(key));
 }
 
@@ -1017,7 +1025,7 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection)
             .iter()
             .filter_map(|p| blueprint_part_index(p))
             .collect();
-        parts::show_blueprint(editor, ui, &key, &indices);
+        parts::selected_parts(editor, ui, &key, &indices);
         return;
     }
     inspect::show_parts(editor, ui, selection);

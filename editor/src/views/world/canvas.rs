@@ -8,9 +8,9 @@ use egui::{
     Vec2,
 };
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
-use engine::systems::area::AreaId;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
+use engine::systems::area::{self, AreaId};
 
 use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
 use super::filters::{self, ColorRanges};
@@ -677,18 +677,22 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                 .response
                 .hover_pos()
                 .and_then(|p| canvas.tile_at(atlas, p));
-            vec![
-                match hover {
-                    Some(hit) => format!(
+            match hover {
+                Some(hit) => vec![
+                    format!(
                         "World · zoom {zoom:.0}% · {} {}, {}",
                         hit.area,
                         hit.at.x.floor(),
                         hit.at.y.floor()
                     ),
-                    None => format!("World · zoom {zoom:.0}%"),
-                },
-                "right-click a tile to play there".to_owned(),
-            ]
+                    tile_facts(map, &hit),
+                    "right-click a tile to play there".to_owned(),
+                ],
+                None => vec![
+                    format!("World · zoom {zoom:.0}%"),
+                    "right-click a tile to play there".to_owned(),
+                ],
+            }
         }
         _ => overview_status(editor, map, overlays),
     };
@@ -735,7 +739,7 @@ fn overview_status(editor: &Editor, map: &OpenWorldMap, overlays: &Overlays) -> 
         )];
     }
     vec![
-        format!("World · {} areas", map.layout.cards.len()),
+        world_summary(atlas),
         format!(
             "drag to arrange · scroll to zoom · {} drag to pan",
             EditorKey::Pan.name()
@@ -1251,4 +1255,83 @@ fn topmost_card_at(cards: &[MapCard], p: Pos2) -> Option<AreaId> {
         .filter(|card| card.frame.contains(p))
         .min_by(|a, b| a.frame.area().total_cmp(&b.frame.area()))
         .map(|card| card.area)
+}
+
+fn world_summary(atlas: &WorldAtlas) -> String {
+    let one_way = atlas
+        .warps
+        .iter()
+        .filter(|warp| !atlas.both_ways(warp))
+        .count();
+    let warps = match one_way {
+        0 => format!("{} warps, each with a way back", atlas.warps.len()),
+        _ => format!("{} warps, {one_way} one way", atlas.warps.len()),
+    };
+    let unreached = atlas
+        .areas
+        .keys()
+        .filter(|area| !atlas.distances.contains_key(area))
+        .count();
+    let reach = match unreached {
+        0 => format!(
+            "every area at most {} warps from the initial spawn",
+            atlas.distances.values().copied().max().unwrap_or(0)
+        ),
+        _ => format!("{unreached} areas unreached from the initial spawn"),
+    };
+    let residents: usize = atlas.areas.values().map(|info| info.residents.len()).sum();
+    let populations: usize = atlas
+        .areas
+        .values()
+        .map(|info| info.populations.len())
+        .sum();
+    format!(
+        "World · {} areas · {warps} · {reach} · {residents} residents, {populations} populations",
+        atlas.areas.len()
+    )
+}
+
+fn tile_facts(map: &OpenWorldMap, hit: &MapTileHit) -> String {
+    let atlas = &map.atlas;
+    let Some(id) = atlas.id(&hit.area) else {
+        return String::new();
+    };
+    let info = &atlas.areas[&id];
+    let cell = hit.at.snap();
+    let loaded = area::load(&map.content, id);
+    let walkable = if loaded.grid.walkable(cell) {
+        "walkable"
+    } else {
+        "not walkable"
+    };
+    let safe = if loaded.safe_zones.iter().any(|zone| zone.contains(cell)) {
+        "in a safe zone"
+    } else {
+        "no safe zone"
+    };
+    let nearest_npc = info
+        .residents
+        .iter()
+        .chain(&info.populations)
+        .map(|npc| (npc.key.as_str(), npc.at.distance(cell).0))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map_or_else(
+            || "no npc placed".to_owned(),
+            |(npc, tiles)| format!("npc {npc} {} tiles away", tiles.round()),
+        );
+    let nearest_door = info
+        .doors
+        .iter()
+        .map(|door| {
+            (
+                atlas.owners[door.owner].name.as_str(),
+                door.at.distance(cell).0,
+            )
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map_or_else(
+            || "no door".to_owned(),
+            |(door, tiles)| format!("door {door} {} tiles away", tiles.round()),
+        );
+    format!("{walkable} · {safe} · {nearest_npc} · {nearest_door}")
 }

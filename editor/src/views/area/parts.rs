@@ -17,23 +17,17 @@ use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema};
 
-pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
+/// The blueprint itself: its parts to pick from, where it is placed, its variables and modules.
+pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
     let Some(mut row) = editor.row_value("blueprint", key) else {
         return;
     };
     let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
-    let crumb = match selected {
-        [one] => format!(
-            "blueprint/{key} › {}",
-            parts
-                .get(*one)
-                .map(super::shapes::label)
-                .unwrap_or_default()
-        ),
-        [] => format!("blueprint/{key}"),
-        many => format!("blueprint/{key} › {} parts", many.len()),
-    };
-    ui.label(theme::muted(crumb).monospace().size(13.0));
+    ui.label(
+        theme::muted(format!("blueprint/{key}"))
+            .monospace()
+            .size(13.0),
+    );
     ui.add_space(4.0);
     widgets::section_count(ui, "Parts", parts.len());
     let mut pick: Option<Vec<usize>> = None;
@@ -117,13 +111,30 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
         }
         return;
     }
-    if !selected.is_empty() {
-        ui.add_space(6.0);
-        part_cards(editor, ui, key, &mut row, selected);
-    }
     placed_list(editor, ui, key);
     variables_section(editor, ui, key, &row);
     blueprint_modules(editor, ui, key, &mut row);
+}
+
+/// The blueprint window's inspector: the cards of the selected parts.
+pub fn selected_parts(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[usize]) {
+    let Some(mut row) = editor.row_value("blueprint", key) else {
+        return;
+    };
+    let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
+    let crumb = match selected {
+        [one] => format!(
+            "blueprint/{key} › {}",
+            parts
+                .get(*one)
+                .map(super::shapes::label)
+                .unwrap_or_default()
+        ),
+        many => format!("blueprint/{key} › {} parts", many.len()),
+    };
+    ui.label(theme::muted(crumb).monospace().size(13.0));
+    ui.add_space(4.0);
+    part_cards(editor, ui, key, &mut row, selected);
 }
 
 pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {

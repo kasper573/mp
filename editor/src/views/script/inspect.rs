@@ -21,22 +21,15 @@ use crate::value::RowValue;
 use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    let Some(owner) = editor.views.script.focused() else {
-        ui.label(theme::muted("No script in view"));
-        return;
-    };
-    let Some(doc) = ScriptDoc::load(editor, &owner) else {
-        ui.label(theme::muted(format!("{} is gone", owner.title())));
-        return;
-    };
+/// Whether anything inside the script wants the inspector: selected nodes, or a run in progress.
+pub fn has_inspector(editor: &Editor, doc: &ScriptDoc, selection: &RowSelection) -> bool {
+    !selected_nodes(doc, selection).is_empty() || editor.views.script.run_of(&doc.owner).is_some()
+}
+
+pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
+    let owner = doc.owner.clone();
     super::sync_with_content(editor);
-    let names: Vec<String> = selection
-        .parts
-        .iter()
-        .filter_map(|part| part.strip_prefix("node:").map(str::to_owned))
-        .filter(|name| doc.nodes().contains_key(name))
-        .collect();
+    let names = selected_nodes(doc, selection);
     let choice: Option<(String, usize)> = selection
         .parts
         .iter()
@@ -46,20 +39,22 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     egui::ScrollArea::vertical()
         .id_salt(("script-inspector", owner.slug()))
         .show(ui, |ui| match names.as_slice() {
-            [] => script_inspector(editor, ui, &doc),
+            [] => {
+                super::run::inspector(editor, ui, doc);
+            }
             [name] => {
                 let name = name.clone();
                 match &choice {
                     Some((node, index)) if *node == name => {
-                        choice_inspector(editor, ui, &doc, &name, *index)
+                        choice_inspector(editor, ui, doc, &name, *index)
                     }
-                    _ => node_inspector(editor, ui, &doc, &name),
+                    _ => node_inspector(editor, ui, doc, &name),
                 }
             }
             many => {
                 breadcrumb(
                     ui,
-                    &format!("{} › {} nodes", owner_short(editor, &doc), many.len()),
+                    &format!("{} › {} nodes", owner_short(editor, doc), many.len()),
                 );
                 widgets::card_frame(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
@@ -76,7 +71,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     }
                     ui.add_space(6.0);
                     if widgets::danger(ui, "Delete these nodes").clicked() {
-                        super::delete_nodes(editor, &doc, many.to_vec());
+                        super::delete_nodes(editor, doc, many.to_vec());
                     }
                 });
             }
@@ -96,11 +91,17 @@ fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
     }
 }
 
-pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
+    selection
+        .parts
+        .iter()
+        .filter_map(|part| part.strip_prefix("node:").map(str::to_owned))
+        .filter(|name| doc.nodes().contains_key(name))
+        .collect()
+}
+
+pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
-    if super::run::inspector(editor, ui, doc) {
-        return;
-    }
     if doc.is_shared() {
         shared_inspector(editor, ui, doc);
     } else {

@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentRow, Fixture};
-use engine::core::tiling::TilePos;
 use engine::systems::area::world_map::{
     MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap, WorldMapDef,
 };
@@ -13,7 +12,7 @@ use strum::VariantArray;
 use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
 use super::canvas::{line_badge, viridis};
 use super::filters::{self, AreaRange, ColorField, ColorOf, ColorRanges, ColorShow, ColorTable};
-use super::{MapPart, MapTileHit, OpenWorldMap, region_color, region_color_name, select, toolbar};
+use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
 use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
@@ -21,20 +20,15 @@ use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
 use crate::ui::{theme, widgets};
+use crate::value;
 use crate::views::area as area_view;
-use crate::{play, value};
 
 fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     let Some(map) = OpenWorldMap::of(editor) else {
         return;
     };
     let view = &editor.views.world;
-    let hover = view.menu_target.clone().or_else(|| view.hover.clone());
-    if super::shows_areas(view.zoom)
-        && let Some(hit) = hover
-    {
-        tile_panel(editor, ui, &map, &hit);
-    } else if view.route.is_some() {
+    if view.route.is_some() {
         route_panel(editor, ui, &map.atlas);
     } else if view.quest_line.is_some() {
         line_panel(editor, ui, &map);
@@ -42,9 +36,18 @@ fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
         color_panel(editor, ui, &map.atlas);
     } else if !view.lenses.is_empty() {
         lens_panel(editor, ui, &map.atlas);
-    } else {
-        overview(editor, ui, &map);
     }
+}
+
+/// Whether the world window has anything to inspect: map parts selected, or a route, quest line,
+/// colouring or lens laid over the map.
+pub fn has_inspector(editor: &Editor) -> bool {
+    let view = &editor.views.world;
+    !super::selected(editor).is_empty()
+        || view.route.is_some()
+        || view.quest_line.is_some()
+        || view.color.is_some()
+        || !view.lenses.is_empty()
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
@@ -95,58 +98,6 @@ fn open(editor: &mut Editor, opens: &OpenTarget) {
 fn go_to(editor: &mut Editor, map: &OpenWorldMap, area: AreaId) {
     let zoom = editor.views.world.zoom;
     editor.views.world.look_at(map, area, zoom);
-}
-
-fn overview(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
-    let atlas = &map.atlas;
-    crumb(
-        ui,
-        &format!("{}/{}", WorldMapDef::TABLE, WorldMap::World.key()),
-    );
-    widgets::section(ui, "Layers");
-    toolbar::layer_rows(editor, ui, map);
-    ui.add_space(8.0);
-    widgets::section(ui, "This world");
-    let one_way = atlas
-        .warps
-        .iter()
-        .filter(|warp| !atlas.both_ways(warp))
-        .count();
-    let unreached = atlas
-        .areas
-        .keys()
-        .filter(|area| !atlas.distances.contains_key(area))
-        .count();
-    let furthest = atlas.distances.values().copied().max().unwrap_or(0);
-    widgets::kv_text(ui, "areas", atlas.areas.len().to_string());
-    widgets::kv_text(
-        ui,
-        "warps",
-        match one_way {
-            0 => format!("{}, each with a way back", atlas.warps.len()),
-            _ => format!("{}, {one_way} one way", atlas.warps.len()),
-        },
-    );
-    widgets::kv_text(
-        ui,
-        "from the initial spawn",
-        match unreached {
-            0 => format!("every area, at most {furthest} warps away"),
-            _ => format!("{unreached} areas unreached"),
-        },
-    );
-    let residents: usize = atlas.areas.values().map(|info| info.residents.len()).sum();
-    let populations: usize = atlas
-        .areas
-        .values()
-        .map(|info| info.populations.len())
-        .sum();
-    widgets::kv_text(
-        ui,
-        "npcs placed",
-        format!("{residents} residents, {populations} populations"),
-    );
-    ui.add_space(8.0);
 }
 
 fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
@@ -492,92 +443,6 @@ fn check(ui: &mut Ui, ok: bool, text: &str) {
         };
         ui.label(RichText::new(text).size(12.5));
     });
-}
-
-fn tile_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTileHit) {
-    let atlas = &map.atlas;
-    let Some(id) = atlas.id(&hit.area) else {
-        return;
-    };
-    let info = &atlas.areas[&id];
-    let cell = hit.at.snap();
-    crumb(ui, &format!("{} · tile {}, {}", hit.area, cell.x, cell.y));
-    let loaded = area::load(&map.content, id);
-    let safe = loaded.safe_zones.iter().any(|zone| zone.contains(cell));
-    widgets::kv_text(
-        ui,
-        "walkable",
-        if loaded.grid.walkable(cell) {
-            "yes"
-        } else {
-            "no"
-        },
-    );
-    widgets::kv_text(
-        ui,
-        "safe zone",
-        if safe { "inside one" } else { "none here" },
-    );
-    let nearest_npc = info
-        .residents
-        .iter()
-        .chain(&info.populations)
-        .map(|npc| (npc.key.as_str(), npc.at.distance(cell).0))
-        .min_by(|a, b| a.1.total_cmp(&b.1));
-    widgets::kv_text(
-        ui,
-        "nearest npc",
-        nearest_npc.map_or_else(
-            || "none placed".to_owned(),
-            |(npc, tiles)| format!("{npc}, {} tiles", tiles.round()),
-        ),
-    );
-    let nearest_door = info
-        .doors
-        .iter()
-        .map(|door| {
-            (
-                atlas.owners[door.owner].name.as_str(),
-                door.at.distance(cell).0,
-            )
-        })
-        .min_by(|a, b| a.1.total_cmp(&b.1));
-    widgets::kv_text(
-        ui,
-        "nearest door",
-        nearest_door.map_or_else(
-            || "none".to_owned(),
-            |(door, tiles)| format!("{door}, {} tiles", tiles.round()),
-        ),
-    );
-    ui.add_space(8.0);
-    widgets::section(ui, "Test character");
-    let characters = play::test_characters(editor);
-    let current = play::current_character(editor).unwrap_or_default();
-    let mut picked = current.clone();
-    let shown = characters
-        .iter()
-        .find(|character| character.key == current)
-        .map_or_else(
-            || "none".to_owned(),
-            |character| format!("{} · level {}", character.key, character.level),
-        );
-    widgets::combo_box("world-play-character")
-        .width(ui.available_width() - 8.0)
-        .selected_text(theme::mono(shown).size(12.5))
-        .show_ui(ui, |ui| {
-            for character in &characters {
-                ui.selectable_value(
-                    &mut picked,
-                    character.key.clone(),
-                    format!("{} · level {}", character.key, character.level),
-                );
-            }
-        });
-    if picked != current {
-        editor.play.character = Some(picked);
-    }
-    ui.add_space(6.0);
 }
 
 fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas, a: &str, b: &str) {
