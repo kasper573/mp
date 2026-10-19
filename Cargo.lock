@@ -2046,18 +2046,8 @@ dependencies = [
  "bevy_app",
  "bevy_ecs",
  "bevy_replicon",
- "bevy_terminal_macros",
- "inventory",
+ "bevy_state",
  "serde",
-]
-
-[[package]]
-name = "bevy_terminal_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.9",
 ]
 
 [[package]]

@@ -59,7 +59,6 @@ use area::AreaTag;
 use movement::{Position, TileClaim};
 use skill::Cooldowns;
 use status::{ActiveAspects, Boosts, Statuses};
-use terminal::TerminalKind;
 
 pub const TICK_HZ: Hertz = Hertz(30.0);
 
@@ -91,7 +90,7 @@ pub fn protocol(app: &mut App) {
     quest::register(app);
     player::register(app);
     reach::register(app);
-    terminal::register(app);
+    bevy_terminal::register(app, &[]);
     vfx::register(app);
     plug_ins(app.world_mut());
 }
@@ -297,8 +296,7 @@ pub fn server_app(
                     combat::defeats,
                     skill::hotbar::settle_basic_attack,
                     actor::settle,
-                    bevy_terminal::ingest::<TerminalKind>,
-                    bevy_terminal::dispatch::<TerminalKind>,
+                    bevy_terminal::ingest,
                     chat::rebroadcast,
                     belongings::notify_changes,
                     history::backfill,
