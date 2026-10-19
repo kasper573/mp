@@ -11,6 +11,7 @@ use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
@@ -372,8 +373,13 @@ impl QuestDef {
     }
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[strum_discriminants(
+    name(ObjectiveKind),
+    derive(EnumString, IntoStaticStr, VariantArray),
+    strum(serialize_all = "snake_case")
+)]
 pub enum Objective {
     Hold(ItemStack),
     Defeat {
@@ -391,6 +397,17 @@ pub enum Objective {
         label: String,
         paths: Vec<DecisionPath>,
     },
+}
+
+impl ObjectiveKind {
+    /// The kind of objective a `type` tag names, when it names one.
+    pub fn of(tag: &str) -> Option<ObjectiveKind> {
+        tag.parse().ok()
+    }
+
+    pub fn tag(self) -> &'static str {
+        self.into()
+    }
 }
 
 impl Objective {

@@ -353,24 +353,6 @@ pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
     (table == NpcDef::TABLE).then(|| key.to_owned())
 }
 
-pub(super) fn is_objective(tag: &str) -> bool {
-    !matches!(
-        tag,
-        "shown"
-            | "requires"
-            | "grants"
-            | "hand_in"
-            | "hand_over"
-            | "reward"
-            | "pick_one"
-            | "daily"
-            | "time_limit"
-            | "drop"
-            | "inline_script"
-            | "shared_script"
-    )
-}
-
 pub fn summary_of(root: &Value, module: &Value) -> String {
     let Some(object) = module.as_object() else {
         return String::new();

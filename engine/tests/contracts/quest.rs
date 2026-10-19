@@ -7,10 +7,13 @@ use engine::systems::item::{
 };
 use engine::systems::memory::{self, MemoryDef};
 use engine::systems::player::Xp;
-use engine::systems::quest::{self, QuestDef, QuestLog, QuestRequest, QuestResult};
+use engine::systems::quest::{
+    self, Objective, ObjectiveKind, QuestDef, QuestLog, QuestRequest, QuestResult,
+};
 use engine::systems::shop::{self, ShopRequest};
 use engine::systems::{area, combat, movement, npc, rewards, script, stat};
 use serde_json::{Value, json};
+use strum::VariantArray;
 use testkit::{Game, Map, Sim, labels, locked};
 
 #[test]
@@ -867,4 +870,20 @@ fn fill_bag(sim: &mut Sim, player: Entity) {
     for _ in used..INVENTORY_MAX as usize {
         sim.give(player, "pebble", 1);
     }
+}
+
+#[test]
+fn objective_kinds_name_the_tags_objectives_are_written_with() {
+    let schema = serde_json::to_value(schemars::schema_for!(Objective)).expect("a schema");
+    let written: Vec<&str> = schema["oneOf"]
+        .as_array()
+        .expect("one schema per kind")
+        .iter()
+        .filter_map(|kind| kind["properties"]["type"]["const"].as_str())
+        .collect();
+    let named: Vec<&str> = ObjectiveKind::VARIANTS
+        .iter()
+        .map(|kind| kind.tag())
+        .collect();
+    assert_eq!(written, named);
 }

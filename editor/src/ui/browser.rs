@@ -242,18 +242,10 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
-        if table == WorldMapDef::TABLE {
-            action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
-        } else if EditorKey::ToggleSelection.held_among(modifiers)
-            || EditorKey::ExtendSelection.held_among(modifiers)
-        {
-            select_rows(
-                editor,
-                table,
-                key,
-                EditorKey::ToggleSelection.held_among(modifiers),
-                EditorKey::ExtendSelection.held_among(modifiers),
-            );
+        let toggle = EditorKey::ToggleSelection.held_among(modifiers);
+        let extend = EditorKey::ExtendSelection.held_among(modifiers);
+        if table != WorldMapDef::TABLE && (toggle || extend) {
+            select_rows(editor, table, key, toggle, extend);
         } else {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         }
@@ -553,7 +545,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     editor.status.left.push(format!(
         "{} result{} for \"{}\"",
         hits.len(),
-        crate::ui::widgets::plural(hits.len()),
+        widgets::plural(hits.len()),
         editor.views.browser.search.trim()
     ));
     let mut clicked: Option<(String, String, bool, bool)> = None;

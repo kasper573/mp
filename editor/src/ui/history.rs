@@ -287,11 +287,7 @@ fn restores(step: &EditStep) -> String {
     if let Some(camera) = &step.camera {
         parts.push(format!("the camera on {}", camera.area));
     }
-    match parts.len() {
-        1 => parts.remove(0),
-        2 => format!("{} and {}", parts[0], parts[1]),
-        _ => format!("{}, {} and {}", parts[0], parts[1], parts[2]),
-    }
+    widgets::join_and(&parts)
 }
 
 fn clock(at: SystemTime) -> String {

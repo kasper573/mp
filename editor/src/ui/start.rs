@@ -269,11 +269,7 @@ pub fn pick_folder(editor: &mut Editor) {
         dialog = dialog.set_directory(start);
     }
     if let Some(folder) = dialog.pick_folder() {
-        if editor.has_unsaved() {
-            ui::request_close(editor, CloseThen::Open(folder));
-        } else {
-            editor.open_folder(&folder);
-        }
+        ui::request_close(editor, CloseThen::Open(folder));
     }
 }
 

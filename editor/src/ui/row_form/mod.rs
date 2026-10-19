@@ -20,7 +20,7 @@ use engine::systems::area::AreaDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::class::ClassDef;
 use engine::systems::input::map::InputDef;
-use engine::systems::quest::QuestDef;
+use engine::systems::quest::{ObjectiveKind, QuestDef};
 use engine::systems::registry;
 use engine::systems::skill::SkillDef;
 use serde_json::Value;
@@ -29,8 +29,8 @@ use self::bindings::bindings_section;
 use self::preview::PreviewPlace;
 use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{
-    is_objective, module_lines, outline_block, script_extras, script_summary, script_values,
-    speaker_of, summary_of,
+    module_lines, outline_block, script_extras, script_summary, script_values, speaker_of,
+    summary_of,
 };
 use super::{theme, widgets};
 use crate::app::{
@@ -419,7 +419,7 @@ fn modules_column(
         }
         let summary = if is_script {
             script_summary(module)
-        } else if table == QuestDef::TABLE && is_objective(&tag) {
+        } else if table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some() {
             objectives += 1;
             format!("objective {objectives}")
         } else if let Some(condition) = module.get("condition") {

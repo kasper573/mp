@@ -283,11 +283,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
             match result {
                 Ok(()) => {
                     editor.say(format!("Created {}", folder.display()));
-                    if editor.has_unsaved() {
-                        ui::request_close(editor, CloseThen::Open(folder));
-                    } else {
-                        editor.open_folder(&folder);
-                    }
+                    ui::request_close(editor, CloseThen::Open(folder));
                     None
                 }
                 Err(error) => {
