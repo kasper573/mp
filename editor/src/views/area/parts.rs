@@ -25,11 +25,14 @@ pub fn blueprint_row(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[us
         return;
     };
     let parts: Vec<Value> = row["parts"].as_array().cloned().unwrap_or_default();
-    ui.label(
-        theme::muted(format!("blueprint/{key}"))
-            .monospace()
-            .size(13.0),
-    );
+    let owners = editor
+        .project
+        .as_ref()
+        .map(|project| project.files.owners())
+        .unwrap_or_default();
+    if let Some(owner) = crate::ui::breadcrumb::show(ui, &owners, BlueprintDef::TABLE, key) {
+        editor.open_row(&owner.table, &owner.key);
+    }
     ui.add_space(4.0);
     widgets::section_count(ui, "Parts", parts.len());
     let mut pick: Option<Vec<usize>> = None;

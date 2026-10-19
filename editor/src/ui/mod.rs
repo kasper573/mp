@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod breadcrumb;
 pub mod browser;
 pub mod categories;
 pub mod content_list;
@@ -96,6 +97,21 @@ pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
         })
 }
 
+/// Opens the owner of the row in the active tab, climbing one level at a time.
+fn open_owner(editor: &mut Editor) {
+    let Some((table, key)) = active_tab(editor).and_then(|tab| tab.row()) else {
+        return;
+    };
+    let owner = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.files.owners().owner(&table, &key).cloned());
+    match owner {
+        Some(owner) => editor.open_row(&owner.table, &owner.key),
+        None => editor.toast(format!("{table}/{key} is global: it has no owner")),
+    }
+}
+
 fn shortcuts(editor: &mut Editor, ctx: &Context) {
     if ctx.text_edit_focused() {
         return;
@@ -109,6 +125,9 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         .is_some_and(|(rect, pos)| rect.contains(pos));
     if (script_tab || script_hovered) && editor.dialogs.is_empty() {
         editor.views.script.keys = ScriptKeys::take(ctx);
+    }
+    if ctx.input_mut(|i| EditorKey::OpenOwner.consume(i)) {
+        open_owner(editor);
     }
     let (save, undo, redo, search, quit, close) = ctx.input_mut(|i| {
         (
@@ -485,6 +504,13 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         if selection.keys.len() == 1 && selection.parts.is_empty() {
             let (table, key) = (&selection.table, &selection.keys[0]);
             left.push(format!("{table}/{key}"));
+            if let Some(owner) = editor
+                .project
+                .as_ref()
+                .and_then(|project| project.files.owners().owner(table, key).cloned())
+            {
+                left.push(format!("local to {owner}"));
+            }
             left.push(row_file(table, key));
         }
     }
@@ -526,15 +552,24 @@ impl TabViewer for Viewer<'_> {
 
     fn title(&mut self, tab: &mut EditorTab) -> egui::WidgetText {
         let title = tab.title();
-        let unsaved = self
-            .editor
-            .project
-            .as_ref()
+        let project = self.editor.project.as_ref();
+        let unsaved = project
             .zip(tab.row())
             .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
+        let prefix = project.zip(tab.row()).and_then(|(project, (table, key))| {
+            breadcrumb::tab_prefix(&project.files.owners(), &table, &key)
+        });
         let mut job = LayoutJob::default();
+        let italics = self.editor.preview.as_ref() == Some(tab);
+        if let Some(prefix) = prefix {
+            let format = TextFormat {
+                italics,
+                ..TextRole::Tab.format(theme::FAINT)
+            };
+            job.append(&prefix, 0.0, format);
+        }
         let format = TextFormat {
-            italics: self.editor.preview.as_ref() == Some(tab),
+            italics,
             ..TextRole::Tab.format(egui::Color32::PLACEHOLDER)
         };
         job.append(&title, 0.0, format);

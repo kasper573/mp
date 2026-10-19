@@ -24,7 +24,7 @@ use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
-use crate::ui::{patterns, row_form, sidebar, theme, widgets};
+use crate::ui::{breadcrumb, patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::{self, RowValue};
 use crate::{picker, schema, views};
@@ -45,7 +45,14 @@ pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     if !editor.views.area.views.contains_key(&view_key) {
         return;
     }
-    ui.label(theme::muted(format!("area/{key}")).monospace().size(13.0));
+    let owners = editor
+        .project
+        .as_ref()
+        .map(|project| project.files.owners())
+        .unwrap_or_default();
+    if let Some(owner) = breadcrumb::show(ui, &owners, AreaDef::TABLE, key) {
+        editor.open_row(&owner.table, &owner.key);
+    }
     ui.add_space(4.0);
     area_card(editor, ui, key, &content, area_id);
     module_counts(editor, ui, &view_key, key);

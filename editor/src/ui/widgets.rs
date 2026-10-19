@@ -237,6 +237,23 @@ pub fn card_header(
     subtitle: &str,
     menu: impl FnOnce(&mut Ui),
 ) -> Response {
+    card_header_with(
+        ui,
+        |ui| {
+            ui.label(theme::strong(title).monospace());
+        },
+        subtitle,
+        menu,
+    )
+}
+
+/// A card's header whose title is drawn by `title`, for one that is more than a name.
+pub fn card_header_with(
+    ui: &mut Ui,
+    title: impl FnOnce(&mut Ui),
+    subtitle: &str,
+    menu: impl FnOnce(&mut Ui),
+) -> Response {
     card_heading(ui, title, subtitle, |ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button(theme::faint("…"), menu);
@@ -245,7 +262,14 @@ pub fn card_header(
 }
 
 pub fn card_title(ui: &mut Ui, title: &str) -> Response {
-    card_heading(ui, title, "", |_| {})
+    card_heading(
+        ui,
+        |ui| {
+            ui.label(theme::strong(title).monospace());
+        },
+        "",
+        |_| {},
+    )
 }
 
 pub fn code_block(ui: &mut Ui, text: &str) {
@@ -461,14 +485,14 @@ pub fn ago(elapsed: Seconds) -> String {
 
 fn card_heading(
     ui: &mut Ui,
-    title: &str,
+    title: impl FnOnce(&mut Ui),
     subtitle: &str,
     trailing: impl FnOnce(&mut Ui),
 ) -> Response {
     let response = ui
         .horizontal(|ui| {
             ui.set_min_height(ui.spacing().interact_size.y);
-            ui.label(theme::strong(title).monospace());
+            title(ui);
             if !subtitle.is_empty() {
                 ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
             }

@@ -28,7 +28,7 @@ use self::bindings::bindings_section;
 use self::preview::PreviewPlace;
 use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{module_lines, script_module_body, script_summary, speaker_of, summary_of};
-use super::{theme, widgets};
+use super::{breadcrumb, theme, widgets};
 use crate::app::{
     Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
 };
@@ -248,9 +248,11 @@ fn row_card(
     let mut changed = FormChange::default();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(
+        let owners = cx.files.owners();
+        let mut open_owner = None;
+        widgets::card_header_with(
             ui,
-            &format!("{table}/{key}"),
+            |ui| open_owner = breadcrumb::show(ui, &owners, table, key),
             if fixture { "fixture" } else { "" },
             |ui| {
                 if ui.button("Copy as JSON").clicked() {
@@ -263,6 +265,12 @@ fn row_card(
                 }
             },
         );
+        if let Some(owner) = open_owner {
+            cx.actions.push(FormAction::OpenRow {
+                table: owner.table,
+                key: owner.key,
+            });
+        }
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
         if table == ModelDef::TABLE {

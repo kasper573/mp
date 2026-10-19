@@ -88,7 +88,15 @@ fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
 pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
     let key = doc.at.key.clone();
-    breadcrumb(ui, &doc.at.title());
+    let owners = editor
+        .project
+        .as_ref()
+        .map(|project| project.files.owners())
+        .unwrap_or_default();
+    if let Some(owner) = crate::ui::breadcrumb::show(ui, &owners, ScriptDef::TABLE, &key) {
+        editor.open_row(&owner.table, &owner.key);
+    }
+    ui.add_space(4.0);
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
     let runner_schema = root
