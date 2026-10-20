@@ -507,14 +507,7 @@ pub fn registry() -> &'static ContentRegistry {
     static REGISTRY: std::sync::LazyLock<ContentRegistry> = std::sync::LazyLock::new(|| {
         let mut registry = settled_tables();
         registry
-            .fixture::<input::map::InputAction>()
-            .fixture::<attention::AttentionMark>()
-            .fixture::<interface::InterfaceSound>()
-            .fixture::<interface::CursorShape>()
-            .fixture::<interface::InterfaceIcon>()
-            .fixture::<vfx::VfxFixture>()
-            .fixture::<vfx::VfxShaderFixture>()
-            .fixture::<area::world_map::WorldMap>()
+            .require_fixtures()
             .hook(LoadStep::Across, script::check_reached);
         registry
     });
@@ -538,6 +531,14 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
+        .fixture::<input::map::InputAction>()
+        .fixture::<attention::AttentionMark>()
+        .fixture::<interface::InterfaceSound>()
+        .fixture::<interface::CursorShape>()
+        .fixture::<interface::InterfaceIcon>()
+        .fixture::<vfx::VfxFixture>()
+        .fixture::<vfx::VfxShaderFixture>()
+        .fixture::<area::world_map::WorldMap>()
         .bundle::<SfxDef>()
         .file::<SfxRoleDef>()
         .file::<attention::AttentionDef>()

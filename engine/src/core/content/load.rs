@@ -18,7 +18,7 @@ use super::files::{
     CONFIG_FILE, FIXTURES_DIR, FileType, Listing, SETTINGS_FILE, Shape, bundle_of, fields_file,
     table_of,
 };
-use super::fixture::{Fixture, FixtureLock};
+use super::fixture::{Fixture, FixtureIds, FixtureLock};
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
@@ -45,12 +45,13 @@ pub enum LoadStep {
 }
 
 type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
+type FixtureCheck = Box<dyn Fn(&mut Loading, bool) + Send + Sync>;
 struct FixtureEntry {
     table: &'static str,
     folder: &'static str,
     whole_table: bool,
     paths: Vec<(String, Vec<FixtureLock>)>,
-    check: Hook,
+    check: FixtureCheck,
 }
 
 pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> + Send + Sync>;
@@ -59,6 +60,7 @@ pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> 
 pub struct ContentRegistry {
     rows: Vec<Box<dyn TableLoader>>,
     fixtures: Vec<FixtureEntry>,
+    fixtures_required: bool,
     hooks: Vec<(LoadStep, Hook)>,
     settings: Option<Box<dyn SettingsLoader>>,
     writers: Vec<FolderWriter>,
@@ -230,6 +232,13 @@ impl ContentRegistry {
                 .collect(),
             check: Box::new(check_fixture::<F>),
         });
+        self
+    }
+
+    /// Holds a game to every fixture: without this, a game's fixtures are found wherever it has
+    /// them, and the ones it lacks are no error.
+    pub fn require_fixtures(&mut self) -> &mut ContentRegistry {
+        self.fixtures_required = true;
         self
     }
 
@@ -959,7 +968,7 @@ impl Loading {
 
     fn check_fixtures(&mut self, registry: &ContentRegistry) {
         for fixture in &registry.fixtures {
-            (fixture.check)(self);
+            (fixture.check)(self, registry.fixtures_required);
         }
     }
 
@@ -1660,12 +1669,16 @@ pub fn write(registry: &ContentRegistry, content: Content, root: &Path) -> io::R
 
 /// Every fixture of `F` is at its path, keeping what the engine reads from it, and a type whose
 /// files are all fixtures holds no other file.
-fn check_fixture<F: Fixture>(loading: &mut Loading) {
+fn check_fixture<F: Fixture>(loading: &mut Loading, required: bool) {
     let content = loading.content();
     let table = F::Row::TABLE;
+    let mut ids = HashMap::new();
     for fixture in F::VARIANTS {
         let path = fixture.path();
         let Some(id) = content.table::<F::Row>().id_of(&path) else {
+            if !required {
+                continue;
+            }
             loading.file_error(
                 path.clone(),
                 ErrorPlace::WholeFile,
@@ -1677,6 +1690,10 @@ fn check_fixture<F: Fixture>(loading: &mut Loading) {
             );
             continue;
         };
+        ids.insert(fixture.name(), id);
+        if !required {
+            continue;
+        }
         let Ok(row) = serde_json::to_value(id.get(&content)) else {
             continue;
         };
@@ -1686,7 +1703,8 @@ fn check_fixture<F: Fixture>(loading: &mut Loading) {
         }
         loading.row_errors(id, check);
     }
-    if !F::WHOLE_TABLE {
+    loading.built(FixtureIds::<F>(ids));
+    if !required || !F::WHOLE_TABLE {
         return;
     }
     let fixed: Vec<String> = F::VARIANTS.iter().map(|fixture| fixture.path()).collect();

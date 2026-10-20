@@ -33,7 +33,7 @@ name = "client"
 harness = false
 
 [features]
-profiling = ["dep:pprof", "bevy/debug"]
+profiling = ["bevy/debug"]
 
 # One dependency set for every target keeps the source tree free of #[cfg] gates: the browser-only
 # crates (bevy's render stack, egui, web-sys, kira, …) also compile natively — wasm imports become
@@ -159,7 +159,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 blocking = "1"
 walkdir = "2"
 serde_urlencoded = "0.7"
-pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optional = true }
 cargo_metadata = "0.23"
 syn = { workspace = true, features = ["visit"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }

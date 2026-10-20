@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::VariantArray;
@@ -30,10 +32,11 @@ pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
     }
 
     fn id(self, content: &Content) -> ContentId<Self::Row> {
-        content
-            .table::<Self::Row>()
-            .id_of(&self.path())
-            .unwrap_or_else(|| panic!("fixture {} is checked at load", self.path()))
+        *content
+            .built::<FixtureIds<Self>>()
+            .0
+            .get(self.name())
+            .unwrap_or_else(|| panic!("no fixture at {} in this game", self.path()))
     }
 
     fn get(self, content: &Content) -> &Self::Row {
@@ -45,6 +48,9 @@ pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
         Vec::new()
     }
 }
+
+/// Where each fixture of `F` resolved at load, so reading one costs no path to build.
+pub struct FixtureIds<F: Fixture>(pub HashMap<&'static str, ContentId<F::Row>>);
 
 /// A part of a fixture's row the engine reads: content tunes its values, but never removes or
 /// reshapes it, so the engine finds what it reads in every game.
