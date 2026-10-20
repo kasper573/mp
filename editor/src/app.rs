@@ -271,6 +271,24 @@ pub enum PickRowThen {
     MoveInto {
         paths: Vec<String>,
     },
+    /// Moves rows of a scene graph into the folder picked, by its labels.
+    MoveNodes {
+        bundle: String,
+        ids: Vec<String>,
+        folders: Vec<(String, String)>,
+    },
+}
+
+impl PickRowThen {
+    /// The file the picked row is written into, when it is one.
+    pub fn editing(&self) -> Option<&str> {
+        match self {
+            PickRowThen::AddModule { area, .. } | PickRowThen::ReplaceBlueprint { area, .. } => {
+                Some(area)
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -864,6 +882,7 @@ impl Editor {
                     outcome.taken.len()
                 )
             };
+            let text = crate::views::area::drop_gone(self).unwrap_or(text);
             self.toast(text);
             self.views.content_changed();
         }

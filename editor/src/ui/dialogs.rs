@@ -6,6 +6,7 @@ use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
 use engine::core::content::{ContentFile, SETTINGS_FILE, fields_file, version};
 use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
@@ -738,7 +739,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::PickRow(mut dialog) => {
             let mut outcome = None;
             window(ctx, &dialog.title, |ui| {
-                let keys: Vec<String> = if dialog.options.is_empty() {
+                let mut keys: Vec<String> = if dialog.options.is_empty() {
                     editor
                         .project
                         .as_ref()
@@ -747,6 +748,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 } else {
                     dialog.options.clone()
                 };
+                let editing = dialog.then.editing();
+                keys.sort_by_cached_key(|key| {
+                    (crate::forms::seen_from(editing, key).0, key.clone())
+                });
                 ui.add(egui::TextEdit::singleline(&mut dialog.search).hint_text("search"));
                 let needle = dialog.search.to_lowercase();
                 egui::ScrollArea::vertical()
@@ -757,12 +762,25 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                             .filter(|k| needle.is_empty() || k.to_lowercase().contains(&needle))
                         {
                             let picked = dialog.picked.as_deref() == Some(key.as_str());
-                            let shown = if key.is_empty() {
-                                "the game folder"
-                            } else {
-                                key
+                            let shown = match (key.as_str(), editing) {
+                                ("", _) => "the game folder".to_owned(),
+                                (key, Some(_)) => crate::forms::seen_from(editing, key).1,
+                                (key, None) => key.to_owned(),
                             };
-                            let response = ui.selectable_label(picked, shown);
+                            let refused = editing
+                                .filter(|_| dialog.table == BlueprintDef::TABLE)
+                                .zip(editor.project.as_ref())
+                                .and_then(|(into, project)| {
+                                    placement::holds_itself(&project.files, into, key)
+                                });
+                            if let Some(reason) = refused {
+                                ui.add_enabled(
+                                    false,
+                                    egui::Button::selectable(false, format!("{shown} · {reason}")),
+                                );
+                                continue;
+                            }
+                            let response = ui.selectable_label(picked, shown).on_hover_text(key);
                             if response.clicked() {
                                 dialog.picked = Some(key.clone());
                             }
@@ -791,6 +809,13 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                         PickRowThen::NewFile { folder } => {
                             content_tree::new_file(editor, &folder, &picked)
                         }
+                        PickRowThen::MoveNodes {
+                            bundle,
+                            ids,
+                            folders,
+                        } => crate::views::area::panel::move_into_picked(
+                            editor, &bundle, &ids, &folders, &picked,
+                        ),
                         PickRowThen::MoveInto { paths } => {
                             if let Err(error) = rows::move_into(editor, &paths, &picked) {
                                 editor.toast(error);

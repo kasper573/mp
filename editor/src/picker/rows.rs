@@ -2,6 +2,7 @@ use egui::Ui;
 use engine::core::content::{ContentFile, fields_file, parent_of};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::MODEL_SPRITES;
+use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::{TILESET_IMAGE, TilesetDef};
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::attention::AttentionDef;
@@ -258,6 +259,9 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
                 .then(|| content.built::<RiftScripts>())?;
             let id = content.by_path::<NpcDef>(key)?;
             (!npc::can_be_fought(scripts, id)).then(|| "no script sets it hostile".to_owned())
+        }
+        BlueprintDef::TABLE => {
+            crate::views::area::placement::holds_itself(cx.files, cx.row_key.as_deref()?, key)
         }
         _ => None,
     }

@@ -285,7 +285,7 @@ fn restores(step: &EditStep) -> String {
         parts.push("the selection".to_owned());
     }
     if let Some(camera) = &step.camera {
-        parts.push(format!("the camera on {}", camera.area));
+        parts.push(format!("the camera on {}", camera.bundle));
     }
     widgets::join_and(&parts)
 }

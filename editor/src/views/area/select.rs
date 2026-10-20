@@ -1,33 +1,26 @@
-use std::collections::HashSet;
-
 use egui::{Pos2, Ui};
-use engine::core::content::{ContentFile, table_of};
+use engine::core::content::table_of;
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::AreaModuleKind;
-use engine::systems::area::blueprint::BlueprintDef;
 use serde_json::Value;
 
+use super::flags::RowFlags;
 use super::placement::{self, AreaPlacement, PartView};
 use super::{
-    AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner, nodes,
-    pick, pins, shapes,
+    AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
+    blueprint, nodes, pick, pins, scene_tree, shapes,
 };
-use crate::app::{Clipboard, Editor};
+use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;
-use crate::rows;
+use crate::ui::widgets;
 use crate::value::RowValue;
 
-/// The selected modules of the scene of `bundle`, in tree order.
+/// The modules of the scene of `bundle` the selection moves, in tree order: those selected and
+/// what selected folders hold.
 pub(super) fn selected_nodes(editor: &Editor, frame: &AreaSnapshot) -> Vec<String> {
-    let selected = super::selected_parts(editor, &frame.area_key);
-    frame
-        .modules
-        .iter()
-        .filter(|module| selected.contains(&module.pointer))
-        .map(|module| module.pointer.clone())
-        .collect()
+    frame.selected_modules(&super::selected_parts(editor, &frame.bundle))
 }
 
 pub(super) fn select_input(
@@ -137,7 +130,7 @@ impl SelectScope<'_> {
 
     fn key<'a>(&'a self, frame: &'a AreaFrame) -> &'a str {
         match self {
-            SelectScope::Area => &frame.area_key,
+            SelectScope::Area => &frame.bundle,
             SelectScope::Blueprint { place, .. } => &place.blueprint,
         }
     }
@@ -156,7 +149,7 @@ impl SelectScope<'_> {
             SelectScope::Area => frame.hit(tile),
             SelectScope::Blueprint { parts, .. } => parts
                 .iter()
-                .filter(|part| part.bounds.is_some_and(|b| b.contains(tile)))
+                .filter(|part| !part.locked && part.bounds.is_some_and(|b| b.contains(tile)))
                 .min_by(|a, b| {
                     a.bounds
                         .map_or(0.0, |b| b.area())
@@ -166,8 +159,10 @@ impl SelectScope<'_> {
         }
     }
 
-    fn contained(&self, frame: &AreaFrame, rect: Rect<Tiles>) -> Vec<String> {
-        match self {
+    /// What a box over `rect` takes, and how many it passes over because they're hidden or locked.
+    fn contained(&self, frame: &AreaFrame, rect: Rect<Tiles>) -> (Vec<String>, Skipped) {
+        let mut skipped = Skipped::default();
+        let taken = match self {
             SelectScope::Area => frame
                 .modules
                 .iter()
@@ -177,14 +172,20 @@ impl SelectScope<'_> {
                             .module_bounds(&module.pointer)
                             .is_some_and(|bounds| rect.contains_rect(&bounds))
                 })
+                .filter(|module| skipped.passes(&frame.flags.row(&module.pointer)))
                 .map(|module| module.pointer.clone())
                 .collect(),
             SelectScope::Blueprint { parts, .. } => parts
                 .iter()
                 .filter(|part| part.bounds.is_some_and(|b| rect.contains_rect(&b)))
+                .filter(|part| {
+                    skipped.locked += usize::from(part.locked);
+                    !part.locked
+                })
                 .map(|part| part.part.clone())
                 .collect(),
-        }
+        };
+        (taken, skipped)
     }
 
     fn move_selected(&self, editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) {
@@ -202,7 +203,7 @@ impl SelectScope<'_> {
     fn clear_selection(&self, editor: &mut Editor, frame: &AreaFrame) {
         match self {
             SelectScope::Area => {
-                editor.selection = RowSelection::row(self.table(frame), &frame.area_key)
+                editor.selection = RowSelection::row(self.table(frame), &frame.bundle)
             }
             SelectScope::Blueprint { .. } => editor.selection.parts.clear(),
         }
@@ -282,6 +283,24 @@ fn start_select_drag(
             return;
         }
     }
+    let in_folder_box = scope.is_area()
+        && frame
+            .folder_box(&super::selected_parts(editor, &frame.bundle))
+            .is_some_and(|(bounds, _)| bounds.contains(tile));
+    let hit = match hit {
+        None if in_folder_box => {
+            set_drag(
+                editor,
+                view_key,
+                AreaDrag::Move {
+                    from: tile,
+                    moved: false,
+                },
+            );
+            return;
+        }
+        hit => hit,
+    };
     match hit {
         Some(node) => {
             if !scope.selected(editor, frame).contains(&node) {
@@ -400,7 +419,8 @@ fn finish_select_drag(
     match drag {
         AreaDrag::Box { from } => {
             let rect = Rect::from_points([from, tile]);
-            let hits = scope.contained(frame, rect);
+            let (hits, skipped) = scope.contained(frame, rect);
+            let count = hits.len();
             let parts = boxed(
                 editor,
                 scope.table(frame),
@@ -409,6 +429,7 @@ fn finish_select_drag(
                 modifiers,
             );
             editor.selection = RowSelection::parts(scope.table(frame), scope.key(frame), parts);
+            skipped.tell(editor, count);
         }
         AreaDrag::Move { from, moved } => {
             if !moved {
@@ -438,7 +459,7 @@ fn finish_select_drag(
             };
             let w = (new_max.x - new_min.x).max(1.0);
             let h = (new_max.y - new_min.y).max(1.0);
-            nodes::change_scene(editor, &frame.area_key, |scene| {
+            nodes::change_scene(editor, &frame.bundle, |scene| {
                 let module = scene.pointer_mut(&part)?;
                 shapes::shift(module, new_min.x - min.x, new_min.y - min.y);
                 shapes::resize(module, w, h);
@@ -451,7 +472,7 @@ fn finish_select_drag(
         }
         AreaDrag::InitialSpawn => {
             let at = snap_to(tile, EditorKey::Unsnapped.held_among(modifiers));
-            pins::set_spawn(editor, &frame.area_key, at);
+            pins::set_spawn(editor, &frame.bundle, at);
         }
         AreaDrag::Stamp { .. } => {}
     }
@@ -490,7 +511,7 @@ pub fn move_selection(editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) 
     if moved.is_empty() {
         return;
     }
-    nodes::change_scene(editor, &frame.area_key, |scene| {
+    nodes::change_scene(editor, &frame.bundle, |scene| {
         for node in &moved {
             shapes::shift(scene.pointer_mut(node)?, dx, dy);
         }
@@ -502,31 +523,8 @@ pub fn move_selection(editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) 
 }
 
 pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    let copied = selected_nodes(editor, frame);
-    if copied.is_empty() {
-        return;
-    }
-    let origin = copied
-        .iter()
-        .filter_map(|node| frame.module_bounds(node))
-        .reduce(|a, b| a.union(&b))
-        .map(|r| r.min())
-        .unwrap_or(Pos::new(0.0, 0.0));
-    let modules: Vec<Value> = copied
-        .iter()
-        .filter_map(|node| frame.module(node))
-        .map(|module| {
-            let mut module = module.clone();
-            shapes::shift(&mut module, -origin.x, -origin.y);
-            module
-        })
-        .collect();
-    editor.clipboard = Some(Clipboard {
-        from: frame.area_key.clone(),
-        modules,
-        origin: Some(origin),
-    });
-    editor.toast(format!("Copied {} modules", copied.len()));
+    let ids = scene_tree::selected_ids(frame, &editor.selection);
+    scene_tree::copy_rows(editor, frame, &ids);
 }
 
 pub fn start_paste(editor: &mut Editor, view_key: &str) {
@@ -565,82 +563,94 @@ pub(super) fn paste_anchor(tile: Pos<Tiles>) -> Pos<Tiles> {
 }
 
 pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, pasted: Vec<Value>, at: Pos<Tiles>) {
-    let mut names = object_names(frame);
-    let mut placed = Vec::new();
-    for mut module in pasted {
-        shapes::shift(&mut module, at.x, at.y);
-        if let Some(name) = module["name"].as_str().map(str::to_owned)
-            && names.contains(&name)
-        {
-            let fresh = rows::free_name(&name, &names);
-            names.insert(fresh.clone());
-            module["name"] = Value::String(fresh);
-        }
-        placed.push(module);
-    }
+    let mut taken = frame.object_names();
+    let placed: Vec<Value> = pasted
+        .into_iter()
+        .map(|mut node| {
+            blueprint::shift_tree(&mut node, at.x, at.y);
+            scene_tree::rename_objects(&mut node, &mut taken);
+            node
+        })
+        .collect();
     let count = placed.len();
     nodes::add(
         editor,
-        &frame.area_key,
+        &frame.bundle,
         placed,
-        &format!("Paste {count} modules"),
+        &format!("Paste {count} row{}", widgets::plural(count)),
     );
 }
 
-/// Copies the selected modules right beside themselves, one tile down and right.
 pub fn duplicate_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    let copied = selected_nodes(editor, frame);
-    if copied.is_empty() {
-        return;
-    }
-    let mut taken = object_names(frame);
-    let mut made = Vec::new();
-    let applied = nodes::change_scene(editor, &frame.area_key, |scene| {
-        made = nodes::duplicate(scene, &copied, |module| {
-            let mut module = module.clone();
-            shapes::shift(&mut module, 1.0, 1.0);
-            if let Some(name) = module["name"].as_str().map(str::to_owned) {
-                let fresh = rows::free_name(&name, &taken);
-                taken.insert(fresh.clone());
-                module["name"] = Value::String(fresh);
-            }
-            module
-        });
-        Some(format!("Duplicate {} modules", copied.len()))
-    });
-    if applied {
-        nodes::select(editor, &frame.area_key, made);
-    }
+    let ids = scene_tree::selected_ids(frame, &editor.selection);
+    scene_tree::duplicate_rows(editor, frame, &ids);
 }
 
 pub fn delete_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    if editor.selection.table == BlueprintDef::TABLE
-        && let Some(place) = frame.in_place.last().cloned()
-    {
-        placement::delete_parts_in_place(editor, frame, &place);
-        return;
-    }
-    let removed = selected_nodes(editor, frame);
-    if removed.is_empty() {
-        return;
-    }
-    let applied = nodes::change_scene(editor, &frame.area_key, |scene| {
-        let label = match removed.as_slice() {
-            [one] => format!("Remove {}", shapes::label(scene.pointer(one)?)),
-            many => format!("Remove {} modules", many.len()),
-        };
-        nodes::remove(scene, &removed);
-        Some(label)
-    });
-    if applied {
-        editor.selection.parts.clear();
-    }
+    let ids = scene_tree::selected_ids(frame, &editor.selection);
+    scene_tree::delete_rows(editor, frame, &ids);
 }
 
-fn object_names(frame: &AreaSnapshot) -> HashSet<String> {
-    frame
-        .modules
-        .iter()
-        .filter_map(|module| module.json["name"].as_str().map(str::to_owned))
-        .collect()
+/// Selects every module of the scene the map lets the pointer at, passing over what is hidden or
+/// locked.
+pub fn select_all(editor: &mut Editor, frame: &AreaFrame) {
+    let mut skipped = Skipped::default();
+    let (bundle, parts): (String, Vec<String>) = match frame.in_place.last() {
+        Some(place) => (
+            place.blueprint.clone(),
+            placement::parts_in_place(frame, place)
+                .into_iter()
+                .filter(|part| {
+                    skipped.locked += usize::from(part.locked);
+                    !part.locked
+                })
+                .map(|part| part.part)
+                .collect(),
+        ),
+        None => (
+            frame.bundle.clone(),
+            frame
+                .modules
+                .iter()
+                .filter(|module| super::is_selectable(&module.json))
+                .filter(|module| skipped.passes(&frame.flags.row(&module.pointer)))
+                .map(|module| module.pointer.clone())
+                .collect(),
+        ),
+    };
+    let count = parts.len();
+    nodes::select(editor, &bundle, parts);
+    skipped.tell(editor, count);
+}
+
+/// What a selection over many modules passed over.
+#[derive(Default)]
+struct Skipped {
+    hidden: usize,
+    locked: usize,
+}
+
+impl Skipped {
+    fn passes(&mut self, flags: &RowFlags) -> bool {
+        if flags.hidden.on() {
+            self.hidden += 1;
+        } else if flags.locked.on() {
+            self.locked += 1;
+        }
+        !flags.hidden.on() && !flags.locked.on()
+    }
+
+    fn tell(&self, editor: &mut Editor, selected: usize) {
+        let said: Vec<String> = [(self.locked, "locked"), (self.hidden, "hidden")]
+            .into_iter()
+            .filter(|(count, _)| *count > 0)
+            .map(|(count, what)| format!("{count} {what}"))
+            .collect();
+        if !said.is_empty() {
+            editor.toast(format!(
+                "Selected {selected}, {} skipped",
+                said.join(" and ")
+            ));
+        }
+    }
 }

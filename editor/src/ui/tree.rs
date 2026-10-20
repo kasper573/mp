@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::ops::Range;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Align2, Color32, FontId, Id, Pos2, Rangef, Rect, Stroke, StrokeKind, Ui, Vec2};
@@ -55,13 +56,60 @@ pub struct TreeRow {
     pub locked: Option<String>,
     /// What assistive tech reads for the row, when more than its name.
     pub spoken: Option<String>,
+    /// A letter in a coloured square in place of the icon, as the editor marks module kinds.
+    pub badge: Option<(String, Color32)>,
+    /// The row's eye and padlock, when it has them.
+    pub toggles: Option<RowToggles>,
+    /// Where new rows land: marked on the folder's left edge.
+    pub inserting: bool,
+    /// A closed folder with something selected inside.
+    pub holds_selected: bool,
+    /// Lit for what the pointer is over elsewhere, such as on the map.
+    pub lit: bool,
+    /// The part of the name a search matched.
+    pub matched: Option<Range<usize>>,
+    /// Said when the pointer rests on the row, after its problem.
+    pub tip: Option<String>,
 }
 
-/// Where dragged rows land: in `folder`, at `at` among what it holds.
+/// A row's hide and lock, each off, set on the row, or set by a folder above it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RowToggles {
+    pub hidden: ToggleState,
+    pub locked: ToggleState,
+    /// Shown but not pressable; the row's tip says why.
+    pub disabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ToggleState {
+    #[default]
+    Off,
+    Own,
+    Inherited,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Toggle {
+    Hide,
+    Lock,
+}
+
+/// A press on a row's eye or padlock, and whether Show only was held.
+#[derive(Clone, Debug)]
+pub struct Toggled {
+    pub id: String,
+    pub toggle: Toggle,
+    pub only: bool,
+}
+
+/// Where dragged rows land: in `folder`, at `at` among what it holds. `onto` is the row that
+/// isn't a folder the pointer rests on the middle of, which a source may refuse to drop onto.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeDrop {
     pub folder: String,
     pub at: DropAt,
+    pub onto: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -120,6 +168,13 @@ impl TreeState {
         self.renaming.as_ref().map(|renaming| renaming.id.as_str())
     }
 
+    /// Forgets which folders the tree holds open and what it has selected, for rows whose ids
+    /// now name other things.
+    pub fn forget(&mut self) {
+        self.view = TreeViewState::default();
+        self.narrowed_view = TreeViewState::default();
+    }
+
     /// Opens or closes every folder among `ids`.
     pub fn set_open(&mut self, ids: impl IntoIterator<Item = String>, open: bool) {
         for id in ids {
@@ -139,6 +194,7 @@ pub struct TreeResponse<A> {
     pub dropped: Option<(Vec<String>, TreeDrop)>,
     /// A row renamed in place, with the name typed.
     pub renamed: Option<(String, String)>,
+    pub toggled: Option<Toggled>,
     /// Whether the keys go to the tree.
     pub focused: bool,
 }
@@ -193,6 +249,7 @@ pub fn show<S: TreeSource>(
     let top = ui.cursor().min.y;
     let drawn: RefCell<Vec<DrawnRow>> = RefCell::new(Vec::new());
     let renamed: RefCell<Option<RenameEnd>> = RefCell::new(None);
+    let toggled: RefCell<Option<Toggled>> = RefCell::new(None);
     let picked: RefCell<Option<S::Action>> = RefCell::new(None);
     let rename_tip = renaming
         .as_ref()
@@ -222,6 +279,7 @@ pub fn show<S: TreeSource>(
                         drawn: &drawn,
                         renaming: &renaming_cell,
                         renamed: &renamed,
+                        toggled: &toggled,
                         rename_tip: rename_tip.as_deref(),
                     };
                     build(builder, lines, &rows);
@@ -238,6 +296,7 @@ pub fn show<S: TreeSource>(
         action: picked.into_inner(),
         dropped: None,
         renamed: None,
+        toggled: toggled.into_inner(),
         focused: ui.memory(|m| m.has_focus(id)),
     };
     match renamed.into_inner() {
@@ -418,6 +477,7 @@ struct RowsCx<'a> {
     drawn: &'a RefCell<Vec<DrawnRow>>,
     renaming: &'a RefCell<Option<Renaming>>,
     renamed: &'a RefCell<Option<RenameEnd>>,
+    toggled: &'a RefCell<Option<Toggled>>,
     rename_tip: Option<&'a str>,
 }
 
@@ -435,6 +495,7 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
             (true, false) => Some(Mark::Folder),
             (false, _) => row.icon,
         };
+        let badge = row.badge.clone().filter(|_| !folder);
         let dim = row.dim;
         let label_id = id.clone();
         let mut node = if folder {
@@ -464,7 +525,24 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
             .label_ui(move |ui: &mut Ui| {
                 row_label(ui, cx, &label_id, &row, open);
             });
-        if let Some(mark) = icon {
+        if let Some((letter, color)) = badge {
+            node = node.icon(move |ui: &mut Ui| {
+                let rect = Rect::from_center_size(ui.max_rect().center(), Vec2::splat(14.0));
+                let color = if dim {
+                    color.gamma_multiply(0.5)
+                } else {
+                    color
+                };
+                ui.painter().rect_filled(rect, 3.0, color);
+                ui.painter().text(
+                    rect.center(),
+                    Align2::CENTER_CENTER,
+                    &letter,
+                    FontId::monospace(10.0),
+                    design_tokens::ink::CREAM,
+                );
+            });
+        } else if let Some(mark) = icon {
             node = node.icon(move |ui: &mut Ui| {
                 let color = if dim { theme::FAINT } else { theme::MUTED };
                 glyph::paint(
@@ -485,9 +563,23 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
 
 fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
     let rect = ui.max_rect();
-    let right = rect.right() - 6.0;
+    if row.lit {
+        ui.painter()
+            .rect_filled(rect.expand2(Vec2::new(2.0, 1.0)), 3.0, theme::ACCENT_SOFT);
+    }
+    if row.inserting {
+        let bar = Rect::from_min_size(
+            egui::pos2(rect.left() - INDENT - 9.0, rect.top() + 2.0),
+            Vec2::new(3.0, rect.height() - 4.0),
+        );
+        ui.painter().rect_filled(bar, 1.0, theme::DROP);
+    }
+    let mut right = rect.right() - 6.0;
+    if let Some(toggles) = row.toggles {
+        right = row_toggles(ui, cx, id, row, toggles, right);
+    }
     let marks = row_marks(row, !row.folder || !open);
-    let mut reserved = MARK * (marks.len() as f32 + 1.0) + 6.0;
+    let mut reserved = rect.right() - right + MARK * (marks.len() as f32 + 1.0) + 6.0;
     let detail = (!row.detail.is_empty()).then(|| {
         ui.painter()
             .layout_no_wrap(row.detail.clone(), FontId::proportional(12.0), theme::FAINT)
@@ -538,11 +630,26 @@ fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
 fn name_label(ui: &mut Ui, row: &TreeRow, width: f32) {
     let ink = if row.dim { theme::FAINT } else { theme::TEXT };
     let mut job = egui::text::LayoutJob::default();
-    job.append(
-        &row.name,
-        0.0,
-        egui::TextFormat::simple(FontId::monospace(13.0), ink),
-    );
+    let plain = egui::TextFormat::simple(FontId::monospace(13.0), ink);
+    match row
+        .matched
+        .clone()
+        .filter(|range| row.name.get(range.clone()).is_some())
+    {
+        Some(range) => {
+            job.append(&row.name[..range.start], 0.0, plain.clone());
+            job.append(
+                &row.name[range.clone()],
+                0.0,
+                egui::TextFormat {
+                    background: theme::alpha(theme::WARN, 70),
+                    ..plain.clone()
+                },
+            );
+            job.append(&row.name[range.end..], 0.0, plain);
+        }
+        None => job.append(&row.name, 0.0, plain),
+    }
     if let Some((suffix, color)) = &row.suffix {
         let color = if row.dim { theme::FAINT } else { *color };
         job.append(
@@ -553,8 +660,15 @@ fn name_label(ui: &mut Ui, row: &TreeRow, width: f32) {
     }
     job.wrap = egui::text::TextWrapping::truncate_at_width(width);
     let spoken = row.spoken.clone().unwrap_or_else(|| row.name.clone());
-    ui.add(egui::Label::new(job).selectable(false))
-        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &spoken));
+    let response = ui.add(egui::Label::new(job).selectable(false));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &spoken));
+    let tip: Vec<&str> = [row.problem.as_deref(), row.tip.as_deref()]
+        .into_iter()
+        .flatten()
+        .collect();
+    if !tip.is_empty() {
+        response.on_hover_text(tip.join("\n\n"));
+    }
 }
 
 fn rename_box(ui: &mut Ui, cx: &RowsCx, renaming: &mut Renaming, width: f32) {
@@ -610,10 +724,146 @@ fn row_marks(row: &TreeRow, inside: bool) -> Vec<(Mark, Color32)> {
     if inside && row.unsaved {
         marks.push((Mark::Dot, theme::WARN));
     }
+    if inside && row.holds_selected {
+        marks.push((Mark::Dot, theme::DANGER));
+    }
     if row.locked.is_some() {
         marks.push((Mark::Padlock, theme::FAINT));
     }
     marks
+}
+
+/// Draws a row's eye and padlock at its right end and takes presses on them; answers where the
+/// rest of the row ends.
+fn row_toggles(
+    ui: &mut Ui,
+    cx: &RowsCx,
+    id: &str,
+    row: &TreeRow,
+    toggles: RowToggles,
+    right: f32,
+) -> f32 {
+    let center_y = ui.max_rect().center().y;
+    let mut x = right;
+    for (toggle, state) in [
+        (Toggle::Lock, toggles.locked),
+        (Toggle::Hide, toggles.hidden),
+    ] {
+        let rect = Rect::from_center_size(egui::pos2(x - MARK / 2.0, center_y), Vec2::splat(MARK));
+        let sense = if toggles.disabled {
+            egui::Sense::hover()
+        } else {
+            egui::Sense::click()
+        };
+        let response = ui.interact(rect, Id::new(("tree toggle", id, toggle as u8)), sense);
+        let (on, off, verb, undo) = match toggle {
+            Toggle::Hide => (Mark::EyeClosed, Mark::Eye, "Hide", "Show"),
+            Toggle::Lock => (Mark::Padlock, Mark::PadlockOpen, "Lock", "Unlock"),
+        };
+        let (mark, color) = match state {
+            ToggleState::Off if toggles.disabled => (off, theme::alpha(theme::FAINT, 120)),
+            ToggleState::Own | ToggleState::Inherited if toggles.disabled => (on, theme::FAINT),
+            ToggleState::Off if response.hovered() => (off, theme::MUTED),
+            ToggleState::Off => (off, theme::alpha(theme::FAINT, 120)),
+            ToggleState::Own => (on, theme::TEXT),
+            ToggleState::Inherited => (on, theme::FAINT),
+        };
+        glyph::paint(
+            ui.painter(),
+            mark,
+            Rect::from_center_size(rect.center(), Vec2::splat(11.0)),
+            color,
+        );
+        if state == ToggleState::Inherited {
+            let y = rect.center().y + 7.0;
+            for dot in 0..3 {
+                ui.painter().circle_filled(
+                    egui::pos2(rect.center().x - 4.0 + dot as f32 * 4.0, y),
+                    0.8,
+                    theme::FAINT,
+                );
+            }
+        }
+        let said = match state {
+            ToggleState::Own => format!("{undo} {}", row.name),
+            ToggleState::Inherited => format!("{verb} {}, now set by a folder above", row.name),
+            ToggleState::Off => format!("{verb} {}", row.name),
+        };
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, !toggles.disabled, &said)
+        });
+        let said = match (&row.tip, toggles.disabled) {
+            (Some(why), true) => why.clone(),
+            _ => said,
+        };
+        if response.on_hover_text(&said).clicked() {
+            *cx.toggled.borrow_mut() = Some(Toggled {
+                id: id.to_owned(),
+                toggle,
+                only: ui.input(|i| EditorKey::ShowOnly.held(i)),
+            });
+        }
+        x -= MARK;
+    }
+    x - 4.0
+}
+
+/// Where `needle`, lowercased, first shows in `name`, to highlight it.
+pub fn matched(name: &str, needle: &str) -> Option<Range<usize>> {
+    if needle.is_empty() {
+        return None;
+    }
+    let start = name.to_lowercase().find(needle)?;
+    Some(start..start + needle.len()).filter(|range| name.is_char_boundary(range.end))
+}
+
+/// Show ▾: which kinds of row a tree lists, and whether folders with nothing shown stay.
+pub fn show_menu(ui: &mut Ui, view: &mut crate::user::TreeView, kinds: &[String]) -> bool {
+    let shown = kinds
+        .iter()
+        .filter(|kind| !view.hidden_kinds.contains(*kind))
+        .count();
+    let label = if shown == kinds.len() {
+        "Show".to_owned()
+    } else {
+        format!("Show {shown} of {}", kinds.len())
+    };
+    let mut changed = false;
+    let button = design_tokens::controls::marked(ui, Mark::ChevronDown, label);
+    let menu = egui::Popup::from_toggle_button_response(&button)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+    menu.show(|ui| {
+        let mut all = shown == kinds.len();
+        if ui.checkbox(&mut all, "All").changed() {
+            view.hidden_kinds = if all {
+                BTreeSet::new()
+            } else {
+                kinds.iter().cloned().collect()
+            };
+            changed = true;
+        }
+        ui.separator();
+        egui::ScrollArea::vertical()
+            .max_height(360.0)
+            .show(ui, |ui| {
+                for kind in kinds {
+                    let mut on = !view.hidden_kinds.contains(kind);
+                    if ui.checkbox(&mut on, kind).changed() {
+                        if on {
+                            view.hidden_kinds.remove(kind);
+                        } else {
+                            view.hidden_kinds.insert(kind.clone());
+                        }
+                        changed = true;
+                    }
+                }
+            });
+        ui.separator();
+        changed |= ui
+            .checkbox(&mut view.hide_empty_folders, "Hide empty folders")
+            .changed();
+    });
+    changed
 }
 
 /// Where a drag would land. A tree without an order of its own always drops into a folder: the
@@ -632,9 +882,18 @@ fn drop_of<S: TreeSource>(
             DirPosition::Before(id) => DropAt::Before(id.clone()),
             DirPosition::After(id) => DropAt::After(id.clone()),
         };
+        let onto = drawn
+            .iter()
+            .find(|row| !row.folder && row.contains(pointer))
+            .filter(|row| {
+                let band = row.y.span() / 4.0;
+                pointer.y > row.y.min + band && pointer.y < row.y.max - band
+            })
+            .map(|row| row.id.clone());
         return TreeDrop {
             folder: target.to_owned(),
             at,
+            onto,
         };
     }
     let folder = match drawn.iter().find(|row| row.contains(pointer)) {
@@ -645,6 +904,7 @@ fn drop_of<S: TreeSource>(
     TreeDrop {
         folder,
         at: DropAt::End,
+        onto: None,
     }
 }
 

@@ -7,15 +7,16 @@ use engine::core::script::VariableType;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::scene::SceneNode;
-use engine::systems::area::{self, AreaId, Flip};
+use engine::systems::area::{self, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::fill_holes;
-use super::{AreaFrame, modules, select, shapes};
+use super::{AreaFrame, modules, nodes, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::theme;
+use crate::value::RowValue;
 use crate::{rows, thumbs, value};
 
 pub fn placement_json(blueprint: &str, at: Pos<Tiles>, flip: Flip, values: &Value) -> Value {
@@ -59,17 +60,17 @@ pub fn stamp_panel(
     ui: &mut Ui,
     view_key: &str,
     content: &Content,
-    area_id: AreaId,
+    bundle: &str,
 ) {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    for placement in area::placements(content, area_id) {
-        if placement.chain.len() <= 1 {
+    for module in nodes::modules(&nodes::scene_of(editor, bundle)) {
+        if module.json.is_module(area::AreaModuleKind::Blueprint) {
             *counts
-                .entry(placement.blueprint.path(content).to_owned())
+                .entry(module.json.text("blueprint").to_owned())
                 .or_default() += 1;
         }
     }
-    let area_key = area_id.path(content).to_owned();
+    let area_key = bundle.to_owned();
     let needle = {
         let view = editor.views.area.view_mut(view_key);
         ui.add_space(4.0);
@@ -130,9 +131,22 @@ pub fn stamp_panel(
         ui.spacing_mut().item_spacing.x = gap;
         for (key, count) in listed.iter().take(shown) {
             let selected = editor.views.area.view(view_key).stamp.as_deref() == Some(key);
+            let refused = editor
+                .project
+                .as_ref()
+                .and_then(|project| super::placement::holds_itself(&project.files, &area_key, key));
             let response = blueprint_card(editor, ui, content, key, *count, selected, card);
-            if response.on_hover_text(key).clicked() {
-                picked = Some(key.clone());
+            match refused {
+                Some(reason) => {
+                    ui.painter()
+                        .rect_filled(response.rect, 4.0, theme::alpha(theme::PANEL, 180));
+                    response.on_hover_text(format!("{key}: {reason}"));
+                }
+                None => {
+                    if response.on_hover_text(key).clicked() {
+                        picked = Some(key.clone());
+                    }
+                }
             }
         }
         if listed.len() > shown {
@@ -402,7 +416,7 @@ pub(super) fn place_stamps(
     };
     let def = id.get(&content);
     let flip = stamp_flip(editor, stamp);
-    let mut taken: HashSet<String> = object_names(&content, frame.area_id);
+    let mut taken: HashSet<String> = frame.object_names();
     let mut modules = Vec::new();
     for at in &placed {
         let mut own = values.clone();
@@ -430,11 +444,11 @@ pub(super) fn place_stamps(
     }
     let count = modules.len();
     let label = if count == 1 {
-        format!("Place {stamp} in {}", frame.area_key)
+        format!("Place {stamp} in {}", frame.bundle)
     } else {
-        format!("Place {count} × {stamp} in {}", frame.area_key)
+        format!("Place {count} × {stamp} in {}", frame.bundle)
     };
-    let area_key = frame.area_key.clone();
+    let area_key = frame.bundle.clone();
     let text = match modules::place_modules(editor, &area_key, modules, &label) {
         modules::PlaceOutcome::Whole => None,
         modules::PlaceOutcome::Partly { skipped, reason } => {
@@ -444,18 +458,13 @@ pub(super) fn place_stamps(
     if let Some(text) = &text {
         editor.toast(text.clone());
     }
-    if let Some(view) = editor
-        .views
-        .area
-        .views
-        .get_mut(&super::area_view_key(&area_key))
-    {
+    if let Some(view) = editor.views.area.views.get_mut(&super::view_key(&area_key)) {
         view.skipped = text;
     }
 }
 
-pub fn object_names(content: &Content, area_id: AreaId) -> HashSet<String> {
-    area::objects(area::placed(content, area_id))
+pub fn object_names(placed: &[area::blueprint::Flattened]) -> HashSet<String> {
+    area::objects(placed)
         .filter_map(|(_, object)| object.name.clone())
         .collect()
 }

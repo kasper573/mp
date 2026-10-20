@@ -8,13 +8,9 @@ use crate::schema;
 use crate::value::RowValue;
 use crate::views::sound;
 
-pub fn pick_then_add(
-    editor: &mut Editor,
-    frame: &AreaFrame,
-    module: Value,
-    table: &str,
-    field: &str,
-) {
+/// Asks which row of `table` the new `module` names in its `field`, then adds it to `bundle`'s
+/// insertion folder.
+pub fn pick_then_add(editor: &mut Editor, bundle: &str, module: Value, table: &str, field: &str) {
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
         title: format!(
             "Pick a {table} for the new {}",
@@ -25,7 +21,7 @@ pub fn pick_then_add(
         picked: None,
         options: Vec::new(),
         then: PickRowThen::AddModule {
-            area: frame.area_key.clone(),
+            area: bundle.to_owned(),
             module,
             field: field.to_owned(),
         },
@@ -40,6 +36,9 @@ pub fn add_picked(editor: &mut Editor, area: &str, mut module: Value, field: &st
 }
 
 pub fn listen(editor: &mut Editor, frame: &AreaFrame, tile: Pos<Tiles>) {
-    sound::listen(editor, &frame.content, frame.area_id, tile);
+    let Some(area) = frame.area_id() else {
+        return;
+    };
+    sound::listen(editor, &frame.content, area, tile);
     editor.panels.bottom = BottomTab::Listen;
 }

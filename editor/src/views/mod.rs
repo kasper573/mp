@@ -114,13 +114,13 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
 pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
     match (ui::active_tab(editor), tab) {
         (Some(EditorTab::Area { key }), BottomTab::Palette | BottomTab::Blueprints) => {
-            area::bottom(editor, ui, &area::area_view_key(&key), tab)
+            area::bottom(editor, ui, &area::view_key(&key), tab)
         }
         (Some(EditorTab::Area { .. }) | Some(EditorTab::Blueprint { .. }), BottomTab::Listen) => {
             sound::panel(editor, ui)
         }
         (Some(EditorTab::Blueprint { key }), BottomTab::Palette | BottomTab::Blueprints) => {
-            area::bottom(editor, ui, &area::blueprint_view_key(&key), tab)
+            area::bottom(editor, ui, &area::view_key(&key), tab)
         }
         (Some(EditorTab::Script(owner)), BottomTab::MayDo | BottomTab::UsedBy | BottomTab::Run) => {
             script::bottom(editor, ui, &owner, tab)

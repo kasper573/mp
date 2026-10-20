@@ -32,9 +32,9 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaF
     let selecting = view.tool == AreaTool::Select;
     if selecting
         && let Some(hit) = frame.hit(tile)
-        && !super::selected_parts(editor, &frame.area_key).contains(&hit)
+        && !super::selected_parts(editor, &frame.bundle).contains(&hit)
     {
-        nodes::select(editor, &frame.area_key, vec![hit]);
+        nodes::select(editor, &frame.bundle, vec![hit]);
     }
     let view = editor.views.area.view_mut(view_key);
     open_menu(
@@ -111,7 +111,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         return;
     };
     let mut action: Option<MenuAction> = None;
-    let selected = super::selected_parts(editor, &frame.area_key);
+    let selected = super::selected_parts(editor, &frame.bundle);
     let variants = module_variants(editor);
     egui::Popup::new(
         id,
@@ -126,31 +126,35 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         ui.label(RichText::new(format!("{}, {}", cell.x, cell.y)).weak());
         let character =
             play::current_character(editor).unwrap_or_else(|| "a test character".to_owned());
-        if ui
-            .add(widgets::shortcut_button(
-                format!("Play here as {character}"),
-                EditorKey::PlayHere,
-            ))
-            .clicked()
+        let in_area = frame.area_id().is_some();
+        if in_area
+            && ui
+                .add(widgets::shortcut_button(
+                    format!("Play here as {character}"),
+                    EditorKey::PlayHere,
+                ))
+                .clicked()
         {
             action = Some(MenuAction::PlayHere);
             ui.close();
         }
-        ui.menu_button("Play here as…", |ui| {
-            for other in play::test_characters(editor) {
-                if ui
-                    .button(format!(
-                        "{} · level {} · {}",
-                        other.key, other.level, other.area
-                    ))
-                    .clicked()
-                {
-                    editor.play.character = Some(other.key.clone());
-                    editor.settings.last_play = Some(other.key);
-                    action = Some(MenuAction::PlayHere);
-                    ui.close();
+        ui.add_enabled_ui(in_area, |ui| {
+            ui.menu_button("Play here as…", |ui| {
+                for other in play::test_characters(editor) {
+                    if ui
+                        .button(format!(
+                            "{} · level {} · {}",
+                            other.key, other.level, other.area
+                        ))
+                        .clicked()
+                    {
+                        editor.play.character = Some(other.key.clone());
+                        editor.settings.last_play = Some(other.key);
+                        action = Some(MenuAction::PlayHere);
+                        ui.close();
+                    }
                 }
-            }
+            })
         });
         if ui
             .add(widgets::shortcut_button(
@@ -163,20 +167,31 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             ui.close();
         }
         ui.separator();
-        if ui.button("Set the game's spawn here").clicked() {
+        if in_area && ui.button("Set the game's spawn here").clicked() {
             action = Some(MenuAction::SetSpawn);
             ui.close();
         }
-        if ui
-            .button(format!("Listen here ({} click)", EditorKey::Listen.name()))
-            .clicked()
+        if in_area
+            && ui
+                .button(format!("Listen here ({} click)", EditorKey::Listen.name()))
+                .clicked()
         {
             action = Some(MenuAction::Listen);
             ui.close();
         }
         ui.separator();
+        let folder = nodes::insertion_folder(editor, &frame.bundle);
+        let into = match folder.as_str() {
+            "" => String::new(),
+            folder => frame
+                .scene
+                .pointer(folder)
+                .and_then(|node| node["label"].as_str())
+                .map(|label| format!(" INTO {}", label.to_uppercase()))
+                .unwrap_or_default(),
+        };
         ui.label(
-            RichText::new("ADD MODULE")
+            RichText::new(format!("ADD MODULE{into}"))
                 .size(11.0)
                 .color(crate::ui::theme::MUTED)
                 .family(theme::medium()),
@@ -284,14 +299,16 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
     };
     match action {
         MenuAction::PlayHere => {
-            let place = Place {
-                area: frame.area_id,
-                at: tile.snap(),
-            };
-            play::start(editor, Some(place));
+            if let Some(area) = frame.area_id() {
+                let place = Place {
+                    area,
+                    at: tile.snap(),
+                };
+                play::start(editor, Some(place));
+            }
         }
         MenuAction::PlayFromStart => play::start(editor, None),
-        MenuAction::SetSpawn => pins::set_spawn(editor, &frame.area_key, tile.snap()),
+        MenuAction::SetSpawn => pins::set_spawn(editor, &frame.bundle, tile.snap()),
         MenuAction::Listen => {
             editor.views.area.view_mut(view_key).listener = Some(tile);
             pick::listen(editor, frame, tile);
@@ -414,15 +431,29 @@ pub fn add_module(
     if let Some(table) = reference
         && module[table].as_str().unwrap_or_default().is_empty()
     {
-        pick::pick_then_add(editor, frame, module, table, table);
+        pick::pick_then_add(editor, &frame.bundle, module, table, table);
         return;
     }
+    let bundle = match frame.in_place.last() {
+        Some(place) if editor.selection.keys.first() == Some(&place.blueprint) => {
+            let at = shapes::pos_of(&module["at"])
+                .or_else(|| shapes::bounds(&module, None).map(|bounds| bounds.min()));
+            if let Some(at) = at {
+                let local = place
+                    .flip
+                    .apply(Pos::new(at.x - place.at.x, at.y - place.at.y));
+                shapes::shift(&mut module, local.x - at.x, local.y - at.y);
+            }
+            place.blueprint.clone()
+        }
+        _ => frame.bundle.clone(),
+    };
     let label = shapes::label(&module);
     nodes::add(
         editor,
-        &frame.area_key,
+        &bundle,
         vec![module],
-        &format!("Add {label} to {}", file_title(&frame.area_key)),
+        &format!("Add {label} to {}", file_title(&bundle)),
     );
 }
 

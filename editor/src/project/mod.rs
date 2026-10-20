@@ -38,6 +38,9 @@ pub struct ContentEdit {
     pub label: String,
     pub changes: Vec<FileChange>,
     pub merge: bool,
+    /// The label of the last step this edit joins, taking its own label, when that step is still
+    /// the last one made.
+    pub amends: Option<String>,
 }
 
 impl ContentEdit {
@@ -46,11 +49,17 @@ impl ContentEdit {
             label: label.into(),
             changes: Vec::new(),
             merge: false,
+            amends: None,
         }
     }
 
     pub fn merging(mut self) -> ContentEdit {
         self.merge = true;
+        self
+    }
+
+    pub fn amending(mut self, step: &str) -> ContentEdit {
+        self.amends = Some(step.to_owned());
         self
     }
 
@@ -189,7 +198,8 @@ pub struct EditViewpoint {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AreaCameraState {
-    pub area: String,
+    /// The area or blueprint bundle the camera looks at.
+    pub bundle: String,
     pub center: Pos<Tiles>,
     pub zoom: f32,
 }
@@ -431,7 +441,13 @@ impl Project {
             .collect();
         let next = self.files.with(&changes);
         self.adopt(next);
-        if !(edit.merge && self.history.merge_into_last(&edit.label, changes.clone())) {
+        let amended = edit.amends.as_deref().is_some_and(|step| {
+            self.history
+                .amend_last(step, &edit.label, changes.clone(), &before)
+        });
+        let merged =
+            amended || (edit.merge && self.history.merge_into_last(&edit.label, changes.clone()));
+        if !merged {
             self.history.push(EditStep {
                 label: edit.label,
                 before,

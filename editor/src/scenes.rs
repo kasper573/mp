@@ -289,7 +289,7 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
                 .and_then(|c| c.by_path::<AreaDef>(key).map(|id| area::load(&c, id).size));
             editor.open_tab(EditorTab::Area { key: key.clone() });
             editor.dialogs.push(ModalDialog::Resize(ResizeDialog {
-                area: key.clone(),
+                bundle: key.clone(),
                 width: size.map_or(0, |s| s.width as u32),
                 height: size.map_or(0, |s| s.height as u32),
                 anchor: (-1, -1),

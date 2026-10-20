@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bevy::asset::RenderAssetUsages;
@@ -10,11 +11,11 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
 use engine::core::content::Content;
-use engine::core::math::{Pos, Rect};
+use engine::core::math::{Pos, Rect, Size};
 use engine::core::render::{self, TILE, ToScreen};
 use engine::core::tiling::{TileSize, Tiles};
 use engine::systems::area::scene::SceneNode;
-use engine::systems::area::{self, AreaId, AreaModule, Flip, Scenery};
+use engine::systems::area::{self, AreaGrids, AreaModule, Flip, Picture, Scenery};
 use engine::systems::screen::area::TileSheets;
 
 use super::stamp;
@@ -35,21 +36,48 @@ pub struct AreaSceneRequest {
 
 #[derive(Clone, PartialEq)]
 pub struct AreaSceneSpec {
-    pub ground: String,
-    pub scenery: SceneryOf,
+    pub drawn: Drawn,
     pub hidden_ground: Vec<String>,
-    pub show_blueprints: bool,
-    pub show_scenery: bool,
+    /// Whether the scene clears to nothing, so what is drawn under it shows where it paints no
+    /// cell.
+    pub see_through: bool,
 }
 
-#[derive(Clone, PartialEq)]
-pub enum SceneryOf {
-    Area,
-    Parts {
-        blueprint: String,
-        at: Pos<Tiles>,
-        values: serde_json::Value,
-    },
+impl AreaSceneSpec {
+    pub fn area(path: &str) -> AreaSceneSpec {
+        AreaSceneSpec {
+            drawn: Drawn::Area(path.to_owned()),
+            hidden_ground: Vec::new(),
+            see_through: false,
+        }
+    }
+
+    /// The ground of the area at `path` alone, as a backdrop under a bundle's own picture.
+    pub fn ground(path: &str) -> AreaSceneSpec {
+        AreaSceneSpec {
+            drawn: Drawn::Ground(path.to_owned()),
+            ..AreaSceneSpec::area(path)
+        }
+    }
+}
+
+/// What a scene draws: an area as the game builds it, only its ground, or a picture the editor
+/// made of a bundle.
+#[derive(Clone)]
+pub enum Drawn {
+    Area(String),
+    Ground(String),
+    Picture(Arc<Picture>),
+}
+
+impl PartialEq for Drawn {
+    fn eq(&self, other: &Drawn) -> bool {
+        match (self, other) {
+            (Drawn::Area(a), Drawn::Area(b)) | (Drawn::Ground(a), Drawn::Ground(b)) => a == b,
+            (Drawn::Picture(a), Drawn::Picture(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
 }
 
 pub struct AreaScene {
@@ -252,8 +280,29 @@ fn spawn(
     world: &mut World,
     now: Duration,
 ) {
-    let Some(area_id) = content.by_path::<area::AreaDef>(&request.spec.ground) else {
-        return;
+    let picture = match &request.spec.drawn {
+        Drawn::Area(path) | Drawn::Ground(path) => {
+            let Some(id) = content.by_path::<area::AreaDef>(path) else {
+                return;
+            };
+            let area = area::load(content, id);
+            let scenery = match request.spec.drawn {
+                Drawn::Ground(_) => Vec::new(),
+                _ => area.scenery.clone(),
+            };
+            Pictured {
+                size: area.size,
+                sort_base: area.sort_base(),
+                ground: area.grids.clone(),
+                scenery,
+            }
+        }
+        Drawn::Picture(picture) => Pictured {
+            size: picture.area.size,
+            sort_base: picture.area.sort_base(),
+            ground: picture.ground.clone(),
+            scenery: picture.scenery.clone(),
+        },
     };
     let layer = scenes.free_layers.pop().unwrap_or_else(|| {
         scenes.next_layer += 1;
@@ -271,7 +320,11 @@ fn spawn(
             RenderTarget::Image(image.clone().into()),
             Camera {
                 order: -(10 + layer as isize),
-                clear_color: ClearColorConfig::Custom(Color::srgb(0.09, 0.09, 0.11)),
+                clear_color: ClearColorConfig::Custom(if request.spec.see_through {
+                    Color::NONE
+                } else {
+                    Color::srgb(0.09, 0.09, 0.11)
+                }),
                 ..default()
             },
             Projection::Orthographic(OrthographicProjection {
@@ -283,33 +336,16 @@ fn spawn(
             AreaSceneOf(layer),
         ))
         .id();
-    let area = area::load(content, area_id);
-    let scenery: Vec<Scenery> = match &request.spec.scenery {
-        SceneryOf::Area => area::placed(content, area_id)
-            .iter()
-            .filter(|placed| {
-                if placed.chain.is_empty() {
-                    request.spec.show_scenery
-                } else {
-                    request.spec.show_blueprints
-                }
-            })
-            .filter_map(|placed| match &placed.module {
-                AreaModule::Scenery(scenery) => Some(scenery.clone()),
-                _ => None,
-            })
-            .collect(),
-        SceneryOf::Parts {
-            blueprint,
-            at,
-            values,
-        } => parts_scenery(content, blueprint, *at, values),
-    };
-    let sheets = sheets_for(scenes, content, files, &area.grids, &scenery, world);
+    let sheets = sheets_for(
+        scenes,
+        content,
+        files,
+        &picture.ground,
+        &picture.scenery,
+        world,
+    );
     let spec = SpawnSpec {
-        content: content.clone(),
-        area: area_id,
-        scenery,
+        picture,
         sheets,
         layer,
         hidden_ground: request.spec.hidden_ground.clone(),
@@ -418,10 +454,16 @@ pub fn image_handle(
     handle
 }
 
-struct SpawnSpec {
-    content: Content,
-    area: AreaId,
+/// What a scene spawns tiles for.
+struct Pictured {
+    size: Size<Tiles>,
+    sort_base: f32,
+    ground: Arc<AreaGrids>,
     scenery: Vec<Scenery>,
+}
+
+struct SpawnSpec {
+    picture: Pictured,
     sheets: TileSheets,
     layer: usize,
     hidden_ground: Vec<String>,
@@ -434,10 +476,10 @@ fn spawn_tiles(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<bevy_tilemap::TilemapMaterial>>,
 ) {
-    let area = area::load(&spec.content, spec.area);
-    let grids = area.grids.clone();
+    let picture = &spec.picture;
+    let grids = picture.ground.clone();
     let size = grids.size;
-    let origin = area.size.bounds().min().to_screen();
+    let origin = picture.size.bounds().min().to_screen();
     let scene_tag = (
         AreaSceneOf(spec.layer),
         RenderLayers::from_layers(&[spec.layer]),
@@ -480,21 +522,21 @@ fn spawn_tiles(
             scene_tag.clone(),
         );
     }
-    let flat_count = spec
+    let flat_count = picture
         .scenery
         .iter()
         .filter(|s| s.sort_line().is_none())
         .count();
     let mut flat_index = 0;
-    for scenery in &spec.scenery {
+    for scenery in &picture.scenery {
         let Some(sheet) = spec.sheets.index(scenery.tileset) else {
             continue;
         };
         let z = match scenery.sort_line() {
-            Some(line) => render::dynamic_z(area.size.height, area.sort_base(), line),
+            Some(line) => render::dynamic_z(picture.size.height, picture.sort_base, line),
             None => {
                 flat_index += 1;
-                area.sort_base() - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
+                picture.sort_base - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
             }
         };
         for (row, tiles) in scenery.tiles.iter().enumerate() {

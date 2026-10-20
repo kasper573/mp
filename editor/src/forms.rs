@@ -101,16 +101,22 @@ impl<'a> FormCx<'a> {
     /// How `path` reads from the file this form edits: how many folders up from it their paths
     /// meet, and the path from there.
     pub fn seen_from_here(&self, path: &str) -> (usize, String) {
-        let here: Vec<&str> = self.row_key.as_deref().map_or(Vec::new(), |own| {
-            parent_of(own)
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect()
-        });
-        let there: Vec<&str> = path.split('/').collect();
-        let shared = here.iter().zip(&there).take_while(|(a, b)| a == b).count();
-        (here.len() - shared, there[shared..].join("/"))
+        seen_from(self.row_key.as_deref(), path)
     }
+}
+
+/// How `path` reads from the file `own`: how many folders up from it their paths meet, and the
+/// path from there.
+pub fn seen_from(own: Option<&str>, path: &str) -> (usize, String) {
+    let here: Vec<&str> = own.map_or(Vec::new(), |own| {
+        parent_of(own)
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect()
+    });
+    let there: Vec<&str> = path.split('/').collect();
+    let shared = here.iter().zip(&there).take_while(|(a, b)| a == b).count();
+    (here.len() - shared, there[shared..].join("/"))
 }
 
 #[derive(Default)]

@@ -2,6 +2,7 @@ use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area::AreaModuleKind;
+use serde_json::Value;
 use strum::VariantArray;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
@@ -11,8 +12,8 @@ use super::select::{
     paste_in_place, select_input, selected_nodes, snapped_delta, start_paste,
 };
 use super::{
-    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, nodes, placement, shapes,
-    stamp,
+    AreaDrag, AreaFrame, AreaTool, Armed, MAX_ZOOM, MIN_ZOOM, blueprint, grid, nodes, placement,
+    shapes, stamp,
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
@@ -61,8 +62,20 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         }
         ui.add_space(2.0);
     }
-    if let Some(bottom) = switched.and_then(AreaTool::bottom_tab) {
+    if let Some(tool) = switched {
+        took(editor, view_key, tool);
+    }
+}
+
+/// What taking a tool brings along: its bottom tab, and for a brush, a layer to paint into.
+fn took(editor: &mut Editor, view_key: &str, tool: AreaTool) {
+    if let Some(bottom) = tool.bottom_tab() {
         editor.panels.bottom = bottom;
+    }
+    let walking = editor.views.area.view(view_key).armed == Armed::Walk;
+    let walk_brush = matches!(tool, AreaTool::Paint | AreaTool::Fill | AreaTool::Erase);
+    if tool.paints() && !(walking && walk_brush) {
+        super::arm_a_layer(editor, view_key);
     }
 }
 
@@ -157,15 +170,22 @@ pub fn input(
         );
         return;
     }
-    let tool = editor.views.area.view(view_key).tool;
-    let walk_overlay = editor.views.area.view(view_key).walk_overlay;
+    let view = editor.views.area.view(view_key);
+    let tool = view.tool;
+    let walking = view.armed == Armed::Walk;
+    let walk_locked = walking && view.walk_locked;
+    let walk_value = view.walk_value;
     if response.secondary_clicked() {
         context_menu_at(editor, view_key, frame);
     }
     match tool {
         AreaTool::Select => select_input(editor, ui, view_key, frame, modifiers),
-        AreaTool::Paint if walk_overlay => {
-            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk)
+        _ if walk_locked && tool.paints() => {}
+        AreaTool::Paint if walking => {
+            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk(walk_value))
+        }
+        AreaTool::Erase if walking => {
+            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk(None))
         }
         AreaTool::Paint => grid_stroke(editor, view_key, frame, BrushStrokeKind::Paint),
         AreaTool::Erase => grid_stroke(editor, view_key, frame, BrushStrokeKind::Erase),
@@ -195,8 +215,15 @@ pub fn input(
             if response.clicked()
                 && let Some(tile) = frame.pointer_tile
             {
-                editor.views.area.view_mut(view_key).cursor_cell = Some(tile.cell());
-                open_add_menu(ui, editor, view_key, frame, tile);
+                let view = editor.views.area.view_mut(view_key);
+                view.cursor_cell = Some(tile.cell());
+                match view.placing.take() {
+                    Some(kind) => {
+                        view.set_tool(AreaTool::Select);
+                        super::modules::add_module(editor, view_key, frame, kind, tile);
+                    }
+                    None => open_add_menu(ui, editor, view_key, frame, tile),
+                }
             }
         }
     }
@@ -254,7 +281,8 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     {
         let at = paste_anchor(tile);
         let mut whole: Option<Rect<Tiles>> = None;
-        for module in &ghost.modules {
+        for module in nodes::modules(&Value::Array(ghost.modules.clone())) {
+            let module = &module.json;
             let mut placed = module.clone();
             shapes::shift(&mut placed, at.x, at.y);
             if let Some(bounds) = shapes::bounds(&placed, None) {
@@ -305,7 +333,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         editor
             .status
             .left
-            .push(format!("pasting into area/{}", frame.area_key));
+            .push(format!("pasting into area/{}", frame.bundle));
         editor.status.left.push(format!(
             "click or {} places · {} cancels",
             EditorKey::Confirm.name(),
@@ -320,22 +348,40 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     let Some(cell) = frame.pointer_cell() else {
         return;
     };
+    let walking = view.armed == Armed::Walk;
+    let covered = match &view.armed {
+        Armed::Layer { name, .. } if view.tool.paints() => frame.covering(cell, name),
+        _ => None,
+    };
+    if let Some(placement) = &covered {
+        under_placement_tip(frame, placement, &view.armed);
+    }
     match view.tool {
         AreaTool::Paint | AreaTool::Erase => {
             let cells = grid::brush_cells(cell, brush.size);
             if let Some(rect) = grid::rect_of_cells(&cells) {
-                let color = if view.tool == AreaTool::Erase || view.walk_overlay {
+                let color = if view.tool == AreaTool::Erase || walking {
                     Color32::from_rgb(255, 120, 120)
                 } else {
                     accent
                 };
-                painter.rect_stroke(
-                    canvas.rect(rect),
-                    0.0,
-                    EStroke::new(1.5, color),
-                    egui::StrokeKind::Inside,
-                );
-                if view.tool == AreaTool::Paint && !view.walk_overlay {
+                if covered.is_some() {
+                    widgets::dashed_rect(
+                        painter,
+                        canvas.rect(rect),
+                        EStroke::new(1.5, color),
+                        5.0,
+                        3.0,
+                    );
+                } else {
+                    painter.rect_stroke(
+                        canvas.rect(rect),
+                        0.0,
+                        EStroke::new(1.5, color),
+                        egui::StrokeKind::Inside,
+                    );
+                }
+                if view.tool == AreaTool::Paint && !walking {
                     paint_preview(editor, painter, view_key, frame, &cells);
                 }
             }
@@ -349,6 +395,20 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                     0.0,
                     EStroke::new(1.5, Color32::from_rgb(140, 220, 140)),
                     egui::StrokeKind::Inside,
+                );
+            }
+        }
+        AreaTool::Module if view.placing.is_some() => {
+            let kind = view.placing.expect("a kind being placed");
+            if let Some(module) = super::modules::module_template(editor, kind, cell) {
+                let color = super::overlays::module_color(Some(kind));
+                let bounds = shapes::bounds(&module, None).unwrap_or(cell.bounds());
+                let rect = canvas.rect(bounds);
+                widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+                frame.labels.chip(
+                    rect.min + Vec2::new(0.0, -4.0),
+                    format!("new {}", kind.tag().replace('_', " ")),
+                    color,
                 );
             }
         }
@@ -398,14 +458,11 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         for &tool in AreaTool::VARIANTS {
             if pressed(tool.key()) {
                 view.set_tool(tool);
-                switched = tool.bottom_tab();
+                switched = Some(tool);
             }
         }
         if pressed(EditorKey::WalkOverlay) {
             view.walk_overlay = !view.walk_overlay;
-        }
-        if pressed(EditorKey::Layers) {
-            view.layers_open = Some(!view.layers_shown());
         }
         if view.tool == AreaTool::Terrain
             && let Some(index) = EditorKey::Pick.digit(&input)
@@ -413,8 +470,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             view.terrain.terrain = index;
         }
     }
-    if let Some(bottom) = switched {
-        editor.panels.bottom = bottom;
+    if let Some(tool) = switched {
+        took(editor, view_key, tool);
     }
     let view_tool = editor.views.area.view(view_key).tool;
     let flip_across = pressed(EditorKey::FlipHorizontal);
@@ -434,7 +491,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             _ => {
                 let flipped = selected_nodes(editor, frame);
                 if !flipped.is_empty() {
-                    nodes::change_scene(editor, &frame.area_key, |scene| {
+                    nodes::change_scene(editor, &frame.bundle, |scene| {
                         for node in &flipped {
                             shapes::flip_field(scene.pointer_mut(node)?, horizontal);
                         }
@@ -446,7 +503,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     }
     if pressed(EditorKey::Cancel) {
         let view = editor.views.area.view_mut(view_key);
-        if !view.cancel_gesture() && view.paste.take().is_none() {
+        if !view.cancel_gesture() && view.paste.take().is_none() && view.show_only.take().is_none()
+        {
             view.in_place.pop();
             editor.selection.parts.clear();
         }
@@ -488,6 +546,9 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     if pressed(EditorKey::Duplicate) {
         duplicate_selection(editor, frame);
     }
+    if pressed(EditorKey::SelectAll) {
+        super::select::select_all(editor, frame);
+    }
     if pressed(EditorKey::MakeBlueprint) {
         blueprint::make_blueprint_from_selection(editor, frame);
     }
@@ -510,7 +571,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     {
         let tile = cursor.center();
         if let Some(hit) = frame.hit(tile) {
-            nodes::select(editor, &frame.area_key, vec![hit]);
+            nodes::select(editor, &frame.bundle, vec![hit]);
         }
     }
     if pressed(EditorKey::ContextMenu) {
@@ -522,4 +583,29 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
         super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }
+}
+
+/// Says that the cell under the brush shows what a placement paints, so a stroke on the bundle's
+/// own cells there won't show.
+fn under_placement_tip(frame: &AreaFrame, placement: &str, armed: &Armed) {
+    let Armed::Layer { name, .. } = armed else {
+        return;
+    };
+    let label = frame
+        .module(placement)
+        .map(shapes::label)
+        .unwrap_or_default();
+    if let Some(bounds) = frame.module_bounds(placement) {
+        widgets::dashed_rect(
+            &frame.response.ctx.layer_painter(frame.response.layer_id),
+            frame.canvas.rect(bounds),
+            EStroke::new(1.0, theme::DROP),
+            4.0,
+            3.0,
+        );
+    }
+    frame.response.clone().on_hover_text_at_pointer(format!(
+        "This cell shows {label}'s {name}: the stroke paints the {name} beneath it. \
+         Double-click {label} in the scene to edit it in place instead."
+    ));
 }

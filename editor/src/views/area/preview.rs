@@ -5,7 +5,7 @@ use engine::systems::area;
 use engine::systems::script::Place;
 use serde_json::Value;
 
-use super::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use super::scene::{AreaSceneRequest, AreaSceneSpec};
 use super::{pins, select};
 use crate::app::Editor;
 use crate::forms;
@@ -101,13 +101,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let view_key = format!("pick:{area_key}");
     editor.views.area.requests.push(AreaSceneRequest {
         key: view_key.clone(),
-        spec: AreaSceneSpec {
-            ground: area_key.clone(),
-            scenery: SceneryOf::Area,
-            hidden_ground: Vec::new(),
-            show_blueprints: true,
-            show_scenery: true,
-        },
+        spec: AreaSceneSpec::area(&area_key),
         width: (rect.width() * ppp).round().max(1.0) as u32,
         height: (rect.height() * ppp).round().max(1.0) as u32,
         center,

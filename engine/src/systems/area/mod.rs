@@ -644,17 +644,96 @@ impl Area {
     }
 }
 
-pub struct Areas(Vec<Option<Area>>);
+pub struct Areas(Vec<Option<Arc<Area>>>);
 
 pub struct AreaGridSet(Vec<Option<Arc<AreaGrids>>>);
 
 pub fn load(content: &Content, area: AreaId) -> &Area {
+    shared(content, area)
+}
+
+/// The area as `load` gives it, to keep beside the content it came from.
+pub fn shared(content: &Content, area: AreaId) -> &Arc<Area> {
     content
         .built::<Areas>()
         .0
         .get(area.index())
         .and_then(Option::as_ref)
         .unwrap_or_else(|| panic!("area {} failed to load", area.path(content)))
+}
+
+/// A bundle the editor pictures: an area, or a blueprint on its own canvas.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Pictured {
+    Area(AreaId),
+    Blueprint(blueprint::BlueprintId),
+}
+
+/// What a bundle's scene makes, as the editor shows it.
+pub struct Picture {
+    /// The area the bundle makes with every node in it, as the game builds it.
+    pub area: Arc<Area>,
+    pub placed: Vec<Flattened>,
+    pub placements: Vec<PlacedBlueprint>,
+    /// The ground drawn: the bundle's own cells, stamped by the placements kept.
+    pub ground: Arc<AreaGrids>,
+    /// The scenery drawn: what the nodes kept bring.
+    pub scenery: Vec<Scenery>,
+}
+
+/// Which module nodes a picture draws, each named by its path as `blueprint::flatten_kept` names
+/// it.
+#[derive(Clone, Copy)]
+pub enum Kept<'a> {
+    All,
+    Only(&'a dyn Fn(&[&str]) -> bool),
+}
+
+/// The picture of `pictured`, drawing the module nodes `kept`. A blueprint is pictured on its own
+/// canvas with its holes filled by their defaults.
+pub fn picture(content: &Content, pictured: Pictured, kept: Kept) -> Option<Picture> {
+    let own = content.built::<OwnGrids>();
+    let own = match pictured {
+        Pictured::Area(id) => own.areas.get(id.index())?.as_ref()?,
+        Pictured::Blueprint(id) => own.blueprints.get(id.index())?.as_ref()?,
+    };
+    let mut errors = Vec::new();
+    let flatten = |keep: &dyn Fn(&[&str]) -> bool, errors: &mut Vec<_>| match pictured {
+        Pictured::Area(id) => content
+            .table::<AreaDef>()
+            .get(id)
+            .map(|def| blueprint::flatten_kept(content, &def.scene().nodes, keep, errors)),
+        Pictured::Blueprint(id) => Some(blueprint::flatten_blueprint(content, id, keep, errors)),
+    };
+    let (area, placed, placements) = match pictured {
+        Pictured::Area(id) => (
+            shared(content, id).clone(),
+            self::placed(content, id).to_vec(),
+            self::placements(content, id).to_vec(),
+        ),
+        Pictured::Blueprint(id) => {
+            let def = content.table::<BlueprintDef>().get(id)?;
+            let all = flatten(&|_| true, &mut errors)?;
+            let grids = Arc::new(stamp_placed(content, own, &all.placements, &mut errors));
+            let area = Arc::new(build_area(content, &def.map, grids, &all.modules));
+            (area, all.modules, all.placements)
+        }
+    };
+    let (ground, scenery) = match kept {
+        Kept::All => (area.grids.clone(), area.scenery.clone()),
+        Kept::Only(keep) => {
+            let kept = flatten(keep, &mut errors)?;
+            let ground = Arc::new(stamp_placed(content, own, &kept.placements, &mut errors));
+            (ground, sceneries(&kept.modules))
+        }
+    };
+    Some(Picture {
+        area,
+        placed,
+        placements,
+        ground,
+        scenery,
+    })
 }
 
 pub fn of(world: &World, entity: Entity) -> Option<&Area> {
@@ -732,6 +811,34 @@ fn own_grids(
     })
 }
 
+/// The cells of `own` with every one of `placements` stamped over them.
+fn stamp_placed(
+    content: &Content,
+    own: &AreaGrids,
+    placements: &[PlacedBlueprint],
+    errors: &mut Vec<blueprint::FlattenError>,
+) -> AreaGrids {
+    let grids = content.built::<OwnGrids>();
+    let blueprints = content.table::<BlueprintDef>();
+    let grids_of = |blueprint: blueprint::BlueprintId| {
+        Some((
+            blueprints.get(blueprint)?,
+            grids.blueprints.get(blueprint.index())?.as_ref()?,
+        ))
+    };
+    blueprint::stamp(own, placements, grids_of, content, errors)
+}
+
+fn sceneries(modules: &[Flattened]) -> Vec<Scenery> {
+    modules
+        .iter()
+        .filter_map(|placed| match &placed.module {
+            AreaModule::Scenery(scenery) => Some(scenery.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn flatten_all(loading: &mut Loading) {
     let content = loading.content();
     let own = content.built::<OwnGrids>();
@@ -794,7 +901,7 @@ fn build_all(loading: &mut Loading) {
     let content = loading.content();
     let grids = content.built::<AreaGridSet>();
     let sizes = content.built::<ImageSizes>();
-    let mut areas: Vec<Option<Area>> = content.ids::<AreaDef>().map(|_| None).collect();
+    let mut areas: Vec<Option<Arc<Area>>> = content.ids::<AreaDef>().map(|_| None).collect();
     let mut reported: BTreeSet<(String, String)> = BTreeSet::new();
     for (id, def) in loading.rows::<AreaDef>(&content) {
         let Some(grids) = grids.0[id.index()].clone() else {
@@ -814,50 +921,55 @@ fn build_all(loading: &mut Loading) {
         let map = def.map();
         let mut check = RowCheck::default();
         check_bounds(&content, map, modules, sizes, &mut check);
-        let safe_zones: Vec<Rect<Tiles>> = modules
-            .iter()
-            .filter_map(|placed| match &placed.module {
-                AreaModule::SafeZone(zone) => Some(zone.rect),
-                _ => None,
-            })
-            .collect();
-        let scenery: Vec<Scenery> = modules
-            .iter()
-            .filter_map(|placed| match &placed.module {
-                AreaModule::Scenery(scenery) => Some(scenery.clone()),
-                _ => None,
-            })
-            .collect();
-        let walk = walk::grids(&content, &grids, &scenery, &safe_zones);
-        let size = map.size.grid();
-        let area = Area {
-            size: map.size.tiles(),
-            tile: map.tile,
-            grid: movement::Grid::new(size, walk.walk),
-            wild_grid: movement::Grid::new(size, walk.wild),
-            airspace: movement::Grid::new(size, walk.airspace),
-            wild_airspace: movement::Grid::new(size, walk.wild_airspace),
-            safe_zones,
-            safe_cells: walk.safe_cells,
-            footsteps: walk.footsteps,
-            soundscape: modules
-                .iter()
-                .filter_map(|placed| match &placed.module {
-                    AreaModule::Soundscape(soundscape) => Some(soundscape.zone()),
-                    _ => None,
-                })
-                .collect(),
-            grids,
-            scenery,
-        };
+        let area = build_area(&content, map, grids, modules);
         check_placed(&content, id, &area, modules, &mut check);
         let scene = scene_file(id.path(&content));
         for error in check.into_errors() {
             loading.json_error(&scene, &error.pointer, error.problem);
         }
-        areas[id.index()] = Some(area);
+        areas[id.index()] = Some(Arc::new(area));
     }
     loading.built(Areas(areas));
+}
+
+/// The area a map, its stamped grids and its flattened modules make: where it walks, flies, is
+/// safe and sounds.
+fn build_area(
+    content: &Content,
+    map: &Tilemap,
+    grids: Arc<AreaGrids>,
+    modules: &[Flattened],
+) -> Area {
+    let safe_zones: Vec<Rect<Tiles>> = modules
+        .iter()
+        .filter_map(|placed| match &placed.module {
+            AreaModule::SafeZone(zone) => Some(zone.rect),
+            _ => None,
+        })
+        .collect();
+    let scenery = sceneries(modules);
+    let walk = walk::grids(content, &grids, &scenery, &safe_zones);
+    let size = map.size.grid();
+    Area {
+        size: map.size.tiles(),
+        tile: map.tile,
+        grid: movement::Grid::new(size, walk.walk),
+        wild_grid: movement::Grid::new(size, walk.wild),
+        airspace: movement::Grid::new(size, walk.airspace),
+        wild_airspace: movement::Grid::new(size, walk.wild_airspace),
+        safe_zones,
+        safe_cells: walk.safe_cells,
+        footsteps: walk.footsteps,
+        soundscape: modules
+            .iter()
+            .filter_map(|placed| match &placed.module {
+                AreaModule::Soundscape(soundscape) => Some(soundscape.zone()),
+                _ => None,
+            })
+            .collect(),
+        grids,
+        scenery,
+    }
 }
 
 /// Where in the area's scene a problem with `placed` is reported: at its own node and field, or at

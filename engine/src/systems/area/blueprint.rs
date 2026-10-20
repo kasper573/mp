@@ -184,6 +184,7 @@ impl Flattened {
 
 /// A blueprint placed in an area, at any depth: where its cells and modules land, and the scripts
 /// that run once for it.
+#[derive(Clone)]
 pub struct PlacedBlueprint {
     pub blueprint: BlueprintId,
     pub origin: String,
@@ -221,11 +222,25 @@ pub fn flatten(
     nodes: &[SceneNode],
     errors: &mut Vec<FlattenError>,
 ) -> Flattening {
+    flatten_kept(content, nodes, &|_| true, errors)
+}
+
+/// `flatten`, leaving out every module node `keep` refuses. A node is named by its path: its
+/// pointer in the scene, then for a node a placement brings, its pointer in each blueprint on the
+/// way to it.
+pub fn flatten_kept(
+    content: &Content,
+    nodes: &[SceneNode],
+    keep: &dyn Fn(&[&str]) -> bool,
+    errors: &mut Vec<FlattenError>,
+) -> Flattening {
     let mut out = Vec::new();
     let mut placements = Vec::new();
     let mut found = Vec::new();
     scene::walk(nodes, &mut |pointer, node, _| {
-        if let SceneNode::Module(module) = node {
+        if let SceneNode::Module(module) = node
+            && keep(&[pointer])
+        {
             found.push((pointer.to_owned(), module));
         }
     });
@@ -244,6 +259,8 @@ pub fn flatten(
                     origin: pointer.clone(),
                     values_at: FlattenAt::Area(format!("{pointer}/values")),
                     chain: Vec::new(),
+                    keep,
+                    holes_open: false,
                 };
                 cx.expand(&placement, placement.at, placement.flip, &placement.values);
             }
@@ -271,6 +288,54 @@ pub fn flatten(
     }
 }
 
+/// A blueprint's scene flattened on its own canvas, leaving out every module node `keep` refuses,
+/// named by its path as `flatten_kept` names it. Its holes are filled with their defaults; a module
+/// with a hole that has none is left out. Origins are pointers in the blueprint's scene, as an
+/// area's are in the area's.
+pub fn flatten_blueprint(
+    content: &Content,
+    blueprint: BlueprintId,
+    keep: &dyn Fn(&[&str]) -> bool,
+    errors: &mut Vec<FlattenError>,
+) -> Flattening {
+    let mut out = Vec::new();
+    let mut placements = Vec::new();
+    let placement = Placement {
+        blueprint,
+        at: Pos::new(0.0, 0.0),
+        flip: Flip::None,
+        values: BTreeMap::new(),
+    };
+    let mut cx = Expansion {
+        content,
+        errors,
+        out: &mut out,
+        placements: &mut placements,
+        origin: String::new(),
+        values_at: FlattenAt::Blueprint(blueprint, CONFIG_FILE, "/variables".to_owned()),
+        chain: Vec::new(),
+        keep: &|path| keep(&path[1..]),
+        holes_open: true,
+    };
+    cx.expand(&placement, placement.at, placement.flip, &placement.values);
+    let own = |chain: &mut Vec<(BlueprintId, String)>, origin: &mut String| {
+        if !chain.is_empty() {
+            *origin = chain.remove(0).1;
+        }
+    };
+    for placed in &mut out {
+        own(&mut placed.chain, &mut placed.origin);
+    }
+    let mut nested: Vec<PlacedBlueprint> = placements.into_iter().skip(1).collect();
+    for placed in &mut nested {
+        own(&mut placed.chain, &mut placed.origin);
+    }
+    Flattening {
+        modules: out,
+        placements: nested,
+    }
+}
+
 fn misread(at: FlattenAt, error: serde_path_to_error::Error<serde_json::Error>) -> FlattenError {
     let error = ParseError::from(error);
     let at = match at {
@@ -294,6 +359,10 @@ struct Expansion<'a> {
     /// Where the values the placement being expanded gives are written.
     values_at: FlattenAt,
     chain: Vec<(BlueprintId, String)>,
+    keep: &'a dyn Fn(&[&str]) -> bool,
+    /// Whether a variable with neither a value nor a default leaves its holes open instead of
+    /// failing the placement.
+    holes_open: bool,
 }
 
 impl Expansion<'_> {
@@ -374,6 +443,7 @@ impl Expansion<'_> {
                 Some(value) => (value, true),
                 None => match &variable.default {
                     Some(default) => (default, false),
+                    None if self.holes_open => continue,
                     None => {
                         missing = true;
                         let at = self.values_at.clone();
@@ -426,9 +496,16 @@ impl Expansion<'_> {
         });
         let start = self.out.len();
         let mut nodes = Vec::new();
+        let keep = self.keep;
+        let above: Vec<&str> = std::iter::once(self.origin.as_str())
+            .chain(self.chain.iter().map(|(_, pointer)| pointer.as_str()))
+            .collect();
         scene::walk(&def.scene.nodes, &mut |pointer, node, _| {
             if let SceneNode::Module(module) = node {
-                nodes.push((pointer.to_owned(), module));
+                let path: Vec<&str> = above.iter().copied().chain([pointer]).collect();
+                if keep(&path) {
+                    nodes.push((pointer.to_owned(), module));
+                }
             }
         });
         for (pointer, node) in nodes {
@@ -484,6 +561,8 @@ impl Expansion<'_> {
                         origin: self.origin.clone(),
                         values_at,
                         chain,
+                        keep: self.keep,
+                        holes_open: false,
                     };
                     inner.expand(&nested, nested_at, nested_flip, &nested.values);
                 }

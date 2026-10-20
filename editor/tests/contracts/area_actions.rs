@@ -7,7 +7,7 @@ use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
-use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, nodes, run_action};
+use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, nodes, run_action};
 use engine::core::content::ContentFile;
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
@@ -56,7 +56,7 @@ fn duplicating_a_module_places_its_copy_one_tile_on_under_a_fresh_name() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec![DOOR.to_owned()]);
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
 
     let copies = modules(&editor);
@@ -72,7 +72,7 @@ fn duplicating_is_one_undo_step() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec![DOOR.to_owned()]);
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
     assert_eq!(modules(&editor).len(), 2);
 
@@ -85,7 +85,7 @@ fn duplicating_with_nothing_selected_changes_nothing() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     editor.selection = RowSelection::row(AreaDef::TABLE, &area());
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
     assert_eq!(modules(&editor), vec![barn_door()]);
 }
@@ -94,30 +94,28 @@ fn duplicating_with_nothing_selected_changes_nothing() {
 fn a_snapshot_lists_the_modules_of_its_area() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     let listed: Vec<(&str, &Value)> = snapshot
         .modules
         .iter()
         .map(|module| (module.pointer.as_str(), &module.json))
         .collect();
     assert_eq!(listed, vec![(DOOR, &barn_door())]);
-    assert_eq!(snapshot.area_key, area());
-    assert!(AreaSnapshot::for_area(&mut editor, "nowhere").is_none());
+    assert_eq!(snapshot.bundle, area());
+    assert!(AreaSnapshot::for_bundle(&mut editor, "nowhere").is_none());
 }
 
 #[test]
 fn switching_tools_ends_the_stroke_held_across_it() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
-    let draft = GridDraft::own(&snapshot.content, &snapshot.area_key).expect("the area's grids");
-    let view = editor
-        .views
-        .area
-        .ensure_view(&area_view_key(&area()), &area());
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    let draft = GridDraft::own(&snapshot.content, &snapshot.bundle).expect("the area's grids");
+    let view = editor.views.area.ensure_view(&area());
     view.set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,
+        layer: 0,
         cells: HashSet::new(),
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
@@ -166,11 +164,12 @@ fn show_area(
 }
 
 fn hold_a_stroke(editor: &mut Editor) {
-    let snapshot = AreaSnapshot::for_area(editor, &area()).expect("the area is open");
-    let draft = GridDraft::own(&snapshot.content, &snapshot.area_key).expect("the area's grids");
+    let snapshot = AreaSnapshot::for_bundle(editor, &area()).expect("the area is open");
+    let draft = GridDraft::own(&snapshot.content, &snapshot.bundle).expect("the area's grids");
     view(editor).set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,
+        layer: 0,
         cells: HashSet::new(),
         anchor: CellPos::new(0, 0),
         rng: Rng::new(1),
@@ -178,8 +177,40 @@ fn hold_a_stroke(editor: &mut Editor) {
 }
 
 fn view(editor: &mut Editor) -> &mut editor::views::area::AreaViewState {
-    editor
-        .views
-        .area
-        .ensure_view(&area_view_key(&area()), &area())
+    editor.views.area.ensure_view(&area())
+}
+
+#[test]
+fn ctrl_g_over_the_scene_graph_groups_the_selection_into_a_new_folder() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = editor_with_a_door(&scratch);
+    let ctx = egui::Context::default();
+    editor::ui::theme::apply(&ctx);
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 900.0));
+    let over_the_panel = vec![egui::Event::PointerMoved(egui::pos2(150.0, 400.0))];
+    show_area(&ctx, &mut editor, screen, over_the_panel.clone());
+    editor.selection = RowSelection::parts(
+        AreaDef::TABLE,
+        &area(),
+        vec!["/0".to_owned(), DOOR.to_owned()],
+    );
+    show_area(&ctx, &mut editor, screen, over_the_panel);
+
+    let ctrl = egui::Modifiers::CTRL | egui::Modifiers::COMMAND;
+    let ctrl_g = vec![
+        egui::Event::ModifiersChanged(ctrl),
+        egui::Event::Key {
+            key: egui::Key::G,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: ctrl,
+        },
+    ];
+    show_area(&ctx, &mut editor, screen, ctrl_g);
+
+    let scene = nodes::scene_of(&editor, &area());
+    assert_eq!(scene.as_array().map(Vec::len), Some(1));
+    assert_eq!(scene[0]["type"], "folder");
+    assert_eq!(scene[0]["children"].as_array().map(Vec::len), Some(2));
 }

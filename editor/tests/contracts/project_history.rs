@@ -110,5 +110,6 @@ fn rename(project: &Project, name: &str) -> ContentEdit {
             bytes: Some(json_bytes(&game)),
         }],
         merge: false,
+        amends: None,
     }
 }

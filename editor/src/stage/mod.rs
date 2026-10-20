@@ -32,7 +32,7 @@ use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::thumbs;
 use crate::ui::theme;
-use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes, SceneryOf};
+use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
@@ -197,13 +197,7 @@ pub fn show(
         let scene_key = ground_key(key);
         editor.views.area.requests.push(AreaSceneRequest {
             key: scene_key.clone(),
-            spec: AreaSceneSpec {
-                ground: spawn.area.path(&content).to_owned(),
-                scenery: SceneryOf::Area,
-                hidden_ground: Vec::new(),
-                show_blueprints: true,
-                show_scenery: true,
-            },
+            spec: AreaSceneSpec::area(spawn.area.path(&content)),
             width: (rect.width() * ppp) as u32,
             height: (rect.height() * ppp) as u32,
             center: spawn.at,

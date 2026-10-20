@@ -6,7 +6,8 @@ use engine::core::audio::soundscape::EDGE_FALLOFF;
 use engine::core::math::{Pos, Rect};
 use engine::core::render::TILE;
 use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
-use engine::systems::area::{self, AreaModuleKind};
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaModuleKind, Pictured};
 use serde_json::Value;
 
 use super::population::{self, NpcSprite};
@@ -29,12 +30,22 @@ pub(super) fn overlay_grid(
 ) {
     let canvas = frame.canvas;
     let bounds = Rect::new(Pos::new(-0.5, -0.5), area.size);
-    painter.rect_stroke(
-        canvas.rect(bounds),
-        0.0,
-        EStroke::new(1.0, Color32::from_gray(120)),
-        egui::StrokeKind::Outside,
-    );
+    if matches!(frame.pictured, Pictured::Blueprint(_)) {
+        let rect = canvas.rect(bounds).expand(1.0);
+        widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::DROP), 6.0, 4.0);
+        frame.labels.chip(
+            rect.right_top() + Vec2::new(6.0, 18.0),
+            format!("{} × {} canvas", area.size.width, area.size.height),
+            theme::DROP,
+        );
+    } else {
+        painter.rect_stroke(
+            canvas.rect(bounds),
+            0.0,
+            EStroke::new(1.0, Color32::from_gray(120)),
+            egui::StrokeKind::Outside,
+        );
+    }
     if !lines || canvas.scale() < 6.0 {
         return;
     }
@@ -123,7 +134,15 @@ pub(super) fn overlay_modules(
     frame: &AreaFrame,
 ) {
     let canvas = frame.canvas;
-    let selected: HashSet<String> = selected_parts(editor, &frame.area_key);
+    let parts: HashSet<String> = selected_parts(editor, &frame.bundle);
+    let selected: HashSet<String> = frame.selected_modules(&parts).into_iter().collect();
+    if let Some((bounds, label)) = frame.folder_box(&parts) {
+        let rect = canvas.rect(bounds).expand(3.0);
+        widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::ACCENT), 6.0, 4.0);
+        frame
+            .labels
+            .chip(rect.min + Vec2::new(0.0, -4.0), label, theme::ACCENT);
+    }
     let view = editor.views.area.view(view_key);
     let editing = view.in_place.first().cloned();
     let visible = canvas.visible();
@@ -131,7 +150,10 @@ pub(super) fn overlay_modules(
         AreaTool::Select | AreaTool::Module => frame.pointer_tile.and_then(|tile| frame.hit(tile)),
         _ => None,
     };
-    for node in &frame.modules {
+    for node in frame.modules.iter() {
+        if frame.flags.hidden(&node.pointer) {
+            continue;
+        }
         let module = &node.json;
         let Some(bounds) = frame.module_bounds(&node.pointer) else {
             continue;
@@ -147,6 +169,21 @@ pub(super) fn overlay_modules(
         }
         let is_selected = selected.contains(&node.pointer);
         let is_hovered = hovered.as_ref() == Some(&node.pointer);
+        if kind == AreaModuleKind::Blueprint
+            && frame
+                .content
+                .by_path::<BlueprintDef>(module.text("blueprint"))
+                .is_none()
+        {
+            let rect = canvas.rect(bounds);
+            widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::DANGER), 5.0, 3.0);
+            frame.labels.chip(
+                rect.min + Vec2::new(0.0, -4.0),
+                format!("{} doesn't load", shapes::label(module)),
+                theme::DANGER,
+            );
+            continue;
+        }
         if matches!(kind, AreaModuleKind::Blueprint | AreaModuleKind::Scenery)
             && !is_selected
             && !is_hovered
@@ -198,7 +235,7 @@ pub(super) fn overlay_modules(
                 color,
             );
         }
-        if is_selected && shapes::has_size(module) {
+        if parts.contains(&node.pointer) && shapes::has_size(module) {
             for corner in [
                 rect.min,
                 Pos2::new(rect.max.x, rect.min.y),
@@ -212,22 +249,6 @@ pub(super) fn overlay_modules(
                 );
             }
         }
-    }
-    if view.blueprint.is_some() {
-        let (origin, _) = frame.origin();
-        let at = canvas.to_screen(origin);
-        let color = Color32::from_rgb(90, 220, 220);
-        painter.line_segment(
-            [at - Vec2::new(10.0, 0.0), at + Vec2::new(10.0, 0.0)],
-            EStroke::new(1.0, color),
-        );
-        painter.line_segment(
-            [at - Vec2::new(0.0, 10.0), at + Vec2::new(0.0, 10.0)],
-            EStroke::new(1.0, color),
-        );
-        frame
-            .labels
-            .chip(at + Vec2::new(8.0, -8.0), "0, 0 · top-left", color);
     }
 }
 
@@ -317,7 +338,7 @@ pub(super) fn overlay_selected_scenery(
         };
         let new_sort = snapped.clamp(0.0, height);
         if (new_sort - sort).abs() > f32::EPSILON {
-            nodes::change_scene(editor, &frame.area_key, |scene| {
+            nodes::change_scene(editor, &frame.bundle, |scene| {
                 scene.pointer_mut(&node)?["sort"] = Value::from(new_sort as f64);
                 Some("Move the sort line of the scenery".to_owned())
             });
@@ -340,7 +361,7 @@ pub(super) fn overlay_soundscape_reach(
     frame: &AreaFrame,
 ) {
     let canvas = frame.canvas;
-    for part in selected_parts(editor, &frame.area_key) {
+    for part in selected_parts(editor, &frame.bundle) {
         let Some(module) = frame.module(&part) else {
             continue;
         };
@@ -391,8 +412,9 @@ pub(super) fn overlay_populations(
     let view = editor.views.area.view_mut(view_key);
     view.population_previews.retain(|key, _| live.contains(key));
     let previews = view.population_previews.clone();
-    for module in frame.modules.iter().map(|module| &module.json) {
-        if !module.is_module(AreaModuleKind::Population) {
+    for node in frame.modules.iter() {
+        let module = &node.json;
+        if !module.is_module(AreaModuleKind::Population) || frame.flags.hidden(&node.pointer) {
             continue;
         }
         let preview = previews

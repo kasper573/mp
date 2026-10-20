@@ -140,7 +140,7 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
     let before = shown(settled(&mut editor));
 
     nodes::select(&mut editor, &area(), vec!["/1".to_owned()]);
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::MakeBlueprint);
 
     let made = path("blueprint", "pews");
@@ -175,7 +175,7 @@ fn unpacking_a_placement_leaves_a_folder_of_what_it_placed_and_the_area_as_it_wa
     let mut editor = open(chapel(), &scratch);
     let before = shown(settled(&mut editor));
 
-    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(
         &mut editor,
         &snapshot,

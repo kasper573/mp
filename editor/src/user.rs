@@ -109,6 +109,10 @@ pub struct EditorSettings {
     pub last_play: Option<String>,
     /// By project folder, how its content tree is shown.
     pub content_trees: BTreeMap<String, TreeView>,
+    /// By project folder and bundle, how a scene graph is shown.
+    pub scene_trees: BTreeMap<String, TreeView>,
+    /// Whether the area and blueprint boxes above a scene graph are folded to one line.
+    pub boxes_folded: bool,
 }
 
 /// How a tree is shown: the folders open, by path, and the kinds of rows left out.

@@ -121,15 +121,29 @@ impl GridDraft {
         true
     }
 
+    /// The cells joined to `start` that hold what it holds in `layer`.
     pub fn flood(&self, layer: usize, start: CellPos) -> Vec<CellPos> {
-        let Some(ground) = self.ground.get(layer) else {
-            return Vec::new();
-        };
+        match self.ground.get(layer) {
+            Some(ground) => self.flood_by(start, |index| ground.cells[index]),
+            None => Vec::new(),
+        }
+    }
+
+    /// The cells joined to `start` whose walk is forced as its is.
+    pub fn flood_walk(&self, start: CellPos) -> Vec<CellPos> {
+        self.flood_by(start, |index| self.walk[index])
+    }
+
+    pub fn layer_index(&self, name: &str) -> Option<usize> {
+        self.ground.iter().position(|layer| layer.name == name)
+    }
+
+    fn flood_by<T: PartialEq>(&self, start: CellPos, holds: impl Fn(usize) -> T) -> Vec<CellPos> {
         let Some(start_index) = self.index(start) else {
             return Vec::new();
         };
-        let wanted = ground.cells[start_index];
-        let mut seen = vec![false; ground.cells.len()];
+        let wanted = holds(start_index);
+        let mut seen = vec![false; self.walk.len()];
         let mut out = Vec::new();
         let mut stack = vec![start];
         seen[start_index] = true;
@@ -139,7 +153,7 @@ impl GridDraft {
                 let next = cell.step((dx, dy));
                 if let Some(index) = self.index(next)
                     && !seen[index]
-                    && ground.cells[index] == wanted
+                    && holds(index) == wanted
                 {
                     seen[index] = true;
                     stack.push(next);

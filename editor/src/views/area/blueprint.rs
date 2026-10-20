@@ -20,7 +20,7 @@ use crate::value::RowValue;
 /// blueprint is named after the folder or node, and starts with the ground layers of the scene it
 /// came from, so what it paints lands in layers of the same name.
 pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) {
-    let bundle = frame.area_key.clone();
+    let bundle = frame.bundle.clone();
     let scene = nodes::scene_of(editor, &bundle);
     let selected = selected_nodes(editor, &bundle, &scene);
     let Some(first) = selected.first().cloned() else {
@@ -57,7 +57,10 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
         &format!("{name}.{}", BlueprintDef::TABLE),
         &[],
     );
-    let origin = bounds.min();
+    let origin: Pos<Tiles> = Pos::new(
+        (bounds.min().x + 0.5).floor(),
+        (bounds.min().y + 0.5).floor(),
+    );
     let mut shifted = held;
     for node in &mut shifted {
         shift_tree(node, -origin.x, -origin.y);
@@ -75,8 +78,8 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
     let config = json!({
         "map": {
             "size": {
-                "width": bounds.size.width.ceil().max(1.0) as u32,
-                "height": bounds.size.height.ceil().max(1.0) as u32,
+                "width": (bounds.max().x - origin.x + 0.5).ceil().max(1.0) as u32,
+                "height": (bounds.max().y - origin.y + 0.5).ceil().max(1.0) as u32,
             },
             "tile": tile,
         }
@@ -127,7 +130,7 @@ fn selected_nodes(editor: &Editor, bundle: &str, scene: &Value) -> Vec<String> {
 
 /// What the modules among `nodes` cover on the map, through their folders, a placement by what
 /// its blueprint holds.
-fn covered(content: &Content, nodes: &[Value]) -> Option<Rect<Tiles>> {
+pub(super) fn covered(content: &Content, nodes: &[Value]) -> Option<Rect<Tiles>> {
     nodes::modules(&Value::Array(nodes.to_vec()))
         .iter()
         .filter_map(|module| match module.json.module_kind() {
@@ -139,7 +142,7 @@ fn covered(content: &Content, nodes: &[Value]) -> Option<Rect<Tiles>> {
         .reduce(|a, b| a.union(&b))
 }
 
-fn shift_tree(node: &mut Value, dx: f32, dy: f32) {
+pub(super) fn shift_tree(node: &mut Value, dx: f32, dy: f32) {
     if nodes::is_folder(node) {
         for child in node["children"].as_array_mut().into_iter().flatten() {
             shift_tree(child, dx, dy);

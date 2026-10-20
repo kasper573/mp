@@ -1,12 +1,12 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentFile, fields_file, table_of};
+use engine::core::content::{Content, ContentFile, table_of};
 use engine::core::math::Rng;
 use engine::core::script::VariableType;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::scene::scene_file;
-use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
+use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::placement::{self, placement_extras};
@@ -14,79 +14,24 @@ use super::population::from_npc;
 use super::preview::{clipboard_panel, pick_preview};
 use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
-use super::{AreaTool, AreaViewState, brush, grid, nodes, resize, stamp, terrain};
-use crate::app::{Editor, ModalDialog};
+use super::{AreaTool, AreaViewState, brush, grid, nodes, scene_tree, stamp, terrain};
+use crate::app::Editor;
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
-use crate::tabs::EditorTab;
 use crate::tabs::file_title;
-use crate::ui::{breadcrumb, content_tree, patterns, row_form, sidebar, theme, widgets};
+use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::{self, RowValue};
-use crate::{picker, schema, views};
+use crate::{picker, schema};
 
-/// The area itself: where it is in the game folder, and its card.
-pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let view_key = super::area_view_key(key);
-    let Some(content) = editor
-        .project
-        .as_ref()
-        .and_then(|project| project.content.clone())
-    else {
-        return;
-    };
-    let Some(area_id) = content.by_path::<AreaDef>(key) else {
-        return;
-    };
-    if !editor.views.area.views.contains_key(&view_key) {
+/// The view's inspector: a paste or a pick under way, the selected nodes, the blueprint parts
+/// edited in place, or else the card of the tool in hand.
+pub fn sidebar(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
+    if !editor.views.area.views.contains_key(view_key) {
         return;
     }
-    if let Some(folder) = breadcrumb::show(ui, key) {
-        content_tree::reveal(editor, &folder);
-    }
-    ui.add_space(4.0);
-    area_card(editor, ui, key, &content, area_id);
-}
-
-/// The area window's inspector: the selected modules, the blueprint parts edited in place, a paste
-/// or a pick under way, or else the card of the tool in hand.
-pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let selection = editor.selection.clone();
-    if selection.table == BlueprintDef::TABLE && !selection.parts.is_empty() {
-        super::inspect_parts(editor, ui, &selection);
-    } else if selected_parts(editor, key) {
-        show_parts(editor, ui, &selection);
-    } else {
-        tool(editor, ui, key);
-    }
-}
-
-fn selected_parts(editor: &Editor, key: &str) -> bool {
-    let selection = &editor.selection;
-    let of_this_area = selection.keys.first().is_some_and(|k| k == key);
-    (of_this_area && !selection.parts.is_empty())
-        || (selection.table == BlueprintDef::TABLE && !selection.parts.is_empty())
-}
-
-fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let view_key = super::area_view_key(key);
-    let Some(content) = editor
-        .project
-        .as_ref()
-        .and_then(|project| project.content.clone())
-    else {
-        return;
-    };
-    let Some(area_id) = content.by_path::<AreaDef>(key) else {
-        return;
-    };
-    if !editor.views.area.views.contains_key(&view_key) {
-        return;
-    }
-    let tool = editor.views.area.view(&view_key).tool;
-    let walk = editor.views.area.view(&view_key).walk_overlay;
-    if editor.views.area.view(&view_key).paste.is_some() {
+    if editor.views.area.view(view_key).paste.is_some() {
         clipboard_panel(editor, ui);
         return;
     }
@@ -94,21 +39,203 @@ fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
         pick_preview(editor, ui);
         return;
     }
-    match tool {
-        AreaTool::Paint if walk => {
-            walk_card(editor, ui, &view_key);
+    let Some(snapshot) = super::AreaSnapshot::for_view(editor, view_key) else {
+        return;
+    };
+    let selection = editor.selection.clone();
+    let in_place = snapshot
+        .in_place
+        .last()
+        .map(|place| place.blueprint.clone());
+    if in_place.is_some()
+        && selection.keys.first() == in_place.as_ref()
+        && !selection.parts.is_empty()
+    {
+        show_parts(editor, ui, view_key, &selection);
+        return;
+    }
+    let parts: Vec<String> = super::selected_parts_of(editor, &snapshot.bundle)
+        .into_iter()
+        .cloned()
+        .collect();
+    let node = |part: &String| snapshot.scene.pointer(part);
+    match parts.as_slice() {
+        [walk] if walk == super::WALK_ROW => {
+            walk_card(editor, ui, view_key, &snapshot);
             overlays_legend(ui);
         }
-        AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper => {
-            paint_card(editor, ui, &view_key, &content, area_id);
+        [layer] if node(layer).is_some_and(nodes::is_layer) => {
+            layer_card(editor, ui, &snapshot, layer);
+            ui.add_space(6.0);
+            tool(editor, ui, view_key, &snapshot);
         }
-        AreaTool::Terrain => terrain_card(editor, ui, &view_key, &content, area_id),
-        AreaTool::Stamp => stamp_card(editor, ui, &view_key, &content),
+        [folder] if node(folder).is_some_and(nodes::is_folder) => {
+            folder_card(editor, ui, &snapshot, folder);
+        }
+        [] => tool(editor, ui, view_key, &snapshot),
+        _ => show_parts(editor, ui, view_key, &selection),
+    }
+}
+
+fn tool(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super::AreaSnapshot) {
+    let content = snapshot.content.clone();
+    match editor.views.area.view(view_key).tool {
+        AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper => {
+            paint_card(editor, ui, view_key);
+        }
+        AreaTool::Terrain => terrain_card(editor, ui, view_key, snapshot),
+        AreaTool::Stamp => stamp_card(editor, ui, view_key, &content),
         AreaTool::Select | AreaTool::Module => sidebar::nothing_selected(
             ui,
-            "Select modules on the map, or take a tool with settings, to inspect them here.",
+            "Select nodes in the scene or on the map, or take a tool with settings, to inspect them here.",
         ),
     }
+}
+
+/// A ground layer's card: its name, where it draws among the others, what it holds, and its eye
+/// and padlock.
+fn layer_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, pointer: &str) {
+    let Some(node) = snapshot.scene.pointer(pointer).cloned() else {
+        return;
+    };
+    let name = node["name"].as_str().unwrap_or_default().to_owned();
+    let mut order: Vec<String> = Vec::new();
+    nodes::walk(&snapshot.scene, &mut |_, node| {
+        if nodes::is_layer(node) {
+            order.push(node["name"].as_str().unwrap_or_default().to_owned());
+        }
+    });
+    let at = order.iter().position(|layer| *layer == name).unwrap_or(0);
+    let (under, over) = (&order[..at], &order[at + 1..]);
+    let painted = grid::GridDraft::own(&snapshot.content, &snapshot.bundle)
+        .and_then(|draft| {
+            let layer = draft.layer_index(&name)?;
+            Some(draft.ground[layer].cells.iter().flatten().count())
+        })
+        .unwrap_or(0);
+    let flags = snapshot.flags.row(pointer);
+    let mut toggled = None;
+    widgets::card_frame(true).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        let state = if flags.hidden.on() { "hidden" } else { "" };
+        widgets::card_header(ui, &format!("ground layer {name}"), state, |_| {});
+        ui.add_space(4.0);
+        widgets::kv_text(ui, "file", format!("layers/{name}.csv"));
+        let listed = |names: &[String]| match names {
+            [] => "nothing".to_owned(),
+            names => names.join(" and "),
+        };
+        widgets::kv_text(
+            ui,
+            "draws",
+            format!("over {}, under {}", listed(under), listed(over)),
+        );
+        widgets::kv_text(ui, "painted", format!("{painted} cells"));
+        widgets::kv(ui, "shown", |ui| {
+            if ui.checkbox(&mut !flags.hidden.on(), "").clicked() {
+                toggled = Some(scene_tree::Toggle::Hide);
+            }
+        });
+        widgets::kv(ui, "locked", |ui| {
+            if ui.checkbox(&mut flags.locked.on(), "").clicked() {
+                toggled = Some(scene_tree::Toggle::Lock);
+            }
+        });
+    });
+    if let Some(toggle) = toggled {
+        scene_tree::toggle(editor, &snapshot.bundle, &[pointer.to_owned()], toggle);
+    }
+}
+
+/// A folder's card: what it holds by kind, its eye and padlock, and what can be made of it.
+fn folder_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, pointer: &str) {
+    let Some(node) = snapshot.scene.pointer(pointer).cloned() else {
+        return;
+    };
+    let label = node["label"].as_str().unwrap_or_default().to_owned();
+    let mut counts: std::collections::BTreeMap<String, usize> = Default::default();
+    nodes::walk(&node["children"], &mut |_, child| {
+        if !nodes::is_folder(child) {
+            *counts
+                .entry(child["type"].as_str().unwrap_or("module").to_owned())
+                .or_default() += 1;
+        }
+    });
+    let flags = snapshot.flags.row(pointer);
+    let mut action = None;
+    ui.label(
+        theme::muted(format!("{} › {label}", file_title(&snapshot.bundle)))
+            .monospace()
+            .size(13.0),
+    );
+    ui.add_space(4.0);
+    widgets::card_frame(true).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        let state = if flags.hidden.on() { "hidden" } else { "" };
+        widgets::card_header(ui, &format!("folder {label}"), state, |_| {});
+        ui.add_space(4.0);
+        if counts.is_empty() {
+            ui.label(theme::muted("Empty").size(12.5));
+        }
+        for (kind, count) in &counts {
+            ui.horizontal(|ui| {
+                widgets::badge(ui, kind);
+                ui.label(theme::mono(format!("{count} × {}", schema::title(kind))).size(13.0));
+            });
+        }
+        ui.add_space(4.0);
+        widgets::kv(ui, "shown", |ui| {
+            if ui.checkbox(&mut !flags.hidden.on(), "").clicked() {
+                action = Some(FolderAction::Toggle(scene_tree::Toggle::Hide));
+            }
+        });
+        widgets::kv(ui, "locked", |ui| {
+            if ui.checkbox(&mut flags.locked.on(), "").clicked() {
+                action = Some(FolderAction::Toggle(scene_tree::Toggle::Lock));
+            }
+        });
+    });
+    ui.add_space(6.0);
+    ui.horizontal_wrapped(|ui| {
+        if controls::marked(ui, Mark::Copy, "Make blueprint").clicked() {
+            action = Some(FolderAction::MakeBlueprint);
+        }
+        if ui.button("Ungroup").clicked() {
+            action = Some(FolderAction::Ungroup);
+        }
+        if ui.button("Select what's inside").clicked() {
+            action = Some(FolderAction::SelectInside);
+        }
+    });
+    let bundle = snapshot.bundle.clone();
+    match action {
+        Some(FolderAction::Toggle(toggle)) => {
+            scene_tree::toggle(editor, &bundle, &[pointer.to_owned()], toggle);
+        }
+        Some(FolderAction::MakeBlueprint) => {
+            if let Some(snapshot) = super::AreaSnapshot::for_bundle(editor, &bundle) {
+                super::run_action(editor, &snapshot, super::AreaAction::MakeBlueprint);
+            }
+        }
+        Some(FolderAction::Ungroup) => scene_tree::ungroup(editor, &bundle, &[pointer.to_owned()]),
+        Some(FolderAction::SelectInside) => {
+            let mut inside = Vec::new();
+            nodes::walk(&node["children"], &mut |at, child| {
+                if nodes::is_module(child) {
+                    inside.push(format!("{pointer}/children{at}"));
+                }
+            });
+            nodes::select(editor, &bundle, inside);
+        }
+        None => {}
+    }
+}
+
+enum FolderAction {
+    Toggle(scene_tree::Toggle),
+    MakeBlueprint,
+    Ungroup,
+    SelectInside,
 }
 
 fn tool_card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
@@ -122,20 +249,13 @@ fn tool_card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
     });
 }
 
-fn paint_card(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: &Content,
-    area_id: AreaId,
-) {
+fn paint_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let title = match editor.views.area.view(view_key).tool {
         AreaTool::Fill => "Fill",
         AreaTool::Erase => "Erase",
         AreaTool::Eyedropper => "Eyedropper",
         _ => "Paint",
     };
-    let layers = area::load(content, area_id).grids.layer_names();
     let mut brush = editor.settings.brush.clone();
     let mut changed = false;
     let picked = {
@@ -147,10 +267,6 @@ fn paint_card(
         }
     };
     tool_card(ui, title, |ui| {
-        let view = editor.views.area.view_mut(view_key);
-        widgets::kv(ui, "layer", |ui| {
-            layer_combo(ui, view, &layers, (view_key, "layer"))
-        });
         widgets::kv(ui, "brush", |ui| {
             changed |= brush_size_field(ui, &mut brush, true);
         });
@@ -203,23 +319,14 @@ fn flip_chip(ui: &mut Ui, axis: &str, key: EditorKey, on: bool) -> bool {
     response.clicked()
 }
 
-fn terrain_card(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: &Content,
-    area_id: AreaId,
-) {
-    let tile_px = area::load(content, area_id).tile;
-    let layers = area::load(content, area_id).grids.layer_names();
+fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super::AreaSnapshot) {
+    let content = &snapshot.content;
+    let tile_px = snapshot.area().tile;
     let sets = terrain::sets_for(content, tile_px);
     let mut brush = editor.settings.brush.clone();
     let mut changed = false;
     tool_card(ui, "Terrain brush", |ui| {
         let view = editor.views.area.view_mut(view_key);
-        widgets::kv(ui, "layer", |ui| {
-            layer_combo(ui, view, &layers, (view_key, "terrain-layer"))
-        });
         widgets::kv(ui, "terrains", |ui| {
             let current = view
                 .terrain
@@ -274,8 +381,8 @@ fn terrain_card(
     if changed {
         editor.set_brush(brush);
     }
-    widgets::section(ui, "Terrains of this area's tilesets");
-    let used = area::load(content, area_id).grids.tilesets();
+    widgets::section(ui, "Terrains of these tilesets");
+    let used = snapshot.picture.ground.tilesets();
     let mut own: Vec<&terrain::TerrainSetCoverage> = sets
         .iter()
         .filter(|set| used.contains(&set.tileset))
@@ -306,13 +413,11 @@ fn terrain_card(
     }
     let picked = {
         let view = editor.views.area.view(view_key);
-        view.terrain
-            .tileset
-            .clone()
-            .zip(view.terrain.set.clone())
-            .map(|(tileset, set)| (tileset, set, view.layer))
+        view.terrain.tileset.clone().zip(view.terrain.set.clone())
     };
-    if let Some((tileset, set, layer)) = picked {
+    let layer = grid::GridDraft::own(content, &snapshot.bundle)
+        .and_then(|draft| brush::target_layer(editor, snapshot, &draft));
+    if let (Some((tileset, set)), Some(layer)) = (picked, layer) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             if ui
@@ -320,7 +425,7 @@ fn terrain_card(
                 .on_hover_text("Re-picks a tile for every cell of this layer painted from the set, as the set is now")
                 .clicked()
             {
-                repaint_layer(editor, content, area_id, &tileset, &set, layer);
+                repaint_layer(editor, content, &snapshot.bundle, &tileset, &set, layer);
             }
         });
     }
@@ -329,7 +434,7 @@ fn terrain_card(
 fn repaint_layer(
     editor: &mut Editor,
     content: &Content,
-    area_id: AreaId,
+    key: &str,
     tileset: &str,
     set: &str,
     layer: usize,
@@ -340,8 +445,7 @@ fn repaint_layer(
     else {
         return;
     };
-    let key = area_id.path(content).to_owned();
-    let Some(mut draft) = grid::GridDraft::own(content, &key) else {
+    let Some(mut draft) = grid::GridDraft::own(content, key) else {
         return;
     };
     let mut rng = Rng::new(editor.frame);
@@ -360,10 +464,18 @@ fn repaint_layer(
     }
 }
 
-fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
+fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super::AreaSnapshot) {
     let mut brush = editor.settings.brush.clone();
     let mut changed = false;
+    let forced = snapshot
+        .picture
+        .ground
+        .walk
+        .iter()
+        .filter(|cell| cell.is_some())
+        .count();
     tool_card(ui, "Paint walkability", |ui| {
+        widgets::kv_text(ui, "forced", format!("{forced} cells"));
         let view = editor.views.area.view_mut(view_key);
         widgets::kv(ui, "paint", |ui| {
             for (value, label, color) in [
@@ -394,6 +506,9 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         widgets::kv(ui, "overlay", |ui| {
             ui.checkbox(&mut view.walk_overlay, "");
             widgets::key_hint_text(ui, EditorKey::WalkOverlay, "toggles");
+        });
+        widgets::kv(ui, "locked", |ui| {
+            ui.checkbox(&mut view.walk_locked, "");
         });
     });
     if changed {
@@ -597,92 +712,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
     }
 }
 
-fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, area_id: AreaId) {
-    let Some(mut row) = editor.row_value(key) else {
-        return;
-    };
-    let area = area::load(content, area_id);
-    let name_id = ui.id().with(("area-name", key));
-    let mut rename = None;
-    let mut menu_action: Option<AreaMenu> = None;
-    widgets::card_frame(false).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        widgets::card_header(ui, row["name"].as_str().unwrap_or(key), "", |ui| {
-            if ui.button("Resize…").clicked() {
-                menu_action = Some(AreaMenu::Resize);
-                ui.close();
-            }
-            if ui
-                .add(widgets::shortcut_button("Play here", EditorKey::PlayHere))
-                .clicked()
-            {
-                menu_action = Some(AreaMenu::Play);
-                ui.close();
-            }
-            if ui.button("Open as file").clicked() {
-                menu_action = Some(AreaMenu::OpenRow);
-                ui.close();
-            }
-        });
-        ui.add_space(4.0);
-        widgets::kv(ui, "name", |ui| {
-            let name = row["name"].as_str().unwrap_or_default();
-            rename = forms::drafted(ui, name_id, name, |ui, draft| {
-                forms::boxed_input(ui, None, |ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(draft)
-                            .frame(egui::Frame::NONE)
-                            .desired_width(f32::INFINITY),
-                    )
-                })
-            });
-        });
-        widgets::kv(ui, "size", |ui| {
-            forms::boxed_input(ui, Some("tiles"), |ui| {
-                ui.label(theme::mono(format!(
-                    "{} × {}",
-                    area.size.width, area.size.height
-                )))
-            });
-        });
-        widgets::kv(ui, "tile", |ui| {
-            forms::boxed_input(ui, Some("px"), |ui| {
-                ui.label(theme::mono(area.tile.to_string()))
-            });
-        });
-    });
-    if let Some(name) = rename {
-        row["name"] = Value::String(name);
-        let mut edit = ContentEdit::new(format!("Rename area {}", file_title(key)));
-        edit.write_json(fields_file(key), &row);
-        editor.apply(edit);
-    }
-    match menu_action {
-        Some(AreaMenu::Resize) => editor
-            .dialogs
-            .push(ModalDialog::Resize(resize::ResizeDialog {
-                area: key.to_owned(),
-                width: area.size.width as u32,
-                height: area.size.height as u32,
-                anchor: (-1, -1),
-                error: None,
-            })),
-        Some(AreaMenu::Play) => views::play_here(editor),
-        Some(AreaMenu::OpenRow) => editor.open_tab(EditorTab::Row {
-            table: AreaDef::TABLE.to_owned(),
-            key: key.to_owned(),
-        }),
-        None => {}
-    }
-}
-
-enum AreaMenu {
-    Resize,
-    Play,
-    OpenRow,
-}
-
-pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
+pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &RowSelection) {
     let Some(bundle) = selection.keys.first().cloned() else {
         return;
     };
@@ -702,6 +732,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let mut changed = false;
     let mut actions = Vec::new();
     let mut out = Followups::default();
+    let mut group = false;
     let label;
     {
         let Editor {
@@ -716,7 +747,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             .editing(&table, Some(&bundle))
             .errors_of(&scene_file(&bundle));
         if let [node] = selected.as_slice() {
-            let view = views.area.views.get_mut(&super::area_view_key(&bundle));
+            let view = views.area.views.get_mut(&super::view_key(&bundle));
             label = super::shapes::label(scene.pointer(node).unwrap_or(&Value::Null));
             changed = module_inspector(ui, &mut cx, view, &bundle, &mut scene, node, &mut out);
         } else {
@@ -730,6 +761,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                 .monospace()
                 .size(13.0),
             );
+            ui.label(theme::muted(spans(&scene, &selected)).size(12.5));
             ui.add_space(4.0);
             widgets::card_frame(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -755,7 +787,16 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             });
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                if controls::marked(ui, Mark::Copy, "Make blueprint…").clicked() {
+                if ui
+                    .add(widgets::shortcut_button(
+                        "Group into folder",
+                        EditorKey::Group,
+                    ))
+                    .clicked()
+                {
+                    group = true;
+                }
+                if controls::marked(ui, Mark::Copy, "Make blueprint").clicked() {
                     out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
@@ -774,8 +815,15 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     for action in actions {
         row_form::act(editor, action, &table, &bundle);
     }
+    if group {
+        let ids = super::AreaSnapshot::for_view(editor, view_key)
+            .map(|snapshot| scene_tree::selected_ids(&snapshot, &editor.selection))
+            .unwrap_or_default();
+        editor.views.area.view_mut(view_key).scene.queued =
+            Some(scene_tree::SceneAction::Group(ids));
+    }
     for action in out.actions {
-        if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &bundle) {
+        if let Some(snapshot) = super::AreaSnapshot::for_bundle(editor, &bundle) {
             super::run_action(editor, &snapshot, action);
         }
     }
@@ -796,17 +844,20 @@ fn module_inspector(
 ) -> bool {
     let variants = cx.shapes.scene_variants();
     let path = node.to_owned();
-    let Some(module) = scene.pointer_mut(node) else {
+    let Some(module) = scene.pointer(node) else {
         return false;
     };
     let kind = module["type"].as_str().unwrap_or("module").to_owned();
     let module_kind = module.module_kind();
     let shown_kind = kind.replace('_', " ");
-    ui.label(
-        theme::muted(format!("{} › {shown_kind}", file_title(bundle)))
-            .monospace()
-            .size(13.0),
-    );
+    let crumbs: Vec<String> = std::iter::once(file_title(bundle).to_owned())
+        .chain(folders_above(scene, node))
+        .chain(std::iter::once(shown_kind.clone()))
+        .collect();
+    ui.label(theme::muted(crumbs.join(" › ")).monospace().size(13.0));
+    let Some(module) = scene.pointer_mut(node) else {
+        return false;
+    };
     ui.add_space(4.0);
     let mut changed = false;
     let content = cx.content.clone();
@@ -901,6 +952,12 @@ fn module_inspector(
             object_extras(ui, module, out, node);
         }
         Some(AreaModuleKind::Soundscape) => changed |= soundscape_extras(ui, cx, module, &path),
+        Some(AreaModuleKind::Script) if table_of(bundle) == Some(BlueprintDef::TABLE) => {
+            widgets::hint(
+                ui,
+                "In a blueprint, this script runs once for each placement.",
+            );
+        }
         _ => {}
     }
     changed
@@ -981,19 +1038,40 @@ fn brush_size_field(ui: &mut Ui, brush: &mut BrushSettings, square: bool) -> boo
     changed
 }
 
-fn layer_combo(ui: &mut Ui, view: &mut AreaViewState, layers: &[String], salt: (&str, &str)) {
-    let current = layers.get(view.layer).cloned().unwrap_or_default();
-    widgets::combo(salt)
-        .selected_text(theme::mono(current))
-        .width(ui.available_width())
-        .show_ui(ui, |ui| {
-            for (index, name) in layers.iter().enumerate() {
-                if ui
-                    .selectable_label(view.layer == index, theme::mono(name))
-                    .clicked()
-                {
-                    view.layer = index;
-                }
-            }
-        });
+/// The labels of the folders above the node at `pointer`, outermost first.
+fn folders_above(scene: &Value, pointer: &str) -> Vec<String> {
+    let mut labels: Vec<String> = std::iter::successors(nodes::place_of(pointer), |(folder, _)| {
+        nodes::place_of(folder)
+    })
+    .map(|(folder, _)| folder)
+    .take_while(|folder| !folder.is_empty())
+    .filter_map(|folder| scene.pointer(folder).map(super::shapes::node_label))
+    .collect();
+    labels.reverse();
+    labels
+}
+
+/// Which folders the modules at `pointers` sit in, said in a line.
+fn spans(scene: &Value, pointers: &[String]) -> String {
+    let mut folders: Vec<String> = Vec::new();
+    for pointer in pointers {
+        let folder = nodes::place_of(pointer).map_or("", |(folder, _)| folder);
+        let label = match folder {
+            "" => "the top level".to_owned(),
+            folder => scene
+                .pointer(folder)
+                .map(super::shapes::node_label)
+                .unwrap_or_default(),
+        };
+        if !folders.contains(&label) {
+            folders.push(label);
+        }
+    }
+    let shown = match folders.as_slice() {
+        [] => String::new(),
+        [one] => one.clone(),
+        [first @ .., last] if folders.len() <= 3 => format!("{} and {last}", first.join(", ")),
+        [a, b, rest @ ..] => format!("{a}, {b} and {} more folders", rest.len()),
+    };
+    format!("In {shown}")
 }

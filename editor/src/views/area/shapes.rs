@@ -1,5 +1,5 @@
 use engine::core::audio::soundscape::SoundscapeShape;
-use engine::core::content::serial;
+use engine::core::content::{name_of, serial};
 use engine::core::math::{Offset, Pos, Rect, Size};
 use engine::core::tiling::Tiles;
 use engine::systems::area::{AreaModuleKind, Flip, ObjectShape};
@@ -103,24 +103,91 @@ pub fn sixteenth_json(v: f32) -> Value {
 }
 
 pub fn label(module: &Value) -> String {
+    let named = |field: &str| name_of(module[field].as_str().unwrap_or_default()).to_owned();
     match module.module_kind() {
         Some(AreaModuleKind::Object) => module["name"]
             .as_str()
             .or(module["label"].as_str())
             .map_or("object".to_owned(), |name| format!("object {name}")),
-        Some(AreaModuleKind::Blueprint) => {
-            format!("{} placement", module.text_or("blueprint", "blueprint"))
-        }
+        Some(AreaModuleKind::Blueprint) => module["label"].as_str().map_or_else(
+            || format!("{} placement", named("blueprint")),
+            str::to_owned,
+        ),
         Some(AreaModuleKind::Population) => format!(
             "{} × {}",
-            module.text_or("npc", "npc"),
+            named("npc"),
             module["count"].as_u64().unwrap_or(0)
         ),
-        Some(AreaModuleKind::Resident) => format!("resident {}", module.text_or("npc", "npc")),
-        Some(AreaModuleKind::Scenery) => format!("scenery {}", module.text("tileset")),
-        Some(AreaModuleKind::Script) => format!("script {}", module.text("script")),
+        Some(AreaModuleKind::Resident) => format!("resident {}", named("npc")),
+        Some(AreaModuleKind::Scenery) => format!("scenery {}", named("tileset")),
+        Some(AreaModuleKind::Script) => format!("script {}", named("script")),
         Some(other) => other.tag().replace('_', " "),
         None => module.kind_or("module").replace('_', " "),
+    }
+}
+
+/// What a node reads as in a scene graph: its label, a ground layer's name, or what the module is:
+/// a stamp its tileset, a resident its npc.
+pub fn node_label(node: &Value) -> String {
+    if let Some(label) = node["label"].as_str() {
+        return label.to_owned();
+    }
+    let named = |field: &str| name_of(node[field].as_str().unwrap_or_default()).to_owned();
+    match node["type"].as_str() {
+        Some("ground_layer") => return node["name"].as_str().unwrap_or_default().to_owned(),
+        Some("folder") => return "folder".to_owned(),
+        _ => {}
+    }
+    match node.module_kind() {
+        Some(AreaModuleKind::Object) => node["name"].as_str().unwrap_or("object").to_owned(),
+        Some(AreaModuleKind::Resident | AreaModuleKind::Population) => named("npc"),
+        Some(AreaModuleKind::Scenery) => named("tileset"),
+        Some(AreaModuleKind::Script) => named("script"),
+        Some(AreaModuleKind::Blueprint) => named("blueprint"),
+        Some(other) => other.tag().replace('_', " "),
+        None => node.kind_or("module").replace('_', " "),
+    }
+}
+
+/// What a module node's row says after its name: where a warp leads, how many a population keeps,
+/// where a point stands, or how big a shape is.
+pub fn node_detail(node: &Value) -> String {
+    let kind = node.module_kind();
+    if kind == Some(AreaModuleKind::Object)
+        && let Some((area, _)) = super::placement::warp_destinations(node).into_iter().next()
+    {
+        return format!("→ {}", name_of(&area));
+    }
+    let size = |rect: Rect<Tiles>| {
+        format!(
+            "{} × {}",
+            crate::forms::tiles(rect.size.width),
+            crate::forms::tiles(rect.size.height)
+        )
+    };
+    match kind {
+        Some(AreaModuleKind::Population) => format!("× {}", node["count"].as_u64().unwrap_or(0)),
+        Some(AreaModuleKind::Resident) => pos_of(&node["at"])
+            .map(|at| {
+                format!(
+                    "{}, {}",
+                    crate::forms::tiles(at.x),
+                    crate::forms::tiles(at.y)
+                )
+            })
+            .unwrap_or_default(),
+        Some(AreaModuleKind::Object) if is_point(node) => object_shape(node)
+            .map(|shape| {
+                let at = shape.bounds().center();
+                format!(
+                    "{}, {}",
+                    crate::forms::tiles(at.x),
+                    crate::forms::tiles(at.y)
+                )
+            })
+            .unwrap_or_default(),
+        Some(AreaModuleKind::Blueprint | AreaModuleKind::Script) | None => String::new(),
+        Some(_) => bounds(node, None).map(size).unwrap_or_default(),
     }
 }
 

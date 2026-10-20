@@ -67,7 +67,7 @@ pub fn strong(text: impl Into<String>) -> RichText {
 pub fn badge_color(kind: &str) -> Color32 {
     match kind {
         "population" | "resident" | "npc" | "player" | "nameplate" | "tint" | "voice" => ink::OCHRE,
-        "object" | "safe_zone" | "area" | "walk" => ink::VERDIGRIS,
+        "object" | "safe_zone" | "area" | "walk" | "ground_layer" => ink::VERDIGRIS,
         "script" | "shown" | "requires" => ink::TYRIAN,
         "soundscape" | "sfx" | "babble" | "step" => ink::GOLD,
         "loot" | "item" | "stack" | "reward" | "hold" | "deliver" | "offer" | "shop" => ink::AZURE,

@@ -21,7 +21,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use strum::{AsRefStr, VariantArray};
 
-use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use super::area::scene::{AreaSceneRequest, AreaSceneSpec};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::project::ContentEdit;
@@ -783,13 +783,7 @@ fn start(
             );
             area.requests.push(AreaSceneRequest {
                 key: scene_key.clone(),
-                spec: AreaSceneSpec {
-                    ground: area_key.clone(),
-                    scenery: SceneryOf::Area,
-                    hidden_ground: Vec::new(),
-                    show_blueprints: true,
-                    show_scenery: true,
-                },
+                spec: AreaSceneSpec::area(&area_key),
                 width: (MAP.x * ppp) as u32,
                 height: (MAP.y * ppp) as u32,
                 center,

@@ -30,6 +30,19 @@ pub fn row(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
     column(ui, ("row", id), Side::Left, |ui| scrolled(ui, body));
 }
 
+/// The left column of a view whose body scrolls what it must itself, such as a tree under a few
+/// fixed boxes.
+pub fn panel(ui: &mut Ui, id: &str, body: impl FnOnce(&mut Ui)) {
+    column(ui, ("row", id), Side::Left, |ui| {
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(10, 8))
+            .show(ui, |ui| {
+                ui.set_min_height(ui.available_height());
+                body(ui)
+            });
+    });
+}
+
 fn scrolled(ui: &mut Ui, body: impl FnOnce(&mut Ui)) {
     egui::ScrollArea::vertical()
         .id_salt("sidebar")

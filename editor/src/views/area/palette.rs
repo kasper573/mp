@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
 use engine::core::content::Content;
 use engine::systems::area::tileset::TilesetDef;
-use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
 
+use super::AreaSnapshot;
 use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
@@ -20,15 +20,21 @@ pub enum PaletteLens {
     Terrains,
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content, area_id: AreaId) {
-    let tile_px = area::load(content, area_id).tile;
+pub fn show(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    view_key: &str,
+    content: &Content,
+    area: &AreaSnapshot,
+) {
+    let tile_px = area.area().tile;
     let tilesets: Vec<(String, &TilesetDef)> = content
         .table::<TilesetDef>()
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
         .map(|(id, def)| (id.path(content).to_owned(), def))
         .collect();
-    let used = area::load(content, area_id).grids.tilesets();
+    let used = area.picture.ground.tilesets();
     let view = editor.views.area.view(view_key);
     let stored = view.palette_lens;
     let lens = if view.tool == super::AreaTool::Terrain {

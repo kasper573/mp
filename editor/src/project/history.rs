@@ -146,6 +146,44 @@ impl EditHistory {
         true
     }
 
+    /// Folds `after` into the last step when it is labelled `step` and nothing was undone since,
+    /// relabelling it; files the step didn't touch keep `before` to undo to.
+    pub fn amend_last(
+        &mut self,
+        step: &str,
+        label: &str,
+        after: Vec<FileChange>,
+        before: &[FileChange],
+    ) -> bool {
+        if self.applied != self.steps.len() {
+            return false;
+        }
+        let Some(last) = self.steps.last_mut() else {
+            return false;
+        };
+        if last.label != step {
+            return false;
+        }
+        for change in after {
+            match last
+                .after
+                .iter_mut()
+                .find(|known| known.file == change.file)
+            {
+                Some(known) => known.bytes = change.bytes,
+                None => {
+                    if let Some(was) = before.iter().find(|was| was.file == change.file) {
+                        last.before.push(was.clone());
+                    }
+                    last.after.push(change);
+                }
+            }
+        }
+        last.label = label.to_owned();
+        last.at = SystemTime::now();
+        true
+    }
+
     fn trim(&mut self) {
         while self.steps.len() > MAX_STEPS || (self.bytes() > MAX_BYTES && self.steps.len() > 1) {
             self.steps.remove(0);

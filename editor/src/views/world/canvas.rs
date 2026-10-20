@@ -300,13 +300,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
     let scene_key = format!("world:{key}");
     editor.views.area.requests.push(scene::AreaSceneRequest {
         key: scene_key.clone(),
-        spec: scene::AreaSceneSpec {
-            ground: key.clone(),
-            scenery: scene::SceneryOf::Area,
-            hidden_ground: Vec::new(),
-            show_blueprints: true,
-            show_scenery: true,
-        },
+        spec: scene::AreaSceneSpec::area(key),
         width: (card.art.width() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         height: (card.art.height() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
         center: Pos::new(info.size.width / 2.0, info.size.height / 2.0),

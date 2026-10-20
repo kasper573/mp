@@ -21,7 +21,6 @@ use crate::project::files::{FolderIndex, content_holding};
 use crate::rows;
 use crate::tabs::EditorTab;
 use crate::user::{TreeView, UserFolder};
-use design_tokens::controls;
 
 /// The content panel's tree of the game folder, and what it was asked to do.
 #[derive(Default)]
@@ -483,7 +482,7 @@ fn filters(editor: &mut Editor, ui: &mut Ui, folder_key: &str) -> bool {
         if widgets::toggle_chip(ui, "unused", tree.only_unused).clicked() {
             tree.only_unused = !tree.only_unused;
         }
-        changed = show_menu(ui, view, &kinds);
+        changed = tree::show_menu(ui, view, &kinds);
     });
     if changed {
         editor.save_settings();
@@ -500,55 +499,6 @@ fn first_file(source: &GameFolder, folder: &str) -> Option<String> {
             Some(path)
         }
     })
-}
-
-/// Show ▾: which kinds of file the tree lists, and whether folders with nothing shown stay.
-fn show_menu(ui: &mut Ui, view: &mut TreeView, kinds: &[String]) -> bool {
-    let shown = kinds
-        .iter()
-        .filter(|kind| !view.hidden_kinds.contains(*kind))
-        .count();
-    let label = if shown == kinds.len() {
-        "Show".to_owned()
-    } else {
-        format!("Show {shown} of {}", kinds.len())
-    };
-    let mut changed = false;
-    let button = controls::marked(ui, Mark::ChevronDown, label);
-    let menu = egui::Popup::from_toggle_button_response(&button)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-    menu.show(|ui| {
-        let mut all = shown == kinds.len();
-        if ui.checkbox(&mut all, "All").changed() {
-            view.hidden_kinds = if all {
-                BTreeSet::new()
-            } else {
-                kinds.iter().cloned().collect()
-            };
-            changed = true;
-        }
-        ui.separator();
-        egui::ScrollArea::vertical()
-            .max_height(360.0)
-            .show(ui, |ui| {
-                for kind in kinds {
-                    let mut on = !view.hidden_kinds.contains(kind);
-                    if ui.checkbox(&mut on, kind).changed() {
-                        if on {
-                            view.hidden_kinds.remove(kind);
-                        } else {
-                            view.hidden_kinds.insert(kind.clone());
-                        }
-                        changed = true;
-                    }
-                }
-            });
-        ui.separator();
-        changed |= ui
-            .checkbox(&mut view.hide_empty_folders, "Hide empty folders")
-            .changed();
-    });
-    changed
 }
 
 const MEDIA_KIND: &str = "media";
@@ -616,6 +566,8 @@ struct GameFolder<'a> {
     shown: Option<HashSet<String>>,
     narrowed: bool,
     filtered: bool,
+    /// What the search looks for, lowercased.
+    needle: String,
     copied: bool,
     last_new: Option<String>,
 }
@@ -674,6 +626,7 @@ impl<'a> GameFolder<'a> {
             shown: None,
             narrowed,
             filtered,
+            needle: needle.clone(),
             copied: !tree.copied.is_empty(),
             last_new: tree.last_new.clone(),
         };
@@ -1019,6 +972,7 @@ impl TreeSource for GameFolder<'_> {
         if self.filtered && row.dim {
             row.suffix = row.suffix.map(|(text, _)| (text, Color32::GRAY));
         }
+        row.matched = tree::matched(&row.name, &self.needle);
         row
     }
 

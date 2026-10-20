@@ -76,15 +76,22 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         return;
     };
     let tileset = module.text("tileset").to_owned();
-    let Some(mut draft) = GridDraft::own(&frame.content, &frame.area_key) else {
+    let Some(mut draft) = GridDraft::own(&frame.content, &frame.bundle) else {
         return;
     };
-    let layer = editor
+    let last = editor
         .views
         .area
         .views
-        .get(&super::area_view_key(&frame.area_key))
-        .map_or(0, |v| v.layer);
+        .get(&super::view_key(&frame.bundle))
+        .and_then(|view| view.last_layer.clone());
+    let Some(layer) = last
+        .and_then(|name| draft.layer_index(&name))
+        .or(draft.ground.len().checked_sub(1))
+    else {
+        editor.toast("There is no ground layer to split the scenery into");
+        return;
+    };
     let rows = module["tiles"].as_array().cloned().unwrap_or_default();
     let mut kept: Vec<Vec<Value>> = rows
         .iter()
@@ -106,11 +113,14 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         placed += 1;
     }
     if placed == 0 {
-        editor.toast("No free cell under the scenery on the active layer");
+        editor.toast(format!(
+            "No free cell under the scenery in {}",
+            draft.ground[layer].name
+        ));
         return;
     }
     let all_gone = kept.iter().all(|row| row.iter().all(Value::is_null));
-    let Some(mut edit) = nodes::scene_edit(editor, &frame.area_key, |scene| {
+    let Some(mut edit) = nodes::scene_edit(editor, &frame.bundle, |scene| {
         if all_gone {
             nodes::remove(scene, &[node.to_owned()]).first()?;
         } else {
@@ -128,7 +138,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
 }
 
 pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
-    let area_key = &frame.area_key;
+    let area_key = &frame.bundle;
     let Some(module) = frame.module(node) else {
         return;
     };
@@ -169,7 +179,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         editor.toast("The destination has no walkable cell");
         return;
     };
-    let mut names = object_names(&content, there_id);
+    let mut names = object_names(area::placed(&content, there_id));
     let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
@@ -292,18 +302,13 @@ pub(super) fn scenery_extras(
     });
 }
 
-pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Option<usize> {
+pub(super) fn blocked_under(cx: &FormCx, bundle: &str, module: &Value) -> Option<usize> {
     let content = cx.content.clone()?;
-    let area_id = content.by_path::<AreaDef>(area_key)?;
-    let grids = area::load(&content, area_id).grids.clone();
+    let draft = GridDraft::own(&content, bundle)?;
     let rect = shapes::scenery_rect(module)?;
-    let size = grids.size;
     Some(
         rect.tiles()
-            .filter(|cell| {
-                cell.index(size)
-                    .is_some_and(|index| grids.walk[index] == Some(false))
-            })
+            .filter(|cell| draft.walk_at(*cell) == Some(false))
             .count(),
     )
 }
@@ -318,7 +323,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
     let Some(at) = super::shapes::pos_of(&module["at"]) else {
         return;
     };
-    let Some(mut draft) = GridDraft::own(&frame.content, &frame.area_key) else {
+    let Some(mut draft) = GridDraft::own(&frame.content, &frame.bundle) else {
         return;
     };
     let mut adopted: Vec<Value> = module["blocks"].as_array().cloned().unwrap_or_default();
@@ -337,7 +342,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         editor.toast("Nothing under the scenery is blocked on the walk grid");
         return;
     }
-    let Some(mut edit) = nodes::scene_edit(editor, &frame.area_key, |scene| {
+    let Some(mut edit) = nodes::scene_edit(editor, &frame.bundle, |scene| {
         scene.pointer_mut(node)?["blocks"] = Value::Array(adopted);
         Some(format!("Give {count} blocked cells to the scenery"))
     }) else {
@@ -348,7 +353,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
 }
 
 pub fn selected_scenery(editor: &Editor, frame: &AreaFrame) -> Option<String> {
-    let parts = super::selected_parts(editor, &frame.area_key);
+    let parts = super::selected_parts(editor, &frame.bundle);
     if parts.len() != 1 {
         return None;
     }

@@ -1,8 +1,8 @@
 use egui::{Rect as ERect, Vec2};
 use engine::core::tiling::{Cell, TilePos};
-use engine::systems::area;
+use engine::systems::area::{self, Pictured};
 
-use super::{AreaFrame, AreaTool, placement};
+use super::{AreaFrame, AreaTool, Armed, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::scene_graph;
@@ -15,6 +15,7 @@ pub(super) fn status_bar(
     view_key: &str,
     frame: &AreaFrame,
 ) {
+    let armed = super::armed(editor, frame);
     let view = editor.views.area.view(view_key);
     let mut left: Vec<String> = Vec::new();
     if let Some(place) = frame.in_place.last() {
@@ -29,7 +30,8 @@ pub(super) fn status_bar(
             "double-click a part to open it · {} goes up one level",
             EditorKey::Cancel.name()
         ));
-    } else if let Some(blueprint) = &view.blueprint {
+    } else if let Pictured::Blueprint(_) = frame.pictured {
+        let blueprint = &frame.bundle;
         let parts = part_count(frame, blueprint);
         left.push(format!(
             "{} · {parts} part{}",
@@ -41,11 +43,17 @@ pub(super) fn status_bar(
                 .trim_end_matches('.')
                 .to_lowercase(),
         );
-        left.push("S stamps it".to_owned());
+    }
+    if let Some(said) = frame.flags.said() {
+        let name = editor
+            .row_value(&frame.bundle)
+            .and_then(|row| row["name"].as_str().map(str::to_owned))
+            .unwrap_or_else(|| file_title(&frame.bundle).to_owned());
+        left.push(format!("{said} in {name}"));
     }
     if let Some(tile) = frame.pointer_tile {
         let cell = tile.cell();
-        if view.walk_overlay && view.tool == AreaTool::Paint {
+        if armed == Armed::Walk && view.tool.paints() {
             left.push(format!("cell {}, {}", cell.x, cell.y));
             if frame.in_map(tile) {
                 let area = frame.area();
@@ -80,13 +88,10 @@ pub(super) fn status_bar(
                 AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper
             ) && let Some(tileset) = &view.pick.tileset
             {
-                let layer = frame
-                    .area()
-                    .grids
-                    .ground
-                    .get(view.layer)
-                    .map(|l| l.name.clone())
-                    .unwrap_or_default();
+                let layer = match &armed {
+                    Armed::Layer { name, .. } => name.clone(),
+                    _ => String::new(),
+                };
                 let picked = view
                     .pick
                     .block
@@ -139,11 +144,12 @@ pub(super) fn status_bar(
             && visible.max().x >= size.width
             && visible.max().y >= size.height
     };
-    if whole_map_visible && view.in_place.is_empty() && view.blueprint.is_none() {
+    let quiet = view.in_place.is_empty() && view.show_only.is_none() && !view.tool.paints();
+    if whole_map_visible && quiet && matches!(frame.pictured, Pictured::Area(_)) {
         let size = frame.size();
         let text = format!(
-            "area/{} · {} × {} · zoom {}%",
-            frame.area_key,
+            "{} · {} × {} · zoom {}%",
+            frame.bundle,
             size.width,
             size.height,
             (zoom * 100.0).round()

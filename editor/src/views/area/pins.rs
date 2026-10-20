@@ -115,7 +115,7 @@ pub fn commit_pick(editor: &mut Editor, area_key: &str, at: Pos<Tiles>) {
 
 pub fn draw_arrivals(editor: &Editor, painter: &egui::Painter, frame: &AreaFrame) {
     let canvas = frame.canvas;
-    for arrival in arrivals(editor, &frame.area_key) {
+    for arrival in arrivals(editor, &frame.bundle) {
         let at = canvas.to_screen(arrival.at);
         let color = if arrival.initial_spawn {
             Color32::from_rgb(120, 255, 160)
@@ -150,7 +150,7 @@ fn pin(painter: &egui::Painter, at: Pos2, color: Color32) {
 }
 
 pub fn pin_at(editor: &Editor, frame: &AreaFrame, pointer: Pos2) -> Option<PinHit> {
-    for arrival in arrivals(editor, &frame.area_key) {
+    for arrival in arrivals(editor, &frame.bundle) {
         let at = frame.canvas.to_screen(arrival.at);
         let hit = egui::Rect::from_min_max(at + Vec2::new(-8.0, -20.0), at + Vec2::new(8.0, 2.0));
         if hit.contains(pointer) {
@@ -197,7 +197,7 @@ pub fn move_pin(editor: &mut Editor, frame: &AreaFrame, file: &str, pointer: &st
     place["y"] = serde_json::json!(at.y);
     let mut edit = ContentEdit::new(format!(
         "Move arrival in {} to {}, {}",
-        frame.area_key, at.x, at.y
+        frame.bundle, at.x, at.y
     ));
     edit.write_json(file.to_owned(), &json);
     editor.apply(edit);
