@@ -30,7 +30,7 @@ pub fn register(app: &mut App) {
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
-        .row::<ModelDef>()
+        .bundle::<ModelDef>()
         .modules::<ModelDef>()
         .hook(LoadStep::Files, model::build_all);
 }

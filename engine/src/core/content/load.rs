@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
@@ -12,15 +12,18 @@ use schemars::generate::SchemaSettings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use super::bundle::{Bundle, PartSpec, Parts};
 use super::check::RowCheck;
+use super::files::{
+    CONFIG_FILE, FIXTURES_DIR, FileType, Listing, SETTINGS_FILE, Shape, bundle_of, fields_file,
+    table_of,
+};
 use super::fixture::{Fixture, FixtureLock};
-use super::id::{ContentId, ContentScope, Leaf, LeafKind, ScopeReader, nearest, with_content};
+use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
-use super::owner::{ContentOwners, FOLDER_FIELD, OWNER_FIELD, RowFolder, RowFolders, RowName};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
-use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
+use super::table::{Content, ContentBuilder, ContentFile, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
-use super::{ASSETS_DIR, GAME_FILE, TABLES_DIR, row_file, row_folder, table_folder};
 
 // The steps a load runs its hooks at, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,8 +47,9 @@ pub enum LoadStep {
 type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
 struct FixtureEntry {
     table: &'static str,
+    folder: &'static str,
     whole_table: bool,
-    keys: Vec<(&'static str, Vec<FixtureLock>)>,
+    paths: Vec<(String, Vec<FixtureLock>)>,
     check: Hook,
 }
 
@@ -61,6 +65,7 @@ pub struct ContentRegistry {
     module_rules: Vec<(&'static str, ModuleProbe)>,
     list_kinds: Vec<ListKind>,
     beside: Vec<BesideFile>,
+    json_parts: Vec<JsonPart>,
     // Hashing every shape takes a while, and a registry is read far more often than it changes.
     version: OnceLock<ContentVersion>,
 }
@@ -75,20 +80,21 @@ pub struct ContentShapes {
 #[derive(Serialize)]
 pub struct TableShape {
     pub table: String,
-    /// Whether each row keeps a folder of files beside its file.
-    pub folders: bool,
+    /// Whether each file is a bundle of its config and parts.
+    pub bundle: bool,
     pub shape: serde_json::Value,
+    /// The path of every fixture of the type.
     pub fixtures: Vec<String>,
-    /// What each fixture's row keeps as the engine reads it, by key.
+    /// What each fixture's file keeps as the engine reads it, by path.
     pub locks: BTreeMap<String, Vec<FixtureLock>>,
-    /// Whether the table holds its fixtures and nothing else.
+    /// Whether the type holds its fixtures and nothing else.
     pub closed: bool,
 }
 
 /// What the entries of a JSON list field are called in shape errors: a list of `field` whose
 /// entry names an unknown variant reports `rule`, and asks for `expected` in its place.
 #[derive(Clone, Copy, Debug)]
-struct ListKind {
+pub(super) struct ListKind {
     field: &'static str,
     rule: &'static str,
     expected: &'static str,
@@ -96,30 +102,59 @@ struct ListKind {
 
 type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
 
-/// A file in the folders of a table's rows that names rows of its own, as an area's palette names
+/// A part of a type's bundles that isn't JSON and names content of its own, as a palette names
 /// tilesets.
 pub struct BesideFile {
     pub table: &'static str,
     pub name: &'static str,
-    /// Every row the file names, where it is written.
+    /// Every content file the part names, where it is written.
     pub names: fn(&str) -> Vec<BesideName>,
-    /// The file with every name of the `table` row `from` written as `to`.
+    /// The part with every name of the `table` file at `from` written as `to`.
     pub rename: fn(text: &str, table: &str, from: &str, to: &str) -> String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BesideName {
     pub table: &'static str,
-    pub key: String,
+    pub path: String,
     pub line: usize,
     pub column: usize,
 }
 
+/// A JSON part of a type's bundles that names content, read the way the bundle's type reads it, so
+/// its references are found where the editor looks for them.
+pub struct JsonPart {
+    pub table: &'static str,
+    pub name: &'static str,
+    /// Reads `value`, the part of the bundle at the given path, in the scope it is called in.
+    pub read: fn(&Content, &str, &serde_json::Value) -> Result<(), ParseError>,
+}
+
 impl ContentRegistry {
-    pub fn row<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
+    pub fn file<Row: ContentFile>(&mut self) -> &mut ContentRegistry {
+        assert_eq!(Row::SHAPE, Shape::Json, "{} is a bundle type", Row::TABLE);
         self.version.take();
         self.rows.push(Box::new(RowLoader::<Row> {
-            folders: false,
+            parts: None,
+            marker: PhantomData,
+        }));
+        self
+    }
+
+    pub fn bundle<Row: Bundle>(&mut self) -> &mut ContentRegistry {
+        assert_eq!(
+            Row::SHAPE,
+            Shape::Bundle,
+            "{} isn't a bundle type",
+            Row::TABLE
+        );
+        self.version.take();
+        self.rows.push(Box::new(RowLoader::<Row> {
+            parts: Some(BundleParts {
+                specs: Row::PARTS,
+                read: Row::read_parts,
+                write: Row::write_parts,
+            }),
             marker: PhantomData,
         }));
         self
@@ -178,12 +213,8 @@ impl ContentRegistry {
         self
     }
 
-    pub fn folder<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
-        self.version.take();
-        self.rows.push(Box::new(RowLoader::<Row> {
-            folders: true,
-            marker: PhantomData,
-        }));
+    pub fn json_part(&mut self, part: JsonPart) -> &mut ContentRegistry {
+        self.json_parts.push(part);
         self
     }
 
@@ -191,10 +222,11 @@ impl ContentRegistry {
         self.version.take();
         self.fixtures.push(FixtureEntry {
             table: F::Row::TABLE,
+            folder: F::FOLDER,
             whole_table: F::WHOLE_TABLE,
-            keys: F::VARIANTS
+            paths: F::VARIANTS
                 .iter()
-                .map(|fixture| (fixture.key(), fixture.locks()))
+                .map(|fixture| (fixture.path(), fixture.locks()))
                 .collect(),
             check: Box::new(check_fixture::<F>),
         });
@@ -228,28 +260,61 @@ impl ContentRegistry {
         self.rows.iter().map(|row| row.name()).collect()
     }
 
-    /// Whether the table's rows may name any row, local or not, as `ContentRow::SEES_ALL_ROWS`
-    /// declares.
-    pub fn sees_all_rows(&self, table: &str) -> bool {
+    /// Every type the folder may hold, as the walk of a folder sorts its files.
+    pub fn file_types(&self) -> Vec<FileType> {
         self.rows
             .iter()
-            .any(|row| row.name() == table && row.sees_all_rows())
+            .map(|row| FileType {
+                table: row.name(),
+                shape: row.shape(),
+                parts: row.parts(),
+            })
+            .collect()
     }
 
-    /// Whether every row of the table is in use by being in it, as
-    /// `ContentRow::PICKED_FROM_TABLE` declares.
+    pub fn shape_of(&self, table: &str) -> Option<Shape> {
+        self.rows
+            .iter()
+            .find(|row| row.name() == table)
+            .map(|row| row.shape())
+    }
+
+    /// Whether every file of the type is in use by being there, as
+    /// `ContentFile::PICKED_FROM_TABLE` declares.
     pub fn picked_from_table(&self, table: &str) -> bool {
         self.rows
             .iter()
             .any(|row| row.name() == table && row.picked_from_table())
     }
 
-    /// Whether code names the row through a fixture, which keeps it global.
-    pub fn is_fixture(&self, row: &RowName) -> bool {
-        self.fixtures.iter().any(|fixture| {
-            fixture.table == row.table
-                && (fixture.whole_table || fixture.keys.iter().any(|(key, _)| *key == row.key))
-        })
+    /// Whether code names the content file at `path` through a fixture, which keeps it where the
+    /// engine looks.
+    pub fn is_fixture(&self, path: &str) -> bool {
+        self.fixtures
+            .iter()
+            .any(|fixture| fixture.paths.iter().any(|(fixed, _)| fixed == path))
+    }
+
+    /// The path of every fixture, so the editor knows what stays where it is.
+    pub fn fixture_paths(&self) -> impl Iterator<Item = &str> {
+        self.fixtures
+            .iter()
+            .flat_map(|fixture| fixture.paths.iter().map(|(path, _)| path.as_str()))
+    }
+
+    /// Whether the type's files are its fixtures and nothing else, so the game adds none.
+    pub fn closed(&self, table: &str) -> bool {
+        self.fixtures
+            .iter()
+            .any(|fixture| fixture.table == table && fixture.whole_table)
+    }
+
+    /// Every folder a fixture sits in under `fixtures/`, by the system that declares it.
+    pub fn fixture_folders(&self) -> BTreeSet<String> {
+        self.fixtures
+            .iter()
+            .map(|fixture| format!("{FIXTURES_DIR}/{}", fixture.folder))
+            .collect()
     }
 
     pub fn version(&self) -> ContentVersion {
@@ -267,16 +332,16 @@ impl ContentRegistry {
                     self.fixtures
                         .iter()
                         .filter(|fixture| fixture.table == row.name())
-                        .flat_map(|fixture| fixture.keys.iter())
+                        .flat_map(|fixture| fixture.paths.iter())
                 };
                 TableShape {
                     table: row.name().to_owned(),
-                    folders: row.folders(),
-                    shape: row.shape(settings),
-                    fixtures: fixtures().map(|(key, _)| (*key).to_owned()).collect(),
+                    bundle: row.shape() == Shape::Bundle,
+                    shape: row.schema(settings),
+                    fixtures: fixtures().map(|(path, _)| path.clone()).collect(),
                     locks: fixtures()
                         .filter(|(_, locks)| !locks.is_empty())
-                        .map(|(key, locks)| ((*key).to_owned(), locks.clone()))
+                        .map(|(path, locks)| (path.clone(), locks.clone()))
                         .collect(),
                     closed: self
                         .fixtures
@@ -291,14 +356,17 @@ impl ContentRegistry {
         }
     }
 
-    /// Whether `file` is one the registry reads references from: the game's settings, a row, or a
-    /// file beside a row that names rows.
-    pub fn names_rows(&self, file: &str) -> bool {
-        file == GAME_FILE || super::row_of(file).is_some() || self.beside_of(file).is_some()
+    /// Whether `file` is one the registry reads references from: the game's settings, a content
+    /// file's fields, or a part of a bundle that names content.
+    pub fn names_content(&self, file: &str) -> bool {
+        file == SETTINGS_FILE
+            || self.loader_of_fields(file).is_some()
+            || self.beside_of(file).is_some()
+            || self.json_part_of(file).is_some()
     }
 
-    /// `text`, the file beside a row at `file`, with every name of the `table` row `from` written
-    /// as `to`; `None` when no such file names rows.
+    /// `text`, a part of a bundle at `file`, with every name of the `table` file at `from` written
+    /// as `to`; `None` when no such part names content.
     pub fn rename_beside(
         &self,
         file: &str,
@@ -312,10 +380,35 @@ impl ContentRegistry {
     }
 
     fn beside_of(&self, file: &str) -> Option<&BesideFile> {
-        let (table, _, name) = super::beside_parts(file)?;
+        let (bundle, part) = bundle_of(file)?;
+        let table = table_of(bundle)?;
         self.beside
             .iter()
-            .find(|beside| beside.table == table && beside.name == name)
+            .find(|beside| beside.table == table && beside.name == part)
+    }
+
+    fn json_part_of<'f>(&self, file: &'f str) -> Option<(&JsonPart, &'f str)> {
+        let (bundle, part) = bundle_of(file)?;
+        let table = table_of(bundle)?;
+        self.json_parts
+            .iter()
+            .find(|json| json.table == table && json.name == part)
+            .map(|json| (json, bundle))
+    }
+
+    /// The loader of the type whose fields `file` holds: a content file, or a bundle's config.
+    fn loader_of_fields(&self, file: &str) -> Option<&dyn TableLoader> {
+        let path = match bundle_of(file) {
+            Some((bundle, CONFIG_FILE)) => bundle,
+            Some(_) => return None,
+            None if file.ends_with(".json") => file,
+            None => return None,
+        };
+        let table = table_of(path)?;
+        self.rows
+            .iter()
+            .find(|row| row.name() == table)
+            .map(Box::as_ref)
     }
 
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
@@ -323,11 +416,14 @@ impl ContentRegistry {
             return (beside.names)(text)
                 .into_iter()
                 .map(|named| Reference {
-                    known: content
-                        .table_named(named.table)
-                        .is_some_and(|rows| rows.keys().binary_search(&named.key).is_ok()),
+                    known: content.table_named(named.table).is_some_and(|files| {
+                        files
+                            .paths()
+                            .binary_search_by(|path| path.as_bytes().cmp(named.path.as_bytes()))
+                            .is_ok()
+                    }),
                     kind: LeafKind::Row(named.table),
-                    value: named.key,
+                    value: named.path,
                     pointer: String::new(),
                     key: false,
                     line: named.line,
@@ -335,20 +431,21 @@ impl ContentRegistry {
                 })
                 .collect();
         }
-        let parse: &dyn Fn(&serde_json::Value) -> ParseResult = if file == GAME_FILE {
+        let json_part = self.json_part_of(file);
+        let parse: &dyn Fn(&serde_json::Value) -> ParseResult = if file == SETTINGS_FILE {
             let Some(loader) = self.settings.as_deref() else {
                 return Vec::new();
             };
             &|value| loader.parse_value(value)
+        } else if let Some((part, bundle)) = json_part {
+            &move |value| (part.read)(content, bundle, value).map(|()| Box::new(()) as _)
         } else {
-            let loader = super::row_of(file)
-                .and_then(|(table, _)| self.rows.iter().find(|row| row.name() == table));
-            let Some(loader) = loader else {
+            let Some(loader) = self.loader_of_fields(file) else {
                 return Vec::new();
             };
             &|value| loader.parse_value(value)
         };
-        let Ok((value, _)) = split_header(text) else {
+        let Ok(value) = parse_json::<serde_json::Value>(text) else {
             return Vec::new();
         };
         let unread = ContentScope::of(content);
@@ -487,13 +584,13 @@ pub fn load(
     outcome: &str,
 ) -> Result<Content, LoadReport> {
     let version = registry.version();
-    let listing = Listing::read(registry, folder.as_ref());
+    let (listing, errors) = super::files::list(folder.as_ref(), &registry.file_types());
     let mut loading = Loading {
         folder: folder.clone(),
-        listing: listing.listing,
+        listing,
         builder: ContentBuilder::default(),
         snapshot: None,
-        errors: listing.errors,
+        errors,
         indexes: HashMap::new(),
         failed: HashSet::new(),
     };
@@ -571,7 +668,8 @@ impl Loading {
         self.file_error(file, at, problem);
     }
 
-    pub fn row_error<Row: ContentRow>(
+    /// A problem at `pointer` in the file holding the fields of `id`.
+    pub fn row_error<Row: ContentFile>(
         &mut self,
         id: ContentId<Row>,
         pointer: &str,
@@ -581,22 +679,35 @@ impl Loading {
         self.json_error(file, pointer, problem);
     }
 
-    pub fn row_errors<Row: ContentRow>(&mut self, id: ContentId<Row>, check: RowCheck) {
+    /// A problem at `pointer` in the JSON part `part` of the bundle `id`.
+    pub fn part_error<Row: ContentFile>(
+        &mut self,
+        id: ContentId<Row>,
+        part: &str,
+        pointer: &str,
+        problem: ContentProblem,
+    ) {
+        let file = format!("{}/{part}", id.path(&self.content()));
+        self.json_error(file, pointer, problem);
+    }
+
+    pub fn row_errors<Row: ContentFile>(&mut self, id: ContentId<Row>, check: RowCheck) {
         for error in check.into_errors() {
             self.row_error(id, &error.pointer, error.problem);
         }
     }
 
-    pub fn row_file<Row: ContentRow>(&mut self, id: ContentId<Row>) -> String {
-        super::row_file(Row::TABLE, id.key(&self.content()))
+    /// The file holding the fields of `id`: the file itself, or its bundle's config.
+    pub fn row_file<Row: ContentFile>(&mut self, id: ContentId<Row>) -> String {
+        fields_file(id.path(&self.content()))
     }
 
-    pub fn fail<Row: ContentRow>(&mut self, id: ContentId<Row>) {
-        let key = id.key(&self.content()).to_owned();
-        self.failed.insert((Row::TABLE, key));
+    pub fn fail<Row: ContentFile>(&mut self, id: ContentId<Row>) {
+        let path = id.path(&self.content()).to_owned();
+        self.failed.insert((Row::TABLE, path));
     }
 
-    pub fn rows<'c, Row: ContentRow>(
+    pub fn rows<'c, Row: ContentFile>(
         &self,
         content: &'c Content,
     ) -> Vec<(ContentId<Row>, &'c Row)> {
@@ -606,7 +717,7 @@ impl Loading {
             .filter(|(id, _)| {
                 !self
                     .failed
-                    .contains(&(Row::TABLE, id.key(content).to_owned()))
+                    .contains(&(Row::TABLE, id.path(content).to_owned()))
             })
             .collect()
     }
@@ -625,25 +736,31 @@ impl Loading {
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))
     }
 
-    pub fn assets(&self) -> &[String] {
-        &self.listing.assets
+    /// Every media file outside the bundles, by its path from the game folder.
+    pub fn media(&self) -> &[String] {
+        &self.listing.media
     }
 
-    pub fn has_asset(&self, path: &str) -> bool {
-        self.listing
-            .assets
-            .binary_search_by(|candidate| candidate.as_str().cmp(path))
-            .is_ok()
+    /// Every media file kept as a part of a bundle, by its path from the game folder.
+    pub fn media_parts(&self) -> Vec<String> {
+        let mut parts: Vec<String> = self
+            .listing
+            .parts
+            .iter()
+            .flat_map(|(bundle, parts)| {
+                parts
+                    .iter()
+                    .filter(|part| super::is_media_file(part))
+                    .map(move |part| format!("{bundle}/{part}"))
+            })
+            .collect();
+        parts.sort_unstable();
+        parts
     }
 
-    pub fn row_folder<Row: ContentRow>(&mut self, id: ContentId<Row>) -> Vec<String> {
-        let key = id.key(&self.content()).to_owned();
-        self.listing
-            .tables
-            .get(Row::TABLE)
-            .and_then(|table| table.folders.get(&key))
-            .cloned()
-            .unwrap_or_default()
+    /// Every part of the bundle at `path`, by its path inside the bundle.
+    pub fn parts_of(&self, path: &str) -> &[String] {
+        self.listing.parts.get(path).map_or(&[], Vec::as_slice)
     }
 
     pub fn place(&mut self, file: &str, pointer: &str) -> ErrorPlace {
@@ -673,10 +790,11 @@ impl Loading {
             scope.table_by_type(
                 loader.row_type(),
                 loader.name(),
-                self.listing.keys_of(loader.name()),
+                self.listing.paths_of(loader.name()),
             );
         }
-        scope.assets(self.listing.assets.clone());
+        scope.media(self.listing.media.clone());
+        self.builder.built(self.listing.files());
 
         let jobs: Vec<(usize, String)> = registry
             .row_loaders()
@@ -684,79 +802,61 @@ impl Loading {
             .enumerate()
             .flat_map(|(index, loader)| {
                 self.listing
-                    .keys_of(loader.name())
+                    .paths_of(loader.name())
                     .into_iter()
-                    .map(move |key| (index, key))
+                    .map(move |path| (index, path))
             })
             .collect();
         let root = self.folder.clone();
-        let read: Vec<(usize, String, ReadFile)> = jobs
+        let listing = &self.listing;
+        let parsed: Vec<(usize, String, ParsedFile)> = jobs
             .into_par_iter()
-            .map(|(index, key)| {
-                let file = super::row_file(registry.row_loaders()[index].name(), &key);
-                (index, key, read_file(root.as_ref(), &file, true))
-            })
-            .collect();
-
-        let mut owned: Vec<(RowName, RowName)> = Vec::new();
-        let mut folders: Vec<(RowName, RowFolder)> = Vec::new();
-        for (loader, key, file) in &read {
-            let row = RowName::new(registry.row_loaders()[*loader].name(), key.clone());
-            if let Some(owner) = &file.owner {
-                owned.push((row.clone(), owner.clone()));
-            }
-            if let Some(folder) = &file.folder {
-                folders.push((row, folder.clone()));
-            }
-        }
-        self.builder.built(RowFolders::new(folders));
-        for (_, _, file) in &read {
-            if let Some(index) = &file.index {
-                self.indexes.insert(file.file.clone(), index.clone());
-            }
-        }
-        let owners = Arc::new(self.check_owners(registry, owned));
-
-        let parsed: Vec<(usize, String, ParsedFile)> = read
-            .into_par_iter()
-            .map(|(index, key, file)| {
+            .map(|(index, path)| {
                 let loader = &registry.row_loaders()[index];
-                let reader = (!loader.sees_all_rows()).then(|| ScopeReader {
-                    row: Some(RowName::new(loader.name(), key.clone())),
-                    owners: owners.clone(),
-                });
-                let scope = match reader {
-                    Some(reader) => scope.clone().reading(reader),
-                    None => scope.clone(),
-                };
-                let parsed = parse_read(file, &scope, &registry.list_kinds, &|value| {
+                let file = read_file(root.as_ref(), &fields_file(&path));
+                let mut parsed = parse_read(file, &scope, &registry.list_kinds, &|value| {
                     loader.parse_value(value)
                 });
-                (index, key, parsed)
+                if let Some(row) = parsed.row.as_mut() {
+                    let parts = listing.parts.get(&path).map_or(&[][..], Vec::as_slice);
+                    let mut reader = Parts::new(&path, parts, &root, &scope);
+                    loader.read_parts(row.as_mut(), &mut reader);
+                    let (errors, indexes) = reader.finish();
+                    parsed.errors.extend(errors);
+                    parsed.parts.extend(indexes);
+                }
+                (index, path, parsed)
             })
             .collect();
 
         let mut rows: Vec<Vec<(String, Box<dyn Any + Send + Sync>)>> =
             registry.row_loaders().iter().map(|_| Vec::new()).collect();
-        for (loader, key, parsed) in parsed {
+        for (loader, path, parsed) in parsed {
+            if let Some(index) = parsed.index {
+                self.indexes.insert(fields_file(&path), index);
+            }
+            self.indexes.extend(parsed.parts);
             if !parsed.errors.is_empty() {
                 let table = registry.row_loaders()[loader].name();
-                self.failed.insert((table, key.clone()));
+                self.failed.insert((table, path.clone()));
             }
             self.errors.extend(parsed.errors);
             if let Some(row) = parsed.row {
-                rows[loader].push((key, row));
+                rows[loader].push((path, row));
             }
         }
         for (loader, rows) in registry.row_loaders().iter().zip(rows) {
-            loader.finish(self.listing.keys_of(loader.name()), rows, &mut self.builder);
+            loader.finish(
+                self.listing.paths_of(loader.name()),
+                rows,
+                &mut self.builder,
+            );
         }
-        self.builder.built(ContentOwners::clone(&owners));
         self.snapshot = None;
 
         let settings = parse_read(
-            read_file(root.as_ref(), GAME_FILE, false),
-            &scope.clone().reading(ScopeReader { row: None, owners }),
+            read_file(root.as_ref(), SETTINGS_FILE),
+            &scope,
             &registry.list_kinds,
             &|value| {
                 registry
@@ -767,7 +867,7 @@ impl Loading {
         );
         self.errors.extend(settings.errors);
         if let Some(index) = settings.index {
-            self.indexes.insert(GAME_FILE.to_owned(), index);
+            self.indexes.insert(SETTINGS_FILE.to_owned(), index);
         }
         match settings.row {
             Some(settings) => {
@@ -775,109 +875,18 @@ impl Loading {
                     loader.store(settings, &mut self.builder);
                 }
             }
-            None if !self.listing.game_json => self.file_error(
-                GAME_FILE,
+            None if !self.listing.settings => self.file_error(
+                SETTINGS_FILE,
                 ErrorPlace::WholeFile,
                 ContentProblem::new(
                     "missing file",
                     "no such file",
-                    "game.json at the root of the folder",
+                    format!("the game's settings at {SETTINGS_FILE}"),
                 ),
             ),
             None => {}
         }
         self.snapshot = None;
-    }
-
-    /// Keeps every owner that names a row and leads up to a global one; reports the others, whose
-    /// rows then load as global.
-    fn check_owners(
-        &mut self,
-        registry: &ContentRegistry,
-        owned: Vec<(RowName, RowName)>,
-    ) -> ContentOwners {
-        let mut kept: Vec<(RowName, RowName)> = Vec::new();
-        for (row, owner) in owned {
-            let file = row_file(&row.table, &row.key);
-            let keys = registry
-                .row_loaders()
-                .iter()
-                .find(|loader| loader.name() == owner.table)
-                .map(|loader| self.listing.keys_of(loader.name()));
-            let problem = match keys {
-                Some(keys) if keys.contains(&owner.key) => registry.is_fixture(&row).then(|| {
-                    ContentProblem::new(
-                        "fixture with an owner",
-                        format!("{row} owned by {owner}"),
-                        format!(
-                            "no owner: {} rows are fixtures, which code names, so they stay global",
-                            row.table
-                        ),
-                    )
-                }),
-                keys => {
-                    let candidates: Vec<String> = match keys {
-                        Some(keys) => keys
-                            .iter()
-                            .map(|key| format!("{}/{key}", owner.table))
-                            .collect(),
-                        None => registry
-                            .table_names()
-                            .iter()
-                            .map(|table| format!("{table}/{}", owner.key))
-                            .collect(),
-                    };
-                    let wanted = owner.to_string();
-                    Some(
-                        ContentProblem::new(
-                            "unknown owner",
-                            format!("{wanted:?}"),
-                            "the table/key of a row",
-                        )
-                        .near(nearest(&candidates, &wanted).map(|near| format!("{near:?}"))),
-                    )
-                }
-            };
-            match problem {
-                Some(problem) => {
-                    self.json_error(file, &format!("/{OWNER_FIELD}"), problem);
-                    self.failed
-                        .insert((table_name(registry, &row.table), row.key));
-                }
-                None => kept.push((row, owner)),
-            }
-        }
-        let owners = ContentOwners::new(kept.clone());
-        let mut looped: Vec<RowName> = Vec::new();
-        for (row, _) in &kept {
-            let mut path = vec![row.clone()];
-            let mut at = row.clone();
-            while let Some(owner) = owners.owner(&at.table, &at.key) {
-                if owner == row {
-                    path.push(owner.clone());
-                    let names: Vec<String> = path.iter().map(RowName::to_string).collect();
-                    self.json_error(
-                        row_file(&row.table, &row.key),
-                        &format!("/{OWNER_FIELD}"),
-                        ContentProblem::new(
-                            "owner loop",
-                            names.join(" → "),
-                            "owners that lead up to a global row",
-                        ),
-                    );
-                    self.failed
-                        .insert((table_name(registry, &row.table), row.key.clone()));
-                    looped.push(row.clone());
-                    break;
-                }
-                if path.contains(owner) {
-                    break;
-                }
-                path.push(owner.clone());
-                at = owner.clone();
-            }
-        }
-        ContentOwners::new(kept.into_iter().filter(|(row, _)| !looped.contains(row)))
     }
 
     fn check_rows(&mut self, registry: &ContentRegistry) {
@@ -886,9 +895,9 @@ impl Loading {
         for loader in registry.row_loaders() {
             loader.check_rows(&content, &mut errors);
         }
-        for (table, key, check) in errors {
-            let file = super::row_file(table, &key);
-            self.failed.insert((table, key));
+        for (table, path, check) in errors {
+            let file = fields_file(&path);
+            self.failed.insert((table, path));
             for error in check.into_errors() {
                 self.json_error(file.clone(), &error.pointer, error.problem);
             }
@@ -897,24 +906,18 @@ impl Loading {
 
     fn hash_files(&mut self) {
         let mut files: Vec<String> = Vec::new();
-        if self.listing.game_json {
-            files.push(GAME_FILE.to_owned());
+        if self.listing.settings {
+            files.push(SETTINGS_FILE.to_owned());
         }
-        for (table, listing) in &self.listing.tables {
-            for key in &listing.keys {
-                files.push(super::row_file(table, key));
-            }
-            for (key, names) in &listing.folders {
-                let folder = row_folder(table, key);
-                files.extend(names.iter().map(|name| format!("{folder}/{name}")));
+        for paths in self.listing.content.values() {
+            for path in paths {
+                match self.listing.parts.get(path) {
+                    Some(parts) => files.extend(parts.iter().map(|part| format!("{path}/{part}"))),
+                    None => files.push(path.clone()),
+                }
             }
         }
-        files.extend(
-            self.listing
-                .assets
-                .iter()
-                .map(|path| super::asset_file(path)),
-        );
+        files.extend(self.listing.media.iter().cloned());
         let root = self.folder.clone();
         let hashed: Vec<(String, io::Result<FileHash>)> = files
             .into_par_iter()
@@ -970,7 +973,7 @@ impl Loading {
         };
         if found != version {
             self.json_error(
-                GAME_FILE,
+                SETTINGS_FILE,
                 "/content_version",
                 ContentProblem::new(
                     VERSION_RULE,
@@ -993,6 +996,7 @@ pub struct FileHashes(pub BTreeMap<String, FileHash>);
 struct ParsedFile {
     row: Option<Box<dyn Any + Send + Sync>>,
     index: Option<Arc<JsonIndex>>,
+    parts: Vec<(String, Arc<JsonIndex>)>,
     errors: Vec<LoadError>,
 }
 
@@ -1011,23 +1015,18 @@ impl From<serde_path_to_error::Error<serde_json::Error>> for ParseError {
 }
 type ParseResult = Result<Box<dyn Any + Send + Sync>, ParseError>;
 
-/// A file read and parsed as JSON, with a row's owner and folder taken off it, before any row type
-/// reads it.
+/// A file read and parsed as JSON, before any type reads it.
 struct ReadFile {
     file: String,
     value: Option<serde_json::Value>,
-    owner: Option<RowName>,
-    folder: Option<RowFolder>,
     index: Option<Arc<JsonIndex>>,
     errors: Vec<LoadError>,
 }
 
-fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
+fn read_file(root: &dyn ContentFolder, file: &str) -> ReadFile {
     let mut read = ReadFile {
         file: file.to_owned(),
         value: None,
-        owner: None,
-        folder: None,
         index: None,
         errors: Vec::new(),
     };
@@ -1056,54 +1055,12 @@ fn read_file(root: &dyn ContentFolder, file: &str, row: bool) -> ReadFile {
         }
     };
     let index = Arc::new(JsonIndex::of(&text));
-    let split = if row {
-        split_header(&text)
-    } else {
-        parse_json(&text).map(|value| (value, RowHeader::default()))
-    };
-    match split {
-        Ok((value, header)) => {
-            read.value = Some(value);
-            read.owner = header.owner;
-            read.folder = header.folder;
-        }
+    match parse_json(&text) {
+        Ok(value) => read.value = Some(value),
         Err(error) => read.errors.push(shape_error(file, &error, &index, &[])),
     }
     read.index = Some(index);
     read
-}
-
-/// What a row file says about the row besides the row itself.
-#[derive(Default)]
-pub struct RowHeader {
-    pub owner: Option<RowName>,
-    pub folder: Option<RowFolder>,
-}
-
-/// A row file's JSON without its header fields, and the header they make.
-pub fn split_header(text: &str) -> Result<(serde_json::Value, RowHeader), ParseError> {
-    let mut value: serde_json::Value = parse_json(text)?;
-    let header = RowHeader {
-        owner: take_field(&mut value, OWNER_FIELD)?,
-        folder: take_field(&mut value, FOLDER_FIELD)?,
-    };
-    Ok((value, header))
-}
-
-fn take_field<T: DeserializeOwned>(
-    value: &mut serde_json::Value,
-    field: &str,
-) -> Result<Option<T>, ParseError> {
-    value
-        .as_object_mut()
-        .and_then(|fields| fields.shift_remove(field))
-        .map(|taken| {
-            serde_path_to_error::deserialize::<_, T>(taken).map_err(|error| ParseError {
-                pointer: format!("/{field}"),
-                inner: error.into_inner(),
-            })
-        })
-        .transpose()
 }
 
 fn parse_read(
@@ -1115,6 +1072,7 @@ fn parse_read(
     let mut parsed = ParsedFile {
         row: None,
         index: read.index,
+        parts: Vec::new(),
         errors: read.errors,
     };
     let (Some(value), Some(index)) = (read.value, parsed.index.clone()) else {
@@ -1259,7 +1217,7 @@ pub fn pointer_of(path: &serde_path_to_error::Path) -> String {
     pointer
 }
 
-fn shape_error(
+pub(super) fn shape_error(
     file: &str,
     error: &ParseError,
     index: &JsonIndex,
@@ -1268,12 +1226,7 @@ fn shape_error(
     use serde_json::error::Category;
     let inner = &error.inner;
     let pointer = error.pointer.clone();
-    let message = inner.to_string();
-    let message = message
-        .split(" at line ")
-        .next()
-        .unwrap_or(&message)
-        .to_owned();
+    let message = message_of(inner);
     if matches!(
         inner.classify(),
         Category::Syntax | Category::Eof | Category::Io
@@ -1305,6 +1258,20 @@ fn shape_error(
         at,
         problem: classify_shape(&message, &pointer, list_kinds),
     }
+}
+
+/// What is wrong with a value that didn't parse as its type.
+pub fn shape_problem(error: &ParseError) -> ContentProblem {
+    classify_shape(&message_of(&error.inner), &error.pointer, &[])
+}
+
+fn message_of(error: &serde_json::Error) -> String {
+    let message = error.to_string();
+    message
+        .split(" at line ")
+        .next()
+        .unwrap_or(&message)
+        .to_owned()
 }
 
 fn classify_shape(message: &str, pointer: &str, list_kinds: &[ListKind]) -> ContentProblem {
@@ -1392,11 +1359,12 @@ fn expected_options(what: &str, options: &[String]) -> String {
 pub(super) trait TableLoader: Send + Sync {
     fn name(&self) -> &'static str;
     fn row_type(&self) -> TypeId;
-    fn folders(&self) -> bool;
-    fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
-    fn sees_all_rows(&self) -> bool;
+    fn shape(&self) -> Shape;
+    fn parts(&self) -> &'static [PartSpec];
+    fn schema(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn picked_from_table(&self) -> bool;
     fn parse_value(&self, value: &serde_json::Value) -> ParseResult;
+    fn read_parts(&self, row: &mut (dyn Any + Send + Sync), parts: &mut Parts);
     fn finish(
         &self,
         keys: Vec<String>,
@@ -1416,11 +1384,17 @@ fn shape_of<T: JsonSchema>(settings: &SchemaSettings) -> serde_json::Value {
 }
 
 struct RowLoader<Row> {
-    folders: bool,
+    parts: Option<BundleParts<Row>>,
     marker: PhantomData<fn() -> Row>,
 }
 
-impl<Row: ContentRow> TableLoader for RowLoader<Row> {
+struct BundleParts<Row> {
+    specs: &'static [PartSpec],
+    read: fn(&mut Row, &mut Parts),
+    write: fn(&Row, &str, &mut FileWriter) -> io::Result<()>,
+}
+
+impl<Row: ContentFile> TableLoader for RowLoader<Row> {
     fn name(&self) -> &'static str {
         Row::TABLE
     }
@@ -1429,16 +1403,16 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         TypeId::of::<Row>()
     }
 
-    fn folders(&self) -> bool {
-        self.folders
+    fn shape(&self) -> Shape {
+        Row::SHAPE
     }
 
-    fn shape(&self, settings: &SchemaSettings) -> serde_json::Value {
+    fn parts(&self) -> &'static [PartSpec] {
+        self.parts.as_ref().map_or(&[], |parts| parts.specs)
+    }
+
+    fn schema(&self, settings: &SchemaSettings) -> serde_json::Value {
         shape_of::<Row>(settings)
-    }
-
-    fn sees_all_rows(&self) -> bool {
-        Row::SEES_ALL_ROWS
     }
 
     fn picked_from_table(&self) -> bool {
@@ -1452,18 +1426,27 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
         })
     }
 
+    fn read_parts(&self, row: &mut (dyn Any + Send + Sync), parts: &mut Parts) {
+        if let Some(bundle) = &self.parts {
+            let row = row
+                .downcast_mut::<Row>()
+                .expect("a file parsed by its own loader");
+            (bundle.read)(row, parts);
+        }
+    }
+
     fn finish(
         &self,
-        keys: Vec<String>,
+        paths: Vec<String>,
         rows: Vec<(String, Box<dyn Any + Send + Sync>)>,
         builder: &mut ContentBuilder,
     ) {
-        let mut table = Table::<Row>::keyed(keys);
-        for (key, row) in rows {
+        let mut table = Table::<Row>::of_paths(paths);
+        for (path, row) in rows {
             let row = *row
                 .downcast::<Row>()
-                .expect("a row parsed by its own loader");
-            table.insert(&key, row);
+                .expect("a file parsed by its own loader");
+            table.insert(&path, row);
         }
         builder.insert_table(table);
     }
@@ -1473,34 +1456,21 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
             let mut check = RowCheck::default();
             row.check(&mut check);
             if !check.is_empty() {
-                errors.push((Row::TABLE, id.key(content).to_owned(), check));
+                errors.push((Row::TABLE, id.path(content).to_owned(), check));
             }
         }
     }
 
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         for (id, row) in content.table::<Row>().iter() {
-            let key = id.key(content);
-            let file = super::row_file(Row::TABLE, key);
-            let headed = Headed {
-                owner: content.owners().owner(Row::TABLE, key),
-                folder: content.folders().of(Row::TABLE, key),
-                row,
-            };
-            writer.json(&file, &headed)?;
+            let path = id.path(content);
+            writer.json(&fields_file(path), row)?;
+            if let Some(bundle) = &self.parts {
+                (bundle.write)(row, path, writer)?;
+            }
         }
         Ok(())
     }
-}
-
-#[derive(Serialize)]
-struct Headed<'a, Row> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    owner: Option<&'a RowName>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    folder: Option<&'a RowFolder>,
-    #[serde(flatten)]
-    row: &'a Row,
 }
 
 pub fn parse_value<T: DeserializeOwned>(value: &serde_json::Value) -> Result<T, ParseError> {
@@ -1555,7 +1525,7 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
 
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         if self.built(content) {
-            writer.json(GAME_FILE, content.built::<G>())?;
+            writer.json(SETTINGS_FILE, content.built::<G>())?;
         }
         Ok(())
     }
@@ -1600,208 +1570,8 @@ fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
     }
 }
 
-struct Listing {
-    game_json: bool,
-    tables: BTreeMap<&'static str, TableListing>,
-    assets: Vec<String>,
-}
-
-#[derive(Default)]
-struct TableListing {
-    keys: Vec<String>,
-    folders: HashMap<String, Vec<String>>,
-}
-
-struct Listed {
-    listing: Listing,
-    errors: Vec<LoadError>,
-}
-
-impl Listing {
-    fn keys_of(&self, table: &str) -> Vec<String> {
-        self.tables
-            .get(table)
-            .map(|listing| listing.keys.clone())
-            .unwrap_or_default()
-    }
-
-    fn read(registry: &ContentRegistry, root: &dyn ContentFolder) -> Listed {
-        let mut errors = Vec::new();
-        let mut listing = Listing {
-            game_json: false,
-            tables: BTreeMap::new(),
-            assets: Vec::new(),
-        };
-        for loader in registry.row_loaders() {
-            listing
-                .tables
-                .insert(loader.name(), TableListing::default());
-        }
-        for entry in entries(root, "") {
-            let name = entry.name.clone();
-            match (name.as_str(), entry.dir) {
-                (GAME_FILE, false) => listing.game_json = true,
-                ("credits.md" | "README.md", false) => {}
-                (TABLES_DIR, true) => listing.read_tables(registry, root, &mut errors),
-                (ASSETS_DIR, true) => collect_assets(root, ASSETS_DIR, "", &mut listing.assets),
-                _ => errors.push(whole_file(
-                    &name,
-                    "unknown entry",
-                    describe(&entry),
-                    "game.json, tables/, assets/, credits.md or README.md at the root",
-                )),
-            }
-        }
-        listing.assets.sort_unstable();
-        Listed { listing, errors }
-    }
-
-    fn read_tables(
-        &mut self,
-        registry: &ContentRegistry,
-        root: &dyn ContentFolder,
-        errors: &mut Vec<LoadError>,
-    ) {
-        let names: Vec<&'static str> = registry.table_names();
-        for entry in entries(root, TABLES_DIR) {
-            let Some(loader) = registry
-                .row_loaders()
-                .iter()
-                .find(|loader| entry.dir && loader.name() == entry.name)
-            else {
-                errors.push(whole_file(
-                    &table_folder(&entry.name),
-                    "unknown entry",
-                    describe(&entry),
-                    expected_options(
-                        "a table",
-                        &names.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
-                    ),
-                ));
-                continue;
-            };
-            let table = loader.name();
-            let dir = table_folder(table);
-            let mut keyed: Vec<(String, String)> = Vec::new();
-            let mut folders: Vec<(String, Vec<String>)> = Vec::new();
-            for entry in entries(root, &dir) {
-                let file = format!("{dir}/{}", entry.name);
-                match (entry.dir, entry.name.strip_suffix(".json")) {
-                    (false, Some(key)) => {
-                        if valid_key(key) {
-                            keyed.push((key.to_owned(), file));
-                        } else {
-                            errors.push(whole_file(
-                                &file,
-                                "invalid key",
-                                format!("{key:?}"),
-                                KEY_RULE,
-                            ));
-                        }
-                    }
-                    (true, _) if loader.folders() => {
-                        let files: Vec<String> = entries(root, &format!("{dir}/{}", entry.name))
-                            .into_iter()
-                            .filter(|inner| {
-                                if inner.dir {
-                                    errors.push(whole_file(
-                                        &format!("{file}/{}", inner.name),
-                                        "unknown entry",
-                                        "a folder",
-                                        format!("only files inside tables/{table}/<key>/"),
-                                    ));
-                                }
-                                !inner.dir
-                            })
-                            .map(|inner| inner.name)
-                            .collect();
-                        folders.push((entry.name.clone(), files));
-                    }
-                    _ => errors.push(whole_file(
-                        &file,
-                        "unknown entry",
-                        describe(&entry),
-                        format!("only <key>.json rows in tables/{table}/"),
-                    )),
-                }
-            }
-            keyed.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-            let mut keys: Vec<String> = Vec::new();
-            for (key, file) in keyed {
-                if let Some(clash) = keys.iter().find(|k| k.eq_ignore_ascii_case(&key)) {
-                    errors.push(whole_file(
-                        &file,
-                        "duplicate key",
-                        format!("{clash} and {key}"),
-                        "keys unique in their table ignoring case",
-                    ));
-                    continue;
-                }
-                keys.push(key);
-            }
-            let mut listing = TableListing::default();
-            for (folder, files) in folders {
-                if keys.contains(&folder) {
-                    listing.folders.insert(folder, files);
-                } else {
-                    errors.push(whole_file(
-                        &row_folder(table, &folder),
-                        "unknown entry",
-                        format!("a folder with no {table} row {folder}.json beside it"),
-                        format!("{} for its files", row_file(table, &folder)),
-                    ));
-                }
-            }
-            listing.keys = keys;
-            self.tables.insert(table, listing);
-        }
-    }
-}
-
-fn table_name(registry: &ContentRegistry, table: &str) -> &'static str {
-    registry
-        .table_names()
-        .into_iter()
-        .find(|name| *name == table)
-        .expect("a row's own table is registered")
-}
-
 pub const KEY_RULE: &str =
     "1 to 64 of ASCII letters, digits, _ and -, not starting with -, not a Windows device name";
-
-fn describe(entry: &FolderEntry) -> String {
-    if entry.dir {
-        format!("folder {}", entry.name)
-    } else {
-        format!("file {}", entry.name)
-    }
-}
-
-fn entries(root: &dyn ContentFolder, dir: &str) -> Vec<FolderEntry> {
-    let mut entries: Vec<FolderEntry> = root
-        .entries(dir)
-        .into_iter()
-        .filter(|entry| !entry.name.starts_with('.'))
-        .collect();
-    entries.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
-    entries
-}
-
-fn collect_assets(root: &dyn ContentFolder, dir: &str, prefix: &str, into: &mut Vec<String>) {
-    for entry in entries(root, dir) {
-        let path = format!("{prefix}{}", entry.name);
-        if entry.dir {
-            collect_assets(
-                root,
-                &format!("{dir}/{}", entry.name),
-                &format!("{path}/"),
-                into,
-            );
-        } else {
-            into.push(path);
-        }
-    }
-}
 
 pub fn valid_key(key: &str) -> bool {
     const DEVICES: [&str; 22] = [
@@ -1888,19 +1658,21 @@ pub fn write(registry: &ContentRegistry, content: Content, root: &Path) -> io::R
     result.map(|()| writer)
 }
 
-/// Every fixture of `F` has its row, and every row keeps what the engine reads from it.
+/// Every fixture of `F` is at its path, keeping what the engine reads from it, and a type whose
+/// files are all fixtures holds no other file.
 fn check_fixture<F: Fixture>(loading: &mut Loading) {
     let content = loading.content();
     let table = F::Row::TABLE;
     for fixture in F::VARIANTS {
-        let Some(id) = content.table::<F::Row>().id_of(fixture.key()) else {
+        let path = fixture.path();
+        let Some(id) = content.table::<F::Row>().id_of(&path) else {
             loading.file_error(
-                super::row_file(table, fixture.key()),
+                path.clone(),
                 ErrorPlace::WholeFile,
                 ContentProblem::new(
                     "missing fixture",
-                    "no such file",
-                    format!("one row for every {table} fixture the engine requires"),
+                    format!("no {table} {} at {path}", fixture.name()),
+                    format!("the {table} the engine requires at {path}"),
                 ),
             );
             continue;
@@ -1917,17 +1689,20 @@ fn check_fixture<F: Fixture>(loading: &mut Loading) {
     if !F::WHOLE_TABLE {
         return;
     }
-    let fixed: Vec<&str> = F::VARIANTS.iter().map(|fixture| fixture.key()).collect();
+    let fixed: Vec<String> = F::VARIANTS.iter().map(|fixture| fixture.path()).collect();
     for (id, _) in content.table::<F::Row>().iter() {
-        let key = id.key(&content);
-        if !fixed.contains(&key) {
+        let path = id.path(&content);
+        if !fixed.iter().any(|fixed| fixed == path) {
             loading.file_error(
-                super::row_file(table, key),
+                path,
                 ErrorPlace::WholeFile,
                 ContentProblem::new(
-                    "row the engine never reads",
-                    key,
-                    format!("one of the {table} fixtures the engine requires"),
+                    "file the engine never reads",
+                    path,
+                    format!(
+                        "only the {table} fixtures the engine requires, under {FIXTURES_DIR}/{}/",
+                        F::FOLDER
+                    ),
                 ),
             );
         }

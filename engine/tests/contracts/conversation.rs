@@ -229,8 +229,8 @@ fn inn() -> Sim {
             "inn",
             &Map::open(15, 15),
             json!([
-                { "type": "resident", "npc": "keeper", "at": { "x": 7.0, "y": 4.0 } },
-                { "type": "resident", "npc": "crier", "at": { "x": 7.0, "y": 13.0 } },
+                { "type": "resident", "npc": "keeper.npc.json", "at": { "x": 7.0, "y": 4.0 } },
+                { "type": "resident", "npc": "crier.npc.json", "at": { "x": 7.0, "y": 13.0 } },
             ]),
         )
         .hero("inn", 7.0, 7.0)
@@ -245,16 +245,16 @@ fn inn() -> Sim {
         .npc(
             "keeper",
             40.0,
-            json!([{ "type": "script", "script": "keeper_talk" }]),
+            json!([{ "type": "script", "script": "keeper_talk.script.json" }]),
         )
-        .script("keeper_talk", "npc/keeper", "npc", keeping())
+        .script("keeper_talk", "npc", keeping())
         .busts("keeper")
         .npc(
             "crier",
             40.0,
-            json!([{ "type": "script", "script": "crier_talk" }]),
+            json!([{ "type": "script", "script": "crier_talk.script.json" }]),
         )
-        .script("crier_talk", "npc/crier", "npc", crying())
+        .script("crier_talk", "npc", crying())
         .row(
             "memory",
             "favour",
@@ -316,7 +316,7 @@ fn keeping() -> Value {
             "hello": {
                 "type": "dialogue",
                 "lines": [{
-                    "by": { "type": "npc", "npc": "keeper", "face": "neutral" },
+                    "by": { "type": "npc", "npc": "keeper.npc.json", "face": "neutral" },
                     "text": ["Welcome in."],
                 }],
                 "choices": [
@@ -326,18 +326,18 @@ fn keeping() -> Value {
             },
             "pay_round": {
                 "type": "items",
-                "take": [{ "item": "gold", "count": 10 }],
+                "take": [{ "item": "gold.item.json", "count": 10 }],
                 "done": "count_round",
             },
             "count_round": {
                 "type": "remember",
-                "memory": "favour",
-                "to": { "type": "add", "a": { "type": "memory", "memory": "favour" }, "b": 1 },
+                "memory": "favour.memory.json",
+                "to": { "type": "add", "a": { "type": "memory", "memory": "favour.memory.json" }, "b": 1 },
                 "next": "round",
             },
             "round": {
                 "type": "dialogue",
-                "lines": [{ "by": { "type": "npc", "npc": "keeper", "face": "happy" }, "text": ["Cheers!"] }],
+                "lines": [{ "by": { "type": "npc", "npc": "keeper.npc.json", "face": "happy" }, "text": ["Cheers!"] }],
                 "choices": [{ "label": ["Goodbye."] }],
             },
     })
@@ -353,7 +353,7 @@ fn crying() -> Value {
                 "news": true,
                 "next": "meet",
             },
-            "meet": { "type": "remember", "memory": "met", "next": "hello" },
+            "meet": { "type": "remember", "memory": "met.memory.json", "next": "hello" },
             "hello": {
                 "type": "dialogue",
                 "lines": [{ "by": { "type": "narrator" }, "text": ["The crier tips his hat."] }],
@@ -371,13 +371,13 @@ fn crying() -> Value {
                 "test": {
                     "type": "all",
                     "of": [
-                        { "type": "memory", "memory": "met" },
-                        { "type": "not", "of": { "type": "memory", "memory": "news_today" } },
+                        { "type": "memory", "memory": "met.memory.json" },
+                        { "type": "not", "of": { "type": "memory", "memory": "news_today.memory.json" } },
                     ],
                 },
                 "yes": "remember_news",
             },
-            "remember_news": { "type": "remember", "memory": "news_today", "next": "news" },
+            "remember_news": { "type": "remember", "memory": "news_today.memory.json", "next": "news" },
             "news": {
                 "type": "dialogue",
                 "lines": [{ "by": { "type": "narrator" }, "text": ["Hear ye!"] }],

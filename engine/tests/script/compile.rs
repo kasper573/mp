@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use engine::core::content::{Content, ContentId, ContentRow};
+use engine::core::content::{Content, ContentFile, ContentId};
 use engine::core::math::Pos;
 use engine::core::script::compile::compile_owner;
 use engine::core::script::{EffectDef, Expr, ScriptError};
@@ -15,6 +15,7 @@ use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
 
 use crate::game::{content, game, module, parse, parse_in};
+use testkit::{Declared, path};
 
 const OWNERS: [RunnerKind; 6] = [
     RunnerKind::Object,
@@ -44,7 +45,8 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
             let parsed: engine::systems::script::RiftEffect = parse_in(&content, value.clone());
             let kind = parsed.kind().name();
             let allowed = parsed.owners().contains(&owner);
-            let script: ScriptModule = parse_in(&content, json!({ "script": "probe" }));
+            let script: ScriptModule =
+                parse_in(&content, json!({ "script": path("script", "probe") }));
             let compiled = compile_in(&content, owner, &[&script]);
             assert_eq!(
                 compiled.is_ok(),
@@ -148,7 +150,7 @@ fn may_do_names_the_functions_a_script_calls() {
     let procedures = compile(RunnerKind::Npc, &[&module("calls_helper")]).expect("compiles");
 
     let may_do = &procedures[0].may_do;
-    assert_eq!(may_do.calls, vec!["helper".to_owned()]);
+    assert_eq!(may_do.calls, vec![path("script", "helper")]);
     assert_eq!(may_do.answers, vec![EventKind::Started]);
     assert!(may_do.reaches.is_empty());
     assert!(!may_do.waits);
@@ -220,9 +222,9 @@ fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
     assert_eq!(error.rule, "unknown field");
 }
 
-fn id<Row: ContentRow>(key: &str) -> ContentId<Row> {
+fn id<Row: ContentFile>(key: &str) -> ContentId<Row> {
     content()
-        .by_key::<Row>(key)
+        .declared::<Row>(key)
         .expect("a row of the test game")
 }
 
@@ -259,33 +261,33 @@ fn entry(owner: RunnerKind, next: &str) -> Value {
 
 fn every_capability() -> Vec<Value> {
     vec![
-        json!({ "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } }),
+        json!({ "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 18.0 } }),
         json!({ "type": "heal", "by": "full" }),
         json!({ "type": "damage", "by": 10.0 }),
-        json!({ "type": "apply_status", "effect": "guarded", "power": 10.0, "seconds": 10.0 }),
+        json!({ "type": "apply_status", "effect": "guarded.status_effect.json", "power": 10.0, "seconds": 10.0 }),
         json!({ "type": "remove_status", "category": "debuff" }),
-        json!({ "type": "items", "take": [{ "item": "gold" }] }),
-        json!({ "type": "use_item", "item": "map" }),
-        json!({ "type": "equip", "item": "pass" }),
+        json!({ "type": "items", "take": [{ "item": "gold.item.json" }] }),
+        json!({ "type": "use_item", "item": "map.item.json" }),
+        json!({ "type": "equip", "item": "pass.item.json" }),
         json!({ "type": "unequip", "slot": "weapon" }),
-        json!({ "type": "drop_items", "item": "gold", "count": 1 }),
-        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold" }], "for": "subject" }),
+        json!({ "type": "drop_items", "item": "gold.item.json", "count": 1 }),
+        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold.item.json" }], "for": "subject" }),
         json!({ "type": "clear_ground_items", "within": 10.0 }),
         json!({
             "type": "move_items", "from": { "type": "subject" }, "to": { "type": "subject" },
-            "items": [{ "item": "gold" }]
+            "items": [{ "item": "gold.item.json" }]
         }),
         json!({ "type": "grant_xp", "xp": 1 }),
-        json!({ "type": "remember", "memory": "bribed" }),
-        json!({ "type": "forget", "memories": ["bribed"] }),
-        json!({ "type": "offer_quest", "quest": "x_marks" }),
-        json!({ "type": "accept_quest", "quest": "x_marks" }),
-        json!({ "type": "turn_in", "quest": "x_marks" }),
-        json!({ "type": "fail_quest", "quest": "x_marks" }),
-        json!({ "type": "complete_task", "quest": "x_marks", "task": "find_stone" }),
-        json!({ "type": "decide", "quest": "plea", "path": "Keep them" }),
-        json!({ "type": "open_shop", "shop": "box" }),
-        json!({ "type": "notify", "notification": "gulls" }),
+        json!({ "type": "remember", "memory": "bribed.memory.json" }),
+        json!({ "type": "forget", "memories": ["bribed.memory.json"] }),
+        json!({ "type": "offer_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "accept_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "turn_in", "quest": "x_marks.quest.json" }),
+        json!({ "type": "fail_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "complete_task", "quest": "x_marks.quest.json", "task": "find_stone" }),
+        json!({ "type": "decide", "quest": "plea.quest.json", "path": "Keep them" }),
+        json!({ "type": "open_shop", "shop": "box.shop.json" }),
+        json!({ "type": "notify", "notification": "gulls.notification.json" }),
         json!({ "type": "say", "text": ["Hm."] }),
         json!({ "type": "wander", "priority": 1 }),
         json!({ "type": "walk_to", "to": { "type": "subject" }, "within": 1, "priority": 3 }),
@@ -293,13 +295,13 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "stop", "priority": 9 }),
         json!({ "type": "face", "toward": { "type": "subject" } }),
         json!({ "type": "animate", "action": "attack", "wait": "apex" }),
-        json!({ "type": "use_skill", "skill": "strike", "at": { "type": "subject" } }),
+        json!({ "type": "use_skill", "skill": "strike.skill.json", "at": { "type": "subject" } }),
         json!({ "type": "reset_skills" }),
-        json!({ "type": "vfx", "vfx": "damage_taken" }),
+        json!({ "type": "vfx", "vfx": "fixtures/vfx/damage_taken.vfx.json" }),
         json!({ "type": "set_attitude", "attitude": "hostile" }),
-        json!({ "type": "spawn_npcs", "npc": "fighter", "count": 1, "near": "subject", "shown": "everyone" }),
+        json!({ "type": "spawn_npcs", "npc": "fighter.npc.json", "count": 1, "near": "subject", "shown": "everyone" }),
         json!({ "type": "despawn" }),
-        json!({ "type": "play_sound", "sfx": "ui_pick", "for": "subject" }),
+        json!({ "type": "play_sound", "sfx": "fixtures/interface/ui_pick.sfx", "for": "subject" }),
     ]
 }
 
@@ -321,14 +323,14 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                     },
                     "pay": {
                         "type": "items",
-                        "take": [{ "item": "gold", "count": 5 }],
-                        "give": [{ "item": "pass" }],
+                        "take": [{ "item": "gold.item.json", "count": 5 }],
+                        "give": [{ "item": "pass.item.json" }],
                         "done": "warp"
                     },
-                    "warp": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } },
+                    "warp": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 18.0 } },
                     "go": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "mark" },
-                    "mark": { "type": "remember", "memory": "bribed", "next": "shop" },
-                    "shop": { "type": "open_shop", "shop": "box" },
+                    "mark": { "type": "remember", "memory": "bribed.memory.json", "next": "shop" },
+                    "shop": { "type": "open_shop", "shop": "box.shop.json" },
                 },
             }),
         ),
@@ -363,7 +365,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                     "on": entry(RunnerKind::Npc, "decide"),
                     "decide": {
                         "type": "decide",
-                        "quest": "plea",
+                        "quest": "plea.quest.json",
                         "path": "Keep them",
                     },
                 },
@@ -375,7 +377,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                 "runs_on": "npc",
                 "nodes": {
                     "on": entry(RunnerKind::Npc, "a"),
-                    "a": { "type": "complete_task", "quest": "x_marks", "task": "no_such_task" },
+                    "a": { "type": "complete_task", "quest": "x_marks.quest.json", "task": "no_such_task" },
                 },
             }),
         ),
@@ -387,7 +389,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                     "on": entry(RunnerKind::Npc, "a"),
                     "a": {
                         "type": "if",
-                        "test": { "type": "task_done", "quest": "x_marks", "task": "no_such_task" },
+                        "test": { "type": "task_done", "quest": "x_marks.quest.json", "task": "no_such_task" },
                     },
                 },
             }),
@@ -399,8 +401,8 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                 "nodes": {
                     "on": entry(RunnerKind::Area, "check"),
                     "check": { "type": "if", "test": { "type": "not", "of": true }, "yes": "yes", "no": "no" },
-                    "yes": { "type": "notify", "notification": "gulls" },
-                    "no": { "type": "notify", "notification": "intro" },
+                    "yes": { "type": "notify", "notification": "gulls.notification.json" },
+                    "no": { "type": "notify", "notification": "intro.notification.json" },
                 },
             }),
         ),
@@ -444,7 +446,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                 "runs_on": "any",
                 "nodes": {
                     "run": { "type": "on", "event": "run", "next": "again" },
-                    "again": { "type": "run", "script": "loops" }
+                    "again": { "type": "run", "script": "loops.script.json" }
                 }
             }),
         ),
@@ -458,7 +460,7 @@ fn calling(script: &str) -> Value {
         "runs_on": "npc",
         "nodes": {
             "on": { "type": "on", "event": "started", "next": "call" },
-            "call": { "type": "run", "script": script }
+            "call": { "type": "run", "script": path("script", script) }
         }
     })
 }

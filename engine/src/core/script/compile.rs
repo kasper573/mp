@@ -17,7 +17,7 @@ use super::{
     ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::id::nearest;
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId};
 use crate::core::time::Seconds;
 
 pub type Eval = Box<dyn Fn(&World, &FlowCx) -> Value + Send + Sync>;
@@ -39,7 +39,7 @@ pub struct OwnerRow<V: Vocabulary> {
 }
 
 impl<V: Vocabulary> OwnerRow<V> {
-    pub fn id<Row: ContentRow>(&self) -> ContentId<Row> {
+    pub fn id<Row: ContentFile>(&self) -> ContentId<Row> {
         ContentId::new(self.row)
     }
 }
@@ -360,7 +360,7 @@ fn compile_source<'c, V: Vocabulary>(
     stack: &[ScriptId<V>],
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
     let Call { script, values } = binding.call;
-    let shared = Some(script.key(content).to_owned());
+    let shared = Some(script.path(content).to_owned());
     let fail = |rule: &'static str, node: Option<&str>, expected: String| ScriptError {
         rule,
         owner: binding.label.clone(),
@@ -384,8 +384,8 @@ fn compile_source<'c, V: Vocabulary>(
                     return Err(at_call(
                         "run by another kind",
                         format!(
-                            "script/{} is {}'s, run by {}",
-                            script.key(content),
+                            "{} is {}'s, run by {}",
+                            script.path(content),
                             def.runs_on.name(),
                             binding.owner.name()
                         ),
@@ -394,7 +394,7 @@ fn compile_source<'c, V: Vocabulary>(
             } else if def.runs_on != binding.owner {
                 return Err(at_call(
                     "run by another kind",
-                    format!("script/{} is {}'s", script.key(content), def.runs_on.name()),
+                    format!("{} is {}'s", script.path(content), def.runs_on.name()),
                 ));
             }
             (
@@ -402,7 +402,7 @@ fn compile_source<'c, V: Vocabulary>(
                     state: slots(&def.state),
                     locals: slots(&def.locals),
                     nodes: &def.nodes,
-                    label: format!("script/{}", script.key(content)),
+                    label: script.path(content).to_owned(),
                 },
                 Some(values),
                 Some(&def.variables),
@@ -668,7 +668,7 @@ fn compile_source<'c, V: Vocabulary>(
                 if cx.stack.contains(script) {
                     return Err(node_fail(
                         "runs itself",
-                        format!("script/{} reaches itself", script.key(content)),
+                        format!("{} reaches itself", script.path(content)),
                     ));
                 }
                 if cx.stack.len() + 1 > MAX_CALL_DEPTH {
@@ -684,7 +684,7 @@ fn compile_source<'c, V: Vocabulary>(
                     &Binding {
                         owner: binding.owner,
                         row: binding.row,
-                        label: format!("{} › script/{}", source.label, script.key(content)),
+                        label: format!("{} › script/{}", source.label, script.path(content)),
                         call: Call {
                             script: *script,
                             values,
@@ -695,7 +695,7 @@ fn compile_source<'c, V: Vocabulary>(
                 let entry = callee.run_entry().ok_or_else(|| {
                     node_fail(
                         "event not raised here",
-                        format!("script/{} has no run node", script.key(content)),
+                        format!("{} has no run node", script.path(content)),
                     )
                 })?;
                 let into = match into {
@@ -710,7 +710,7 @@ fn compile_source<'c, V: Vocabulary>(
                                     format!(
                                         "{local} is {} but script/{} returns {}",
                                         ty.name(),
-                                        script.key(content),
+                                        script.path(content),
                                         returned.name()
                                     ),
                                 ));
@@ -721,7 +721,7 @@ fn compile_source<'c, V: Vocabulary>(
                     None => None,
                 };
                 may_do.absorb(&callee.may_do);
-                may_do.calls.push(script.key(content).to_owned());
+                may_do.calls.push(script.path(content).to_owned());
                 needs_subject[index] |= callee.needs_subject;
                 Step::Run {
                     callee,

@@ -4,7 +4,7 @@ use bevy_ecs::schedule::{IntoScheduleConfigs, ScheduleLabel, SingleThreadedExecu
 use bevy_ecs::system::ScheduleSystem;
 use bevy_replicon::prelude::ToClients;
 use bevy_time::Time;
-use engine::core::content::{Content, ContentId, ContentRow};
+use engine::core::content::{Content, ContentFile, ContentId};
 use engine::core::math::Rng;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::systems::notification::NotificationSent;
@@ -54,12 +54,13 @@ impl Sim {
         }
     }
 
-    /// The row of `Row`'s table the test declared under `key`.
-    pub fn id<Row: ContentRow>(&self, key: &str) -> ContentId<Row> {
+    /// The file of `Row`'s type the test declared as `name`.
+    pub fn id<Row: ContentFile>(&self, name: &str) -> ContentId<Row> {
+        let path = crate::path(Row::TABLE, name);
         self.world
             .resource::<Content>()
-            .by_key::<Row>(key)
-            .unwrap_or_else(|| panic!("the test game has no {} row `{key}`", Row::TABLE))
+            .by_path::<Row>(&path)
+            .unwrap_or_else(|| panic!("the test game has no {} `{path}`", Row::TABLE))
     }
 
     /// Runs `systems` every tick, one after another in the order given, after those added before.

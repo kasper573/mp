@@ -7,7 +7,9 @@ use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
-use crate::core::content::{ContentId, ContentProblem, ContentRow, RowCheck};
+use crate::core::content::{
+    Bundle, ContentFile, ContentId, ContentProblem, FileWriter, PartSpec, Parts, RowCheck, Shape,
+};
 use crate::core::math::{Pos, Rect, Size, WorldPx};
 
 pub type TilesetId = ContentId<TilesetDef>;
@@ -20,6 +22,7 @@ pub const MAX_TILE_FRAME_MS: u32 = 60_000;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TilesetDef {
+    #[serde(skip)]
     pub image: ImageRef,
     pub tile: u32,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -28,8 +31,28 @@ pub struct TilesetDef {
     pub tiles: BTreeMap<u32, TileData>,
 }
 
-impl ContentRow for TilesetDef {
+pub const TILESET_IMAGE: PartSpec = PartSpec::File {
+    name: "image",
+    exts: &["png"],
+};
+
+impl Bundle for TilesetDef {
+    const PARTS: &'static [PartSpec] = &[TILESET_IMAGE];
+
+    fn read_parts(&mut self, parts: &mut Parts) {
+        if let Some(image) = parts.required(TILESET_IMAGE) {
+            self.image = ImageRef::new(parts.path(image));
+        }
+    }
+
+    fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl ContentFile for TilesetDef {
     const TABLE: &'static str = "tileset";
+    const SHAPE: Shape = Shape::Bundle;
 
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/tile", self.tile, 1, MAX_TILE_PX, "a tile size in pixels");
@@ -150,7 +173,7 @@ pub struct SurfaceDef {
     pub footstep: SfxId,
 }
 
-impl ContentRow for SurfaceDef {
+impl ContentFile for SurfaceDef {
     const TABLE: &'static str = "surface";
 
     fn check(&self, cx: &mut RowCheck) {

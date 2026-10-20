@@ -66,7 +66,7 @@ fn play(shoot: &mut Shoot) {
         snapshot.shop.as_ref().is_some_and(|shop| {
             shop.offers
                 .iter()
-                .any(|offer| offer.item.key(content()) == "bone_shield" && offer.left == Some(0))
+                .any(|offer| offer.item.name(content()) == "bone_shield" && offer.left == Some(0))
         })
     });
 
@@ -145,7 +145,7 @@ fn shop_is(snapshot: &ProbeSnapshot, shop: &str) -> bool {
     snapshot
         .shop
         .as_ref()
-        .is_some_and(|open| open.shop.key(content()) == shop)
+        .is_some_and(|open| open.shop.name(content()) == shop)
 }
 
 // Esc closes the bag before the conversation under it.

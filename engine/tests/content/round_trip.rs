@@ -10,9 +10,9 @@ use walkdir::WalkDir;
 use crate::support::game;
 
 #[test]
-fn a_folder_written_from_scratch_lists_every_row_and_grid() {
+fn a_folder_written_from_scratch_lists_every_json_and_csv_file() {
     let game = rich_game();
-    let declared = rows_and_grids(&game);
+    let declared = written_kinds(&game);
     let out = tempfile::tempdir().expect("a temp folder");
 
     let writer = write(game.registry(), game.load(), out.path()).expect("written");
@@ -27,7 +27,7 @@ fn writing_a_written_folder_back_changes_no_bytes() {
     let game = rich_game();
     let out = tempfile::tempdir().expect("a temp folder");
     for (path, bytes) in game.folder().files {
-        if path.starts_with("assets/") {
+        if !written_kind(&path) {
             let file = out.path().join(&path);
             std::fs::create_dir_all(file.parent().expect("a parent folder")).expect("folders");
             std::fs::write(file, bytes).expect("an asset");
@@ -43,7 +43,7 @@ fn writing_a_written_folder_back_changes_no_bytes() {
     assert_eq!(again.kept(), first.written().len());
 }
 
-/// A game of rows from many tables, and the grids of its area.
+/// A game of files of many types, bundles among them, and the grids of its area.
 fn rich_game() -> Game {
     game()
         .sword()
@@ -53,7 +53,7 @@ fn rich_game() -> Game {
         .npc(
             "brute",
             30.0,
-            json!([{ "type": "voice", "babble": "brute" }]),
+            json!([{ "type": "voice", "babble": testkit::path("babble", "brute") }]),
         )
         .item(
             "bone",
@@ -79,12 +79,18 @@ fn load(registry: &ContentRegistry, folder: &Path) -> Content {
     .unwrap_or_else(|report| panic!("{report}"))
 }
 
-fn rows_and_grids(game: &Game) -> BTreeSet<String> {
+fn written_kinds(game: &Game) -> BTreeSet<String> {
     game.folder()
         .files
         .into_keys()
-        .filter(|path| path == "game.json" || path.starts_with("tables/"))
+        .filter(|path| written_kind(path))
         .collect()
+}
+
+/// The JSON of settings and content and the CSV of grids, which the writer writes; media and
+/// shader sources are files the editor keeps as they are.
+fn written_kind(path: &str) -> bool {
+    path.ends_with(".json") || path.ends_with(".csv")
 }
 
 fn on_disk(folder: &Path) -> BTreeSet<String> {

@@ -1,0 +1,22 @@
+{
+  "name": "Fishing Bait",
+  "icon": "assets/icons/monster_part/monster_meat.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_flesh.sfx",
+    "trade": "sound-and-voice/sfx/trade_flesh.sfx",
+    "drop": "sound-and-voice/sfx/landing01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Smells exactly as bad as you'd think. The fish disagree."
+    },
+    {
+      "type": "stack",
+      "max": 20
+    }
+  ]
+}

@@ -22,6 +22,7 @@ pub enum VfxFixture {
 
 impl Fixture for VfxFixture {
     type Row = VfxDef;
+    const FOLDER: &'static str = "vfx";
 }
 
 /// The shaders every game provides, drawn by the engine itself: the ground an area skill is aimed
@@ -39,6 +40,7 @@ pub enum VfxShaderFixture {
 
 impl Fixture for VfxShaderFixture {
     type Row = VfxShaderDef;
+    const FOLDER: &'static str = "vfx";
 
     fn locks(self) -> Vec<FixtureLock> {
         let set: &[(&str, ParamKind)] = match self {

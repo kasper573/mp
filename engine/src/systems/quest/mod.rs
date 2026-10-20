@@ -16,7 +16,7 @@ use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Fixture, Loading, ModuleRule, ModuleSet,
+    Content, ContentFile, ContentId, ContentProblem, Fixture, Loading, ModuleRule, ModuleSet,
     RowCheck,
 };
 use crate::core::math::{Percent, Rng};
@@ -64,7 +64,7 @@ pub struct QuestDef {
     pub modules: Vec<QuestModule>,
 }
 
-impl ContentRow for QuestDef {
+impl ContentFile for QuestDef {
     const TABLE: &'static str = "quest";
 }
 
@@ -549,7 +549,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             let (_, object) = area::objects(area::placed(content, area))
                 .find(|(index, _)| Some(*index) == owner.object)?;
             Party {
-                name: object.label.clone().or_else(|| object.name.clone())?,
+                name: object.title.clone().or_else(|| object.name.clone())?,
                 item: None,
                 npc: None,
             }
@@ -951,7 +951,7 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
     for (id, quest) in loading.rows::<QuestDef>(&content) {
-        let key = id.key(&content);
+        let key = id.path(&content);
         let mut check = RowCheck::default();
         let item_rows = |stacks: &[ItemStack]| -> Vec<ItemId> {
             stacks
@@ -978,7 +978,7 @@ pub fn check_all(loading: &mut Loading) {
                             check.error(
                                 format!("/modules/{index}/items/{at}/item"),
                                 "not a quest item",
-                                format!("grants {}", item.key(&content)),
+                                format!("grants {}", item.path(&content)),
                                 "an item with quest_item",
                             );
                         }
@@ -991,7 +991,7 @@ pub fn check_all(loading: &mut Loading) {
                     check.error(
                         format!("/modules/{index}/item"),
                         "not a quest item",
-                        format!("drops {}", drop.item.key(&content)),
+                        format!("drops {}", drop.item.path(&content)),
                         "an item with quest_item",
                     );
                 }
@@ -1062,7 +1062,7 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
         };
     }
     for (id, _) in loading.rows::<QuestDef>(&content) {
-        let key = id.key(&content);
+        let key = id.path(&content);
         let found = parties.get(id);
         let givers = found.is_some_and(|found| !found.givers.is_empty());
         let turn_ins = found.is_some_and(|found| !found.turn_ins.is_empty());

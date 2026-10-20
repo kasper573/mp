@@ -73,7 +73,13 @@ fn a_bad_hash_is_fetched_again() {
     let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
     let first = run(&server, &store).expect("a full sync");
-    let file = first.index.files[0].clone();
+    let file = first
+        .index
+        .files
+        .iter()
+        .find(|file| file.path == slash_clip())
+        .expect("the sound is indexed")
+        .clone();
 
     server.corrupt_once.borrow_mut().insert(file.hash.clone());
     let fresh = MemoryStore::default();
@@ -105,7 +111,7 @@ fn a_bad_hash_is_fetched_again() {
 #[test]
 fn a_file_gone_from_the_server_restarts_from_the_manifest() {
     let v1 = served(sounding());
-    let v2 = served(sounding().asset("audio/slash.wav", longer_slash()));
+    let v2 = served(sounding().part("sfx", "slash", "clip.wav", longer_slash()));
     let changed = v1.manifest.index.hash.clone();
     let server = FakeServer::new(v1);
     *server.deploy_on_404.borrow_mut() = Some((changed, v2));
@@ -123,7 +129,7 @@ fn a_file_gone_from_the_server_restarts_from_the_manifest() {
 fn a_deploy_fetches_only_what_changed_and_drops_what_it_replaced() {
     let after = sounding()
         .edit("class", "hero", |row| row["name"] = "Wanderer".into())
-        .asset("audio/slash.wav", longer_slash());
+        .part("sfx", "slash", "clip.wav", longer_slash());
     let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
     let v1 = run(&server, &store).expect("the first visit syncs");
@@ -131,7 +137,7 @@ fn a_deploy_fetches_only_what_changed_and_drops_what_it_replaced() {
         .index
         .files
         .iter()
-        .find(|file| file.path == "assets/audio/slash.wav")
+        .find(|file| file.path == slash_clip())
         .expect("the sound is indexed")
         .clone();
 
@@ -218,6 +224,10 @@ fn another_build_is_refused_before_anything_downloads() {
 /// A small game with a sound to fetch.
 fn sounding() -> Game {
     game().sfx("slash")
+}
+
+fn slash_clip() -> String {
+    format!("{}/clip.wav", testkit::path("sfx", "slash"))
 }
 
 fn longer_slash() -> Vec<u8> {

@@ -11,7 +11,7 @@ use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::{self, Speaker};
 use engine::systems::shop::{self, SaleQuote, SaleVerdict, ShopDef, ShopRequest, ShopView};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 #[test]
 fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
@@ -222,26 +222,25 @@ fn market() -> Sim {
             "market",
             &Map::open(15, 15),
             json!([
-                { "type": "resident", "npc": "merchant", "at": { "x": 4.0, "y": 4.0 } },
-                { "type": "resident", "npc": "collector", "at": { "x": 10.0, "y": 4.0 } },
+                { "type": "resident", "npc": "merchant.npc.json", "at": { "x": 4.0, "y": 4.0 } },
+                { "type": "resident", "npc": "collector.npc.json", "at": { "x": 10.0, "y": 4.0 } },
                 {
                     "type": "object",
                     "name": "box",
-                    "label": "Honesty box",
+                    "title": "Honesty box",
                     "shape": { "type": "point", "x": 7.0, "y": 10.0 },
                     "look": "objects/box.png",
-                    "scripts": [{ "script": "box_use" }],
+                    "scripts": [{ "script": "box_use.script.json" }],
                 },
             ]),
         )
         .script(
             "box_use",
-            "area/market",
             "object",
             json!({
                 "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
                 "note": said("Pay what's written.", "shop"),
-                "shop": { "type": "open_shop", "shop": "box" },
+                "shop": { "type": "open_shop", "shop": "box.shop.json" },
             }),
         )
         .asset("objects/box.png", testkit::png(1, 1))
@@ -254,17 +253,15 @@ fn market() -> Sim {
         .item("token", stacked())
         .item("tusk", stacked())
         .item("steak", stacked())
-        .npc("merchant", 40.0, json!([{ "type": "script", "script": "merchant_talk" }]))
+        .npc("merchant", 40.0, json!([{ "type": "script", "script": "merchant_talk.script.json" }]))
         .script(
             "merchant_talk",
-            "npc/merchant",
             "npc",
             keeper("Show me your wares.", "wares", "wares"),
         )
-        .npc("collector", 40.0, json!([{ "type": "script", "script": "collector_talk" }]))
+        .npc("collector", 40.0, json!([{ "type": "script", "script": "collector_talk.script.json" }]))
         .script(
             "collector_talk",
-            "npc/collector",
             "npc",
             keeper("I've brought bones.", "counter", "exchange"),
         )
@@ -273,26 +270,26 @@ fn market() -> Sim {
             "wares",
             json!({
                 "title": "Wares",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [
                     {
                         "type": "sells",
-                        "item": "potion",
-                        "price": [{ "item": "gold", "count": 6 }],
+                        "item": "potion.item.json",
+                        "price": [{ "item": "gold.item.json", "count": 6 }],
                         "stock": { "type": "unlimited" },
                     },
                     {
                         "type": "sells",
-                        "item": "tonic",
-                        "price": [{ "item": "gold", "count": 10 }, { "item": "wing", "count": 2 }],
+                        "item": "tonic.item.json",
+                        "price": [{ "item": "gold.item.json", "count": 10 }, { "item": "wing.item.json", "count": 2 }],
                         "stock": { "type": "limited", "count": 3, "restock": 600.0 },
                     },
                     {
                         "type": "reactions",
-                        "bought": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["A fine choice."] }],
-                        "sold": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["It'll do."] }],
+                        "bought": [{ "by": { "type": "npc", "npc": "merchant.npc.json" }, "text": ["A fine choice."] }],
+                        "sold": [{ "by": { "type": "npc", "npc": "merchant.npc.json" }, "text": ["It'll do."] }],
                         "cant_afford": [{
-                            "by": { "type": "npc", "npc": "merchant" },
+                            "by": { "type": "npc", "npc": "merchant.npc.json" },
                             "text": ["Come back when your purse is heavier."],
                         }],
                     },
@@ -304,15 +301,15 @@ fn market() -> Sim {
             "exchange",
             json!({
                 "title": "Exchange",
-                "mark": "collector",
+                "mark": "collector.attention.json",
                 "modules": [
                     {
                         "type": "sells",
-                        "item": "tonic",
-                        "price": [{ "item": "token", "count": 3 }],
+                        "item": "tonic.item.json",
+                        "price": [{ "item": "token.item.json", "count": 3 }],
                         "stock": { "type": "unlimited" },
                     },
-                    { "type": "buys", "what": { "type": "item", "item": "bone" }, "pays": [{ "item": "token" }] },
+                    { "type": "buys", "what": { "type": "item", "item": "bone.item.json" }, "pays": [{ "item": "token.item.json" }] },
                 ],
             }),
         )
@@ -321,11 +318,11 @@ fn market() -> Sim {
             "box",
             json!({
                 "title": "Honesty box",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [{
                     "type": "sells",
-                    "item": "steak",
-                    "price": [{ "item": "gold", "count": 3 }],
+                    "item": "steak.item.json",
+                    "price": [{ "item": "gold.item.json", "count": 3 }],
                     "stock": { "type": "limited", "count": 5, "restock": 1800.0 },
                 }],
             }),
@@ -369,7 +366,7 @@ fn keeper(ask: &str, browsing: &str, shop: &str) -> Value {
             "lines": [{ "by": { "type": "narrator" }, "text": ["Welcome."] }],
             "choices": [{ "label": [ask], "to": browsing }, { "label": ["Goodbye."] }],
         },
-        "shop": { "type": "open_shop", "shop": shop },
+        "shop": { "type": "open_shop", "shop": path("shop", shop) },
     });
     nodes[browsing] = said("Take your time.", "shop");
     nodes

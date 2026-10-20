@@ -17,7 +17,7 @@ use engine::systems::skill::{
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, reach, script, vfx};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 #[test]
 fn a_fresh_fighter_wears_the_sword_and_its_strike_fills_the_basic_attack_slot() {
@@ -413,14 +413,14 @@ fn yard() -> (Sim, Entity) {
                 { "xp": 30, "skill_points": 1 },
             ]);
             hero["tree"] = json!({
-                "cleave": { "skill": "cleave", "at": { "x": 0.0, "y": 0.0 } },
-                "guard": { "skill": "guard", "at": { "x": 80.0, "y": 0.0 } },
+                "cleave": { "skill": "cleave.skill.json", "at": { "x": 0.0, "y": 0.0 } },
+                "guard": { "skill": "guard.skill.json", "at": { "x": 80.0, "y": 0.0 } },
                 "second_wind": {
-                    "skill": "second_wind",
+                    "skill": "second_wind.skill.json",
                     "requires": [{ "type": "skill", "node": "cleave" }, { "type": "skill", "node": "guard" }],
                     "at": { "x": 40.0, "y": 80.0 },
                 },
-                "throw_knife": { "skill": "throw_knife", "at": { "x": 160.0, "y": 0.0 } },
+                "throw_knife": { "skill": "throw_knife.skill.json", "at": { "x": 160.0, "y": 0.0 } },
             });
         })
         .row(
@@ -437,7 +437,7 @@ fn yard() -> (Sim, Entity) {
                 "cleave_strike",
             ),
         )
-        .script("cleave_strike", "skill/cleave", "skill", strike_nodes())
+        .script("cleave_strike", "skill", strike_nodes())
         .row(
             "skill",
             "throw_knife",
@@ -447,32 +447,31 @@ fn yard() -> (Sim, Entity) {
                     "target": "single_enemy",
                     "range": 4.0,
                     "cooldown": 2.0,
-                    "cost": [{ "item": "knife" }],
+                    "cost": [{ "item": "knife.item.json" }],
                     "levels": [{ "cost": 1, "stats": {} }],
                 }),
                 "throw_knife_strike",
             ),
         )
-        .script("throw_knife_strike", "skill/throw_knife", "skill", strike_nodes())
+        .script("throw_knife_strike", "skill", strike_nodes())
         .row("skill", "guard", self_skill("Guard", "guard_breathe"))
-        .script("guard_breathe", "skill/guard", "skill", breathing())
+        .script("guard_breathe", "skill", breathing())
         .row("skill", "second_wind", self_skill("Second Wind", "second_wind_breathe"))
-        .script("second_wind_breathe", "skill/second_wind", "skill", breathing())
+        .script("second_wind_breathe", "skill", breathing())
         .asset("icons/skill.png", testkit::png(1, 1))
         .item(
             "potion",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": "potion_drink" }],
+                "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": "potion_drink.script.json" }],
             }),
         )
         .script(
             "potion_drink",
-            "item/potion",
             "item",
             json!({
                 "used": { "type": "on", "event": "used", "next": "drink" },
-                "drink": { "type": "items", "take": [{ "item": "potion" }] },
+                "drink": { "type": "items", "take": [{ "item": "potion.item.json" }] },
             }),
         )
         .item("knife", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 20 }] }))
@@ -480,17 +479,16 @@ fn yard() -> (Sim, Entity) {
             "draught",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "script", "script": "draught_drink" }],
+                "modules": [{ "type": "script", "script": "draught_drink.script.json" }],
             }),
         )
         .script(
             "draught_drink",
-            "item/draught",
             "item",
             json!({
                 "used": { "type": "on", "event": "used", "next": "ask" },
                 "ask": { "type": "reset_skills", "accepted": "drink" },
-                "drink": { "type": "items", "take": [{ "item": "draught" }] },
+                "drink": { "type": "items", "take": [{ "item": "draught.item.json" }] },
             }),
         )
         .npc("dummy", 100.0, json!([]))
@@ -544,7 +542,7 @@ fn skill(name: &str, fields: Value, script: &str) -> Value {
     let mut row = json!({
         "name": name,
         "icon": "icons/skill.png",
-        "modules": [{ "type": "script", "script": script }],
+        "modules": [{ "type": "script", "script": path("script", script) }],
     });
     for (field, value) in fields.as_object().expect("a skill's fields") {
         row[field] = value.clone();

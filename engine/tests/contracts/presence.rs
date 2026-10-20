@@ -16,7 +16,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::{self, Presence};
 use engine::systems::{actor, reach, skill};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim, path};
 
 #[test]
 fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {
@@ -114,7 +114,7 @@ fn a_world_that_serves_no_area_judges_an_items_requirements() {
             }),
         )
         .load();
-    let shield = content.by_key::<ItemDef>("shield").expect("the shield");
+    let shield = content.declared::<ItemDef>("shield").expect("the shield");
     let ItemKind::Equipment {
         requires: Some(requirement),
         ..
@@ -139,13 +139,9 @@ fn arena() -> Sim {
         .npc(
             "hunter",
             25.0,
-            json!([{ "type": "script", "script": "hunter_hunt" }]),
+            json!([{ "type": "script", "script": "hunter_hunt.script.json" }]),
         )
-        .owned(
-            "script",
-            "hunter_hunt",
-            "npc/hunter",
-            json!({
+        .row("script", "hunter_hunt", json!({
                 "runs_on": "npc",
                 "locals": { "target": "actor" },
                 "nodes": {
@@ -178,7 +174,7 @@ fn arena() -> Sim {
                 },
             }),
         )
-        .edit("npc", "hunter", |hunter| hunter["basic_attack"] = json!("strike"))
+        .edit("npc", "hunter", |hunter| hunter["basic_attack"] = json!(path("skill", "strike")))
         .row(
             "memory",
             "slain",

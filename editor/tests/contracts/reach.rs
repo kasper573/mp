@@ -1,5 +1,5 @@
 use editor::project::{ProjectFiles, json_bytes};
-use engine::core::content::{ContentRow, RowName};
+use engine::core::content::{ContentFile, RowName};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use serde_json::{Value, json};
 

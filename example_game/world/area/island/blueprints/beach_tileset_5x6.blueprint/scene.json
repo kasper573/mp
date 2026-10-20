@@ -1,0 +1,55 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/tileset/beach_tileset.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        624,
+        625,
+        626
+      ],
+      [
+        658,
+        659,
+        660,
+        661,
+        662
+      ],
+      [
+        694,
+        695,
+        696,
+        697,
+        null
+      ],
+      [
+        730,
+        731,
+        732,
+        733,
+        null
+      ],
+      [
+        null,
+        767,
+        768,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        804,
+        null,
+        null
+      ]
+    ],
+    "sort": 5.0
+  }
+]

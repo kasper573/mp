@@ -1,6 +1,0 @@
-{
-  "owner": "script/ferry_pier",
-  "label": "Heard the gulls",
-  "type": "boolean",
-  "resets": "never"
-}

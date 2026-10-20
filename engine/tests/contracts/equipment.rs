@@ -89,12 +89,11 @@ fn wardrobe() -> (Sim, Entity) {
             "rock",
             json!({
                 "kind": { "type": "equipment", "slot": "head" },
-                "modules": [{ "type": "script", "script": "rock_lower" }],
+                "modules": [{ "type": "script", "script": "rock_lower.script.json" }],
             }),
         )
         .script(
             "rock_lower",
-            "item/rock",
             "item",
             json!({
                 "activated": { "type": "on", "event": "activated", "next": "lower" },

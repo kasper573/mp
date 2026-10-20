@@ -35,8 +35,8 @@ pub fn arrived_in(snapshot: &ProbeSnapshot, area: &str) -> bool {
     snapshot.area == Some(id::<AreaDef>(area)) && in_world(snapshot)
 }
 
-pub fn area_key(snapshot: &ProbeSnapshot) -> Option<&'static str> {
-    snapshot.area.map(|area| area.key(content()))
+pub fn area_name(snapshot: &ProbeSnapshot) -> Option<&'static str> {
+    snapshot.area.map(|area| area.name(content()))
 }
 
 pub fn at_rest(body: &ProbeBody) -> bool {
@@ -415,14 +415,14 @@ pub fn blocked(snapshot: &ProbeSnapshot, slot: usize) -> bool {
 
 pub fn slot_skill(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
     match snapshot.hotbar.get(slot)?.entry {
-        HotbarEntry::Skill(skill) => Some(skill.key(content())),
+        HotbarEntry::Skill(skill) => Some(skill.name(content())),
         _ => None,
     }
 }
 
 pub fn slot_item(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
     match snapshot.hotbar.get(slot)?.entry {
-        HotbarEntry::Item(item) => Some(item.key(content())),
+        HotbarEntry::Item(item) => Some(item.name(content())),
         _ => None,
     }
 }

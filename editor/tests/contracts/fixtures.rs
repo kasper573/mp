@@ -1,5 +1,5 @@
 use editor::schema::SchemaShapes;
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::vfx::VfxShaderDef;
 use serde_json::json;
 

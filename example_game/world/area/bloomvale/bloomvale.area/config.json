@@ -1,0 +1,12 @@
+{
+  "name": "Bloomvale",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 88,
+        "height": 64
+      },
+      "tile": 16
+    }
+  }
+}

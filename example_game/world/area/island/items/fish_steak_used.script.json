@@ -1,0 +1,30 @@
+{
+  "runs_on": "item",
+  "nodes": {
+    "eat": {
+      "type": "items",
+      "take": [
+        {
+          "item": "world/area/island/items/fish_steak.item.json"
+        }
+      ],
+      "done": "mend"
+    },
+    "fill": {
+      "type": "apply_status",
+      "effect": "world/area/island/items/well_fed.status_effect.json",
+      "power": 5.0,
+      "seconds": 60.0
+    },
+    "mend": {
+      "type": "heal",
+      "by": 15.0,
+      "next": "fill"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "eat"
+    }
+  }
+}

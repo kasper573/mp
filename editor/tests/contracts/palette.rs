@@ -1,6 +1,6 @@
 use editor::schema::SchemaShapes;
 use editor::views::script::nodes::NodeCatalogue;
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::script::ScriptDef;
 
 #[test]

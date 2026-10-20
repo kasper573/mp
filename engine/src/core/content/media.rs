@@ -11,12 +11,13 @@ pub struct ImageSizes(pub HashMap<String, (u32, u32)>);
 type MediaCheck = Result<Option<(u32, u32)>, (&'static str, String, &'static str)>;
 
 pub fn check_media(loading: &mut Loading) {
-    let paths: Vec<String> = loading.assets().to_vec();
+    let mut paths: Vec<String> = loading.media().to_vec();
+    paths.extend(loading.media_parts());
     let folder = loading.folder();
     let checked: Vec<(String, MediaCheck)> = paths
         .into_par_iter()
         .map(|path| {
-            let bytes = match folder.read(&super::asset_file(&path)) {
+            let bytes = match folder.read(&path) {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     return (
@@ -69,7 +70,7 @@ pub fn check_media(loading: &mut Loading) {
             }
             Ok(None) => {}
             Err((rule, found, expected)) => loading.file_error(
-                super::asset_file(&path),
+                path,
                 ErrorPlace::WholeFile,
                 ContentProblem::new(rule, found, expected),
             ),

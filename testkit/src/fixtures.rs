@@ -47,7 +47,7 @@ impl Game {
 
 fn each<F: Fixture>(game: Game, add: impl Fn(Game, &str, Vec<FixtureLock>) -> Game) -> Game {
     F::VARIANTS.iter().fold(game, |game, fixture| {
-        add(game, fixture.key(), fixture.locks())
+        add(game, fixture.name(), fixture.locks())
     })
 }
 

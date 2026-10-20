@@ -1,0 +1,12 @@
+{
+  "name": "The baker's cottage",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 18,
+        "height": 13
+      },
+      "tile": 16
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "The forge",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 25,
+        "height": 15
+      },
+      "tile": 16
+    }
+  }
+}

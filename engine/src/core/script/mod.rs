@@ -26,7 +26,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId};
 
 /// The output an effect takes when nothing else is said.
 pub const NEXT: &str = "next";
@@ -196,7 +196,7 @@ pub struct ScriptDef<V: Vocabulary> {
     pub nodes: BTreeMap<String, Node<V>>,
 }
 
-impl<V: Vocabulary> ContentRow for ScriptDef<V> {
+impl<V: Vocabulary> ContentFile for ScriptDef<V> {
     const TABLE: &'static str = "script";
 }
 

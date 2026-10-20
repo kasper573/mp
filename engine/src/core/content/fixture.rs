@@ -3,36 +3,44 @@ use serde_json::Value;
 use strum::VariantArray;
 
 use super::check::RowCheck;
+use super::files::{FIXTURES_DIR, content_path};
 use super::id::ContentId;
-use super::table::{Content, ContentRow};
+use super::table::{Content, ContentFile};
 
+/// Content code reads by name, which every game provides at the path the fixture's declaration
+/// builds: `fixtures/<FOLDER>/<variant>.<type>`, as one file or a bundle by its type's shape.
 pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
-    type Row: ContentRow;
-    /// Whether the fixtures are every row of their table, which content adds none of its own to.
+    type Row: ContentFile;
+    /// The folder under `fixtures/` of the system that declares the fixture.
+    const FOLDER: &'static str;
+    /// Whether the fixtures are every file of their type, which content adds none of its own to.
     const WHOLE_TABLE: bool = false;
 
-    fn key(self) -> &'static str {
+    fn name(self) -> &'static str {
         self.into()
+    }
+
+    fn path(self) -> String {
+        content_path(
+            &format!("{FIXTURES_DIR}/{}", Self::FOLDER),
+            self.name(),
+            Self::Row::TABLE,
+            Self::Row::SHAPE,
+        )
     }
 
     fn id(self, content: &Content) -> ContentId<Self::Row> {
         content
             .table::<Self::Row>()
-            .id_of(self.key())
-            .unwrap_or_else(|| {
-                panic!(
-                    "fixture {}/{} is checked at load",
-                    Self::Row::TABLE,
-                    self.key()
-                )
-            })
+            .id_of(&self.path())
+            .unwrap_or_else(|| panic!("fixture {} is checked at load", self.path()))
     }
 
     fn get(self, content: &Content) -> &Self::Row {
         self.id(content).get(content)
     }
 
-    /// The parts of the fixture's row the engine reads beyond the row being there.
+    /// The parts of the fixture's file the engine reads beyond the file being there.
     fn locks(self) -> Vec<FixtureLock> {
         Vec::new()
     }

@@ -1,0 +1,12 @@
+{
+  "name": "Amberwood",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 52,
+        "height": 84
+      },
+      "tile": 16
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "The fairy's mushroom",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 16,
+        "height": 13
+      },
+      "tile": 16
+    }
+  }
+}

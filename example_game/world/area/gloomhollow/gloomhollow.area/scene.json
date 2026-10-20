@@ -1,0 +1,5995 @@
+[
+  {
+    "type": "ground_layer",
+    "name": "ground"
+  },
+  {
+    "type": "ground_layer",
+    "name": "terrain"
+  },
+  {
+    "type": "ground_layer",
+    "name": "overlay"
+  },
+  {
+    "type": "ground_layer",
+    "name": "decor"
+  },
+  {
+    "type": "object",
+    "name": "chapel-door",
+    "shape": {
+      "type": "rect",
+      "x": 22.5,
+      "y": 21.5,
+      "w": 1.0,
+      "h": 1.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/gloomhollow_chapel/gloomhollow_chapel.area",
+            "x": 9.0,
+            "y": 13.0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "chapel-side-door",
+    "shape": {
+      "type": "rect",
+      "x": 25.5,
+      "y": 21.5,
+      "w": 1.0,
+      "h": 1.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/gloomhollow_chapel/gloomhollow_chapel.area",
+            "x": 19.0,
+            "y": 13.0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "crypt",
+    "shape": {
+      "type": "rect",
+      "x": 46.5,
+      "y": 16.5,
+      "w": 2.0,
+      "h": 1.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/gloomhollow_crypt/gloomhollow_crypt.area",
+            "x": 7.0,
+            "y": 11.0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "frostmere-trail",
+    "shape": {
+      "type": "rect",
+      "x": -0.5,
+      "y": 33.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/frostmere/frostmere.area",
+            "x": 61.5,
+            "y": 35.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "glimmercap-path",
+    "shape": {
+      "type": "rect",
+      "x": 25.5,
+      "y": 69.5,
+      "w": 3.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/glimmercap/glimmercap.area",
+            "x": 24.5,
+            "y": 2.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghost.npc.json",
+    "count": 5,
+    "roams": {
+      "x": 10.5,
+      "y": 22.5,
+      "w": 29.0,
+      "h": 15.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghost.npc.json",
+    "count": 3,
+    "roams": {
+      "x": 39.5,
+      "y": 5.5,
+      "w": 17.0,
+      "h": 17.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghost.npc.json",
+    "count": 3,
+    "roams": {
+      "x": 4.5,
+      "y": 54.5,
+      "w": 14.0,
+      "h": 10.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghoul.npc.json",
+    "count": 3,
+    "roams": {
+      "x": 39.5,
+      "y": 5.5,
+      "w": 17.0,
+      "h": 17.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghoul.npc.json",
+    "count": 4,
+    "roams": {
+      "x": 11.5,
+      "y": 40.5,
+      "w": 11.0,
+      "h": 18.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/gloomhollow/npcs/ghoul.npc.json",
+    "count": 5,
+    "roams": {
+      "x": 32.5,
+      "y": 42.5,
+      "w": 21.0,
+      "h": 17.0
+    }
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": -0.5,
+      "y": -0.5,
+      "w": 60.0,
+      "h": 72.0
+    },
+    "emit": 0.0,
+    "channels": [
+      {
+        "channel": 1,
+        "file": "assets/audio/music/forest.flac",
+        "volume": 0.24,
+        "category": "music"
+      },
+      {
+        "channel": 2,
+        "file": "assets/audio/ambient/forest_air.flac",
+        "volume": 0.3
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 4.5,
+      "y": -0.5,
+      "w": 9.0,
+      "h": 72.0
+    },
+    "emit": 2.0,
+    "channels": [
+      {
+        "channel": 4,
+        "file": "assets/audio/ambient/lapping_water.flac",
+        "volume": 0.3
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 39.5,
+      "y": 5.5,
+      "w": 17.0,
+      "h": 19.0
+    },
+    "emit": 3.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/stone_hum.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 32.5,
+      "y": 42.5,
+      "w": 21.0,
+      "h": 17.0
+    },
+    "emit": 3.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/stone_hum.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 9.5,
+      "y": 11.5,
+      "w": 10.0,
+      "h": 10.0
+    },
+    "emit": 2.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/timbers.flac",
+        "volume": 0.3
+      }
+    ]
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 41.125,
+      "y": -2.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 43.813,
+      "y": -2.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        248,
+        249,
+        250,
+        251
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.188,
+      "y": -2.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 6.5,
+      "y": -2.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.313,
+      "y": -2.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 50.813,
+      "y": -2.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 6.313,
+      "y": -2.313
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        100,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 13.75,
+      "y": -2.313
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        368,
+        369,
+        370,
+        371
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 26.188,
+      "y": -2.25
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 15.0,
+      "y": -2.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        100,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.375,
+      "y": -2.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        368,
+        369,
+        370,
+        371
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 13.313,
+      "y": -2.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        248,
+        249,
+        250,
+        251
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.688,
+      "y": -1.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 32.0,
+      "y": -1.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        336,
+        337,
+        338,
+        339
+      ],
+      [
+        368,
+        369,
+        370,
+        371
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 34.688,
+      "y": -1.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 46.75,
+      "y": -1.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 8.688,
+      "y": -1.688
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        79
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 51.5,
+      "y": -1.688
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        79
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 30.188,
+      "y": -1.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 33.625,
+      "y": -1.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 40.313,
+      "y": -1.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        216,
+        217,
+        218,
+        219
+      ],
+      [
+        248,
+        249,
+        250,
+        251
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.375,
+      "y": -1.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 17.813,
+      "y": -0.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 35.25,
+      "y": -0.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        47
+      ],
+      [
+        76,
+        77,
+        78,
+        79
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 16.813,
+      "y": -0.688
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        43
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 9.438,
+      "y": -0.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        43
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 24.75,
+      "y": -0.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        43
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 32.063,
+      "y": -0.25
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 16.688,
+      "y": -0.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.0,
+      "y": -0.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        43
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        104,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 4.125,
+      "y": 0.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 31.063,
+      "y": 0.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 11.25,
+      "y": 0.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 27.75,
+      "y": 0.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 19.938,
+      "y": 0.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 22.5,
+      "y": 0.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 14.563,
+      "y": 0.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 31.188,
+      "y": 0.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 8.125,
+      "y": 1.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.5,
+      "y": 1.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.313,
+      "y": 1.313
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 15.438,
+      "y": 1.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_25",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_25.blueprint",
+    "at": {
+      "x": 52.9,
+      "y": 2.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 32.375,
+      "y": 2.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 15.5,
+      "y": 2.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 0.438,
+      "y": 3.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_122",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_122.blueprint",
+    "at": {
+      "x": 40.4,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_90",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_90.blueprint",
+    "at": {
+      "x": 42.24,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_80",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_80.blueprint",
+    "at": {
+      "x": 43.96,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_46",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_46.blueprint",
+    "at": {
+      "x": 45.8,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_92",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_92.blueprint",
+    "at": {
+      "x": 47.64,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_41",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_41.blueprint",
+    "at": {
+      "x": 48.96,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_79",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_79.blueprint",
+    "at": {
+      "x": 50.8,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_7",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_7.blueprint",
+    "at": {
+      "x": 38.7,
+      "y": 4.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 33.813,
+      "y": 4.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 20.813,
+      "y": 4.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 34.375,
+      "y": 4.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 27.125,
+      "y": 4.75
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.125,
+      "y": 5.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 37.1,
+      "y": 5.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 28.688,
+      "y": 5.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 60.25,
+      "y": 5.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_90 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_90.blueprint",
+    "at": {
+      "x": 38.77,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_128",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_128.blueprint",
+    "at": {
+      "x": 40.26,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_88",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_88.blueprint",
+    "at": {
+      "x": 42.1,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_80 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_80.blueprint",
+    "at": {
+      "x": 44.17,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_92 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_92.blueprint",
+    "at": {
+      "x": 45.66,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_89",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_89.blueprint",
+    "at": {
+      "x": 47.5,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_91",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_91.blueprint",
+    "at": {
+      "x": 49.17,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_49",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_49.blueprint",
+    "at": {
+      "x": 50.66,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_26",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_26.blueprint",
+    "at": {
+      "x": 52.5,
+      "y": 6.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 1.375,
+      "y": 6.875
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.063,
+      "y": 7.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        4,
+        5,
+        null,
+        null
+      ],
+      [
+        36,
+        37,
+        null,
+        null
+      ],
+      [
+        68,
+        69,
+        null,
+        null
+      ],
+      [
+        100,
+        101,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 37.5,
+      "y": 7.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 20.813,
+      "y": 7.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_90 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_90.blueprint",
+    "at": {
+      "x": 38.56,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_90 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_90.blueprint",
+    "at": {
+      "x": 42.24,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_131",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_131.blueprint",
+    "at": {
+      "x": 49.03,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_37",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_37.blueprint",
+    "at": {
+      "x": 50.87,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_94",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_94.blueprint",
+    "at": {
+      "x": 52.36,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_24",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_24.blueprint",
+    "at": {
+      "x": 40.4,
+      "y": 9.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.813,
+      "y": 9.313
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.375,
+      "y": 9.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 36.9,
+      "y": 9.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 55.688,
+      "y": 10.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.625,
+      "y": 10.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        5,
+        6,
+        7
+      ],
+      [
+        null,
+        37,
+        38,
+        39
+      ],
+      [
+        null,
+        69,
+        70,
+        71
+      ],
+      [
+        null,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.938,
+      "y": 11.125
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        6,
+        7
+      ],
+      [
+        null,
+        null,
+        38,
+        39
+      ],
+      [
+        null,
+        null,
+        70,
+        71
+      ],
+      [
+        null,
+        null,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_41 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_41.blueprint",
+    "at": {
+      "x": 50.8,
+      "y": 11.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_79 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_79.blueprint",
+    "at": {
+      "x": 52.64,
+      "y": 11.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 55.563,
+      "y": 11.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_128 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_128.blueprint",
+    "at": {
+      "x": 40.26,
+      "y": 11.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_24 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_24.blueprint",
+    "at": {
+      "x": 38.7,
+      "y": 11.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_119",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_119.blueprint",
+    "at": {
+      "x": 42.1,
+      "y": 11.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 16.7,
+      "y": 12.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_17",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_17.blueprint",
+    "at": {
+      "x": 48.3,
+      "y": 12.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 41.4,
+      "y": 12.1
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.313,
+      "y": 12.125
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        273,
+        274,
+        275
+      ],
+      [
+        null,
+        305,
+        306,
+        307
+      ],
+      [
+        null,
+        337,
+        338,
+        339
+      ],
+      [
+        null,
+        369,
+        370,
+        371
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_58",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_58.blueprint",
+    "at": {
+      "x": 42.7,
+      "y": 13.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 36.1,
+      "y": 13.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 12.438,
+      "y": 13.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.75,
+      "y": 13.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        14,
+        15
+      ],
+      [
+        null,
+        null,
+        46,
+        47
+      ],
+      [
+        null,
+        null,
+        78,
+        79
+      ],
+      [
+        null,
+        null,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_122 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_122.blueprint",
+    "at": {
+      "x": 38.63,
+      "y": 14.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_122 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_122.blueprint",
+    "at": {
+      "x": 41.96,
+      "y": 14.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_82",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_82.blueprint",
+    "at": {
+      "x": 40.4,
+      "y": 14.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 8.125,
+      "y": 14.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_42",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_42.blueprint",
+    "at": {
+      "x": 8.7,
+      "y": 16.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_54",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_54.blueprint",
+    "at": {
+      "x": 15.5,
+      "y": 16.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_86",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_86.blueprint",
+    "at": {
+      "x": 47.1,
+      "y": 16.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.938,
+      "y": 16.438
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_56",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_56.blueprint",
+    "at": {
+      "x": 53.9,
+      "y": 16.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_98",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_98.blueprint",
+    "at": {
+      "x": 43.5,
+      "y": 16.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_136",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_136.blueprint",
+    "at": {
+      "x": 42.3,
+      "y": 17.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.188,
+      "y": 17.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        11
+      ],
+      [
+        null,
+        null,
+        null,
+        43
+      ],
+      [
+        null,
+        null,
+        null,
+        75
+      ],
+      [
+        null,
+        null,
+        null,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.313,
+      "y": 18.125
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_16",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_16.blueprint",
+    "at": {
+      "x": 38.9,
+      "y": 18.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_9",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_9.blueprint",
+    "at": {
+      "x": 11.5,
+      "y": 18.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 8.6,
+      "y": 18.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 14.4,
+      "y": 18.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_55",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_55.blueprint",
+    "at": {
+      "x": 16.3,
+      "y": 18.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_83",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_83.blueprint",
+    "at": {
+      "x": 19.1,
+      "y": 18.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_83 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_83.blueprint",
+    "at": {
+      "x": 22.9,
+      "y": 18.7
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.688,
+      "y": 18.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 61.063,
+      "y": 19.75
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_126",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_126.blueprint",
+    "at": {
+      "x": 40.9,
+      "y": 20.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_9 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_9.blueprint",
+    "at": {
+      "x": 45.5,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 42.6,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_55 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_55.blueprint",
+    "at": {
+      "x": 39.0,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 48.4,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 50.2,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_55 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_55.blueprint",
+    "at": {
+      "x": 52.0,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_15 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_15.blueprint",
+    "at": {
+      "x": 53.8,
+      "y": 20.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_35",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_35.blueprint",
+    "at": {
+      "x": 26.5,
+      "y": 21.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_30",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_30.blueprint",
+    "at": {
+      "x": 31.1,
+      "y": 21.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_30 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_30.blueprint",
+    "at": {
+      "x": 17.1,
+      "y": 21.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.688,
+      "y": 21.438
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        15
+      ],
+      [
+        null,
+        null,
+        null,
+        47
+      ],
+      [
+        null,
+        null,
+        null,
+        79
+      ],
+      [
+        null,
+        null,
+        null,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 59.875,
+      "y": 21.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.938,
+      "y": 22.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 55.688,
+      "y": 23.625
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.188,
+      "y": 24.938
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        null,
+        null,
+        null
+      ],
+      [
+        64,
+        null,
+        null,
+        null
+      ],
+      [
+        96,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 59.188,
+      "y": 25.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_109",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_109.blueprint",
+    "at": {
+      "x": 25.1,
+      "y": 25.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_110",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_110.blueprint",
+    "at": {
+      "x": 27.9,
+      "y": 25.7
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.75,
+      "y": 26.125
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 59.438,
+      "y": 26.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_4",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_4.blueprint",
+    "at": {
+      "x": 32.9,
+      "y": 27.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 5.25,
+      "y": 27.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_4 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_4.blueprint",
+    "at": {
+      "x": 45.1,
+      "y": 27.9
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.063,
+      "y": 28.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        15
+      ],
+      [
+        null,
+        null,
+        null,
+        47
+      ],
+      [
+        null,
+        null,
+        null,
+        79
+      ],
+      [
+        null,
+        null,
+        null,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_137",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_137.blueprint",
+    "at": {
+      "x": 30.5,
+      "y": 28.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.563,
+      "y": 28.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_126 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_126.blueprint",
+    "at": {
+      "x": 38.5,
+      "y": 29.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 55.063,
+      "y": 29.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_77",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_77.blueprint",
+    "at": {
+      "x": 43.3,
+      "y": 29.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 53.563,
+      "y": 30.938
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.375,
+      "y": 31.0
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        152,
+        153,
+        154,
+        null
+      ],
+      [
+        184,
+        185,
+        186,
+        null
+      ],
+      [
+        216,
+        217,
+        218,
+        null
+      ],
+      [
+        248,
+        249,
+        250,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_71",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_71.blueprint",
+    "at": {
+      "x": 20.5,
+      "y": 31.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 50.938,
+      "y": 32.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_77 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_77.blueprint",
+    "at": {
+      "x": 16.3,
+      "y": 32.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 46.625,
+      "y": 32.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 54.125,
+      "y": 32.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_59",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_59.blueprint",
+    "at": {
+      "x": 14.1,
+      "y": 32.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 47.875,
+      "y": 32.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 8.875,
+      "y": 33.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.563,
+      "y": 33.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_137 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_137.blueprint",
+    "at": {
+      "x": 15.9,
+      "y": 33.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.563,
+      "y": 34.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_126 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_126.blueprint",
+    "at": {
+      "x": 12.3,
+      "y": 34.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 46.563,
+      "y": 34.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 5.125,
+      "y": 34.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 36.25,
+      "y": 35.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 47.25,
+      "y": 35.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 45.5,
+      "y": 35.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_106",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_106.blueprint",
+    "at": {
+      "x": 17.125,
+      "y": 35.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 35.688,
+      "y": 35.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_21",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_21.blueprint",
+    "at": {
+      "x": 19.7,
+      "y": 35.7
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.188,
+      "y": 36.063
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        3
+      ],
+      [
+        null,
+        null,
+        null,
+        35
+      ],
+      [
+        null,
+        null,
+        null,
+        67
+      ],
+      [
+        null,
+        null,
+        null,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 0.813,
+      "y": 36.313
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.25,
+      "y": 37.0
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (12)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 44.75,
+      "y": 37.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_60",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_60.blueprint",
+    "at": {
+      "x": 17.9,
+      "y": 37.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_82 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_82.blueprint",
+    "at": {
+      "x": 20.3,
+      "y": 37.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (13)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 41.438,
+      "y": 37.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 5.563,
+      "y": 38.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 51.188,
+      "y": 38.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 60.438,
+      "y": 38.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 10.1,
+      "y": 38.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.438,
+      "y": 39.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        11
+      ],
+      [
+        null,
+        null,
+        null,
+        43
+      ],
+      [
+        null,
+        null,
+        null,
+        75
+      ],
+      [
+        null,
+        null,
+        null,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 34.9,
+      "y": 39.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.875,
+      "y": 40.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        1,
+        2,
+        3
+      ],
+      [
+        null,
+        33,
+        34,
+        35
+      ],
+      [
+        null,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_5",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_5.blueprint",
+    "at": {
+      "x": 30.5,
+      "y": 40.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_12",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_12.blueprint",
+    "at": {
+      "x": 11.9,
+      "y": 40.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (12)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 1.75,
+      "y": 41.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_28",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_28.blueprint",
+    "at": {
+      "x": 45.1,
+      "y": 41.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_36",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_36.blueprint",
+    "at": {
+      "x": 39.1,
+      "y": 41.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 7.625,
+      "y": 42.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_141",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_141.blueprint",
+    "at": {
+      "x": 26.3,
+      "y": 42.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_large_props_0",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_large_props_0.blueprint",
+    "at": {
+      "x": 13.66,
+      "y": 38.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_59 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_59.blueprint",
+    "at": {
+      "x": 41.5,
+      "y": 43.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_4 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_4.blueprint",
+    "at": {
+      "x": 36.1,
+      "y": 43.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (14)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 3.438,
+      "y": 43.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (15)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 4.188,
+      "y": 43.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.063,
+      "y": 43.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        272,
+        null,
+        null,
+        null
+      ],
+      [
+        304,
+        null,
+        null,
+        null
+      ],
+      [
+        336,
+        null,
+        null,
+        null
+      ],
+      [
+        368,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_18",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_18.blueprint",
+    "at": {
+      "x": 38.5,
+      "y": 43.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_18 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_18.blueprint",
+    "at": {
+      "x": 48.5,
+      "y": 43.9
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 60.875,
+      "y": 44.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        1,
+        2,
+        3
+      ],
+      [
+        null,
+        33,
+        34,
+        35
+      ],
+      [
+        null,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (13)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 55.25,
+      "y": 44.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.063,
+      "y": 44.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        154,
+        155
+      ],
+      [
+        null,
+        null,
+        186,
+        187
+      ],
+      [
+        null,
+        null,
+        218,
+        219
+      ],
+      [
+        null,
+        null,
+        250,
+        251
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (16)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 55.375,
+      "y": 44.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 31.875,
+      "y": 44.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_46 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_46.blueprint",
+    "at": {
+      "x": 10.7,
+      "y": 44.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_24 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_24.blueprint",
+    "at": {
+      "x": 12.5,
+      "y": 44.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 6.313,
+      "y": 44.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_7 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_7.blueprint",
+    "at": {
+      "x": 48.5,
+      "y": 45.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 3.0,
+      "y": 46.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_127",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_127.blueprint",
+    "at": {
+      "x": 19.3,
+      "y": 46.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_18 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_18.blueprint",
+    "at": {
+      "x": 38.5,
+      "y": 46.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (17)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 4.813,
+      "y": 47.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_24 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_24.blueprint",
+    "at": {
+      "x": 16.5,
+      "y": 47.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_137 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_137.blueprint",
+    "at": {
+      "x": 44.7,
+      "y": 47.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (14)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 54.875,
+      "y": 47.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (18)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 5.25,
+      "y": 48.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.688,
+      "y": 48.125
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_12 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_12.blueprint",
+    "at": {
+      "x": 17.7,
+      "y": 48.3
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_50",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_50.blueprint",
+    "at": {
+      "x": 42.9,
+      "y": 48.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 8.188,
+      "y": 48.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (15)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 59.875,
+      "y": 48.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.188,
+      "y": 49.5
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        154,
+        155
+      ],
+      [
+        null,
+        null,
+        186,
+        187
+      ],
+      [
+        null,
+        null,
+        218,
+        219
+      ],
+      [
+        null,
+        null,
+        250,
+        251
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_12 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_12.blueprint",
+    "at": {
+      "x": 18.1,
+      "y": 49.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_18 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_18.blueprint",
+    "at": {
+      "x": 38.5,
+      "y": 49.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_18 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_18.blueprint",
+    "at": {
+      "x": 48.5,
+      "y": 49.9
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 58.625,
+      "y": 49.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 4.563,
+      "y": 50.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (19)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 5.438,
+      "y": 50.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 6.063,
+      "y": 50.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_17 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_17.blueprint",
+    "at": {
+      "x": 35.9,
+      "y": 50.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_140",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_140.blueprint",
+    "at": {
+      "x": 22.7,
+      "y": 51.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_4 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_4.blueprint",
+    "at": {
+      "x": 51.9,
+      "y": 51.1
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 57.875,
+      "y": 51.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 1.313,
+      "y": 51.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 61.438,
+      "y": 51.938
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_46 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_46.blueprint",
+    "at": {
+      "x": 15.9,
+      "y": 52.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (16)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 4.125,
+      "y": 52.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_6",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_6.blueprint",
+    "at": {
+      "x": 41.7,
+      "y": 52.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (20)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 6.75,
+      "y": 53.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 59.75,
+      "y": 53.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.625,
+      "y": 54.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        2,
+        3
+      ],
+      [
+        null,
+        null,
+        34,
+        35
+      ],
+      [
+        null,
+        null,
+        66,
+        67
+      ],
+      [
+        null,
+        null,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 0.938,
+      "y": 54.313
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.063,
+      "y": 54.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (17)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 55.875,
+      "y": 55.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (12)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 54.688,
+      "y": 55.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_40",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_40.blueprint",
+    "at": {
+      "x": 17.3,
+      "y": 55.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (13)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 1.25,
+      "y": 55.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 51.0,
+      "y": 56.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_138",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_138.blueprint",
+    "at": {
+      "x": 26.3,
+      "y": 56.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.75,
+      "y": 56.938
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.563,
+      "y": 57.0
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        null,
+        null
+      ],
+      [
+        64,
+        65,
+        null,
+        null
+      ],
+      [
+        96,
+        97,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (21)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 57.688,
+      "y": 57.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (14)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 7.25,
+      "y": 57.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_106 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_106.blueprint",
+    "at": {
+      "x": 54.0,
+      "y": 57.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (4)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 54.875,
+      "y": 57.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 53.063,
+      "y": 58.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 23.313,
+      "y": 58.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 20.063,
+      "y": 58.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (18)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 58.25,
+      "y": 58.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.313,
+      "y": 58.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        null
+      ],
+      [
+        64,
+        65,
+        66,
+        null
+      ],
+      [
+        96,
+        97,
+        98,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 47.125,
+      "y": 58.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_106 (2)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_106.blueprint",
+    "at": {
+      "x": 33.688,
+      "y": 59.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (22)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 52.125,
+      "y": 59.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 41.75,
+      "y": 59.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (23)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 50.063,
+      "y": 59.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (19)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 60.438,
+      "y": 59.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 17.125,
+      "y": 60.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (20)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 52.188,
+      "y": 60.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 38.0,
+      "y": 60.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 50.438,
+      "y": 60.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 55.0,
+      "y": 60.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (15)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 56.063,
+      "y": 60.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 34.25,
+      "y": 60.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (16)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 4.688,
+      "y": 60.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (24)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 7.0,
+      "y": 61.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 37.313,
+      "y": 61.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 44.813,
+      "y": 61.25
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -3.0,
+      "y": 61.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        15
+      ],
+      [
+        null,
+        null,
+        null,
+        47
+      ],
+      [
+        null,
+        null,
+        null,
+        79
+      ],
+      [
+        null,
+        null,
+        null,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 38.875,
+      "y": 61.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_5 (1)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_5.blueprint",
+    "at": {
+      "x": 23.5,
+      "y": 61.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_106 (3)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_106.blueprint",
+    "at": {
+      "x": 13.688,
+      "y": 61.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (21)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 41.813,
+      "y": 61.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 32.375,
+      "y": 61.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 41.813,
+      "y": 62.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_97 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_97.blueprint",
+    "at": {
+      "x": 32.875,
+      "y": 62.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (22)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 0.188,
+      "y": 62.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 33.875,
+      "y": 62.25
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.813,
+      "y": 62.375
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (17)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 49.938,
+      "y": 62.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (23)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 44.563,
+      "y": 62.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (5)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 54.375,
+      "y": 62.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (24)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 51.0,
+      "y": 62.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 40.0,
+      "y": 62.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (25)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 41.813,
+      "y": 63.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 48.0,
+      "y": 63.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (25)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 54.625,
+      "y": 64.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_81 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_81.blueprint",
+    "at": {
+      "x": 29.25,
+      "y": 64.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 55.688,
+      "y": 64.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_96 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_96.blueprint",
+    "at": {
+      "x": 35.438,
+      "y": 64.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (26)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 14.125,
+      "y": 64.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.75,
+      "y": 64.875
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        4,
+        5,
+        6,
+        null
+      ],
+      [
+        36,
+        37,
+        38,
+        null
+      ],
+      [
+        68,
+        69,
+        70,
+        null
+      ],
+      [
+        100,
+        101,
+        102,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (27)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 15.5,
+      "y": 64.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (9)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 19.125,
+      "y": 64.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (26)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 47.75,
+      "y": 64.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (27)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 5.313,
+      "y": 65.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (28)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 46.688,
+      "y": 65.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (18)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 55.375,
+      "y": 65.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.375,
+      "y": 65.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 17.25,
+      "y": 65.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (28)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 15.625,
+      "y": 65.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 61.063,
+      "y": 65.813
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_20 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_20.blueprint",
+    "at": {
+      "x": 15.438,
+      "y": 65.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (6)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 52.125,
+      "y": 65.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (29)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 57.25,
+      "y": 65.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (19)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 38.188,
+      "y": 66.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (30)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 56.063,
+      "y": 66.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (29)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 1.0,
+      "y": 66.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (31)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 44.188,
+      "y": 66.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (10)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 4.063,
+      "y": 66.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (30)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 32.688,
+      "y": 66.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (32)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 23.0,
+      "y": 66.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (11)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 41.063,
+      "y": 66.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (20)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 0.188,
+      "y": 66.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (12)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 49.438,
+      "y": 66.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (31)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 14.625,
+      "y": 66.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (7)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 47.625,
+      "y": 66.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (13)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 31.313,
+      "y": 67.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (33)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 17.938,
+      "y": 67.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_14 (8)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_14.blueprint",
+    "at": {
+      "x": 20.688,
+      "y": 67.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (34)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 18.938,
+      "y": 67.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (35)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 30.625,
+      "y": 67.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (32)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 41.5,
+      "y": 68.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (21)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 28.75,
+      "y": 68.063
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.313,
+      "y": 68.188
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        155
+      ],
+      [
+        null,
+        null,
+        null,
+        187
+      ],
+      [
+        null,
+        null,
+        null,
+        219
+      ],
+      [
+        null,
+        null,
+        null,
+        251
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (14)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 10.5,
+      "y": 68.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (36)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 40.313,
+      "y": 68.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (33)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 38.563,
+      "y": 68.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (34)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 50.938,
+      "y": 68.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_2 (37)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_2.blueprint",
+    "at": {
+      "x": 57.375,
+      "y": 68.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_3 (15)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_3.blueprint",
+    "at": {
+      "x": 7.063,
+      "y": 68.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_1 (22)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_1.blueprint",
+    "at": {
+      "x": 44.125,
+      "y": 68.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_props_0 (35)",
+    "blueprint": "world/area/gloomhollow/blueprints/gloomhollow_props_0.blueprint",
+    "at": {
+      "x": 59.5,
+      "y": 68.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 10.125,
+      "y": 68.5
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        3
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 19.0,
+      "y": 68.5
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        11
+      ],
+      [
+        40,
+        41,
+        42,
+        43
+      ],
+      [
+        72,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 47.625,
+      "y": 68.5
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        3
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.625,
+      "y": 68.563
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 9.313,
+      "y": 68.625
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        4,
+        5,
+        6,
+        7
+      ],
+      [
+        36,
+        37,
+        38,
+        39
+      ],
+      [
+        68,
+        69,
+        70,
+        71
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 37.688,
+      "y": 68.75
+    },
+    "tileset": "world/area/gloomhollow/tilesets/gloomhollow_props.tileset",
+    "tiles": [
+      [
+        0,
+        1,
+        2,
+        3
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 45.5,
+      "y": 11.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        689,
+        667,
+        668,
+        689
+      ],
+      [
+        669,
+        670,
+        671,
+        672
+      ],
+      [
+        673,
+        674,
+        675,
+        676
+      ],
+      [
+        677,
+        678,
+        679,
+        680
+      ],
+      [
+        681,
+        682,
+        683,
+        684
+      ],
+      [
+        685,
+        686,
+        687,
+        688
+      ]
+    ],
+    "sort": 5.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 11.5,
+      "y": 13.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        1057,
+        1058,
+        1059,
+        1060,
+        1061
+      ],
+      [
+        1062,
+        1063,
+        1064,
+        1065,
+        1066
+      ],
+      [
+        1067,
+        1068,
+        1069,
+        1070,
+        1071
+      ],
+      [
+        1072,
+        1073,
+        1074,
+        1075,
+        1076
+      ],
+      [
+        1077,
+        1078,
+        1079,
+        1080,
+        1081
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.5,
+      "y": 15.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        1252,
+        1252,
+        1252,
+        1252,
+        1252,
+        1210,
+        1252
+      ],
+      [
+        1252,
+        1211,
+        1212,
+        1213,
+        1214,
+        1215,
+        1216
+      ],
+      [
+        1217,
+        1218,
+        1219,
+        1220,
+        1221,
+        1222,
+        1223
+      ],
+      [
+        1224,
+        1225,
+        1226,
+        1227,
+        1228,
+        1229,
+        1230
+      ],
+      [
+        1231,
+        1232,
+        1233,
+        1234,
+        1235,
+        1236,
+        1237
+      ],
+      [
+        1238,
+        1239,
+        1240,
+        1241,
+        1242,
+        1243,
+        1244
+      ],
+      [
+        1245,
+        1246,
+        1247,
+        1248,
+        1249,
+        1250,
+        1251
+      ]
+    ],
+    "sort": 6.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 51.5,
+      "y": 16.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        519,
+        501,
+        502,
+        519
+      ],
+      [
+        503,
+        504,
+        505,
+        506
+      ],
+      [
+        507,
+        508,
+        509,
+        510
+      ],
+      [
+        511,
+        512,
+        513,
+        514
+      ],
+      [
+        515,
+        516,
+        517,
+        518
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 29.5,
+      "y": 17.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        1082,
+        1083,
+        1084
+      ],
+      [
+        1085,
+        1086,
+        1087
+      ],
+      [
+        1088,
+        1089,
+        1090
+      ],
+      [
+        1091,
+        1092,
+        1093
+      ],
+      [
+        1094,
+        1095,
+        1096
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 34.5,
+      "y": 18.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        93,
+        94,
+        95,
+        96,
+        97
+      ],
+      [
+        98,
+        99,
+        100,
+        101,
+        102
+      ],
+      [
+        103,
+        104,
+        105,
+        106,
+        107
+      ],
+      [
+        108,
+        109,
+        110,
+        111,
+        112
+      ],
+      [
+        113,
+        114,
+        115,
+        116,
+        117
+      ]
+    ],
+    "sort": 4.0
+  }
+]

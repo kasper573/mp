@@ -1,0 +1,12 @@
+{
+  "name": "Frostmere",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 64,
+        "height": 52
+      },
+      "tile": 16
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Slash hit",
+  "layers": [
+    {
+      "type": "shader",
+      "shader": "visual-effects/vfx_shader/slash.vfx_shader",
+      "duration": 0.3
+    }
+  ]
+}

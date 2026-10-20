@@ -89,7 +89,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the bait's card", |snapshot| {
         snapshot
             .item_card
-            .is_some_and(|card| card.item.key(content()) == "fishing_bait")
+            .is_some_and(|card| card.item.name(content()) == "fishing_bait")
     });
     me.hold();
     me.act(InputAction::Dismiss);
@@ -190,7 +190,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the shield's card", |snapshot| {
         snapshot
             .item_card
-            .is_some_and(|card| card.item.key(content()) == "bone_shield")
+            .is_some_and(|card| card.item.name(content()) == "bone_shield")
     });
     me.hold();
     me.act(InputAction::Dismiss);

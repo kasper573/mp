@@ -286,7 +286,7 @@ impl EffectDef<RiftScripting> for CompleteTask {
             .ok_or_else(|| {
                 ScriptFault::new(
                     "unknown task",
-                    format!("{} has no task {task}", quest.key(cx.content)),
+                    format!("{} has no task {task}", quest.path(cx.content)),
                 )
             })?;
         Ok(Box::new(move |world, _, cx| {
@@ -321,7 +321,7 @@ impl EffectDef<RiftScripting> for Decide {
         if !known {
             return Err(ScriptFault::new(
                 "unknown path",
-                format!("{} has no path {path:?}", quest.key(cx.content)),
+                format!("{} has no path {path:?}", quest.path(cx.content)),
             ));
         }
         Ok(Box::new(move |world, _, cx| {

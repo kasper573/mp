@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
-use crate::core::content::{Content, ContentRow, Fixture};
+use crate::core::content::{Content, ContentFile, Fixture};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct CursorDef {
@@ -12,7 +12,7 @@ pub struct CursorDef {
     pub hotspot: Hotspot,
 }
 
-impl ContentRow for CursorDef {
+impl ContentFile for CursorDef {
     const TABLE: &'static str = "cursor";
 }
 
@@ -45,6 +45,7 @@ pub enum CursorShape {
 
 impl Fixture for CursorShape {
     type Row = CursorDef;
+    const FOLDER: &'static str = "interface";
     const WHOLE_TABLE: bool = true;
 }
 
@@ -53,7 +54,7 @@ pub struct InterfaceIconDef {
     pub image: ImageRef,
 }
 
-impl ContentRow for InterfaceIconDef {
+impl ContentFile for InterfaceIconDef {
     const TABLE: &'static str = "interface_icon";
 }
 
@@ -73,6 +74,7 @@ pub enum InterfaceIcon {
 
 impl Fixture for InterfaceIcon {
     type Row = InterfaceIconDef;
+    const FOLDER: &'static str = "interface";
     const WHOLE_TABLE: bool = true;
 }
 
@@ -96,6 +98,7 @@ pub enum InterfaceSound {
 
 impl Fixture for InterfaceSound {
     type Row = SfxDef;
+    const FOLDER: &'static str = "interface";
 }
 
 impl InterfaceSound {

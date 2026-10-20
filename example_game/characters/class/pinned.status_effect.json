@@ -1,0 +1,12 @@
+{
+  "name": "Pinned",
+  "icon": "assets/icons/material/string.png",
+  "category": "debuff",
+  "description": "An arrow through the cloak: hardly a step to be had.",
+  "modules": [
+    {
+      "type": "script",
+      "script": "characters/class/pinned_activated.script.json"
+    }
+  ]
+}

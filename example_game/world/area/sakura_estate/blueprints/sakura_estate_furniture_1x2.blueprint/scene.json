@@ -1,0 +1,19 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
+    "tiles": [
+      [
+        188
+      ],
+      [
+        189
+      ]
+    ],
+    "sort": 1.0
+  }
+]

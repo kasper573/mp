@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
-use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::{Pos, Rgba};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
@@ -328,7 +328,7 @@ pub enum NotificationDefKind {
     },
 }
 
-impl ContentRow for NotificationDef {
+impl ContentFile for NotificationDef {
     const TABLE: &'static str = "notification";
 }
 
@@ -493,7 +493,7 @@ pub fn check_all(loading: &mut Loading) {
             check.error(
                 "/kind/speaker",
                 "needs a voice",
-                speaker.key(&content),
+                speaker.path(&content),
                 "an npc with a voice module",
             );
         }

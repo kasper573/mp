@@ -1,0 +1,37 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/bloomvale_inn/tilesets/bloomvale_inn_props.tileset",
+    "tiles": [
+      [
+        3600,
+        3601,
+        3602,
+        3603
+      ],
+      [
+        3632,
+        3633,
+        3634,
+        3635
+      ],
+      [
+        3664,
+        3665,
+        3666,
+        3667
+      ],
+      [
+        3696,
+        3697,
+        3698,
+        3699
+      ]
+    ],
+    "sort": 3.5
+  }
+]

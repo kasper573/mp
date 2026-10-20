@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::{Duration, Instant, SystemTime};
 
 use driver::{
-    Pace, Player, Playtest, PlaytestSetup, aiming, area_key, area_named, arrived_in,
+    Pace, Player, Playtest, PlaytestSetup, aiming, area_name, area_named, arrived_in,
     clickable_point, ground_near, hunting_ground, open, warp_named,
 };
 use engine::core::render::transition::ScreenTransitionPhase;
@@ -138,7 +138,7 @@ fn report(scenes: &[Scene]) {
 
 fn set_off(me: &mut Player) {
     let seen = me.snapshot();
-    let area = area_key(&seen).expect("the player is in an area");
+    let area = area_name(&seen).expect("the player is in an area");
     let at = seen.me.as_ref().expect("the player").at;
     let far = ground_near(area, at, Tiles(5.0)..=Tiles(8.0))
         .into_iter()
@@ -189,7 +189,7 @@ fn cast_on_nearest_foe(me: &mut Player, slot: InputAction) {
 
 // Bats flying out over the water are out of reach.
 fn foe(snapshot: &ProbeSnapshot, actor: &ProbeBody) -> bool {
-    let (Some(me), Some(area)) = (snapshot.me.as_ref(), area_key(snapshot)) else {
+    let (Some(me), Some(area)) = (snapshot.me.as_ref(), area_name(snapshot)) else {
         return false;
     };
     let grid = &area_named(area).grid;

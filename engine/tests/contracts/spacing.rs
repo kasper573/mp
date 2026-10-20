@@ -15,7 +15,7 @@ use engine::systems::npc::{self, Home, Npc, NpcDef, Pack};
 use engine::systems::script::{self, Place};
 use engine::systems::{actor, skill, stat};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 const FIGHTERS: Pack = Pack(1);
 const VICTIMS: Pack = Pack(2);
@@ -463,7 +463,7 @@ fn field() -> Sim {
         .wearing(&["sword"])
         .npc("brute", 100_000.0, json!([]))
         .edit("npc", "brute", |brute| {
-            brute["basic_attack"] = json!("strike")
+            brute["basic_attack"] = json!(path("skill", "strike"))
         })
         .vfx("damage_taken")
         .shader("damage_pop")

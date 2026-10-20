@@ -1,0 +1,19 @@
+{
+  "kind": {
+    "type": "speech",
+    "speaker": "world/area/island/npcs/pell.npc.json"
+  },
+  "text": [
+    "Nobody calls ",
+    {
+      "text": "Pell",
+      "ink": "name"
+    },
+    " a cheat ",
+    {
+      "text": "twice",
+      "voice": "shout"
+    },
+    "!"
+  ]
+}

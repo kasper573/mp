@@ -1,4 +1,4 @@
-use engine::core::content::{ContentRegistry, ContentRow};
+use engine::core::content::{ContentFile, ContentRegistry};
 use engine::systems::registry;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use crate::support::game;
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(registry().version().0, "f3145c2b");
+    assert_eq!(registry().version().0, "4bf5d0d6");
 }
 
 #[test]
@@ -16,7 +16,7 @@ fn another_version_is_refused_last() {
     let report = game()
         .edit_settings(|settings| {
             settings["content_version"] = json!("deadbeef");
-            settings["initial_spawn"]["area"] = json!("strat");
+            settings["initial_spawn"]["area"] = json!("strat.area");
         })
         .try_load()
         .err()
@@ -28,7 +28,7 @@ fn another_version_is_refused_last() {
         .map(|error| error.problem.rule)
         .collect();
     assert_eq!(rules.last(), Some(&"content version"));
-    assert!(rules.contains(&"unknown row"), "{rules:?}");
+    assert!(rules.contains(&"missing file"), "{rules:?}");
     let version = report.errors.last().expect("an error");
     assert_eq!(version.problem.found, "\"deadbeef\"");
 }
@@ -67,21 +67,21 @@ struct SameShape {
     name: String,
 }
 
-impl ContentRow for Narrow {
+impl ContentFile for Narrow {
     const TABLE: &'static str = "thing";
 }
-impl ContentRow for Wide {
+impl ContentFile for Wide {
     const TABLE: &'static str = "thing";
 }
-impl ContentRow for Retyped {
+impl ContentFile for Retyped {
     const TABLE: &'static str = "thing";
 }
-impl ContentRow for SameShape {
+impl ContentFile for SameShape {
     const TABLE: &'static str = "thing";
 }
 
-fn version_of<Row: ContentRow>() -> String {
+fn version_of<Row: ContentFile>() -> String {
     let mut registry = ContentRegistry::default();
-    registry.row::<Row>();
+    registry.file::<Row>();
     registry.version().0
 }

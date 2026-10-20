@@ -1,0 +1,19 @@
+{
+  "name": "Level up",
+  "layers": [
+    {
+      "type": "shader",
+      "shader": "visual-effects/vfx_shader/flash.vfx_shader",
+      "params": {
+        "color": [
+          255,
+          214,
+          92,
+          255
+        ],
+        "strength": 0.5
+      },
+      "duration": 0.5
+    }
+  ]
+}

@@ -170,7 +170,7 @@ pub struct ProbeBody {
 pub struct ProbeObject {
     pub id: Entity,
     pub name: Option<String>,
-    pub label: Option<String>,
+    pub title: Option<String>,
     pub at: Pos<Tiles>,
     pub aim: Pos<Tiles>,
     pub hitbox: Rect<Tiles>,
@@ -621,7 +621,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .0
                     .iter()
                     .map(|held| ProbeStatus {
-                        effect: held.effect.key(&content).to_owned(),
+                        effect: held.effect.path(&content).to_owned(),
                         category: held.effect.get(&content).category,
                         left: held.until.zip(now).map(|(until, now)| until.since(now)),
                     })
@@ -707,7 +707,7 @@ fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
         .map(|learned| learned.0.iter().map(|(k, r)| (k.to_string(), *r)).collect())
         .unwrap_or_default();
     Some(ProbeSkills {
-        class: class.key(content).to_owned(),
+        class: class.path(content).to_owned(),
         level: crate::systems::class::level(world, me),
         to_spend: crate::systems::class::points_to_spend(world, me).0,
         learned,
@@ -860,7 +860,7 @@ fn objects(world: &mut World, area: Option<AreaId>) -> Vec<ProbeObject> {
             let seen = ProbeObject {
                 id: entity,
                 name: object.name.clone(),
-                label: object.label.clone(),
+                title: object.title.clone(),
                 at: at.pos,
                 aim: hitbox.center(),
                 hitbox,

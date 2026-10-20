@@ -1,6 +1,0 @@
-{
-  "owner": "script/tide_chest",
-  "label": "Found the tattered map",
-  "type": "boolean",
-  "resets": "never"
-}

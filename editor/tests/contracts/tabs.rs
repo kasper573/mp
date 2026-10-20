@@ -7,7 +7,7 @@ use editor::tabs::{DockRequest, EditorTab};
 use editor::ui;
 use editor::user::{EditorSettings, UserFolder};
 use egui_dock::NodeIndex;
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, row_file};
 use engine::systems::area::AreaDef;
 
 use crate::support::{AREA, game_folder};

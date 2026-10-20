@@ -1,0 +1,16 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/forest/tilesets/forest_tileset.tileset",
+    "tiles": [
+      [
+        256
+      ]
+    ],
+    "sort": 0.5
+  }
+]

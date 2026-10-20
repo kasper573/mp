@@ -15,7 +15,7 @@ use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet, RowCheck};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
 use crate::systems::script::{RunnerKind, ScriptModule, ScriptedRow};
@@ -230,7 +230,7 @@ impl<T> Phased<T> {
     }
 }
 
-impl ContentRow for StatusEffectDef {
+impl ContentFile for StatusEffectDef {
     const TABLE: &'static str = "status_effect";
 
     fn check(&self, check: &mut RowCheck) {

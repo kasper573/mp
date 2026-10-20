@@ -1,0 +1,26 @@
+{
+  "name": "Iron Sword",
+  "icon": "assets/icons/weapon_and_tool/silver_sword.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_blade.sfx",
+    "trade": "sound-and-voice/sfx/trade_blade.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon",
+    "grants": [
+      "items-and-skills/skill/slash.skill.json"
+    ]
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Honest iron, honestly sharpened."
+    },
+    {
+      "type": "script",
+      "script": "items-and-skills/item/iron_sword_activated.script.json"
+    }
+  ]
+}

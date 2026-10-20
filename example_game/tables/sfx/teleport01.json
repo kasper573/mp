@@ -1,9 +1,0 @@
-{
-  "file": "audio/movement/teleport01.wav",
-  "role": "movement",
-  "volume": {
-    "min": 0.54,
-    "max": 0.68
-  },
-  "pitch": 1.0
-}

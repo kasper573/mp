@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cargo_metadata::MetadataCommand;
-use engine::core::content::{FilesystemFolder, GAME_FILE, TABLES_DIR, write};
+use engine::core::content::{FilesystemFolder, write};
 use engine::systems::{load_content, registry};
 use syn::UseTree;
 use syn::visit::{self, Visit};
@@ -80,8 +80,8 @@ fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
 /// from.
 const SHIPPED_GAMES: &[&str] = &["example_game", "editor/templates/new_game"];
 
-/// A shipped game loads as a whole game, and every row and grid in it reads exactly as the editor
-/// writes it, so saving it in the editor changes only what was edited.
+/// A shipped game loads as a whole game, and every JSON and CSV file in it reads exactly as the
+/// editor writes it, so saving it in the editor changes only what was edited.
 fn check_shipped_game(name: &str, folder: &Path, scratch: &Path, out: &mut Vec<String>) {
     let content = match load_content(Arc::new(FilesystemFolder(folder.to_path_buf())), "lint") {
         Ok(content) => content,
@@ -95,11 +95,9 @@ fn check_shipped_game(name: &str, folder: &Path, scratch: &Path, out: &mut Vec<S
     }
     let writer = write(registry(), content, scratch).expect("write the game to the scratch folder");
     let written: BTreeSet<String> = writer.written().iter().cloned().collect();
-    let shipped = rows_and_grids(folder);
+    let shipped = written_kinds(folder);
     for file in shipped.difference(&written) {
-        out.push(format!(
-            "[{name}] {file}: a file no row or grid is written to"
-        ));
+        out.push(format!("[{name}] {file}: a file the editor never writes"));
     }
     for file in written.intersection(&shipped) {
         let ours = fs::read(folder.join(file)).expect("a shipped file");
@@ -113,18 +111,23 @@ fn check_shipped_game(name: &str, folder: &Path, scratch: &Path, out: &mut Vec<S
     }
 }
 
-fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
-    let tables = WalkDir::new(folder.join(TABLES_DIR))
+/// Every file of the kinds the editor writes: the JSON of settings and content, and the CSV of grids.
+fn written_kinds(folder: &Path) -> BTreeSet<String> {
+    WalkDir::new(folder)
         .follow_links(true)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|ext| ext == "json" || ext == "csv")
+        })
         .map(|entry| {
             let relative = entry.path().strip_prefix(folder).unwrap_or(entry.path());
             relative.to_string_lossy().replace('\\', "/")
-        });
-    std::iter::once(GAME_FILE.to_owned())
-        .chain(tables)
+        })
         .collect()
 }
 
@@ -182,7 +185,7 @@ fn content_keys(file: &Path) -> Vec<(usize, String)> {
     found.hits
 }
 
-const KEY_LOOKUPS: &[&str] = &["by_key", "id_of"];
+const KEY_LOOKUPS: &[&str] = &["by_path", "id_of"];
 
 #[derive(Default)]
 struct KeyLookups {

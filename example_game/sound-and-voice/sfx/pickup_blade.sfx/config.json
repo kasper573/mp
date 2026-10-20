@@ -1,0 +1,8 @@
+{
+  "role": "sound-and-voice/sfx_role/items.sfx_role.json",
+  "volume": 0.19,
+  "pitch": {
+    "min": 0.95,
+    "max": 1.05
+  }
+}

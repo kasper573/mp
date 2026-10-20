@@ -55,8 +55,8 @@ use crate::core::audio::soundscape::SoundscapePlugin;
 use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
-    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
-    Loading, Settings,
+    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, LoadReport, Loading,
+    SETTINGS_FILE, Settings,
 };
 use crate::core::gui::GuiPlugin;
 use crate::core::interpolate::SnapshotPlugin;
@@ -538,30 +538,30 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
-        .row::<SfxDef>()
-        .row::<SfxRoleDef>()
-        .row::<attention::AttentionDef>()
-        .row::<input::map::InputDef>()
-        .row::<interface::CursorDef>()
-        .row::<interface::InterfaceIconDef>()
-        .row::<item::ItemDef>()
+        .bundle::<SfxDef>()
+        .file::<SfxRoleDef>()
+        .file::<attention::AttentionDef>()
+        .file::<input::map::InputDef>()
+        .file::<interface::CursorDef>()
+        .file::<interface::InterfaceIconDef>()
+        .file::<item::ItemDef>()
         .modules::<item::ItemDef>()
-        .row::<class::ClassDef>()
-        .row::<memory::MemoryDef>()
-        .row::<notification::NotificationDef>()
-        .row::<npc::NpcDef>()
+        .file::<class::ClassDef>()
+        .file::<memory::MemoryDef>()
+        .file::<notification::NotificationDef>()
+        .file::<npc::NpcDef>()
         .modules::<npc::NpcDef>()
-        .row::<player::PlayerDef>()
+        .file::<player::PlayerDef>()
         .modules::<player::PlayerDef>()
-        .row::<player::snapshot::CharacterSnapshot>()
-        .row::<quest::QuestDef>()
+        .file::<player::snapshot::CharacterSnapshot>()
+        .file::<quest::QuestDef>()
         .modules::<quest::QuestDef>()
-        .row::<script::ScriptDef>()
-        .row::<shop::ShopDef>()
+        .file::<script::ScriptDef>()
+        .file::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
-        .row::<skill::SkillDef>()
+        .file::<skill::SkillDef>()
         .modules::<skill::SkillDef>()
-        .row::<status::StatusEffectDef>()
+        .file::<status::StatusEffectDef>()
         .modules::<status::StatusEffectDef>()
         .list_kind("modules", "unknown module type", "a module type")
         .hook(LoadStep::Files, crate::core::content::media::check_media);
@@ -593,7 +593,7 @@ fn check_settings(loading: &mut Loading) {
     let settings = content.built::<GameSettings>();
     if let Err(problem) = area::check_place(&content, settings.initial_spawn) {
         loading.json_error(
-            GAME_FILE,
+            SETTINGS_FILE,
             "/initial_spawn",
             ContentProblem::new(problem.rule, problem.found, problem.expected)
                 .near(problem.nearest),

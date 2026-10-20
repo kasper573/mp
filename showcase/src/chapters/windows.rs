@@ -187,7 +187,7 @@ fn inspect(me: &mut Player, icon: &str, item: &str) {
     me.wait_until(&format!("the card of {item}"), |snapshot| {
         snapshot
             .item_card
-            .is_some_and(|card| card.item.key(content()) == item)
+            .is_some_and(|card| card.item.name(content()) == item)
     });
 }
 

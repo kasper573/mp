@@ -8,7 +8,7 @@ use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
 use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, run_action};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, row_file};
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
 use engine::systems::area::AreaDef;

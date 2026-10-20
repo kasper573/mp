@@ -14,7 +14,7 @@ use engine::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
 use crate::content::{from_json, to_json};
 use crate::recording::{Footage, Recording};
-use crate::seen::area_key;
+use crate::seen::area_name;
 use crate::server::Server;
 
 /// The machine a desktop client plays on: a screen and speakers of its own, recorded, and a probe
@@ -373,7 +373,7 @@ impl Desktop {
             "frame {}: {step} | claim {:?} | area {:?} | me {me:?} | stage {:?}",
             snapshot.frame,
             snapshot.claim,
-            area_key(snapshot),
+            area_name(snapshot),
             snapshot.stage.as_ref().map(|stage| &stage.node),
         );
     }

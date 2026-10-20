@@ -1,0 +1,17 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/sakura_teahouse/tilesets/sakura_teahouse_furniture.tileset",
+    "tiles": [
+      [
+        251,
+        252
+      ]
+    ],
+    "sort": 0.0
+  }
+]

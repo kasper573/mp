@@ -11,7 +11,8 @@ use crate::core::assets::AudioRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{HushVoice, PlayClip, SfxPlace, SfxTune};
 use crate::core::content::{
-    Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
+    Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, ErrorPlace,
+    FileWriter, PartSpec, Parts, RowCheck, Shape,
 };
 use crate::core::math::Rng;
 use crate::core::text::{
@@ -46,48 +47,62 @@ pub struct BabbleDef {
     pub pace: Hertz,
 }
 
-impl ContentRow for BabbleDef {
+impl ContentFile for BabbleDef {
     const TABLE: &'static str = "babble";
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct BabbleBankDef {
+    /// The bundle's folder of one clip per letter.
+    #[serde(skip)]
     pub letters: String,
     pub volume: f32,
 }
 
-impl ContentRow for BabbleBankDef {
+pub const BABBLE_LETTERS: PartSpec = PartSpec::Keyed {
+    folder: "letters",
+    exts: &["wav"],
+};
+
+impl ContentFile for BabbleBankDef {
     const TABLE: &'static str = "babble_bank";
+    const SHAPE: Shape = Shape::Bundle;
+
+    fn check(&self, cx: &mut RowCheck) {
+        cx.range("/volume", self.volume, 0.0, 4.0, "a volume");
+    }
+}
+
+impl Bundle for BabbleBankDef {
+    const PARTS: &'static [PartSpec] = &[BABBLE_LETTERS];
+
+    fn read_parts(&mut self, parts: &mut Parts) {
+        self.letters = parts.path("letters");
+        let missing: Vec<char> = LETTERS
+            .chars()
+            .filter(|letter| !parts.has(&format!("letters/{letter}.wav")))
+            .collect();
+        if !missing.is_empty() {
+            let missing: String = missing.into_iter().collect();
+            parts.error(
+                "",
+                ErrorPlace::WholeFile,
+                ContentProblem::new(
+                    "missing file",
+                    format!("no clip for {missing}"),
+                    "letters/a.wav to letters/z.wav in the bundle",
+                ),
+            );
+        }
+    }
+
+    fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 pub fn content(registry: &mut ContentRegistry) {
-    registry
-        .row::<BabbleDef>()
-        .row::<BabbleBankDef>()
-        .hook(LoadStep::Files, check_banks);
-}
-
-fn check_banks(loading: &mut Loading) {
-    let content = loading.content();
-    for (id, bank) in loading.rows::<BabbleBankDef>(&content) {
-        let mut check = RowCheck::default();
-        check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
-        for letter in letter_files(bank) {
-            if !loading.has_asset(letter.as_str()) {
-                check.error(
-                    "/letters",
-                    "missing file",
-                    format!("{:?}", letter.as_str()),
-                    "a folder under assets/ with a.wav to z.wav",
-                );
-                break;
-            }
-        }
-        if !check.is_empty() {
-            loading.row_errors(id, check);
-            loading.fail(id);
-        }
-    }
+    registry.file::<BabbleDef>().bundle::<BabbleBankDef>();
 }
 
 #[derive(

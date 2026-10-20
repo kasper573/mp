@@ -1,15 +1,17 @@
 pub mod blueprint;
 pub mod grid;
 pub mod object;
+pub mod scene;
 pub mod tileset;
 pub mod transition;
 pub mod walk;
 pub mod warp;
 pub mod world_map;
 
-pub use blueprint::{Flattened, PlacedBlueprint, Placement};
+pub use blueprint::{BlueprintDef, Flattened, PlacedBlueprint, Placement};
 pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
+pub use scene::{Scene, SceneNode};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -31,17 +33,17 @@ use crate::core::audio::soundscape::{
 };
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRegistry, ContentRow, FileWriter, LoadStep, Loading,
-    ModuleRule, ModuleSet, RowCheck, serial, valid_key,
+    Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, FileWriter,
+    LoadError, LoadStep, Loading, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
 use crate::systems::npc::NpcId;
-use crate::systems::script::{
-    self, Condition, OwnerRow, Reach, RiftScripts, RunnerKind, ScriptModule, ScriptedRow,
-};
+use crate::systems::script::{self, Condition, OwnerRow, Reach, RiftScripts, ScriptModule};
+use blueprint::FlattenAt;
+use scene::{SCENE_PARTS, scene_file};
 
 pub type AreaId = ContentId<AreaDef>;
 
@@ -59,18 +61,19 @@ pub fn register(app: &mut App) {
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
-        .row::<tileset::TilesetDef>()
-        .row::<tileset::SurfaceDef>()
-        .row::<blueprint::BlueprintDef>()
-        .row::<world_map::WorldMapDef>()
-        .folder::<AreaDef>()
-        .beside(grid::palette_beside())
-        .modules::<AreaDef>()
-        .hook(LoadStep::Files, read_grids)
+        .bundle::<tileset::TilesetDef>()
+        .file::<tileset::SurfaceDef>()
+        .bundle::<BlueprintDef>()
+        .bundle::<AreaDef>()
+        .file::<world_map::WorldMapDef>()
+        .beside(grid::palette_beside(AreaDef::TABLE))
+        .beside(grid::palette_beside(BlueprintDef::TABLE))
+        .json_part(scene::json_part(AreaDef::TABLE))
+        .json_part(scene::json_part(BlueprintDef::TABLE))
+        .hook(LoadStep::Files, resolve_grids)
         .hook(LoadStep::Expand, flatten_all)
         .hook(LoadStep::Assemble, build_all)
-        .hook(LoadStep::Across, world_map::check_all)
-        .writer(write_grids);
+        .hook(LoadStep::Across, world_map::check_all);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -90,105 +93,57 @@ pub fn same_area(world: &World, a: Entity, b: Entity) -> bool {
     area(a).is_some() && area(a) == area(b)
 }
 
+/// A place in the world: a blueprint with a name, whose own ground and modules are all it holds.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AreaDef {
     pub name: String,
-    pub map: Tilemap,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub modules: Vec<AreaModule>,
+    pub blueprint: BlueprintDef,
 }
 
-impl ContentRow for AreaDef {
+impl ContentFile for AreaDef {
     const TABLE: &'static str = "area";
+    const SHAPE: Shape = Shape::Bundle;
 
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);
-        let map = &self.map;
-        cx.range(
-            "/map/size/width",
-            map.size.width,
-            MIN_SIDE,
-            MAX_SIDE,
-            "tiles",
-        );
-        cx.range(
-            "/map/size/height",
-            map.size.height,
-            MIN_SIDE,
-            MAX_SIDE,
-            "tiles",
-        );
-        if map.size.width.saturating_mul(map.size.height) > MAX_CELLS {
+        self.blueprint.map.check("/blueprint/map", MIN_SIDE, cx);
+        if !self.blueprint.variables.is_empty() {
             cx.error(
-                "/map/size",
+                "/blueprint/variables",
                 "out of range",
-                format!("{} cells", map.size.width * map.size.height),
-                format!("at most {MAX_CELLS} cells"),
+                format!("{} variables", self.blueprint.variables.len()),
+                "no variables: an area is never placed, so nothing fills them",
             );
         }
-        cx.range(
-            "/map/tile",
-            map.tile,
-            1,
-            tileset::MAX_TILE_PX,
-            "pixels per tile",
-        );
-        cx.count(
-            "/map/ground",
-            map.ground.len(),
-            1,
-            MAX_GROUND_LAYERS,
-            "ground layers",
-        );
-        for (index, layer) in map.ground.iter().enumerate() {
-            let pointer = format!("/map/ground/{index}");
-            if layer == "palette" || layer == "walk" || !valid_key(layer) {
-                cx.error(
-                    &pointer,
-                    "out of range",
-                    format!("{layer:?}"),
-                    "a valid key that isn't palette or walk",
-                );
-            }
-            if map.ground[..index]
-                .iter()
-                .any(|other| other.eq_ignore_ascii_case(layer))
-            {
-                cx.error(
-                    &pointer,
-                    "duplicate name",
-                    format!("layer {layer} twice"),
-                    "unique layer names",
-                );
-            }
-        }
-        for (index, module) in self.modules.iter().enumerate() {
-            module.check(&format!("/modules/{index}"), cx);
-        }
     }
 }
 
-impl ModuleSet for AreaDef {
-    type Module = AreaModule;
+impl Bundle for AreaDef {
+    const PARTS: &'static [PartSpec] = SCENE_PARTS;
 
-    fn modules(&self) -> &[AreaModule] {
-        &self.modules
+    fn read_parts(&mut self, parts: &mut Parts) {
+        let blueprint = &mut self.blueprint;
+        scene::read(
+            &mut blueprint.scene,
+            &blueprint.map,
+            &blueprint.variables,
+            parts,
+        );
     }
 
-    fn rule(_: &AreaModule) -> ModuleRule {
-        ModuleRule::AnyNumber
+    fn write_parts(&self, bundle: &str, writer: &mut FileWriter) -> io::Result<()> {
+        scene::write(&self.blueprint.scene, &self.blueprint.map, bundle, writer)
     }
 }
 
-impl ScriptedRow for AreaDef {
-    const OWNER: RunnerKind = RunnerKind::Area;
+impl AreaDef {
+    pub fn map(&self) -> &Tilemap {
+        &self.blueprint.map
+    }
 
-    fn script(module: &AreaModule) -> Option<&ScriptModule> {
-        match module {
-            AreaModule::Script(script) => Some(script),
-            _ => None,
-        }
+    pub fn scene(&self) -> &Scene {
+        &self.blueprint.scene
     }
 }
 
@@ -197,7 +152,40 @@ impl ScriptedRow for AreaDef {
 pub struct Tilemap {
     pub size: MapSize,
     pub tile: u32,
-    pub ground: Vec<String>,
+}
+
+impl Tilemap {
+    pub(super) fn check(&self, pointer: &str, min_side: u32, cx: &mut RowCheck) {
+        cx.range(
+            format!("{pointer}/size/width"),
+            self.size.width,
+            min_side,
+            MAX_SIDE,
+            "tiles",
+        );
+        cx.range(
+            format!("{pointer}/size/height"),
+            self.size.height,
+            min_side,
+            MAX_SIDE,
+            "tiles",
+        );
+        if self.size.width.saturating_mul(self.size.height) > MAX_CELLS {
+            cx.error(
+                format!("{pointer}/size"),
+                "out of range",
+                format!("{} cells", self.size.width * self.size.height),
+                format!("at most {MAX_CELLS} cells"),
+            );
+        }
+        cx.range(
+            format!("{pointer}/tile"),
+            self.tile,
+            1,
+            tileset::MAX_TILE_PX,
+            "pixels per tile",
+        );
+    }
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -666,7 +654,7 @@ pub fn load(content: &Content, area: AreaId) -> &Area {
         .0
         .get(area.index())
         .and_then(Option::as_ref)
-        .unwrap_or_else(|| panic!("area {} failed to load", area.key(content)))
+        .unwrap_or_else(|| panic!("area {} failed to load", area.path(content)))
 }
 
 pub fn of(world: &World, entity: Entity) -> Option<&Area> {
@@ -678,46 +666,119 @@ pub fn of_in<'c>(content: &'c Content, world: &World, entity: Entity) -> Option<
     Some(load(content, area))
 }
 
-fn read_grids(loading: &mut Loading) {
+/// The grids every area and blueprint paints itself, before placements stamp theirs.
+struct OwnGrids {
+    areas: Vec<Option<AreaGrids>>,
+    blueprints: Vec<Option<AreaGrids>>,
+}
+
+fn resolve_grids(loading: &mut Loading) {
     let content = loading.content();
     let sizes = content.built::<ImageSizes>();
-    let mut grids: Vec<Option<Arc<AreaGrids>>> = content.ids::<AreaDef>().map(|_| None).collect();
+    let mut errors = Vec::new();
+    let mut own = OwnGrids {
+        areas: content.ids::<AreaDef>().map(|_| None).collect(),
+        blueprints: content.ids::<BlueprintDef>().map(|_| None).collect(),
+    };
     for (id, def) in loading.rows::<AreaDef>(&content) {
-        match grid::read_area(loading, &content, sizes, id, &def.map) {
-            Some(read) => grids[id.index()] = Some(Arc::new(read)),
-            None => loading.fail(id),
+        own.areas[id.index()] = own_grids(
+            &content,
+            sizes,
+            &def.blueprint,
+            id.path(&content),
+            &mut errors,
+        );
+    }
+    for (id, def) in loading.rows::<BlueprintDef>(&content) {
+        own.blueprints[id.index()] =
+            own_grids(&content, sizes, def, id.path(&content), &mut errors);
+    }
+    for (id, _) in loading.rows::<AreaDef>(&content) {
+        if own.areas[id.index()].is_none() {
+            loading.fail(id);
         }
     }
-    loading.built(AreaGridSet(grids));
+    for (id, _) in loading.rows::<BlueprintDef>(&content) {
+        if own.blueprints[id.index()].is_none() {
+            loading.fail(id);
+        }
+    }
+    loading.extend_errors(errors);
+    loading.built(own);
+}
+
+fn own_grids(
+    content: &Content,
+    sizes: &ImageSizes,
+    def: &BlueprintDef,
+    bundle: &str,
+    errors: &mut Vec<LoadError>,
+) -> Option<AreaGrids> {
+    let scene = &def.scene;
+    let palette = grid::resolve_palette(
+        content,
+        sizes,
+        &def.map,
+        &format!("{bundle}/{}", scene::PALETTE_FILE),
+        &scene.grids.palette,
+        errors,
+    )?;
+    Some(AreaGrids {
+        size: def.map.size.grid(),
+        palette,
+        palette_keys: scene.grids.palette.clone(),
+        ground: blueprint::layer_grids(scene, &def.map),
+        walk: scene.grids.walk.clone(),
+    })
 }
 
 fn flatten_all(loading: &mut Loading) {
     let content = loading.content();
+    let own = content.built::<OwnGrids>();
     let mut placed: Vec<Vec<Flattened>> = content.ids::<AreaDef>().map(|_| Vec::new()).collect();
     let mut placements: Vec<Vec<PlacedBlueprint>> =
         content.ids::<AreaDef>().map(|_| Vec::new()).collect();
+    let mut stamped: Vec<Option<Arc<AreaGrids>>> = content.ids::<AreaDef>().map(|_| None).collect();
     let loaded: BTreeSet<blueprint::BlueprintId> = loading
-        .rows::<blueprint::BlueprintDef>(&content)
+        .rows::<BlueprintDef>(&content)
         .into_iter()
         .map(|(id, _)| id)
         .collect();
+    let blueprints = content.table::<BlueprintDef>();
     for (id, def) in loading.rows::<AreaDef>(&content) {
         let mut errors = Vec::new();
-        let flattening = blueprint::flatten(&content, &def.modules, &mut errors);
+        let flattening = blueprint::flatten(&content, &def.scene().nodes, &mut errors);
         let places_a_failed_blueprint = flattening
             .placements
             .iter()
             .any(|placed| !loaded.contains(&placed.blueprint));
+        if let Some(area) = &own.areas[id.index()]
+            && !places_a_failed_blueprint
+        {
+            let grids_of = |blueprint: blueprint::BlueprintId| {
+                Some((
+                    blueprints.get(blueprint)?,
+                    own.blueprints[blueprint.index()].as_ref()?,
+                ))
+            };
+            let grids = blueprint::stamp(
+                area,
+                &flattening.placements,
+                grids_of,
+                &content,
+                &mut errors,
+            );
+            stamped[id.index()] = Some(Arc::new(grids));
+        }
         if !errors.is_empty() || places_a_failed_blueprint {
             loading.fail(id);
         }
+        let scene = scene_file(id.path(&content));
         for error in errors {
             match error.at {
-                blueprint::FlattenAt::Area(pointer) => {
-                    loading.row_error(id, &pointer, error.problem)
-                }
-                blueprint::FlattenAt::Blueprint(blueprint, pointer) => {
-                    loading.row_error(blueprint, &pointer, error.problem)
+                FlattenAt::Area(pointer) => loading.json_error(&scene, &pointer, error.problem),
+                FlattenAt::Blueprint(blueprint, part, pointer) => {
+                    loading.part_error(blueprint, part, &pointer, error.problem)
                 }
             }
         }
@@ -726,6 +787,7 @@ fn flatten_all(loading: &mut Loading) {
     }
     loading.built(PlacedModules(placed));
     loading.built(PlacedBlueprints(placements));
+    loading.built(AreaGridSet(stamped));
 }
 
 fn build_all(loading: &mut Loading) {
@@ -733,12 +795,23 @@ fn build_all(loading: &mut Loading) {
     let grids = content.built::<AreaGridSet>();
     let sizes = content.built::<ImageSizes>();
     let mut areas: Vec<Option<Area>> = content.ids::<AreaDef>().map(|_| None).collect();
+    let mut reported: BTreeSet<(String, String)> = BTreeSet::new();
     for (id, def) in loading.rows::<AreaDef>(&content) {
         let Some(grids) = grids.0[id.index()].clone() else {
             continue;
         };
         let modules = placed(&content, id);
-        let map = &def.map;
+        for module in modules {
+            let (file, pointer) = module.site(&content, id);
+            let mut check = RowCheck::default();
+            module.module.check(&pointer, &mut check);
+            for error in check.into_errors() {
+                if reported.insert((file.clone(), error.pointer.clone())) {
+                    loading.json_error(&file, &error.pointer, error.problem);
+                }
+            }
+        }
+        let map = def.map();
         let mut check = RowCheck::default();
         check_bounds(&content, map, modules, sizes, &mut check);
         let safe_zones: Vec<Rect<Tiles>> = modules
@@ -778,14 +851,23 @@ fn build_all(loading: &mut Loading) {
             scenery,
         };
         check_placed(&content, id, &area, modules, &mut check);
-        loading.row_errors(id, check);
+        let scene = scene_file(id.path(&content));
+        for error in check.into_errors() {
+            loading.json_error(&scene, &error.pointer, error.problem);
+        }
         areas[id.index()] = Some(area);
     }
     loading.built(Areas(areas));
 }
 
-fn module_pointer(placed: &Flattened) -> String {
-    format!("/modules/{}", placed.origin)
+/// Where in the area's scene a problem with `placed` is reported: at its own node and field, or at
+/// the placement that brings it.
+fn module_pointer(placed: &Flattened, field: &str) -> String {
+    if placed.chain.is_empty() {
+        format!("{}{field}", placed.origin)
+    } else {
+        placed.origin.clone()
+    }
 }
 
 fn check_bounds(
@@ -798,11 +880,11 @@ fn check_bounds(
     let bounds = map.size.tiles().bounds();
     let outside = |at: Pos<Tiles>| !bounds.contains(at);
     for placed in modules {
-        let pointer = module_pointer(placed);
+        let site = |field: &str| module_pointer(placed, field);
         let what = placed.describe(content);
         let out = |check: &mut RowCheck, at: Pos<Tiles>| {
             check.error(
-                pointer.clone(),
+                site(""),
                 "outside the map",
                 format!("{what} lands outside the map at {}, {}", at.x, at.y),
                 format!(
@@ -822,7 +904,7 @@ fn check_bounds(
                 let tileset = scenery.tileset.get(content);
                 if tileset.tile != map.tile {
                     check.error(
-                        format!("{pointer}/tileset"),
+                        site("/tileset"),
                         "tile size mismatch",
                         format!("{} against {}", map.tile, tileset.tile),
                         format!("tilesets of {} px tiles, the area's", map.tile),
@@ -845,7 +927,7 @@ fn check_bounds(
                             && tile.tile >= count
                         {
                             check.error(
-                                format!("{pointer}/tiles/{row}/{column}"),
+                                site(&format!("/tiles/{row}/{column}")),
                                 "tile out of range",
                                 format!("tile {} of {count}", tile.tile),
                                 format!("0 to {}", count.saturating_sub(1)),
@@ -876,7 +958,7 @@ fn check_placed(
 ) {
     let warps: Vec<(u32, &ObjectDef, String)> = warp_objects(content, id)
         .into_iter()
-        .map(|(index, object)| (index, object, object.title(index)))
+        .map(|(index, object)| (index, object, object.display_name(index)))
         .collect();
     let in_warp = |at: Pos<Tiles>| {
         warps
@@ -892,7 +974,7 @@ fn check_placed(
     let mut names: Vec<(String, String)> = Vec::new();
     let mut seen_residents: Vec<NpcId> = Vec::new();
     for placed in modules {
-        let pointer = module_pointer(placed);
+        let site = |field: &str| module_pointer(placed, field);
         match &placed.module {
             AreaModule::Object(object) => {
                 if let Some(name) = &object.name {
@@ -900,7 +982,7 @@ fn check_placed(
                         names.iter().find(|(n, _)| n.eq_ignore_ascii_case(name))
                     {
                         check.error(
-                            pointer.clone(),
+                            site(""),
                             "duplicate name",
                             format!("{name}, from {} and {}", first, placed.describe(content)),
                             "object names unique in the area ignoring case",
@@ -913,7 +995,7 @@ fn check_placed(
                     && !area.grid.walkable(at)
                 {
                     check.problem(
-                        format!("{pointer}/shape"),
+                        site("/shape"),
                         ContentProblem::new(
                             "not walkable",
                             format!("{}, {}", at.x, at.y),
@@ -924,19 +1006,19 @@ fn check_placed(
                 }
             }
             AreaModule::Resident(resident) => {
-                let key = resident.npc.key(content);
+                let key = resident.npc.path(content);
                 if seen_residents.contains(&resident.npc) {
                     check.error(
-                        pointer.clone(),
+                        site(""),
                         "resident twice",
-                        format!("{key} in {}", id.key(content)),
+                        format!("{key} in {}", id.path(content)),
                         "each npc resident once per area",
                     );
                 }
                 seen_residents.push(resident.npc);
                 if !area.grid.walkable(resident.at) {
                     check.problem(
-                        format!("{pointer}/at"),
+                        site("/at"),
                         ContentProblem::new(
                             "not walkable",
                             format!("{} {}, {}", key, resident.at.x, resident.at.y),
@@ -946,7 +1028,7 @@ fn check_placed(
                     );
                 } else if let Some(door) = in_warp(resident.at) {
                     check.error(
-                        format!("{pointer}/at"),
+                        site("/at"),
                         "in a warp object",
                         format!(
                             "{key} {}, {} inside object {door}",
@@ -964,9 +1046,9 @@ fn check_placed(
                 };
                 if !has_ground {
                     check.error(
-                        pointer.clone(),
+                        site(""),
                         "no wild ground",
-                        format!("{} in {}", population.npc.key(content), id.key(content)),
+                        format!("{} in {}", population.npc.path(content), id.path(content)),
                         "a walkable cell outside every safe zone to spawn on",
                     );
                 }
@@ -975,7 +1057,7 @@ fn check_placed(
         }
     }
     for (index, (object_index, object, name)) in warps.iter().enumerate() {
-        let pointer = format!("/modules/{}", modules[*object_index as usize].origin);
+        let pointer = module_pointer(&modules[*object_index as usize], "");
         let covered = object
             .shape
             .bounds()
@@ -1011,7 +1093,7 @@ pub fn check_place(content: &Content, place: script::Place) -> Result<(), Conten
     else {
         return Ok(());
     };
-    let key = place.area.key(content);
+    let key = place.area.path(content);
     let warps = warp_objects(content, place.area);
     let problem = |rule: &'static str, found: String| {
         let nearest = area
@@ -1042,34 +1124,9 @@ pub fn check_place(content: &Content, place: script::Place) -> Result<(), Conten
                     "{key} {}, {} inside object {}",
                     place.at.x,
                     place.at.y,
-                    object.title(index)
+                    object.display_name(index)
                 ),
             ));
-        }
-    }
-    Ok(())
-}
-
-fn write_grids(content: &Content, writer: &mut FileWriter) -> io::Result<()> {
-    let grids = content.built::<AreaGridSet>();
-    for (id, _) in content.table::<AreaDef>().iter() {
-        let Some(grids) = grids.0[id.index()].as_ref() else {
-            continue;
-        };
-        let folder = grid::folder(id.key(content));
-        writer.file(
-            &format!("{folder}/{}", grid::PALETTE_FILE),
-            grids.write_palette().as_bytes(),
-        )?;
-        writer.file(
-            &format!("{folder}/{}", grid::WALK_FILE),
-            grids.write_walk().as_bytes(),
-        )?;
-        for layer in &grids.ground {
-            writer.file(
-                &format!("{folder}/{}", grid::layer_file(&layer.name)),
-                grids.write_layer(layer).as_bytes(),
-            )?;
         }
     }
     Ok(())

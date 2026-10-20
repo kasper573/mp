@@ -1,0 +1,11 @@
+{
+  "role": "sound-and-voice/sfx_role/combat.sfx_role.json",
+  "volume": {
+    "min": 0.45,
+    "max": 0.55
+  },
+  "pitch": {
+    "min": 0.95,
+    "max": 1.05
+  }
+}

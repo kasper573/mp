@@ -8,7 +8,7 @@ use engine::systems::npc::body::{self, Act, Priority};
 use engine::systems::script::{EventKind, Owner, RiftInstances};
 use engine::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
-use testkit::{Sim, labels};
+use testkit::{Sim, labels, path};
 
 use crate::game::{field, health, module, scripted_npc, spawn};
 
@@ -171,8 +171,8 @@ fn interacted(next: &str) -> Value {
 
 fn remember(key: &str, next: Option<&str>) -> Value {
     match next {
-        Some(next) => json!({ "type": "remember", "memory": key, "next": next }),
-        None => json!({ "type": "remember", "memory": key }),
+        Some(next) => json!({ "type": "remember", "memory": path("memory", key), "next": next }),
+        None => json!({ "type": "remember", "memory": path("memory", key) }),
     }
 }
 
@@ -209,7 +209,7 @@ fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
 
     assert_eq!(
         found,
-        vec![("script/flow_random".to_owned(), "hello".to_owned())]
+        vec![(path("script", "flow_random"), "hello".to_owned())]
     );
 }
 
@@ -224,7 +224,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                 "hello": say("Pay up.", vec![("Pay.", Some("pay"))]),
                 "pay": {
                     "type": "items",
-                    "take": [{ "item": "gold", "count": 5 }],
+                    "take": [{ "item": "gold.item.json", "count": 5 }],
                     "done": "paid",
                     "refused": "broke"
                 },
@@ -236,11 +236,11 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
             "flow_notices",
             npc(json!({
                 "interacted": interacted("first"),
-                "first": { "type": "notify", "notification": "gulls" },
+                "first": { "type": "notify", "notification": "gulls.notification.json" },
                 "came_near": {
                     "type": "on", "event": "came_near", "within": 3.0, "by": "characters", "next": "second"
                 },
-                "second": { "type": "notify", "notification": "sails" },
+                "second": { "type": "notify", "notification": "sails.notification.json" },
             })),
         ),
         (
@@ -285,7 +285,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
                     "give": {
                         "type": "items",
                         "who": { "type": "local", "local": "nobody" },
-                        "give": [{ "item": "gold" }],
+                        "give": [{ "item": "gold.item.json" }],
                         "done": "gave",
                         "refused": "refused"
                     },

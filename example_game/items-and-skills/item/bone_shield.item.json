@@ -1,0 +1,30 @@
+{
+  "name": "Bone Shield",
+  "icon": "assets/icons/weapon_and_tool/wooden_shield.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_bone.sfx",
+    "trade": "sound-and-voice/sfx/trade_bone.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "offhand",
+    "requires": {
+      "type": "at_least",
+      "a": {
+        "type": "level"
+      },
+      "b": 2
+    }
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Ribs lashed to a plank. It creaks when struck, but it holds."
+    },
+    {
+      "type": "script",
+      "script": "items-and-skills/item/bone_shield_activated.script.json"
+    }
+  ]
+}

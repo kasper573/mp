@@ -1,0 +1,10 @@
+{
+  "name": "Rift",
+  "content_version": "4bf5d0d6",
+  "initial_spawn": {
+    "area": "world/area/island/island.area",
+    "x": 39.0,
+    "y": 29.0
+  },
+  "player": "characters/player/adventurer.player.json"
+}

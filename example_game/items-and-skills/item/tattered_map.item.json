@@ -1,0 +1,26 @@
+{
+  "name": "Tattered Map",
+  "icon": "assets/icons/misc/map.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_paper.sfx",
+    "trade": "sound-and-voice/sfx/trade_paper.sfx",
+    "drop": "sound-and-voice/sfx/landing01.sfx",
+    "use": "fixtures/interface/ui_page.sfx"
+  },
+  "kind": {
+    "type": "usable"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Wrapped in oilcloth and left by the tide. Someone inked a cross deep in the forest."
+    },
+    {
+      "type": "quest_item"
+    },
+    {
+      "type": "script",
+      "script": "items-and-skills/item/tattered_map_used.script.json"
+    }
+  ]
+}

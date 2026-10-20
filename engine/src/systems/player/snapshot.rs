@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentProblem, ContentRow, Loading, RowCheck, id, key_of, serial,
+    Content, ContentFile, ContentProblem, Loading, RowCheck, id, key_of, serial,
 };
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
@@ -64,9 +64,8 @@ pub struct CharacterSnapshot {
     pub start: CharacterStart,
 }
 
-impl ContentRow for CharacterSnapshot {
+impl ContentFile for CharacterSnapshot {
     const TABLE: &'static str = "test_character";
-    const SEES_ALL_ROWS: bool = true;
     const PICKED_FROM_TABLE: bool = true;
 }
 
@@ -392,7 +391,7 @@ fn check_start(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowC
         check.error(
             "/known_areas",
             "start not known",
-            start.area.key(content),
+            start.area.path(content),
             "the known areas to include the start's area",
         );
     }
@@ -420,7 +419,7 @@ fn check_bag(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowChe
             check.error(
                 format!("/bag/{index}/count"),
                 "bag too full",
-                format!("{} {} in one slot", stack.count, stack.item.key(content)),
+                format!("{} {} in one slot", stack.count, stack.item.path(content)),
                 format!("a stack of at most {max}"),
             );
         }
@@ -438,7 +437,7 @@ fn check_equipment(content: &Content, snapshot: &CharacterSnapshot, check: &mut 
             check.error(
                 format!("/equipment/{slot}"),
                 "not wearable",
-                format!("{} on {slot}", worn.key(content)),
+                format!("{} on {slot}", worn.path(content)),
                 format!("an item made for the {slot} slot"),
             );
         }
@@ -556,13 +555,13 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             HotbarEntry::Skill(skill) if !known.contains_key(&skill) => check.error(
                 format!("/hotbar/{index}/entry"),
                 "skill not known",
-                skill.key(content),
+                skill.path(content),
                 "a skill learned in the tree or granted by worn gear",
             ),
             HotbarEntry::Item(item) if !held(item) => check.error(
                 format!("/hotbar/{index}/entry"),
                 "item not held",
-                item.key(content),
+                item.path(content),
                 "an item in the bag or worn",
             ),
             _ => {}
@@ -573,14 +572,14 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             check.error(
                 "/basic_attack",
                 "skill not known",
-                skill.key(content),
+                skill.path(content),
                 "a skill learned in the tree or granted by worn gear",
             );
         } else if !skill.get(content).basic_attack {
             check.error(
                 "/basic_attack",
                 "not a basic attack",
-                skill.key(content),
+                skill.path(content),
                 "a skill flagged basic_attack",
             );
         }
@@ -597,7 +596,7 @@ fn check_quests(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             check.error(
                 format!("/quests/{index}/quest"),
                 "quest listed twice",
-                entry.quest.key(content),
+                entry.quest.path(content),
                 "each quest once",
             );
         }
@@ -645,7 +644,7 @@ fn check_memories(content: &Content, snapshot: &CharacterSnapshot, check: &mut R
                 format!(
                     "{}, the type of {}",
                     ty.name(),
-                    remembered.memory.key(content)
+                    remembered.memory.path(content)
                 ),
             );
         }
@@ -664,7 +663,7 @@ fn check_shops(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowC
                     format!(
                         "0 to {}, an offer of {}",
                         offers.saturating_sub(1),
-                        visited.shop.key(content)
+                        visited.shop.path(content)
                     ),
                 );
             }

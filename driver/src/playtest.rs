@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use engine::core::content::{GAME_FILE, row_file};
+use engine::core::content::{SETTINGS_FILE, fields_file};
 use engine::systems::launch;
 use engine::systems::script::Place;
 use serde_json::Value;
@@ -28,22 +28,38 @@ pub struct PlaytestSetup {
 
 /// A content file, and how a deploy changes it.
 pub struct DeployEdit<'a> {
-    file: String,
+    file: DeployFile,
     change: &'a dyn Fn(&mut Value),
+}
+
+enum DeployFile {
+    Settings,
+    Content { table: String, name: String },
 }
 
 impl<'a> DeployEdit<'a> {
     pub fn game(change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
         DeployEdit {
-            file: GAME_FILE.to_owned(),
+            file: DeployFile::Settings,
             change,
         }
     }
 
-    pub fn row(table: &str, key: &str, change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
+    /// An edit of the fields of the one content file of the type `table` named `name`.
+    pub fn file(table: &str, name: &str, change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
         DeployEdit {
-            file: row_file(table, key),
+            file: DeployFile::Content {
+                table: table.to_owned(),
+                name: name.to_owned(),
+            },
             change,
+        }
+    }
+
+    fn path(&self) -> String {
+        match &self.file {
+            DeployFile::Settings => SETTINGS_FILE.to_owned(),
+            DeployFile::Content { table, name } => fields_file(content::path_named(table, name)),
         }
     }
 }
@@ -115,7 +131,7 @@ impl Playtest {
             copy_folder(&self.content, &deployed);
         }
         for edit in edits {
-            let path = deployed.join(&edit.file);
+            let path = deployed.join(edit.path());
             let text = std::fs::read_to_string(&path).expect("a content file to deploy");
             let mut row: Value = serde_json::from_str(&text).expect("a content row");
             (edit.change)(&mut row);

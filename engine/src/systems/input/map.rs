@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, ContentRow, Fixture, serial};
+use crate::core::content::{Content, ContentFile, Fixture, serial};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -77,6 +77,7 @@ pub enum InputAction {
 
 impl Fixture for InputAction {
     type Row = InputDef;
+    const FOLDER: &'static str = "input";
     const WHOLE_TABLE: bool = true;
 
     fn locks(self) -> Vec<FixtureLock> {
@@ -148,7 +149,7 @@ pub struct InputDef {
     pub bindings: Vec<InputBinding>,
 }
 
-impl ContentRow for InputDef {
+impl ContentFile for InputDef {
     const TABLE: &'static str = "input";
 }
 

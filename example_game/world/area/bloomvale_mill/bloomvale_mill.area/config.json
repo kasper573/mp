@@ -1,0 +1,12 @@
+{
+  "name": "The windmill",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 14,
+        "height": 12
+      },
+      "tile": 16
+    }
+  }
+}

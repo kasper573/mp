@@ -16,7 +16,7 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, aiming, area_key, at_rest, clickable_point, in_warp, in_world, me_at_rest,
+    UiTarget, aiming, area_name, at_rest, clickable_point, in_warp, in_world, me_at_rest,
     object_named, open, passed_by, taken, townsperson, warp_named,
 };
 
@@ -323,7 +323,7 @@ impl Player {
     /// Into a marked spot of the area: a named object, or a townsperson's home.
     pub fn walk_into(&mut self, marker: &str, reach: Tiles) -> Pos<Tiles> {
         let seen = self.in_world();
-        let area = area_key(&seen).expect("the player is in an area");
+        let area = area_name(&seen).expect("the player is in an area");
         let at = marker_at(area, marker);
         let inside = |me: Pos<Tiles>| (me.x - at.x).abs().max((me.y - at.y).abs()) <= reach.0;
         self.travel_to(
@@ -432,7 +432,7 @@ impl Player {
 
     /// Heads for where `npc` roams, and ends once `done` holds.
     pub fn look_out(&mut self, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) -> Pos<Tiles> {
-        let area = area_key(&self.snapshot()).expect("an area");
+        let area = area_name(&self.snapshot()).expect("an area");
         let ground = hunting_ground(area, npc);
         self.look_for(&format!("{npc} in sight"), ground, done);
         ground

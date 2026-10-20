@@ -1,0 +1,19 @@
+{
+  "name": "Rally",
+  "layers": [
+    {
+      "type": "shader",
+      "shader": "visual-effects/vfx_shader/ring.vfx_shader",
+      "params": {
+        "color": [
+          255,
+          214,
+          92,
+          255
+        ],
+        "width": 0.2
+      },
+      "duration": 0.6
+    }
+  ]
+}

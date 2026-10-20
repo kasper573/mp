@@ -42,7 +42,7 @@ impl AssetKind {
 
 macro_rules! asset_ref {
     ($name:ident, $kind:ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize)]
         #[serde(transparent)]
         pub struct $name(String);
 
@@ -52,7 +52,7 @@ macro_rules! asset_ref {
             }
 
             pub fn path(&self) -> String {
-                crate::core::content::asset_file(&self.0)
+                self.0.clone()
             }
 
             pub fn as_str(&self) -> &str {

@@ -590,7 +590,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                     .ok_or_else(|| {
                         ScriptFault::new(
                             "unknown task",
-                            format!("{} has no task {task}", quest.key(cx.content)),
+                            format!("{} has no task {task}", quest.path(cx.content)),
                         )
                     })?;
                 Box::new(move |world, cx| {
@@ -608,7 +608,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 if !quest.get(cx.content).daily() {
                     return Err(ScriptFault::new(
                         "never resets",
-                        format!("a daily quest, not {}", quest.key(cx.content)),
+                        format!("a daily quest, not {}", quest.path(cx.content)),
                     ));
                 }
                 let of = cx.actor(of.as_deref())?;

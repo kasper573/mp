@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
 use driver::{
-    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding,
+    Player, UiTarget, WaitBudget, area_name, area_named, carried, clickable_point, holding,
     input_name, nearest_npc, npc_is, resident_home, surrounded_by,
 };
 use engine::core::math::{Offset, Pos};
@@ -223,7 +223,7 @@ fn nearest_prey(snapshot: &ProbeSnapshot) -> Option<&ProbeBody> {
 }
 
 fn safe(snapshot: &ProbeSnapshot, at: Pos<Tiles>) -> bool {
-    area_key(snapshot).is_some_and(|area| area_named(area).safe(at))
+    area_name(snapshot).is_some_and(|area| area_named(area).safe(at))
 }
 
 fn safe_here(snapshot: &ProbeSnapshot) -> bool {
@@ -233,7 +233,7 @@ fn safe_here(snapshot: &ProbeSnapshot) -> bool {
 // The ground in town nearest the player, a couple of tiles in from every edge.
 fn in_town(snapshot: &ProbeSnapshot) -> Pos<Tiles> {
     let me = snapshot.me.as_ref().expect("the player").at;
-    let area = area_named(area_key(snapshot).expect("an area"));
+    let area = area_named(area_name(snapshot).expect("an area"));
     let grid = &area.grid;
     let deep = |at: Pos<Tiles>| {
         [(-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)]

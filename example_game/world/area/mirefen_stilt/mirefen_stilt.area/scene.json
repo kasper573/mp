@@ -1,0 +1,412 @@
+[
+  {
+    "type": "ground_layer",
+    "name": "floor"
+  },
+  {
+    "type": "ground_layer",
+    "name": "walls"
+  },
+  {
+    "type": "ground_layer",
+    "name": "rug"
+  },
+  {
+    "type": "ground_layer",
+    "name": "decor"
+  },
+  {
+    "type": "object",
+    "name": "front-door",
+    "shape": {
+      "type": "rect",
+      "x": 4.5,
+      "y": 9.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/mirefen/mirefen.area",
+            "x": 41.0,
+            "y": 22.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "resident",
+    "npc": "world/area/mirefen_stilt/npcs/fisher_boy.npc.json",
+    "at": {
+      "x": 10.0,
+      "y": 7.0
+    }
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": -0.5,
+      "y": -0.5,
+      "w": 14.0,
+      "h": 12.0
+    },
+    "emit": 0.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/lapping_water.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 3.5,
+      "y": 2.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "emit": 2.0,
+    "channels": [
+      {
+        "channel": 4,
+        "file": "assets/audio/ambient/campfire.flac",
+        "volume": 0.22
+      }
+    ]
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.0,
+      "y": -0.625
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        1068,
+        1069,
+        1070,
+        1071
+      ],
+      [
+        1100,
+        1101,
+        1102,
+        1103
+      ],
+      [
+        1132,
+        1133,
+        1134,
+        1135
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "mirefen_stilt_props_68",
+    "blueprint": "world/area/mirefen_stilt/blueprints/mirefen_stilt_props_68.blueprint",
+    "at": {
+      "x": 8.0,
+      "y": 2.375
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        152,
+        153
+      ],
+      [
+        154,
+        155
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        16,
+        17
+      ],
+      [
+        18,
+        19
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 5.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        164,
+        165
+      ],
+      [
+        166,
+        167
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 9.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        104,
+        105
+      ],
+      [
+        106,
+        107
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 11.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        8,
+        9
+      ],
+      [
+        10,
+        11
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 4.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        240,
+        241
+      ],
+      [
+        242,
+        243
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 11.5,
+      "y": 4.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        58,
+        59
+      ],
+      [
+        60,
+        61
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 4.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        82
+      ],
+      [
+        83
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 5.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        236,
+        237
+      ],
+      [
+        238,
+        239
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        112,
+        113
+      ],
+      [
+        114,
+        115
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 7.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.5,
+      "y": 7.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        24,
+        25
+      ],
+      [
+        26,
+        27
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.5,
+      "y": 7.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        116,
+        117
+      ],
+      [
+        118,
+        119
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 9.5,
+      "y": 7.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        12,
+        13
+      ],
+      [
+        14,
+        15
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 11.5,
+      "y": 7.5
+    },
+    "tileset": "world/area/mirefen_stilt/tilesets/mirefen_stilt_furniture.tileset",
+    "tiles": [
+      [
+        144,
+        145
+      ],
+      [
+        146,
+        147
+      ]
+    ],
+    "sort": 1.0
+  }
+]

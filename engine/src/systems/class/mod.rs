@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, Loading, RowCheck};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::notification;
@@ -75,7 +75,7 @@ impl ClassDef {
     }
 }
 
-impl ContentRow for ClassDef {
+impl ContentFile for ClassDef {
     const TABLE: &'static str = "class";
 
     fn check(&self, check: &mut RowCheck) {
@@ -235,7 +235,7 @@ pub fn check_all(loading: &mut Loading) {
                 check.error(
                     format!("/tree/{key}/skill"),
                     "no ranks",
-                    node.skill.key(&content),
+                    node.skill.path(&content),
                     "a skill with at least one rank",
                 );
             }

@@ -9,7 +9,7 @@ use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::reach::{self, ReachAct, ReachTarget, Tether};
 use engine::systems::skill::SkillDef;
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {
@@ -141,7 +141,7 @@ fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
 
 fn bones(world: &World, player: Entity) -> u32 {
     let content = world.resource::<engine::core::content::Content>();
-    let bone = content.by_key::<ItemDef>("bone").expect("bones");
+    let bone = content.declared::<ItemDef>("bone").expect("bones");
     world
         .get::<Inventory>(player)
         .map_or(0, |inventory| inventory.count(bone))

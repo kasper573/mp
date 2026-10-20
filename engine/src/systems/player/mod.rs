@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snapshot::{CharacterSnapshot, JoinAs};
 
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rgba, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
@@ -127,7 +127,7 @@ pub struct PlayerDef {
     pub modules: Vec<PlayerModule>,
 }
 
-impl ContentRow for PlayerDef {
+impl ContentFile for PlayerDef {
     const TABLE: &'static str = "player";
 }
 

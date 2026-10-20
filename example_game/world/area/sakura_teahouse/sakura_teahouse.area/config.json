@@ -1,0 +1,12 @@
+{
+  "name": "The teahouse",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 18,
+        "height": 14
+      },
+      "tile": 16
+    }
+  }
+}

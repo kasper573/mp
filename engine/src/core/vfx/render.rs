@@ -810,7 +810,7 @@ fn load_shaders(
         .0
         .iter()
         .map(|(id, source)| {
-            let path = format!("vfx_shader/{}-{generation}.wgsl", id.key(&content));
+            let path = format!("vfx_shader/{}-{generation}.wgsl", id.path(&content));
             (*id, assets.add(Shader::from_wgsl(source.clone(), path)))
         })
         .collect();

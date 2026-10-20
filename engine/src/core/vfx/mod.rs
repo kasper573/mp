@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::ImageRef;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck, serial,
+    ContentFile, ContentId, ContentRegistry, LoadStep, Loading, RowCheck, serial,
 };
 use crate::core::geometry::{Footprint, Radians};
 use crate::core::math::{FrameSize, Pos, Rgba};
@@ -36,8 +36,8 @@ pub const LONGEST_RUN: Seconds = Seconds(60.0);
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
-        .row::<VfxDef>()
-        .row::<VfxShaderDef>()
+        .file::<VfxDef>()
+        .bundle::<VfxShaderDef>()
         .hook(LoadStep::Files, shader::compile_all)
         .hook(LoadStep::Across, check_all);
 }
@@ -242,7 +242,7 @@ impl VfxDef {
     }
 }
 
-impl ContentRow for VfxDef {
+impl ContentFile for VfxDef {
     const TABLE: &'static str = "vfx";
 
     fn check(&self, check: &mut RowCheck) {

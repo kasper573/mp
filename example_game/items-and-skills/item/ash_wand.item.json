@@ -1,0 +1,30 @@
+{
+  "name": "Ash Wand",
+  "icon": "assets/icons/weapon_and_tool/magic_wand.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_stone.sfx",
+    "trade": "sound-and-voice/sfx/trade_stone.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon",
+    "requires": {
+      "type": "is_class",
+      "class": "characters/class/mage.class.json"
+    },
+    "grants": [
+      "items-and-skills/item/spark.skill.json"
+    ]
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Ash cut in a storm. It remembers the lightning."
+    },
+    {
+      "type": "script",
+      "script": "items-and-skills/item/ash_wand_activated.script.json"
+    }
+  ]
+}

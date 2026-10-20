@@ -1,0 +1,286 @@
+[
+  {
+    "type": "ground_layer",
+    "name": "floor"
+  },
+  {
+    "type": "ground_layer",
+    "name": "walls"
+  },
+  {
+    "type": "ground_layer",
+    "name": "rug"
+  },
+  {
+    "type": "ground_layer",
+    "name": "decor"
+  },
+  {
+    "type": "object",
+    "name": "front-door",
+    "shape": {
+      "type": "rect",
+      "x": 7.5,
+      "y": 12.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/emberfall/emberfall.area",
+            "x": 50.5,
+            "y": 30.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "resident",
+    "npc": "world/area/emberfall_shrine/npcs/fire_priestess.npc.json",
+    "at": {
+      "x": 9.0,
+      "y": 6.0
+    }
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 5.5,
+      "y": 2.5,
+      "w": 6.0,
+      "h": 4.0
+    },
+    "emit": 3.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/campfire.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_props_69",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_props_69.blueprint",
+    "at": {
+      "x": 5.0,
+      "y": 1.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_props_65",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_props_65.blueprint",
+    "at": {
+      "x": 8.0,
+      "y": 1.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2.blueprint",
+    "at": {
+      "x": 3.5,
+      "y": 2.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_1x2",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_1x2.blueprint",
+    "at": {
+      "x": 5.5,
+      "y": 2.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_1x2 (1)",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_1x2.blueprint",
+    "at": {
+      "x": 10.5,
+      "y": 2.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2 (1)",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2.blueprint",
+    "at": {
+      "x": 11.5,
+      "y": 2.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 14.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        100,
+        101
+      ],
+      [
+        102,
+        103
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 14.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        286,
+        287
+      ]
+    ],
+    "sort": 0.0
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2_2",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2_2.blueprint",
+    "at": {
+      "x": 2.5,
+      "y": 6.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2_2 (1)",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2_2.blueprint",
+    "at": {
+      "x": 11.5,
+      "y": 6.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 14.5,
+      "y": 6.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        26,
+        27
+      ],
+      [
+        28,
+        29
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 8.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        228,
+        229
+      ],
+      [
+        230,
+        231
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2_2 (2)",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2_2.blueprint",
+    "at": {
+      "x": 2.5,
+      "y": 9.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "emberfall_shrine_furniture_2x2_2 (3)",
+    "blueprint": "world/area/emberfall_shrine/blueprints/emberfall_shrine_furniture_2x2_2.blueprint",
+    "at": {
+      "x": 11.5,
+      "y": 9.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 10.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        104,
+        105
+      ],
+      [
+        106,
+        107
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 4.5,
+      "y": 10.5
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        38,
+        39
+      ],
+      [
+        40,
+        41
+      ]
+    ],
+    "sort": 1.0
+  }
+]

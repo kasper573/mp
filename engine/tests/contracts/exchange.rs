@@ -2,7 +2,7 @@ use engine::core::content::Content;
 use engine::systems::item::effects::move_between;
 use engine::systems::item::{ExchangeRefusal, Inventory, ItemDef, ItemId, ItemStack};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 #[test]
 fn moving_items_onto_the_same_character_changes_nothing() {
@@ -149,7 +149,7 @@ fn goods() -> Game {
 }
 
 fn items<const N: usize>(content: &Content, keys: [&str; N]) -> [ItemId; N] {
-    keys.map(|key| content.by_key::<ItemDef>(key).expect("a declared item"))
+    keys.map(|key| content.declared::<ItemDef>(key).expect("a declared item"))
 }
 
 fn bag(max: u32, slots: &[ItemStack]) -> Inventory {

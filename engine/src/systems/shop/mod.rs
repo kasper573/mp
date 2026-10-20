@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, serial,
 };
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -41,7 +41,7 @@ pub struct ShopDef {
     pub modules: Vec<ShopModule>,
 }
 
-impl ContentRow for ShopDef {
+impl ContentFile for ShopDef {
     const TABLE: &'static str = "shop";
 }
 
@@ -431,8 +431,8 @@ pub fn check_all(loading: &mut Loading) {
                             "shop loses money",
                             format!(
                                 "{}: {} buys {} for {}, sold for {}",
-                                offer.item.key(&content),
-                                buyer.key(&content),
+                                offer.item.path(&content),
+                                buyer.path(&content),
                                 offer.count,
                                 stacks_text(&content, pays, offer.count),
                                 stacks_text(&content, &offer.price, 1)
@@ -453,7 +453,7 @@ fn stacks_text(content: &Content, stacks: &[ItemStack], times: u32) -> String {
             format!(
                 "{} {}",
                 stack.count.saturating_mul(times),
-                stack.item.key(content)
+                stack.item.path(content)
             )
         })
         .collect();

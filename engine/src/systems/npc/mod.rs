@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{
-    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
+    Content, ContentFile, ContentId, Loading, ModuleRule, ModuleSet, RowCheck, serial,
 };
 use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{CellPos, TilePos, Tiles};
@@ -112,7 +112,7 @@ pub struct NpcSkill {
     pub rank: Rank,
 }
 
-impl ContentRow for NpcDef {
+impl ContentFile for NpcDef {
     const TABLE: &'static str = "npc";
 
     fn check(&self, check: &mut RowCheck) {

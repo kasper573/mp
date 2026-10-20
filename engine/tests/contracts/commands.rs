@@ -45,16 +45,15 @@ fn camp() -> (Sim, Entity) {
             "potion",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "script", "script": "potion_drink" }],
+                "modules": [{ "type": "script", "script": "potion_drink.script.json" }],
             }),
         )
         .script(
             "potion_drink",
-            "item/potion",
             "item",
             json!({
                 "used": { "type": "on", "event": "used", "next": "drink" },
-                "drink": { "type": "items", "take": [{ "item": "potion" }], "done": "mend" },
+                "drink": { "type": "items", "take": [{ "item": "potion.item.json" }], "done": "mend" },
                 "mend": { "type": "heal", "by": 25.0 },
             }),
         )

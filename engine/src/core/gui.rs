@@ -11,7 +11,6 @@ use egui::{LayerId, Order};
 use strum::VariantArray;
 
 use crate::core::assets::ImageRef;
-use crate::core::content::asset_of;
 
 /// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -277,7 +276,7 @@ pub fn image_file(world: &mut World, file: &str) -> Option<GuiImage> {
     Some(GuiImage {
         texture: texture.id(),
         size: texture.size_vec2(),
-        path: asset_of(file).to_owned(),
+        path: file.to_owned(),
     })
 }
 

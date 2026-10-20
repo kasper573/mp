@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial};
+use crate::core::content::locate::escape;
+use crate::core::content::{ContentFile, ContentProblem, Fixture, Loading, RowCheck, serial};
 use crate::core::math::Pos;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
@@ -14,6 +15,8 @@ pub enum WorldMap {
 
 impl Fixture for WorldMap {
     type Row = WorldMapDef;
+    const FOLDER: &'static str = "area";
+    const WHOLE_TABLE: bool = true;
 }
 
 pub const MIN_SIZE: u32 = 10;
@@ -31,9 +34,8 @@ pub struct WorldMapDef {
     pub notes: Vec<Note>,
 }
 
-impl ContentRow for WorldMapDef {
+impl ContentFile for WorldMapDef {
     const TABLE: &'static str = "world_map";
-    const SEES_ALL_ROWS: bool = true;
 
     fn check(&self, cx: &mut RowCheck) {
         let mut placed: Vec<&super::AreaId> = Vec::new();
@@ -117,7 +119,7 @@ pub fn check_all(loading: &mut Loading) {
             if !(MIN_SIZE..=MAX_SIZE).contains(&card.size) {
                 loading.row_error(
                     id,
-                    &format!("/cards/{}/size", area.key(&content)),
+                    &format!("/cards/{}/size", escape(area.path(&content))),
                     ContentProblem::new(
                         "out of range",
                         card.size,
@@ -125,22 +127,6 @@ pub fn check_all(loading: &mut Loading) {
                     ),
                 );
             }
-        }
-    }
-    let only = WorldMap::World.key();
-    for id in content.ids::<WorldMapDef>() {
-        let key = id.key(&content);
-        if key != only {
-            loading.row_error(
-                id,
-                "",
-                ContentProblem::new(
-                    "wrong key",
-                    format!("world_map/{key}"),
-                    format!("one world_map row, the {only} fixture"),
-                )
-                .near(Some(format!("{only:?}"))),
-            );
         }
     }
 }

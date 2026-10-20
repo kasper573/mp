@@ -7,7 +7,8 @@ use strum::{IntoStaticStr, VariantArray};
 
 use super::ParamValue;
 use crate::core::content::{
-    ContentId, ContentProblem, ContentRow, ErrorPlace, Loading, RowCheck, asset_file,
+    Bundle, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading, PartSpec,
+    Parts, RowCheck, Shape,
 };
 use crate::core::math::Rgba;
 
@@ -16,7 +17,7 @@ pub type VfxShaderId = ContentId<VfxShaderDef>;
 /// The bytes the parameter uniform spans, however few parameters a shader declares.
 pub const PARAMS_BYTES: usize = 128;
 
-/// A shader a game ships: the WGSL file at `shader_file(key)` defining
+/// A shader a game ships: the WGSL part of its bundle, `shader.wgsl`, defining
 /// `fn vfx(uv: vec2<f32>) -> vec4<f32>`, and the parameters it reads from `params`, each with the
 /// default it gets when a layer leaves it unfilled and, for a number, the range the designer means
 /// it to be set within. A flag is `true` or `false` in the data and 0.0 or 1.0 in the shader.
@@ -28,9 +29,26 @@ pub struct VfxShaderDef {
     pub params: Vec<ShaderParam>,
 }
 
-/// Where a shader row's WGSL lives: beside the other assets, named after the row.
-pub fn shader_file(key: &str) -> String {
-    asset_file(&format!("shaders/{key}.wgsl"))
+pub const SHADER_SOURCE: PartSpec = PartSpec::File {
+    name: "shader",
+    exts: &["wgsl"],
+};
+
+/// Where the WGSL of the shader bundle at `path` lives.
+pub fn shader_file(path: &str) -> String {
+    format!("{path}/shader.wgsl")
+}
+
+impl Bundle for VfxShaderDef {
+    const PARTS: &'static [PartSpec] = &[SHADER_SOURCE];
+
+    fn read_parts(&mut self, parts: &mut Parts) {
+        parts.required(SHADER_SOURCE);
+    }
+
+    fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -221,8 +239,9 @@ pub fn prelude_names() -> Vec<String> {
     names
 }
 
-impl ContentRow for VfxShaderDef {
+impl ContentFile for VfxShaderDef {
     const TABLE: &'static str = "vfx_shader";
+    const SHAPE: Shape = Shape::Bundle;
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
@@ -337,7 +356,7 @@ pub fn compile_all(loading: &mut Loading) {
     let content = loading.content();
     let mut compiled = HashMap::new();
     for (id, def) in loading.rows::<VfxShaderDef>(&content) {
-        let file = shader_file(id.key(&content));
+        let file = shader_file(id.path(&content));
         let source = match loading.read_text(&file) {
             Ok(source) => source,
             Err(_) => {

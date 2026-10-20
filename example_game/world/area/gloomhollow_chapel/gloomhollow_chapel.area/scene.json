@@ -1,0 +1,402 @@
+[
+  {
+    "type": "ground_layer",
+    "name": "floor"
+  },
+  {
+    "type": "ground_layer",
+    "name": "walls"
+  },
+  {
+    "type": "ground_layer",
+    "name": "rug"
+  },
+  {
+    "type": "ground_layer",
+    "name": "decor"
+  },
+  {
+    "type": "object",
+    "name": "nave-door",
+    "shape": {
+      "type": "rect",
+      "x": 6.5,
+      "y": 13.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/gloomhollow/gloomhollow.area",
+            "x": 23.5,
+            "y": 23.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "quarters-door",
+    "shape": {
+      "type": "rect",
+      "x": 16.5,
+      "y": 13.5,
+      "w": 2.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/gloomhollow/gloomhollow.area",
+            "x": 26.5,
+            "y": 23.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "resident",
+    "npc": "world/area/gloomhollow_chapel/npcs/gravedigger.npc.json",
+    "at": {
+      "x": 12.0,
+      "y": 12.0
+    }
+  },
+  {
+    "type": "resident",
+    "npc": "world/area/gloomhollow_chapel/npcs/priest.npc.json",
+    "at": {
+      "x": 19.0,
+      "y": 8.0
+    }
+  },
+  {
+    "type": "safe_zone",
+    "rect": {
+      "x": 0.5,
+      "y": 2.5,
+      "w": 22.0,
+      "h": 11.0
+    }
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 0.5,
+      "y": 2.5,
+      "w": 14.0,
+      "h": 11.0
+    },
+    "emit": 4.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/stone_hum.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 16.5,
+      "y": 2.5,
+      "w": 3.0,
+      "h": 3.0
+    },
+    "emit": 3.0,
+    "channels": [
+      {
+        "channel": 4,
+        "file": "assets/audio/ambient/campfire.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_5",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_5.blueprint",
+    "at": {
+      "x": 4.0,
+      "y": 0.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_5 (1)",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_5.blueprint",
+    "at": {
+      "x": 7.0,
+      "y": 0.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_25",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_25.blueprint",
+    "at": {
+      "x": 19.0,
+      "y": 0.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_3",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_3.blueprint",
+    "at": {
+      "x": 11.1,
+      "y": 0.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_45",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_45.blueprint",
+    "at": {
+      "x": 17.0,
+      "y": 0.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_4",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_4.blueprint",
+    "at": {
+      "x": 8.5,
+      "y": 1.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_58",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_58.blueprint",
+    "at": {
+      "x": 17.0,
+      "y": 2.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_90",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_90.blueprint",
+    "at": {
+      "x": 17.0,
+      "y": 3.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_30",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_30.blueprint",
+    "at": {
+      "x": 19.9,
+      "y": 5.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_81",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_81.blueprint",
+    "at": {
+      "x": 11.0,
+      "y": 8.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_27",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_27.blueprint",
+    "at": {
+      "x": 4.0,
+      "y": 9.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_35",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_35.blueprint",
+    "at": {
+      "x": 2.3,
+      "y": 9.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_20",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_20.blueprint",
+    "at": {
+      "x": 8.1,
+      "y": 9.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_props_211",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_props_211.blueprint",
+    "at": {
+      "x": 11.4,
+      "y": 9.4
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        8,
+        9
+      ],
+      [
+        10,
+        11
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 6.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        4,
+        5
+      ],
+      [
+        6,
+        7
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 16.5,
+      "y": 2.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        466,
+        467
+      ],
+      [
+        468,
+        469
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_furniture_4x6",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_furniture_4x6.blueprint",
+    "at": {
+      "x": 1.5,
+      "y": 5.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "gloomhollow_chapel_furniture_4x6 (1)",
+    "blueprint": "world/area/gloomhollow_chapel/blueprints/gloomhollow_chapel_furniture_4x6.blueprint",
+    "at": {
+      "x": 9.5,
+      "y": 5.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 16.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        182,
+        183
+      ],
+      [
+        184,
+        185
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.5,
+      "y": 5.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        228,
+        229
+      ],
+      [
+        230,
+        231
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 16.5,
+      "y": 8.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        178,
+        179
+      ],
+      [
+        180,
+        181
+      ]
+    ],
+    "sort": 1.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.5,
+      "y": 10.5
+    },
+    "tileset": "world/area/gloomhollow_chapel/tilesets/gloomhollow_chapel_furniture.tileset",
+    "tiles": [
+      [
+        104,
+        105
+      ],
+      [
+        106,
+        107
+      ]
+    ],
+    "sort": 1.0
+  }
+]

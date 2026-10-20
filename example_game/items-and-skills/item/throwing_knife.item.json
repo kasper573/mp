@@ -1,0 +1,22 @@
+{
+  "name": "Throwing Knife",
+  "icon": "assets/icons/weapon_and_tool/knife.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_blade.sfx",
+    "trade": "sound-and-voice/sfx/trade_blade.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Balanced for the hand, not the belt."
+    },
+    {
+      "type": "stack",
+      "max": 20
+    }
+  ]
+}

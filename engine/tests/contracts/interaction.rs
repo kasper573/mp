@@ -4,7 +4,7 @@ use engine::systems::interact::{self, InteractRequest};
 use engine::systems::player::commands_locked;
 use engine::systems::{area, movement, script};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 const DAY: u64 = 24 * 3_600_000;
 
@@ -80,7 +80,6 @@ fn beach() -> Sim {
         )
         .script(
             "board_read",
-            "area/beach",
             "object",
             json!({
                 "interacted": { "type": "on", "event": "interacted", "verb": "read", "reach": 1.5, "next": "read" },
@@ -89,22 +88,21 @@ fn beach() -> Sim {
         )
         .script(
             "chest_open",
-            "area/beach",
             "object",
             json!({
                 "interacted": { "type": "on", "event": "interacted", "verb": "open", "reach": 1.5, "next": "looted" },
                 "looted": {
                     "type": "if",
-                    "test": { "type": "memory", "memory": "chest_looted" },
+                    "test": { "type": "memory", "memory": "chest_looted.memory.json" },
                     "yes": "empty",
                     "no": "loot",
                 },
                 "loot": {
                     "type": "items",
-                    "give": [{ "item": "gold", "count": 5 }],
+                    "give": [{ "item": "gold.item.json", "count": 5 }],
                     "done": "remember",
                 },
-                "remember": { "type": "remember", "memory": "chest_looted", "next": "found" },
+                "remember": { "type": "remember", "memory": "chest_looted.memory.json", "next": "found" },
                 "found": said("Five coins glint in the sand."),
                 "empty": said("Only sand."),
             }),
@@ -142,10 +140,10 @@ fn object(name: &str, x: f32, y: f32, script: &str) -> Value {
     json!({
         "type": "object",
         "name": name,
-        "label": name,
+        "title": name,
         "shape": { "type": "point", "x": x, "y": y },
         "look": "objects/look.png",
-        "scripts": [{ "script": script }],
+        "scripts": [{ "script": path("script", script) }],
     })
 }
 

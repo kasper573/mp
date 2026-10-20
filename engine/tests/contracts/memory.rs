@@ -6,7 +6,7 @@ use engine::systems::area::transition::{self, Crossing};
 use engine::systems::memory::{self, Memory, MemoryDef, MemoryId};
 use engine::systems::movement::position;
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 const HOUR: u64 = 3_600_000;
 
@@ -129,7 +129,9 @@ fn memories() -> Game {
 }
 
 fn id(content: &Content, key: &str) -> MemoryId {
-    content.by_key::<MemoryDef>(key).expect("a declared memory")
+    content
+        .declared::<MemoryDef>(key)
+        .expect("a declared memory")
 }
 
 fn at(millis: u64) -> WallClock {

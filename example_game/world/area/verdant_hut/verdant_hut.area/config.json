@@ -1,0 +1,12 @@
+{
+  "name": "The shaman's hut",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 16,
+        "height": 12
+      },
+      "tile": 16
+    }
+  }
+}

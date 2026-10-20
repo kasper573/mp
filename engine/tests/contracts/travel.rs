@@ -248,24 +248,23 @@ fn harbour() -> Sim {
             "harbour",
             &Map::open(20, 12),
             json!([
-                { "type": "resident", "npc": "warden", "at": { "x": 11.0, "y": 3.0 } },
-                { "type": "resident", "npc": "ferryman", "at": { "x": 4.0, "y": 9.0 } },
+                { "type": "resident", "npc": "warden.npc.json", "at": { "x": 11.0, "y": 3.0 } },
+                { "type": "resident", "npc": "ferryman.npc.json", "at": { "x": 4.0, "y": 9.0 } },
                 {
                     "type": "object",
                     "name": "road",
                     "shape": { "type": "rect", "x": 12.5, "y": 5.5, "w": 1.0, "h": 1.0 },
-                    "scripts": [{ "script": "road_pass" }],
+                    "scripts": [{ "script": "road_pass.script.json" }],
                 },
             ]),
         )
         .script(
             "road_pass",
-            "area/harbour",
             "object",
             json!({
                 "entered": { "type": "on", "event": "entered", "by": "characters", "next": "pass" },
                 "pass": { "type": "if", "test": holding_pass(), "yes": "cross" },
-                "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
+                "cross": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 3.0 } },
             }),
         )
         .area("forest", &Map::open(8, 8), json!([]))
@@ -273,10 +272,10 @@ fn harbour() -> Sim {
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }))
         .item("pass", stacked())
         .item("fish", stacked())
-        .npc("warden", 40.0, json!([{ "type": "script", "script": "warden_talk" }]))
-        .script("warden_talk", "npc/warden", "npc", warden())
-        .npc("ferryman", 40.0, json!([{ "type": "script", "script": "ferryman_talk" }]))
-        .script("ferryman_talk", "npc/ferryman", "npc", ferryman())
+        .npc("warden", 40.0, json!([{ "type": "script", "script": "warden_talk.script.json" }]))
+        .script("warden_talk", "npc", warden())
+        .npc("ferryman", 40.0, json!([{ "type": "script", "script": "ferryman_talk.script.json" }]))
+        .script("ferryman_talk", "npc", ferryman())
         .row(
             "memory",
             "sided",
@@ -286,7 +285,7 @@ fn harbour() -> Sim {
             "notification",
             "sails",
             json!({
-                "kind": { "type": "narration", "label": "The ferry", "sfx": "hull" },
+                "kind": { "type": "narration", "label": "The ferry", "sfx": "hull.sfx" },
                 "text": ["The ferry scrapes onto the forest shore."],
             }),
         )
@@ -353,19 +352,19 @@ fn warden() -> Value {
                 { "label": ["Would a fish change your mind?"], "reveal": ["costs"], "to": "fish_for_pass" },
                 {
                     "label": ["The clan walks with me."],
-                    "requires": { "type": "memory", "memory": "sided" },
+                    "requires": { "type": "memory", "memory": "sided.memory.json" },
                     "to": "clan_pass",
                 },
                 { "label": ["Goodbye."] },
             ])),
-            "earn_pass": { "type": "items", "give": [{ "item": "pass" }], "done": "lets_you_pass" },
+            "earn_pass": { "type": "items", "give": [{ "item": "pass.item.json" }], "done": "lets_you_pass" },
             "fish_for_pass": {
                 "type": "items",
-                "take": [{ "item": "fish" }],
-                "give": [{ "item": "pass" }],
+                "take": [{ "item": "fish.item.json" }],
+                "give": [{ "item": "pass.item.json" }],
                 "done": "fish",
             },
-            "clan_pass": { "type": "items", "give": [{ "item": "pass" }], "done": "uneasy" },
+            "clan_pass": { "type": "items", "give": [{ "item": "pass.item.json" }], "done": "uneasy" },
             "lets_you_pass": said("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
             "fish": said("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
             "uneasy": said("Then go.", json!([{ "label": ["Thank you."] }])),
@@ -389,14 +388,14 @@ fn ferryman() -> Value {
                     { "label": ["Goodbye."] },
                 ],
             },
-            "fare": { "type": "items", "take": [{ "item": "gold", "count": 20 }], "done": "sail" },
-            "sail": { "type": "notify", "notification": "sails", "next": "cross" },
-            "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
+            "fare": { "type": "items", "take": [{ "item": "gold.item.json", "count": 20 }], "done": "sail" },
+            "sail": { "type": "notify", "notification": "sails.notification.json", "next": "cross" },
+            "cross": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 3.0 } },
     })
 }
 
 fn holding_pass() -> Value {
-    json!({ "type": "at_least", "a": { "type": "holding", "item": "pass" }, "b": 1 })
+    json!({ "type": "at_least", "a": { "type": "holding", "item": "pass.item.json" }, "b": 1 })
 }
 
 /// A client joined but has not yet drawn the area it arrived in.

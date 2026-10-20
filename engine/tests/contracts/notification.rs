@@ -18,7 +18,7 @@ use engine::systems::status::{self, StatusEffectDef};
 use engine::systems::text::LineText;
 use engine::systems::{actor, belongings, class, script, stat, vfx};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 const BESIDE_PIER: Pos<Tiles> = Pos::new(8.0, 6.0);
 const ON_PIER: Pos<Tiles> = Pos::new(10.0, 6.0);
@@ -340,35 +340,34 @@ fn game() -> Content {
     let intro = |notice: &str| {
         json!({
             "discovered": { "type": "on", "event": "discovered", "next": "intro" },
-            "intro": { "type": "notify", "notification": notice },
+            "intro": { "type": "notify", "notification": path("notification", notice) },
         })
     };
     let island_modules = json!([
-        { "type": "script", "script": "island_intro" },
-        { "type": "resident", "npc": "talker", "at": { "x": 2.0, "y": 2.0 } },
+        { "type": "script", "script": "island_intro.script.json" },
+        { "type": "resident", "npc": "talker.npc.json", "at": { "x": 2.0, "y": 2.0 } },
         {
             "type": "object",
             "name": "pier",
             "shape": { "type": "rect", "x": 9.5, "y": 5.5, "w": 2.0, "h": 2.0 },
-            "scripts": [{ "script": "pier_gulls" }],
+            "scripts": [{ "script": "pier_gulls.script.json" }],
         },
     ]);
     Game::new()
         .area("island", &Map::open(12, 12), island_modules)
-        .script("island_intro", "area/island", "area", intro("island_intro"))
+        .script("island_intro", "area", intro("island_intro"))
         .script(
             "pier_gulls",
-            "area/island",
             "object",
             json!({
                 "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
-                "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls", "seconds": 600 }, "no": "remember" },
-                "remember": { "type": "remember", "memory": "heard_gulls", "next": "gulls" },
-                "gulls": { "type": "notify", "notification": "gulls" },
+                "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls.memory.json", "seconds": 600 }, "no": "remember" },
+                "remember": { "type": "remember", "memory": "heard_gulls.memory.json", "next": "gulls" },
+                "gulls": { "type": "notify", "notification": "gulls.notification.json" },
             }),
         )
-        .area("forest", &Map::open(8, 8), json!([{ "type": "script", "script": "forest_intro" }]))
-        .script("forest_intro", "area/forest", "area", intro("forest_intro"))
+        .area("forest", &Map::open(8, 8), json!([{ "type": "script", "script": "forest_intro.script.json" }]))
+        .script("forest_intro", "area", intro("forest_intro"))
         .hero("island", 3.0, 8.0)
         .edit("class", "hero", |hero| {
             hero["levels"] = json!([{ "xp": 0, "skill_points": 1 }, { "xp": 20 }])
@@ -376,11 +375,10 @@ fn game() -> Content {
         .npc(
             "talker",
             40.0,
-            json!([{ "type": "script", "script": "talker_talk" }]),
+            json!([{ "type": "script", "script": "talker_talk.script.json" }]),
         )
         .script(
             "talker_talk",
-            "npc/talker",
             "npc",
             json!({
                 "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
@@ -395,25 +393,24 @@ fn game() -> Content {
         .npc(
             "chief",
             40.0,
-            json!([{ "type": "voice", "babble": "chief" }, { "type": "script", "script": "chief_taunt" }]),
+            json!([{ "type": "voice", "babble": "chief.babble.json" }, { "type": "script", "script": "chief_taunt.script.json" }]),
         )
         .script(
             "chief_taunt",
-            "npc/chief",
             "npc",
             json!({
                 "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
                 "hunting_me": {
                     "type": "if",
                     "test": { "type": "all", "of": [
-                        { "type": "on_quest", "quest": "tusks" },
-                        { "type": "not", "of": { "type": "set_within", "memory": "taunted", "seconds": 120 } },
+                        { "type": "on_quest", "quest": "tusks.quest.json" },
+                        { "type": "not", "of": { "type": "set_within", "memory": "taunted.memory.json", "seconds": 120 } },
                     ] },
                     "yes": "taunted",
                 },
-                "taunted": { "type": "remember", "memory": "taunted", "next": "challenge" },
-                "challenge": { "type": "notify", "notification": "challenge", "next": "threat" },
-                "threat": { "type": "notify", "notification": "threat" },
+                "taunted": { "type": "remember", "memory": "taunted.memory.json", "next": "challenge" },
+                "challenge": { "type": "notify", "notification": "challenge.notification.json", "next": "threat" },
+                "threat": { "type": "notify", "notification": "threat.notification.json" },
             }),
         )
         .npc("dummy", 40.0, json!([]))
@@ -427,8 +424,8 @@ fn game() -> Content {
                 "blurb": "Bring tusks.",
                 "xp": 10,
                 "modules": [
-                    { "type": "hold", "item": "tusk", "count": 5 },
-                    { "type": "hand_in", "items": [{ "item": "tusk", "count": 5 }] },
+                    { "type": "hold", "item": "tusk.item.json", "count": 5 },
+                    { "type": "hand_in", "items": [{ "item": "tusk.item.json", "count": 5 }] },
                     { "type": "hand_over", "text": ["Here are your tusks."] },
                 ],
             }),
@@ -450,19 +447,19 @@ fn game() -> Content {
             "notification",
             "gulls",
             json!({
-                "kind": { "type": "narration", "label": "Gulls", "sfx": "gull_cries" },
+                "kind": { "type": "narration", "label": "Gulls", "sfx": "gull_cries.sfx" },
                 "text": ["Gulls squabble over a fish head."],
             }),
         )
         .row(
             "notification",
             "challenge",
-            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["WHO DARES?!"] }),
+            json!({ "kind": { "type": "speech", "speaker": "chief.npc.json" }, "text": ["WHO DARES?!"] }),
         )
         .row(
             "notification",
             "threat",
-            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["I'll grind your bones!"] }),
+            json!({ "kind": { "type": "speech", "speaker": "chief.npc.json" }, "text": ["I'll grind your bones!"] }),
         )
         .row("notification", "island_intro", intro_row("The island"))
         .row("notification", "forest_intro", intro_row("The forest"))
@@ -497,7 +494,7 @@ fn game() -> Content {
 
 fn intro_row(title: &str) -> serde_json::Value {
     json!({
-        "kind": { "type": "intro", "title": title, "tint": [143, 209, 139, 255], "motion": "pulse", "sfx": "drums" },
+        "kind": { "type": "intro", "title": title, "tint": [143, 209, 139, 255], "motion": "pulse", "sfx": "drums.sfx" },
         "text": ["Pines close in around you."],
         "lasts": 5.0,
     })

@@ -7,7 +7,7 @@ use engine::systems::movement::{self, MoveRequest, MoveSeq, position};
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::{actor, reach, script, skill, stat};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 const LAIR: Pos<Tiles> = Pos::new(1.0, 4.0);
 const DOORSTEP: Pos<Tiles> = Pos::new(4.0, 4.0);
@@ -15,7 +15,7 @@ const REFUGE: Pos<Tiles> = Pos::new(8.0, 4.0);
 
 #[test]
 fn wild_monsters_never_set_foot_in_a_safe_zone() {
-    let mut sim = border(json!([{ "type": "population", "npc": "wanderer", "count": 6 }]));
+    let mut sim = border(json!([{ "type": "population", "npc": "wanderer.npc.json", "count": 6 }]));
     npc::spawn_all(&mut sim.world);
     let monsters: Vec<Entity> = sim
         .world
@@ -136,11 +136,10 @@ fn border(modules: Value) -> Sim {
         .npc(
             "wanderer",
             25.0,
-            json!([{ "type": "script", "script": "wanderer_roam" }]),
+            json!([{ "type": "script", "script": "wanderer_roam.script.json" }]),
         )
         .script(
             "wanderer_roam",
-            "npc/wanderer",
             "npc",
             json!({
                 "spawned": { "type": "on", "event": "started", "next": "roam" },
@@ -151,11 +150,11 @@ fn border(modules: Value) -> Sim {
         .npc(
             "hunter",
             1_000.0,
-            json!([{ "type": "script", "script": "hunter_hunt" }]),
+            json!([{ "type": "script", "script": "hunter_hunt.script.json" }]),
         )
-        .owned("script", "hunter_hunt", "npc/hunter", hunting())
+        .row("script", "hunter_hunt", hunting())
         .edit("npc", "hunter", |hunter| {
-            hunter["basic_attack"] = json!("strike")
+            hunter["basic_attack"] = json!(path("skill", "strike"))
         })
         .npc("bat", 8.0, json!([]))
         .edit("model", "bat", |bat| {

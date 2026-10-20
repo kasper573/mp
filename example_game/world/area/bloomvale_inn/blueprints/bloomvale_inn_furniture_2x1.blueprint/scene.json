@@ -1,0 +1,17 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/bloomvale_inn/tilesets/bloomvale_inn_furniture.tileset",
+    "tiles": [
+      [
+        210,
+        211
+      ]
+    ],
+    "sort": 0.0
+  }
+]

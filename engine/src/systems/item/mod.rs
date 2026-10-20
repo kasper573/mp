@@ -19,7 +19,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
+use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
@@ -335,7 +335,7 @@ pub struct ItemDef {
     pub modules: Vec<ItemModule>,
 }
 
-impl ContentRow for ItemDef {
+impl ContentFile for ItemDef {
     const TABLE: &'static str = "item";
 }
 

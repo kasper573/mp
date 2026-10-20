@@ -36,7 +36,7 @@ pub struct ObjectDef {
     #[schemars(extend("x-name" = true))]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
+    pub title: Option<String>,
     pub shape: ObjectShape,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<ImageRef>,
@@ -47,10 +47,10 @@ pub struct ObjectDef {
 }
 
 impl ObjectDef {
-    pub fn title(&self, index: u32) -> String {
+    pub fn display_name(&self, index: u32) -> String {
         self.name
             .clone()
-            .or_else(|| self.label.clone())
+            .or_else(|| self.title.clone())
             .unwrap_or_else(|| format!("object {index}"))
     }
 }
@@ -200,7 +200,7 @@ impl ObjectShape {
 pub struct AreaObject {
     pub index: u32,
     pub name: Option<String>,
-    pub label: Option<String>,
+    pub title: Option<String>,
     pub shape: ObjectShape,
     pub look: Option<String>,
     pub warp: Option<Place>,
@@ -239,21 +239,21 @@ pub fn spawn_all(world: &mut World) {
             AreaObject {
                 index: index as u32,
                 name: object.name.clone(),
-                label: object.label.clone(),
+                title: object.title.clone(),
                 shape: object.shape,
                 look: object.look.as_ref().map(|look| look.path()),
                 warp,
             },
         ));
-        if object.look.is_some() || object.label.is_some() || interactive.is_some() {
+        if object.look.is_some() || object.title.is_some() || interactive.is_some() {
             entity.insert(bevy_replicon::prelude::Replicated);
         }
         if object.look.is_some() || interactive.is_some() {
             entity.insert(Hitbox { size: bounds.size });
         }
-        if let Some(label) = &object.label {
+        if let Some(title) = &object.title {
             entity.insert(ActorName {
-                name: label.clone(),
+                name: title.clone(),
             });
         }
         if let Some(interactive) = interactive {

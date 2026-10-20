@@ -1,50 +1,53 @@
 use std::collections::BTreeMap;
+use std::io;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::grid::Flip;
-use super::{AreaDef, AreaModule, ObjectShape};
+use super::grid::{AreaGrids, Flip, LayerGrid, PaletteEntry};
+use super::scene::{self, SCENE_FILE, SCENE_PARTS, Scene, SceneNode, module_json, scene_file};
+use super::{AreaId, AreaModule, ObjectShape, Tilemap};
 use crate::core::audio::soundscape::SoundscapeShape;
-use crate::core::content::id::{Leaf, nearest, read_aside};
+use crate::core::content::id::{Leaf, nearest, nearest_path};
+use crate::core::content::load::{ParseError, shape_problem};
 use crate::core::content::locate::escape;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, ContentScope, RowCheck, pointer_of, row_file,
-    serial, valid_key, with_content,
+    Bundle, CONFIG_FILE, Content, ContentFile, ContentId, ContentProblem, ContentScope, FileWriter,
+    PartSpec, Parts, RowCheck, Shape, serial, valid_key, with_content,
 };
-use crate::core::math::{Pos, Rect};
+use crate::core::math::{Pos, Rect, Size};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
-use crate::core::tiling::Tiles;
+use crate::core::tiling::{Cell, CellPos, GridDims, TilePos, Tiles};
 use crate::systems::script::{RiftScripting, ScriptModule};
 
 pub type BlueprintId = ContentId<BlueprintDef>;
 
+/// Placements nest at most this deep.
 pub const MAX_DEPTH: usize = 8;
 pub const MAX_PARTS: usize = 4096;
 pub const MAX_AREA_PARTS: usize = 65_536;
 pub const MAX_VARIABLES: usize = 32;
 
+/// A reusable piece of an area: a box of ground with a scene graph of modules on it, placed as one
+/// node of an area or of another blueprint. Its variables are holes in its modules that each
+/// placement fills.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlueprintDef {
+    pub map: Tilemap,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variables: BTreeMap<String, Variable<RiftScripting>>,
-    pub parts: Vec<Value>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub modules: Vec<BlueprintModule>,
+    #[serde(skip)]
+    pub scene: Scene,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum BlueprintModule {
-    Script(ScriptModule),
-}
-
-impl ContentRow for BlueprintDef {
+impl ContentFile for BlueprintDef {
     const TABLE: &'static str = "blueprint";
+    const SHAPE: Shape = Shape::Bundle;
 
     fn check(&self, cx: &mut RowCheck) {
+        self.map.check("/map", 1, cx);
         cx.count(
             "/variables",
             self.variables.len(),
@@ -62,41 +65,45 @@ impl ContentRow for BlueprintDef {
                 );
             }
         }
-        let mut used: Vec<String> = Vec::new();
-        for part in &self.parts {
-            holes(part, &mut used);
-        }
+    }
+}
+
+impl Bundle for BlueprintDef {
+    const PARTS: &'static [PartSpec] = SCENE_PARTS;
+
+    fn read_parts(&mut self, parts: &mut Parts) {
+        scene::read(&mut self.scene, &self.map, &self.variables, parts);
+        let used = scene::holes(&self.scene.nodes);
         for name in self.variables.keys() {
             if !used.contains(name) {
-                cx.error(
-                    format!("/variables/{}", escape(name)),
-                    "unused variable",
-                    name,
-                    "a variable some hole in the parts names",
+                parts.json_error(
+                    CONFIG_FILE,
+                    &format!("/variables/{}", escape(name)),
+                    ContentProblem::new(
+                        "unused variable",
+                        name,
+                        "a variable some hole in the scene names",
+                    ),
                 );
             }
         }
     }
 
-    fn read_held(&self) {
-        for part in &self.parts {
-            let mut json = part.clone();
-            stand_in_holes(&mut json, &self.variables);
-            read_aside(
-                || serde_json::from_value::<AreaModule>(json).ok(),
-                |leaf| leaf.value != HOLE,
-            );
-        }
+    fn write_parts(&self, bundle: &str, writer: &mut FileWriter) -> io::Result<()> {
+        scene::write(&self.scene, &self.map, bundle, writer)
     }
 }
 
-/// What a hole without a value reads as while its part is read for references: a key no row has,
-/// whose reference is left out.
-const HOLE: &str = "\u{1}hole";
+/// What a hole without a value reads as while its module is read for references: a path no file
+/// has, whose reference is left out.
+pub(super) const HOLE: &str = "\u{1}hole";
 
 /// Fills each hole with its variable's default, or with a stand-in of the variable's type, so the
-/// rest of the part reads as a module would.
-fn stand_in_holes(json: &mut Value, variables: &BTreeMap<String, Variable<RiftScripting>>) {
+/// rest of the module reads as a module would.
+pub(super) fn stand_in_holes(
+    json: &mut Value,
+    variables: &BTreeMap<String, Variable<RiftScripting>>,
+) {
     if let Some(name) = hole_name(json) {
         let variable = variables.get(name);
         let default = variable
@@ -136,36 +143,36 @@ pub struct Placement {
     pub values: BTreeMap<String, VarValue<RiftScripting>>,
 }
 
+/// A module of an area once its scene is flattened: folders dissolved and placed blueprints
+/// expanded.
 #[derive(Clone)]
 pub struct Flattened {
     pub module: AreaModule,
-    pub origin: usize,
-    pub chain: Vec<(BlueprintId, usize)>,
+    /// The path of the node in the area's scene that is the module or brings it.
+    pub origin: String,
+    /// The placed blueprints it came through, each with the path of the node in that blueprint's
+    /// scene that is the module or places the next one.
+    pub chain: Vec<(BlueprintId, String)>,
 }
 
 impl Flattened {
-    pub fn site(&self, content: &Content, area: super::AreaId) -> (String, String) {
+    /// The file and JSON pointer of the node the module was written as.
+    pub fn site(&self, content: &Content, area: AreaId) -> (String, String) {
         match self.chain.last() {
-            None => (
-                row_file(AreaDef::TABLE, area.key(content)),
-                format!("/modules/{}", self.origin),
-            ),
-            Some((blueprint, part)) => (
-                row_file(BlueprintDef::TABLE, blueprint.key(content)),
-                format!("/parts/{part}"),
-            ),
+            None => (scene_file(area.path(content)), self.origin.clone()),
+            Some((blueprint, pointer)) => (scene_file(blueprint.path(content)), pointer.clone()),
         }
     }
 
     pub fn describe(&self, content: &Content) -> String {
         match self.chain.last() {
-            None => format!("module {}", self.origin),
-            Some((blueprint, part)) => {
+            None => format!("node {}", self.origin),
+            Some((blueprint, pointer)) => {
                 let through: Vec<&str> = self.chain[..self.chain.len() - 1]
                     .iter()
-                    .map(|(blueprint, _)| blueprint.key(content))
+                    .map(|(blueprint, _)| blueprint.name(content))
                     .collect();
-                let mut text = format!("part {part} of {}", blueprint.key(content));
+                let mut text = format!("node {pointer} of {}", blueprint.name(content));
                 if !through.is_empty() {
                     text.push_str(&format!(", through {}", through.join(" → ")));
                 }
@@ -175,14 +182,17 @@ impl Flattened {
     }
 }
 
+/// A blueprint placed in an area, at any depth: where its cells and modules land, and the scripts
+/// that run once for it.
 pub struct PlacedBlueprint {
     pub blueprint: BlueprintId,
-    pub origin: usize,
-    pub chain: Vec<(BlueprintId, usize)>,
+    pub origin: String,
+    pub chain: Vec<(BlueprintId, String)>,
     pub at: Pos<Tiles>,
     pub flip: Flip,
     pub values: BTreeMap<String, Value>,
-    pub scripts: Vec<ScriptModule>,
+    /// Each script with the path of its node in the blueprint's scene.
+    pub scripts: Vec<(String, ScriptModule)>,
 }
 
 pub struct Flattening {
@@ -192,8 +202,10 @@ pub struct Flattening {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FlattenAt {
+    /// A JSON pointer in the area's scene.
     Area(String),
-    Blueprint(BlueprintId, String),
+    /// A JSON part of a blueprint and a pointer in it.
+    Blueprint(BlueprintId, &'static str, String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -202,37 +214,50 @@ pub struct FlattenError {
     pub problem: ContentProblem,
 }
 
+/// The modules an area's scene adds up to, in tree order: folders dissolve, ground layers are left to
+/// the grids, and each placement brings its blueprint's modules, placed.
 pub fn flatten(
     content: &Content,
-    modules: &[AreaModule],
+    nodes: &[SceneNode],
     errors: &mut Vec<FlattenError>,
 ) -> Flattening {
     let mut out = Vec::new();
     let mut placements = Vec::new();
-    for (index, module) in modules.iter().enumerate() {
+    let mut found = Vec::new();
+    scene::walk(nodes, &mut |pointer, node, _| {
+        if let SceneNode::Module(module) = node {
+            found.push((pointer.to_owned(), module));
+        }
+    });
+    for (pointer, module) in found {
+        let module = with_content(ContentScope::of(content), || {
+            serde_path_to_error::deserialize::<_, AreaModule>(module_json(module))
+        })
+        .0;
         match module {
-            AreaModule::Blueprint(placement) => {
+            Ok(AreaModule::Blueprint(placement)) => {
                 let mut cx = Expansion {
                     content,
-                    errors,
+                    errors: &mut *errors,
                     out: &mut out,
                     placements: &mut placements,
-                    origin: index,
-                    pointer: format!("/modules/{index}"),
+                    origin: pointer.clone(),
+                    values_at: FlattenAt::Area(format!("{pointer}/values")),
                     chain: Vec::new(),
                 };
-                cx.expand(placement, placement.at, placement.flip, &placement.values);
+                cx.expand(&placement, placement.at, placement.flip, &placement.values);
             }
-            other => out.push(Flattened {
-                module: other.clone(),
-                origin: index,
+            Ok(module) => out.push(Flattened {
+                module,
+                origin: pointer,
                 chain: Vec::new(),
             }),
+            Err(error) => errors.push(misread(FlattenAt::Area(pointer), error)),
         }
     }
     if out.len() > MAX_AREA_PARTS {
         errors.push(FlattenError {
-            at: FlattenAt::Area("/modules".to_owned()),
+            at: FlattenAt::Area(String::new()),
             problem: ContentProblem::new(
                 "too many parts",
                 format!("{} modules after flattening", out.len()),
@@ -246,14 +271,29 @@ pub fn flatten(
     }
 }
 
+fn misread(at: FlattenAt, error: serde_path_to_error::Error<serde_json::Error>) -> FlattenError {
+    let error = ParseError::from(error);
+    let at = match at {
+        FlattenAt::Area(pointer) => FlattenAt::Area(format!("{pointer}{}", error.pointer)),
+        FlattenAt::Blueprint(id, part, pointer) => {
+            FlattenAt::Blueprint(id, part, format!("{pointer}{}", error.pointer))
+        }
+    };
+    FlattenError {
+        at,
+        problem: shape_problem(&error),
+    }
+}
+
 struct Expansion<'a> {
     content: &'a Content,
     errors: &'a mut Vec<FlattenError>,
     out: &'a mut Vec<Flattened>,
     placements: &'a mut Vec<PlacedBlueprint>,
-    origin: usize,
-    pointer: String,
-    chain: Vec<(BlueprintId, usize)>,
+    origin: String,
+    /// Where the values the placement being expanded gives are written.
+    values_at: FlattenAt,
+    chain: Vec<(BlueprintId, String)>,
 }
 
 impl Expansion<'_> {
@@ -262,6 +302,26 @@ impl Expansion<'_> {
             at,
             problem: ContentProblem::new(rule, found, expected),
         });
+    }
+
+    /// Where the placement being expanded is written: in the area's scene at the top, or in the
+    /// scene of the blueprint that places it.
+    fn placed_at(&self) -> FlattenAt {
+        match self.chain.last() {
+            None => FlattenAt::Area(self.origin.clone()),
+            Some((blueprint, pointer)) => {
+                FlattenAt::Blueprint(*blueprint, SCENE_FILE, pointer.clone())
+            }
+        }
+    }
+
+    fn values_pointer(&self, name: &str) -> FlattenAt {
+        match &self.values_at {
+            FlattenAt::Area(pointer) => FlattenAt::Area(format!("{pointer}/{}", escape(name))),
+            FlattenAt::Blueprint(id, part, pointer) => {
+                FlattenAt::Blueprint(*id, part, format!("{pointer}/{}", escape(name)))
+            }
+        }
     }
 
     fn expand(
@@ -275,11 +335,11 @@ impl Expansion<'_> {
         let Some(def) = content.table::<BlueprintDef>().get(placement.blueprint) else {
             return;
         };
-        let key = placement.blueprint.key(&content);
         if self.chain.len() + 1 > MAX_DEPTH {
             let chain = self.chain_text(Some(placement.blueprint));
+            let at = self.placed_at();
             self.error(
-                FlattenAt::Area(self.pointer.clone()),
+                at,
                 "nested too deep",
                 format!("depth {} through {chain}", self.chain.len() + 1),
                 format!("at most {MAX_DEPTH} levels of placements"),
@@ -293,37 +353,32 @@ impl Expansion<'_> {
         {
             let chain = self.chain_text(Some(placement.blueprint));
             self.error(
-                FlattenAt::Blueprint(placement.blueprint, String::new()),
+                FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, String::new()),
                 "blueprint holds itself",
                 chain,
                 "a blueprint that never contains itself, at any depth".to_owned(),
             );
             return;
         }
-        let values_pointer = if self.chain.is_empty() {
-            format!("{}/values", self.pointer)
-        } else {
-            self.pointer.clone()
-        };
         let mut filled: BTreeMap<String, Value> = BTreeMap::new();
         let mut supplied: Vec<String> = Vec::new();
         let mut missing = false;
         for name in values.keys() {
             if !def.variables.contains_key(name) {
-                let at = FlattenAt::Area(format!("{values_pointer}/{}", escape(name)));
+                let at = self.values_pointer(name);
                 self.unknown_variable(at, placement.blueprint, def, name);
             }
         }
         for (name, variable) in &def.variables {
-            let pointer = format!("{values_pointer}/{}", escape(name));
             let (value, own) = match values.get(name) {
                 Some(value) => (value, true),
                 None => match &variable.default {
                     Some(default) => (default, false),
                     None => {
                         missing = true;
+                        let at = self.values_at.clone();
                         self.error(
-                            FlattenAt::Area(values_pointer.clone()),
+                            at,
                             "missing value",
                             format!("no value for {name}"),
                             format!(
@@ -344,10 +399,11 @@ impl Expansion<'_> {
                 }
                 Err(problem) => {
                     let at = if own {
-                        FlattenAt::Area(pointer)
+                        self.values_pointer(name)
                     } else {
                         FlattenAt::Blueprint(
                             placement.blueprint,
+                            CONFIG_FILE,
                             format!("/variables/{}/default", escape(name)),
                         )
                     };
@@ -358,32 +414,32 @@ impl Expansion<'_> {
         if missing {
             return;
         }
-        let scripts = self.filled_scripts(placement.blueprint, def, &filled);
+        let placed = self.placements.len();
         self.placements.push(PlacedBlueprint {
             blueprint: placement.blueprint,
-            origin: self.origin,
+            origin: self.origin.clone(),
             chain: self.chain.clone(),
             at,
             flip,
             values: filled.clone(),
-            scripts,
+            scripts: Vec::new(),
         });
         let start = self.out.len();
-        for (index, part) in def.parts.iter().enumerate() {
-            let part_pointer = format!("/parts/{index}");
-            let mut json = part.clone();
+        let mut nodes = Vec::new();
+        scene::walk(&def.scene.nodes, &mut |pointer, node, _| {
+            if let SceneNode::Module(module) = node {
+                nodes.push((pointer.to_owned(), module));
+            }
+        });
+        for (pointer, node) in nodes {
+            let mut json = module_json(node);
             let mut unknown: Vec<(String, String)> = Vec::new();
-            fill(
-                &mut json,
-                &filled,
-                &def.variables,
-                &part_pointer,
-                &mut unknown,
-            );
+            fill(&mut json, &filled, &def.variables, &pointer, &mut unknown);
             for (pointer, name) in unknown {
-                let at = FlattenAt::Blueprint(placement.blueprint, pointer);
+                let at = FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, pointer);
                 self.unknown_variable(at, placement.blueprint, def, &name);
             }
+            let site = FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, pointer.clone());
             let module = {
                 let (result, scope) = with_content(ContentScope::of(&content), || {
                     serde_path_to_error::deserialize::<_, AreaModule>(json)
@@ -394,43 +450,39 @@ impl Expansion<'_> {
                     .filter(|leaf| supplied.contains(&leaf.value));
                 for problem in from_placement.filter_map(Leaf::reported) {
                     self.errors.push(FlattenError {
-                        at: FlattenAt::Blueprint(placement.blueprint, part_pointer.clone()),
+                        at: site.clone(),
                         problem,
                     });
                 }
                 match result {
                     Ok(module) => module,
                     Err(error) => {
-                        let pointer = format!("{part_pointer}{}", pointer_of(error.path()));
-                        self.error(
-                            FlattenAt::Blueprint(placement.blueprint, pointer),
-                            "wrong type",
-                            error.inner().to_string(),
-                            "a part in an area module's shape".to_owned(),
-                        );
+                        self.errors.push(misread(site, error));
                         continue;
                     }
                 }
             };
             let mut chain = self.chain.clone();
-            chain.push((placement.blueprint, index));
+            chain.push((placement.blueprint, pointer.clone()));
             match module {
-                AreaModule::Script(_) => self.error(
-                    FlattenAt::Blueprint(placement.blueprint, part_pointer),
-                    "module not allowed here",
-                    "an area script".to_owned(),
-                    "any area module but script".to_owned(),
-                ),
+                AreaModule::Script(script) => {
+                    self.placements[placed].scripts.push((pointer, script))
+                }
                 AreaModule::Blueprint(nested) => {
-                    let nested_at = at + flip.apply(nested.at).to_vector();
+                    let nested_at = at_of(at, flip, nested.at);
                     let nested_flip = nested.flip.compose(flip);
+                    let values_at = FlattenAt::Blueprint(
+                        placement.blueprint,
+                        SCENE_FILE,
+                        format!("{pointer}/values"),
+                    );
                     let mut inner = Expansion {
                         content: self.content,
                         errors: self.errors,
                         out: self.out,
                         placements: self.placements,
-                        origin: self.origin,
-                        pointer: self.pointer.clone(),
+                        origin: self.origin.clone(),
+                        values_at,
                         chain,
                     };
                     inner.expand(&nested, nested_at, nested_flip, &nested.values);
@@ -439,7 +491,7 @@ impl Expansion<'_> {
                     place(&mut module, at, flip);
                     self.out.push(Flattened {
                         module,
-                        origin: self.origin,
+                        origin: self.origin.clone(),
                         chain,
                     });
                 }
@@ -447,53 +499,16 @@ impl Expansion<'_> {
         }
         if self.out.len() - start > MAX_PARTS {
             self.error(
-                FlattenAt::Blueprint(placement.blueprint, "/parts".to_owned()),
+                FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, String::new()),
                 "too many parts",
-                format!("{}: {}", key, self.out.len() - start),
+                format!(
+                    "{}: {}",
+                    placement.blueprint.name(&content),
+                    self.out.len() - start
+                ),
                 format!("at most {MAX_PARTS} flattened parts per blueprint"),
             );
         }
-    }
-
-    fn filled_scripts(
-        &mut self,
-        blueprint: BlueprintId,
-        def: &BlueprintDef,
-        filled: &BTreeMap<String, Value>,
-    ) -> Vec<ScriptModule> {
-        let content = self.content.clone();
-        let mut scripts = Vec::new();
-        for (index, BlueprintModule::Script(module)) in def.modules.iter().enumerate() {
-            let pointer = format!("/modules/{index}");
-            let Ok(mut json) =
-                with_content(ContentScope::of(&content), || serde_json::to_value(module)).0
-            else {
-                continue;
-            };
-            let mut unknown: Vec<(String, String)> = Vec::new();
-            fill(&mut json, filled, &def.variables, &pointer, &mut unknown);
-            for (pointer, name) in unknown {
-                self.unknown_variable(
-                    FlattenAt::Blueprint(blueprint, pointer),
-                    blueprint,
-                    def,
-                    &name,
-                );
-            }
-            let (result, _) = with_content(ContentScope::of(&content), || {
-                serde_json::from_value::<ScriptModule>(json)
-            });
-            match result {
-                Ok(script) => scripts.push(script),
-                Err(error) => self.error(
-                    FlattenAt::Blueprint(blueprint, pointer),
-                    "wrong type",
-                    error.to_string(),
-                    "a script module whose holes the placement fills".to_owned(),
-                ),
-            }
-        }
-        scripts
     }
 
     fn unknown_variable(
@@ -508,7 +523,7 @@ impl Expansion<'_> {
             problem: ContentProblem::new(
                 "unknown variable",
                 format!("{name:?}"),
-                format!("a variable {} declares", blueprint.key(self.content)),
+                format!("a variable {} declares", blueprint.name(self.content)),
             )
             .near(nearest(def.variables.keys(), name).map(|n| format!("{n:?}"))),
         });
@@ -519,13 +534,134 @@ impl Expansion<'_> {
         let mut names: Vec<&str> = self
             .chain
             .iter()
-            .map(|(blueprint, _)| blueprint.key(content))
+            .map(|(blueprint, _)| blueprint.path(content))
             .collect();
         if let Some(last) = last {
-            names.push(last.key(content));
+            names.push(last.path(content));
         }
         names.join(" → ")
     }
+}
+
+/// Where a point given in a placed blueprint's own coordinates lands.
+fn at_of(at: Pos<Tiles>, flip: Flip, point: Pos<Tiles>) -> Pos<Tiles> {
+    at + flip.apply(point).to_vector()
+}
+
+/// The ground an area shows once every placed blueprint painted into it: layer by layer of the same
+/// name, each placement's cells over what's under them in tree order, a placement's own blueprint
+/// under the placements inside it. Forced walk cells merge the same way, and each placement's
+/// palette entries join the area's, flipped as the placement is.
+pub fn stamp<'a>(
+    area: &AreaGrids,
+    placements: &[PlacedBlueprint],
+    grids_of: impl Fn(BlueprintId) -> Option<(&'a BlueprintDef, &'a AreaGrids)>,
+    content: &Content,
+    errors: &mut Vec<FlattenError>,
+) -> AreaGrids {
+    let mut out = area.clone();
+    let size = out.size;
+    for placement in placements {
+        let Some((def, grids)) = grids_of(placement.blueprint) else {
+            continue;
+        };
+        let site = match placement.chain.last() {
+            None => FlattenAt::Area(placement.origin.clone()),
+            Some((blueprint, pointer)) => {
+                FlattenAt::Blueprint(*blueprint, SCENE_FILE, pointer.clone())
+            }
+        };
+        let cells: Vec<(usize, CellPos)> = def
+            .map
+            .size
+            .grid()
+            .cells()
+            .enumerate()
+            .map(|(index, cell)| {
+                let square = Rect::new(Pos::new(cell.x as f32, cell.y as f32), Size::splat(1.0));
+                (
+                    index,
+                    placement.flip.place(square, placement.at).origin.cell(),
+                )
+            })
+            .collect();
+        let mut off_edge = false;
+        for layer in &grids.ground {
+            if layer.cells.iter().all(Option::is_none) {
+                continue;
+            }
+            let Some(target) = out.ground.iter().position(|known| known.name == layer.name) else {
+                errors.push(FlattenError {
+                    at: site.clone(),
+                    problem: ContentProblem::new(
+                        "missing layer",
+                        format!(
+                            "{} paints layer {}, which the area has none of",
+                            placement.blueprint.name(content),
+                            layer.name
+                        ),
+                        format!("a ground layer named {} in the area", layer.name),
+                    ),
+                });
+                continue;
+            };
+            for &(index, cell) in &cells {
+                let Some(tile) = layer.cells[index] else {
+                    continue;
+                };
+                let Some(to) = cell.index(size) else {
+                    off_edge = true;
+                    continue;
+                };
+                let Some(entry) = grids.palette.get(tile as usize) else {
+                    continue;
+                };
+                let entry = PaletteEntry {
+                    flip: entry.flip.compose(placement.flip),
+                    ..*entry
+                };
+                let at = out.palette_index(entry, content);
+                out.ground[target].cells[to] = Some(at);
+            }
+        }
+        for &(index, cell) in &cells {
+            let Some(forced) = grids.walk.get(index).copied().flatten() else {
+                continue;
+            };
+            match cell.index(size) {
+                Some(to) => out.walk[to] = Some(forced),
+                None => off_edge = true,
+            }
+        }
+        if off_edge {
+            errors.push(FlattenError {
+                at: site,
+                problem: ContentProblem::new(
+                    "outside the map",
+                    format!(
+                        "cells of {} land outside the map",
+                        placement.blueprint.name(content)
+                    ),
+                    format!(
+                        "every painted cell inside the {} × {} map",
+                        size.width, size.height
+                    ),
+                ),
+            });
+        }
+    }
+    out
+}
+
+/// The layers of `grids` in tree order with the cells painted in each.
+pub fn layer_grids(def_scene: &Scene, map: &Tilemap) -> Vec<LayerGrid> {
+    scene::layers(&def_scene.nodes)
+        .into_iter()
+        .map(|layer| LayerGrid {
+            name: layer.name.clone(),
+            cells: def_scene.grids.layer(&layer.name, map),
+        })
+        .collect()
 }
 
 fn typed_value(
@@ -561,7 +697,7 @@ fn typed_value(
                     key,
                     content
                         .table_named(table)
-                        .and_then(|rows| nearest(rows.keys(), key))
+                        .and_then(|files| nearest_path(files.paths(), key))
                         .as_deref(),
                 )),
             }

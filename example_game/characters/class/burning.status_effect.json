@@ -1,0 +1,16 @@
+{
+  "name": "Burning",
+  "icon": "assets/icons/misc/candle.png",
+  "category": "debuff",
+  "description": "Flames cling to the cloak and bite every second.",
+  "vfx": {
+    "on_activate": "visual-effects/vfx/spark_hit.vfx.json",
+    "during": "characters/class/embers.vfx.json"
+  },
+  "modules": [
+    {
+      "type": "script",
+      "script": "characters/class/burning_interval.script.json"
+    }
+  ]
+}

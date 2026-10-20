@@ -27,7 +27,7 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, RowCheck,
     serial,
 };
 use crate::core::geometry::{Footprint, Shape};
@@ -102,7 +102,7 @@ pub struct SkillDef {
     pub modules: Vec<SkillModule>,
 }
 
-impl ContentRow for SkillDef {
+impl ContentFile for SkillDef {
     const TABLE: &'static str = "skill";
 
     fn check(&self, check: &mut RowCheck) {
@@ -561,7 +561,7 @@ pub fn check_rank(
             format!(
                 "1 to {}, the ranks of {}",
                 def.rank_count(),
-                skill.key(content)
+                skill.path(content)
             ),
         );
     }
@@ -775,7 +775,7 @@ pub fn check_all(loading: &mut Loading) {
         loading.row_error(
             id,
             "/modules",
-            ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
+            ContentProblem::new(rule, format!("skill/{}", id.path(&content)), expected),
         );
     }
 }

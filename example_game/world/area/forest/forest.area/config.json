@@ -1,0 +1,12 @@
+{
+  "name": "The forest",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 45,
+        "height": 31
+      },
+      "tile": 16
+    }
+  }
+}

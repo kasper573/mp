@@ -676,7 +676,7 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
     if let Some(problem) = scope.leaves().iter().find_map(Leaf::reported) {
         return (StatusCode::BAD_REQUEST, problem.to_string()).into_response();
     }
-    let Some(character) = content.by_key::<CharacterSnapshot>(&request.test_character) else {
+    let Some(character) = content.by_path::<CharacterSnapshot>(&request.test_character) else {
         return (
             StatusCode::BAD_REQUEST,
             format!("no test character `{}`", request.test_character),

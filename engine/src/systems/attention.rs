@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{ContentId, ContentRow, Fixture};
+use crate::core::content::{ContentFile, ContentId, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{AreaId, AreaTag};
@@ -29,7 +29,7 @@ pub struct AttentionDef {
     pub icon: ImageRef,
 }
 
-impl ContentRow for AttentionDef {
+impl ContentFile for AttentionDef {
     const TABLE: &'static str = "attention";
 }
 
@@ -48,6 +48,7 @@ pub enum AttentionMark {
 
 impl Fixture for AttentionMark {
     type Row = AttentionDef;
+    const FOLDER: &'static str = "attention";
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

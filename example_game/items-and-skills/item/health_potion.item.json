@@ -1,0 +1,27 @@
+{
+  "name": "Health Potion",
+  "icon": "assets/icons/potion/red_potion.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_glass.sfx",
+    "trade": "sound-and-voice/sfx/trade_glass.sfx",
+    "drop": "sound-and-voice/sfx/landing01.sfx",
+    "use": "sound-and-voice/sfx/heal01.sfx"
+  },
+  "kind": {
+    "type": "usable"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Tastes of copper and seaweed. Works anyway."
+    },
+    {
+      "type": "stack",
+      "max": 10
+    },
+    {
+      "type": "script",
+      "script": "items-and-skills/item/health_potion_used.script.json"
+    }
+  ]
+}

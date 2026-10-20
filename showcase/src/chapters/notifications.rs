@@ -179,7 +179,7 @@ fn yelled(snapshot: &ProbeSnapshot, npc: &str) -> bool {
         .notifications
         .bubbles
         .iter()
-        .any(|bubble| bubble.npc.key(content()) == npc)
+        .any(|bubble| bubble.npc.name(content()) == npc)
 }
 
 fn fight_until(me: &mut Player, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) {

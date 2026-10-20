@@ -1,0 +1,21 @@
+{
+  "name": "Belfry Key",
+  "icon": "assets/icons/misc/iron_key.png",
+  "sfx": {
+    "pickup": "world/area/island/sfx/pickup_trinket.sfx",
+    "trade": "world/area/island/sfx/trade_trinket.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Heavy, cold, and nibbled at the bow. Bram wants it back."
+    },
+    {
+      "type": "quest_item"
+    }
+  ]
+}

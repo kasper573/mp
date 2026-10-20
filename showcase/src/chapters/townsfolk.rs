@@ -42,7 +42,7 @@ fn play(shoot: &mut Shoot) {
         snapshot
             .items
             .iter()
-            .find(|item| item.item.key(content()) == "rusty_sword")
+            .find(|item| item.item.name(content()) == "rusty_sword")
             .cloned()
     });
     let under_foot = sword.at - Offset::new(0.0, 0.3);

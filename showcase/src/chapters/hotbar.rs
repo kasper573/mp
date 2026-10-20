@@ -189,7 +189,7 @@ fn play(shoot: &mut Shoot) {
 fn slashing(snapshot: &ProbeSnapshot) -> bool {
     snapshot
         .basic_attack
-        .is_some_and(|skill| skill.key(content()) == "slash")
+        .is_some_and(|skill| skill.name(content()) == "slash")
 }
 
 fn in_bag(image: &str) -> UiTarget {

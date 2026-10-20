@@ -10,7 +10,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::{self, Presence};
 use engine::systems::{actor, movement, rewards, script, skill};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 #[test]
 fn a_gamblers_dice_take_ten_gold_a_roll_and_pay_twenty_on_a_win() {
@@ -168,20 +168,20 @@ fn harbour() -> Sim {
             json!([
                 {
                     "type": "resident",
-                    "npc": "gambler",
+                    "npc": "gambler.npc.json",
                     "at": { "x": 7.0, "y": 4.0 },
                     "shown": {
                         "type": "all",
                         "of": [
-                            { "type": "not", "of": { "type": "memory", "memory": "fighting" } },
+                            { "type": "not", "of": { "type": "memory", "memory": "fighting.memory.json" } },
                             {
                                 "type": "not",
-                                "of": { "type": "set_within", "memory": "dead", "seconds": 1800 },
+                                "of": { "type": "set_within", "memory": "dead.memory.json", "seconds": 1800 },
                             },
                         ],
                     },
                 },
-                { "type": "resident", "npc": "baker", "at": { "x": 10.0, "y": 6.0 } },
+                { "type": "resident", "npc": "baker.npc.json", "at": { "x": 10.0, "y": 6.0 } },
             ]),
         )
         .hero("harbour", 5.0, 4.0)
@@ -191,31 +191,30 @@ fn harbour() -> Sim {
             "gold",
             json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 100_000 }] }),
         )
-        .npc("gambler", 40.0, json!([{ "type": "script", "script": "gambler_roll" }]))
-        .script("gambler_roll", "npc/gambler", "npc", gambling())
+        .npc("gambler", 40.0, json!([{ "type": "script", "script": "gambler_roll.script.json" }]))
+        .script("gambler_roll", "npc", gambling())
         .npc(
             "gambler_hostile",
             40.0,
             json!([
-                { "type": "script", "script": "gambler_hostile_hunt" },
-                { "type": "script", "script": "gambler_hostile_defeat" },
+                { "type": "script", "script": "gambler_hostile_hunt.script.json" },
+                { "type": "script", "script": "gambler_hostile_defeat.script.json" },
             ]),
         )
-        .owned("script", "gambler_hostile_hunt", "npc/gambler_hostile", hunting())
+        .row("script", "gambler_hostile_hunt", hunting())
         .script(
             "gambler_hostile_defeat",
-            "npc/gambler_hostile",
             "npc",
             json!({
                 "defeated": { "type": "on", "event": "defeated", "next": "over" },
-                "over": { "type": "forget", "memories": ["fighting"], "next": "dead" },
-                "dead": { "type": "remember", "memory": "dead" },
+                "over": { "type": "forget", "memories": ["fighting.memory.json"], "next": "dead" },
+                "dead": { "type": "remember", "memory": "dead.memory.json" },
             }),
         )
-        .edit("npc", "gambler_hostile", |copy| copy["basic_attack"] = json!("strike"))
-        .npc("guard", 30.0, json!([{ "type": "script", "script": "guard_hunt" }]))
-        .owned("script", "guard_hunt", "npc/guard", hunting())
-        .edit("npc", "guard", |guard| guard["basic_attack"] = json!("strike"))
+        .edit("npc", "gambler_hostile", |copy| copy["basic_attack"] = json!(path("skill", "strike")))
+        .npc("guard", 30.0, json!([{ "type": "script", "script": "guard_hunt.script.json" }]))
+        .row("script", "guard_hunt", hunting())
+        .edit("npc", "guard", |guard| guard["basic_attack"] = json!(path("skill", "strike")))
         .npc("baker", 20.0, json!([{ "type": "respawn", "after": 5.0 }]))
         .row("memory", "grudge", memory_row("never"))
         .row("memory", "fighting", memory_row("leaving_area"))
@@ -275,7 +274,7 @@ fn gambling() -> Value {
             },
             "holds_grudge": {
                 "type": "if",
-                "test": { "type": "set_within", "memory": "grudge", "seconds": 1800 },
+                "test": { "type": "set_within", "memory": "grudge.memory.json", "seconds": 1800 },
                 "yes": "grudging",
                 "no": "hello",
             },
@@ -283,9 +282,9 @@ fn gambling() -> Value {
                 { "label": ["Roll the dice."], "to": "stake" },
                 { "label": ["Not today."] },
             ])),
-            "stake": { "type": "items", "take": [{ "item": "gold", "count": 10 }], "done": "roll" },
+            "stake": { "type": "items", "take": [{ "item": "gold.item.json", "count": 10 }], "done": "roll" },
             "roll": { "type": "random", "weights": [45, 55], "outputs": ["payout", "wins"] },
-            "payout": { "type": "items", "give": [{ "item": "gold", "count": 20 }], "done": "loses" },
+            "payout": { "type": "items", "give": [{ "item": "gold.item.json", "count": 20 }], "done": "loses" },
             "loses": said("Beginner's luck.", json!([
                 { "label": ["Roll again."], "to": "stake" },
                 { "label": ["Quit."] },
@@ -295,10 +294,10 @@ fn gambling() -> Value {
                 { "label": ["You're cheating."], "to": "remember_grudge" },
                 { "label": ["Leave."] },
             ])),
-            "remember_grudge": { "type": "remember", "memory": "grudge", "next": "guards" },
+            "remember_grudge": { "type": "remember", "memory": "grudge.memory.json", "next": "guards" },
             "guards": {
                 "type": "spawn_npcs",
-                "npc": "guard",
+                "npc": "guard.npc.json",
                 "count": 2,
                 "near": "owner",
                 "shown": "subject",
@@ -307,10 +306,10 @@ fn gambling() -> Value {
                 { "label": ["Then let's settle this."], "to": "remember_fight" },
                 { "label": ["I'm leaving."] },
             ])),
-            "remember_fight": { "type": "remember", "memory": "fighting", "next": "copy" },
+            "remember_fight": { "type": "remember", "memory": "fighting.memory.json", "next": "copy" },
             "copy": {
                 "type": "spawn_npcs",
-                "npc": "gambler_hostile",
+                "npc": "gambler_hostile.npc.json",
                 "count": 1,
                 "near": "owner",
                 "shown": "subject",

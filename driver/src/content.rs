@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use engine::core::content::{
-    Content, ContentId, ContentRow, ContentScope, FilesystemFolder, with_content,
+    Content, ContentFile, ContentId, ContentScope, FilesystemFolder, with_content,
 };
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
@@ -15,7 +15,7 @@ use engine::systems::script::Place;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::seen::{area_key, clickable_point};
+use crate::seen::{area_name, clickable_point};
 
 /// The content the driver reads names and places from: the one the server it drives plays.
 pub fn content() -> &'static Content {
@@ -51,13 +51,35 @@ pub fn input_names(action: InputAction) -> Vec<String> {
         .collect()
 }
 
-pub fn id<Row: ContentRow>(name: &str) -> ContentId<Row> {
-    content()
-        .by_key::<Row>(name)
-        .unwrap_or_else(|| panic!("no {} named {name}", Row::TABLE))
+/// The one file of `Row`'s type named `name`, wherever in the game folder it is.
+pub fn id<Row: ContentFile>(name: &str) -> ContentId<Row> {
+    let content = content();
+    let mut named = content.ids::<Row>().filter(|id| id.name(content) == name);
+    match (named.next(), named.next()) {
+        (Some(id), None) => id,
+        (None, _) => panic!("no {} named {name}", Row::TABLE),
+        (Some(_), Some(_)) => panic!("more than one {} named {name}", Row::TABLE),
+    }
 }
 
-/// Content ids travel by key, so JSON is read and written within the content's scope.
+/// The path of the one file of the type `table` named `name`.
+pub fn path_named(table: &str, name: &str) -> &'static str {
+    let content = content();
+    let files = content
+        .table_named(table)
+        .unwrap_or_else(|| panic!("no content type {table}"));
+    let mut named = files
+        .paths()
+        .iter()
+        .filter(|path| engine::core::content::name_of(path) == name);
+    match (named.next(), named.next()) {
+        (Some(path), None) => path,
+        (None, _) => panic!("no {table} named {name}"),
+        (Some(_), Some(_)) => panic!("more than one {table} named {name}"),
+    }
+}
+
+/// Content ids travel by path, so JSON is read and written within the content's scope.
 pub fn to_json(value: &impl Serialize) -> String {
     let (json, _) = with_content(ContentScope::of(content()), || {
         serde_json::to_string(value).expect("serializable")
@@ -134,7 +156,7 @@ pub fn open_ground_beside(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
             .fold(f32::INFINITY, f32::min)
     };
     let mut ground: Vec<Pos<Tiles>> = ground_near(
-        area_key(snapshot).expect("an area"),
+        area_name(snapshot).expect("an area"),
         me,
         Tiles(2.0)..=Tiles(4.0),
     )

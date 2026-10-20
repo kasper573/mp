@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId};
 use crate::core::script::{
     Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
 };
@@ -21,7 +21,7 @@ pub struct MemoryDef {
     pub resets: Resets,
 }
 
-impl ContentRow for MemoryDef {
+impl ContentFile for MemoryDef {
     const TABLE: &'static str = "memory";
 }
 

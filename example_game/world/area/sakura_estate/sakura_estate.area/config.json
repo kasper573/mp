@@ -1,0 +1,12 @@
+{
+  "name": "The lord's estate",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 38,
+        "height": 28
+      },
+      "tile": 16
+    }
+  }
+}

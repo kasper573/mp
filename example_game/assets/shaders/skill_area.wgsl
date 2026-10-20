@@ -1,1 +1,0 @@
-../../../editor/templates/new_game/assets/shaders/skill_area.wgsl

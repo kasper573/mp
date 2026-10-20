@@ -14,7 +14,7 @@ use engine::systems::shop::{self, ShopRequest};
 use engine::systems::{area, combat, movement, npc, rewards, script, stat};
 use serde_json::{Value, json};
 use strum::VariantArray;
-use testkit::{Game, Map, Sim, labels, locked};
+use testkit::{Game, Map, Sim, labels, locked, path};
 
 #[test]
 fn accepting_a_quest_logs_it_tracks_it_and_hands_over_its_items() {
@@ -395,23 +395,22 @@ fn harbour() -> Sim {
                 {
                     "type": "object",
                     "name": "stone",
-                    "label": "Standing stone",
+                    "title": "Standing stone",
                     "shape": { "type": "point", "x": 12.0, "y": 12.0 },
                     "look": "objects/stone.png",
-                    "scripts": [{ "script": "stone_look" }],
+                    "scripts": [{ "script": "stone_look.script.json" }],
                 },
             ]),
         )
         .script(
             "stone_look",
-            "area/harbour",
             "object",
             json!({
                 "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "on_quest" },
                 "on_quest": { "type": "if", "test": on_quest("x_marks"), "yes": "found", "no": "look" },
-                "found": { "type": "complete_task", "quest": "x_marks", "task": "find_stone", "next": "matches" },
+                "found": { "type": "complete_task", "quest": "x_marks.quest.json", "task": "find_stone", "next": "matches" },
                 "matches": said("The stone matches the drawing.", "turn_in"),
-                "turn_in": { "type": "turn_in", "quest": "x_marks" },
+                "turn_in": { "type": "turn_in", "quest": "x_marks.quest.json" },
                 "look": dialogue("Moss covers the runes.", json!([{ "label": ["Step away."] }])),
             }),
         )
@@ -437,18 +436,17 @@ fn harbour() -> Sim {
         .item("key", quest_item("resource"))
         .item("map", {
             let mut map = quest_item("usable");
-            map["modules"].as_array_mut().expect("modules").push(json!({ "type": "script", "script": "map_read" }));
+            map["modules"].as_array_mut().expect("modules").push(json!({ "type": "script", "script": "map_read.script.json" }));
             map
         })
         .script(
             "map_read",
-            "item/map",
             "item",
             json!({
                 "used": { "type": "on", "event": "used", "next": "read" },
                 "read": { "type": "if", "test": on_quest("x_marks"), "yes": "waiting", "no": "offer" },
                 "offer": said("A cross is scrawled beside a standing stone.", "card"),
-                "card": { "type": "offer_quest", "quest": "x_marks" },
+                "card": { "type": "offer_quest", "quest": "x_marks.quest.json" },
                 "waiting": dialogue("The cross sits beside a standing stone.", json!([{ "label": ["Fold it away."] }])),
             }),
         )
@@ -456,7 +454,6 @@ fn harbour() -> Sim {
         .npc("rat", 10.0, json!([]))
         .script(
             "giver_talk",
-            "npc/giver",
             "npc",
             talker(
                 json!([
@@ -467,10 +464,9 @@ fn harbour() -> Sim {
                 [offered("letter", "I'll take it."), offered("low_tide", "I'll hurry.")],
             ),
         )
-        .npc("giver", 40.0, json!([{ "type": "script", "script": "giver_talk" }]))
+        .npc("giver", 40.0, json!([{ "type": "script", "script": "giver_talk.script.json" }]))
         .script(
             "captain_talk",
-            "npc/captain",
             "npc",
             talker(
                 json!([
@@ -487,30 +483,28 @@ fn harbour() -> Sim {
                 ]),
                 [
                     json!({
-                        "letter_turn_in": { "type": "turn_in", "quest": "letter", "done": "letter_thanks" },
+                        "letter_turn_in": { "type": "turn_in", "quest": "letter.quest.json", "done": "letter_thanks" },
                         "letter_thanks": dialogue("A letter? For me?", json!([{ "label": ["Never mind."] }])),
                     }),
                     offered("bats", "I'll clear them."),
                 ],
             ),
         )
-        .npc("captain", 40.0, json!([{ "type": "script", "script": "captain_talk" }]))
+        .npc("captain", 40.0, json!([{ "type": "script", "script": "captain_talk.script.json" }]))
         .script(
             "keeper_talk",
-            "npc/keeper",
             "npc",
             talker(
                 json!([
-                    { "label": ["Tithe"], "requires": not(json!({ "type": "quest_cooling", "quest": "tithe" })), "to": "tithe" },
+                    { "label": ["Tithe"], "requires": not(json!({ "type": "quest_cooling", "quest": "tithe.quest.json" })), "to": "tithe" },
                     { "label": ["Goodbye."] },
                 ]),
                 [offered("tithe", "I'll bring today's bones.")],
             ),
         )
-        .npc("keeper", 40.0, json!([{ "type": "script", "script": "keeper_talk" }]))
+        .npc("keeper", 40.0, json!([{ "type": "script", "script": "keeper_talk.script.json" }]))
         .script(
             "trader_talk",
-            "npc/trader",
             "npc",
             talker(
                 json!([
@@ -521,22 +515,22 @@ fn harbour() -> Sim {
                 [
                     json!({
                         "wares": said("Take your time.", "shop"),
-                        "shop": { "type": "open_shop", "shop": "wares" },
+                        "shop": { "type": "open_shop", "shop": "wares.shop.json" },
                     }),
                     offered("tusks", "I'll bring them."),
                 ],
             ),
         )
-        .npc("trader", 40.0, json!([{ "type": "script", "script": "trader_talk" }]))
-        .npc("shaman", 40.0, json!([{ "type": "script", "script": "shaman_talk" }]))
-        .script("shaman_talk", "npc/shaman", "npc", shaman())
+        .npc("trader", 40.0, json!([{ "type": "script", "script": "trader_talk.script.json" }]))
+        .npc("shaman", 40.0, json!([{ "type": "script", "script": "shaman_talk.script.json" }]))
+        .script("shaman_talk", "npc", shaman())
         .row(
             "shop",
             "wares",
             json!({
                 "title": "Wares",
-                "mark": "merchant",
-                "modules": [{ "type": "buys", "what": { "type": "category", "category": "material" }, "pays": [{ "item": "gold" }] }],
+                "mark": "merchant.attention.json",
+                "modules": [{ "type": "buys", "what": { "type": "category", "category": "material" }, "pays": [{ "item": "gold.item.json" }] }],
             }),
         )
         .mark("merchant")
@@ -552,11 +546,11 @@ fn harbour() -> Sim {
             quest(
                 "A Letter",
                 json!([
-                    { "type": "grants", "items": [{ "item": "letter" }] },
-                    { "type": "deliver", "item": "letter" },
-                    { "type": "hand_in", "items": [{ "item": "letter" }] },
+                    { "type": "grants", "items": [{ "item": "letter.item.json" }] },
+                    { "type": "deliver", "item": "letter.item.json" },
+                    { "type": "hand_in", "items": [{ "item": "letter.item.json" }] },
                     { "type": "hand_over", "text": ["The giver asked me to bring you this."] },
-                    { "type": "reward", "items": [{ "item": "gold", "count": 10 }] },
+                    { "type": "reward", "items": [{ "item": "gold.item.json", "count": 10 }] },
                 ]),
             ),
         )
@@ -567,12 +561,12 @@ fn harbour() -> Sim {
                 "Bats",
                 json!([
                     { "type": "requires", "condition": bats_open() },
-                    { "type": "defeat", "npc": "bat", "count": 4 },
-                    { "type": "hold", "item": "key" },
-                    { "type": "hand_in", "items": [{ "item": "key" }] },
+                    { "type": "defeat", "npc": "bat.npc.json", "count": 4 },
+                    { "type": "hold", "item": "key.item.json" },
+                    { "type": "hand_in", "items": [{ "item": "key.item.json" }] },
                     { "type": "hand_over", "text": ["Here's your key."] },
-                    { "type": "reward", "items": [{ "item": "gold", "count": 25 }] },
-                    { "type": "drop", "from": "bat", "item": "key", "chance": 10.0, "grows": 15.0 },
+                    { "type": "reward", "items": [{ "item": "gold.item.json", "count": 25 }] },
+                    { "type": "drop", "from": "bat.npc.json", "item": "key.item.json", "chance": 10.0, "grows": 15.0 },
                 ]),
             ),
         )
@@ -582,11 +576,11 @@ fn harbour() -> Sim {
             quest(
                 "Tusks",
                 json!([
-                    { "type": "shown", "condition": not(json!({ "type": "memory", "memory": "sided" })) },
-                    { "type": "hold", "item": "tusk", "count": 5 },
-                    { "type": "hand_in", "items": [{ "item": "tusk", "count": 5 }] },
-                    { "type": "reward", "items": [{ "item": "gold", "count": 35 }] },
-                    { "type": "pick_one", "items": [{ "item": "shield" }, { "item": "helm" }] },
+                    { "type": "shown", "condition": not(json!({ "type": "memory", "memory": "sided.memory.json" })) },
+                    { "type": "hold", "item": "tusk.item.json", "count": 5 },
+                    { "type": "hand_in", "items": [{ "item": "tusk.item.json", "count": 5 }] },
+                    { "type": "reward", "items": [{ "item": "gold.item.json", "count": 35 }] },
+                    { "type": "pick_one", "items": [{ "item": "shield.item.json" }, { "item": "helm.item.json" }] },
                 ]),
             ),
         )
@@ -596,10 +590,10 @@ fn harbour() -> Sim {
             quest(
                 "Tithe",
                 json!([
-                    { "type": "hold", "item": "bone", "count": 10 },
-                    { "type": "hand_in", "items": [{ "item": "bone", "count": 10 }] },
+                    { "type": "hold", "item": "bone.item.json", "count": 10 },
+                    { "type": "hand_in", "items": [{ "item": "bone.item.json", "count": 10 }] },
                     { "type": "hand_over", "text": ["Here are today's bones."] },
-                    { "type": "reward", "items": [{ "item": "token", "count": 6 }] },
+                    { "type": "reward", "items": [{ "item": "token.item.json", "count": 6 }] },
                     { "type": "daily" },
                 ]),
             ),
@@ -610,10 +604,10 @@ fn harbour() -> Sim {
             quest(
                 "Low Tide",
                 json!([
-                    { "type": "hold", "item": "steak", "count": 3 },
-                    { "type": "hand_in", "items": [{ "item": "steak", "count": 3 }] },
+                    { "type": "hold", "item": "steak.item.json", "count": 3 },
+                    { "type": "hand_in", "items": [{ "item": "steak.item.json", "count": 3 }] },
                     { "type": "hand_over", "text": ["Here are the steaks."] },
-                    { "type": "reward", "items": [{ "item": "gold", "count": 15 }] },
+                    { "type": "reward", "items": [{ "item": "gold.item.json", "count": 15 }] },
                     { "type": "time_limit", "seconds": 600.0 },
                 ]),
             ),
@@ -625,9 +619,9 @@ fn harbour() -> Sim {
                 "X Marks the Spot",
                 json!([
                     { "type": "task", "task": "find_stone", "label": "Find the standing stone" },
-                    { "type": "hand_in", "items": [{ "item": "map" }] },
+                    { "type": "hand_in", "items": [{ "item": "map.item.json" }] },
                     { "type": "hand_over", "text": ["Dig where the cross says."] },
-                    { "type": "reward", "items": [{ "item": "cutlass" }] },
+                    { "type": "reward", "items": [{ "item": "cutlass.item.json" }] },
                 ]),
             ),
         )
@@ -699,7 +693,7 @@ fn harbour() -> Sim {
 }
 
 fn resident(npc: &str, x: f32, y: f32) -> Value {
-    json!({ "type": "resident", "npc": npc, "at": { "x": x, "y": y } })
+    json!({ "type": "resident", "npc": path("npc", npc), "at": { "x": x, "y": y } })
 }
 
 fn talker<const N: usize>(choices: Value, topics: [Value; N]) -> Value {
@@ -733,11 +727,11 @@ fn offered(quest: &str, accept: &str) -> Value {
     );
     nodes.insert(
         node("accept"),
-        json!({ "type": "accept_quest", "quest": quest }),
+        json!({ "type": "accept_quest", "quest": path("quest", quest) }),
     );
     nodes.insert(
         node("turn_in"),
-        json!({ "type": "turn_in", "quest": quest, "done": node("thanks"), "refused": node("waiting") }),
+        json!({ "type": "turn_in", "quest": path("quest", quest), "done": node("thanks"), "refused": node("waiting") }),
     );
     nodes.insert(
         node("thanks"),
@@ -754,8 +748,8 @@ fn offered(quest: &str, accept: &str) -> Value {
 fn shaman() -> Value {
     json!({
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "befriended" },
-            "befriended": { "type": "if", "test": { "type": "memory", "memory": "sided" }, "yes": "friend", "no": "spurned_before" },
-            "spurned_before": { "type": "if", "test": { "type": "memory", "memory": "spurned" }, "yes": "silent", "no": "hello" },
+            "befriended": { "type": "if", "test": { "type": "memory", "memory": "sided.memory.json" }, "yes": "friend", "no": "spurned_before" },
+            "spurned_before": { "type": "if", "test": { "type": "memory", "memory": "spurned.memory.json" }, "yes": "silent", "no": "hello" },
             "silent": dialogue("She turns away.", json!([{ "label": ["Leave."] }])),
             "hello": dialogue("Speak, outlander.", json!([
                 {
@@ -770,21 +764,21 @@ fn shaman() -> Value {
                 { "label": ["I'm listening."], "to": "plea_accept" },
                 { "label": ["Not now."] },
             ])),
-            "plea_accept": { "type": "accept_quest", "quest": "plea", "done": "plea_answer" },
+            "plea_accept": { "type": "accept_quest", "quest": "plea.quest.json", "done": "plea_answer" },
             "plea_answer": dialogue("Give me the tusks of my kin.", json!([
                 { "label": ["Give her the tusks."], "requires": on_quest("tusks"), "to": "give_tusks" },
                 { "label": ["Keep them."], "to": "keep_tusks" },
                 { "label": ["Let me think on it."] },
             ])),
-            "give_tusks": { "type": "items", "take": [{ "item": "tusk", "count": 5 }], "done": "side_with_clan" },
-            "side_with_clan": { "type": "decide", "quest": "plea", "path": "Give the tusks", "next": "plea_given" },
-            "plea_given": { "type": "turn_in", "quest": "plea", "done": "fail_tusks" },
-            "fail_tusks": { "type": "fail_quest", "quest": "tusks", "next": "remember_sided" },
-            "remember_sided": { "type": "remember", "memory": "sided", "next": "grateful" },
+            "give_tusks": { "type": "items", "take": [{ "item": "tusk.item.json", "count": 5 }], "done": "side_with_clan" },
+            "side_with_clan": { "type": "decide", "quest": "plea.quest.json", "path": "Give the tusks", "next": "plea_given" },
+            "plea_given": { "type": "turn_in", "quest": "plea.quest.json", "done": "fail_tusks" },
+            "fail_tusks": { "type": "fail_quest", "quest": "tusks.quest.json", "next": "remember_sided" },
+            "remember_sided": { "type": "remember", "memory": "sided.memory.json", "next": "grateful" },
             "grateful": dialogue("Then the clan owes you.", json!([{ "label": ["Rest easy."] }])),
-            "keep_tusks": { "type": "decide", "quest": "plea", "path": "Keep them", "next": "plea_kept" },
-            "plea_kept": { "type": "turn_in", "quest": "plea", "done": "remember_spurned" },
-            "remember_spurned": { "type": "remember", "memory": "spurned", "next": "silent" },
+            "keep_tusks": { "type": "decide", "quest": "plea.quest.json", "path": "Keep them", "next": "plea_kept" },
+            "plea_kept": { "type": "turn_in", "quest": "plea.quest.json", "done": "remember_spurned" },
+            "remember_spurned": { "type": "remember", "memory": "spurned.memory.json", "next": "silent" },
             "friend": dialogue("Friend of the clan.", json!([{ "label": ["Farewell."] }])),
     })
 }
@@ -817,11 +811,11 @@ fn said(text: &str, next: &str) -> Value {
 }
 
 fn on_quest(quest: &str) -> Value {
-    json!({ "type": "on_quest", "quest": quest })
+    json!({ "type": "on_quest", "quest": path("quest", quest) })
 }
 
 fn quest_done(quest: &str) -> Value {
-    json!({ "type": "quest_done", "quest": quest })
+    json!({ "type": "quest_done", "quest": path("quest", quest) })
 }
 
 fn not(condition: Value) -> Value {

@@ -1,0 +1,22 @@
+{
+  "name": "Orc Tusk",
+  "icon": "assets/icons/monster_part/skull.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_bone.sfx",
+    "trade": "sound-and-voice/sfx/trade_bone.sfx",
+    "drop": "sound-and-voice/sfx/landing01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Yellowed and chipped. Mara pays well for these, and Ugra mourns every one."
+    },
+    {
+      "type": "stack",
+      "max": 50
+    }
+  ]
+}

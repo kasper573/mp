@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use driver::{DeployEdit, UiTarget, WaitBudget, arrived_in, in_world, resident_home};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::math::Offset;
 use engine::systems::npc::NpcDef;
 use serde_json::json;
@@ -40,11 +40,11 @@ fn play(shoot: &mut Shoot) {
     let changed = shoot.deploy(
         &[
             DeployEdit::game(&|game| game["name"] = json!(EDITION)),
-            DeployEdit::row(NpcDef::TABLE, "mara", &|npc| {
+            DeployEdit::file(NpcDef::TABLE, "mara", &|npc| {
                 npc["name"] = json!("Mara the Harbourmaster")
             }),
-            DeployEdit::row(NpcDef::TABLE, "tobb", &|npc| npc["name"] = json!("Tobb, town crier")),
-            DeployEdit::row(NpcDef::TABLE, "grisha", &|npc| {
+            DeployEdit::file(NpcDef::TABLE, "tobb", &|npc| npc["name"] = json!("Tobb, town crier")),
+            DeployEdit::file(NpcDef::TABLE, "grisha", &|npc| {
                 npc["name"] = json!("Grisha of the quay")
             }),
         ],

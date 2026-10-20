@@ -1,0 +1,7670 @@
+[
+  {
+    "type": "ground_layer",
+    "name": "ground"
+  },
+  {
+    "type": "ground_layer",
+    "name": "terrain"
+  },
+  {
+    "type": "ground_layer",
+    "name": "overlay"
+  },
+  {
+    "type": "ground_layer",
+    "name": "decor"
+  },
+  {
+    "type": "object",
+    "name": "shaman-hut",
+    "shape": {
+      "type": "rect",
+      "x": 21.5,
+      "y": 25.5,
+      "w": 1.0,
+      "h": 1.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/verdant_hut/verdant_hut.area",
+            "x": 9.0,
+            "y": 9.0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "vine-temple",
+    "shape": {
+      "type": "rect",
+      "x": 9.5,
+      "y": 57.5,
+      "w": 1.0,
+      "h": 1.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/verdant_temple/verdant_temple.area",
+            "x": 10.0,
+            "y": 15.0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "fen-path",
+    "shape": {
+      "type": "rect",
+      "x": 19.5,
+      "y": -0.5,
+      "w": 3.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/mirefen/mirefen.area",
+            "x": 61.5,
+            "y": 55.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "object",
+    "name": "desert-road",
+    "shape": {
+      "type": "rect",
+      "x": 14.5,
+      "y": 81.5,
+      "w": 3.0,
+      "h": 2.0
+    },
+    "scripts": [
+      {
+        "script": "story/script/warp.script.json",
+        "values": {
+          "to": {
+            "area": "world/area/sunscar/sunscar.area",
+            "x": 16.5,
+            "y": 2.5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "type": "population",
+    "npc": "world/area/verdant/npcs/panther.npc.json",
+    "count": 5,
+    "roams": {
+      "x": 41.5,
+      "y": 5.5,
+      "w": 13.0,
+      "h": 36.0
+    }
+  },
+  {
+    "type": "population",
+    "npc": "world/area/verdant/npcs/lizardman.npc.json",
+    "count": 6,
+    "roams": {
+      "x": 42.5,
+      "y": 51.5,
+      "w": 12.0,
+      "h": 28.0
+    }
+  },
+  {
+    "type": "resident",
+    "npc": "world/area/verdant/npcs/explorer.npc.json",
+    "at": {
+      "x": 24.0,
+      "y": 69.0
+    }
+  },
+  {
+    "type": "safe_zone",
+    "rect": {
+      "x": -0.5,
+      "y": -0.5,
+      "w": 41.0,
+      "h": 84.0
+    }
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": -0.5,
+      "y": -0.5,
+      "w": 56.0,
+      "h": 84.0
+    },
+    "emit": 0.0,
+    "channels": [
+      {
+        "channel": 1,
+        "file": "assets/audio/music/forest.flac",
+        "volume": 0.24,
+        "category": "music"
+      },
+      {
+        "channel": 2,
+        "file": "assets/audio/ambient/jungle.flac",
+        "volume": 0.32
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 33.5,
+      "y": -0.5,
+      "w": 10.0,
+      "h": 72.0
+    },
+    "emit": 2.0,
+    "channels": [
+      {
+        "channel": 4,
+        "file": "assets/audio/ambient/lapping_water.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 40.5,
+      "y": 69.5,
+      "w": 12.0,
+      "h": 9.0
+    },
+    "emit": 2.0,
+    "channels": [
+      {
+        "channel": 4,
+        "file": "assets/audio/ambient/lake.flac",
+        "volume": 0.3
+      }
+    ]
+  },
+  {
+    "type": "soundscape",
+    "shape": {
+      "type": "rect",
+      "x": 43.5,
+      "y": 50.5,
+      "w": 11.0,
+      "h": 9.0
+    },
+    "emit": 3.0,
+    "channels": [
+      {
+        "channel": 3,
+        "file": "assets/audio/ambient/stone_hum.flac",
+        "volume": 0.29
+      }
+    ]
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 11.625,
+      "y": -2.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        100,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 42.438,
+      "y": -2.75
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 46.938,
+      "y": -2.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 6.5,
+      "y": -2.438
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        244,
+        245,
+        246,
+        247
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 44.5,
+      "y": -2.438
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 13.5,
+      "y": -2.375
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 21.5,
+      "y": -1.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        79
+      ],
+      [
+        108,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.3,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        33,
+        34,
+        35
+      ],
+      [
+        null,
+        65,
+        66,
+        67
+      ],
+      [
+        null,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.7,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        48,
+        49,
+        50,
+        51
+      ],
+      [
+        80,
+        81,
+        82,
+        83
+      ],
+      [
+        112,
+        113,
+        114,
+        115
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.7,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        188,
+        189,
+        190,
+        191
+      ],
+      [
+        220,
+        221,
+        222,
+        223
+      ],
+      [
+        252,
+        253,
+        254,
+        255
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 15.7,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 24.7,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        48,
+        49,
+        50,
+        51
+      ],
+      [
+        80,
+        81,
+        82,
+        83
+      ],
+      [
+        112,
+        113,
+        114,
+        115
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 32.7,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        188,
+        189,
+        190,
+        191
+      ],
+      [
+        220,
+        221,
+        222,
+        223
+      ],
+      [
+        252,
+        253,
+        254,
+        255
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 32.5,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 46.1,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        48,
+        49,
+        50,
+        51
+      ],
+      [
+        80,
+        81,
+        82,
+        83
+      ],
+      [
+        112,
+        113,
+        114,
+        115
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 46.1,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        188,
+        189,
+        190,
+        191
+      ],
+      [
+        220,
+        221,
+        222,
+        223
+      ],
+      [
+        252,
+        253,
+        254,
+        255
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 54.3,
+      "y": -0.8
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        32,
+        33,
+        34,
+        35
+      ],
+      [
+        64,
+        65,
+        66,
+        67
+      ],
+      [
+        96,
+        97,
+        98,
+        99
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 20.063,
+      "y": -0.75
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        36,
+        37,
+        38,
+        39
+      ],
+      [
+        68,
+        69,
+        70,
+        71
+      ],
+      [
+        100,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 41.25,
+      "y": -0.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        444,
+        445,
+        446,
+        447
+      ],
+      [
+        476,
+        477,
+        478,
+        479
+      ],
+      [
+        508,
+        509,
+        510,
+        511
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 13.375,
+      "y": -0.063
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        688,
+        689,
+        690,
+        691
+      ],
+      [
+        720,
+        721,
+        722,
+        723
+      ],
+      [
+        752,
+        753,
+        754,
+        755
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 20.938,
+      "y": 0.875
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 52.625,
+      "y": 1.063
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        4,
+        5,
+        6,
+        null
+      ],
+      [
+        36,
+        37,
+        38,
+        null
+      ],
+      [
+        68,
+        69,
+        70,
+        null
+      ],
+      [
+        100,
+        101,
+        102,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 13.563,
+      "y": 1.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 48.938,
+      "y": 1.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 29.938,
+      "y": 1.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 8.125,
+      "y": 2.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 20.75,
+      "y": 2.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 4.313,
+      "y": 2.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 46.813,
+      "y": 2.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.938,
+      "y": 2.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 32.563,
+      "y": 3.125
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.125,
+      "y": 3.188
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        null,
+        null,
+        null
+      ],
+      [
+        444,
+        null,
+        null,
+        null
+      ],
+      [
+        476,
+        null,
+        null,
+        null
+      ],
+      [
+        508,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 52.563,
+      "y": 3.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 55.5,
+      "y": 3.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.5,
+      "y": 3.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 17.438,
+      "y": 3.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 12.25,
+      "y": 3.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 25.25,
+      "y": 3.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 7.875,
+      "y": 3.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.625,
+      "y": 4.0
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 52.188,
+      "y": 4.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 48.063,
+      "y": 4.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 32.313,
+      "y": 4.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 47.625,
+      "y": 4.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 50.188,
+      "y": 4.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 31.063,
+      "y": 4.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 47.625,
+      "y": 4.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 5.375,
+      "y": 4.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 23.813,
+      "y": 5.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 4.313,
+      "y": 5.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 23.125,
+      "y": 5.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 50.188,
+      "y": 5.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 4.625,
+      "y": 5.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 51.5,
+      "y": 6.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 16.0,
+      "y": 6.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 14.5,
+      "y": 6.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 47.625,
+      "y": 6.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 28.688,
+      "y": 6.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 39.438,
+      "y": 7.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 42.188,
+      "y": 7.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 17.438,
+      "y": 7.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 3.563,
+      "y": 7.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 31.063,
+      "y": 7.625
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.125,
+      "y": 7.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        14,
+        15
+      ],
+      [
+        null,
+        null,
+        46,
+        47
+      ],
+      [
+        null,
+        null,
+        78,
+        79
+      ],
+      [
+        null,
+        null,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 52.25,
+      "y": 8.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 27.75,
+      "y": 8.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 4.688,
+      "y": 8.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 25.438,
+      "y": 8.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 12.5,
+      "y": 8.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 25.375,
+      "y": 8.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_9",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_9.blueprint",
+    "at": {
+      "x": 42.3,
+      "y": 8.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_21",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_21.blueprint",
+    "at": {
+      "x": 43.0,
+      "y": 9.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 4.375,
+      "y": 9.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 51.813,
+      "y": 10.0
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.5,
+      "y": 10.063
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 2.563,
+      "y": 10.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 27.25,
+      "y": 10.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 50.563,
+      "y": 10.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 4.313,
+      "y": 10.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 28.188,
+      "y": 10.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.75,
+      "y": 11.188
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 1.188,
+      "y": 11.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 45.75,
+      "y": 11.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 9.25,
+      "y": 11.563
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.688,
+      "y": 11.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        149,
+        150,
+        151
+      ],
+      [
+        null,
+        181,
+        182,
+        183
+      ],
+      [
+        null,
+        213,
+        214,
+        215
+      ],
+      [
+        null,
+        245,
+        246,
+        247
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 50.063,
+      "y": 11.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 39.188,
+      "y": 11.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 21.438,
+      "y": 11.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 49.5,
+      "y": 11.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_45",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_45.blueprint",
+    "at": {
+      "x": 17.1,
+      "y": 11.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 1.625,
+      "y": 12.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 27.75,
+      "y": 12.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 7.75,
+      "y": 12.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 10.875,
+      "y": 12.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 42.313,
+      "y": 12.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.875,
+      "y": 12.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        5,
+        6,
+        7
+      ],
+      [
+        null,
+        37,
+        38,
+        39
+      ],
+      [
+        null,
+        69,
+        70,
+        71
+      ],
+      [
+        null,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.438,
+      "y": 12.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_26",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_26.blueprint",
+    "at": {
+      "x": 31.5,
+      "y": 12.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 24.625,
+      "y": 13.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 50.625,
+      "y": 13.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.813,
+      "y": 13.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 47.375,
+      "y": 13.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 40.563,
+      "y": 13.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 29.938,
+      "y": 13.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_144",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_144.blueprint",
+    "at": {
+      "x": 30.9,
+      "y": 14.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 51.0,
+      "y": 14.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 7.688,
+      "y": 14.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 26.375,
+      "y": 14.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 42.188,
+      "y": 14.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 32.1,
+      "y": 15.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.25,
+      "y": 15.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 3.813,
+      "y": 15.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 49.188,
+      "y": 15.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 26.813,
+      "y": 15.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 41.25,
+      "y": 15.75
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.438,
+      "y": 15.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        148,
+        null,
+        null,
+        null
+      ],
+      [
+        180,
+        null,
+        null,
+        null
+      ],
+      [
+        212,
+        null,
+        null,
+        null
+      ],
+      [
+        244,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 44.0,
+      "y": 15.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 55.375,
+      "y": 16.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.5,
+      "y": 16.438
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        14,
+        15
+      ],
+      [
+        null,
+        null,
+        46,
+        47
+      ],
+      [
+        null,
+        null,
+        78,
+        79
+      ],
+      [
+        null,
+        null,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 39.125,
+      "y": 16.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 0.188,
+      "y": 16.875
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.688,
+      "y": 17.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        14,
+        15
+      ],
+      [
+        null,
+        null,
+        46,
+        47
+      ],
+      [
+        null,
+        null,
+        78,
+        79
+      ],
+      [
+        null,
+        null,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_47",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_47.blueprint",
+    "at": {
+      "x": 46.9,
+      "y": 17.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 38.313,
+      "y": 18.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_30",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_30.blueprint",
+    "at": {
+      "x": 49.3,
+      "y": 18.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 40.25,
+      "y": 18.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.063,
+      "y": 18.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_149",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_149.blueprint",
+    "at": {
+      "x": 47.5,
+      "y": 19.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 42.7,
+      "y": 19.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 44.7,
+      "y": 19.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.25,
+      "y": 19.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.75,
+      "y": 19.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        11
+      ],
+      [
+        null,
+        null,
+        null,
+        43
+      ],
+      [
+        null,
+        null,
+        null,
+        75
+      ],
+      [
+        null,
+        null,
+        null,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 2.813,
+      "y": 19.875
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.5,
+      "y": 19.938
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_111",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_111.blueprint",
+    "at": {
+      "x": 12.1,
+      "y": 20.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_53",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_53.blueprint",
+    "at": {
+      "x": 46.5,
+      "y": 20.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 50.1,
+      "y": 21.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 28.3,
+      "y": 21.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_23",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_23.blueprint",
+    "at": {
+      "x": 6.9,
+      "y": 21.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.625,
+      "y": 21.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        656,
+        657,
+        658,
+        null
+      ],
+      [
+        688,
+        689,
+        690,
+        null
+      ],
+      [
+        720,
+        721,
+        722,
+        null
+      ],
+      [
+        752,
+        753,
+        754,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 1.875,
+      "y": 21.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_145",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_145.blueprint",
+    "at": {
+      "x": 16.5,
+      "y": 21.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_42",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_42.blueprint",
+    "at": {
+      "x": 31.9,
+      "y": 22.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 5.125,
+      "y": 22.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_78",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_78.blueprint",
+    "at": {
+      "x": 48.3,
+      "y": 22.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_146",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_146.blueprint",
+    "at": {
+      "x": 27.5,
+      "y": 22.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_129",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_129.blueprint",
+    "at": {
+      "x": 22.5,
+      "y": 22.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.375,
+      "y": 23.063
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_86",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_86.blueprint",
+    "at": {
+      "x": 18.8,
+      "y": 23.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_86 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_86.blueprint",
+    "at": {
+      "x": 21.2,
+      "y": 23.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_56",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_56.blueprint",
+    "at": {
+      "x": 11.3,
+      "y": 23.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_144 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_144.blueprint",
+    "at": {
+      "x": 23.3,
+      "y": 23.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 1.75,
+      "y": 23.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 7.125,
+      "y": 23.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_135",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_135.blueprint",
+    "at": {
+      "x": 26.7,
+      "y": 23.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.438,
+      "y": 23.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        148,
+        null,
+        null,
+        null
+      ],
+      [
+        180,
+        null,
+        null,
+        null
+      ],
+      [
+        212,
+        null,
+        null,
+        null
+      ],
+      [
+        244,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_56 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_56.blueprint",
+    "at": {
+      "x": 16.3,
+      "y": 23.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 0.625,
+      "y": 23.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.563,
+      "y": 24.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 0.0,
+      "y": 25.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 45.375,
+      "y": 25.375
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 52.625,
+      "y": 25.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        413,
+        414,
+        null
+      ],
+      [
+        444,
+        445,
+        446,
+        null
+      ],
+      [
+        476,
+        477,
+        478,
+        null
+      ],
+      [
+        508,
+        509,
+        510,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 9.188,
+      "y": 25.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 47.313,
+      "y": 26.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 0.125,
+      "y": 26.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_56 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_56.blueprint",
+    "at": {
+      "x": 16.3,
+      "y": 26.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_18",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_18.blueprint",
+    "at": {
+      "x": 12.5,
+      "y": 26.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 54.625,
+      "y": 26.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 52.563,
+      "y": 27.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_35",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_35.blueprint",
+    "at": {
+      "x": 22.3,
+      "y": 27.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 45.875,
+      "y": 27.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.75,
+      "y": 27.813
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        657,
+        658,
+        659
+      ],
+      [
+        null,
+        689,
+        690,
+        691
+      ],
+      [
+        null,
+        721,
+        722,
+        723
+      ],
+      [
+        null,
+        753,
+        754,
+        755
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 8.75,
+      "y": 27.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 44.25,
+      "y": 27.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 6.063,
+      "y": 28.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_27",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_27.blueprint",
+    "at": {
+      "x": 19.1,
+      "y": 28.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.5,
+      "y": 28.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 44.688,
+      "y": 28.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 49.5,
+      "y": 28.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_20",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_20.blueprint",
+    "at": {
+      "x": 17.3,
+      "y": 28.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_20 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_20.blueprint",
+    "at": {
+      "x": 24.9,
+      "y": 29.1
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 22.5,
+      "y": 29.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 24.5,
+      "y": 29.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 26.5,
+      "y": 29.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_17 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_17.blueprint",
+    "at": {
+      "x": 28.5,
+      "y": 29.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 8.313,
+      "y": 29.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.25,
+      "y": 29.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 44.875,
+      "y": 29.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 42.5,
+      "y": 29.625
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.375,
+      "y": 30.188
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        null,
+        null,
+        null
+      ],
+      [
+        444,
+        null,
+        null,
+        null
+      ],
+      [
+        476,
+        null,
+        null,
+        null
+      ],
+      [
+        508,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 44.5,
+      "y": 30.188
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.25,
+      "y": 30.25
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        10,
+        null
+      ],
+      [
+        40,
+        41,
+        42,
+        null
+      ],
+      [
+        72,
+        73,
+        74,
+        null
+      ],
+      [
+        104,
+        105,
+        106,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_147",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_147.blueprint",
+    "at": {
+      "x": 21.9,
+      "y": 30.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 7.875,
+      "y": 30.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 22.5,
+      "y": 31.2
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 24.5,
+      "y": 31.2
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 26.5,
+      "y": 31.2
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 28.5,
+      "y": 31.2
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 39.875,
+      "y": 31.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 55.125,
+      "y": 31.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.313,
+      "y": 31.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        413,
+        null,
+        null
+      ],
+      [
+        444,
+        445,
+        null,
+        null
+      ],
+      [
+        476,
+        477,
+        null,
+        null
+      ],
+      [
+        508,
+        509,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 1.438,
+      "y": 31.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 4.188,
+      "y": 31.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_10",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_10.blueprint",
+    "at": {
+      "x": 43.1,
+      "y": 31.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 49.813,
+      "y": 32.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (21)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 14.938,
+      "y": 32.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 52.75,
+      "y": 33.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (21)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 2.75,
+      "y": 33.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 54.0,
+      "y": 33.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 23.5,
+      "y": 33.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 25.5,
+      "y": 33.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 27.5,
+      "y": 33.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 49.813,
+      "y": 33.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 21.938,
+      "y": 33.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 13.563,
+      "y": 33.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.438,
+      "y": 33.938
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 8.188,
+      "y": 34.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 47.938,
+      "y": 34.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (22)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 36.188,
+      "y": 34.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 32.563,
+      "y": 34.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 10.25,
+      "y": 34.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 0.813,
+      "y": 34.938
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.688,
+      "y": 35.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        5,
+        6,
+        7
+      ],
+      [
+        null,
+        37,
+        38,
+        39
+      ],
+      [
+        null,
+        69,
+        70,
+        71
+      ],
+      [
+        null,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 15.063,
+      "y": 35.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 2.75,
+      "y": 35.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 50.5,
+      "y": 35.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 44.625,
+      "y": 35.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_21 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_21.blueprint",
+    "at": {
+      "x": 32.625,
+      "y": 35.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 9.688,
+      "y": 36.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 49.75,
+      "y": 36.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (22)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 44.625,
+      "y": 36.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 12.25,
+      "y": 36.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 52.0,
+      "y": 36.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.25,
+      "y": 36.938
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        13,
+        14,
+        15
+      ],
+      [
+        null,
+        45,
+        46,
+        47
+      ],
+      [
+        null,
+        77,
+        78,
+        79
+      ],
+      [
+        null,
+        109,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 44.313,
+      "y": 37.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (23)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 35.5,
+      "y": 37.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.25,
+      "y": 37.375
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        151
+      ],
+      [
+        null,
+        null,
+        null,
+        183
+      ],
+      [
+        null,
+        null,
+        null,
+        215
+      ],
+      [
+        null,
+        null,
+        null,
+        247
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (24)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 27.938,
+      "y": 37.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (25)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 25.75,
+      "y": 37.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (26)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 6.188,
+      "y": 37.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (27)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 6.5,
+      "y": 37.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 51.813,
+      "y": 37.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (23)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 26.5,
+      "y": 37.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (24)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 29.0,
+      "y": 38.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (25)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 5.188,
+      "y": 38.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 36.063,
+      "y": 38.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (28)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 22.625,
+      "y": 38.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (26)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 31.438,
+      "y": 38.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (29)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 29.813,
+      "y": 38.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (27)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 10.875,
+      "y": 38.813
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.938,
+      "y": 38.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 34.5,
+      "y": 39.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 28.375,
+      "y": 39.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 42.125,
+      "y": 39.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (30)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 36.938,
+      "y": 39.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 7.063,
+      "y": 39.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 57.375,
+      "y": 39.938
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        9,
+        10,
+        11
+      ],
+      [
+        null,
+        41,
+        42,
+        43
+      ],
+      [
+        null,
+        73,
+        74,
+        75
+      ],
+      [
+        null,
+        105,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 1.25,
+      "y": 40.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (28)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 30.125,
+      "y": 40.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_9 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_9.blueprint",
+    "at": {
+      "x": 6.5,
+      "y": 40.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 48.563,
+      "y": 40.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 30.688,
+      "y": 40.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 10.25,
+      "y": 40.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_58",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_58.blueprint",
+    "at": {
+      "x": 18.1,
+      "y": 40.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (31)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 27.438,
+      "y": 40.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 38.0,
+      "y": 40.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 47.563,
+      "y": 40.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 55.188,
+      "y": 40.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 40.688,
+      "y": 40.75
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.25,
+      "y": 40.813
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (29)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 28.5,
+      "y": 41.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 35.313,
+      "y": 41.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (30)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 47.438,
+      "y": 41.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 52.563,
+      "y": 41.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 13.75,
+      "y": 41.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (31)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 52.438,
+      "y": 41.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 17.688,
+      "y": 41.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (32)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 47.563,
+      "y": 42.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.063,
+      "y": 42.188
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        4,
+        5,
+        null,
+        null
+      ],
+      [
+        36,
+        37,
+        null,
+        null
+      ],
+      [
+        68,
+        69,
+        null,
+        null
+      ],
+      [
+        100,
+        101,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (32)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 30.313,
+      "y": 42.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (33)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 5.938,
+      "y": 42.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 9.5,
+      "y": 42.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 22.9,
+      "y": 43.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 56.563,
+      "y": 43.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        149,
+        150,
+        151
+      ],
+      [
+        null,
+        181,
+        182,
+        183
+      ],
+      [
+        null,
+        213,
+        214,
+        215
+      ],
+      [
+        null,
+        245,
+        246,
+        247
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 7.563,
+      "y": 43.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 4.625,
+      "y": 43.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (33)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 6.875,
+      "y": 43.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 44.313,
+      "y": 43.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 34.188,
+      "y": 43.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 51.375,
+      "y": 43.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (34)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 27.25,
+      "y": 43.938
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.25,
+      "y": 44.0
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        null,
+        null,
+        null
+      ],
+      [
+        40,
+        null,
+        null,
+        null
+      ],
+      [
+        72,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (34)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 47.625,
+      "y": 44.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (35)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 15.5,
+      "y": 44.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (35)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 45.938,
+      "y": 44.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 29.375,
+      "y": 44.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 9.188,
+      "y": 44.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 43.5,
+      "y": 44.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 41.625,
+      "y": 45.063
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.313,
+      "y": 45.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        12,
+        13,
+        14,
+        null
+      ],
+      [
+        44,
+        45,
+        46,
+        null
+      ],
+      [
+        76,
+        77,
+        78,
+        null
+      ],
+      [
+        108,
+        109,
+        110,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 48.563,
+      "y": 45.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (36)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.625,
+      "y": 45.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (36)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 51.25,
+      "y": 45.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 23.25,
+      "y": 45.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (37)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 30.438,
+      "y": 45.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (37)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 9.625,
+      "y": 45.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (38)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 42.75,
+      "y": 45.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (39)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 12.438,
+      "y": 45.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 4.75,
+      "y": 45.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (40)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 20.125,
+      "y": 46.25
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (38)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 5.5,
+      "y": 46.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 51.313,
+      "y": 46.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 32.563,
+      "y": 46.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (39)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 23.438,
+      "y": 46.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 47.875,
+      "y": 46.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 0.688,
+      "y": 46.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_83",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_83.blueprint",
+    "at": {
+      "x": 11.1,
+      "y": 46.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.438,
+      "y": 47.063
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        14,
+        15
+      ],
+      [
+        null,
+        null,
+        46,
+        47
+      ],
+      [
+        null,
+        null,
+        78,
+        79
+      ],
+      [
+        null,
+        null,
+        110,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.188,
+      "y": 47.25
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        140,
+        141,
+        142,
+        null
+      ],
+      [
+        172,
+        173,
+        174,
+        null
+      ],
+      [
+        204,
+        205,
+        206,
+        null
+      ],
+      [
+        236,
+        237,
+        238,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 46.313,
+      "y": 47.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (41)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 2.0,
+      "y": 47.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 8.063,
+      "y": 47.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 38.063,
+      "y": 47.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 46.25,
+      "y": 47.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (40)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 4.875,
+      "y": 48.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (21)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 27.688,
+      "y": 48.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (41)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 50.875,
+      "y": 48.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (42)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 6.25,
+      "y": 48.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 19.125,
+      "y": 48.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (43)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 25.938,
+      "y": 48.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 4.063,
+      "y": 49.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (44)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 30.125,
+      "y": 49.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (22)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 50.0,
+      "y": 49.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (45)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 51.938,
+      "y": 50.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (46)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.313,
+      "y": 50.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (47)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 3.125,
+      "y": 50.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (21)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 22.0,
+      "y": 50.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (42)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 0.25,
+      "y": 50.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_8",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_8.blueprint",
+    "at": {
+      "x": 47.1,
+      "y": 51.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.75,
+      "y": 51.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        142,
+        143
+      ],
+      [
+        null,
+        null,
+        174,
+        175
+      ],
+      [
+        null,
+        null,
+        206,
+        207
+      ],
+      [
+        null,
+        null,
+        238,
+        239
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (48)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 23.063,
+      "y": 51.438
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.688,
+      "y": 51.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 29.188,
+      "y": 51.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 5.0,
+      "y": 51.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 44.3,
+      "y": 51.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 19.938,
+      "y": 51.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 49.9,
+      "y": 52.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_149 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_149.blueprint",
+    "at": {
+      "x": 44.3,
+      "y": 52.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 33.938,
+      "y": 52.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (43)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 32.25,
+      "y": 52.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_149 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_149.blueprint",
+    "at": {
+      "x": 49.9,
+      "y": 52.6
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_5",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_5.blueprint",
+    "at": {
+      "x": 13.5,
+      "y": 52.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (44)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 8.938,
+      "y": 52.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_34",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_34.blueprint",
+    "at": {
+      "x": 41.9,
+      "y": 52.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 34.938,
+      "y": 53.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_5 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_5.blueprint",
+    "at": {
+      "x": 6.1,
+      "y": 53.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.0,
+      "y": 53.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        5,
+        6,
+        7
+      ],
+      [
+        null,
+        37,
+        38,
+        39
+      ],
+      [
+        null,
+        69,
+        70,
+        71
+      ],
+      [
+        null,
+        101,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (49)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 32.688,
+      "y": 53.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 43.9,
+      "y": 54.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (50)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 33.5,
+      "y": 54.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_74 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_74.blueprint",
+    "at": {
+      "x": 50.3,
+      "y": 54.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_56 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_56.blueprint",
+    "at": {
+      "x": 6.8,
+      "y": 55.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_56 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_56.blueprint",
+    "at": {
+      "x": 9.3,
+      "y": 55.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_64",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_64.blueprint",
+    "at": {
+      "x": 11.9,
+      "y": 55.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (22)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 2.25,
+      "y": 55.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (45)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 37.25,
+      "y": 55.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.625,
+      "y": 55.875
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        140,
+        141,
+        null,
+        null
+      ],
+      [
+        172,
+        173,
+        null,
+        null
+      ],
+      [
+        204,
+        205,
+        null,
+        null
+      ],
+      [
+        236,
+        237,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_54",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_54.blueprint",
+    "at": {
+      "x": 3.9,
+      "y": 55.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_5 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_5.blueprint",
+    "at": {
+      "x": 50.9,
+      "y": 55.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 31.375,
+      "y": 56.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_23 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_23.blueprint",
+    "at": {
+      "x": 14.7,
+      "y": 56.7
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_132",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_132.blueprint",
+    "at": {
+      "x": 42.9,
+      "y": 56.7
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 31.0,
+      "y": 56.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (51)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 1.0,
+      "y": 57.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_23 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_23.blueprint",
+    "at": {
+      "x": 5.5,
+      "y": 57.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.938,
+      "y": 57.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        656,
+        null,
+        null,
+        null
+      ],
+      [
+        688,
+        null,
+        null,
+        null
+      ],
+      [
+        720,
+        null,
+        null,
+        null
+      ],
+      [
+        752,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 20.5,
+      "y": 57.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 24.5,
+      "y": 57.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_115",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_115.blueprint",
+    "at": {
+      "x": 28.5,
+      "y": 57.4
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 32.5,
+      "y": 57.4
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.375,
+      "y": 57.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        413,
+        414,
+        null
+      ],
+      [
+        444,
+        445,
+        446,
+        null
+      ],
+      [
+        476,
+        477,
+        478,
+        null
+      ],
+      [
+        508,
+        509,
+        510,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 50.688,
+      "y": 57.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 48.9,
+      "y": 58.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 46.5,
+      "y": 58.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 51.938,
+      "y": 58.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.688,
+      "y": 59.25
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        413,
+        414,
+        415
+      ],
+      [
+        null,
+        445,
+        446,
+        447
+      ],
+      [
+        null,
+        477,
+        478,
+        479
+      ],
+      [
+        null,
+        509,
+        510,
+        511
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (52)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 3.188,
+      "y": 60.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (53)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 5.5,
+      "y": 60.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_115 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_115.blueprint",
+    "at": {
+      "x": 51.7,
+      "y": 60.3
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 52.938,
+      "y": 60.438
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        1280,
+        1281,
+        1282,
+        null
+      ],
+      [
+        1312,
+        1313,
+        1314,
+        null
+      ],
+      [
+        1344,
+        1345,
+        1346,
+        null
+      ],
+      [
+        1376,
+        1377,
+        1378,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_45 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_45.blueprint",
+    "at": {
+      "x": 18.3,
+      "y": 60.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (54)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.75,
+      "y": 60.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 20.5,
+      "y": 60.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_115 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_115.blueprint",
+    "at": {
+      "x": 24.5,
+      "y": 60.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_16 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_16.blueprint",
+    "at": {
+      "x": 28.5,
+      "y": 60.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_115 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_115.blueprint",
+    "at": {
+      "x": 32.5,
+      "y": 60.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 1.563,
+      "y": 61.188
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        null,
+        null,
+        null
+      ],
+      [
+        444,
+        null,
+        null,
+        null
+      ],
+      [
+        476,
+        null,
+        null,
+        null
+      ],
+      [
+        508,
+        null,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 47.5,
+      "y": 61.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 44.125,
+      "y": 61.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_115 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_115.blueprint",
+    "at": {
+      "x": 42.3,
+      "y": 61.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (55)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 4.563,
+      "y": 61.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_105",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_105.blueprint",
+    "at": {
+      "x": 39.688,
+      "y": 62.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_132 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_132.blueprint",
+    "at": {
+      "x": 48.5,
+      "y": 62.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.375,
+      "y": 62.25
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_58 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_58.blueprint",
+    "at": {
+      "x": 30.9,
+      "y": 62.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (23)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 13.438,
+      "y": 62.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (56)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 9.188,
+      "y": 62.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 47.5,
+      "y": 63.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_66 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_66.blueprint",
+    "at": {
+      "x": 5.625,
+      "y": 63.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (24)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 6.438,
+      "y": 63.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_69",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_69.blueprint",
+    "at": {
+      "x": 25.1,
+      "y": 64.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_125",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_125.blueprint",
+    "at": {
+      "x": 23.5,
+      "y": 64.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 12.375,
+      "y": 64.5
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 3.875,
+      "y": 64.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        656,
+        657,
+        658,
+        null
+      ],
+      [
+        688,
+        689,
+        690,
+        null
+      ],
+      [
+        720,
+        721,
+        722,
+        null
+      ],
+      [
+        752,
+        753,
+        754,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_22",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_22.blueprint",
+    "at": {
+      "x": 27.7,
+      "y": 64.7
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.125,
+      "y": 64.75
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        656,
+        657,
+        null,
+        null
+      ],
+      [
+        688,
+        689,
+        null,
+        null
+      ],
+      [
+        720,
+        721,
+        null,
+        null
+      ],
+      [
+        752,
+        753,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_23 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_23.blueprint",
+    "at": {
+      "x": 50.1,
+      "y": 64.9
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (46)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 6.063,
+      "y": 65.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_5 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_5.blueprint",
+    "at": {
+      "x": 46.9,
+      "y": 65.7
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_135 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_135.blueprint",
+    "at": {
+      "x": 23.7,
+      "y": 65.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.563,
+      "y": 66.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        10,
+        11
+      ],
+      [
+        null,
+        null,
+        42,
+        43
+      ],
+      [
+        null,
+        null,
+        74,
+        75
+      ],
+      [
+        null,
+        null,
+        106,
+        107
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (47)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 7.063,
+      "y": 66.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (23)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 16.313,
+      "y": 66.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_48",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_48.blueprint",
+    "at": {
+      "x": 28.1,
+      "y": 66.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 40.688,
+      "y": 66.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_148",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_148.blueprint",
+    "at": {
+      "x": 22.1,
+      "y": 66.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_133",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_133.blueprint",
+    "at": {
+      "x": 26.7,
+      "y": 66.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (48)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 10.188,
+      "y": 66.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 12.188,
+      "y": 66.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_130",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_130.blueprint",
+    "at": {
+      "x": 26.1,
+      "y": 66.9
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.813,
+      "y": 67.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        148,
+        149,
+        null,
+        null
+      ],
+      [
+        180,
+        181,
+        null,
+        null
+      ],
+      [
+        212,
+        213,
+        null,
+        null
+      ],
+      [
+        244,
+        245,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 4.875,
+      "y": 67.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_35 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_35.blueprint",
+    "at": {
+      "x": 19.9,
+      "y": 67.3
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (49)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 34.75,
+      "y": 67.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_58 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_58.blueprint",
+    "at": {
+      "x": 45.9,
+      "y": 67.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (57)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 8.0,
+      "y": 67.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (25)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 30.75,
+      "y": 67.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 18.625,
+      "y": 68.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (50)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 12.188,
+      "y": 68.438
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (26)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 7.188,
+      "y": 68.688
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.25,
+      "y": 68.75
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        6,
+        7
+      ],
+      [
+        null,
+        null,
+        38,
+        39
+      ],
+      [
+        null,
+        null,
+        70,
+        71
+      ],
+      [
+        null,
+        null,
+        102,
+        103
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_85 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_85.blueprint",
+    "at": {
+      "x": 30.563,
+      "y": 68.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 14.875,
+      "y": 68.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_60",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_60.blueprint",
+    "at": {
+      "x": 48.1,
+      "y": 69.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (27)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 4.188,
+      "y": 69.125
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_11 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_11.blueprint",
+    "at": {
+      "x": 6.75,
+      "y": 69.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 26.813,
+      "y": 69.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 27.813,
+      "y": 69.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 28.438,
+      "y": 70.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_60 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_60.blueprint",
+    "at": {
+      "x": 51.3,
+      "y": 70.1
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.625,
+      "y": 70.25
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        141,
+        142,
+        143
+      ],
+      [
+        null,
+        173,
+        174,
+        175
+      ],
+      [
+        null,
+        205,
+        206,
+        207
+      ],
+      [
+        null,
+        237,
+        238,
+        239
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (58)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 6.313,
+      "y": 70.25
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -2.688,
+      "y": 70.563
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        null,
+        15
+      ],
+      [
+        null,
+        null,
+        null,
+        47
+      ],
+      [
+        null,
+        null,
+        null,
+        79
+      ],
+      [
+        null,
+        null,
+        null,
+        111
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 12.0,
+      "y": 70.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 9.875,
+      "y": 70.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 17.5,
+      "y": 70.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (59)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 6.875,
+      "y": 71.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (60)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 36.938,
+      "y": 71.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (15)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 22.875,
+      "y": 71.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 10.625,
+      "y": 71.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (61)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 8.313,
+      "y": 72.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 31.625,
+      "y": 72.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (16)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 20.5,
+      "y": 72.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (51)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 10.813,
+      "y": 72.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (62)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 0.25,
+      "y": 73.0
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_23 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_23.blueprint",
+    "at": {
+      "x": 17.3,
+      "y": 73.1
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (24)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 5.813,
+      "y": 73.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_46 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_46.blueprint",
+    "at": {
+      "x": 51.25,
+      "y": 73.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (12)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 36.813,
+      "y": 73.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (52)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 28.375,
+      "y": 73.625
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 34.375,
+      "y": 73.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 19.875,
+      "y": 73.938
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (18)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 27.25,
+      "y": 73.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (53)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 6.563,
+      "y": 74.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (54)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 9.938,
+      "y": 74.063
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_13 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_13.blueprint",
+    "at": {
+      "x": 51.375,
+      "y": 74.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (19)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 10.0,
+      "y": 74.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_44 (25)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_44.blueprint",
+    "at": {
+      "x": 41.125,
+      "y": 74.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (63)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 56.438,
+      "y": 74.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_84",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_84.blueprint",
+    "at": {
+      "x": 50.313,
+      "y": 74.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (20)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 4.313,
+      "y": 74.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_80 (13)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_80.blueprint",
+    "at": {
+      "x": 36.063,
+      "y": 75.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_100 (14)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_100.blueprint",
+    "at": {
+      "x": 30.75,
+      "y": 75.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (21)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 33.75,
+      "y": 75.625
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (22)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 1.938,
+      "y": 75.875
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 27.5,
+      "y": 76.063
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 2.563,
+      "y": 76.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        8,
+        9,
+        null,
+        null
+      ],
+      [
+        40,
+        41,
+        null,
+        null
+      ],
+      [
+        72,
+        73,
+        null,
+        null
+      ],
+      [
+        104,
+        105,
+        null,
+        null
+      ]
+    ],
+    "sort": 3.5,
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_24 (17)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_24.blueprint",
+    "at": {
+      "x": 25.563,
+      "y": 76.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 31.938,
+      "y": 76.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 36.625,
+      "y": 76.313
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (64)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 5.188,
+      "y": 76.375
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (65)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 12.938,
+      "y": 76.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 34.5,
+      "y": 76.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 30.0,
+      "y": 76.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (66)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 25.438,
+      "y": 76.75
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 44.375,
+      "y": 77.063
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (55)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 7.125,
+      "y": 77.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 32.813,
+      "y": 77.125
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (23)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 5.188,
+      "y": 77.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_2 (67)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_2.blueprint",
+    "at": {
+      "x": 9.25,
+      "y": 77.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (28)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 33.75,
+      "y": 77.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 50.438,
+      "y": 77.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_84 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_84.blueprint",
+    "at": {
+      "x": 43.125,
+      "y": 77.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (5)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 33.875,
+      "y": 77.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 51.25,
+      "y": 77.688
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 36.75,
+      "y": 77.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_3 (56)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_3.blueprint",
+    "at": {
+      "x": 21.75,
+      "y": 77.875
+    }
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.938,
+      "y": 77.938
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        414,
+        415
+      ],
+      [
+        null,
+        null,
+        446,
+        447
+      ],
+      [
+        null,
+        null,
+        478,
+        479
+      ],
+      [
+        null,
+        null,
+        510,
+        511
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_82",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_82.blueprint",
+    "at": {
+      "x": 38.438,
+      "y": 78.188
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (29)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 29.125,
+      "y": 78.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (6)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 46.438,
+      "y": 78.25
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (7)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 56.125,
+      "y": 78.313
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_82 (1)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_82.blueprint",
+    "at": {
+      "x": 41.0,
+      "y": 78.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_82 (2)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_82.blueprint",
+    "at": {
+      "x": 13.313,
+      "y": 78.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 23.563,
+      "y": 78.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (24)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 36.938,
+      "y": 78.813
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 51.625,
+      "y": 78.813
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (8)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 8.313,
+      "y": 78.875
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (9)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 5.75,
+      "y": 78.938
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_82 (3)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_82.blueprint",
+    "at": {
+      "x": 25.188,
+      "y": 79.0
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -1.313,
+      "y": 79.125
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        null,
+        646,
+        647
+      ],
+      [
+        null,
+        null,
+        678,
+        679
+      ],
+      [
+        null,
+        null,
+        710,
+        711
+      ],
+      [
+        null,
+        null,
+        742,
+        743
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (25)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 6.875,
+      "y": 79.188
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_82 (4)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_82.blueprint",
+    "at": {
+      "x": 36.0,
+      "y": 79.375
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (30)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 38.438,
+      "y": 79.438
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 33.875,
+      "y": 79.5
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (31)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 36.063,
+      "y": 79.5
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (10)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 26.813,
+      "y": 79.563
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_1 (26)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_1.blueprint",
+    "at": {
+      "x": 48.875,
+      "y": 79.563
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 53.063,
+      "y": 79.625
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        412,
+        413,
+        414,
+        null
+      ],
+      [
+        444,
+        445,
+        446,
+        null
+      ],
+      [
+        476,
+        477,
+        478,
+        null
+      ],
+      [
+        508,
+        509,
+        510,
+        null
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": -0.438,
+      "y": 79.688
+    },
+    "tileset": "world/area/verdant/tilesets/verdant_props.tileset",
+    "tiles": [
+      [
+        null,
+        25,
+        26,
+        27
+      ],
+      [
+        null,
+        57,
+        58,
+        59
+      ],
+      [
+        null,
+        89,
+        90,
+        91
+      ],
+      [
+        null,
+        121,
+        122,
+        123
+      ]
+    ],
+    "sort": 3.5
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_6 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_6.blueprint",
+    "at": {
+      "x": 25.063,
+      "y": 79.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_31 (32)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_31.blueprint",
+    "at": {
+      "x": 47.875,
+      "y": 79.688
+    }
+  },
+  {
+    "type": "blueprint",
+    "label": "verdant_props_41 (11)",
+    "blueprint": "world/area/verdant/blueprints/verdant_props_41.blueprint",
+    "at": {
+      "x": 47.188,
+      "y": 79.75
+    },
+    "flip": "horizontal"
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.5,
+      "y": 17.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        929,
+        929,
+        888,
+        889,
+        890,
+        891,
+        929
+      ],
+      [
+        929,
+        892,
+        893,
+        894,
+        895,
+        896,
+        897
+      ],
+      [
+        929,
+        898,
+        899,
+        900,
+        901,
+        902,
+        903
+      ],
+      [
+        904,
+        905,
+        906,
+        907,
+        908,
+        909,
+        910
+      ],
+      [
+        911,
+        912,
+        913,
+        914,
+        915,
+        916,
+        917
+      ],
+      [
+        918,
+        919,
+        920,
+        921,
+        922,
+        923,
+        924
+      ],
+      [
+        929,
+        929,
+        925,
+        926,
+        927,
+        928,
+        929
+      ]
+    ],
+    "sort": 6.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 30.5,
+      "y": 20.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        581,
+        582,
+        583,
+        584,
+        585
+      ],
+      [
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      [
+        591,
+        592,
+        593,
+        594,
+        595
+      ],
+      [
+        596,
+        597,
+        598,
+        599,
+        603
+      ],
+      [
+        603,
+        600,
+        601,
+        602,
+        603
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 19.5,
+      "y": 21.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        1032,
+        1033,
+        1034,
+        1035,
+        1056
+      ],
+      [
+        1036,
+        1037,
+        1038,
+        1039,
+        1040
+      ],
+      [
+        1041,
+        1042,
+        1043,
+        1044,
+        1045
+      ],
+      [
+        1046,
+        1047,
+        1048,
+        1049,
+        1050
+      ],
+      [
+        1051,
+        1052,
+        1053,
+        1054,
+        1055
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 25.5,
+      "y": 21.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        418,
+        419,
+        420,
+        421
+      ],
+      [
+        422,
+        423,
+        424,
+        425
+      ],
+      [
+        426,
+        427,
+        428,
+        429
+      ],
+      [
+        430,
+        431,
+        432,
+        433
+      ],
+      [
+        434,
+        435,
+        436,
+        437
+      ]
+    ],
+    "sort": 4.0
+  },
+  {
+    "type": "scenery",
+    "at": {
+      "x": 7.5,
+      "y": 53.5
+    },
+    "tileset": "world/tileset/buildings.tileset",
+    "tiles": [
+      [
+        461,
+        438,
+        439,
+        440,
+        461
+      ],
+      [
+        441,
+        442,
+        443,
+        444,
+        445
+      ],
+      [
+        446,
+        447,
+        448,
+        449,
+        450
+      ],
+      [
+        451,
+        452,
+        453,
+        454,
+        455
+      ],
+      [
+        456,
+        457,
+        458,
+        459,
+        460
+      ]
+    ],
+    "sort": 4.0
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "name": "Verdant",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 56,
+        "height": 84
+      },
+      "tile": 16
+    }
+  }
+}

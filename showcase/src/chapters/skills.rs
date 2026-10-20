@@ -78,7 +78,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("Cleave's card", |snapshot| {
         snapshot
             .skill_card
-            .is_some_and(|card| card.skill.key(content()) == "cleave")
+            .is_some_and(|card| card.skill.name(content()) == "cleave")
     });
     me.hold();
     me.act(InputAction::Dismiss);

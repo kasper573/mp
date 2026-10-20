@@ -19,7 +19,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, skill};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 use crate::{behaviour, compile, flow};
 
@@ -43,9 +43,9 @@ pub fn parse_in<T: DeserializeOwned>(content: &Content, value: Value) -> T {
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 
-/// The module that runs the test game's script row under `key`.
-pub fn module(key: &str) -> ScriptModule {
-    parse(json!({ "script": key }))
+/// The module that runs the test game's script declared as `name`.
+pub fn module(name: &str) -> ScriptModule {
+    parse(json!({ "script": path("script", name) }))
 }
 
 /// A fighter alone in the middle of a field, where the test game's characters can be set loose.
@@ -114,13 +114,12 @@ pub fn health(sim: &Sim, who: Entity) -> f32 {
 }
 
 pub fn game() -> Game {
-    let fighter =
-        |script: &str| json!([{ "type": "script", "script": script, "values": { "aggro": 4.0 } }]);
+    let fighter = |script: &str| json!([{ "type": "script", "script": path("script", script), "values": { "aggro": 4.0 } }]);
     let game = Game::new()
         .area(
             "field",
             &Map::open(32, 32),
-            json!([{ "type": "resident", "npc": "stroller", "at": { "x": 26.0, "y": 4.0 } }]),
+            json!([{ "type": "resident", "npc": "stroller.npc.json", "at": { "x": 26.0, "y": 4.0 } }]),
         )
         .area("forest", &Map::open(8, 20), json!([]))
         .hero("field", 8.0, 8.0)
@@ -130,8 +129,8 @@ pub fn game() -> Game {
         .npc("hunter", 30.0, fighter("hunts"))
         .npc("guard", 30.0, fighter("defends"))
         .npc("chief", 30.0, fighter("protects"))
-        .npc("bat", 30.0, json!([{ "type": "script", "script": "flees" }]))
-        .npc("stroller", 30.0, json!([{ "type": "script", "script": "strolls" }]))
+        .npc("bat", 30.0, json!([{ "type": "script", "script": "flees.script.json" }]))
+        .npc("stroller", 30.0, json!([{ "type": "script", "script": "strolls.script.json" }]))
         .edit("npc", "fighter", striking)
         .edit("npc", "hunter", striking)
         .edit("npc", "guard", striking)
@@ -171,16 +170,15 @@ pub fn game() -> Game {
             "map",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "script", "script": "map_read" }],
+                "modules": [{ "type": "script", "script": "map_read.script.json" }],
             }),
         )
         .script(
             "map_read",
-            "item/map",
             "item",
             json!({
                 "used": { "type": "on", "event": "used", "next": "look" },
-                "look": { "type": "notify", "notification": "gulls" },
+                "look": { "type": "notify", "notification": "gulls.notification.json" },
             }),
         )
         .row("memory", "bribed", remembered("Bribed"))
@@ -236,11 +234,11 @@ pub fn game() -> Game {
             "box",
             json!({
                 "title": "Honesty box",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [{
                     "type": "sells",
-                    "item": "pass",
-                    "price": [{ "item": "gold", "count": 3 }],
+                    "item": "pass.item.json",
+                    "price": [{ "item": "gold.item.json", "count": 3 }],
                     "stock": { "type": "unlimited" },
                 }],
             }),
@@ -300,7 +298,7 @@ fn fights_nearest(among: &str) -> Value {
 }
 
 fn striking(npc: &mut Value) {
-    npc["basic_attack"] = json!("strike");
+    npc["basic_attack"] = json!("strike.skill.json");
 }
 
 fn remembered(label: &str) -> Value {
@@ -308,5 +306,5 @@ fn remembered(label: &str) -> Value {
 }
 
 fn narration(text: &str) -> Value {
-    json!({ "kind": { "type": "narration", "label": "Shore", "sfx": "waves" }, "text": [text] })
+    json!({ "kind": { "type": "narration", "label": "Shore", "sfx": "waves.sfx" }, "text": [text] })
 }

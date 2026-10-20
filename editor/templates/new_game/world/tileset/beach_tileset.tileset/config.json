@@ -1,0 +1,9 @@
+{
+  "tile": 16,
+  "tiles": {
+    "338": {
+      "walk": "walkable",
+      "surface": "world/surface/sand.surface.json"
+    }
+  }
+}

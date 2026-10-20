@@ -1,0 +1,19 @@
+[
+  {
+    "type": "scenery",
+    "at": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tileset": "world/area/emberfall_shrine/tilesets/emberfall_shrine_furniture.tileset",
+    "tiles": [
+      [
+        8
+      ],
+      [
+        9
+      ]
+    ],
+    "sort": 1.0
+  }
+]

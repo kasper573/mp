@@ -13,13 +13,13 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::ASSETS_DIR;
-use super::owner::{ContentOwners, RowName};
+use super::files::{bundle_of, name_of};
 use super::report::ContentProblem;
-use super::table::{Content, ContentRow};
+use super::table::{Content, ContentFile};
 
-/// In files a key, in memory and on the wire the index among the table's keys sorted bytewise, so
-/// an id is valid only within the `Content` it was resolved against.
+/// In files the path of a content file from the game folder, in memory and on the wire the index
+/// among its type's paths sorted bytewise, so an id is valid only within the `Content` it was
+/// resolved against.
 pub struct ContentId<Row>(u32, PhantomData<fn() -> Row>);
 
 impl<Row> ContentId<Row> {
@@ -36,13 +36,18 @@ impl<Row> ContentId<Row> {
     }
 }
 
-impl<Row: ContentRow> ContentId<Row> {
+impl<Row: ContentFile> ContentId<Row> {
     pub fn get(self, content: &Content) -> &Row {
         content.table::<Row>().row(self)
     }
 
-    pub fn key(self, content: &Content) -> &str {
-        content.table::<Row>().key(self)
+    pub fn path(self, content: &Content) -> &str {
+        content.table::<Row>().path(self)
+    }
+
+    /// The name the file goes by: its file name before the first dot.
+    pub fn name(self, content: &Content) -> &str {
+        name_of(self.path(content))
     }
 }
 
@@ -80,23 +85,23 @@ impl<Row> Hash for ContentId<Row> {
     }
 }
 
-impl<Row: ContentRow> fmt::Debug for ContentId<Row> {
+impl<Row: ContentFile> fmt::Debug for ContentId<Row> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match SCOPE.with(|scope| {
             scope
                 .borrow()
                 .as_ref()
-                .and_then(|scope| scope.key::<Row>(self.0))
+                .and_then(|scope| scope.path::<Row>(self.0))
         }) {
-            Some(key) => write!(f, "{}/{key}", Row::TABLE),
+            Some(path) => f.write_str(&path),
             None => write!(f, "{}#{}", Row::TABLE, self.0),
         }
     }
 }
 
-impl<Row: ContentRow> JsonSchema for ContentId<Row> {
+impl<Row: ContentFile> JsonSchema for ContentId<Row> {
     fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("Key")
+        Cow::Borrowed("ContentPath")
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
@@ -110,42 +115,42 @@ impl<Row: ContentRow> JsonSchema for ContentId<Row> {
     }
 }
 
-impl<Row: ContentRow> Serialize for ContentId<Row> {
+impl<Row: ContentFile> Serialize for ContentId<Row> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if !serializer.is_human_readable() {
             return serializer.serialize_u32(self.0);
         }
-        let key = SCOPE.with(|scope| {
+        let path = SCOPE.with(|scope| {
             scope
                 .borrow()
                 .as_ref()
-                .and_then(|scope| scope.key::<Row>(self.0))
+                .and_then(|scope| scope.path::<Row>(self.0))
         });
-        match key {
-            Some(key) => serializer.serialize_str(&key),
+        match path {
+            Some(path) => serializer.serialize_str(&path),
             None => Err(serde::ser::Error::custom(format!(
-                "a {} id is written as its key only inside with_content",
+                "a {} id is written as its path only inside with_content",
                 Row::TABLE
             ))),
         }
     }
 }
 
-impl<'de, Row: ContentRow> Deserialize<'de> for ContentId<Row> {
+impl<'de, Row: ContentFile> Deserialize<'de> for ContentId<Row> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<ContentId<Row>, D::Error> {
         if !deserializer.is_human_readable() {
             return u32::deserialize(deserializer).map(ContentId::new);
         }
-        let key = String::deserialize(deserializer)?;
+        let path = String::deserialize(deserializer)?;
         SCOPE.with(|scope| {
             let mut scope = scope.borrow_mut();
             let Some(scope) = scope.as_mut() else {
                 return Err(de::Error::custom(format!(
-                    "a {} key is read only inside with_content",
+                    "a {} path is read only inside with_content",
                     Row::TABLE
                 )));
             };
-            Ok(scope.resolve::<Row>(key))
+            Ok(scope.resolve::<Row>(path))
         })
     }
 }
@@ -168,25 +173,21 @@ impl Leaf {
                     nearest.as_deref(),
                 ));
             }
-            (LeafKind::Row(table), LeafProblem::OutOfReach { owner, reach }) => {
-                return Some(ContentProblem::out_of_reach(
-                    table,
-                    &self.value,
-                    owner,
-                    reach,
-                ));
-            }
-            (LeafKind::Asset, LeafProblem::OutOfReach { .. }) => return None,
             (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
                 "missing file",
-                format!("a file under {ASSETS_DIR}/"),
+                "the path of a media file from the game folder".to_owned(),
                 nearest.as_ref(),
             ),
+            (LeafKind::Asset, LeafProblem::InBundle { bundle }) => (
+                "part of a bundle",
+                format!("a media file outside every bundle: {bundle} keeps its parts to itself"),
+                None,
+            ),
+            (LeafKind::Row(_), LeafProblem::InBundle { .. }) => return None,
             (_, LeafProblem::Unsafe) => (
                 "unsafe path",
-                format!(
-                    "a path under {ASSETS_DIR}/: forward slashes, never absolute or through .."
-                ),
+                "a path from the game folder: forward slashes, never absolute or through .."
+                    .to_owned(),
                 None,
             ),
         };
@@ -208,41 +209,29 @@ pub enum LeafProblem {
     Unknown {
         nearest: Option<String>,
     },
-    /// A row local to `owner`, which the reading row can't reach; `reach` is the owners whose
-    /// local rows it can.
-    OutOfReach {
-        owner: RowName,
-        reach: Vec<RowName>,
+    /// A part of `bundle`, which nothing outside it names.
+    InBundle {
+        bundle: String,
     },
     Unsafe,
 }
 
-/// The row a scope reads for, to check that every row it names is in its reach. `row` is `None` for
-/// what sits above every row, such as the game's settings.
-#[derive(Clone)]
-pub struct ScopeReader {
-    pub row: Option<RowName>,
-    pub owners: Arc<ContentOwners>,
-}
+type ScopePaths = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
 
-type ScopeKeys = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
-
-/// Resolves keys while reading and collects every reference it met, so one parse reports every
+/// Resolves paths while reading and collects every reference it met, so one parse reports every
 /// dangling reference instead of stopping at the first.
 #[derive(Clone)]
 pub struct ContentScope {
-    keys: Arc<ScopeKeys>,
-    assets: Option<Arc<Vec<String>>>,
-    reader: Option<ScopeReader>,
+    paths: Arc<ScopePaths>,
+    media: Option<Arc<Vec<String>>>,
     leaves: Vec<Leaf>,
 }
 
 impl ContentScope {
     pub fn new() -> ContentScope {
         ContentScope {
-            keys: Arc::new(HashMap::default()),
-            assets: None,
-            reader: None,
+            paths: Arc::new(HashMap::default()),
+            media: None,
             leaves: Vec::new(),
         }
     }
@@ -250,28 +239,23 @@ impl ContentScope {
     pub fn of(content: &Content) -> ContentScope {
         let mut scope = ContentScope::new();
         for (type_id, table) in content.tables() {
-            Arc::make_mut(&mut scope.keys).insert(type_id, (table.name(), table.keys().to_vec()));
+            Arc::make_mut(&mut scope.paths).insert(type_id, (table.name(), table.paths().to_vec()));
         }
         scope
     }
 
-    pub fn table<Row: ContentRow>(&mut self, keys: Vec<String>) {
-        Arc::make_mut(&mut self.keys).insert(TypeId::of::<Row>(), (Row::TABLE, keys));
+    pub fn table<Row: ContentFile>(&mut self, paths: Vec<String>) {
+        Arc::make_mut(&mut self.paths).insert(TypeId::of::<Row>(), (Row::TABLE, paths));
     }
 
-    pub fn table_by_type(&mut self, type_id: TypeId, name: &'static str, keys: Vec<String>) {
-        Arc::make_mut(&mut self.keys).insert(type_id, (name, keys));
+    pub fn table_by_type(&mut self, type_id: TypeId, name: &'static str, paths: Vec<String>) {
+        Arc::make_mut(&mut self.paths).insert(type_id, (name, paths));
     }
 
-    pub fn assets(&mut self, mut files: Vec<String>) {
+    /// Checks every media path read from here on against `files`.
+    pub fn media(&mut self, mut files: Vec<String>) {
         files.sort_unstable();
-        self.assets = Some(Arc::new(files));
-    }
-
-    /// Checks every row read from here on against what `reader` may reach.
-    pub fn reading(mut self, reader: ScopeReader) -> ContentScope {
-        self.reader = Some(reader);
-        self
+        self.media = Some(Arc::new(files));
     }
 
     pub fn leaves(&self) -> &[Leaf] {
@@ -285,11 +269,15 @@ impl ContentScope {
             || path.chars().nth(1) == Some(':');
         let problem = if unsafe_path {
             Some(LeafProblem::Unsafe)
+        } else if let Some((bundle, _)) = bundle_of(path) {
+            Some(LeafProblem::InBundle {
+                bundle: bundle.to_owned(),
+            })
         } else {
-            match &self.assets {
+            match &self.media {
                 Some(files) if files.binary_search_by(|f| f.as_str().cmp(path)).is_err() => {
                     Some(LeafProblem::Unknown {
-                        nearest: nearest(files.as_slice(), path),
+                        nearest: nearest_path(files.as_slice(), path),
                     })
                 }
                 _ => None,
@@ -302,54 +290,36 @@ impl ContentScope {
         });
     }
 
-    fn key<Row: ContentRow>(&self, index: u32) -> Option<String> {
-        self.keys
+    fn path<Row: ContentFile>(&self, index: u32) -> Option<String> {
+        self.paths
             .get(&TypeId::of::<Row>())?
             .1
             .get(index as usize)
             .cloned()
     }
 
-    fn resolve<Row: ContentRow>(&mut self, key: String) -> ContentId<Row> {
-        let keys = self.keys.get(&TypeId::of::<Row>()).map(|(_, keys)| keys);
-        let (id, problem) = match keys.and_then(|keys| keys.binary_search(&key).ok()) {
-            Some(index) => (ContentId::new(index as u32), self.reach::<Row>(&key)),
+    fn resolve<Row: ContentFile>(&mut self, path: String) -> ContentId<Row> {
+        let paths = self.paths.get(&TypeId::of::<Row>()).map(|(_, paths)| paths);
+        let found = paths.and_then(|paths| {
+            paths
+                .binary_search_by(|candidate| candidate.as_bytes().cmp(path.as_bytes()))
+                .ok()
+        });
+        let (id, problem) = match found {
+            Some(index) => (ContentId::new(index as u32), None),
             None => (
                 ContentId::new(u32::MAX),
                 Some(LeafProblem::Unknown {
-                    nearest: keys.and_then(|keys| nearest(keys, &key)),
+                    nearest: paths.and_then(|paths| nearest_path(paths, &path)),
                 }),
             ),
         };
         self.leaves.push(Leaf {
             kind: LeafKind::Row(Row::TABLE),
-            value: key,
+            value: path,
             problem,
         });
         id
-    }
-}
-
-impl ContentScope {
-    fn reach<Row: ContentRow>(&self, key: &str) -> Option<LeafProblem> {
-        let reader = self.reader.as_ref()?;
-        if reader.owners.in_reach(reader.row.as_ref(), Row::TABLE, key) {
-            return None;
-        }
-        let owner = reader.owners.owner(Row::TABLE, key)?.clone();
-        let reach = reader
-            .row
-            .iter()
-            .cloned()
-            .chain(reader.row.iter().flat_map(|row| {
-                reader
-                    .owners
-                    .chain(&row.table, &row.key)
-                    .cloned()
-                    .collect::<Vec<_>>()
-            }))
-            .collect();
-        Some(LeafProblem::OutOfReach { owner, reach })
     }
 }
 
@@ -394,6 +364,23 @@ pub fn read_aside<T>(f: impl FnOnce() -> T, keep: impl Fn(&Leaf) -> bool) -> T {
         }
     });
     result
+}
+
+/// The path among `candidates` that `path` most likely meant: the one file of the same file name,
+/// as after a move made outside the editor, or the one file of the same name, as when only a name
+/// is written, or else the nearest by spelling.
+pub fn nearest_path(candidates: &[String], path: &str) -> Option<String> {
+    let file = path.rsplit('/').next().unwrap_or(path);
+    let only = |same: &dyn Fn(&str) -> bool| {
+        let mut found = candidates.iter().filter(|candidate| same(candidate));
+        match (found.next(), found.next()) {
+            (Some(only), None) => Some(only.clone()),
+            _ => None,
+        }
+    };
+    only(&|candidate| candidate.rsplit('/').next() == Some(file))
+        .or_else(|| only(&|candidate| name_of(candidate) == name_of(path)))
+        .or_else(|| nearest(candidates, path))
 }
 
 pub fn nearest<'a>(candidates: impl IntoIterator<Item = &'a String>, key: &str) -> Option<String> {

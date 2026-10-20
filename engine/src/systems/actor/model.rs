@@ -11,7 +11,8 @@ use crate::core::assets::{FileSize, ImageRef};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
-    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
+    Bundle, Content, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading,
+    ModuleRule, ModuleSet, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Direction, FrameSize, Pos, Rect, Size, WorldPx};
 use crate::core::tiling::Tiles;
@@ -28,8 +29,76 @@ pub struct ModelDef {
     pub modules: Vec<ModelModule>,
 }
 
-impl ContentRow for ModelDef {
+pub const MODEL_SPRITES: PartSpec = PartSpec::File {
+    name: "sprites",
+    exts: &["png"],
+};
+
+pub const MODEL_BUSTS: PartSpec = PartSpec::Keyed {
+    folder: "busts",
+    exts: &["png"],
+};
+
+impl Bundle for ModelDef {
+    const PARTS: &'static [PartSpec] = &[MODEL_SPRITES, MODEL_BUSTS];
+
+    fn read_parts(&mut self, parts: &mut Parts) {
+        if let Some(sheet) = parts.required(MODEL_SPRITES) {
+            self.sprites.image = ImageRef::new(parts.path(sheet));
+        }
+        let keyed = parts.keyed(MODEL_BUSTS);
+        let busts = self.modules.iter_mut().find_map(|module| match module {
+            ModelModule::Bust(busts) => Some(busts),
+            _ => None,
+        });
+        let Some(busts) = busts else {
+            for (_, file) in keyed {
+                parts.error(
+                    file,
+                    ErrorPlace::WholeFile,
+                    ContentProblem::new(
+                        "unknown part",
+                        format!("file {file}"),
+                        "a bust module in config.json for the model's busts",
+                    ),
+                );
+            }
+            return;
+        };
+        for &expression in GenericExpression::VARIANTS {
+            let part = format!("busts/{}.png", expression.as_ref());
+            if parts.has(&part) {
+                *busts.generic.of_mut(expression) = ImageRef::new(parts.path(&part));
+            } else {
+                parts.error(
+                    "",
+                    ErrorPlace::WholeFile,
+                    ContentProblem::new(
+                        "missing file",
+                        format!("no {part}"),
+                        "a bust for every generic expression in busts/",
+                    ),
+                );
+            }
+        }
+        busts.own = keyed
+            .into_iter()
+            .filter(|(name, _)| name.parse::<GenericExpression>().is_err())
+            .map(|(name, file)| OwnBust {
+                name: name.to_owned(),
+                file: ImageRef::new(parts.path(file)),
+            })
+            .collect();
+    }
+
+    fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl ContentFile for ModelDef {
     const TABLE: &'static str = "model";
+    const SHAPE: Shape = Shape::Bundle;
 
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");
@@ -91,6 +160,7 @@ impl HitboxSize {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpriteSheet {
+    #[serde(skip)]
     pub image: ImageRef,
     pub frame_size: FrameSize,
     pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
@@ -145,22 +215,24 @@ impl ModelDef {
     }
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+/// A face for every generic expression and for each of the model's own, kept as parts of its bundle
+/// under `busts/`: one `busts/<expression>.png` each.
+#[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Busts {
-    #[serde(flatten)]
+    #[serde(skip)]
     pub generic: GenericBusts,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip)]
     pub own: Vec<OwnBust>,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone)]
 pub struct OwnBust {
     pub name: String,
     pub file: ImageRef,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[derive(Clone, Default)]
 pub struct GenericBusts {
     pub neutral: ImageRef,
     pub happy: ImageRef,
@@ -269,6 +341,17 @@ impl GenericBusts {
             GenericExpression::Thinking => &self.thinking,
         }
     }
+
+    fn of_mut(&mut self, expression: GenericExpression) -> &mut ImageRef {
+        match expression {
+            GenericExpression::Neutral => &mut self.neutral,
+            GenericExpression::Happy => &mut self.happy,
+            GenericExpression::Sad => &mut self.sad,
+            GenericExpression::Angry => &mut self.angry,
+            GenericExpression::Surprised => &mut self.surprised,
+            GenericExpression::Thinking => &mut self.thinking,
+        }
+    }
 }
 
 pub const MAX_STRIP_FRAMES: usize = 256;
@@ -296,7 +379,7 @@ pub fn build_all(loading: &mut Loading) {
                 || height % sheet.frame_size.height.max(1) != 0)
         {
             check.error(
-                "/sprites/image",
+                "/sprites/frame_size",
                 "image size",
                 format!(
                     "{width} × {height}, not a multiple of {} × {}",
@@ -455,7 +538,7 @@ impl ActorModel {
             .0
             .get(model.index())
             .and_then(Option::as_ref)
-            .unwrap_or_else(|| panic!("model {} failed to load", model.key(content)))
+            .unwrap_or_else(|| panic!("model {} failed to load", model.path(content)))
     }
 
     // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
