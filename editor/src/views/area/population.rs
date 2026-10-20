@@ -7,7 +7,6 @@ use engine::systems::actor::model::ModelId;
 use engine::systems::actor::{Action, ActorModel};
 use engine::systems::area;
 use engine::systems::npc::NpcDef;
-use engine::systems::player::PlayerDef;
 use serde_json::Value;
 
 use crate::app::Editor;
@@ -120,16 +119,6 @@ pub fn npc_sprite(
     npc: &str,
 ) -> Option<NpcSprite> {
     let def = content.by_key::<NpcDef>(npc)?.get(content);
-    model_sprite(editor, ctx, content, def.model)
-}
-
-pub fn player_sprite(
-    editor: &mut Editor,
-    ctx: &egui::Context,
-    content: &Content,
-) -> Option<NpcSprite> {
-    let player = content.table::<PlayerDef>().keys().first().cloned()?;
-    let def = content.by_key::<PlayerDef>(&player)?.get(content);
     model_sprite(editor, ctx, content, def.model)
 }
 

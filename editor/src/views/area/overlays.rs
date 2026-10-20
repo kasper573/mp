@@ -376,69 +376,6 @@ pub(super) fn overlay_soundscape_reach(
     }
 }
 
-pub(super) fn overlay_blueprint_ghost(
-    editor: &mut Editor,
-    ui: &Ui,
-    painter: &egui::Painter,
-    view_key: &str,
-    frame: &AreaFrame,
-) {
-    let canvas = frame.canvas;
-    let origin = {
-        let view = editor.views.area.view(view_key);
-        if view.blueprint.is_none() {
-            return;
-        }
-        frame.origin().0
-    };
-    let ctx = ui.ctx().clone();
-    let Some(sprite) = population::player_sprite(editor, &ctx, &frame.content) else {
-        return;
-    };
-    let view = editor.views.area.view_mut(view_key);
-    let feet_tile = view
-        .ghost
-        .unwrap_or(Pos::new(origin.x + 4.0, origin.y + 2.0));
-    let sprite = draw_sprite(painter, canvas, feet_tile, &sprite, 230);
-    let heard: Vec<String> = frame
-        .area()
-        .soundscape
-        .iter()
-        .filter_map(|zone| {
-            let heard = zone.heard_from(feet_tile)?;
-            let file = zone
-                .channels
-                .values()
-                .next()
-                .and_then(|layer| layer.src.as_str().rsplit('/').next())
-                .map(|f| {
-                    f.trim_end_matches(".flac")
-                        .trim_end_matches(".ogg")
-                        .to_owned()
-                })
-                .unwrap_or_else(|| "soundscape".to_owned());
-            Some(format!("hears {file} {:.2}", heard.proximity))
-        })
-        .collect();
-    let text = if heard.is_empty() {
-        "ghost".to_owned()
-    } else {
-        format!("ghost · {}", heard.join(" · "))
-    };
-    frame.labels.chip(
-        sprite.right_bottom() + Vec2::new(8.0, 0.0),
-        &text,
-        Color32::WHITE,
-    );
-    let drag = ui.interact(sprite, ui.id().with((view_key, "ghost")), Sense::drag());
-    if drag.dragged()
-        && let Some(pointer) = drag.interact_pointer_pos()
-    {
-        let tile = canvas.to_tile(pointer);
-        view.ghost = Some(Pos::new(tile.x, tile.y - 0.5));
-    }
-}
-
 pub(super) fn overlay_populations(
     editor: &mut Editor,
     ui: &Ui,

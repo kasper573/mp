@@ -43,9 +43,8 @@ use serde_json::Value;
 use strum::{AsRefStr, VariantArray};
 
 use self::overlays::{
-    AreaLabels, overlay_blueprint_ghost, overlay_grid, overlay_modules, overlay_populations,
-    overlay_selected_scenery, overlay_sort_lines, overlay_soundscape_reach, overlay_surfaces,
-    overlay_walk,
+    AreaLabels, overlay_grid, overlay_modules, overlay_populations, overlay_selected_scenery,
+    overlay_sort_lines, overlay_soundscape_reach, overlay_surfaces, overlay_walk,
 };
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
@@ -183,7 +182,6 @@ pub struct AreaViewState {
     pub blueprints_global: bool,
     pub palette_lens: palette::PaletteLens,
     pub menu: Option<modules::AreaMenuAnchor>,
-    pub ghost: Option<Pos<Tiles>>,
     pub population_previews: HashMap<String, PopulationPreview>,
     pub walk_value: Option<bool>,
     pub preview_area: Option<String>,
@@ -816,7 +814,6 @@ fn canvas(
     }
     overlay_selected_scenery(editor, ui, &painter, view_key, &frame, area);
     overlay_soundscape_reach(editor, &painter, &frame);
-    overlay_blueprint_ghost(editor, ui, &painter, view_key, &frame);
     let view = editor.views.area.view(view_key);
     if view.overlay_surfaces {
         overlay_surfaces(&painter, &frame, area);
