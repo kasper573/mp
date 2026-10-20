@@ -3,7 +3,7 @@ use engine::core::content::RowFolder;
 
 use super::dialogs::{DialogKeys, card, keys};
 use super::move_dialogs::{answer, error_line, title};
-use super::{theme, widgets};
+use super::{content_list, theme, widgets};
 use crate::app::{Editor, ModalDialog, NewFolderDialog, RenameDialog, RenameTarget};
 use crate::folders;
 use crate::project::ContentEdit;
@@ -149,7 +149,7 @@ fn create(editor: &mut Editor, dialog: &NewFolderDialog) -> Result<(), String> {
         while let Some(parent) = at {
             folds
                 .tables
-                .insert(format!("folder:{}:{parent}", dialog.table));
+                .insert(content_list::folder_id(&dialog.table, &parent));
             at = parent.parent();
         }
     }
@@ -186,33 +186,56 @@ fn project_key(editor: &Editor) -> Option<String> {
     Some(editor.project.as_ref()?.root.display().to_string())
 }
 
-/// Moves the folders kept empty in this project from `folder` of `table` where `moved` says,
-/// given the rest of their path below it; `None` forgets one.
+/// Moves the folders kept empty in this project, and which folders are unfolded, from `folder` of
+/// `table` where `moved` says, given the rest of their path below it; `None` forgets one.
 fn regroup_kept(
     editor: &mut Editor,
     table: &str,
     folder: &RowFolder,
     moved: impl Fn(Option<&str>) -> Option<RowFolder>,
 ) {
-    let Some(root) = project_key(editor) else {
-        return;
-    };
-    let Some(kept) = editor.settings.folders.get_mut(&root) else {
-        return;
-    };
-    let own = format!("{table}/{folder}");
-    let inside = format!("{own}/");
-    let affected: Vec<String> = kept
-        .iter()
-        .filter(|entry| **entry == own || entry.starts_with(&inside))
-        .cloned()
-        .collect();
-    for entry in affected {
-        kept.remove(&entry);
-        let rest = entry.strip_prefix(&inside);
-        if let Some(to) = moved(rest) {
-            kept.insert(format!("{table}/{to}"));
+    for folds in editor.settings.content_folds.values_mut() {
+        let unfolded: Vec<RowFolder> = folds
+            .tables
+            .iter()
+            .filter_map(|id| content_list::folder_of_id(id))
+            .filter(|(of, _)| *of == table)
+            .map(|(_, unfolded)| unfolded)
+            .filter(|unfolded| unfolded == folder || below(unfolded, folder).is_some())
+            .collect();
+        for unfolded in unfolded {
+            folds
+                .tables
+                .remove(&content_list::folder_id(table, &unfolded));
+            if let Some(to) = moved(below(&unfolded, folder)) {
+                folds.tables.insert(content_list::folder_id(table, &to));
+            }
+        }
+    }
+    if let Some(root) = project_key(editor)
+        && let Some(kept) = editor.settings.folders.get_mut(&root)
+    {
+        let own = format!("{table}/{folder}");
+        let inside = format!("{own}/");
+        let affected: Vec<String> = kept
+            .iter()
+            .filter(|entry| **entry == own || entry.starts_with(&inside))
+            .cloned()
+            .collect();
+        for entry in affected {
+            kept.remove(&entry);
+            if let Some(to) = moved(entry.strip_prefix(&inside)) {
+                kept.insert(format!("{table}/{to}"));
+            }
         }
     }
     editor.save_settings();
+}
+
+/// The rest of `inner`'s path below `outer`, when `outer` holds it.
+fn below<'a>(inner: &'a RowFolder, outer: &RowFolder) -> Option<&'a str> {
+    inner
+        .as_str()
+        .strip_prefix(outer.as_str())?
+        .strip_prefix('/')
 }

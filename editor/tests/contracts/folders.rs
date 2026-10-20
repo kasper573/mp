@@ -4,7 +4,8 @@ use editor::app::Editor;
 use editor::folders;
 use editor::project::{ContentEdit, Project};
 use editor::schema::SchemaShapes;
-use editor::user::{EditorSettings, UserFolder};
+use editor::ui::folder_dialogs;
+use editor::user::{ContentFolds, EditorSettings, UserFolder};
 use engine::core::content::{RowFolder, RowName, row_file};
 use serde_json::json;
 use testkit::Game;
@@ -143,4 +144,25 @@ fn removing_a_folder_moves_what_it_held_up_one_level() {
     assert_eq!(folder(&editor, "lamp"), None);
     assert_eq!(folder(&editor, "net").as_deref(), Some("coast"));
     assert_eq!(folder(&editor, "key").as_deref(), Some("dungeons"));
+}
+
+#[test]
+fn a_renamed_folder_stays_unfolded_with_the_folders_inside_it() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(stocked(), &scratch);
+    let unfolded = |ids: &[&str]| ContentFolds {
+        tables: ids.iter().map(|id| (*id).to_owned()).collect(),
+        ..ContentFolds::default()
+    };
+    editor.settings.content_folds.insert(
+        "global".to_owned(),
+        unfolded(&["model", "folder:model:towns", "folder:model:towns/coast"]),
+    );
+
+    folder_dialogs::rename(&mut editor, "model", &named("towns"), "cities").expect("renames");
+
+    assert_eq!(
+        editor.settings.content_folds["global"],
+        unfolded(&["model", "folder:model:cities", "folder:model:cities/coast"])
+    );
 }

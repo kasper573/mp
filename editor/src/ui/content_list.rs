@@ -576,11 +576,11 @@ fn folder_lines(
 }
 
 /// The id of a folder's line in a table: `folder:table:path`.
-fn folder_id(table: &str, folder: &RowFolder) -> String {
+pub(super) fn folder_id(table: &str, folder: &RowFolder) -> String {
     format!("folder:{table}:{folder}")
 }
 
-fn folder_of_id(id: &str) -> Option<(&str, RowFolder)> {
+pub(super) fn folder_of_id(id: &str) -> Option<(&str, RowFolder)> {
     let (table, folder) = id.strip_prefix("folder:")?.split_once(':')?;
     Some((table, RowFolder::try_from(folder.to_owned()).ok()?))
 }
