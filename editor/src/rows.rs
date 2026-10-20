@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::Ui;
+use engine::core::assets::AssetKind;
 use engine::core::content::files::NAME_RULE;
 use engine::core::content::{
     ContentFile, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
@@ -54,7 +55,13 @@ pub fn name_problem(
     name: &str,
     own: Option<&str>,
 ) -> Option<String> {
-    if !valid_name(name) {
+    let note = own.is_some_and(|own| own.ends_with(&format!(".{NOTE_EXTENSION}")));
+    if note && (name.is_empty() || name.starts_with('.') || name.contains(['/', '\\'])) {
+        return Some(
+            "a note's name is any name without a slash, not starting with a dot".to_owned(),
+        );
+    }
+    if !note && !valid_name(name) {
         return Some(format!("a name is {NAME_RULE}"));
     }
     let wanted = name.to_lowercase();
@@ -179,22 +186,124 @@ pub fn new_note(editor: &mut Editor, folder: &str) -> Result<String, String> {
 
 /// Copies the file or bundle at `path` beside it as "name (1)", and opens the copy.
 pub fn duplicate(editor: &mut Editor, path: &str) -> Result<String, String> {
-    let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let copy = free_path(&project.files, parent_of(path), moves::file_name(path), &[]);
-    let mut edit = ContentEdit::new(format!("Duplicate {path} as {copy}"));
-    let files: Vec<(String, FileBytes)> = project
-        .files
-        .files_of(path)
-        .into_iter()
-        .filter_map(|file| Some((file.clone(), project.files.get(&file)?.clone())))
-        .collect();
-    write_moved(&mut edit, &files, path, &copy);
-    editor.try_apply(edit)?;
+    let copies = copy_into(
+        editor,
+        &[path.to_owned()],
+        parent_of(path),
+        format!("Duplicate {path}"),
+    )?;
+    let copy = copies.into_iter().next().ok_or("nothing was copied")?;
     if let Some(table) = table_of(&copy).filter(|_| content_holding(&copy).is_some()) {
         let table = table.to_owned();
         editor.open_row(&table, &copy);
     }
     Ok(copy)
+}
+
+/// Copies what is at each path, a file, bundle or folder with all it holds, into `folder`,
+/// numbering a name taken there, as one step labelled `label`. Gives where each copy landed.
+pub fn copy_into(
+    editor: &mut Editor,
+    paths: &[String],
+    folder: &str,
+    label: String,
+) -> Result<Vec<String>, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let mut edit = ContentEdit::new(label);
+    let mut copies: Vec<String> = Vec::new();
+    for path in paths {
+        if folder == path || folder.starts_with(&format!("{path}/")) {
+            return Err(format!("{path} can't be copied inside itself"));
+        }
+        let copy = free_path_among(&project.files, folder, moves::file_name(path), &[], &copies);
+        let held = if project.files.index().folders.contains(path) {
+            project
+                .files
+                .paths_under(&folder_entry(path))
+                .cloned()
+                .collect()
+        } else {
+            project.files.files_of(path)
+        };
+        let files: Vec<(String, FileBytes)> = held
+            .into_iter()
+            .filter_map(|file| Some((file.clone(), project.files.get(&file)?.clone())))
+            .collect();
+        write_moved(&mut edit, &files, path, &copy);
+        copies.push(copy);
+    }
+    editor.try_apply(edit)?;
+    Ok(copies)
+}
+
+/// Copies media files from anywhere on disk into `folder`, numbering a name taken there, as one
+/// step. Gives their paths.
+pub fn import_media(
+    editor: &mut Editor,
+    folder: &str,
+    sources: &[std::path::PathBuf],
+) -> Result<Vec<String>, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let mut edit = ContentEdit::new(match sources {
+        [one] => format!("Import {}", import_name(one)),
+        many => format!("Import {} files", many.len()),
+    });
+    let mut made: Vec<String> = Vec::new();
+    for source in sources {
+        let name = import_name(source);
+        if AssetKind::of(&name).is_none() {
+            return Err(format!("{name} is no kind of media a game holds"));
+        }
+        let bytes = std::fs::read(source).map_err(|error| format!("{name}: {error}"))?;
+        let path = free_path_among(&project.files, folder, &name, &[], &made);
+        edit.write(path.clone(), FileBytes::from(bytes));
+        made.push(path);
+    }
+    editor.try_apply(edit)?;
+    Ok(made)
+}
+
+/// Puts the bytes of `source` in place of the media file at `path`, which keeps its name.
+pub fn replace_media(
+    editor: &mut Editor,
+    path: &str,
+    source: &std::path::Path,
+) -> Result<(), String> {
+    let name = import_name(source);
+    let extension = |file: &str| file.rsplit_once('.').map(|(_, ext)| ext.to_lowercase());
+    if extension(&name) != extension(path) {
+        return Err(format!("{name} isn't the same kind of file as {path}"));
+    }
+    let bytes = std::fs::read(source).map_err(|error| format!("{name}: {error}"))?;
+    let mut edit = ContentEdit::new(format!("Replace {path} with {name}"));
+    edit.write(path.to_owned(), FileBytes::from(bytes));
+    editor.try_apply(edit)
+}
+
+/// Writes the default content of the fixture at `path`, which the engine looks for there.
+pub fn make_fixture(editor: &mut Editor, path: &str) -> Result<(), String> {
+    let table = table_of(path).ok_or("no type in its name")?;
+    let made = make::content_file(
+        &editor.shapes,
+        table,
+        parent_of(path),
+        engine::core::content::name_of(path),
+    );
+    let mut edit = ContentEdit::new(format!("Make {path}"));
+    for (file, bytes) in made.files {
+        edit.write(file, bytes);
+    }
+    editor.try_apply(edit)?;
+    let table = table.to_owned();
+    editor.open_row(&table, path);
+    Ok(())
+}
+
+fn import_name(source: &std::path::Path) -> String {
+    source
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase().replace(' ', "_"))
+        .unwrap_or_default()
 }
 
 /// Renames the file, bundle or folder at `path` to `name`, keeping its type, and rewrites every

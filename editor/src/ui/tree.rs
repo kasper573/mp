@@ -1,609 +1,740 @@
-use std::collections::{BTreeMap, HashSet};
+use std::cell::RefCell;
+use std::collections::BTreeSet;
 
-use design_tokens::face::Face;
 use design_tokens::glyph::{self, Mark};
-use design_tokens::{controls, face, ink};
-use egui::{Align, Event, Layout, Modifiers, RichText, Sense, Ui};
+use egui::{Align2, Color32, FontId, Id, Pos2, Rangef, Rect, Stroke, StrokeKind, Ui, Vec2};
+use egui_ltreeview::{
+    Action, CloserState, DirPosition, IndentHintStyle, NodeBuilder, RowLayout, TreeView,
+    TreeViewBuilder, TreeViewState,
+};
 
-use super::theme;
+use super::{theme, widgets};
 use crate::keymap::EditorKey;
-use crate::picker::{self, Dragged};
+use crate::picker::Dragged;
 
-pub struct TreeNode<A> {
-    pub id: String,
-    pub label: String,
-    pub style: TreeStyle,
-    pub icon: TreeIcon,
-    pub children: Option<Vec<TreeNode<A>>>,
-    /// For a folder: whether a line inside is selected, shown while it is folded.
-    pub selected: bool,
-    /// For a folder: whether a line inside is unsaved, shown while it is folded.
+/// What a tree lists and what may be done to its rows. The game folder and a scene each implement
+/// it; the tree brings the behaviour, the keys and the looks once.
+pub trait TreeSource {
+    type Action;
+    /// The rows inside the folder `id` as they are shown, in order; the top of the tree is "".
+    fn children(&self, id: &str) -> Vec<String>;
+    /// The folder holding `id`, "" at the top.
+    fn parent(&self, id: &str) -> String;
+    fn row(&self, id: &str) -> TreeRow;
+    /// The menu on `ids`, or on empty space when there are none; the action picked.
+    fn menu(&self, ui: &mut Ui, ids: &[String]) -> Option<Self::Action>;
+    /// What dropping `dragged` at `drop` does, or why it is refused.
+    fn drop_tip(&self, dragged: &[String], drop: &TreeDrop) -> Result<String, String>;
+    /// Whether rows keep an order of their own, so a drop may land between two of them.
+    fn ordered(&self) -> bool;
+    /// Whether the rows shown are narrowed to what matches, every folder opening on what it holds.
+    fn narrowed(&self) -> bool;
+    /// What the pointer carries out of the tree when `ids` are dragged out of it.
+    fn carried(&self, ids: &[String]) -> Option<Dragged>;
+    /// What renaming `id` touches beyond itself, said under its edit box.
+    fn rename_tip(&self, id: &str) -> Option<String>;
+}
+
+/// How one row reads.
+#[derive(Clone, Debug, Default)]
+pub struct TreeRow {
+    pub folder: bool,
+    /// The row's glyph; a folder's is the folder's own.
+    pub icon: Option<Mark>,
+    pub name: String,
+    /// Read after the name in its own colour, such as a content file's type.
+    pub suffix: Option<(String, Color32)>,
+    /// Read at the right end, such as a folder's count.
+    pub detail: String,
+    /// Greyed: a folder only shown for what it holds, or a row that isn't there yet.
+    pub dim: bool,
+    /// What is wrong with the row, or with something inside a folder.
+    pub problem: Option<String>,
     pub unsaved: bool,
-    pub count: Option<String>,
-    pub note: Option<String>,
-    /// What assistive tech reads for the line, when more than its label.
+    /// Why the row can't move, when it can't.
+    pub locked: Option<String>,
+    /// What assistive tech reads for the row, when more than its name.
     pub spoken: Option<String>,
-    /// For a folder: what its menu offers.
-    pub actions: Vec<TreeAction<A>>,
-    /// What the pointer carries away when the leaf is dragged.
-    pub drag: Option<Dragged>,
-    /// For a folder: the table whose rows may be dropped into it, onto it or onto a row inside.
-    pub drops: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TreeStyle {
-    Plain,
-    Mono,
-    Heading,
+/// Where dragged rows land: in `folder`, at `at` among what it holds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeDrop {
+    pub folder: String,
+    pub at: DropAt,
 }
 
-pub struct TreeAction<A> {
-    pub label: String,
-    pub action: A,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DropAt {
+    First,
+    End,
+    Before(String),
+    After(String),
 }
 
-pub enum TreeIcon {
-    None,
-    Mark(Mark),
-    Thumb(String),
-}
-
-#[derive(Clone, Copy)]
-pub struct IconImage {
-    pub texture: egui::TextureId,
-    pub uv: egui::Rect,
-    pub size: egui::Vec2,
-}
-
+/// A tree's own state between frames: what is selected and open, and what it was asked to do.
 #[derive(Default)]
 pub struct TreeState {
-    pub open: HashSet<String>,
-    /// The line the keys move and act on.
-    pub cursor: Option<String>,
-    /// A line to scroll into view the next time it is drawn.
-    pub reveal: Option<String>,
-    typed: String,
-    typed_at: f64,
+    view: TreeViewState<String>,
+    /// Openness while the rows are narrowed, kept apart so a search never closes a folder.
+    narrowed_view: TreeViewState<String>,
+    reveal: Option<String>,
+    renaming: Option<Renaming>,
+    flash: Option<(String, f64)>,
+    drag_hover: Option<(String, f64)>,
+    drag_cancelled: bool,
 }
 
-pub struct TreeOutput<A> {
-    pub clicked: Option<(String, Modifiers)>,
-    pub double_clicked: Option<String>,
-    pub action: Option<(String, A)>,
-    /// Folders folded or unfolded this frame.
-    pub toggled: Vec<String>,
-    /// A folder Enter was pressed on.
-    pub entered: Option<String>,
-    /// A row dropped into a folder, with the folder's id.
-    pub dropped: Option<(String, Dragged)>,
+struct Renaming {
+    id: String,
+    text: String,
+    focused: bool,
 }
 
-impl<A> Default for TreeOutput<A> {
-    fn default() -> Self {
-        TreeOutput {
-            clicked: None,
-            double_clicked: None,
-            action: None,
-            toggled: Vec::new(),
-            entered: None,
-            dropped: None,
-        }
-    }
-}
-
-pub type TreeLeafMenu<'a> = dyn FnMut(&mut Ui, &str) + 'a;
-pub type TreeThumbs<'a> = dyn FnMut(&egui::Context, &str) -> Option<IconImage> + 'a;
-
-#[derive(Default)]
-pub struct TreeHooks<'a, 'b> {
-    pub menu: Option<&'a mut TreeLeafMenu<'b>>,
-    pub thumbs: Option<&'a mut TreeThumbs<'b>>,
-}
-
-impl<A> TreeNode<A> {
-    pub fn leaf(id: impl Into<String>, label: impl Into<String>) -> TreeNode<A> {
-        TreeNode {
-            id: id.into(),
-            label: label.into(),
-            style: TreeStyle::Mono,
-            icon: TreeIcon::None,
-            children: None,
-            selected: false,
-            unsaved: false,
-            count: None,
-            note: None,
-            spoken: None,
-            actions: Vec::new(),
-            drag: None,
-            drops: None,
-        }
+impl TreeState {
+    pub fn selected(&self) -> &[String] {
+        self.view.selected()
     }
 
-    pub fn folder(
-        id: impl Into<String>,
-        label: impl Into<String>,
-        children: Vec<TreeNode<A>>,
-    ) -> TreeNode<A> {
-        TreeNode {
-            children: Some(children),
-            style: TreeStyle::Plain,
-            ..TreeNode::leaf(id, label)
-        }
+    pub fn select(&mut self, ids: Vec<String>) {
+        self.narrowed_view.set_selected(ids.clone());
+        self.view.set_selected(ids);
     }
-}
 
-pub fn from_paths<'a, A>(
-    paths: impl IntoIterator<Item = &'a str>,
-    leaf: &mut dyn FnMut(&str) -> Option<TreeNode<A>>,
-    folder: &mut dyn FnMut(&mut TreeNode<A>),
-) -> Vec<TreeNode<A>> {
-    let mut root = Dir::default();
-    for path in paths {
-        let mut dir = &mut root;
-        let mut parts = path.split('/').peekable();
-        while let Some(part) = parts.next() {
-            if parts.peek().is_none() {
-                dir.files.push(path.to_owned());
-            } else {
-                dir = dir.dirs.entry(part.to_owned()).or_default();
-            }
-        }
+    /// Opens the folders above `id`, selects it, scrolls it into view and flashes it.
+    pub fn reveal(&mut self, id: &str) {
+        self.reveal = Some(id.to_owned());
     }
-    root.into_nodes("", leaf, folder)
-}
 
-/// Draws the tree. With `keys`, the arrows, Home, End, Enter and typed letters move through and
-/// act on its lines: the caller passes it while the tree is what the keyboard is meant for.
-pub fn show<A: Clone>(
-    ui: &mut Ui,
-    state: &mut TreeState,
-    nodes: &[TreeNode<A>],
-    open_all: bool,
-    keys: bool,
-    mut hooks: TreeHooks<'_, '_>,
-) -> TreeOutput<A> {
-    let mut out = TreeOutput::default();
-    if keys && !ui.ctx().text_edit_focused() {
-        let lines = visible_lines(nodes, state, open_all);
-        navigate(ui, state, &lines, &mut out);
-    }
-    let mut walk = Walk {
-        state,
-        open_all,
-        out,
-        toggle: Vec::new(),
-        hooks: &mut hooks,
-    };
-    for node in nodes {
-        node_line(ui, &mut walk, node, 0, None);
-    }
-    let Walk {
-        mut out, toggle, ..
-    } = walk;
-    for id in toggle {
-        toggle_open(state, &id, &mut out);
-    }
-    out
-}
-
-const LINE: f32 = 26.0;
-const INDENT: f32 = 14.0;
-const TYPING_PAUSE: f64 = 0.8;
-
-struct Line<'n> {
-    id: &'n str,
-    label: &'n str,
-    parent: Option<&'n str>,
-    folder: bool,
-    open: bool,
-}
-
-fn visible_lines<'n, A>(
-    nodes: &'n [TreeNode<A>],
-    state: &TreeState,
-    open_all: bool,
-) -> Vec<Line<'n>> {
-    fn walk<'n, A>(
-        nodes: &'n [TreeNode<A>],
-        parent: Option<&'n str>,
-        state: &TreeState,
-        open_all: bool,
-        lines: &mut Vec<Line<'n>>,
-    ) {
-        for node in nodes {
-            let open = open_all || state.open.contains(&node.id);
-            lines.push(Line {
-                id: &node.id,
-                label: &node.label,
-                parent,
-                folder: node.children.is_some(),
-                open,
-            });
-            if let (Some(children), true) = (&node.children, open) {
-                walk(children, Some(&node.id), state, open_all, lines);
-            }
-        }
-    }
-    let mut lines = Vec::new();
-    walk(nodes, None, state, open_all, &mut lines);
-    lines
-}
-
-fn navigate<A>(ui: &Ui, state: &mut TreeState, lines: &[Line], out: &mut TreeOutput<A>) {
-    if lines.is_empty() {
-        return;
-    }
-    let at = state
-        .cursor
-        .as_deref()
-        .and_then(|cursor| lines.iter().position(|line| line.id == cursor));
-    let (arrow, first, last, enter, typed, now) = ui.input_mut(|i| {
-        let typed: String = i
-            .events
-            .iter()
-            .filter_map(|event| match event {
-                Event::Text(text) => Some(text.as_str()),
-                _ => None,
-            })
-            .collect();
-        (
-            EditorKey::Move.take_arrow(i),
-            EditorKey::FirstLine.consume(i),
-            EditorKey::LastLine.consume(i),
-            EditorKey::Confirm.consume(i),
-            typed,
-            i.time,
-        )
-    });
-    let mut moved_to = None;
-    match (arrow, at) {
-        (Some([0, step]), Some(at)) => {
-            moved_to = Some((at as i32 + step).clamp(0, lines.len() as i32 - 1) as usize);
-        }
-        (Some([0, _]), None) => moved_to = Some(0),
-        (Some([1, 0]), Some(at)) if lines[at].folder => {
-            if lines[at].open {
-                moved_to = (at + 1 < lines.len() && lines[at + 1].parent == Some(lines[at].id))
-                    .then_some(at + 1);
-            } else {
-                toggle_open(state, lines[at].id, out);
-            }
-        }
-        (Some([-1, 0]), Some(at)) => {
-            if lines[at].folder && lines[at].open {
-                toggle_open(state, lines[at].id, out);
-            } else if let Some(parent) = lines[at].parent {
-                moved_to = lines.iter().position(|line| line.id == parent);
-            }
-        }
-        _ => {}
-    }
-    if first {
-        moved_to = Some(0);
-    }
-    if last {
-        moved_to = Some(lines.len() - 1);
-    }
-    if !typed.trim().is_empty() {
-        if now - state.typed_at > TYPING_PAUSE {
-            state.typed.clear();
-        }
-        state.typed.push_str(&typed.to_lowercase());
-        state.typed_at = now;
-        let from = at.map_or(0, |at| {
-            if state.typed.len() == typed.len() {
-                at + 1
-            } else {
-                at
-            }
+    /// Puts `name` in an edit box on `id`'s row, ready to type over.
+    pub fn begin_rename(&mut self, id: &str, name: &str) {
+        self.reveal(id);
+        self.renaming = Some(Renaming {
+            id: id.to_owned(),
+            text: name.to_owned(),
+            focused: false,
         });
-        moved_to = (0..lines.len())
-            .map(|step| (from + step) % lines.len())
-            .find(|index| lines[*index].label.to_lowercase().starts_with(&state.typed))
-            .or(moved_to);
     }
-    if let Some(index) = moved_to {
-        state.cursor = Some(lines[index].id.to_owned());
-        state.reveal = state.cursor.clone();
+
+    pub fn renaming(&self) -> Option<&str> {
+        self.renaming.as_ref().map(|renaming| renaming.id.as_str())
     }
-    if enter && let Some(at) = at {
-        let line = &lines[at];
-        if line.folder {
-            out.entered = Some(line.id.to_owned());
-        } else {
-            out.clicked = Some((line.id.to_owned(), Modifiers::NONE));
+
+    /// Opens or closes every folder among `ids`.
+    pub fn set_open(&mut self, ids: impl IntoIterator<Item = String>, open: bool) {
+        for id in ids {
+            self.view.set_openness(id.clone(), open);
+            self.narrowed_view.set_openness(id, open);
         }
     }
 }
 
-fn toggle_open<A>(state: &mut TreeState, id: &str, out: &mut TreeOutput<A>) {
-    if !state.open.remove(id) {
-        state.open.insert(id.to_owned());
-    }
-    out.toggled.push(id.to_owned());
+/// What the user did to the tree this frame.
+pub struct TreeResponse<A> {
+    /// The selection, when the user changed it.
+    pub selected: Option<Vec<String>>,
+    /// Rows opened with Enter or a double click.
+    pub activated: Vec<String>,
+    pub action: Option<A>,
+    pub dropped: Option<(Vec<String>, TreeDrop)>,
+    /// A row renamed in place, with the name typed.
+    pub renamed: Option<(String, String)>,
+    /// Whether the keys go to the tree.
+    pub focused: bool,
 }
 
-struct Walk<'a, 'b, 'c, A> {
-    state: &'a mut TreeState,
-    open_all: bool,
-    out: TreeOutput<A>,
-    toggle: Vec<String>,
-    hooks: &'a mut TreeHooks<'b, 'c>,
-}
-
-/// One line of the tree and, for an open folder, the lines inside it. `into` is the folder a row
-/// dropped on a leaf line goes into.
-fn node_line<A: Clone>(
+/// Draws the tree of `source`. `open` holds the folders open while nothing narrows the rows, kept
+/// by the caller; it answers whether that changed.
+pub fn show<S: TreeSource>(
     ui: &mut Ui,
-    walk: &mut Walk<'_, '_, '_, A>,
-    node: &TreeNode<A>,
-    depth: usize,
-    into: Option<&TreeNode<A>>,
-) {
-    let full = ui.available_rect_before_wrap();
-    let sense = if node.drag.is_some() {
-        Sense::click_and_drag()
-    } else {
-        Sense::click()
+    id: Id,
+    state: &mut TreeState,
+    source: &S,
+    open: &mut BTreeSet<String>,
+) -> (TreeResponse<S::Action>, bool) {
+    let narrowed = source.narrowed();
+    if let Some(target) = &state.reveal {
+        let mut parent = source.parent(target);
+        while !parent.is_empty() {
+            state.view.set_openness(parent.clone(), true);
+            state.narrowed_view.set_openness(parent.clone(), true);
+            parent = source.parent(&parent);
+        }
+        state.select(vec![target.clone()]);
+    }
+    let TreeState {
+        view,
+        narrowed_view,
+        reveal,
+        renaming,
+        flash,
+        drag_hover,
+        drag_cancelled,
+    } = state;
+    let view = if narrowed { narrowed_view } else { view };
+    let lines = lines_of(source, "", &|id| {
+        view.is_open(&id.to_owned())
+            .unwrap_or(narrowed || open.contains(id))
+    });
+    let mut folders: Vec<(String, bool)> = Vec::new();
+    let mut revealed_at = None;
+    let mut index = 0;
+    walk_lines(&lines, &mut |line| {
+        if reveal.as_deref() == Some(line.id.as_str()) {
+            revealed_at = Some(index);
+        }
+        if line.row.folder {
+            folders.push((line.id.clone(), line.open));
+        }
+        index += 1;
+    });
+
+    let painter = ui.painter().clone();
+    let top = ui.cursor().min.y;
+    let drawn: RefCell<Vec<DrawnRow>> = RefCell::new(Vec::new());
+    let renamed: RefCell<Option<RenameEnd>> = RefCell::new(None);
+    let picked: RefCell<Option<S::Action>> = RefCell::new(None);
+    let rename_tip = renaming
+        .as_ref()
+        .and_then(|renaming| source.rename_tip(&renaming.id));
+    let renaming_cell = RefCell::new(renaming.take());
+    let (response, actions) = ui
+        .scope(|ui| {
+            let visuals = ui.visuals_mut();
+            visuals.selection.bg_fill = theme::SELECTION;
+            // The tree fades the selection to 0.3 of this while it lacks focus; the selection reads
+            // the same either way.
+            visuals.widgets.inactive.weak_bg_fill = theme::SELECTION.linear_multiply(1.0 / 0.3);
+            TreeView::new(id)
+                .row_layout(RowLayout::AlignedIconsAndLabels)
+                .indent_hint_style(IndentHintStyle::Line)
+                .override_indent(Some(INDENT))
+                .default_node_height(Some(ROW))
+                .min_height(ui.available_height())
+                .fallback_context_menu(|ui, ids| {
+                    if let Some(action) = source.menu(ui, ids) {
+                        *picked.borrow_mut() = Some(action);
+                    }
+                })
+                .show_state(ui, view, |builder| {
+                    builder.node(NodeBuilder::dir(String::new()).flatten(true));
+                    let rows = RowsCx {
+                        drawn: &drawn,
+                        renaming: &renaming_cell,
+                        renamed: &renamed,
+                        rename_tip: rename_tip.as_deref(),
+                    };
+                    build(builder, lines, &rows);
+                    builder.close_dir();
+                })
+        })
+        .inner;
+    *renaming = renaming_cell.into_inner();
+    let drawn = drawn.into_inner();
+    let now = ui.input(|i| i.time);
+    let mut out = TreeResponse {
+        selected: None,
+        activated: Vec::new(),
+        action: picked.into_inner(),
+        dropped: None,
+        renamed: None,
+        focused: ui.memory(|m| m.has_focus(id)),
     };
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), sense);
-    let visible = ui.clip_rect().intersects(rect);
-    let at_cursor = walk.state.cursor.as_deref() == Some(node.id.as_str());
-    if walk.state.reveal.as_deref() == Some(node.id.as_str()) {
-        response.scroll_to_me(None);
-        walk.state.reveal = None;
+    match renamed.into_inner() {
+        Some(RenameEnd::Typed(id, text)) => {
+            out.renamed = Some((id, text));
+            *renaming = None;
+        }
+        Some(RenameEnd::Left) => *renaming = None,
+        None => {}
     }
-    let open = walk.open_all || walk.state.open.contains(&node.id);
-    let folded = node.children.is_some() && !open;
-    ui.painter().add(controls::row_marks(
-        rect,
-        response.hovered() || at_cursor,
-        node.selected && node.children.is_none(),
-    ));
-    if folded && node.selected {
-        ui.painter().rect_filled(
-            egui::Rect::from_min_size(rect.min, egui::vec2(3.0, rect.height())),
-            0.0,
-            theme::ACCENT,
-        );
+    if let Some(revealed) = reveal.take() {
+        if let Some(index) = revealed_at {
+            let row_height = ROW + ui.spacing().item_spacing.y;
+            let y = top + index as f32 * row_height;
+            let rect = Rect::from_x_y_ranges(response.rect.x_range(), Rangef::new(y, y + ROW));
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
+        *flash = Some((revealed, now));
     }
-    let mut child = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::left_to_right(Align::Center)),
-    );
-    child.add_space(6.0 + INDENT * depth as f32);
-    match &node.children {
-        Some(children) => {
-            response.widget_info(|| {
-                egui::WidgetInfo::labeled(
-                    egui::WidgetType::CollapsingHeader,
-                    true,
-                    spoken_folder(node, open),
-                )
-            });
-            folder_line(&mut child, node, open);
-            if response.clicked() {
-                walk.state.cursor = Some(node.id.clone());
-                walk.toggle.push(node.id.clone());
+    if let Some((flashed, since)) = flash.clone() {
+        let fade = 1.0 - ((now - since) / FLASH) as f32;
+        match drawn.iter().find(|row| row.id == flashed) {
+            Some(row) if fade > 0.0 => {
+                painter.rect_filled(
+                    row.rect(&response.rect),
+                    3.0,
+                    theme::alpha(theme::DROP, (fade * 90.0) as u8),
+                );
+                ui.ctx().request_repaint();
             }
-            if !node.actions.is_empty() {
-                response.context_menu(|ui| folder_menu(ui, node, &mut walk.out));
+            _ if fade <= 0.0 => *flash = None,
+            _ => {}
+        }
+    }
+
+    let escape = ui.input(|i| EditorKey::Cancel.pressed(i));
+    let mut dragging = false;
+    for action in actions {
+        match action {
+            Action::SetSelected(ids) => out.selected = Some(ids),
+            Action::Activate(activate) => out.activated = activate.selected,
+            Action::Drag(drag) => {
+                dragging = true;
+                drag.remove_drop_marker(ui);
+                if escape {
+                    *drag_cancelled = true;
+                }
+                if *drag_cancelled {
+                    continue;
+                }
+                let pointer = ui.input(|i| i.pointer.latest_pos()).unwrap_or_default();
+                let drop = drop_of(source, &drawn, pointer, &drag.target, &drag.position);
+                match source.drop_tip(&drag.source, &drop) {
+                    Ok(tip) => {
+                        mark_drop(&painter, source, &drawn, &response.rect, &drop);
+                        drag_tip(ui, pointer, &tip, theme::TEXT);
+                    }
+                    Err(refusal) => {
+                        if let Some(row) = drawn.iter().find(|row| row.contains(pointer)) {
+                            painter.rect_stroke(
+                                row.rect(&response.rect),
+                                3.0,
+                                Stroke::new(1.5, theme::BLOCKED),
+                                StrokeKind::Inside,
+                            );
+                        }
+                        drag_tip(ui, pointer, &refusal, theme::BLOCKED);
+                    }
+                }
+                open_on_hover(view, drag_hover, &drawn, pointer, now);
+                ui.ctx().request_repaint();
             }
-            take_drop(ui, &response, rect, node, &mut walk.out);
-            if open {
-                let into = node.drops.is_some().then_some(node);
-                for child in children {
-                    node_line(ui, walk, child, depth + 1, into);
+            Action::Move(drag) => {
+                if !std::mem::take(drag_cancelled) {
+                    let pointer = ui.input(|i| i.pointer.latest_pos()).unwrap_or_default();
+                    let drop = drop_of(source, &drawn, pointer, &drag.target, &drag.position);
+                    if source.drop_tip(&drag.source, &drop).is_ok() {
+                        out.dropped = Some((drag.source, drop));
+                    }
                 }
             }
+            Action::DragExternal(drag) => {
+                dragging = true;
+                if let Some(carried) = source.carried(&drag.source) {
+                    drag_tip(ui, drag.position, &carried.label(), theme::TEXT);
+                    egui::DragAndDrop::set_payload(ui.ctx(), carried);
+                }
+            }
+            Action::MoveExternal(_) => *drag_cancelled = false,
         }
-        None => {
-            response.widget_info(|| {
-                egui::WidgetInfo::selected(
-                    egui::WidgetType::SelectableLabel,
-                    true,
-                    node.selected,
-                    node.spoken.as_deref().unwrap_or(&node.label),
-                )
+    }
+    if !dragging {
+        *drag_hover = None;
+    }
+
+    let mut changed = false;
+    if !narrowed {
+        for (folder, was_open) in folders {
+            let now_open = view.is_open(&folder).unwrap_or(was_open);
+            changed |= if now_open {
+                open.insert(folder)
+            } else {
+                open.remove(&folder)
+            };
+        }
+    }
+    (out, changed)
+}
+
+const ROW: f32 = 22.0;
+const INDENT: f32 = 14.0;
+const FLASH: f64 = 0.9;
+const HOVER_OPENS: f64 = 0.5;
+const MARK: f32 = 14.0;
+
+struct Line {
+    id: String,
+    row: TreeRow,
+    open: bool,
+    children: Vec<Line>,
+}
+
+fn lines_of<S: TreeSource>(source: &S, folder: &str, is_open: &dyn Fn(&str) -> bool) -> Vec<Line> {
+    source
+        .children(folder)
+        .into_iter()
+        .map(|id| {
+            let row = source.row(&id);
+            let open = row.folder && is_open(&id);
+            let children = if open {
+                lines_of(source, &id, is_open)
+            } else {
+                Vec::new()
+            };
+            Line {
+                id,
+                row,
+                open,
+                children,
+            }
+        })
+        .collect()
+}
+
+fn walk_lines(lines: &[Line], visit: &mut dyn FnMut(&Line)) {
+    for line in lines {
+        visit(line);
+        walk_lines(&line.children, visit);
+    }
+}
+
+/// A row as it was drawn this frame.
+struct DrawnRow {
+    id: String,
+    folder: bool,
+    open: bool,
+    y: Rangef,
+    /// Where the row's name starts.
+    left: f32,
+}
+
+impl DrawnRow {
+    fn rect(&self, tree: &Rect) -> Rect {
+        Rect::from_x_y_ranges(tree.x_range(), self.y)
+    }
+
+    fn contains(&self, pointer: Pos2) -> bool {
+        self.y.contains(pointer.y)
+    }
+}
+
+enum RenameEnd {
+    Typed(String, String),
+    Left,
+}
+
+struct RowsCx<'a> {
+    drawn: &'a RefCell<Vec<DrawnRow>>,
+    renaming: &'a RefCell<Option<Renaming>>,
+    renamed: &'a RefCell<Option<RenameEnd>>,
+    rename_tip: Option<&'a str>,
+}
+
+fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsCx) {
+    for line in lines {
+        let Line {
+            id,
+            row,
+            open,
+            children,
+        } = line;
+        let folder = row.folder;
+        let icon = match (folder, open) {
+            (true, true) => Some(Mark::FolderOpen),
+            (true, false) => Some(Mark::Folder),
+            (false, _) => row.icon,
+        };
+        let dim = row.dim;
+        let label_id = id.clone();
+        let mut node = if folder {
+            NodeBuilder::dir(id.clone()).default_open(open)
+        } else {
+            NodeBuilder::leaf(id.clone())
+        };
+        node = node
+            .closer(|ui: &mut Ui, closer: CloserState| {
+                let mark = if closer.is_open {
+                    Mark::ChevronDown
+                } else {
+                    Mark::ChevronRight
+                };
+                let color = if closer.is_hovered {
+                    theme::TEXT
+                } else {
+                    theme::FAINT
+                };
+                glyph::paint(
+                    ui.painter(),
+                    mark,
+                    Rect::from_center_size(ui.max_rect().center(), Vec2::splat(10.0)),
+                    color,
+                );
+            })
+            .label_ui(move |ui: &mut Ui| {
+                row_label(ui, cx, &label_id, &row, open);
             });
-            if visible {
-                leaf_line(&mut child, node, &mut walk.hooks.thumbs);
-            }
-            if node.unsaved {
-                unsaved_dot(ui, rect);
-            }
-            if response.clicked() {
-                walk.state.cursor = Some(node.id.clone());
-                walk.out.clicked = Some((node.id.clone(), ui.input(|i| i.modifiers)));
-            }
-            if response.double_clicked() {
-                walk.out.double_clicked = Some(node.id.clone());
-            }
-            if let Some(menu) = walk.hooks.menu.as_deref_mut() {
-                response.context_menu(|ui| menu(ui, &node.id));
-            }
-            if let Some(dragged) = &node.drag {
-                picker::carry(ui, &response, dragged);
-            }
-            if let Some(folder) = into {
-                take_drop(ui, &response, rect, folder, &mut walk.out);
-            }
+        if let Some(mark) = icon {
+            node = node.icon(move |ui: &mut Ui| {
+                let color = if dim { theme::FAINT } else { theme::MUTED };
+                glyph::paint(
+                    ui.painter(),
+                    mark,
+                    Rect::from_center_size(ui.max_rect().center(), Vec2::splat(13.0)),
+                    color,
+                );
+            });
+        }
+        builder.node(node);
+        if folder {
+            build(builder, children, cx);
+            builder.close_dir();
         }
     }
 }
 
-/// Takes a row of the folder's table dropped on `response`, marking the line while one hovers.
-fn take_drop<A>(
-    ui: &Ui,
-    response: &egui::Response,
-    rect: egui::Rect,
-    folder: &TreeNode<A>,
-    out: &mut TreeOutput<A>,
-) {
-    let Some(table) = &folder.drops else {
-        return;
-    };
-    let fits = |dragged: &Dragged| matches!(dragged, Dragged::Row { table: of, .. } if of == table);
-    if response
-        .dnd_hover_payload::<Dragged>()
-        .is_some_and(|dragged| fits(&dragged))
-    {
-        ui.painter().rect_stroke(
-            rect.shrink(1.0),
-            3.0,
-            egui::Stroke::new(1.5, theme::ACCENT),
-            egui::StrokeKind::Inside,
+fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
+    let rect = ui.max_rect();
+    let right = rect.right() - 6.0;
+    let marks = row_marks(row, !row.folder || !open);
+    let mut reserved = MARK * (marks.len() as f32 + 1.0) + 6.0;
+    let detail = (!row.detail.is_empty()).then(|| {
+        ui.painter()
+            .layout_no_wrap(row.detail.clone(), FontId::proportional(12.0), theme::FAINT)
+    });
+    if let Some(detail) = &detail {
+        reserved += detail.size().x + 4.0;
+    }
+    let left = ui.cursor().min.x;
+    let width = (right - reserved - left).max(24.0);
+    let mut x = right;
+    for (mark, color) in &marks {
+        glyph::paint(
+            ui.painter(),
+            *mark,
+            Rect::from_center_size(
+                egui::pos2(x - MARK / 2.0, rect.center().y),
+                Vec2::splat(10.0),
+            ),
+            *color,
+        );
+        x -= MARK;
+    }
+    if let Some(detail) = detail {
+        let at = egui::pos2(
+            right - MARK * marks.len().max(1) as f32 - 4.0,
+            rect.center().y,
+        );
+        ui.painter().galley(
+            Align2::RIGHT_CENTER.anchor_size(at, detail.size()).min,
+            detail,
+            theme::FAINT,
         );
     }
-    if let Some(dragged) = response.dnd_release_payload::<Dragged>()
-        && fits(&dragged)
-    {
-        out.dropped = Some((folder.id.clone(), (*dragged).clone()));
+    let mut renaming = cx.renaming.borrow_mut();
+    match renaming.as_mut().filter(|renaming| renaming.id == id) {
+        Some(renaming) => rename_box(ui, cx, renaming, width),
+        None => name_label(ui, row, width),
     }
-}
-
-fn spoken_folder<A>(node: &TreeNode<A>, open: bool) -> String {
-    let mut parts = vec![node.label.clone()];
-    if node.style == TreeStyle::Heading {
-        parts.push("category".to_owned());
-    }
-    parts.push(if open { "expanded" } else { "folded" }.to_owned());
-    if let Some(count) = &node.count {
-        parts.push(format!("{count} rows"));
-    }
-    parts.join(", ")
-}
-
-fn unsaved_dot(ui: &Ui, rect: egui::Rect) {
-    ui.painter().circle_filled(
-        egui::pos2(rect.max.x - 10.0, rect.center().y),
-        3.5,
-        theme::WARN,
-    );
-}
-
-fn folder_line<A>(ui: &mut Ui, node: &TreeNode<A>, open: bool) {
-    glyph::show(
-        ui,
-        if open {
-            Mark::ChevronDown
-        } else {
-            Mark::ChevronRight
-        },
-        11.0,
-        theme::FAINT,
-    );
-    let label = ui.label(match node.style {
-        TreeStyle::Heading => RichText::new(&node.label)
-            .font(Face::SmallCapsBold.id(13.0))
-            .color(ink::RUBRIC),
-        TreeStyle::Mono => theme::mono(&node.label).size(13.0).color(theme::TEXT),
-        TreeStyle::Plain => face::body(&node.label).color(if node.note.is_some() {
-            theme::MUTED
-        } else {
-            theme::TEXT
-        }),
+    cx.drawn.borrow_mut().push(DrawnRow {
+        id: id.to_owned(),
+        folder: row.folder,
+        open,
+        y: rect.y_range(),
+        left,
     });
-    if let Some(note) = &node.note {
-        label.on_hover_text(note);
+}
+
+fn name_label(ui: &mut Ui, row: &TreeRow, width: f32) {
+    let ink = if row.dim { theme::FAINT } else { theme::TEXT };
+    let mut job = egui::text::LayoutJob::default();
+    job.append(
+        &row.name,
+        0.0,
+        egui::TextFormat::simple(FontId::monospace(13.0), ink),
+    );
+    if let Some((suffix, color)) = &row.suffix {
+        let color = if row.dim { theme::FAINT } else { *color };
+        job.append(
+            suffix,
+            0.0,
+            egui::TextFormat::simple(FontId::monospace(13.0), color),
+        );
     }
-    let rule_from = ui.cursor().min.x + 6.0;
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-        ui.add_space(4.0);
-        ui.spacing_mut().item_spacing.x = 4.0;
-        if let Some(count) = &node.count {
-            ui.label(theme::faint(count).size(12.5));
-        }
-        if !open && node.unsaved {
-            let (rect, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), Sense::hover());
-            ui.painter().circle_filled(rect.center(), 3.5, theme::WARN);
-        }
-        if node.style == TreeStyle::Heading {
-            let y = ui.max_rect().center().y;
-            let rule_to = ui.cursor().max.x - 6.0;
-            if rule_to > rule_from {
-                ui.painter().hline(
-                    rule_from..=rule_to,
-                    y,
-                    egui::Stroke::new(1.0, theme::alpha(ink::RUBRIC, 110)),
-                );
+    job.wrap = egui::text::TextWrapping::truncate_at_width(width);
+    let spoken = row.spoken.clone().unwrap_or_else(|| row.name.clone());
+    ui.add(egui::Label::new(job).selectable(false))
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &spoken));
+}
+
+fn rename_box(ui: &mut Ui, cx: &RowsCx, renaming: &mut Renaming, width: f32) {
+    let edit_id = Id::new(("tree rename", &renaming.id));
+    let response = ui.add(
+        egui::TextEdit::singleline(&mut renaming.text)
+            .id(edit_id)
+            .font(FontId::monospace(13.0))
+            .desired_width(width)
+            .margin(egui::Margin::symmetric(2, 0)),
+    );
+    if let Some(tip) = cx.rename_tip {
+        let painter = ui
+            .ctx()
+            .layer_painter(egui::LayerId::new(egui::Order::Tooltip, edit_id));
+        widgets::floating_chip(
+            &painter,
+            response.rect.left_bottom() + Vec2::new(0.0, 4.0),
+            Align2::LEFT_TOP,
+            tip,
+            theme::RAISED,
+            theme::MUTED,
+            12.0,
+        );
+    }
+    if !renaming.focused {
+        renaming.focused = true;
+        response.request_focus();
+        let mut edit = egui::TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
+        let all = egui::text::CCursorRange::two(
+            egui::text::CCursor::new(0),
+            egui::text::CCursor::new(renaming.text.chars().count()),
+        );
+        edit.cursor.set_char_range(Some(all));
+        edit.store(ui.ctx(), edit_id);
+    } else if response.lost_focus() {
+        let end = if ui.input(|i| EditorKey::Confirm.pressed(i)) {
+            RenameEnd::Typed(renaming.id.clone(), renaming.text.trim().to_owned())
+        } else {
+            RenameEnd::Left
+        };
+        *cx.renamed.borrow_mut() = Some(end);
+    }
+}
+
+/// The marks at a row's right end, rightmost first. A folder shows a problem or an unsaved file
+/// inside it only while it is closed, the rows inside showing their own while it is open.
+fn row_marks(row: &TreeRow, inside: bool) -> Vec<(Mark, Color32)> {
+    let mut marks = Vec::new();
+    if inside && row.problem.is_some() {
+        marks.push((Mark::Warning, theme::DANGER));
+    }
+    if inside && row.unsaved {
+        marks.push((Mark::Dot, theme::WARN));
+    }
+    if row.locked.is_some() {
+        marks.push((Mark::Padlock, theme::FAINT));
+    }
+    marks
+}
+
+/// Where a drag would land. A tree without an order of its own always drops into a folder: the
+/// one under the pointer, or the one holding the row under it.
+fn drop_of<S: TreeSource>(
+    source: &S,
+    drawn: &[DrawnRow],
+    pointer: Pos2,
+    target: &str,
+    position: &DirPosition<String>,
+) -> TreeDrop {
+    if source.ordered() {
+        let at = match position {
+            DirPosition::First => DropAt::First,
+            DirPosition::Last => DropAt::End,
+            DirPosition::Before(id) => DropAt::Before(id.clone()),
+            DirPosition::After(id) => DropAt::After(id.clone()),
+        };
+        return TreeDrop {
+            folder: target.to_owned(),
+            at,
+        };
+    }
+    let folder = match drawn.iter().find(|row| row.contains(pointer)) {
+        Some(row) if row.folder => row.id.clone(),
+        Some(row) => source.parent(&row.id),
+        None => String::new(),
+    };
+    TreeDrop {
+        folder,
+        at: DropAt::End,
+    }
+}
+
+/// A drop into a folder boxes the folder and what shows inside it; one between rows is a line
+/// with a dot at its depth.
+fn mark_drop<S: TreeSource>(
+    painter: &egui::Painter,
+    source: &S,
+    drawn: &[DrawnRow],
+    tree: &Rect,
+    drop: &TreeDrop,
+) {
+    let line = |id: &str, below: bool| {
+        let row = drawn.iter().find(|row| row.id == id)?;
+        let y = if below { row.y.max } else { row.y.min };
+        Some((row.left, y))
+    };
+    let between = match &drop.at {
+        DropAt::Before(id) => line(id, false),
+        DropAt::After(id) => line(id, true),
+        DropAt::First if !drop.folder.is_empty() => drawn
+            .iter()
+            .find(|row| source.parent(&row.id) == drop.folder)
+            .map(|row| (row.left, row.y.min)),
+        _ => None,
+    };
+    if let Some((left, y)) = between {
+        let stroke = Stroke::new(2.0, theme::DROP);
+        painter.line_segment(
+            [egui::pos2(left, y), egui::pos2(tree.right() - 4.0, y)],
+            stroke,
+        );
+        painter.circle_stroke(egui::pos2(left - 3.0, y), 3.0, stroke);
+        return;
+    }
+    let inside = |id: &str| {
+        drop.folder.is_empty() || id == drop.folder || id.starts_with(&format!("{}/", drop.folder))
+    };
+    let boxed = drawn
+        .iter()
+        .filter(|row| inside(&row.id))
+        .map(|row| row.y)
+        .reduce(|a, b| Rangef::new(a.min.min(b.min), a.max.max(b.max)));
+    let y = boxed.unwrap_or(tree.y_range());
+    painter.rect_stroke(
+        Rect::from_x_y_ranges(tree.x_range(), y).shrink(1.0),
+        3.0,
+        Stroke::new(1.5, theme::DROP),
+        StrokeKind::Inside,
+    );
+}
+
+fn drag_tip(ui: &Ui, pointer: Pos2, text: &str, ink: Color32) {
+    let painter = ui.ctx().layer_painter(egui::LayerId::new(
+        egui::Order::Tooltip,
+        Id::new("tree drag tip"),
+    ));
+    widgets::floating_chip(
+        &painter,
+        pointer + Vec2::new(14.0, 16.0),
+        Align2::LEFT_TOP,
+        text,
+        theme::RAISED,
+        ink,
+        12.5,
+    );
+}
+
+/// Opens a closed folder the pointer has rested on for a moment while dragging.
+fn open_on_hover(
+    view: &mut TreeViewState<String>,
+    hover: &mut Option<(String, f64)>,
+    drawn: &[DrawnRow],
+    pointer: Pos2,
+    now: f64,
+) {
+    let Some(row) = drawn
+        .iter()
+        .find(|row| row.contains(pointer) && row.folder && !row.open)
+    else {
+        *hover = None;
+        return;
+    };
+    match hover {
+        Some((id, since)) if *id == row.id => {
+            if now - *since >= HOVER_OPENS {
+                view.set_openness(row.id.clone(), true);
+                *hover = None;
             }
         }
-    });
-}
-
-fn folder_menu<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, out: &mut TreeOutput<A>) {
-    for action in &node.actions {
-        if ui.button(&action.label).clicked() {
-            out.action = Some((node.id.clone(), action.action.clone()));
-            ui.close();
-        }
-    }
-}
-
-fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
-    let color = if node.selected {
-        theme::TEXT
-    } else {
-        theme::CODE
-    };
-    ui.add_space(14.0);
-    let image = match &node.icon {
-        TreeIcon::None => None,
-        TreeIcon::Mark(mark) => {
-            glyph::show(ui, *mark, 13.0, theme::MUTED);
-            None
-        }
-        TreeIcon::Thumb(path) => thumbs
-            .as_deref_mut()
-            .and_then(|thumbs| thumbs(&ui.ctx().clone(), path)),
-    };
-    if let Some(image) = image {
-        ui.add(egui::Image::from_texture((image.texture, image.size)).uv(image.uv));
-        ui.add_space(2.0);
-    } else if matches!(node.icon, TreeIcon::Thumb(_)) {
-        ui.add_space(18.0);
-    }
-    ui.label(theme::mono(&node.label).size(13.0).color(color));
-    if let Some(note) = &node.note {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.add_space(20.0);
-            ui.label(theme::faint(note).size(12.0));
-        });
-    }
-}
-
-#[derive(Default)]
-struct Dir {
-    dirs: BTreeMap<String, Dir>,
-    files: Vec<String>,
-}
-
-impl Dir {
-    fn into_nodes<A>(
-        self,
-        prefix: &str,
-        leaf: &mut dyn FnMut(&str) -> Option<TreeNode<A>>,
-        folder: &mut dyn FnMut(&mut TreeNode<A>),
-    ) -> Vec<TreeNode<A>> {
-        let mut nodes: Vec<TreeNode<A>> = self
-            .dirs
-            .into_iter()
-            .map(|(name, dir)| {
-                let id = if prefix.is_empty() {
-                    name.clone()
-                } else {
-                    format!("{prefix}/{name}")
-                };
-                let children = dir.into_nodes(&id, leaf, folder);
-                let mut node = TreeNode::folder(id, name, children);
-                folder(&mut node);
-                node
-            })
-            .collect();
-        nodes.extend(self.files.iter().filter_map(|path| leaf(path)));
-        nodes
+        _ => *hover = Some((row.id.clone(), now)),
     }
 }

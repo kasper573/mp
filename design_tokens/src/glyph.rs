@@ -82,6 +82,7 @@ pub enum Mark {
     Cross,
     Flag,
     Padlock,
+    PadlockOpen,
     ChevronUp,
     ChevronDown,
     ChevronLeft,
@@ -100,6 +101,9 @@ pub enum Mark {
     Undo,
     Pin,
     Eye,
+    EyeClosed,
+    Folder,
+    FolderOpen,
     Gear,
     Bell,
     Speaker,
@@ -126,6 +130,7 @@ impl Mark {
             Mark::Cross => "no",
             Mark::Flag => "flag",
             Mark::Padlock => "locked",
+            Mark::PadlockOpen => "unlocked",
             Mark::ChevronUp => "up",
             Mark::ChevronDown => "down",
             Mark::ChevronLeft => "left",
@@ -144,6 +149,9 @@ impl Mark {
             Mark::Undo => "undo",
             Mark::Pin => "pin",
             Mark::Eye => "shown",
+            Mark::EyeClosed => "hidden",
+            Mark::Folder => "folder",
+            Mark::FolderOpen => "open folder",
             Mark::Gear => "settings",
             Mark::Bell => "bell",
             Mark::Speaker => "sound on",
@@ -190,6 +198,7 @@ pub fn paint(painter: &Painter, mark: Mark, rect: Rect, color: Color32) {
             ));
         }
         Mark::Padlock => padlock(painter, c, s * 0.8, color),
+        Mark::PadlockOpen => padlock_open(painter, c, s * 0.8, color),
         Mark::ChevronUp => {
             line(vec![u(0.2, 0.65), u(0.5, 0.33), u(0.8, 0.65)]);
         }
@@ -286,6 +295,48 @@ pub fn paint(painter: &Painter, mark: Mark, rect: Rect, color: Color32) {
                 thin,
             ));
             painter.circle_filled(c, s * 0.14, color);
+        }
+        Mark::EyeClosed => {
+            line(vec![
+                u(0.05, 0.42),
+                u(0.3, 0.62),
+                u(0.7, 0.62),
+                u(0.95, 0.42),
+            ]);
+            for (from, to) in [
+                ((0.3, 0.62), (0.22, 0.8)),
+                ((0.5, 0.66), (0.5, 0.86)),
+                ((0.7, 0.62), (0.78, 0.8)),
+            ] {
+                painter.line_segment([u(from.0, from.1), u(to.0, to.1)], thin);
+            }
+        }
+        Mark::Folder => {
+            painter.add(Shape::closed_line(
+                vec![
+                    u(0.06, 0.2),
+                    u(0.4, 0.2),
+                    u(0.5, 0.32),
+                    u(0.94, 0.32),
+                    u(0.94, 0.84),
+                    u(0.06, 0.84),
+                ],
+                thin,
+            ));
+        }
+        Mark::FolderOpen => {
+            line(vec![
+                u(0.06, 0.84),
+                u(0.06, 0.2),
+                u(0.4, 0.2),
+                u(0.5, 0.32),
+                u(0.84, 0.32),
+                u(0.84, 0.46),
+            ]);
+            painter.add(Shape::closed_line(
+                vec![u(0.06, 0.84), u(0.22, 0.46), u(0.98, 0.46), u(0.84, 0.84)],
+                thin,
+            ));
         }
         Mark::Gear => {
             for step in 0..8 {
@@ -519,6 +570,33 @@ pub fn padlock(painter: &Painter, at: Pos2, width: f32, color: Color32) {
                 -width * 0.12 - angle.sin() * width * 0.42,
             )
         })
+        .collect();
+    painter.add(Shape::line(
+        shackle,
+        Stroke::new((width * 0.12).max(1.0), color),
+    ));
+}
+
+/// A padlock whose shackle is lifted clear of its body on one side.
+pub fn padlock_open(painter: &Painter, at: Pos2, width: f32, color: Color32) {
+    let body = Rect::from_center_size(
+        at + Vec2::new(0.0, width * 0.25),
+        Vec2::new(width, width * 0.75),
+    );
+    painter.rect_filled(body, width * 0.12, color);
+    let lift = Vec2::new(width * 0.3, -width * 0.2);
+    let shackle: Vec<Pos2> = (0..=10)
+        .map(|step| {
+            let angle = std::f32::consts::PI * step as f32 / 10.0;
+            at + lift
+                + Vec2::new(
+                    -angle.cos() * width * 0.32,
+                    -width * 0.12 - angle.sin() * width * 0.42,
+                )
+        })
+        .chain(std::iter::once(
+            at + lift + Vec2::new(width * 0.32, width * 0.12),
+        ))
         .collect();
     painter.add(Shape::line(
         shackle,

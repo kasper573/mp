@@ -9,6 +9,7 @@ pub use files::{FileBytes, FileChange, ProjectFiles, hash, json_bytes, text_byte
 pub use history::{EditHistory, EditStep, RowSelection};
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Bound;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{self, TryRecvError};
@@ -16,7 +17,8 @@ use std::time::{Duration, Instant, SystemTime};
 
 use engine::core::content::ErrorPlace::WholeFile;
 use engine::core::content::{
-    Content, ContentFile, ContentProblem, LoadError, LoadReport, SETTINGS_FILE,
+    Content, ContentFile, ContentProblem, LoadError, LoadReport, MISSING_FILE, SETTINGS_FILE,
+    table_of,
 };
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -224,6 +226,8 @@ pub struct Project {
     pub last_usages: Option<Duration>,
     pub generation: u64,
     pub outside_rewrote: usize,
+    /// The paths references name that were moved away on disk, while the folder doesn't load.
+    pub moved_outside: Vec<MovedOutside>,
     pub catalogue: NodeCatalogue,
     loading: Option<Loading>,
     stale: bool,
@@ -281,6 +285,7 @@ impl Project {
             last_usages: None,
             generation: 0,
             outside_rewrote: 0,
+            moved_outside: Vec::new(),
             catalogue,
         };
         project.reload();
@@ -291,9 +296,32 @@ impl Project {
         self.report.is_none() && self.content.is_some()
     }
 
-    /// Whether the files as read from disk stopped loading, as opposed to an edit made here.
+    /// Whether the files as read from disk stopped loading, as opposed to an edit made here, for
+    /// more than files moved away from what names them, which the editor can point there.
     pub fn broken_on_disk(&self) -> bool {
-        self.report.is_some() && self.outside_rewrote > 0
+        self.report.is_some() && self.outside_rewrote > 0 && !self.moves_explain_report()
+    }
+
+    /// Whether every problem of the load is a reference to a file moved away on disk.
+    fn moves_explain_report(&self) -> bool {
+        let Some(report) = &self.report else {
+            return false;
+        };
+        let naming: BTreeSet<&str> = self
+            .moved_outside
+            .iter()
+            .flat_map(|step| {
+                self.usages
+                    .of_content(&step.from)
+                    .iter()
+                    .chain(self.usages.of_media(&step.from))
+            })
+            .map(|usage| usage.file.as_str())
+            .collect();
+        !naming.is_empty()
+            && report.errors.iter().all(|error| {
+                error.problem.rule == MISSING_FILE && naming.contains(error.file.as_str())
+            })
     }
 
     /// Loads the files as they stand, waiting for it: for opening a folder and taking in what
@@ -485,6 +513,7 @@ impl Project {
     }
 
     fn install(&mut self, loaded: Loaded) {
+        self.moved_outside.clear();
         self.last_load = Some(loaded.took);
         self.last_usages = Some(loaded.usages_took);
         self.usages = loaded.usages;
@@ -520,7 +549,7 @@ impl Project {
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
         let candidates: Vec<String> = match change {
-            FolderChange::Files(paths) => paths,
+            FolderChange::Files(paths) => self.held_by(paths),
             FolderChange::Unknown => ProjectFiles::read_dir(&self.root)
                 .map(|files| {
                     let mut all: Vec<String> = files.paths().cloned().collect();
@@ -532,9 +561,7 @@ impl Project {
                 .unwrap_or_default(),
         };
         for path in candidates {
-            let on_disk = std::fs::read(self.root.join(&path))
-                .ok()
-                .map(FileBytes::from);
+            let on_disk = read_entry(&self.root, &path);
             let disk_hash = on_disk.as_ref().map(|bytes| hash(bytes));
             if disk_hash == self.disk.get(&path).cloned() {
                 continue;
@@ -563,6 +590,34 @@ impl Project {
         OutsideChanges { taken, conflicts }
     }
 
+    /// Every file and kept folder a change to `paths` may touch: each path itself and, for a
+    /// folder or a bundle, everything it holds on disk and held before.
+    fn held_by(&self, paths: Vec<String>) -> Vec<String> {
+        let mut held: BTreeSet<String> = BTreeSet::new();
+        for path in paths {
+            let inside = files::folder_entry(&path);
+            held.extend(self.files.paths_under(&inside).cloned());
+            held.extend(
+                self.disk
+                    .range::<str, _>((Bound::Included(inside.as_str()), Bound::Unbounded))
+                    .map(|(entry, _)| entry)
+                    .take_while(|entry| entry.starts_with(&inside))
+                    .cloned(),
+            );
+            let on_disk = self.root.join(&path);
+            if on_disk.is_dir() {
+                let walked = files::content_files(&on_disk).unwrap_or_default();
+                held.extend(walked.into_iter().map(|file| format!("{inside}{file}")));
+                if files::empty_folder(&on_disk).unwrap_or(false) {
+                    held.insert(inside);
+                }
+            } else {
+                held.insert(path);
+            }
+        }
+        held.into_iter().collect()
+    }
+
     pub fn take_disk(&mut self, conflict: &FileConflict) {
         match &conflict.disk {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
@@ -577,6 +632,10 @@ impl Project {
         self.history.reset();
         self.reload();
         self.outside_rewrote = if self.report.is_some() { rewrote } else { 0 };
+        self.moved_outside = match self.report {
+            Some(_) => moved_outside(&self.usages, &self.files),
+            None => Vec::new(),
+        };
     }
 }
 
@@ -604,6 +663,56 @@ pub fn catalogue_of(project: Option<&Project>) -> &NodeCatalogue {
     project.map_or(&NO_CATALOGUE, |project| &project.catalogue)
 }
 
+/// A path the folder's references name that is gone from disk, and the one file of the same
+/// name and type now found elsewhere in the folder.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MovedOutside {
+    pub from: String,
+    pub to: String,
+    pub references: usize,
+}
+
+/// Every path named at the last load that is gone now, with where a file of its name and type is.
+fn moved_outside(usages: &ContentUsages, files: &ProjectFiles) -> Vec<MovedOutside> {
+    let index = files.index();
+    let name = |path: &str| path.rsplit('/').next().unwrap_or(path).to_owned();
+    let found = |from: &str, candidates: Vec<&str>| {
+        let mut same = candidates
+            .into_iter()
+            .filter(|path| name(path) == name(from));
+        match (same.next(), same.next()) {
+            (Some(only), None) => Some(only.to_owned()),
+            _ => None,
+        }
+    };
+    let content = usages.content().filter_map(|(from, uses)| {
+        let table = table_of(from)?;
+        if index.is_content(from) {
+            return None;
+        }
+        let to = found(from, index.paths_of(table).collect())?;
+        Some(MovedOutside {
+            from: from.to_owned(),
+            to,
+            references: uses.len(),
+        })
+    });
+    let media = usages.media().filter_map(|(from, uses)| {
+        if index.media.contains(from) {
+            return None;
+        }
+        let to = found(from, index.media.iter().map(String::as_str).collect())?;
+        Some(MovedOutside {
+            from: from.to_owned(),
+            to,
+            references: uses.len(),
+        })
+    });
+    let mut moved: Vec<MovedOutside> = content.chain(media).collect();
+    moved.sort_by(|a, b| a.from.cmp(&b.from));
+    moved
+}
+
 pub struct OutsideChanges {
     pub taken: Vec<String>,
     pub conflicts: Vec<FileConflict>,
@@ -613,6 +722,17 @@ pub struct OutsideChanges {
 pub struct FileConflict {
     pub file: String,
     pub disk: Option<FileBytes>,
+}
+
+/// What is at `entry` on disk: a file's bytes, or nothing for a kept folder that stays empty.
+fn read_entry(root: &Path, entry: &str) -> Option<FileBytes> {
+    if files::is_folder(entry) {
+        let folder = root.join(entry);
+        return files::empty_folder(&folder)
+            .unwrap_or(false)
+            .then(|| FileBytes::from([]));
+    }
+    std::fs::read(root.join(entry)).ok().map(FileBytes::from)
 }
 
 pub fn load(files: &ProjectFiles, name: &str) -> Result<(Content, Duration), LoadReport> {

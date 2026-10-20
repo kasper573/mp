@@ -354,7 +354,7 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
             play::start(editor, Some(place));
             ui.close();
         }
-        ui.menu_button("Play here as…", |ui| {
+        widgets::submenu(ui, "Play here as…", |ui| {
             for test in play::test_characters(editor) {
                 if ui
                     .button(format!("{} · level {}", test.key, test.level))

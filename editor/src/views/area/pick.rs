@@ -2,7 +2,6 @@ use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use serde_json::Value;
 
-use super::placement::replace_with;
 use super::{AreaFrame, nodes, shapes};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::schema;
@@ -33,19 +32,11 @@ pub fn pick_then_add(
     }));
 }
 
-pub fn picked_row(editor: &mut Editor, then: PickRowThen, picked: &str) {
-    match then {
-        PickRowThen::AddModule {
-            area,
-            mut module,
-            field,
-        } => {
-            module[field] = Value::String(picked.to_owned());
-            let label = format!("Add {} to {area}", shapes::label(&module));
-            nodes::add(editor, &area, vec![module], &label);
-        }
-        PickRowThen::ReplaceBlueprint { area, node } => replace_with(editor, &area, &node, picked),
-    }
+/// Adds `module` to `area` with the picked row's path in its `field`.
+pub fn add_picked(editor: &mut Editor, area: &str, mut module: Value, field: &str, picked: &str) {
+    module[field] = Value::String(picked.to_owned());
+    let label = format!("Add {} to {area}", shapes::label(&module));
+    nodes::add(editor, area, vec![module], &label);
 }
 
 pub fn listen(editor: &mut Editor, frame: &AreaFrame, tile: Pos<Tiles>) {

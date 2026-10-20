@@ -1,4 +1,5 @@
 mod area_actions;
+mod content_tree;
 mod drafts;
 mod fixtures;
 mod import;

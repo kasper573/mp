@@ -174,7 +174,7 @@ impl Leaf {
                 ));
             }
             (LeafKind::Asset, LeafProblem::Unknown { nearest }) => (
-                "missing file",
+                super::MISSING_FILE,
                 "the path of a media file from the game folder".to_owned(),
                 nearest.as_ref(),
             ),

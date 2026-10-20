@@ -18,6 +18,8 @@ pub enum EditorKey {
     StopPlay,
     PlayedCharacter,
     Rename,
+    NewAgain,
+    CopyPath,
     Usages,
     Duplicate,
     Delete,
@@ -217,9 +219,9 @@ impl EditorKey {
         use EditorKey::*;
         match self {
             Search | Save | Undo | Redo | CloseTab | Quit | KeySheet | PlayFromStart | PlayHere
-            | StopPlay | PlayedCharacter | Rename | Usages | Duplicate | Delete | Confirm
-            | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste | SelectAll
-            | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
+            | StopPlay | PlayedCharacter | Rename | NewAgain | CopyPath | Usages | Duplicate
+            | Delete | Confirm | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste
+            | SelectAll | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
             | ContextMenu | FirstLine | LastLine => KeyScope::Everywhere,
             SelectTool | PaintTool | TerrainTool | FillTool | EraseTool | EyedropperTool
             | StampTool | ModuleTool | BrushSmaller | BrushBigger | FlipHorizontal
@@ -249,7 +251,9 @@ impl EditorKey {
             PlayHere => "play here",
             StopPlay => "stop playing",
             PlayedCharacter => "open the test character being played",
-            Rename => "rename the selected row's key or node",
+            Rename => "rename the selected file, folder or node",
+            NewAgain => "make the type made last again, in the content tree's folder",
+            CopyPath => "copy the selected file's path",
             Usages => "show usages",
             Duplicate => "duplicate the selection",
             Delete => "delete the selection, after showing usages",
@@ -336,6 +340,8 @@ impl EditorKey {
             StopPlay => press(Modifiers::SHIFT, Key::F5),
             PlayedCharacter => press(command, Key::T),
             Rename => press(plain, Key::F2),
+            NewAgain => press(command, Key::N),
+            CopyPath => press(command | Modifiers::SHIFT, Key::C),
             Usages => press(Modifiers::SHIFT, Key::F12),
             Duplicate | FillDown => press(command, Key::D),
             Delete => Binding::Press(vec![

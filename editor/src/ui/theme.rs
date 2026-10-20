@@ -22,6 +22,7 @@ pub const VARIABLE_FILL: Color32 = Color32::from_rgba_premultiplied(8, 5, 10, 20
 pub const CANVAS: Color32 = Color32::from_rgb(219, 207, 178);
 pub const BLOCKED: Color32 = ink::RUBRIC;
 pub const SORT_LINE: Color32 = ink::AZURE;
+pub const DROP: Color32 = ink::AZURE;
 
 pub fn apply(ctx: &Context) {
     design_tokens::apply(ctx);

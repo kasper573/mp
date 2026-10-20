@@ -12,7 +12,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading,
-    ModuleRule, ModuleSet, PartSpec, Parts, RowCheck, Shape, serial,
+    MISSING_FILE, ModuleRule, ModuleSet, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Direction, FrameSize, Pos, Rect, Size, WorldPx};
 use crate::core::tiling::Tiles;
@@ -74,7 +74,7 @@ impl Bundle for ModelDef {
                     "",
                     ErrorPlace::WholeFile,
                     ContentProblem::new(
-                        "missing file",
+                        MISSING_FILE,
                         format!("no {part}"),
                         "a bust for every generic expression in busts/",
                     ),

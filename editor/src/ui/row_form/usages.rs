@@ -1,5 +1,6 @@
 use egui::{Align, Layout, Sense, Ui};
 use engine::core::assets::FileSize;
+use engine::core::content::NOTE_EXTENSION;
 
 use super::{theme, widgets};
 use crate::app::Editor;
@@ -82,6 +83,10 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, key: &str, titled: 
 
 pub fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
     ui.label(theme::mono(path.to_owned()).color(theme::CODE));
+    if path.ends_with(&format!(".{NOTE_EXTENSION}")) {
+        show_note(editor, ui, path);
+        return;
+    }
     let ctx = ui.ctx().clone();
     let (thumb, size) = {
         let Editor { project, form, .. } = editor;
@@ -112,6 +117,19 @@ pub fn show_asset(editor: &mut Editor, ui: &mut Ui, path: &str) {
             thumb.size[0], thumb.size[1]
         )));
     }
+}
+
+/// A note reads here as it is; it is written in an editor of the user's choosing.
+fn show_note(editor: &Editor, ui: &mut Ui, path: &str) {
+    let Some(project) = &editor.project else {
+        return;
+    };
+    if ui.button("Open in your editor").clicked() {
+        let _ = opener::open(project.root.join(path));
+    }
+    ui.add_space(6.0);
+    let text = project.files.text(path).unwrap_or_default();
+    ui.add(egui::Label::new(theme::mono(text).color(theme::TEXT)).wrap());
 }
 
 pub fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {

@@ -57,28 +57,6 @@ impl Dragged {
     }
 }
 
-/// Makes a widget the source of a drag: the payload is set when the drag starts and a chip
-/// naming it follows the pointer until it's dropped.
-pub fn carry(ui: &Ui, response: &egui::Response, dragged: &Dragged) {
-    response.dnd_set_drag_payload(dragged.clone());
-    if response.dragged()
-        && let Some(pointer) = ui.ctx().pointer_interact_pos()
-    {
-        let painter = ui
-            .ctx()
-            .layer_painter(egui::LayerId::new(egui::Order::Tooltip, response.id));
-        widgets::floating_chip(
-            &painter,
-            pointer + egui::vec2(12.0, 12.0),
-            egui::Align2::LEFT_TOP,
-            &dragged.label(),
-            theme::RAISED,
-            theme::TEXT,
-            12.5,
-        );
-    }
-}
-
 /// A chip in the popover that narrows the list to one category.
 pub struct Category {
     pub id: String,

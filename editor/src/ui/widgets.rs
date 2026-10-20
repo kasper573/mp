@@ -320,6 +320,25 @@ pub fn search_box(
     inner.expect("search field")
 }
 
+/// A button in a menu that opens `content` beside it, marked with the editor's own chevron.
+pub fn submenu<R>(
+    ui: &mut Ui,
+    text: impl Into<egui::WidgetText>,
+    content: impl FnOnce(&mut Ui) -> R,
+) -> Option<R> {
+    let button = egui::Button::new(text.into()).right_text("   ");
+    let (response, inner) =
+        egui::containers::menu::SubMenuButton::from_button(button).ui(ui, content);
+    let at = response.rect.right_center() - Vec2::new(10.0, 0.0);
+    glyph::paint(
+        ui.painter(),
+        Mark::ChevronRight,
+        Rect::from_center_size(at, Vec2::splat(9.0)),
+        theme::MUTED,
+    );
+    inner.map(|inner| inner.inner)
+}
+
 pub fn plural<N: PartialEq + From<u8>>(count: N) -> &'static str {
     if count == N::from(1) { "" } else { "s" }
 }

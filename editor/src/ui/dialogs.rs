@@ -10,14 +10,16 @@ use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
-use super::{theme, unused_dialog, widgets};
-use crate::app::{CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource};
+use super::{content_tree, theme, unused_dialog, widgets};
+use crate::app::{
+    CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, PickRowThen,
+};
 use crate::keymap::{EditorKey, KeyScope};
 use crate::project::{ContentEdit, files};
 use crate::rows::{self, UsageDecision};
 use crate::templates::{self, GameTemplate};
 use crate::ui::{self, start};
-use crate::views::area::{pick, resize};
+use crate::views::area::{pick, placement, resize};
 use crate::views::script;
 use crate::views::world;
 use crate::{import, play};
@@ -755,7 +757,12 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                             .filter(|k| needle.is_empty() || k.to_lowercase().contains(&needle))
                         {
                             let picked = dialog.picked.as_deref() == Some(key.as_str());
-                            let response = ui.selectable_label(picked, key);
+                            let shown = if key.is_empty() {
+                                "the game folder"
+                            } else {
+                                key
+                            };
+                            let response = ui.selectable_label(picked, shown);
                             if response.clicked() {
                                 dialog.picked = Some(key.clone());
                             }
@@ -780,7 +787,24 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             match outcome {
                 Some(true) => {
                     let picked = dialog.picked.clone().unwrap_or_default();
-                    pick::picked_row(editor, dialog.then, &picked);
+                    match dialog.then {
+                        PickRowThen::NewFile { folder } => {
+                            content_tree::new_file(editor, &folder, &picked)
+                        }
+                        PickRowThen::MoveInto { paths } => {
+                            if let Err(error) = rows::move_into(editor, &paths, &picked) {
+                                editor.toast(error);
+                            }
+                        }
+                        PickRowThen::AddModule {
+                            area,
+                            module,
+                            field,
+                        } => pick::add_picked(editor, &area, module, &field, &picked),
+                        PickRowThen::ReplaceBlueprint { area, node } => {
+                            placement::replace_with(editor, &area, &node, &picked)
+                        }
+                    }
                     None
                 }
                 Some(false) => None,

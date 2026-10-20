@@ -28,6 +28,11 @@ pub struct FolderIndex {
     pub notes: BTreeSet<String>,
     /// Files and folders the loader takes for nothing it may hold.
     pub unknown: BTreeSet<String>,
+    /// What each folder holds directly, its folders, files and bundles, by path; the game folder
+    /// is "".
+    pub children: BTreeMap<String, BTreeSet<String>>,
+    /// How many files each folder holds at any depth, a bundle counting as one.
+    pub counts: BTreeMap<String, usize>,
 }
 
 impl FolderIndex {
@@ -37,6 +42,18 @@ impl FolderIndex {
             .into_iter()
             .flatten()
             .map(String::as_str)
+    }
+
+    pub fn children_of(&self, folder: &str) -> impl Iterator<Item = &str> {
+        self.children
+            .get(folder)
+            .into_iter()
+            .flatten()
+            .map(String::as_str)
+    }
+
+    pub fn count_of(&self, folder: &str) -> usize {
+        self.counts.get(folder).copied().unwrap_or(0)
     }
 
     pub fn is_content(&self, path: &str) -> bool {
@@ -170,9 +187,9 @@ impl ProjectFiles {
         files
     }
 
-    /// Every file that makes up the content file at `path`: itself, or a bundle's every part.
+    /// Every file that makes up what is at `path`: a file itself, or a bundle's every part.
     pub fn files_of(&self, path: &str) -> Vec<String> {
-        if path.ends_with(".json") {
+        if self.map.contains_key(path) {
             vec![path.to_owned()]
         } else {
             self.paths_under(&folder_entry(path)).cloned().collect()
@@ -217,11 +234,21 @@ impl FolderIndex {
         let types = registry.file_types();
         let mut index = FolderIndex::default();
         let add_folders = |index: &mut FolderIndex, path: &str| {
-            let mut parent = files::parent_of(path);
-            while !parent.is_empty() && index.folders.insert(parent.to_owned()) {
-                parent = files::parent_of(parent);
+            let mut child = path;
+            loop {
+                let parent = files::parent_of(child);
+                index
+                    .children
+                    .entry(parent.to_owned())
+                    .or_default()
+                    .insert(child.to_owned());
+                if parent.is_empty() || !index.folders.insert(parent.to_owned()) {
+                    break;
+                }
+                child = parent;
             }
         };
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
         for entry in entries {
             if let Some(folder) = entry.strip_suffix('/') {
                 if bundle_of(entry).is_none() {
@@ -235,6 +262,13 @@ impl FolderIndex {
                 None => (entry.as_str(), false),
             };
             add_folders(&mut index, path);
+            if seen.insert(path) {
+                let mut parent = path;
+                while !parent.is_empty() {
+                    parent = files::parent_of(parent);
+                    *index.counts.entry(parent.to_owned()).or_default() += 1;
+                }
+            }
             match files::classify(path, dir, &types) {
                 Ok(Some(GameFile::Content { table, .. })) => {
                     index
@@ -312,7 +346,7 @@ pub fn content_files(root: &Path) -> io::Result<Vec<String>> {
     Ok(files)
 }
 
-fn empty_folder(path: &Path) -> io::Result<bool> {
+pub fn empty_folder(path: &Path) -> io::Result<bool> {
     Ok(std::fs::read_dir(path)?
         .filter_map(Result::ok)
         .all(|entry| entry.file_name().to_str().is_some_and(hidden)))

@@ -36,6 +36,9 @@ pub enum ErrorPlace {
 
 pub const VERSION_RULE: &str = "content version";
 
+/// The rule a path breaks when nothing is at it.
+pub const MISSING_FILE: &str = "missing file";
+
 pub struct LoadReport {
     pub folder: String,
     pub build: String,
@@ -90,7 +93,7 @@ impl ContentProblem {
 
     pub fn unknown_row(table: &str, path: &str, nearest: Option<&str>) -> ContentProblem {
         ContentProblem::new(
-            "missing file",
+            MISSING_FILE,
             format!("{path:?}"),
             format!("the path of {} {table} file", article(table)),
         )

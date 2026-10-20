@@ -28,7 +28,7 @@ pub use load::{
     FilesystemFolder, FolderEntry, JsonPart, LoadStep, Loading, MemoryFolder, Reference, Settings,
     load, pointer_of, valid_key, write,
 };
-pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
+pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport, MISSING_FILE};
 pub use table::{AnyTable, Content, ContentBuilder, ContentFile, ModuleRule, ModuleSet, Table};
 pub use version::ContentVersion;
 

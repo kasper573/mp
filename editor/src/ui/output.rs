@@ -1,10 +1,11 @@
 use egui::{Align, Layout, RichText, Ui};
 
-use super::theme;
+use super::{theme, widgets};
 use crate::app::Editor;
 use crate::play;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
+    moved_outside(editor, ui);
     ui.horizontal(|ui| {
         ui.label(theme::faint(format!("{} lines", editor.output.lines.len())).size(12.0));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -53,6 +54,51 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
 }
 
 const ROW: f32 = 18.0;
+
+/// Files moved on disk away from what names them, each found again by its name, and the one
+/// button that points every reference there.
+fn moved_outside(editor: &mut Editor, ui: &mut Ui) {
+    let Some((moved, summary)) = editor.project.as_ref().and_then(|project| {
+        let moved = project.moved_outside.clone();
+        let summary = crate::moves::moved_outside_summary(&moved, &project.files.index());
+        (!moved.is_empty()).then_some((moved, summary))
+    }) else {
+        return;
+    };
+    let mut point = false;
+    widgets::card_frame(true).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(theme::warn(summary).size(13.0));
+        for step in moved.iter().take(SHOWN) {
+            ui.label(
+                theme::mono(format!("{}  →  {}", step.from, step.to))
+                    .size(12.5)
+                    .color(theme::CODE),
+            );
+        }
+        if moved.len() > SHOWN {
+            ui.label(theme::muted(format!("and {} more", moved.len() - SHOWN)).size(12.5));
+        }
+        let label = if moved.len() == 1 {
+            "Point it there"
+        } else {
+            "Point them there"
+        };
+        point = widgets::primary(ui, label).clicked();
+    });
+    ui.add_space(4.0);
+    if point {
+        match crate::moves::repoint(editor, &moved) {
+            Ok(count) => editor.toast(format!(
+                "{count} reference{} now name where their files are; Ctrl Z takes it back",
+                widgets::plural(count)
+            )),
+            Err(error) => editor.toast(error),
+        }
+    }
+}
+
+const SHOWN: usize = 3;
 
 fn alarming(text: &str) -> bool {
     let lower = text.to_lowercase();

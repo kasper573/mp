@@ -12,7 +12,7 @@ use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{HushVoice, PlayClip, SfxPlace, SfxTune};
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, ErrorPlace,
-    FileWriter, PartSpec, Parts, RowCheck, Shape,
+    FileWriter, MISSING_FILE, PartSpec, Parts, RowCheck, Shape,
 };
 use crate::core::math::Rng;
 use crate::core::text::{
@@ -88,7 +88,7 @@ impl Bundle for BabbleBankDef {
                 "",
                 ErrorPlace::WholeFile,
                 ContentProblem::new(
-                    "missing file",
+                    MISSING_FILE,
                     format!("no clip for {missing}"),
                     "letters/a.wav to letters/z.wav in the bundle",
                 ),

@@ -265,6 +265,12 @@ pub enum PickRowThen {
         area: String,
         node: String,
     },
+    NewFile {
+        folder: String,
+    },
+    MoveInto {
+        paths: Vec<String>,
+    },
 }
 
 #[derive(Clone)]
@@ -830,15 +836,31 @@ impl Editor {
         };
         let outcome = project.outside_changes(changed);
         if !outcome.taken.is_empty() {
-            let loads = project.loads();
-            let text = if loads {
+            let moved = project.moved_outside.clone();
+            let text = if project.loads() {
                 format!(
-                    "{} rows changed on disk and were reloaded",
+                    "{} files changed on disk and were reloaded",
                     outcome.taken.len()
                 )
+            } else if !moved.is_empty() && !project.broken_on_disk() {
+                for step in &moved {
+                    self.output.say(
+                        "editor",
+                        format!(
+                            "{} reference{} name{} {}, which isn't there; a file of that name is at {}",
+                            step.references,
+                            crate::ui::widgets::plural(step.references),
+                            if step.references == 1 { "s" } else { "" },
+                            step.from,
+                            step.to
+                        ),
+                    );
+                }
+                self.panels.bottom = BottomTab::Output;
+                crate::moves::moved_outside_summary(&moved, &project.files.index())
             } else {
                 format!(
-                    "{} files changed on disk and the folder no longer loads: read-only until it does",
+                    "{} files changed on disk and the folder no longer loads",
                     outcome.taken.len()
                 )
             };

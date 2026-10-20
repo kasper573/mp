@@ -5,7 +5,7 @@ use crate::core::assets::AssetKind;
 use super::bundle::PartSpec;
 use super::id::nearest;
 use super::load::{ContentFolder, FolderEntry};
-use super::report::{ContentProblem, ErrorPlace, LoadError};
+use super::report::{ContentProblem, ErrorPlace, LoadError, MISSING_FILE};
 
 /// The game's own settings: the one content file kept at a path the engine names outright.
 pub const SETTINGS_FILE: &str = "fixtures/game.json";
@@ -94,6 +94,10 @@ pub fn classify(
     let (stem, rest) = name
         .split_once('.')
         .map_or((name, None), |(stem, rest)| (stem, Some(rest)));
+    // Nothing names a note or fetches it by URL, so its name is free, as README.md is.
+    if !dir && rest == Some(NOTE_EXTENSION) {
+        return Ok(Some(GameFile::Note));
+    }
     if !valid_name(stem) {
         return Err(ContentProblem::new(
             "invalid name",
@@ -127,9 +131,6 @@ pub fn classify(
     let Some(rest) = rest else {
         return Err(unknown_file(name));
     };
-    if rest == NOTE_EXTENSION {
-        return Ok(Some(GameFile::Note));
-    }
     if let Some(kind) = AssetKind::of(name).filter(|_| !rest.contains('.')) {
         return Ok(Some(GameFile::Media(kind)));
     }
@@ -330,7 +331,7 @@ fn bundle_parts(
             file: path.to_owned(),
             at: ErrorPlace::WholeFile,
             problem: ContentProblem::new(
-                "missing file",
+                MISSING_FILE,
                 format!("no {CONFIG_FILE} in {path}/"),
                 format!("{CONFIG_FILE} holding the bundle's fields"),
             ),
