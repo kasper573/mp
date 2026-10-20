@@ -495,7 +495,14 @@ impl Screen {
             Command::new("Xwayland")
                 // An X server resets once its last client leaves, and weston's kiosk shell crashes
                 // on the rootful window that reset tears down.
-                .args(["-noreset", "-displayfd", "1", "-nolisten", "tcp", "-geometry"])
+                .args([
+                    "-noreset",
+                    "-displayfd",
+                    "1",
+                    "-nolisten",
+                    "tcp",
+                    "-geometry",
+                ])
                 .arg(format!("{}x{}", size.0, size.1))
                 .env("WAYLAND_DISPLAY", &name)
                 .stdout(Stdio::piped())
