@@ -42,7 +42,7 @@ use crate::systems::script::{OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
 use crate::systems::skill::{self, Rank, SkillId, bar::SlotReport};
 use crate::systems::stat::{StatKind, Stats};
-use crate::systems::status::{self, StatusCategory};
+use crate::systems::status::{self, StatusCategory, StatusEffectId};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
 pub trait ProbeChannel {
@@ -306,7 +306,7 @@ pub struct ProbeSkillCard {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ProbeStatus {
-    pub effect: String,
+    pub effect: StatusEffectId,
     pub category: StatusCategory,
     pub left: Option<Seconds>,
 }
@@ -621,7 +621,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .0
                     .iter()
                     .map(|held| ProbeStatus {
-                        effect: held.effect.path(&content).to_owned(),
+                        effect: held.effect,
                         category: held.effect.get(&content).category,
                         left: held.until.zip(now).map(|(until, now)| until.since(now)),
                     })

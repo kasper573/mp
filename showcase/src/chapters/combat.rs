@@ -65,13 +65,13 @@ fn play(shoot: &mut Shoot) {
     ));
     me.act(InputAction::ToggleInventory);
     me.find_ui("Inventory");
-    me.find_ui(UiTarget::image(GREATER_POTION));
+    me.find_ui(UiTarget::item(GREATER_POTION));
     let potions = holding(&me.snapshot(), "greater_health_potion");
     me.caption(&format!(
         "{} a potion to drink it",
         input_name(InputAction::UseItem)
     ));
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(GREATER_POTION));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(GREATER_POTION));
     me.wait_until("the potion drunk", |snapshot| {
         holding(snapshot, "greater_health_potion") < potions
     });
@@ -95,7 +95,7 @@ fn play(shoot: &mut Shoot) {
     me.hold();
 }
 
-const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
+const GREATER_POTION: &str = "greater_health_potion";
 
 // They fight whoever comes near, so a few at once close in, given a while to wander into sight.
 const PACK: &str = "glow_moth";

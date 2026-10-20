@@ -17,8 +17,8 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const POTION: &str = "icons/potion/red_potion.png";
-const SWORD: &str = "icons/weapon_and_tool/silver_sword.png";
+const POTION: &str = "health_potion";
+const SWORD: &str = "iron_sword";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as(
@@ -97,7 +97,7 @@ fn play(shoot: &mut Shoot) {
         input_name(InputAction::PinToHotbar)
     ));
     me.act(InputAction::ToggleInventory);
-    me.act_on_ui(InputAction::PinToHotbar, UiTarget::image(POTION));
+    me.act_on_ui(InputAction::PinToHotbar, UiTarget::item(POTION));
     me.wait_until("the potion on the bar", |snapshot| {
         slot_item(snapshot, 4) == Some("health_potion")
     });
@@ -192,8 +192,8 @@ fn slashing(snapshot: &ProbeSnapshot) -> bool {
         .is_some_and(|skill| skill.name(content()) == "slash")
 }
 
-fn in_bag(image: &str) -> UiTarget {
-    UiTarget::image(image).and("in the bag", |element, snapshot| {
+fn in_bag(item: &str) -> UiTarget {
+    UiTarget::item(item).and("in the bag", |element, snapshot| {
         !snapshot.ui.iter().any(|slot| {
             slot.text.as_deref().is_some_and(|text| {
                 text.starts_with("Hotbar slot") || text.starts_with("Basic attack slot")

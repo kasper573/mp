@@ -191,7 +191,7 @@ record out title seconds input hook +command:
     module=$(pactl load-module module-null-sink "sink_name=$sink")
     trap 'pactl unload-module "$module"' EXIT
     xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
-      PULSE_SINK="$sink" "$@" & app=$!
+      PULSE_SINK="$sink" PIPEWIRE_NODE="$sink" "$@" & app=$!
       window=$(xdotool search --sync --name "$title" | head -1)
       xdotool windowmove --sync "$window" 0 0
       xdotool windowfocus --sync "$window"

@@ -74,10 +74,7 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::ToggleInventory);
     me.drag_ui("Inventory", Offset::new(384.0, -260.0));
     me.caption(&format!("{} to sell…", input_name(InputAction::SellItem)));
-    me.act_on_ui(
-        InputAction::SellItem,
-        UiTarget::image("icons/monster_part/skull.png"),
-    );
+    me.act_on_ui(InputAction::SellItem, UiTarget::item("orc_tusk"));
     me.wait_until("the tusks to sell", |snapshot| {
         holding(snapshot, "orc_tusk") == 0
     });
@@ -85,10 +82,7 @@ fn play(shoot: &mut Shoot) {
         "…or {} onto the shop. Equipment asks first",
         input_name(InputAction::CarryItem)
     ));
-    me.carry_onto(
-        UiTarget::image("icons/weapon_and_tool/iron_sword.png"),
-        UiTarget::starting("Buys "),
-    );
+    me.carry_onto(UiTarget::item("rusty_sword"), UiTarget::starting("Buys "));
     me.find_ui("Sell Rusty Sword?");
     me.click_ui("Sell");
     me.wait_until("the sword to sell", |snapshot| {
@@ -121,10 +115,7 @@ fn play(shoot: &mut Shoot) {
     );
     me.act(InputAction::ToggleInventory);
     me.hold();
-    me.act_on_ui(
-        InputAction::SellItem,
-        UiTarget::image("icons/monster_part/bone.png"),
-    );
+    me.act_on_ui(InputAction::SellItem, UiTarget::item("bone"));
     me.wait_until("the bones to sell", |snapshot| {
         holding(snapshot, "bone_token") == 4
     });

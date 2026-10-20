@@ -2,6 +2,7 @@ use driver::{UiTarget, input_name, on_quest, told_by};
 use engine::core::tiling::Tiles;
 use engine::systems::history::HistoryMark;
 use engine::systems::input::map::InputAction;
+use engine::systems::interface::InterfaceIcon;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -12,8 +13,6 @@ pub const CHAPTER: Chapter = Chapter {
     summary: "Everything said, shown and gained, kept in one place",
     play,
 };
-
-const HISTORY: &str = "icons/misc/book_3.png";
 
 const TABS: [(&str, &str); 4] = [
     (
@@ -43,7 +42,8 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the letter quest", |snapshot| {
         on_quest(snapshot, "letter_for_the_captain").is_some()
     });
-    // Accepting leads on to a last word, and Tobb may follow it with news he held while you talked.
+    // Tobb holds his news while you talk, and tells it once you're free.
+    me.on_stage("news");
     me.answer_first_choices();
 
     me.walk_into("ferry-pier", Tiles(1.0));
@@ -55,9 +55,9 @@ fn play(shoot: &mut Shoot) {
         "History has its own slot in the toolbar, or press {}",
         input_name(InputAction::ToggleHistory)
     ));
-    me.hover_ui(UiTarget::image(HISTORY));
+    me.hover_ui(UiTarget::interface_icon(InterfaceIcon::History));
     me.hold();
-    me.click_ui(UiTarget::image(HISTORY));
+    me.click_ui(UiTarget::interface_icon(InterfaceIcon::History));
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
     me.caption("All of it, in order: conversations grouped, what you heard, what you gained");
     for (tab, says) in TABS {

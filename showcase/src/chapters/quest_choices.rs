@@ -13,7 +13,7 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const MAP: &str = "icons/misc/map.png";
+const MAP: &str = "tattered_map";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("tusks_midway", None);
@@ -33,9 +33,9 @@ fn play(shoot: &mut Shoot) {
         input_name(InputAction::UseItem)
     ));
     me.act(InputAction::ToggleInventory);
-    me.hover_ui(UiTarget::image(MAP));
+    me.hover_ui(UiTarget::item(MAP));
     me.hold();
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(MAP));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(MAP));
     me.on_stage("offer");
     me.caption("No one to talk to: just you, and the map");
     me.read_to_choices();

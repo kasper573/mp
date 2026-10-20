@@ -86,7 +86,10 @@ impl Desktop {
         let mut client = Command::new(binary)
             .envs(launch::env_of(CLIENT_ENV_PREFIX, &config))
             .env("DISPLAY", &screen.display)
+            // Under PipeWire the client plays through its ALSA plugin, which reads only
+            // PIPEWIRE_NODE; PULSE_SINK alone would leave it on the machine's speakers.
             .env("PULSE_SINK", &speakers.sink)
+            .env("PIPEWIRE_NODE", &speakers.sink)
             .stdin(Stdio::piped())
             .stdout(log.try_clone().expect("a second handle on the client log"))
             .stderr(log)

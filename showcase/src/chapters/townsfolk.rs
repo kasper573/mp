@@ -17,7 +17,7 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
+const SWORD: &str = "rusty_sword";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("swordsman", Some(resident_home("island", "mara")));
@@ -32,7 +32,7 @@ fn play(shoot: &mut Shoot) {
         host.name
     ));
     me.act(InputAction::ToggleInventory);
-    me.act_on_ui(InputAction::DropItem, UiTarget::image(SWORD));
+    me.act_on_ui(InputAction::DropItem, UiTarget::item(SWORD));
     me.wait_until("the sword to drop", |snapshot| {
         holding(snapshot, "rusty_sword") == 0
     });

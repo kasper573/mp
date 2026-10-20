@@ -8,6 +8,7 @@ use engine::systems::actor::Action;
 use engine::systems::area::AreaDef;
 use engine::systems::attention::AttentionMark;
 use engine::systems::history::HistoryTopic;
+use engine::systems::interface::InterfaceIcon;
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::probe::{
@@ -16,6 +17,7 @@ use engine::systems::probe::{
 };
 use engine::systems::quest::{QuestDef, QuestResult};
 use engine::systems::skill::{HotbarEntry, bar::HotbarPress};
+use engine::systems::status::StatusEffectDef;
 
 use crate::content::{content, id};
 
@@ -293,9 +295,23 @@ impl UiTarget {
         })
     }
 
-    pub fn image(path: &str) -> UiTarget {
-        let path = path.to_owned();
-        UiTarget::new(path.clone(), move |element, _| {
+    /// The item named `name`, by the icon the interface shows it with.
+    pub fn item(name: &str) -> UiTarget {
+        let content = content();
+        let item = content
+            .table::<ItemDef>()
+            .get(id(name))
+            .unwrap_or_else(|| panic!("no item named {name}"));
+        UiTarget::showing(name, item.icon.path())
+    }
+
+    /// The interface's own icon for `icon`, as this game draws it.
+    pub fn interface_icon(icon: InterfaceIcon) -> UiTarget {
+        UiTarget::showing(icon.name(), icon.get(content()).image.path())
+    }
+
+    fn showing(describe: &str, path: String) -> UiTarget {
+        UiTarget::new(describe, move |element, _| {
             element.image.as_deref() == Some(path.as_str())
         })
     }
@@ -430,10 +446,11 @@ pub fn slot_item(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> 
 // Statuses, vfx and company, as the probe reports them.
 
 pub fn status_on_me(snapshot: &ProbeSnapshot, effect: &str) -> bool {
+    let wanted = id::<StatusEffectDef>(effect);
     snapshot
         .statuses
         .iter()
-        .any(|status| status.effect == effect)
+        .any(|status| status.effect == wanted)
 }
 
 /// Every instance of a vfx the client saw start lately, over or not: what a wait for a cast to land

@@ -18,9 +18,9 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const LETTER: &str = "icons/misc/envolop.png";
-const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
-const BAIT: &str = "icons/monster_part/monster_meat.png";
+const LETTER: &str = "tobbs_letter";
+const SWORD: &str = "rusty_sword";
+const BAIT: &str = "fishing_bait";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("chief_fallen", None);
@@ -57,7 +57,7 @@ fn play(shoot: &mut Shoot) {
         "Quest items are marked: they can't be sold or dropped, and abandoning takes them back",
     );
     me.act(InputAction::ToggleInventory);
-    me.hover_ui(UiTarget::image(LETTER));
+    me.hover_ui(UiTarget::item(LETTER));
     me.hold();
     me.act(InputAction::ToggleInventory);
 
@@ -80,12 +80,12 @@ fn play(shoot: &mut Shoot) {
     me.find_ui("Active quests");
     me.click_ui(UiTarget::button("Low Tide"));
     me.caption("A long card scrolls its plate under the name band, down to the rewards");
-    me.scroll_until("objectives", UiTarget::image(BAIT));
+    me.scroll_until("objectives", UiTarget::item(BAIT));
     me.caption(&format!(
         "{} a reward for its item card",
         input_name(InputAction::InspectItem)
     ));
-    me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
+    me.act_on_ui(InputAction::InspectItem, UiTarget::item(BAIT));
     me.wait_until("the bait's card", |snapshot| {
         snapshot
             .item_card
@@ -213,7 +213,7 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::ToggleInventory);
     for _ in 0..2 {
         let before = holding(&me.snapshot(), "rusty_sword");
-        me.act_on_ui(InputAction::DropItem, UiTarget::image(SWORD));
+        me.act_on_ui(InputAction::DropItem, UiTarget::item(SWORD));
         me.wait_until("a sword to drop", |snapshot| {
             holding(snapshot, "rusty_sword") < before
         });

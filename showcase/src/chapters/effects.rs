@@ -11,8 +11,8 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const BOG_WATER: &str = "icons/potion/water_bottle.png";
-const ANTIDOTE: &str = "icons/potion/blue_potion.png";
+const BOG_WATER: &str = "bog_water";
+const ANTIDOTE: &str = "antidote";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as(
@@ -24,7 +24,7 @@ fn play(shoot: &mut Shoot) {
         "Buffs and debuffs are status effects. Bog water is a bad idea: Poisoned bites every two seconds",
     );
     me.act(InputAction::ToggleInventory);
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(BOG_WATER));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(BOG_WATER));
     me.wait_until("poisoned", |snapshot| status_on_me(snapshot, "poisoned"));
     me.act(InputAction::ToggleInventory);
     let full = me.snapshot().me.expect("the player").health;
@@ -59,7 +59,7 @@ fn play(shoot: &mut Shoot) {
         "Buff or debuff is only a label, but content can filter by it: the antidote clears every debuff and spares the ward",
     );
     me.act(InputAction::ToggleInventory);
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(ANTIDOTE));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(ANTIDOTE));
     me.wait_until("cleansed", |snapshot| {
         !status_on_me(snapshot, "poisoned")
             && status_on_me(snapshot, "warded")

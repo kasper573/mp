@@ -23,8 +23,8 @@ const LAYOUT: [(InputAction, &str, (f32, f32)); 4] = [
     (InputAction::ToggleSettings, "Settings", (440.0, 40.0)),
 ];
 
-const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
-const SHIELD: &str = "icons/weapon_and_tool/wooden_shield.png";
+const SWORD: &str = "rusty_sword";
+const SHIELD: &str = "bone_shield";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("armed", None);
@@ -57,9 +57,9 @@ fn play(shoot: &mut Shoot) {
         "{} an item and its card is dealt from the slot: what it does, and a line of lore",
         input_name(InputAction::InspectItem)
     ));
-    inspect(&mut me, SHIELD, "bone_shield");
+    inspect(&mut me, SHIELD);
     me.caption("One card at a time: the next is dealt on top, and the old one drops away under it");
-    inspect(&mut me, SWORD, "rusty_sword");
+    inspect(&mut me, SWORD);
     me.caption(&format!(
         "{} an item to use it — or, for gear, to wear it",
         input_name(InputAction::UseItem)
@@ -69,8 +69,8 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "rusty_sword") == 0
     });
     me.caption("Worn gear has a card too…");
-    inspect(&mut me, SHIELD, "bone_shield");
-    inspect(&mut me, SWORD, "rusty_sword");
+    inspect(&mut me, SHIELD);
+    inspect(&mut me, SWORD);
     me.caption(&format!(
         "…and {} takes it off",
         input_name(InputAction::UseItem)
@@ -84,7 +84,7 @@ fn play(shoot: &mut Shoot) {
         input_name(InputAction::InspectItem),
         input_name(InputAction::Dismiss)
     ));
-    inspect(&mut me, SHIELD, "bone_shield");
+    inspect(&mut me, SHIELD);
     me.wait_until("the card in front", card_in_front);
     me.hold();
     me.act(InputAction::Dismiss);
@@ -182,8 +182,8 @@ fn fling_and_resize(me: &mut Star) {
 
 const FLING_STEPS: usize = 240;
 
-fn inspect(me: &mut Player, icon: &str, item: &str) {
-    me.act_on_ui(InputAction::InspectItem, outside_card(icon));
+fn inspect(me: &mut Player, item: &str) {
+    me.act_on_ui(InputAction::InspectItem, outside_card(item));
     me.wait_until(&format!("the card of {item}"), |snapshot| {
         snapshot
             .item_card
@@ -204,8 +204,8 @@ fn card_in_front(snapshot: &ProbeSnapshot) -> bool {
 }
 
 // The item card repeats the icon of the item it shows; only the copies outside it count.
-fn outside_card(icon: &str) -> UiTarget {
-    UiTarget::image(icon).and("outside the item card", |element, snapshot| {
+fn outside_card(item: &str) -> UiTarget {
+    UiTarget::item(item).and("outside the item card", |element, snapshot| {
         snapshot
             .item_card
             .is_none_or(|card| !card.rect.contains(element.rect.center()))
