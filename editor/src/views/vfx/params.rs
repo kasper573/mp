@@ -4,7 +4,7 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Ui};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::core::math::Rgba;
 use engine::core::vfx::{
     ParamFill, ParamKind, ParamValue, ShaderParam, VfxDef, VfxParam, VfxShaderDef,
@@ -56,7 +56,7 @@ impl From<&VfxParam> for ParamSpec {
 /// The parameters the row `table/key` declares, each as far as it parses, so a row being worked
 /// on still shows the ones that are whole.
 pub fn params_of(files: &ProjectFiles, table: &str, key: &str) -> Vec<ParamSpec> {
-    let Some(row) = files.json(&row_file(table, key)) else {
+    let Some(row) = files.json(&fields_file(key)) else {
         return Vec::new();
     };
     let declared = row["params"].as_array().into_iter().flatten();

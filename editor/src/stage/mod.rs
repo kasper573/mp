@@ -198,7 +198,7 @@ pub fn show(
         editor.views.area.requests.push(AreaSceneRequest {
             key: scene_key.clone(),
             spec: AreaSceneSpec {
-                ground: spawn.area.key(&content).to_owned(),
+                ground: spawn.area.path(&content).to_owned(),
                 scenery: SceneryOf::Area,
                 hidden_ground: Vec::new(),
                 show_blueprints: true,
@@ -212,7 +212,7 @@ pub fn show(
             live: true,
         });
         painter.rect_filled(rect, 4.0, theme::CANVAS);
-        if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
+        if let Some(scene) = editor.views.area.scenes.by_path.get(&scene_key) {
             painter.image(scene.texture, rect, scene.uv(), Color32::WHITE);
         }
     } else {
@@ -384,7 +384,7 @@ fn behind(scenes: &AreaScenes, request: &Request) -> Option<SiteTexture> {
     if !request.ground {
         return None;
     }
-    let scene = scenes.by_key.get(&ground_key(&request.key))?;
+    let scene = scenes.by_path.get(&ground_key(&request.key))?;
     let uv = scene.uv();
     Some(SiteTexture {
         image: scene.image.clone(),

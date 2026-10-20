@@ -39,8 +39,6 @@ pub enum EditorKey {
     ContextMenu,
     FirstLine,
     LastLine,
-    OpenOwner,
-    SwitchPanelTab,
     SelectTool,
     PaintTool,
     TerrainTool,
@@ -57,7 +55,6 @@ pub enum EditorKey {
     Layers,
     SelectAtCursor,
     PasteInPlace,
-    JoinScenery,
     MakeBlueprint,
     Listen,
     Topmost,
@@ -223,12 +220,10 @@ impl EditorKey {
             | StopPlay | PlayedCharacter | Rename | Usages | Duplicate | Delete | Confirm
             | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste | SelectAll
             | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
-            | ContextMenu | FirstLine | LastLine | OpenOwner | SwitchPanelTab => {
-                KeyScope::Everywhere
-            }
+            | ContextMenu | FirstLine | LastLine => KeyScope::Everywhere,
             SelectTool | PaintTool | TerrainTool | FillTool | EraseTool | EyedropperTool
             | StampTool | ModuleTool | BrushSmaller | BrushBigger | FlipHorizontal
-            | FlipVertical | WalkOverlay | Layers | SelectAtCursor | PasteInPlace | JoinScenery
+            | FlipVertical | WalkOverlay | Layers | SelectAtCursor | PasteInPlace
             | MakeBlueprint | Listen | Topmost => KeyScope::Area,
             Shrink | Grow | Pin | Route => KeyScope::WorldMap,
             PlayPause | PreviousFrame | NextFrame | Mute | ApexCue | SoundCue | StepCue
@@ -276,8 +271,6 @@ impl EditorKey {
             ContextMenu => "the menu at the cursor",
             FirstLine => "the first line of a list",
             LastLine => "the last line of a list",
-            OpenOwner => "open the owner of the row in the active tab",
-            SwitchPanelTab => "switch the right panel between Inspector and Local content",
             SelectTool => "select",
             PaintTool => "paint",
             TerrainTool => "terrain",
@@ -294,7 +287,6 @@ impl EditorKey {
             Layers => "layers",
             SelectAtCursor => "select what is under the keyboard cursor",
             PasteInPlace => "paste at the same tiles",
-            JoinScenery => "join tiles into one scenery",
             MakeBlueprint => "make a blueprint of the selection",
             Listen => "held while clicking: listen at a spot",
             Topmost => "held with the eyedropper: the topmost layer",
@@ -366,8 +358,6 @@ impl EditorKey {
             ContextMenu => press(Modifiers::SHIFT, Key::F10),
             FirstLine => press(plain, Key::Home),
             LastLine => press(plain, Key::End),
-            OpenOwner => press(Modifiers::ALT, Key::ArrowUp),
-            SwitchPanelTab => press(command, Key::Tab),
             SelectTool => press(plain, Key::V),
             PaintTool => press(plain, Key::B),
             TerrainTool => press(plain, Key::T),
@@ -384,7 +374,6 @@ impl EditorKey {
             Layers => press(plain, Key::L),
             SelectAtCursor | PlayPause => press(plain, Key::Space),
             PasteInPlace => press(command | Modifiers::SHIFT, Key::V),
-            JoinScenery => press(command, Key::G),
             MakeBlueprint => press(command | Modifiers::ALT, Key::B),
             Shrink => press(plain, Key::Minus),
             Grow => Binding::Press(vec![

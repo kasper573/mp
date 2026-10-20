@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use design_tokens::{glyph, ink};
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use engine::core::assets::AssetKind;
-use engine::core::content::{Content, ContentRow};
+use engine::core::content::{Content, ContentFile};
 use engine::systems::class::{
     AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, ClassLevel, NodeKey,
     SkillNode, SkillTree, TreeBackdrop,
@@ -77,7 +77,7 @@ pub fn backdrop_of(content: &Content, row: &Value) -> Option<TreeBackdrop> {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(mut row) = editor.row_value(ClassDef::TABLE, key) else {
+    let Some(mut row) = editor.row_value(key) else {
         return;
     };
     let Some(content) = editor.loaded() else {
@@ -486,7 +486,7 @@ fn canvas(
                     ui.label(
                         theme::muted(format!(
                             "node {node_key} · skill/{}",
-                            node.skill.key(content)
+                            node.skill.path(content)
                         ))
                         .size(12.0),
                     );

@@ -1,31 +1,31 @@
 use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
 
-use egui::{RichText, Ui};
-use engine::core::content::id::LeafKind;
+use egui::Ui;
+use engine::core::content::files::NAME_RULE;
 use engine::core::content::{
-    ContentRow, GAME_FILE, ModuleRule, OWNER_FIELD, RowFolder, RowName, load, locate, row_file,
-    row_folder, row_holding, row_of,
+    ContentFile, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
 };
-use engine::core::vfx::{VfxShaderDef, shader_file};
-use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::scene::{SCENE_FILE, module_json};
 use engine::systems::registry;
 use serde_json::Value;
 
-use crate::app::{DeleteDialog, DuplicateDialog, Editor, ModalDialog, NewRowDialog};
-use crate::folders;
-use crate::project::{ContentEdit, Project, ProjectFiles};
+use crate::app::{DeleteDialog, Editor, ModalDialog};
+use crate::make;
+use crate::moves::{self, PathMove, fixed_place, free_path, free_path_among};
+use crate::project::files::{FolderIndex, content_holding, folder_entry};
+use crate::project::{ContentEdit, FileBytes, Project, ProjectFiles};
 use crate::schema::{self, SchemaShapes};
-use crate::tabs::EditorTab;
+use crate::tabs::{EditorTab, file_title};
 use crate::ui::{theme, widgets};
-use crate::usages::{self, ContentUsage};
+use crate::usages::ContentUsage;
 use crate::views::area::placement;
-use crate::views::world;
 
+/// What deleted files leave behind: the uses of one kind of a deleted file, and what becomes of
+/// them.
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
-    /// The table of the deleted rows the group's uses name.
+    /// The type of the deleted files the group's uses name, or `MEDIA`.
     pub target: String,
     pub table: String,
     pub kind: String,
@@ -35,6 +35,9 @@ pub struct UsageGroup {
     pub decision: UsageDecision,
 }
 
+/// The target of uses that name media rather than a content file.
+pub const MEDIA: &str = "media";
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum UsageDecision {
     Undecided,
@@ -43,48 +46,40 @@ pub enum UsageDecision {
     Unpack,
 }
 
-pub fn key_problem(files: &ProjectFiles, table: &str, key: &str) -> Option<String> {
-    key_problem_besides(files, table, key, None)
-}
-
-/// Why `key` can't name a row of the table, leaving out the row keyed `own` that is being renamed.
-fn key_problem_besides(
+/// Why `name` can't name a file or folder beside the others in `folder`, leaving out the one at
+/// `own` that is being renamed.
+pub fn name_problem(
     files: &ProjectFiles,
-    table: &str,
-    key: &str,
+    folder: &str,
+    name: &str,
     own: Option<&str>,
 ) -> Option<String> {
-    if !load::valid_key(key) {
-        return Some(format!("a key is {}", load::KEY_RULE));
+    if !valid_name(name) {
+        return Some(format!("a name is {NAME_RULE}"));
     }
+    let wanted = name.to_lowercase();
+    let prefix = match folder {
+        "" => String::new(),
+        folder => folder_entry(folder),
+    };
     files
-        .keys_of(table)
-        .filter(|other| Some(*other) != own)
-        .find(|other| other.eq_ignore_ascii_case(key))
-        .map(|other| format!("{table}/{other} already exists (keys ignore case)"))
+        .paths_under(&prefix)
+        .filter_map(|entry| entry[prefix.len()..].split('/').next())
+        .filter(|file| !file.is_empty())
+        .find(|file| {
+            let path = format!("{prefix}{file}");
+            Some(path.as_str()) != own
+                && file
+                    .split_once('.')
+                    .map_or(*file, |(stem, _)| stem)
+                    .to_lowercase()
+                    == wanted
+        })
+        .map(|taken| format!("{taken} already has that name here (names ignore case)"))
 }
 
-/// `row` with an owner line naming `owner` first, as a local row's file is written.
-pub fn owned_row(owner: &RowName, row: &Value) -> Value {
-    let mut fields = serde_json::Map::new();
-    fields.insert(OWNER_FIELD.to_owned(), Value::String(owner.to_string()));
-    for (name, value) in row.as_object().into_iter().flatten() {
-        if name != OWNER_FIELD {
-            fields.insert(name.clone(), value.clone());
-        }
-    }
-    Value::Object(fields)
-}
-
-pub fn key_from_name(name: &str) -> String {
-    name.trim().to_lowercase().replace(' ', "_")
-}
-
-pub fn free_key(files: &ProjectFiles, table: &str, wanted: &str) -> String {
-    let taken: HashSet<String> = files.keys_of(table).map(str::to_owned).collect();
-    free_name(wanted, &taken)
-}
-
+/// `name` as a name within a file, such as a node's or a variable's: `name` itself when none of
+/// `taken` has it, ignoring case, or else `name_2`, `name_3`, the first that is free.
 pub fn free_name(name: &str, taken: &HashSet<String>) -> String {
     let is_taken = |candidate: &str| taken.iter().any(|t| t.eq_ignore_ascii_case(candidate));
     if !is_taken(name) {
@@ -100,478 +95,214 @@ pub fn free_name(name: &str, taken: &HashSet<String>) -> String {
         .expect("a free name")
 }
 
-pub fn new_row_dialog(
-    editor: &mut Editor,
-    table: &str,
-    owner: Option<RowName>,
-    folder: Option<RowFolder>,
-) {
-    new_row(editor, table, owner, folder, None);
+/// A file name made from what someone typed: lower case, spaces as underscores, and only what a
+/// name may hold.
+pub fn name_from(text: &str) -> String {
+    text.trim()
+        .to_lowercase()
+        .chars()
+        .map(|c| if c == ' ' { '_' } else { c })
+        .filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '_' || *c == '-')
+        .collect()
 }
 
-pub fn new_row_into(
-    editor: &mut Editor,
-    table: &str,
-    owner: Option<RowName>,
-    into: Option<(String, String)>,
-) {
-    new_row(editor, table, owner, None, into);
+/// The path a new content file of `table` named `name` gets in `folder`, numbered when the name is
+/// taken there.
+pub fn new_path(files: &ProjectFiles, folder: &str, table: &str, name: &str) -> String {
+    let shape = registry()
+        .shape_of(table)
+        .unwrap_or(engine::core::content::Shape::Json);
+    let wanted = engine::core::content::content_path("", name, table, shape);
+    free_path(files, folder, &wanted, &[])
 }
 
-fn new_row(
-    editor: &mut Editor,
-    table: &str,
-    owner: Option<RowName>,
-    folder: Option<RowFolder>,
-    into: Option<(String, String)>,
-) {
-    let Some(project) = &editor.project else {
-        return;
-    };
-    let Some(shape) = editor.shapes.table(table) else {
-        return;
-    };
-    let value = schema::template(&shape.shape, &shape.shape);
-    let key = free_key(&project.files, table, &format!("new_{table}"));
-    editor.dialogs.push(ModalDialog::NewRow(NewRowDialog {
-        table: table.to_owned(),
-        key,
-        value,
-        error: None,
-        into,
-        owner,
-        folder,
-    }));
+/// Makes a content file of `table` in `folder`, named after its type and numbered when that is
+/// taken, holding the type's default content, and opens it. Gives its path.
+pub fn new_file(editor: &mut Editor, folder: &str, table: &str) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let made = make::content_file(&editor.shapes, table, folder, table);
+    let path = free_path(&project.files, folder, moves::file_name(&made.path), &[]);
+    let mut edit = ContentEdit::new(format!("New {path}"));
+    write_moved(&mut edit, &made.files, &made.path, &path);
+    editor.try_apply(edit)?;
+    editor.open_row(table, &path);
+    Ok(path)
 }
 
-pub fn new_row_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut NewRowDialog) {
-    ui.horizontal(|ui| {
-        ui.label("Key");
-        let response = ui.text_edit_singleline(&mut dialog.key);
-        widgets::default_focus(ui, &response);
+/// Makes a content file of `table` beside `file` and writes its path into `file` at `pointer`, as
+/// one step.
+pub fn new_file_into(
+    editor: &mut Editor,
+    table: &str,
+    file: &str,
+    pointer: &str,
+) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let folder = parent_of(content_holding(file).unwrap_or(file)).to_owned();
+    let made = make::content_file(&editor.shapes, table, &folder, table);
+    let path = free_path(&project.files, &folder, moves::file_name(&made.path), &[]);
+    let mut edit = ContentEdit::new(format!("New {path}"));
+    write_moved(&mut edit, &made.files, &made.path, &path);
+    edit.update_json(&project.files, file, |target| {
+        *target.pointer_mut(pointer)? = Value::String(path.clone());
+        Some(())
     });
-    if let Some(project) = &editor.project
-        && let Some(problem) = key_problem(&project.files, &dialog.table, dialog.key.trim())
-    {
-        ui.label(RichText::new(problem).weak());
-    }
-    if let Some(name) = dialog
-        .value
-        .get_mut("name")
-        .and_then(|name| name.as_str().map(str::to_owned))
-    {
-        let mut draft = name;
-        ui.horizontal(|ui| {
-            ui.label("Name");
-            if ui.text_edit_singleline(&mut draft).changed() {
-                dialog.value["name"] = Value::String(draft);
-            }
-        });
-    }
-    if let Some(owner) = &dialog.owner {
-        ui.label(
-            RichText::new(format!(
-                "File {} · owner {owner}",
-                row_file(&dialog.table, dialog.key.trim())
-            ))
-            .weak()
-            .small(),
-        );
-    }
-    if let Some(folder) = &dialog.folder {
-        ui.label(RichText::new(format!("In folder {folder}")).weak().small());
-    }
-    if let Some((file, pointer)) = &dialog.into {
-        ui.label(
-            RichText::new(format!("Written into {file} at {pointer}"))
-                .weak()
-                .small(),
-        );
-    }
-    if let Some(error) = &dialog.error {
-        ui.colored_label(theme::DANGER, error);
-    }
-}
-
-pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> {
-    let key = dialog.key.trim().to_owned();
-    let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = key_problem(&project.files, &dialog.table, &key) {
-        return Err(problem);
-    }
-    let mut edit = ContentEdit::new(format!("New {} {key}", dialog.table));
-    let row = match &dialog.owner {
-        Some(owner) => owned_row(owner, &dialog.value),
-        None => dialog.value.clone(),
-    };
-    let row = match &dialog.folder {
-        Some(folder) => folders::with_folder(&row, Some(folder)),
-        None => row,
-    };
-    edit.write_json(row_file(&dialog.table, &key), &row);
-    if let Some(file) = companion_file(&dialog.table, &key) {
-        edit.write(file, Arc::from(NEW_SHADER.as_bytes()));
-    }
-    if let Some((file, pointer)) = &dialog.into
-        && let Some(mut target) = project.files.json_owned(file)
-    {
-        if let Some(slot) = target.pointer_mut(pointer) {
-            *slot = Value::String(key.clone());
-        }
-        edit.write_json(file, &target);
-    }
     editor.try_apply(edit)?;
-    editor.open_row(&dialog.table, &key);
-    Ok(())
+    editor.open_row(table, &path);
+    Ok(path)
 }
 
-/// Duplicates a row on the spot, or asks for the copy's key first when rows local to it are copied
-/// along under new keys.
-pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
-    let Some(project) = &editor.project else {
-        return;
-    };
-    let row = RowName::new(table, key);
-    let copy = free_key(&project.files, table, &format!("{key}_2"));
-    if project.files.owners().held_by(&row).is_empty() {
-        if let Err(error) = duplicate_as(editor, &row, &copy) {
-            editor.toast(error);
-        }
-    } else {
-        editor.dialogs.push(ModalDialog::Duplicate(DuplicateDialog {
-            row,
-            draft: copy,
-            error: None,
-        }));
-    }
-}
-
-pub fn duplicate_as(editor: &mut Editor, row: &RowName, copy: &str) -> Result<(), String> {
+/// Makes a folder named "folder", numbered when that is taken, in `parent`. Gives its path.
+pub fn new_folder(editor: &mut Editor, parent: &str) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = key_problem(&project.files, &row.table, copy) {
+    let path = free_path(&project.files, parent, "folder", &[]);
+    let mut edit = ContentEdit::new(format!("New folder {path}"));
+    edit.write(folder_entry(&path), FileBytes::from([]));
+    editor.try_apply(edit)?;
+    Ok(path)
+}
+
+/// Makes an empty note named "note" in `folder`. Gives its path.
+pub fn new_note(editor: &mut Editor, folder: &str) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let path = free_path(
+        &project.files,
+        folder,
+        &format!("note.{NOTE_EXTENSION}"),
+        &[],
+    );
+    let mut edit = ContentEdit::new(format!("New note {path}"));
+    edit.write(path.clone(), FileBytes::from([]));
+    editor.try_apply(edit)?;
+    Ok(path)
+}
+
+/// Copies the file or bundle at `path` beside it as "name (1)", and opens the copy.
+pub fn duplicate(editor: &mut Editor, path: &str) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let copy = free_path(&project.files, parent_of(path), moves::file_name(path), &[]);
+    let mut edit = ContentEdit::new(format!("Duplicate {path} as {copy}"));
+    let files: Vec<(String, FileBytes)> = project
+        .files
+        .files_of(path)
+        .into_iter()
+        .filter_map(|file| Some((file.clone(), project.files.get(&file)?.clone())))
+        .collect();
+    write_moved(&mut edit, &files, path, &copy);
+    editor.try_apply(edit)?;
+    if let Some(table) = table_of(&copy).filter(|_| content_holding(&copy).is_some()) {
+        let table = table.to_owned();
+        editor.open_row(&table, &copy);
+    }
+    Ok(copy)
+}
+
+/// Renames the file, bundle or folder at `path` to `name`, keeping its type, and rewrites every
+/// reference to it and to what is inside it.
+pub fn rename(editor: &mut Editor, path: &str, name: &str) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let to = moves::renamed(path, name);
+    if to == path {
+        return Ok(to);
+    }
+    if let Some(problem) = name_problem(&project.files, parent_of(path), name, Some(path)) {
         return Err(problem);
     }
-    let copies = copied_keys(&project.files, row, copy);
-    let mut label = format!("Duplicate {row} as {copy}");
-    if copies.len() > 1 {
-        label.push_str(&format!(
-            " with {} local row{}",
-            copies.len() - 1,
-            widgets::plural(copies.len() - 1)
-        ));
-    }
-    let mut edit = ContentEdit::new(label);
-    let new_name = |name: &RowName| {
-        copies
-            .iter()
-            .find(|(old, _)| old == name)
-            .map(|(_, key)| RowName::new(&name.table, key))
-    };
-    for (old, key) in &copies {
-        let Some(mut value) = project.files.json_owned(&row_file(&old.table, &old.key)) else {
+    moves::apply(
+        editor,
+        &[PathMove::new(path, &to)],
+        format!("Rename {path} to {name}"),
+    )?;
+    Ok(to)
+}
+
+/// Moves what is at each path into `folder`, numbering a name taken there.
+pub fn move_into(editor: &mut Editor, paths: &[String], folder: &str) -> Result<(), String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let mut steps: Vec<PathMove> = Vec::new();
+    for path in paths {
+        if parent_of(path) == folder {
             continue;
-        };
-        let file = row_file(&old.table, &old.key);
-        let mut references: Vec<_> = project
-            .usages
-            .in_file(&file)
-            .iter()
-            .filter_map(|reference| match reference.kind {
-                LeafKind::Row(table) => Some((
-                    ContentUsage {
-                        file: file.clone(),
-                        pointer: reference.pointer.clone(),
-                        known: reference.known,
-                    },
-                    new_name(&RowName::new(table, &reference.value))?,
-                )),
-                LeafKind::Asset => None,
-            })
-            .collect();
-        references.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
-        for (usage, to) in &references {
-            rewrite(&mut value, usage, &project.usages, &file, to);
         }
-        if let Some(owner) = project.files.owners().owner(&old.table, &old.key)
-            && let Some(copied) = new_name(owner)
-        {
-            value = owned_row(&copied, &value);
+        if folder == path || folder.starts_with(&format!("{path}/")) {
+            return Err(format!("{path} can't go inside itself"));
         }
-        edit.write_json(row_file(&old.table, key), &value);
-        for (from, to) in beside_row(project, &old.table, &old.key, key) {
-            if let Some(bytes) = project.files.get(&from) {
-                edit.write(to, bytes.clone());
-            }
-        }
-        if old.table == AreaDef::TABLE {
-            world::card_beside(project, &mut edit, &old.key, key);
-        }
+        let arriving: Vec<String> = steps.iter().map(|step| step.to.clone()).collect();
+        let to = free_path_among(
+            &project.files,
+            folder,
+            moves::file_name(path),
+            paths,
+            &arriving,
+        );
+        steps.push(PathMove::new(path, to));
     }
-    editor.try_apply(edit)?;
-    editor.open_row(&row.table, copy);
-    Ok(())
-}
-
-/// `row` and every row local to it, at any depth, each with the key its copy gets when `row`'s
-/// copy is keyed `copy`: a key starting with `row`'s takes `copy` in its place, any other gets
-/// `copy` in front, and either is made free in its table.
-pub fn copied_keys(files: &ProjectFiles, row: &RowName, copy: &str) -> Vec<(RowName, String)> {
-    let prefix = format!("{}_", row.key);
-    let mut taken: BTreeMap<String, HashSet<String>> = BTreeMap::new();
-    let mut copies = vec![(row.clone(), copy.to_owned())];
-    for local in files.owners().held_within(row) {
-        let wanted = match local.key.strip_prefix(&prefix) {
-            Some(rest) => format!("{copy}_{rest}"),
-            None => format!("{copy}_{}", local.key),
-        };
-        let taken = taken
-            .entry(local.table.clone())
-            .or_insert_with(|| files.keys_of(&local.table).map(str::to_owned).collect());
-        let key = free_name(&wanted, taken);
-        taken.insert(key.clone());
-        copies.push((local, key));
-    }
-    copies
-}
-
-pub fn rename(
-    editor: &mut Editor,
-    table: &str,
-    key: &str,
-    new_key: &str,
-    local_keys: bool,
-) -> Result<(), String> {
-    if new_key == key {
+    if steps.is_empty() {
         return Ok(());
     }
-    if editor.shapes.is_fixture(table, key) {
-        return Err("fixtures keep their key".to_owned());
-    }
-    let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let row = RowName::new(table, key);
-    let mut renames = vec![(row.clone(), new_key.to_owned())];
-    if local_keys {
-        renames.extend(prefixed_local_keys(&project.files, &row, new_key));
-    }
-    for (index, (row, to)) in renames.iter().enumerate() {
-        if let Some(problem) = key_problem_besides(&project.files, &row.table, to, Some(&row.key)) {
-            return Err(problem);
-        }
-        if renames[..index]
-            .iter()
-            .any(|(other, other_to)| other.table == row.table && other_to == to)
-        {
-            return Err(format!("{}/{to} would be named twice", row.table));
-        }
-    }
-    let edit = rename_edit(
-        project,
-        &renames,
-        format!("Rename {table}/{key} to {new_key}"),
-    )?;
-    let count = edit.changes.len();
-    editor.try_apply(edit)?;
-    editor.toast(format!(
-        "Renamed {table}/{key} to {new_key}: {count} files rewritten"
-    ));
-    for (row, to) in &renames {
-        retarget_tabs(editor, &row.table, &row.key, to);
-        if editor.selection.table == row.table {
-            for selected in &mut editor.selection.keys {
-                if *selected == row.key {
-                    selected.clone_from(to);
-                }
-            }
-        }
-    }
-    Ok(())
+    let into = if folder.is_empty() {
+        "the game folder"
+    } else {
+        folder
+    };
+    let label = match steps.as_slice() {
+        [one] => format!("Move {} into {into}", one.from),
+        many => format!("Move {} files into {into}", many.len()),
+    };
+    moves::apply(editor, &steps, label)
 }
 
-/// The rows local to `row`, at any depth, whose keys start with its key and an underscore, each
-/// with the key it gets when `row` is keyed `new_key`.
-pub fn prefixed_local_keys(
-    files: &ProjectFiles,
-    row: &RowName,
-    new_key: &str,
-) -> Vec<(RowName, String)> {
-    let prefix = format!("{}_", row.key);
-    files
-        .owners()
-        .held_within(row)
+/// The files `files` were kept in, written to where they land when what they make up moves from
+/// `from` to `to`.
+fn write_moved(edit: &mut ContentEdit, files: &[(String, FileBytes)], from: &str, to: &str) {
+    let step = PathMove::new(from, to);
+    for (file, bytes) in files {
+        edit.write(
+            step.moved(file).unwrap_or_else(|| file.clone()),
+            bytes.clone(),
+        );
+    }
+}
+
+/// Asks what becomes of every use of the files at `paths`, and of everything inside the folders
+/// among them, before deleting them.
+pub fn delete_dialog(editor: &mut Editor, paths: Vec<String>) {
+    let paths: Vec<String> = paths
         .into_iter()
-        .filter_map(|local| {
-            let rest = local.key.strip_prefix(&prefix)?.to_owned();
-            Some((local, format!("{new_key}_{rest}")))
-        })
-        .collect()
-}
-
-/// Renames each row to its new key in one edit: its file and the files beside it move, and every
-/// use of it, owner lines included, is rewritten.
-fn rename_edit(
-    project: &Project,
-    renames: &[(RowName, String)],
-    label: String,
-) -> Result<ContentEdit, String> {
-    let mut edit = ContentEdit::new(label);
-    let mut by_file: BTreeMap<String, Vec<(ContentUsage, &RowName, RowName)>> = Default::default();
-    for (row, to) in renames {
-        for usage in project.usages.of_row(&row.table, &row.key) {
-            by_file.entry(usage.file.clone()).or_default().push((
-                usage.clone(),
-                row,
-                RowName::new(&row.table, to),
-            ));
-        }
-    }
-    for (file, mut uses) in by_file {
-        if is_beside(&file) {
-            for (_, from, to) in &uses {
-                edit.rename_beside(&project.files, &file, &from.table, &from.key, &to.key);
-            }
-            continue;
-        }
-        uses.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
-        edit.update_json(&project.files, &file, |value| {
-            for (usage, _, to) in &uses {
-                rewrite(value, usage, &project.usages, &file, to);
-            }
-            Some(())
-        });
-    }
-    for (row, to) in renames {
-        let own = row_file(&row.table, &row.key);
-        let value = edit
-            .pending_json(&project.files, &own)
-            .ok_or("the row is gone")?;
-        edit.write_json(row_file(&row.table, to), &value);
-        edit.remove(own);
-        for (from, moved) in beside_row(project, &row.table, &row.key, to) {
-            if let Some(bytes) = edit.pending_bytes(&project.files, &from) {
-                edit.write(moved, bytes);
-                edit.remove(from);
-            }
-        }
-    }
-    Ok(edit)
-}
-
-fn rewrite(
-    value: &mut Value,
-    usage: &ContentUsage,
-    usages: &usages::ContentUsages,
-    file: &str,
-    to: &RowName,
-) {
-    if usage.is_owner_line() {
-        value[OWNER_FIELD] = Value::String(to.to_string());
-        return;
-    }
-    let pointer = usage.pointer.as_str();
-    let is_key = usages
-        .in_file(file)
-        .iter()
-        .any(|reference| reference.pointer == pointer && reference.key);
-    if is_key {
-        let (parent, name) = split_pointer(pointer);
-        if let Some(map) = value.pointer_mut(parent).and_then(Value::as_object_mut)
-            && let Some(entry) = map.remove(&name)
-        {
-            map.insert(to.key.clone(), entry);
-        }
-    } else if let Some(slot) = value.pointer_mut(pointer) {
-        *slot = Value::String(to.key.clone());
-    }
-}
-
-/// Whether `file` is one beside a row, which names rows in its own format rather than JSON.
-fn is_beside(file: &str) -> bool {
-    file != GAME_FILE && row_of(file).is_none()
-}
-
-fn split_pointer(pointer: &str) -> (&str, String) {
-    let cut = pointer.rfind('/').unwrap_or(0);
-    let name = locate::unescape(&pointer[cut + 1..]);
-    (&pointer[..cut], name)
-}
-
-fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
-    editor.rename_tabs(|tab| match tab {
-        EditorTab::Script(owner) => owner.renamed(table, key, new_key).map(EditorTab::Script),
-        other if other.is_row(table, key) => Some(EditorTab::for_row(table, new_key)),
-        _ => None,
-    });
-}
-
-/// The file a row owns by convention besides its own, which follows the row through a copy, a
-/// rename and a deletion: a shader's WGSL.
-pub fn companion_file(table: &str, key: &str) -> Option<String> {
-    (table == VfxShaderDef::TABLE).then(|| shader_file(key))
-}
-
-const NEW_SHADER: &str =
-    "fn vfx(uv: vec2<f32>) -> vec4<f32> {\n    return sample(site_uv(uv));\n}\n";
-
-pub fn folder_files(project: &Project, table: &str, key: &str) -> Vec<String> {
-    project
-        .files
-        .paths_under(&format!("{}/", row_folder(table, key)))
-        .cloned()
-        .collect()
-}
-
-/// The files a row keeps beside its own, each with where it lands when the row is keyed `to`.
-fn beside_row(project: &Project, table: &str, key: &str, to: &str) -> Vec<(String, String)> {
-    let (from_folder, to_folder) = (row_folder(table, key), row_folder(table, to));
-    let companion = companion_file(table, key).zip(companion_file(table, to));
-    companion
-        .into_iter()
-        .chain(folder_files(project, table, key).into_iter().map(|file| {
-            let moved = file.replacen(&from_folder, &to_folder, 1);
-            (file, moved)
-        }))
-        .collect()
-}
-
-pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
-    let keys: Vec<String> = keys
-        .into_iter()
-        .filter(|key| {
-            if editor.shapes.is_fixture(table, key) {
+        .filter(|path| match fixed_place(path) {
+            Some(reason) => {
                 editor
                     .output
-                    .say("editor", format!("{table}/{key} is a fixture and stays"));
+                    .say("editor", format!("{path} stays: {reason}"));
                 false
-            } else {
-                true
             }
+            None => true,
         })
         .collect();
-    if keys.is_empty() {
-        editor.toast("Fixtures can't be deleted");
+    if paths.is_empty() {
+        editor.toast("Fixtures stay where the engine finds them");
         return;
     }
     let Some(project) = &editor.project else {
         return;
     };
-    let owners = project.files.owners();
-    let named: Vec<RowName> = keys.iter().map(|key| RowName::new(table, key)).collect();
-    let mut along: Vec<RowName> = Vec::new();
-    for row in &named {
-        for local in owners.held_within(row) {
-            if !named.contains(&local) && !along.contains(&local) {
-                along.push(local);
-            }
-        }
-    }
-    let own: Vec<String> = named
+    let index = project.files.index();
+    let gone = gone_with(&index, &paths);
+    let own: Vec<String> = gone
         .iter()
-        .chain(&along)
-        .map(|row| row_file(&row.table, &row.key))
+        .flat_map(|path| project.files.files_of(path))
         .collect();
     let mut groups: Vec<UsageGroup> = Vec::new();
-    for row in named.iter().chain(&along) {
-        for usage in project.usages.of_row(&row.table, &row.key) {
+    for path in &gone {
+        let target = table_of(path)
+            .filter(|_| index.is_content(path))
+            .unwrap_or(MEDIA)
+            .to_owned();
+        let usages = match target.as_str() {
+            MEDIA => project.usages.of_media(path),
+            _ => project.usages.of_content(path),
+        };
+        for usage in usages {
             if own.contains(&usage.file) {
                 continue;
             }
@@ -582,7 +313,7 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
             } = kind_of(project, &usage.file, &usage.pointer);
             let removable = entry.is_some();
             let same_group = |group: &&mut UsageGroup| {
-                group.target == row.table
+                group.target == target
                     && group.table == other_table
                     && group.removable == removable
                     && if removable {
@@ -594,7 +325,7 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
             match groups.iter_mut().find(same_group) {
                 Some(group) => group.usages.push(usage.clone()),
                 None => groups.push(UsageGroup {
-                    target: row.table.clone(),
+                    target: target.clone(),
                     table: other_table,
                     kind,
                     usages: vec![usage.clone()],
@@ -610,12 +341,56 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
         }
     }
     editor.dialogs.push(ModalDialog::Delete(DeleteDialog {
-        table: table.to_owned(),
-        keys,
-        along,
+        paths,
+        gone,
         groups,
         error: None,
     }));
+}
+
+/// Every content file and media file that goes when `paths` do: each one itself, and what the
+/// folders among them hold.
+fn gone_with(index: &FolderIndex, paths: &[String]) -> Vec<String> {
+    let mut gone = Vec::new();
+    for path in paths {
+        if index.folders.contains(path) {
+            let inside = format!("{path}/");
+            gone.extend(
+                index
+                    .content
+                    .values()
+                    .flatten()
+                    .chain(&index.media)
+                    .filter(|file| file.starts_with(&inside))
+                    .cloned(),
+            );
+        } else {
+            gone.push(path.clone());
+        }
+    }
+    gone.sort();
+    gone.dedup();
+    gone
+}
+
+/// What deleting `paths` is called: one file by its name, or how many files go.
+pub fn delete_title(dialog: &DeleteDialog) -> String {
+    match dialog.paths.as_slice() {
+        [one] if dialog.gone.len() == 1 && dialog.gone[0] == *one => {
+            format!("Delete {}", file_title(one))
+        }
+        [one] => format!(
+            "Delete folder {} and its {} file{}",
+            moves::file_name(one),
+            dialog.gone.len(),
+            widgets::plural(dialog.gone.len())
+        ),
+        _ => format!(
+            "Delete {} file{}",
+            dialog.gone.len(),
+            widgets::plural(dialog.gone.len())
+        ),
+    }
 }
 
 pub struct UsageSummary {
@@ -624,12 +399,13 @@ pub struct UsageSummary {
     pub keys: Vec<String>,
 }
 
-pub fn usage_groups(project: &Project, table: &str, key: &str) -> Vec<UsageSummary> {
+pub fn usage_groups(project: &Project, path: &str) -> Vec<UsageSummary> {
     let mut groups: Vec<UsageSummary> = Vec::new();
-    for usage in project.usages.of_row(table, key) {
-        let Some((other_table, other_key)) = row_holding(&usage.file) else {
+    for usage in project.usages.of_content(path) {
+        let Some(other_key) = content_holding(&usage.file) else {
             continue;
         };
+        let other_table = table_of(other_key).unwrap_or_default();
         let field = field_of(project, &usage.file, &usage.pointer);
         match groups
             .iter_mut()
@@ -659,6 +435,14 @@ pub fn field_of(project: &Project, file: &str, pointer: &str) -> String {
             .to_owned();
     }
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
+    if is_scene(file)
+        && let Some(row) = project.files.json(file)
+        && let Some(kind) = row
+            .pointer(&crate::scene_graph::node_pointer(pointer))
+            .and_then(|node| node["type"].as_str())
+    {
+        return kind.to_owned();
+    }
     if segments.first() == Some(&"modules")
         && let Some(index) = segments.get(1)
         && let Some(row) = project.files.json(file)
@@ -686,8 +470,8 @@ struct UsageKind {
 }
 
 fn kind_of(project: &Project, file: &str, pointer: &str) -> UsageKind {
-    let table = row_holding(file)
-        .map(|(table, _)| table)
+    let table = content_holding(file)
+        .and_then(table_of)
         .unwrap_or("game")
         .to_owned();
     let kind = field_of(project, file, pointer);
@@ -697,11 +481,11 @@ fn kind_of(project: &Project, file: &str, pointer: &str) -> UsageKind {
         .flatten();
     let entry = match slot {
         None => None,
-        Some((parent, index)) if parent.ends_with("/modules") => {
+        Some((parent, index)) if parent.ends_with("/modules") || is_scene(file) => {
             let any_number = project
                 .files
                 .json(file)
-                .and_then(|row| row["modules"].get(index).cloned())
+                .and_then(|row| row.pointer(&parent)?.get(index).map(module_json))
                 .and_then(|module| registry().module_rule(&table, &module))
                 == Some(ModuleRule::AnyNumber);
             any_number.then_some(Entry::Module)
@@ -725,7 +509,10 @@ fn list_slot(pointer: &str) -> Option<(String, usize)> {
 }
 
 fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
-    let (Some(row), Some((table, _))) = (project.files.json(file), row_of(file)) else {
+    let (Some(row), Some(table)) = (
+        project.files.json(file),
+        content_holding(file).and_then(table_of),
+    ) else {
         return String::new();
     };
     let parent = pointer
@@ -765,10 +552,21 @@ fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
     parts.join(" · ")
 }
 
+/// Whether `file` is a scene graph, whose nodes nest in folders' children.
+fn is_scene(file: &str) -> bool {
+    file.rsplit('/').next() == Some(SCENE_FILE)
+}
+
+/// Whether `file` is a part of a bundle that names content in a format of its own, not JSON.
+fn is_beside(file: &str) -> bool {
+    !file.ends_with(".json")
+}
+
 pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) {
     let Some(project) = &editor.project else {
         return;
     };
+    let index = project.files.index();
     let total: usize = dialog.groups.iter().map(|group| group.usages.len()).sum();
     let rows: usize = {
         let mut files: Vec<&String> = dialog
@@ -781,31 +579,23 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         files.len()
     };
     if dialog.groups.is_empty() {
-        ui.label(theme::muted(
-            "Nothing names it. The file goes; its assets stay until nothing names them.",
-        ));
+        ui.label(theme::muted("Nothing names it."));
     } else {
         let used = format!(
-            "Used in {total} place{} in {rows} row{}. Nothing is deleted until every group has an answer.",
+            "Used in {total} place{} in {rows} file{}. Nothing is deleted until every group has an answer.",
             widgets::plural(total),
             widgets::plural(rows)
         );
         ui.label(theme::muted(used));
     }
-    if !dialog.along.is_empty() {
-        ui.add_space(4.0);
-        widgets::section_count(ui, "Deleted with it", dialog.along.len());
-        ui.add(egui::Label::new(theme::muted(along_summary(&dialog.along)).size(12.5)).wrap());
-    }
     let candidates = |target: &str| -> Vec<String> {
-        project
-            .files
-            .keys_of(target)
-            .filter(|key| {
-                !(target == dialog.table && dialog.keys.iter().any(|deleted| deleted == key))
-                    && !dialog.along.iter().any(|row| row.is(target, key))
-            })
-            .map(str::to_owned)
+        let all: Vec<&String> = match target {
+            MEDIA => index.media.iter().collect(),
+            table => index.content.get(table).into_iter().flatten().collect(),
+        };
+        all.into_iter()
+            .filter(|path| !dialog.gone.contains(path))
+            .cloned()
             .collect()
     };
     let details: Vec<Vec<(String, String)>> = dialog
@@ -814,9 +604,9 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         .map(|group| {
             let mut lines: Vec<(String, String, usize)> = Vec::new();
             for usage in &group.usages {
-                let row = row_holding(&usage.file)
-                    .map(|(t, k)| format!("{t}/{k}"))
-                    .unwrap_or_else(|| usage.file.clone());
+                let row = content_holding(&usage.file)
+                    .unwrap_or(&usage.file)
+                    .to_owned();
                 let mut detail = usage_detail(project, &usage.file, &usage.pointer);
                 let line = if !group.removable {
                     let field = field_of(project, &usage.file, &usage.pointer);
@@ -883,30 +673,21 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
                 ui.add_space(4.0);
             }
         });
-    let files_removed = dialog.keys.len() + dialog.along.len();
-    let assets_named = dialog.keys.iter().any(|key| {
-        project
-            .usages
-            .in_file(&row_file(&dialog.table, key))
-            .iter()
-            .any(|reference| reference.kind == LeafKind::Asset)
-    });
+    let files_removed = dialog.gone.len();
     ui.add_space(4.0);
-    let mut summary = format!(
-        "{total} edit{} in {rows} row{} and {files_removed} deleted file{}, one undo step.",
-        widgets::plural(total),
-        widgets::plural(rows),
-        widgets::plural(files_removed)
-    );
-    if dialog.groups.is_empty() {
-        summary = format!(
+    let summary = if dialog.groups.is_empty() {
+        format!(
             "{files_removed} deleted file{}, one undo step.",
             widgets::plural(files_removed)
-        );
-    }
-    if assets_named {
-        summary.push_str(" Its files stay in assets/ until nothing names them.");
-    }
+        )
+    } else {
+        format!(
+            "{total} edit{} in {rows} file{} and {files_removed} deleted file{}, one undo step.",
+            widgets::plural(total),
+            widgets::plural(rows),
+            widgets::plural(files_removed)
+        )
+    };
     ui.label(theme::muted(summary).size(12.5));
     if let Some(error) = &dialog.error {
         ui.colored_label(theme::DANGER, error);
@@ -932,8 +713,8 @@ fn group_title(project: &Project, group: &UsageGroup) -> String {
             group.table
         );
     }
-    let row = row_holding(files[0])
-        .map(|(t, k)| format!("{t}/{k}"))
+    let row = content_holding(files[0])
+        .map(|path| file_title(path).to_owned())
         .unwrap_or_else(|| files[0].clone());
     match kinds.as_slice() {
         [kind] if !kind.is_empty() && *kind != group.table => {
@@ -1007,7 +788,7 @@ fn decision_picker(
     let selected = if picked.is_empty() {
         theme::muted("pick a replacement…").size(13.0)
     } else {
-        theme::code(format!("{table}/ {picked}")).size(13.0)
+        theme::code(file_title(&picked).to_owned()).size(13.0)
     };
     ui.allocate_ui_with_layout(
         egui::vec2(170.0, ui.spacing().interact_size.y),
@@ -1020,6 +801,7 @@ fn decision_picker(
                     for candidate in candidates {
                         if ui
                             .selectable_label(picked == *candidate, theme::mono(candidate))
+                            .on_hover_text(candidate.as_str())
                             .clicked()
                         {
                             picked = candidate.clone();
@@ -1070,14 +852,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     {
         return Err(format!("decide what happens to {}", group.kind));
     }
-    let mut label = format!("Delete {} {}", dialog.table, dialog.keys.join(", "));
-    if !dialog.along.is_empty() {
-        label.push_str(&format!(
-            " with {} local row{}",
-            dialog.along.len(),
-            widgets::plural(dialog.along.len())
-        ));
-    }
+    let label = delete_title(dialog);
     let mut edit = ContentEdit::new(label.clone());
     let mut by_file: BTreeMap<String, Vec<(&ContentUsage, &UsageGroup)>> = Default::default();
     for group in &dialog.groups {
@@ -1091,16 +866,13 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     for (file, mut entries) in by_file {
         if is_beside(&file) {
             for (_, group) in &entries {
-                if let UsageDecision::Repoint(key) = &group.decision {
-                    let deleted = dialog
-                        .keys
+                if let UsageDecision::Repoint(to) = &group.decision {
+                    for gone in dialog
+                        .gone
                         .iter()
-                        .map(|key| RowName::new(&dialog.table, key))
-                        .chain(dialog.along.iter().cloned());
-                    for row in deleted {
-                        if row.table == group.target {
-                            edit.rename_beside(&project.files, &file, &row.table, &row.key, key);
-                        }
+                        .filter(|gone| table_of(gone) == Some(&group.target))
+                    {
+                        edit.rename_beside(&project.files, &file, &group.target, gone, to);
                     }
                 }
             }
@@ -1112,13 +884,9 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
         for (usage, group) in entries {
             match &group.decision {
-                UsageDecision::Repoint(key) => rewrite(
-                    &mut value,
-                    usage,
-                    &project.usages,
-                    &file,
-                    &RowName::new(&group.target, key),
-                ),
+                UsageDecision::Repoint(to) => {
+                    moves::rewrite(&mut value, usage, &project.usages, &file, to)
+                }
                 UsageDecision::Remove => remove_entry(&mut value, &usage.pointer),
                 UsageDecision::Unpack => unpack_entry(project, &mut value, &usage.pointer),
                 UsageDecision::Undecided => {}
@@ -1126,51 +894,32 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         }
         edit.write_json(file, &value);
     }
-    let deleted: Vec<RowName> = dialog
-        .keys
-        .iter()
-        .map(|key| RowName::new(&dialog.table, key))
-        .chain(dialog.along.iter().cloned())
-        .collect();
-    for row in &deleted {
-        edit.remove(row_file(&row.table, &row.key));
-        if let Some(file) = companion_file(&row.table, &row.key)
-            && project.files.contains(&file)
-        {
-            edit.remove(file);
+    for path in &dialog.paths {
+        let inside = folder_entry(path);
+        let entries: Vec<String> = if project.files.index().folders.contains(path) {
+            project.files.paths_under(&inside).cloned().collect()
+        } else {
+            project.files.files_of(path)
+        };
+        for entry in entries {
+            edit.remove(entry);
         }
-        for file in folder_files(project, &row.table, &row.key) {
-            edit.remove(file);
-        }
+        moves::keep_folder(&project.files, &mut edit, parent_of(path));
     }
     editor.try_apply(edit)?;
-    for row in &deleted {
-        close_tabs(editor, &row.table, &row.key);
-        if editor.selection.table == row.table {
-            editor.selection.keys.retain(|key| *key != row.key);
-        }
+    for path in &dialog.gone {
+        close_tabs(editor, path);
     }
+    let gone = |key: &String| {
+        dialog.gone.contains(key)
+            || dialog
+                .paths
+                .iter()
+                .any(|path| key.starts_with(&format!("{path}/")))
+    };
+    editor.selection.keys.retain(|key| !gone(key));
     editor.toast(label.replacen("Delete", "Deleted", 1));
     Ok(())
-}
-
-/// The rows going along with an owner, by table: "npc bram, wren · memory 5".
-pub fn along_summary(rows: &[RowName]) -> String {
-    let mut by_table: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    for row in rows {
-        by_table.entry(&row.table).or_default().push(&row.key);
-    }
-    by_table
-        .into_iter()
-        .map(|(table, keys)| {
-            if keys.len() <= 6 {
-                format!("{table} {}", keys.join(", "))
-            } else {
-                format!("{table} {}", keys.len())
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" · ")
 }
 
 fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
@@ -1204,12 +953,18 @@ fn remove_entry(value: &mut Value, pointer: &str) {
     }
 }
 
-pub fn close_tabs(editor: &mut Editor, table: &str, key: &str) {
+pub fn close_tabs(editor: &mut Editor, path: &str) {
     let gone: Vec<EditorTab> = editor
         .dock
         .iter_all_tabs()
         .map(|(_, tab)| tab.clone())
-        .filter(|tab| tab.is_row(table, key))
+        .filter(|tab| {
+            tab.row().is_some_and(|(_, key)| key == path)
+                || *tab
+                    == EditorTab::Asset {
+                        path: path.to_owned(),
+                    }
+        })
         .collect();
     for tab in gone {
         if let Some(path) = editor.dock.find_tab(&tab) {

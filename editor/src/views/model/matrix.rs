@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
 use engine::systems::actor::{Action, ModelDef};

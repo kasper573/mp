@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use engine::core::content::{ContentRow, locate};
+use engine::core::content::{ContentFile, locate};
 use engine::core::script::VariableType;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::{self, hole_name};

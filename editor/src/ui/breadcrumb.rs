@@ -1,43 +1,37 @@
 use egui::{RichText, Sense, Ui};
-use engine::core::content::{ContentOwners, RowName};
 
 use super::theme;
-use crate::keymap::EditorKey;
+use crate::tabs::file_title;
 
-/// A row's name behind every owner it is local to, from the top owner down; a global row's is just
-/// its name. Answers the owner clicked.
-pub fn show(ui: &mut Ui, owners: &ContentOwners, table: &str, key: &str) -> Option<RowName> {
-    let mut chain: Vec<RowName> = owners.chain(table, key).cloned().collect();
-    chain.reverse();
+/// A content file's path: each folder above it, then its name. Answers the folder clicked.
+pub fn show(ui: &mut Ui, path: &str) -> Option<String> {
     let mut clicked = None;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
-        for owner in chain {
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let mut folder = String::new();
+        for segment in path
+            .split('/')
+            .collect::<Vec<_>>()
+            .split_last()
+            .map_or(&[][..], |(_, above)| above)
+        {
+            if !folder.is_empty() {
+                folder.push('/');
+            }
+            folder.push_str(segment);
             let response = ui
                 .add(
-                    egui::Label::new(
-                        RichText::new(owner.to_string())
-                            .monospace()
-                            .underline()
-                            .color(theme::CODE),
-                    )
-                    .sense(Sense::click()),
+                    egui::Label::new(RichText::new(*segment).monospace().color(theme::MUTED))
+                        .sense(Sense::click()),
                 )
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .on_hover_text(format!("{} opens the owner", EditorKey::OpenOwner.name()));
+                .on_hover_text("Show in the content tree");
             if response.clicked() {
-                clicked = Some(owner);
+                clicked = Some(folder.clone());
             }
-            ui.label(theme::faint("›"));
+            ui.label(theme::faint("/"));
         }
-        ui.label(theme::strong(format!("{table}/{key}")).monospace());
+        ui.label(theme::strong(file_title(path)).monospace());
     });
     clicked
-}
-
-/// The prefix a tab of a local row carries: its owner's key.
-pub fn tab_prefix(owners: &ContentOwners, table: &str, key: &str) -> Option<String> {
-    owners
-        .owner(table, key)
-        .map(|owner| format!("{} › ", owner.key))
 }

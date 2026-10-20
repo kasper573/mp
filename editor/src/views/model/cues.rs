@@ -1,8 +1,5 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
-use engine::core::content::RowName;
-use engine::systems::actor::ModelDef;
 use serde_json::Value;
 
 use super::{ModelStrip, StripFrame, play_rule, strip_of, total_ms};
@@ -17,12 +14,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let frames = strip_of(row, strip);
     super::strip::header(editor, ui, key, row, strip);
     super::strip::keys(editor, ui, key, &frames, &sheet);
-    let frames = strip_of(
-        &editor
-            .row_value(ModelDef::TABLE, key)
-            .unwrap_or(row.clone()),
-        strip,
-    );
+    let frames = strip_of(&editor.row_value(key).unwrap_or(row.clone()), strip);
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
         let view = editor.views.model.view_mut(key);
@@ -102,7 +94,7 @@ fn steps(
         };
         found
     };
-    let surfaces = super::sounds::surfaces(editor, Some(&RowName::new(ModelDef::TABLE, key)));
+    let surfaces = super::sounds::surfaces(editor);
     let chosen = editor.views.model.view(key).surface.clone();
     let mut play = None;
     ui.horizontal_top(|ui| {

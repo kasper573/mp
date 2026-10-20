@@ -1,7 +1,5 @@
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
-use engine::core::content::ContentRow;
-use engine::core::content::RowName;
 use engine::core::time::Millis;
 use engine::systems::actor::{Action, ModelDef};
 
@@ -135,11 +133,7 @@ pub fn fire(editor: &mut Editor, key: &str, frames: &[StripFrame], passed: &[usi
         }
         if frame.step && !stepped {
             stepped = true;
-            if let Some(footstep) = super::sounds::footstep_of(
-                editor,
-                Some(&RowName::new(ModelDef::TABLE, key)),
-                surface.as_deref(),
-            ) {
+            if let Some(footstep) = super::sounds::footstep_of(editor, surface.as_deref()) {
                 editor.views.sound.play.push(footstep);
             }
         }
@@ -151,7 +145,7 @@ pub fn draw(editor: &mut Editor, ui: &mut Ui, key: &str, strip: ModelStrip, at: 
     let Some(content) = editor.loaded() else {
         return;
     };
-    let Some(model) = content.by_key::<ModelDef>(key) else {
+    let Some(model) = content.by_path::<ModelDef>(key) else {
         return;
     };
     let posed = Posed {

@@ -1,15 +1,17 @@
 use egui::{RichText, Vec2};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::fields_file;
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{GridSize, TileSize};
+use engine::systems::area::scene::scene_file;
 use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
 use super::grid::GridDraft;
-use super::{pins, shapes};
+use super::{nodes, pins, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::project::ContentEdit;
+use crate::tabs::file_title;
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
 
@@ -32,7 +34,7 @@ pub fn resize_dialog(
         .as_ref()
         .and_then(|p| p.content.clone())
         .and_then(|c| {
-            c.by_key::<AreaDef>(&dialog.area)
+            c.by_path::<AreaDef>(&dialog.area)
                 .map(|id| area::load(&c, id).size)
         })
         .map(|size| (size.width as u32, size.height as u32))
@@ -213,7 +215,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     let id = content
-        .by_key::<AreaDef>(&dialog.area)
+        .by_path::<AreaDef>(&dialog.area)
         .ok_or("the area is gone")?;
     let area = area::load(&content, id);
     let old = area.size.grid();
@@ -222,25 +224,25 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = GridDraft::of(&dialog.area, &area.grids);
+    let draft = GridDraft::own(&content, &dialog.area).ok_or("the area is gone")?;
     let (resized, clipped) = draft.resized(new, shift);
-    let mut row = editor
-        .row_value(AreaDef::TABLE, &dialog.area)
-        .ok_or("the area is gone")?;
-    row["map"]["size"]["width"] = Value::from(dialog.width);
-    row["map"]["size"]["height"] = Value::from(dialog.height);
+    let mut row = editor.row_value(&dialog.area).ok_or("the area is gone")?;
+    let map = row
+        .pointer_mut(nodes::map_pointer(&dialog.area))
+        .ok_or("the area has no map")?;
+    map["size"]["width"] = Value::from(dialog.width);
+    map["size"]["height"] = Value::from(dialog.height);
     let (dx, dy) = (shift.0 as f32, shift.1 as f32);
     let bounds = Rect::new(
         Pos::new(-0.5, -0.5),
         Size::new(dialog.width as f32, dialog.height as f32),
     );
     let mut outside = Vec::new();
-    for (index, module) in row["modules"]
-        .as_array_mut()
-        .into_iter()
-        .flatten()
-        .enumerate()
-    {
+    let mut scene = nodes::scene_of(editor, &dialog.area);
+    for module in nodes::modules(&scene) {
+        let Some(module) = scene.pointer_mut(&module.pointer) else {
+            continue;
+        };
         shapes::shift(module, dx, dy);
         if let Some(b) = shapes::bounds(module, None)
             && !bounds.contains_rect(&b)
@@ -249,7 +251,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
                 Some(AreaModuleKind::SafeZone)
                 | Some(AreaModuleKind::Soundscape)
                 | Some(AreaModuleKind::Population) => {}
-                _ => outside.push(format!("module {index} ({})", shapes::label(module))),
+                _ => outside.push(shapes::label(module)),
             }
         }
     }
@@ -262,9 +264,12 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
     }
     let mut edit = ContentEdit::new(format!(
         "Resize {} to {} × {} ({clipped} cells clipped)",
-        dialog.area, dialog.width, dialog.height
+        file_title(&dialog.area),
+        dialog.width,
+        dialog.height
     ));
-    edit.write_json(row_file(AreaDef::TABLE, &dialog.area), &row);
+    edit.write_json(fields_file(&dialog.area), &row);
+    edit.write_json(scene_file(&dialog.area), &scene);
     resized.write_all_into(&mut edit);
     if dx != 0.0 || dy != 0.0 {
         let files = &editor.project.as_ref().ok_or("no folder")?.files;

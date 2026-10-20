@@ -1,427 +1,329 @@
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
+use std::collections::{BTreeMap, HashSet};
 
-use engine::core::content::id::LeafKind;
-use engine::core::content::{
-    ContentOwners, ContentRow, OWNER_FIELD, RowName, row_file, row_holding,
-};
-use engine::systems::area::AreaDef;
+use engine::core::content::{FIXTURES_DIR, locate, name_of, numbered, parent_of, table_of};
 use engine::systems::registry;
+use serde_json::Value;
 
+use crate::app::Editor;
+use crate::project::files::{folder_entry, is_folder};
 use crate::project::{ContentEdit, Project, ProjectFiles};
-use crate::rows::owned_row;
-use crate::usages::ContentUsages;
+use crate::tabs::EditorTab;
+use crate::usages::{ContentUsage, ContentUsages};
+use crate::user::UserFolder;
 
-/// Where a folder's rows sit and who uses them, with owners that can be changed to try a move
-/// out before it is made. Nothing here writes; `owner_lines` turns the result into an edit.
-#[derive(Clone)]
-pub struct ScopeMoves<'a> {
-    files: &'a ProjectFiles,
-    usages: &'a ContentUsages,
-    owners: ContentOwners,
-}
-
-/// The rows that use a row, leaving out its own local rows and the rows that see every row.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct RowUsers {
-    pub rows: BTreeSet<RowName>,
-    /// Whether the game's settings name it, which only a global row may be.
-    pub settings: bool,
-    /// How many rows that see every row name it; they keep working wherever it goes.
-    pub seeing_all: usize,
-}
-
-/// Why a row can't become local to anything.
+/// A file, bundle, media file or folder going from one path to another.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StaysGlobal {
-    Fixture,
-    Unused,
-    Settings,
-    Scattered(Vec<RowName>),
+pub struct PathMove {
+    pub from: String,
+    pub to: String,
 }
 
-/// A use a move would leave out of reach: `file` names `target` at `pointer`.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BrokenUse {
-    pub file: String,
-    pub pointer: String,
-    pub target: RowName,
-}
-
-/// What making a row local to an owner does: the rows only it uses go along, local to it or to
-/// one of them, and the rows it uses that others use too stay global.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct LocalPlan {
-    pub row: RowName,
-    pub owner: RowName,
-    pub along: Vec<(RowName, RowName)>,
-    pub staying: Vec<(RowName, usize)>,
-    pub seeing_all: usize,
-}
-
-/// One row gathering would make local, and to which owner.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Gathered {
-    pub row: RowName,
-    pub owner: RowName,
-    /// Ticked rows are made local; areas are offered unticked, as the game keeps them global.
-    pub ticked: bool,
-}
-
-impl<'a> ScopeMoves<'a> {
-    pub fn of(project: &'a Project) -> ScopeMoves<'a> {
-        ScopeMoves::new(&project.files, &project.usages)
-    }
-
-    pub fn new(files: &'a ProjectFiles, usages: &'a ContentUsages) -> ScopeMoves<'a> {
-        ScopeMoves {
-            files,
-            usages,
-            owners: (*files.owners()).clone(),
+impl PathMove {
+    pub fn new(from: impl Into<String>, to: impl Into<String>) -> PathMove {
+        PathMove {
+            from: from.into(),
+            to: to.into(),
         }
     }
 
-    pub fn owners(&self) -> &ContentOwners {
-        &self.owners
-    }
-
-    pub fn owner(&self, row: &RowName) -> Option<&RowName> {
-        self.owners.owner(&row.table, &row.key)
-    }
-
-    /// Tries a move out: from here on, `row` has `owner`.
-    pub fn set(&mut self, row: &RowName, owner: Option<RowName>) {
-        self.owners.set(row, owner);
-    }
-
-    pub fn users(&self, row: &RowName) -> RowUsers {
-        let mut users = RowUsers::default();
-        for usage in self.usages.of_row(&row.table, &row.key) {
-            if usage.is_owner_line() {
-                continue;
-            }
-            let Some((table, key)) = row_holding(&usage.file) else {
-                users.settings = true;
-                continue;
-            };
-            let reader = RowName::new(table, key);
-            if registry().sees_all_rows(table) {
-                users.seeing_all += 1;
-            } else if !self.holds(row, &reader) {
-                users.rows.insert(reader);
-            }
+    /// Where `path` lands when this moves: itself if it is what moves, or the same place inside
+    /// it if it is inside.
+    pub fn moved(&self, path: &str) -> Option<String> {
+        if path == self.from {
+            return Some(self.to.clone());
         }
-        users
-    }
-
-    /// The nearest row every use of `row` sits inside: the owner it can become local to.
-    pub fn home(&self, row: &RowName) -> Result<RowName, StaysGlobal> {
-        if registry().is_fixture(row) {
-            return Err(StaysGlobal::Fixture);
-        }
-        let users = self.users(row);
-        if users.settings {
-            return Err(StaysGlobal::Settings);
-        }
-        let Some(first) = users.rows.first() else {
-            return Err(StaysGlobal::Unused);
-        };
-        let home = std::iter::once(first)
-            .chain(self.owners.chain(&first.table, &first.key))
-            .find(|candidate| users.rows.iter().all(|user| self.holds(candidate, user)))
-            .cloned();
-        home.ok_or_else(|| StaysGlobal::Scattered(users.rows.into_iter().collect()))
-    }
-
-    /// Every use, of or by the given rows and the rows local to them, that is out of reach.
-    pub fn broken_uses(&self, rows: &[RowName]) -> Vec<BrokenUse> {
-        let mut checked: Vec<RowName> = rows.to_vec();
-        for row in rows {
-            checked.extend(self.owners.held_within(row));
-        }
-        let mut broken = BTreeSet::new();
-        for row in &checked {
-            let file = row_file(&row.table, &row.key);
-            for reference in self.usages.in_file(&file) {
-                let LeafKind::Row(table) = reference.kind else {
-                    continue;
-                };
-                if !self.reaches(Some(row), table, &reference.value) {
-                    broken.insert(BrokenUse {
-                        file: file.clone(),
-                        pointer: reference.pointer.clone(),
-                        target: RowName::new(table, &reference.value),
-                    });
-                }
-            }
-            for usage in self.usages.of_row(&row.table, &row.key) {
-                if usage.is_owner_line() {
-                    continue;
-                }
-                let reader = row_holding(&usage.file).map(|(table, key)| RowName::new(table, key));
-                if !self.reaches(reader.as_ref(), &row.table, &row.key) {
-                    broken.insert(BrokenUse {
-                        file: usage.file.clone(),
-                        pointer: usage.pointer.clone(),
-                        target: row.clone(),
-                    });
-                }
-            }
-        }
-        broken.into_iter().collect()
-    }
-
-    /// Making `row` local to `owner`, with the rows that can go along: those only it, or rows
-    /// going along with it, use. Rows in `kept` stay where they are.
-    pub fn make_local(
-        &self,
-        row: &RowName,
-        owner: &RowName,
-        kept: &BTreeSet<RowName>,
-    ) -> LocalPlan {
-        let mut tried = self.clone();
-        tried.set(row, Some(owner.clone()));
-        let mut along: Vec<(RowName, RowName)> = Vec::new();
-        loop {
-            let moving: Vec<RowName> = std::iter::once(row.clone())
-                .chain(along.iter().map(|(row, _)| row.clone()))
-                .collect();
-            let next = tried
-                .used_by(&moving)
-                .into_iter()
-                .filter(|used| {
-                    !kept.contains(used)
-                        && used != row
-                        && used.table != AreaDef::TABLE
-                        && tried.owner(used).is_none()
-                })
-                .find_map(|used| {
-                    let home = tried.home(&used).ok()?;
-                    tried.holds(row, &home).then_some((used, home))
-                });
-            let Some((used, home)) = next else {
-                break;
-            };
-            tried.set(&used, Some(home.clone()));
-            along.push((used, home));
-        }
-        let moving: Vec<RowName> = std::iter::once(row.clone())
-            .chain(along.iter().map(|(row, _)| row.clone()))
-            .collect();
-        let staying = tried
-            .used_by(&moving)
-            .into_iter()
-            .filter(|used| tried.owner(used).is_none() && !registry().is_fixture(used))
-            .filter(|used| used != row)
-            .map(|used| {
-                let others = tried.users(&used).rows.len();
-                (used, others)
-            })
-            .collect();
-        LocalPlan {
-            row: row.clone(),
-            owner: owner.clone(),
-            along,
-            staying,
-            seeing_all: self.users(row).seeing_all,
-        }
-    }
-
-    /// The local rows that must become global with `row`, because it or its local rows use them
-    /// and a global row can't reach them. Rows in `kept` are left out, whatever that breaks.
-    pub fn make_global(&self, row: &RowName, kept: &BTreeSet<RowName>) -> Vec<RowName> {
-        let mut tried = self.clone();
-        tried.set(row, None);
-        let mut along: Vec<RowName> = Vec::new();
-        loop {
-            let moving: Vec<RowName> = std::iter::once(row.clone())
-                .chain(along.iter().cloned())
-                .collect();
-            let next = tried
-                .broken_uses(&moving)
-                .into_iter()
-                .map(|broken| broken.target)
-                .find(|target| !kept.contains(target) && !along.contains(target));
-            let Some(next) = next else {
-                break;
-            };
-            tried.set(&next, None);
-            along.push(next);
-        }
-        along
-    }
-
-    /// Why `row` can't move to `owner`: the uses the move would break, or a loop.
-    pub fn move_to(&self, row: &RowName, owner: &RowName) -> Result<(), MoveRefusal> {
-        if !self.files.contains(&row_file(&owner.table, &owner.key)) {
-            return Err(MoveRefusal::NoSuchRow);
-        }
-        if self.holds(row, owner) {
-            return Err(MoveRefusal::Inside);
-        }
-        if registry().is_fixture(row) {
-            return Err(MoveRefusal::Fixture);
-        }
-        let mut tried = self.clone();
-        tried.set(row, Some(owner.clone()));
-        let broken = tried.broken_uses(std::slice::from_ref(row));
-        if broken.is_empty() {
-            Ok(())
-        } else {
-            Err(MoveRefusal::Breaks(broken))
-        }
-    }
-
-    /// Every global row used from inside one row only, made local to the nearest such row, with
-    /// rows nested in the rows they belong to. `ticks` overrides which rows go: every row but an
-    /// area does by default, since the game keeps its areas global.
-    pub fn gather(&self, ticks: &BTreeMap<RowName, bool>) -> Vec<Gathered> {
-        let ticked = |row: &RowName| {
-            ticks
-                .get(row)
-                .copied()
-                .unwrap_or(row.table != AreaDef::TABLE)
-        };
-        let candidates: Vec<RowName> = registry()
-            .table_names()
-            .into_iter()
-            .flat_map(|table| {
-                self.files
-                    .keys_of(table)
-                    .map(move |key| RowName::new(table, key))
-            })
-            .filter(|row| self.owner(row).is_none() && !registry().is_fixture(row))
-            .collect();
-        let mut tried = self.clone();
-        let mut gathered: BTreeMap<RowName, RowName> = BTreeMap::new();
-        loop {
-            let mut changed = false;
-            for row in candidates.iter().filter(|row| ticked(row)) {
-                let Ok(home) = tried.home(row) else {
-                    continue;
-                };
-                if gathered.get(row) != Some(&home) {
-                    tried.set(row, Some(home.clone()));
-                    gathered.insert(row.clone(), home);
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        let unticked = candidates
-            .iter()
-            .filter(|row| !ticked(row))
-            .filter_map(|row| {
-                Some(Gathered {
-                    row: row.clone(),
-                    owner: tried.home(row).ok()?,
-                    ticked: false,
-                })
-            })
-            .collect::<Vec<_>>();
-        gathered
-            .into_iter()
-            .map(|(row, owner)| Gathered {
-                row,
-                owner,
-                ticked: true,
-            })
-            .chain(unticked)
-            .collect()
-    }
-
-    /// Whether `inner` is `outer` or sits inside it, at any depth.
-    pub fn holds(&self, outer: &RowName, inner: &RowName) -> bool {
-        inner == outer
-            || self
-                .owners
-                .chain(&inner.table, &inner.key)
-                .any(|above| above == outer)
-    }
-
-    fn reaches(&self, reader: Option<&RowName>, table: &str, key: &str) -> bool {
-        reader.is_some_and(|reader| registry().sees_all_rows(&reader.table))
-            || self.owners.in_reach(reader, table, key)
-    }
-
-    /// The rows the given rows' files name.
-    fn used_by(&self, rows: &[RowName]) -> BTreeSet<RowName> {
-        rows.iter()
-            .flat_map(|row| self.usages.in_file(&row_file(&row.table, &row.key)))
-            .filter_map(|reference| match reference.kind {
-                LeafKind::Row(table) => Some(RowName::new(table, &reference.value)),
-                LeafKind::Asset => None,
-            })
-            .filter(|used| self.files.contains(&row_file(&used.table, &used.key)))
-            .collect()
+        let rest = path.strip_prefix(&self.from)?.strip_prefix('/')?;
+        Some(format!("{}/{rest}", self.to))
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MoveRefusal {
-    NoSuchRow,
-    Inside,
-    Fixture,
-    Breaks(Vec<BrokenUse>),
+/// What a move does to the folder: the edit, and how many references it rewrites in how many
+/// files.
+pub struct PlannedMove {
+    pub edit: ContentEdit,
+    pub rewritten: usize,
+    pub files_rewritten: usize,
 }
 
-impl fmt::Display for StaysGlobal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            StaysGlobal::Fixture => write!(f, "fixtures are global: code names them"),
-            StaysGlobal::Unused => write!(f, "nothing uses it, so there is no owner to give it"),
-            StaysGlobal::Settings => write!(f, "the game's settings name it"),
-            StaysGlobal::Scattered(users) => write!(
-                f,
-                "used by {}: a row can be local to one owner only",
-                users
-                    .iter()
-                    .map(RowName::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" · ")
-            ),
-        }
+/// Why `path` stays where it is, if the engine finds it there: the fixtures folder, a fixture, or a
+/// folder that holds one.
+pub fn fixed_place(path: &str) -> Option<&'static str> {
+    let registry = registry();
+    if path == FIXTURES_DIR {
+        return Some("the engine finds its fixtures and the game's settings in this folder");
     }
-}
-
-impl fmt::Display for MoveRefusal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MoveRefusal::NoSuchRow => write!(f, "no such row"),
-            MoveRefusal::Inside => write!(f, "a row can't be local to itself or its own content"),
-            MoveRefusal::Fixture => write!(f, "fixtures are global: code names them"),
-            MoveRefusal::Breaks(broken) => write!(
-                f,
-                "{} use{} would lose it",
-                broken.len(),
-                if broken.len() == 1 { "" } else { "s" }
-            ),
-        }
+    if registry.is_fixture(path) {
+        return Some("the engine finds this file at this path");
     }
+    let inside = format!("{path}/");
+    registry
+        .fixture_paths()
+        .any(|fixture| fixture.starts_with(&inside))
+        .then_some("this folder holds fixtures the engine finds by their path")
 }
 
-/// Writes each row's owner line as given, or takes it off for `None`, into `edit`.
-pub fn owner_lines(
-    edit: &mut ContentEdit,
+/// The path a file or folder named `file` gets in `folder`: `file` itself when no neighbour has
+/// its name, ignoring case, or else its name numbered " (1)", " (2)", the first that is free.
+/// `leaving` names entries that move away in the same step, whose names are free.
+pub fn free_path(files: &ProjectFiles, folder: &str, file: &str, leaving: &[String]) -> String {
+    free_path_among(files, folder, file, leaving, &[])
+}
+
+/// `free_path`, with the paths `arriving` in the same step taken as well.
+pub fn free_path_among(
     files: &ProjectFiles,
-    lines: &[(RowName, Option<RowName>)],
-) {
-    for (row, owner) in lines {
-        let file = row_file(&row.table, &row.key);
-        let Some(mut json) = edit.pending_json(files, &file) else {
-            continue;
-        };
-        let json = match owner {
-            Some(owner) => owned_row(owner, &json),
-            None => {
-                if let Some(fields) = json.as_object_mut() {
-                    fields.remove(OWNER_FIELD);
-                }
-                json
-            }
-        };
-        edit.write_json(file, &json);
+    folder: &str,
+    file: &str,
+    leaving: &[String],
+    arriving: &[String],
+) -> String {
+    let mut taken = names_in(files, folder, leaving);
+    taken.extend(
+        arriving
+            .iter()
+            .filter(|path| parent_of(path) == folder)
+            .map(|path| file_name(path).to_lowercase()),
+    );
+    let at = |file: &str| match folder {
+        "" => file.to_owned(),
+        folder => format!("{folder}/{file}"),
+    };
+    if !taken.contains(&file.to_lowercase()) {
+        return at(file);
     }
+    let (stem, rest) = file
+        .split_once('.')
+        .map_or((file, ""), |(stem, rest)| (stem, rest));
+    let base = numbered(stem).map_or(stem, |(base, _)| base);
+    let dot = if rest.is_empty() { "" } else { "." };
+    (1..)
+        .map(|n| format!("{base} ({n}){dot}{rest}"))
+        .find(|candidate| !taken.contains(&candidate.to_lowercase()))
+        .map(|candidate| at(&candidate))
+        .expect("a free name")
+}
+
+/// Plans each move with every reference to what moves rewritten, as one edit labelled `label`.
+pub fn plan(project: &Project, moves: &[PathMove], label: String) -> Result<PlannedMove, String> {
+    for step in moves {
+        if let Some(reason) = fixed_place(&step.from) {
+            return Err(format!("{} stays: {reason}", step.from));
+        }
+        if step.to.starts_with(&format!("{}/", step.from)) {
+            return Err(format!("{} can't go inside itself", step.from));
+        }
+    }
+    let files = &project.files;
+    let mut edit = ContentEdit::new(label);
+    let named = named_inside(&project.usages, moves);
+    let mut by_file: BTreeMap<&str, Vec<(&ContentUsage, String, &str)>> = BTreeMap::new();
+    for (usage, from, to) in &named {
+        by_file
+            .entry(usage.file.as_str())
+            .or_default()
+            .push((usage, to.clone(), from.as_str()));
+    }
+    let files_rewritten = by_file.len();
+    for (file, mut uses) in by_file {
+        if !file.ends_with(".json") {
+            for (_, to, from) in &uses {
+                let table = table_of(from).unwrap_or_default();
+                edit.rename_beside(files, file, table, from, to);
+            }
+            continue;
+        }
+        uses.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
+        edit.update_json(files, file, |value| {
+            for (usage, to, _) in &uses {
+                rewrite(value, usage, &project.usages, file, to);
+            }
+            Some(())
+        });
+    }
+    for step in moves {
+        let entries: Vec<String> = files
+            .entries()
+            .filter(|entry| step.moved(entry.trim_end_matches('/')).is_some())
+            .cloned()
+            .collect();
+        for entry in entries {
+            let Some(bytes) = edit.pending_bytes(files, &entry) else {
+                continue;
+            };
+            let moved = if is_folder(&entry) {
+                folder_entry(&step.moved(entry.trim_end_matches('/')).expect("inside"))
+            } else {
+                step.moved(&entry).expect("inside")
+            };
+            edit.remove(entry);
+            edit.write(moved, bytes);
+        }
+        keep_folder(files, &mut edit, parent_of(&step.from));
+    }
+    Ok(PlannedMove {
+        edit,
+        rewritten: named.len(),
+        files_rewritten,
+    })
+}
+
+/// Moves and renames as one step, and points every open tab and the selection at where things
+/// went. Says what was rewritten.
+pub fn apply(editor: &mut Editor, moves: &[PathMove], label: String) -> Result<(), String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let planned = plan(project, moves, label.clone())?;
+    let (rewritten, files) = (planned.rewritten, planned.files_rewritten);
+    editor.try_apply(planned.edit)?;
+    follow(editor, moves);
+    let mut said = label;
+    if rewritten > 0 {
+        said.push_str(&format!(
+            ": {rewritten} reference{} in {files} file{} rewritten",
+            plural(rewritten),
+            plural(files)
+        ));
+    }
+    editor.toast(said);
+    Ok(())
+}
+
+/// Points open tabs, the selection and open folders at where `moves` took what they show.
+pub fn follow(editor: &mut Editor, moves: &[PathMove]) {
+    let moved = |path: &str| moves.iter().find_map(|step| step.moved(path));
+    editor.rename_tabs(|tab| match tab {
+        EditorTab::Script(owner) => {
+            moved(&owner.key).map(|to| EditorTab::Script(crate::views::script::ScriptRow::new(&to)))
+        }
+        EditorTab::Asset { path } => moved(path).map(|path| EditorTab::Asset { path }),
+        EditorTab::Rows { table, keys } => {
+            keys.iter()
+                .any(|key| moved(key).is_some())
+                .then(|| EditorTab::Rows {
+                    table: table.clone(),
+                    keys: keys
+                        .iter()
+                        .map(|key| moved(key).unwrap_or_else(|| key.clone()))
+                        .collect(),
+                })
+        }
+        other => {
+            let (table, key) = other.row()?;
+            moved(&key).map(|to| EditorTab::for_row(&table, &to))
+        }
+    });
+    for key in &mut editor.selection.keys {
+        if let Some(to) = moved(key) {
+            *key = to;
+        }
+    }
+    editor.imports.moved(&moved);
+    if let Some(project) = &editor.project {
+        let folder = UserFolder::folder_key(&project.root);
+        if let Some(view) = editor.settings.content_trees.get_mut(&folder) {
+            view.moved(&moved);
+        }
+    }
+}
+
+/// The name a moved or renamed file or folder takes in `folder`, as `free_path` gives it.
+pub fn file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+/// `path` renamed to `name`, the name before its first dot, keeping its type.
+pub fn renamed(path: &str, name: &str) -> String {
+    let file = file_name(path);
+    let rest = file.strip_prefix(name_of(path)).unwrap_or("");
+    match parent_of(path) {
+        "" => format!("{name}{rest}"),
+        folder => format!("{folder}/{name}{rest}"),
+    }
+}
+
+/// Every reference to a path that moves, with that path and where it lands.
+fn named_inside<'u>(
+    usages: &'u ContentUsages,
+    moves: &[PathMove],
+) -> Vec<(&'u ContentUsage, String, String)> {
+    let mut named = Vec::new();
+    for (path, uses) in usages.content().chain(usages.media()) {
+        if let Some(to) = moves.iter().find_map(|step| step.moved(path)) {
+            named.extend(
+                uses.iter()
+                    .map(|usage| (usage, path.to_owned(), to.clone())),
+            );
+        }
+    }
+    named
+}
+
+/// Keeps `folder` once what moves leaves it, as a file manager does.
+pub fn keep_folder(files: &ProjectFiles, edit: &mut ContentEdit, folder: &str) {
+    if folder.is_empty() {
+        return;
+    }
+    let kept = folder_entry(folder);
+    let still_holds = files
+        .paths_under(&kept)
+        .any(|entry| edit.pending_bytes(files, entry).is_some());
+    let written = edit
+        .changes
+        .iter()
+        .any(|change| change.bytes.is_some() && change.file.starts_with(&kept));
+    if !still_holds && !written {
+        edit.write(kept, Default::default());
+    }
+}
+
+fn names_in(files: &ProjectFiles, folder: &str, leaving: &[String]) -> HashSet<String> {
+    let prefix = match folder {
+        "" => String::new(),
+        folder => folder_entry(folder),
+    };
+    files
+        .paths_under(&prefix)
+        .filter(|entry| {
+            !leaving
+                .iter()
+                .any(|gone| *entry == gone || entry.starts_with(&format!("{gone}/")))
+        })
+        .filter_map(|entry| entry[prefix.len()..].split('/').next())
+        .filter(|name| !name.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Writes `to` where the use names what moved: the value at its pointer, or the key it is.
+pub fn rewrite(
+    value: &mut Value,
+    usage: &ContentUsage,
+    usages: &ContentUsages,
+    file: &str,
+    to: &str,
+) {
+    let pointer = usage.pointer.as_str();
+    let is_key = usages
+        .in_file(file)
+        .iter()
+        .any(|reference| reference.pointer == pointer && reference.key);
+    if is_key {
+        let (parent, name) = split_pointer(pointer);
+        if let Some(map) = value.pointer_mut(parent).and_then(Value::as_object_mut)
+            && let Some(entry) = map.remove(&name)
+        {
+            map.insert(to.to_owned(), entry);
+        }
+    } else if let Some(slot) = value.pointer_mut(pointer) {
+        *slot = Value::String(to.to_owned());
+    }
+}
+
+fn split_pointer(pointer: &str) -> (&str, String) {
+    let cut = pointer.rfind('/').unwrap_or(0);
+    let name = locate::unescape(&pointer[cut + 1..]);
+    (&pointer[..cut], name)
+}
+
+fn plural(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
 }

@@ -55,7 +55,6 @@ pub fn walker_row() -> Value {
     json!({
         "hitbox": { "width": 0.8, "height": 1.6 },
         "sprites": {
-            "image": "models/walker.png",
             "frame_size": { "width": FRAME.0, "height": FRAME.1 },
             "actions": actions,
         },
@@ -85,7 +84,7 @@ pub fn tileset_row() -> Value {
     let mut tiles = serde_json::Map::new();
     tiles.insert(
         PAVED.to_string(),
-        json!({ "walk": "blocks", "surface": "sand" }),
+        json!({ "walk": "blocks", "surface": testkit::path("surface", "sand") }),
     );
     tiles.insert(BLANK_WITH_DATA.to_string(), json!({ "walk": "blocks" }));
     let first = COLUMNS + 1;
@@ -95,7 +94,7 @@ pub fn tileset_row() -> Value {
             "animation": (0..4).map(|k| json!({ "tile": first + 9 * k, "ms": 250 })).collect::<Vec<_>>(),
         }),
     );
-    json!({ "image": "tilesets/beach.png", "tile": TILE, "tiles": tiles })
+    json!({ "tile": TILE, "tiles": tiles })
 }
 
 /// A tileset of solid tiles each of its own colour, its last row transparent, and the water's four
@@ -139,8 +138,9 @@ pub fn water(tileset: &RgbaImage) -> Vec<RgbaImage> {
 
 /// A palette painting the paved tile, the water's first frame and another plain tile.
 pub fn island_palette() -> String {
+    let beach = testkit::path("tileset", "beach");
     format!(
-        "tileset,tile,flip\nbeach,{PAVED},\nbeach,{},horizontal\nbeach,3,\n",
+        "tileset,tile,flip\n{beach},{PAVED},\n{beach},{},horizontal\n{beach},3,\n",
         COLUMNS + 1
     )
 }

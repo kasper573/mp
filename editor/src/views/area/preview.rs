@@ -55,7 +55,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     });
     let mut areas: Vec<String> = content
         .ids::<area::AreaDef>()
-        .map(|id| id.key(&content).to_owned())
+        .map(|id| id.path(&content).to_owned())
         .collect();
     areas.sort();
     widgets::section(ui, "Pick a place");
@@ -84,7 +84,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let Some(area_key) = area_key else {
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(&area_key) else {
+    let Some(area_id) = content.by_path::<area::AreaDef>(&area_key) else {
         return;
     };
     let area = area::load(&content, area_id);
@@ -117,7 +117,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, theme::INPUT);
-    if let Some(scene) = editor.views.area.scenes.by_key.get(&view_key) {
+    if let Some(scene) = editor.views.area.scenes.by_path.get(&view_key) {
         painter.image(scene.texture, rect, scene.uv(), egui::Color32::WHITE);
     }
     let canvas = navigation::Viewport {

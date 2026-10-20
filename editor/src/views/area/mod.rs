@@ -3,11 +3,10 @@ pub mod brush;
 pub mod grid;
 pub mod holes;
 pub mod inspect;
-pub mod layers;
 pub mod modules;
+pub mod nodes;
 pub mod overlays;
 pub mod palette;
-pub mod parts;
 pub mod pick;
 pub mod pins;
 pub mod placement;
@@ -24,7 +23,6 @@ pub mod status;
 pub mod terrain;
 pub mod tools;
 
-pub use blueprint::{MakeBlueprintDialog, make_blueprint_dialog};
 pub use resize::ResizeDialog;
 
 use std::collections::{HashMap, HashSet};
@@ -33,7 +31,7 @@ use std::ops::Deref;
 use bevy::prelude::World;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, RowName, row_file};
+use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
@@ -49,12 +47,12 @@ use self::overlays::{
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
-use crate::project::{AreaCameraState, ContentEdit, Project, ProjectFiles, RowSelection};
+use crate::project::{AreaCameraState, Project, ProjectFiles, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::{sidebar, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
-use crate::{play, user};
+use crate::{play, scene_graph, user};
 
 pub const MIN_ZOOM: f32 = 0.125;
 pub const MAX_ZOOM: f32 = 16.0;
@@ -69,14 +67,10 @@ pub fn blueprint_view_key(blueprint: &str) -> String {
     format!("blueprint:{blueprint}")
 }
 
-/// The row a view key's view shows: an area, or a blueprint.
-pub fn viewed_row(view_key: &str) -> Option<RowName> {
+/// The bundle a view key's view shows: an area, or a blueprint.
+pub fn viewed_bundle(view_key: &str) -> Option<&str> {
     let (kind, key) = view_key.split_once(':')?;
-    match kind {
-        "area" => Some(RowName::new(AreaDef::TABLE, key)),
-        "blueprint" => Some(RowName::new(BlueprintDef::TABLE, key)),
-        _ => None,
-    }
+    matches!(kind, "area" | "blueprint").then_some(key)
 }
 
 fn camera_key(project: &Project, view_key: &str) -> String {
@@ -106,11 +100,11 @@ pub enum AreaAction {
     OpenBlueprint(String),
     MakeBlueprint,
     GoTo(String, Pos<Tiles>),
-    Unpack(usize),
-    Replace(usize),
-    Split(usize),
-    ReturnDoor(usize),
-    AdoptBlocks(usize),
+    Unpack(String),
+    Replace(String),
+    Split(String),
+    ReturnDoor(String),
+    AdoptBlocks(String),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, VariantArray, AsRefStr)]
@@ -155,7 +149,7 @@ impl AreaTool {
 pub struct AreaViewState {
     pub area: String,
     pub blueprint: Option<String>,
-    pub in_place: Vec<usize>,
+    pub in_place: Vec<String>,
     pub center: Pos<Tiles>,
     pub zoom: f32,
     pub tool: AreaTool,
@@ -178,8 +172,6 @@ pub struct AreaViewState {
     pub cursor_cell: Option<CellPos>,
     pub tileset_search: String,
     pub blueprint_search: String,
-    /// Whether the stamp panel lists global blueprints rather than the area's own.
-    pub blueprints_global: bool,
     pub palette_lens: palette::PaletteLens,
     pub menu: Option<modules::AreaMenuAnchor>,
     pub population_previews: HashMap<String, PopulationPreview>,
@@ -397,45 +389,10 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     );
 }
 
-pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
-    let Some(mut row) = editor.row_value(AreaDef::TABLE, area) else {
-        return;
-    };
-    let Some(layers) = row["map"]["ground"].as_array_mut() else {
-        return;
-    };
-    let removed = layers.iter().position(|name| name.as_str() == Some(layer));
-    layers.retain(|name| name.as_str() != Some(layer));
-    let remaining = layers.len();
-    let mut edit = ContentEdit::new(format!("Remove layer {layer} of {area}"));
-    edit.write_json(row_file(AreaDef::TABLE, area), &row);
-    edit.remove(format!(
-        "{}/{}",
-        area::grid::folder(area),
-        area::grid::layer_file(layer)
-    ));
-    if editor.apply(edit) {
-        for view in editor
-            .views
-            .area
-            .views
-            .values_mut()
-            .filter(|view| view.area == area)
-        {
-            view.hidden_ground.remove(layer);
-            if removed.is_some_and(|index| index < view.layer) {
-                view.layer -= 1;
-            }
-            view.layer = view.layer.min(remaining.saturating_sub(1));
-        }
-    }
-}
-
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
     sidebar::row(ui, "area", |ui| inspect::row(editor, ui, key));
-    let row = RowName::new(AreaDef::TABLE, key);
-    sidebar::inspector(editor, ui, "area", Some(row), |editor, ui| {
+    sidebar::inspector(editor, ui, "area", |editor, ui| {
         inspect::sidebar(editor, ui, key)
     });
     show_canvas(editor, ui, &view_key, key, None);
@@ -460,7 +417,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) 
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<AreaDef>(&area_key) else {
+    let Some(area_id) = content.by_path::<AreaDef>(&area_key) else {
         return;
     };
     match tab {
@@ -484,34 +441,14 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .project
                 .as_ref()
                 .and_then(|p| p.content.clone())
-                .and_then(|c| c.table::<AreaDef>().keys().first().cloned())
+                .and_then(|c| c.table::<AreaDef>().paths().first().cloned())
         });
     let Some(preview) = preview else {
         ui.label("No area to preview the blueprint on");
         return;
     };
-    let selection = editor.selection.clone();
-    let indices: Vec<usize> = if selection.table == BlueprintDef::TABLE
-        && selection.keys.first().is_some_and(|k| k == key)
-    {
-        selection
-            .parts
-            .iter()
-            .filter_map(|p| blueprint_part_index(p))
-            .collect()
-    } else {
-        Vec::new()
-    };
-    sidebar::row(ui, "blueprint", |ui| {
-        parts::blueprint_row(editor, ui, key, &indices)
-    });
-    let row = RowName::new(BlueprintDef::TABLE, key);
-    sidebar::inspector(editor, ui, "blueprint", Some(row), |editor, ui| {
-        if indices.is_empty() {
-            sidebar::nothing_selected(ui, "Select a part to inspect it here.");
-        } else {
-            parts::selected_parts(editor, ui, key, &indices);
-        }
+    sidebar::inspector(editor, ui, "blueprint", |_, ui| {
+        sidebar::nothing_selected(ui, "Select a node to inspect it here.");
     });
     show_canvas(editor, ui, &view_key, &preview, Some(key));
 }
@@ -532,7 +469,7 @@ fn show_canvas(
         );
         return;
     };
-    let Some(area_id) = content.by_key::<AreaDef>(area_key) else {
+    let Some(area_id) = content.by_path::<AreaDef>(area_key) else {
         ui.label(format!("area {area_key} is gone"));
         return;
     };
@@ -583,21 +520,6 @@ fn show_canvas(
     );
     rail_ui.painter().rect_filled(rail, 0.0, theme::PANEL);
     tools::rail(editor, &mut rail_ui, view_key);
-    if editor.views.area.view(view_key).layers_shown() {
-        let mut layers_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(canvas_rect)
-                .layout(egui::Layout::top_down(egui::Align::Min)),
-        );
-        layers::popover(
-            editor,
-            &mut layers_ui,
-            view_key,
-            &content,
-            area_id,
-            canvas_rect,
-        );
-    }
 }
 
 fn resolve_in_place(
@@ -610,8 +532,8 @@ fn resolve_in_place(
     if path.is_empty() {
         return Vec::new();
     }
-    let modules = modules::area_modules(editor, area_key);
-    match placement::resolve_in_place(content, &modules, &path) {
+    let scene = nodes::scene_of(editor, area_key);
+    match placement::resolve_in_place(content, &scene, &path) {
         Some(chain) => chain,
         None => {
             editor.views.area.view_mut(view_key).in_place.clear();
@@ -653,7 +575,7 @@ fn banners(
     let mut done = false;
     if let Some(place) = in_place.last() {
         let count = content
-            .by_key::<BlueprintDef>(&place.blueprint)
+            .by_path::<BlueprintDef>(&place.blueprint)
             .map_or(0, |id| placement::placements_of(content, id).direct.len());
         let name = place.blueprint.clone();
         chip(&mut child, &mut |ui| {
@@ -683,7 +605,7 @@ fn banners(
             );
         });
     } else if blueprint.is_some() {
-        let areas: Vec<String> = content.table::<AreaDef>().keys().to_vec();
+        let areas: Vec<String> = content.table::<AreaDef>().paths().to_vec();
         let mut picked = preview_area.clone().unwrap_or(area_key.clone());
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Eye, 13.0, theme::MUTED);
@@ -725,7 +647,7 @@ fn canvas(
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, theme::CANVAS);
     let area = area::load(content, area_id);
-    let area_key = area_id.key(content).to_owned();
+    let area_key = area_id.path(content).to_owned();
     let ppp = ui.ctx().pixels_per_point();
     let (center, zoom, spec, texture) = {
         let view = editor.views.area.views.get(view_key).expect("the view");
@@ -755,7 +677,7 @@ fn canvas(
             .views
             .area
             .scenes
-            .by_key
+            .by_path
             .get(view_key)
             .map(|scene| (scene.texture, scene.uv()));
         (view.center, view.zoom, spec, texture)
@@ -846,9 +768,9 @@ pub struct AreaSnapshot {
     pub content: Content,
     pub area_id: AreaId,
     pub area_key: String,
-    pub modules: Vec<Value>,
+    pub modules: Vec<nodes::SceneModule>,
     pub in_place: Vec<placement::AreaPlacement>,
-    pub placement_bounds: HashMap<usize, Rect<Tiles>>,
+    pub placement_bounds: HashMap<String, Rect<Tiles>>,
 }
 
 pub struct AreaFrame<'a> {
@@ -877,14 +799,11 @@ impl AreaSnapshot {
         area_key: &str,
         in_place: Vec<placement::AreaPlacement>,
     ) -> Self {
-        let own = editor
-            .row_value(AreaDef::TABLE, area_key)
-            .unwrap_or(Value::Null);
         Self {
             content: content.clone(),
             area_id,
             area_key: area_key.to_owned(),
-            modules: own["modules"].as_array().cloned().unwrap_or_default(),
+            modules: nodes::modules(&nodes::scene_of(editor, area_key)),
             in_place,
             placement_bounds: placement::placement_bounds(content, area_id),
         }
@@ -892,7 +811,7 @@ impl AreaSnapshot {
 
     pub fn for_area(editor: &mut Editor, area_key: &str) -> Option<Self> {
         let content = editor.project.as_ref()?.content.clone()?;
-        let area_id = content.by_key::<AreaDef>(area_key)?;
+        let area_id = content.by_path::<AreaDef>(area_key)?;
         let view_key = area_view_key(area_key);
         let in_place = if editor.views.area.views.contains_key(&view_key) {
             resolve_in_place(editor, &content, &view_key, area_key)
@@ -914,28 +833,37 @@ impl AreaSnapshot {
         area::walk::in_map(self.size().grid(), tile)
     }
 
-    pub fn module_bounds(&self, index: usize) -> Option<Rect<Tiles>> {
-        let module = self.modules.get(index)?;
-        shapes::bounds(module, self.placement_bounds.get(&index).copied())
+    pub fn module(&self, pointer: &str) -> Option<&Value> {
+        self.modules
+            .iter()
+            .find(|module| module.pointer == pointer)
+            .map(|module| &module.json)
     }
 
-    pub fn hit(&self, tile: Pos<Tiles>) -> Option<usize> {
-        let mut best: Option<(usize, f32)> = None;
-        for index in 0..self.modules.len() {
-            let Some(bounds) = self.module_bounds(index) else {
-                continue;
-            };
-            if !is_selectable(&self.modules[index]) {
+    pub fn module_bounds(&self, pointer: &str) -> Option<Rect<Tiles>> {
+        shapes::bounds(
+            self.module(pointer)?,
+            self.placement_bounds.get(pointer).copied(),
+        )
+    }
+
+    pub fn hit(&self, tile: Pos<Tiles>) -> Option<String> {
+        let mut best: Option<(&str, f32)> = None;
+        for module in &self.modules {
+            if !is_selectable(&module.json) {
                 continue;
             }
+            let Some(bounds) = self.module_bounds(&module.pointer) else {
+                continue;
+            };
             if bounds.contains(tile) {
                 let size = bounds.area();
                 if best.is_none_or(|(_, area)| size < area) {
-                    best = Some((index, size));
+                    best = Some((&module.pointer, size));
                 }
             }
         }
-        best.map(|(index, _)| index)
+        best.map(|(pointer, _)| pointer.to_owned())
     }
 }
 
@@ -975,20 +903,15 @@ fn origin_of(
     }
 }
 
-/// The middle of what a blueprint's parts cover, in its own tiles.
+/// The middle of what a blueprint's modules cover, in its own tiles.
 fn blueprint_middle(files: &ProjectFiles, content: &Content, key: &str) -> Pos<Tiles> {
-    let Some(row) = files.json(&row_file(BlueprintDef::TABLE, key)) else {
-        return Pos::new(0.0, 0.0);
-    };
-    row["parts"]
-        .as_array()
+    scene_graph::modules_of(files, key)
         .into_iter()
-        .flatten()
-        .filter_map(|part| {
-            if part.is_module(AreaModuleKind::Blueprint) {
-                placement::nested_bounds(content, part.text("blueprint"), part)
+        .filter_map(|(_, module)| {
+            if module.is_module(AreaModuleKind::Blueprint) {
+                placement::nested_bounds(content, module.text("blueprint"), &module)
             } else {
-                shapes::bounds(part, None)
+                shapes::bounds(&module, None)
             }
         })
         .reduce(|a, b| a.union(&b))
@@ -996,9 +919,7 @@ fn blueprint_middle(files: &ProjectFiles, content: &Content, key: &str) -> Pos<T
 }
 
 pub fn selected_parts(editor: &Editor, area_key: &str) -> HashSet<String> {
-    if editor.selection.table == AreaDef::TABLE
-        && editor.selection.keys.iter().any(|k| k == area_key)
-    {
+    if editor.selection.keys.iter().any(|k| k == area_key) {
         editor.selection.parts.iter().cloned().collect()
     } else {
         HashSet::new()
@@ -1030,18 +951,6 @@ fn remember_camera(editor: &mut Editor, view_key: &str) {
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    if selection.table == BlueprintDef::TABLE {
-        let Some(key) = selection.keys.first().cloned() else {
-            return;
-        };
-        let indices: Vec<usize> = selection
-            .parts
-            .iter()
-            .filter_map(|p| blueprint_part_index(p))
-            .collect();
-        parts::selected_parts(editor, ui, &key, &indices);
-        return;
-    }
     inspect::show_parts(editor, ui, selection);
 }
 
@@ -1074,34 +983,10 @@ pub fn run_action(editor: &mut Editor, frame: &AreaSnapshot, action: AreaAction)
         }
         AreaAction::MakeBlueprint => blueprint::make_blueprint_from_selection(editor, frame),
         AreaAction::GoTo(area, at) => open_area_at(editor, &area, Some(at), None),
-        AreaAction::Unpack(index) => placement::unpack(editor, frame, index),
-        AreaAction::Replace(index) => placement::replace_dialog(editor, frame, index),
-        AreaAction::Split(index) => scenery::split_scenery(editor, frame, index),
-        AreaAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
-        AreaAction::AdoptBlocks(index) => scenery::adopt_blocks(editor, frame, index),
+        AreaAction::Unpack(node) => placement::unpack(editor, frame, &node),
+        AreaAction::Replace(node) => placement::replace_dialog(editor, frame, &node),
+        AreaAction::Split(node) => scenery::split_scenery(editor, frame, &node),
+        AreaAction::ReturnDoor(node) => scenery::return_door(editor, frame, &node),
+        AreaAction::AdoptBlocks(node) => scenery::adopt_blocks(editor, frame, &node),
     }
-}
-
-fn module_part(index: usize) -> String {
-    format!("/modules/{index}")
-}
-
-fn module_index(part: &str) -> Option<usize> {
-    part.strip_prefix("/modules/")?.parse().ok()
-}
-
-fn blueprint_part(index: usize) -> String {
-    format!("/parts/{index}")
-}
-
-fn blueprint_part_index(part: &str) -> Option<usize> {
-    part.strip_prefix("/parts/")?.parse().ok()
-}
-
-fn remove_indices<T>(items: &mut Vec<T>, indices: &[usize]) {
-    let mut position = 0;
-    items.retain(|_| {
-        position += 1;
-        !indices.contains(&(position - 1))
-    });
 }

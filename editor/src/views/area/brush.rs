@@ -99,8 +99,9 @@ pub(super) fn grid_stroke(
         return;
     };
     if pressed && editor.views.area.view(view_key).stroke().is_none() {
-        let grids = frame.area().grids.clone();
-        let draft = grid::GridDraft::of(&frame.area_key, &grids);
+        let Some(draft) = grid::GridDraft::own(&frame.content, &frame.area_key) else {
+            return;
+        };
         let seed = stroke_seed(editor.frame, cell);
         let view = editor.views.area.view_mut(view_key);
         view.skipped = None;
@@ -186,7 +187,7 @@ pub(super) fn apply_brush(
                 return;
             };
             let Some(def) = content
-                .by_key::<TilesetDef>(&tileset)
+                .by_path::<TilesetDef>(&tileset)
                 .map(|id| id.get(&content))
             else {
                 return;
@@ -265,8 +266,9 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
     let walk_overlay = view.walk_overlay;
     let walk_value = view.walk_value;
     let brush = editor.settings.brush.clone();
-    let grids = frame.area().grids.clone();
-    let mut draft = grid::GridDraft::of(&frame.area_key, &grids);
+    let Some(mut draft) = grid::GridDraft::own(&frame.content, &frame.area_key) else {
+        return;
+    };
     let cells = draft.flood(layer, cell);
     if cells.is_empty() {
         return;
@@ -433,7 +435,7 @@ pub(super) fn paint_preview(
     };
     let Some(def) = frame
         .content
-        .by_key::<TilesetDef>(&tileset)
+        .by_path::<TilesetDef>(&tileset)
         .map(|id| id.get(&frame.content))
     else {
         return;

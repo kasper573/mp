@@ -4,8 +4,9 @@ use std::sync::Arc;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
-use engine::core::content::{ContentRow, asset_file, row_file};
-use engine::systems::area::grid::{self, PALETTE_FILE, PaletteRow};
+use engine::core::content::files::NAME_RULE;
+use engine::core::content::{ContentFile, fields_file, valid_name};
+use engine::systems::area::grid::PaletteRow;
 use engine::systems::area::tileset::TilesetDef;
 use image::RgbaImage;
 use serde_json::{Value, json};
@@ -15,16 +16,21 @@ use super::model_ui::TextureCache;
 use super::records::{DueReimport, ImportMapping, ImportRecord};
 use super::tileset::{self, AnimPlan, TileBlock, TileGridCut, TileGridSettings, TilePlan};
 use crate::app::Editor;
+use crate::parts;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
+use crate::ui::content_tree;
 use crate::ui::{dialogs, theme, widgets};
-use crate::value::RowValue;
 use crate::views::area;
+use crate::views::area::grid::palette_file;
 use crate::views::tileset::{ANIMATION_PART, tile_size};
 use crate::{forms, rows, schema, thumbs};
 
 pub struct TilesetDialog {
+    /// The tileset's path when importing onto one, or the name of the one to make.
     pub key: String,
+    /// The folder a new tileset is made in.
+    pub folder: String,
     pub existing: bool,
     pub export: AnimationExport,
     pub texture: Option<TextureHandle>,
@@ -63,8 +69,8 @@ pub struct AnimationDialog {
 
 const NEW_TILE_PX: u32 = 16;
 
-fn image_of(editor: &Editor, row: &Value) -> Option<RgbaImage> {
-    super::asset_image(editor, row["image"].as_str()?)
+fn image_of(editor: &Editor, tileset: &str) -> Option<RgbaImage> {
+    super::asset_image(editor, &parts::tileset_image(tileset))
 }
 
 fn palettes_of(editor: &Editor) -> Vec<(String, Vec<PaletteRow>)> {
@@ -76,18 +82,16 @@ fn palettes_of(editor: &Editor) -> Vec<(String, Vec<PaletteRow>)> {
 }
 
 pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::ImportDialog> {
-    let key = super::free_key(editor, TilesetDef::TABLE, &export);
-    Some(super::ImportDialog::Tileset(Box::new(new_dialog(
-        key,
-        false,
-        export,
-        NEW_TILE_PX,
-    ))))
+    let name = super::suggested_name(&export, TilesetDef::TABLE);
+    let mut dialog = new_dialog(name, false, export, NEW_TILE_PX);
+    dialog.folder = content_tree::current_folder(editor);
+    Some(super::ImportDialog::Tileset(Box::new(dialog)))
 }
 
 fn new_dialog(key: String, existing: bool, export: AnimationExport, tile: u32) -> TilesetDialog {
     let mut dialog = TilesetDialog {
         key,
+        folder: String::new(),
         existing,
         export,
         texture: None,
@@ -131,10 +135,10 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
-    let Some(row) = editor.row_value(TilesetDef::TABLE, key) else {
+    let Some(row) = editor.row_value(key) else {
         return land_new(editor, export);
     };
-    let Some(old) = image_of(editor, &row) else {
+    let Some(old) = image_of(editor, key) else {
         let tile = tile_size(&row).unwrap_or(NEW_TILE_PX);
         return Some(super::ImportDialog::Tileset(Box::new(new_dialog(
             key.to_owned(),
@@ -196,11 +200,9 @@ pub fn land_animation(
     mut export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
-    let row = editor.row_value(TilesetDef::TABLE, key)?;
-    let Some(tileset_image) = image_of(editor, &row) else {
-        editor.toast(format!(
-            "tileset/{key} has no image yet; import its grid first"
-        ));
+    let row = editor.row_value(key)?;
+    let Some(tileset_image) = image_of(editor, key) else {
+        editor.toast(format!("{key} has no image yet; import its grid first"));
         return None;
     };
     let tile = tile_size(&row).and_then(|tile| {
@@ -322,17 +324,19 @@ pub fn dialog(
                 ui.set_width(width - 575.0 - 40.0);
                 ui.horizontal(|ui| {
                     ui.label(theme::muted("into"));
-                    ui.label(theme::mono("tileset/").color(theme::CODE));
                     if dialog.existing {
                         ui.label(theme::mono(&dialog.key));
-                        ui.label(theme::faint("this row, no image yet"));
+                        ui.label(theme::faint("this tileset, no image yet"));
                     } else {
+                        if !dialog.folder.is_empty() {
+                            ui.label(theme::mono(format!("{}/", dialog.folder)).color(theme::CODE));
+                        }
                         ui.add(
                             egui::TextEdit::singleline(&mut dialog.key)
                                 .desired_width(160.0)
                                 .font(egui::TextStyle::Monospace),
                         );
-                        ui.label(theme::faint("a new row"));
+                        ui.label(theme::mono(".tileset").color(theme::CODE));
                     }
                 });
                 widgets::section(ui, "Grid");
@@ -398,18 +402,12 @@ pub fn dialog(
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             let key = dialog.key.trim().to_owned();
-            let problem = if dialog.existing {
-                None
-            } else {
-                editor
-                    .project
-                    .as_ref()
-                    .and_then(|project| rows::key_problem(&project.files, TilesetDef::TABLE, &key))
-            };
+            let problem =
+                (!dialog.existing && !valid_name(&key)).then(|| format!("a name is {NAME_RULE}"));
             let enabled = dialog.cut.is_ok() && problem.is_none();
             if ui
                 .add_enabled_ui(enabled, |ui| {
-                    controls::primary(ui, format!("Create tileset/{key}"))
+                    controls::primary(ui, format!("Create {key}.tileset"))
                 })
                 .inner
                 .clicked()
@@ -420,10 +418,7 @@ pub fn dialog(
                 close = true;
             }
             let status = dialog.error.clone().or(problem).unwrap_or_else(|| {
-                format!(
-                    "writes {} and the row; the export stays where it is",
-                    asset_file(&image_name(&key))
-                )
+                "writes the tileset with its image; the export stays where it is".to_owned()
             });
             ui.label(theme::muted(status));
         });
@@ -440,10 +435,6 @@ pub fn dialog(
     Some(dialog)
 }
 
-fn image_name(key: &str) -> String {
-    super::asset_name("tilesets", key)
-}
-
 pub fn apply_now(editor: &mut Editor, mut dialog: TilesetDialog) -> Option<TilesetDialog> {
     match create_tileset(editor, &dialog) {
         Ok(()) => None,
@@ -458,7 +449,7 @@ pub fn apply_animation_now(
     editor: &mut Editor,
     mut dialog: AnimationDialog,
 ) -> Option<AnimationDialog> {
-    let row = editor.row_value(TilesetDef::TABLE, &dialog.key)?;
+    let row = editor.row_value(&dialog.key)?;
     match apply_animation(editor, &dialog, &row) {
         Ok(()) => None,
         Err(error) => {
@@ -469,31 +460,30 @@ pub fn apply_animation_now(
 }
 
 fn create_tileset(editor: &mut Editor, dialog: &TilesetDialog) -> Result<(), String> {
-    let key = dialog.key.trim().to_owned();
     let cut = dialog.cut.as_ref().map_err(|error| error.clone())?;
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let mut row = if dialog.existing {
-        editor
-            .row_value(TilesetDef::TABLE, &key)
-            .ok_or("the row is gone")?
+    let (key, mut row) = if dialog.existing {
+        let key = dialog.key.clone();
+        let row = editor.row_value(&key).ok_or("the tileset is gone")?;
+        (key, row)
     } else {
-        if let Some(problem) = rows::key_problem(&project.files, TilesetDef::TABLE, &key) {
-            return Err(problem);
+        let name = dialog.key.trim();
+        if !valid_name(name) {
+            return Err(format!("a name is {NAME_RULE}"));
         }
+        let key = rows::new_path(&project.files, &dialog.folder, TilesetDef::TABLE, name);
         let shape = editor
             .shapes
             .table(TilesetDef::TABLE)
-            .ok_or("the tileset table has no shape")?;
-        schema::template(&shape.shape, &shape.shape)
+            .ok_or("the tileset type has no shape")?;
+        (key, schema::template(&shape.shape, &shape.shape))
     };
-    let image = image_name(&key);
-    row["image"] = Value::String(image.clone());
     row["tile"] = json!(cut.settings.tile);
     let png = formats::encode_png(&cut.grid.image)?;
     let names = formats::export_name(&dialog.export.files);
-    let mut edit = ContentEdit::new(format!("Imported {names} as tileset/{key}"));
-    edit.write(asset_file(&image), Arc::from(png));
-    edit.write_json(row_file(TilesetDef::TABLE, &key), &row);
+    let mut edit = ContentEdit::new(format!("Imported {names} as {key}"));
+    edit.write(parts::tileset_image(&key), Arc::from(png));
+    edit.write_json(fields_file(&key), &row);
     editor.try_apply(edit)?;
     let record = ImportRecord::new(
         &dialog.export.files,
@@ -626,7 +616,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             ui,
             &format!(
                 "{} · {} entr{} rewritten",
-                grid::palette_file(&rewrite.area),
+                palette_file(&rewrite.area),
                 rewrite.entries,
                 if rewrite.entries == 1 { "y" } else { "ies" }
             ),
@@ -803,7 +793,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
     let Some(draft) = editor.views.tileset.reimports.get(key) else {
         return;
     };
-    let Some(row) = editor.row_value(TilesetDef::TABLE, key) else {
+    let Some(row) = editor.row_value(key) else {
         return;
     };
     let palettes = palettes_of(editor);
@@ -821,19 +811,16 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
             return;
         }
     };
-    let image = row.text("image").to_owned();
+    let image = parts::tileset_image(key);
     let names = formats::export_name(&draft.export.files);
     let mut edit = ContentEdit::new(format!(
         "Imported {names} into {key} again · {} tiles renumbered",
         draft.plan.renumbered
     ));
-    edit.write(asset_file(&image), Arc::from(png));
-    edit.write_json(row_file(TilesetDef::TABLE, key), &new_row);
-    for (area, text) in rewritten {
-        edit.write(
-            format!("{}/{}", grid::folder(&area), PALETTE_FILE),
-            Arc::from(text.into_bytes()),
-        );
+    edit.write(image.to_owned(), Arc::from(png));
+    edit.write_json(fields_file(key), &new_row);
+    for (bundle, text) in rewritten {
+        edit.write(palette_file(&bundle), Arc::from(text.into_bytes()));
     }
     let record = ImportRecord::new(
         &draft.export.files,
@@ -859,7 +846,7 @@ pub fn animation_dialog(
     let mut animate = false;
     let width = 1100.0;
     let file = dialog.export.files.first().cloned().unwrap_or_default();
-    let row = editor.row_value(TilesetDef::TABLE, &dialog.key)?;
+    let row = editor.row_value(&dialog.key)?;
     let strip = dialog.export.strips.first().cloned();
     let columns_total = (dialog.tileset.width() / dialog.tile.max(1)).max(1);
     dialogs::card(ctx, "import-animation", width, |ui| {
@@ -1111,7 +1098,7 @@ fn apply_animation(
 ) -> Result<(), String> {
     let plan = dialog.plan.as_ref().map_err(|error| error.clone())?;
     let (png, new_row) = tileset::apply_anim_plan(plan, &dialog.tileset, row, &dialog.export)?;
-    let image = row.text("image").to_owned();
+    let image = parts::tileset_image(&dialog.key);
     let names = formats::export_name(&dialog.export.files);
     let mut edit = ContentEdit::new(format!(
         "Animated {} tiles of {} from {names}",
@@ -1119,9 +1106,9 @@ fn apply_animation(
         dialog.key
     ));
     if let Some(png) = png {
-        edit.write(asset_file(&image), Arc::from(png));
+        edit.write(image.to_owned(), Arc::from(png));
     }
-    edit.write_json(row_file(TilesetDef::TABLE, &dialog.key), &new_row);
+    edit.write_json(fields_file(&dialog.key), &new_row);
     editor.try_apply(edit)?;
     let record = ImportRecord::new(
         &dialog.export.files,

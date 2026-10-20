@@ -5,11 +5,12 @@ use std::sync::Arc;
 use bevy::asset::{AssetPath, AssetServer};
 use bevy::prelude::{Entity, World};
 use egui::Ui;
+use engine::core::assets::AssetKind;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
 use engine::core::audio::soundscape::{SoundscapeChannel, SoundscapeLayer, SoundscapeZone};
 use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
-use engine::core::content::{ASSETS_DIR, Content};
+use engine::core::content::Content;
 use engine::core::math::Pos;
 use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
@@ -59,7 +60,7 @@ pub fn listen(editor: &mut Editor, content: &Content, area_id: AreaId, at: Pos<T
         })
         .collect();
     editor.views.sound.listening = Some(ListeningPoint {
-        area: area_id.key(content).to_owned(),
+        area: area_id.path(content).to_owned(),
         at,
         heard,
     });
@@ -120,7 +121,8 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     if views.synced.as_ref().map(|(generation, _)| *generation) != Some(project.generation) {
         let hashes: HashMap<String, String> = project
             .files
-            .paths_under(&format!("{ASSETS_DIR}/"))
+            .paths()
+            .filter(|path| AssetKind::of(path).is_some())
             .filter_map(|path| Some((path.clone(), project.files.hash_of(path)?.to_owned())))
             .collect();
         let assets: HashMap<String, Arc<[u8]>> = hashes
@@ -146,7 +148,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
         return;
     };
     for key in std::mem::take(&mut views.play) {
-        if let Some(id) = content.by_key::<SfxDef>(&key) {
+        if let Some(id) = content.by_path::<SfxDef>(&key) {
             playback::play(
                 world,
                 PlaySfx {
@@ -158,7 +160,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
         }
     }
     for key in std::mem::take(&mut views.stop) {
-        if let Some(id) = content.by_key::<SfxDef>(&key) {
+        if let Some(id) = content.by_path::<SfxDef>(&key) {
             playback::stop(world, id);
             views.sounding.remove(&key);
         }
@@ -168,7 +170,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
         .iter()
         .filter(|key| {
             content
-                .by_key::<SfxDef>(key)
+                .by_path::<SfxDef>(key)
                 .is_some_and(|id| playback::is_sounding(world, id))
         })
         .cloned()
@@ -180,7 +182,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
         world.despawn(previous);
     }
     if let Some(request) = views.babble.take()
-        && let Some(babble) = content.by_key::<BabbleDef>(&request.babble)
+        && let Some(babble) = content.by_path::<BabbleDef>(&request.babble)
     {
         if let Some(previous) = views.babbler.take() {
             world.despawn(previous);

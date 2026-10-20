@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use atlas::WorldAtlas;
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, Fixture, RowName, row_file};
+use engine::core::content::{Content, ContentFile, Fixture, fields_file};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
@@ -273,12 +273,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
-    let row = RowName::new(WorldMapDef::TABLE, WorldMap::World.key());
-    sidebar::inspector(editor, ui, "world", Some(row), |editor, ui| {
+    sidebar::inspector(editor, ui, "world", |editor, ui| {
         let selection = if editor.selection.table == WorldMapDef::TABLE {
             editor.selection.clone()
         } else {
-            RowSelection::row(WorldMapDef::TABLE, WorldMap::World.key())
+            RowSelection::row(WorldMapDef::TABLE, &WorldMap::World.path())
         };
         inspect::inspect_parts(editor, ui, &selection);
     });
@@ -301,7 +300,7 @@ pub fn selected(editor: &Editor) -> Vec<MapPart> {
 pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
     editor.select(RowSelection::parts(
         WorldMapDef::TABLE,
-        WorldMap::World.key(),
+        &WorldMap::World.path(),
         parts.iter().map(MapPart::to_string).collect(),
     ));
 }
@@ -310,7 +309,7 @@ pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, co
     let Some(content) = project.content.clone() else {
         return;
     };
-    let Some(area) = content.by_key::<AreaDef>(original) else {
+    let Some(area) = content.by_path::<AreaDef>(original) else {
         return;
     };
     let Some(card) = WorldMap::World.get(&content).cards.get(&area) else {
@@ -333,7 +332,7 @@ pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, co
 }
 
 fn layout_file() -> String {
-    row_file(WorldMapDef::TABLE, WorldMap::World.key())
+    fields_file(&WorldMap::World.path())
 }
 
 fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {

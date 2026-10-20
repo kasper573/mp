@@ -153,7 +153,7 @@ pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSetCoverage> {
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
         .flat_map(|(id, def)| {
-            let tileset = id.key(content).to_owned();
+            let tileset = id.path(content).to_owned();
             def.terrains.iter().map(move |(set, terrains)| {
                 let mixes = MixCompleteness::of(def, set);
                 TerrainSetCoverage {

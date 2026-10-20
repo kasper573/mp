@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, Fixture};
+use engine::core::content::{ContentFile, Fixture};
 use engine::systems::area::world_map::{
     MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap, WorldMapDef,
 };
@@ -80,7 +80,7 @@ fn open(editor: &mut Editor, opens: &OpenTarget) {
         OpenTarget::Area {
             key,
             module: Some(module),
-        } => area_view::open_area_at(editor, key, None, Some(format!("/modules/{module}"))),
+        } => area_view::open_area_at(editor, key, None, Some(module.clone())),
         OpenTarget::Area { key, module: None } => {
             browser::act(editor, area::AreaDef::TABLE, key, BrowserAction::Open)
         }
@@ -601,7 +601,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         &format!(
             "Stored in {}/{}.json",
             WorldMapDef::TABLE,
-            WorldMap::World.key()
+            WorldMap::World.path()
         ),
     );
     let stored: serde_json::Map<String, serde_json::Value> = cards

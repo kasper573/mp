@@ -4,7 +4,7 @@ pub mod tree;
 use std::collections::HashMap;
 
 use egui::Ui;
-use engine::core::content::{ContentRow, RowName, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::class::ClassDef;
 use engine::systems::stat::StatKind;
 use serde_json::Value;
@@ -62,25 +62,21 @@ impl ClassViews {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    if editor.row_value(ClassDef::TABLE, key).is_none() {
-        ui.label(theme::muted(format!(
-            "{} is gone",
-            row_file(ClassDef::TABLE, key)
-        )));
+    if editor.row_value(key).is_none() {
+        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
         return;
     }
     let page = editor.views.class.page(key);
     let selection = editor.selection.clone();
-    let row = RowName::new(ClassDef::TABLE, key);
     match page {
-        ClassPage::Tree => sidebar::inspector(editor, ui, "class", Some(row), |editor, ui| {
+        ClassPage::Tree => sidebar::inspector(editor, ui, "class", |editor, ui| {
             if selection.keys.first().is_some_and(|k| k == key) && node_of(&selection).is_some() {
                 inspect::show(editor, ui, &selection);
             } else {
                 sidebar::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
             }
         }),
-        ClassPage::Levels => sidebar::local_content(editor, ui, "class", row),
+        ClassPage::Levels => {}
     }
     egui::Frame::new()
         .inner_margin(ui::CONTENT_PADDING)
@@ -135,7 +131,7 @@ pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
 
 pub fn write(editor: &mut Editor, key: &str, label: &str, value: &Value) {
     let mut edit = ContentEdit::new(format!("{label} · {}/{key}", ClassDef::TABLE));
-    edit.write_json(row_file(ClassDef::TABLE, key), value);
+    edit.write_json(fields_file(key), value);
     editor.apply(edit);
 }
 

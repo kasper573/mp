@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentRow, row_file, row_holding, row_of};
+use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::script::{MayDo, NodeKind};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
@@ -16,7 +16,8 @@ use super::{ScriptDoc, ScriptPanel, ScriptPath, ScriptRef, ScriptRow, run};
 use crate::app::Editor;
 use crate::condition;
 use crate::project::RowSelection;
-use crate::tabs::EditorTab;
+use crate::project::files::content_of;
+use crate::tabs::{EditorTab, file_title};
 use crate::ui::{theme, widgets};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
@@ -41,8 +42,8 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
         return Vec::new();
     };
     let mut found: Vec<ScriptBinding> = Vec::new();
-    for usage in project.usages.of_row(ScriptDef::TABLE, &doc.at.key) {
-        let Some((table, row_key)) = row_holding(&usage.file) else {
+    for usage in project.usages.of_content(&doc.at.key) {
+        let Some((table, row_key)) = content_of(&usage.file) else {
             continue;
         };
         let Some(module) = ScriptRef::parse(&usage.pointer).module else {
@@ -67,7 +68,7 @@ pub fn owner_row(
     pointer: &str,
 ) -> Option<ScriptBinding> {
     let kind: RunnerKind = table.parse().ok()?;
-    let file = row_file(table, key);
+    let file = fields_file(key);
     let bound = |label: String, row: OwnerRow| ScriptBinding {
         label,
         row,
@@ -75,19 +76,22 @@ pub fn owner_row(
     };
     Some(match kind {
         RunnerKind::Area => {
-            let area = content.by_key::<AreaDef>(key)?;
-            match ScriptPath::parse(pointer).and_then(ScriptPath::object) {
+            let area = content.by_path::<AreaDef>(key)?;
+            match ScriptPath::parse(pointer)
+                .as_ref()
+                .and_then(ScriptPath::object)
+            {
                 Some(module) => {
                     let placed = area::placed(content, area);
                     let index = placed
                         .iter()
                         .position(|p| p.chain.is_empty() && p.origin == module)?;
                     let name = match &placed[index].module {
-                        AreaModule::Object(object) => object.title(index as u32),
+                        AreaModule::Object(object) => object.display_name(index as u32),
                         _ => "object".to_owned(),
                     };
                     bound(
-                        format!("area/{key} › {name}"),
+                        format!("{} › {name}", file_title(key)),
                         OwnerRow {
                             kind: RunnerKind::Object,
                             row: area.raw(),
@@ -106,7 +110,7 @@ pub fn owner_row(
             }
         }
         RunnerKind::Blueprint => {
-            let blueprint = content.by_key::<BlueprintDef>(key)?;
+            let blueprint = content.by_path::<BlueprintDef>(key)?;
             content.ids::<AreaDef>().find_map(|area| {
                 let ordinal = area::placements(content, area)
                     .iter()
@@ -114,7 +118,7 @@ pub fn owner_row(
                         placement.blueprint == blueprint && !placement.scripts.is_empty()
                     })?;
                 Some(bound(
-                    format!("blueprint/{key} in {} {ordinal}", area.key(content)),
+                    format!("blueprint/{key} in {} {ordinal}", area.path(content)),
                     OwnerRow {
                         kind: RunnerKind::Blueprint,
                         row: area.raw(),
@@ -323,7 +327,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .reaches
         .iter()
         .filter_map(|r| match r {
-            Reach::OpensShop(shop) => Some(format!("shop/{}", shop.key(content))),
+            Reach::OpensShop(shop) => Some(format!("shop/{}", shop.path(content))),
             _ => None,
         })
         .collect();
@@ -351,7 +355,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .filter_map(|r| match r {
             Reach::Warp(place) => Some(format!(
                 "the subject to area/{} · {} · sets its spawn point there",
-                place.area.key(content),
+                place.area.path(content),
                 place_coords(place)
             )),
             _ => None,
@@ -359,11 +363,11 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .collect();
     rows.push(MayRow::maybe("warps", &warps, "nowhere", " · "));
     let takes = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Takes(item) => Some(stack_text(doc, "take", item.key(content))),
+        Reach::Takes(item) => Some(stack_text(doc, "take", item.path(content))),
         _ => None,
     }));
     let gives = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Gives(item) => Some(stack_text(doc, "give", item.key(content))),
+        Reach::Gives(item) => Some(stack_text(doc, "give", item.path(content))),
         _ => None,
     }));
     if !takes.is_empty() || !gives.is_empty() {
@@ -387,7 +391,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         });
     }
     let drops = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Drops(item) => Some(item.key(content).to_owned()),
+        Reach::Drops(item) => Some(item.path(content).to_owned()),
         _ => None,
     }));
     if !drops.is_empty() {
@@ -397,7 +401,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         ));
     }
     let memories = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Remembers(memory) => Some(memory.key(content).to_owned()),
+        Reach::Remembers(memory) => Some(memory.path(content).to_owned()),
         _ => None,
     }));
     if !memories.is_empty() {
@@ -407,7 +411,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         ));
     }
     let notices = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Notifies(n) => Some(format!("notification/{}", n.key(content))),
+        Reach::Notifies(n) => Some(format!("notification/{}", n.path(content))),
         _ => None,
     }));
     if !notices.is_empty() {
@@ -424,7 +428,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             Reach::Decides(q) => ("decides a path of", q),
             _ => continue,
         };
-        let key = quest.key(content).to_owned();
+        let key = quest.path(content).to_owned();
         match quests.iter_mut().find(|(q, _)| *q == key) {
             Some((_, verbs)) => {
                 if !verbs.contains(&verb) {
@@ -450,7 +454,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         rows.push(MayRow::present("quests", text));
     }
     let npcs = unique(may.reaches.iter().filter_map(|reach| match reach {
-        Reach::Spawns(npc) => Some(format!("spawns npc/{}", npc.key(content))),
+        Reach::Spawns(npc) => Some(format!("spawns npc/{}", npc.path(content))),
         Reach::Hostile => Some("may turn hostile".to_owned()),
         Reach::Friendly => Some("may turn friendly".to_owned()),
         Reach::Despawns => Some("despawns".to_owned()),
@@ -463,15 +467,15 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let stats = unique(may.reaches.iter().filter_map(|reach| match reach {
         Reach::Heals => Some("heals".to_owned()),
-        Reach::Applies(effect) => Some(format!("applies {}", effect.key(content))),
+        Reach::Applies(effect) => Some(format!("applies {}", effect.path(content))),
         Reach::Cleanses => Some("removes statuses".to_owned()),
         Reach::Boosts(stat, _) => Some(format!("boosts {}", stat_name(*stat))),
         Reach::GrantsXp => Some("grants xp".to_owned()),
-        Reach::Casts(skill) => Some(format!("casts {}", skill.key(content))),
+        Reach::Casts(skill) => Some(format!("casts {}", skill.path(content))),
         Reach::ResetsSkills => Some("resets skills".to_owned()),
         Reach::Animates => Some("plays an action".to_owned()),
         Reach::ShowsVfx => Some("shows vfx".to_owned()),
-        Reach::Plays(sfx) => Some(format!("plays {}", sfx.key(content))),
+        Reach::Plays(sfx) => Some(format!("plays {}", sfx.path(content))),
         Reach::Says => Some("says a chat line".to_owned()),
         _ => None,
     }));
@@ -538,7 +542,7 @@ fn read_by_rows(content: &Content, may: &MayDo<RiftScripting>) -> Vec<(String, S
         _ => None,
     });
     if let Some(place) = warp {
-        let area = place.area.key(content);
+        let area = place.area.path(content);
         rows.push(("World map".to_owned(), format!("a route to {area}")));
         rows.push((
             "Area view".to_owned(),
@@ -550,7 +554,9 @@ fn read_by_rows(content: &Content, may: &MayDo<RiftScripting>) -> Vec<(String, S
         ));
     }
     let quests = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Offers(q) | Reach::Accepts(q) | Reach::TurnsIn(q) => Some(q.key(content).to_owned()),
+        Reach::Offers(q) | Reach::Accepts(q) | Reach::TurnsIn(q) => {
+            Some(q.path(content).to_owned())
+        }
         _ => None,
     }));
     if !quests.is_empty() {
@@ -564,7 +570,7 @@ fn read_by_rows(content: &Content, may: &MayDo<RiftScripting>) -> Vec<(String, S
         ));
     }
     let items = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.key(content).to_owned()),
+        Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.path(content).to_owned()),
         _ => None,
     }));
     if !items.is_empty() {
@@ -580,21 +586,21 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
     match reach {
         Reach::Warp(place) => format!(
             "warps to {} {}",
-            place.area.key(content),
+            place.area.path(content),
             place_coords(place)
         ),
-        Reach::Takes(item) => format!("takes {}", item.key(content)),
-        Reach::Gives(item) => format!("gives {}", item.key(content)),
-        Reach::Drops(item) => format!("drops {}", item.key(content)),
-        Reach::Offers(quest) => format!("offers quest {}", quest.key(content)),
-        Reach::Accepts(quest) => format!("accepts quest {}", quest.key(content)),
-        Reach::TurnsIn(quest) => format!("turns in quest {}", quest.key(content)),
-        Reach::Fails(quest) => format!("fails quest {}", quest.key(content)),
-        Reach::Completes(quest) => format!("completes a task of {}", quest.key(content)),
-        Reach::Decides(quest) => format!("decides a path of {}", quest.key(content)),
-        Reach::Remembers(memory) => format!("remembers {}", memory.key(content)),
-        Reach::OpensShop(shop) => format!("opens shop {}", shop.key(content)),
-        Reach::Spawns(npc) => format!("spawns {}", npc.key(content)),
+        Reach::Takes(item) => format!("takes {}", item.path(content)),
+        Reach::Gives(item) => format!("gives {}", item.path(content)),
+        Reach::Drops(item) => format!("drops {}", item.path(content)),
+        Reach::Offers(quest) => format!("offers quest {}", quest.path(content)),
+        Reach::Accepts(quest) => format!("accepts quest {}", quest.path(content)),
+        Reach::TurnsIn(quest) => format!("turns in quest {}", quest.path(content)),
+        Reach::Fails(quest) => format!("fails quest {}", quest.path(content)),
+        Reach::Completes(quest) => format!("completes a task of {}", quest.path(content)),
+        Reach::Decides(quest) => format!("decides a path of {}", quest.path(content)),
+        Reach::Remembers(memory) => format!("remembers {}", memory.path(content)),
+        Reach::OpensShop(shop) => format!("opens shop {}", shop.path(content)),
+        Reach::Spawns(npc) => format!("spawns {}", npc.path(content)),
         Reach::Hostile => "may turn hostile".to_owned(),
         Reach::Friendly => "may turn friendly".to_owned(),
         Reach::Despawns => "despawns".to_owned(),
@@ -602,18 +608,18 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
         Reach::Walks => "walks".to_owned(),
         Reach::Damages => "damages".to_owned(),
         Reach::Heals => "heals".to_owned(),
-        Reach::Applies(effect) => format!("applies {}", effect.key(content)),
+        Reach::Applies(effect) => format!("applies {}", effect.path(content)),
         Reach::Cleanses => "removes statuses".to_owned(),
         Reach::Boosts(stat, _) => format!("boosts {}", stat_name(*stat)),
         Reach::GrantsXp => "grants xp".to_owned(),
-        Reach::Casts(skill) => format!("casts {}", skill.key(content)),
+        Reach::Casts(skill) => format!("casts {}", skill.path(content)),
         Reach::ResetsSkills => "resets skills".to_owned(),
         Reach::Animates => "plays an action".to_owned(),
         Reach::ShowsVfx => "shows vfx".to_owned(),
-        Reach::Notifies(notification) => format!("notifies {}", notification.key(content)),
+        Reach::Notifies(notification) => format!("notifies {}", notification.path(content)),
         Reach::Says => "says".to_owned(),
-        Reach::Plays(sfx) => format!("plays {}", sfx.key(content)),
-        Reach::Speaks(npc) => format!("speaks as {}", npc.key(content)),
+        Reach::Plays(sfx) => format!("plays {}", sfx.path(content)),
+        Reach::Speaks(npc) => format!("speaks as {}", npc.path(content)),
     }
 }
 
@@ -638,15 +644,16 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         return;
     };
     let mut rows: Vec<NamedBy> = Vec::new();
-    for (file, pointers) in project.usages.files_naming(ScriptDef::TABLE, key) {
+    for (file, pointers) in project.usages.files_naming(key) {
         let row = project.files.json(&file);
-        let Some((table, row_key)) = row_of(&file) else {
+        let Some((table, row_key)) = content_of(&file) else {
             continue;
         };
         for pointer in pointers {
             let at = ScriptRef::parse(&pointer);
             let module_json = at
                 .module
+                .as_ref()
                 .and_then(|module| row.as_ref()?.pointer(&module.pointer()).cloned());
             let (name, what) = match at.node {
                 Some(node) => (node, "run node".to_owned()),
@@ -708,7 +715,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     open = Some(Open {
                         table: row.table.clone(),
                         key: row.key.clone(),
-                        module: row.module,
+                        module: row.module.clone(),
                     });
                 }
                 widgets::rule(ui);
@@ -748,7 +755,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             editor.select(RowSelection::parts(
                 &table,
                 &key,
-                vec![format!("/modules/{}", module.module())],
+                vec![module.module().to_owned()],
             ));
             editor.open_tab(EditorTab::Area { key });
         }
@@ -757,9 +764,10 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 }
 
 pub fn used_by_count(editor: &Editor, script: &ScriptRow) -> usize {
-    editor.project.as_ref().map_or(0, |project| {
-        project.usages.of_row(ScriptDef::TABLE, &script.key).len()
-    })
+    editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.usages.of_content(&script.key).len())
 }
 
 fn summarise_values(values: &Value) -> String {

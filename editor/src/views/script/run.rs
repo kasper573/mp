@@ -9,7 +9,7 @@ use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentRow, row_file, row_of};
+use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::math::Pos;
 use engine::core::script::{
     FlowSteering, NodeKind, Pause, RunnerKindDef, Value as ScriptValue, ValueType,
@@ -42,6 +42,7 @@ use super::panel::{ScriptBinding, bindings};
 use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::files::content_of;
 use crate::project::{ProjectFiles, RowSelection, catalogue_of};
 use crate::stage::live;
 use crate::tabs::EditorTab;
@@ -156,7 +157,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|content| {
             content
                 .ids::<CharacterSnapshot>()
-                .map(|id| (id.key(&content).to_owned(), id.get(&content).name.clone()))
+                .map(|id| (id.path(&content).to_owned(), id.get(&content).name.clone()))
                 .collect()
         })
         .unwrap_or_default();
@@ -316,7 +317,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     });
     editor.views.script.set_setup(&row_key, setup.clone());
     if let Some(file) = open_owner
-        && let Some((table, key)) = row_of(&file)
+        && let Some((table, key)) = content_of(&file)
     {
         editor.open_row(table, key);
     }
@@ -663,12 +664,12 @@ fn character_card(
     let classes: Vec<(ClassId, String)> = content
         .table::<ClassDef>()
         .ids()
-        .map(|id| (id, id.key(content).to_owned()))
+        .map(|id| (id, id.path(content).to_owned()))
         .collect();
     let tiers = class
         .map(|class| class.get(content).levels.len())
         .unwrap_or(0);
-    let area_key = run.area.key(content).to_owned();
+    let area_key = run.area.path(content).to_owned();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         widgets::card_title(ui, &name);
@@ -693,7 +694,7 @@ fn character_card(
         });
         widgets::kv(ui, "class", |ui| {
             let current = class
-                .map(|class| class.key(content).to_owned())
+                .map(|class| class.path(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
             let mut picked = class;
             widgets::combo("run-class")
@@ -729,7 +730,12 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
     let set: Vec<String> = run
         .world()
         .get::<Memory>(subject)
-        .map(|memory| memory.keys().map(|id| id.key(content).to_owned()).collect())
+        .map(|memory| {
+            memory
+                .keys()
+                .map(|id| id.path(content).to_owned())
+                .collect()
+        })
         .unwrap_or_default();
     let mut shown: Vec<String> = read.to_vec();
     for key in set.iter().chain(&run.watched.memories) {
@@ -737,7 +743,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
             shown.push(key.clone());
         }
     }
-    let all: Vec<String> = content.table::<MemoryDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<MemoryDef>().paths().to_vec();
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
@@ -746,7 +752,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
             ui.label(theme::muted("none set · unset reads as zero").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<MemoryDef>(key) else {
+            let Some(id) = content.by_path::<MemoryDef>(key) else {
                 continue;
             };
             let ty = id.get(content).ty;
@@ -839,7 +845,7 @@ fn quests_card(
             | Reach::TurnsIn(q)
             | Reach::Completes(q)
             | Reach::Decides(q)
-            | Reach::Fails(q) => Some(q.key(content).to_owned()),
+            | Reach::Fails(q) => Some(q.path(content).to_owned()),
             _ => None,
         })
         .collect();
@@ -847,15 +853,19 @@ fn quests_card(
     for key in log
         .active
         .iter()
-        .map(|a| a.quest.key(content).to_owned())
-        .chain(log.finished.iter().map(|f| f.quest.key(content).to_owned()))
+        .map(|a| a.quest.path(content).to_owned())
+        .chain(
+            log.finished
+                .iter()
+                .map(|f| f.quest.path(content).to_owned()),
+        )
         .chain(run.watched.quests.iter().cloned())
     {
         if !shown.contains(&key) {
             shown.push(key);
         }
     }
-    let all: Vec<String> = content.table::<QuestDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<QuestDef>().paths().to_vec();
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
@@ -864,7 +874,7 @@ fn quests_card(
             ui.label(theme::muted("none taken").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<QuestDef>(key) else {
+            let Some(id) = content.by_path::<QuestDef>(key) else {
                 continue;
             };
             let standing = Standing::of_log(&log, id);
@@ -908,21 +918,21 @@ fn bag_card(
     let mut shown: Vec<String> = reaches
         .iter()
         .filter_map(|reach| match reach {
-            Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.key(content).to_owned()),
+            Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.path(content).to_owned()),
             _ => None,
         })
         .collect();
     shown.dedup();
     for key in held
         .iter()
-        .map(|stack| stack.item.key(content).to_owned())
+        .map(|stack| stack.item.path(content).to_owned())
         .chain(run.watched.items.iter().cloned())
     {
         if !shown.contains(&key) {
             shown.push(key);
         }
     }
-    let all: Vec<String> = content.table::<ItemDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<ItemDef>().paths().to_vec();
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
@@ -931,7 +941,7 @@ fn bag_card(
             ui.label(theme::muted("empty").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<ItemDef>(key) else {
+            let Some(id) = content.by_path::<ItemDef>(key) else {
                 continue;
             };
             let count = held
@@ -1195,7 +1205,7 @@ fn snapshot_for(
         ));
     };
     let json = files
-        .json_owned(&row_file(CharacterSnapshot::TABLE, key))
+        .json_owned(&fields_file(key))
         .ok_or_else(|| format!("no test character {key}"))?;
     value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
 }

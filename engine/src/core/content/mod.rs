@@ -17,8 +17,8 @@ pub mod version;
 pub use bundle::{Bundle, PartSpec, Parts};
 pub use check::RowCheck;
 pub use files::{
-    CONFIG_FILE, FIXTURES_DIR, GameFile, GameFiles, SETTINGS_FILE, Shape, bundle_of, content_path,
-    fields_file, name_of, parent_of, table_of, valid_name,
+    CONFIG_FILE, FIXTURES_DIR, GameFile, GameFiles, NOTE_EXTENSION, SETTINGS_FILE, Shape,
+    bundle_of, content_path, fields_file, name_of, numbered, parent_of, table_of, valid_name,
 };
 pub use fixture::Fixture;
 pub use id::{ContentId, ContentScope, with_content};

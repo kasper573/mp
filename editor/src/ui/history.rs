@@ -2,13 +2,13 @@ use std::time::SystemTime;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Align2, FontId, Sense, Ui};
-use engine::core::content::row_of;
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::FileBytes;
+use crate::project::files::content_of;
 use crate::project::history::EditStep;
 
 const ROW: f32 = 28.0;
@@ -208,7 +208,7 @@ fn step_card(editor: &Editor, ui: &mut Ui) {
     for change in &step.after {
         let before = step.before.iter().find(|b| b.file == change.file);
         ui.horizontal(|ui| {
-            let name = row_of(&change.file)
+            let name = content_of(&change.file)
                 .map(|(table, key)| format!("{table}/{key}"))
                 .unwrap_or_else(|| change.file.clone());
             ui.label(theme::mono(name).size(13.0));

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use design_tokens::ink::{self, Ground};
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::text::{TextMotion, TextVoice};
 use engine::systems::input::map::InputDef;
 use engine::systems::text::Ink;

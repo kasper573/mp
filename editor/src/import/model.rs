@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::actor::{Action, ModelDef};
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
@@ -517,13 +517,9 @@ pub fn build(
             .expect("an object")
             .insert(strip.direction.clone(), values);
     }
-    let image = row
-        .and_then(|row| row["sprites"]["image"].as_str())
-        .map(str::to_owned)
-        .unwrap_or_else(|| super::asset_name("models", key));
+    let image = crate::parts::model_sprites(key);
     let mut row = row.cloned().unwrap_or_else(|| json!({}));
     row["sprites"] = json!({
-        "image": image,
         "frame_size": { "width": fw, "height": fh },
         "actions": Value::Object(actions),
     });

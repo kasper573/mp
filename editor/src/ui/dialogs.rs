@@ -4,26 +4,20 @@ use design_tokens::face::TextRole;
 use design_tokens::glyph::{self, Mark};
 use design_tokens::sheet;
 use egui::{Context, RichText, Ui};
-use engine::core::content::{
-    ASSETS_DIR, ContentRow, GAME_FILE, RowName, TABLES_DIR, is_asset_file, row_file, row_of,
-    version,
-};
+use engine::core::content::{ContentFile, SETTINGS_FILE, fields_file, version};
 use engine::systems::area::AreaDef;
 use engine::systems::player::PlayerDef;
 use engine::systems::script::ScriptDef;
 use strum::VariantArray;
 
-use super::{folder_dialogs, move_dialogs, theme, unused_dialog, widgets};
-use crate::app::{
-    CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, RenameDialog,
-    RenameTarget,
-};
+use super::{theme, unused_dialog, widgets};
+use crate::app::{CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource};
 use crate::keymap::{EditorKey, KeyScope};
 use crate::project::{ContentEdit, files};
-use crate::rows::{self, UsageDecision, UsageSummary};
+use crate::rows::{self, UsageDecision};
 use crate::templates::{self, GameTemplate};
 use crate::ui::{self, start};
-use crate::views::area::{self, layers, pick, resize};
+use crate::views::area::{pick, resize};
 use crate::views::script;
 use crate::views::world;
 use crate::{import, play};
@@ -154,7 +148,9 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                         .unwrap_or_default();
                     dialog.folder = base.join(start::slug(&dialog.name)).display().to_string();
                 }
-                ui.label(theme::muted(format!("written into the new {GAME_FILE}")));
+                ui.label(theme::muted(format!(
+                    "written into the new {SETTINGS_FILE}"
+                )));
             });
             widgets::kv(ui, "folder", |ui| {
                 if ui
@@ -184,39 +180,20 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                         ui.set_width(300.0);
                         widgets::section(ui, "Copied");
                         let files = files::content_files(source).unwrap_or_default();
-                        let rows = files.iter().filter(|file| row_of(file).is_some()).count();
-                        let assets = files.iter().filter(|file| is_asset_file(file)).count();
-                        ui.label(theme::mono(format!("{GAME_FILE}   name → {}", dialog.name)));
-                        ui.label(theme::mono(format!("{TABLES_DIR}/     {rows} rows")));
-                        ui.label(theme::mono(format!("{ASSETS_DIR}/     {assets} files")));
+                        ui.label(theme::mono(format!(
+                            "{SETTINGS_FILE}   name → {}",
+                            dialog.name
+                        )));
+                        ui.label(theme::mono(format!(
+                            "every other file · {}",
+                            files.len() - 1
+                        )));
                     });
                     ui.vertical(|ui| {
                         widgets::section(ui, "Stays behind");
-                        let mut others: Vec<String> = std::fs::read_dir(source)
-                            .map(|entries| {
-                                entries
-                                    .flatten()
-                                    .filter_map(|entry| {
-                                        let name = entry.file_name().to_string_lossy().into_owned();
-                                        (!matches!(name.as_str(), GAME_FILE | "tables" | "assets"))
-                                            .then(|| {
-                                                if entry.path().is_dir() {
-                                                    format!("{name}/")
-                                                } else {
-                                                    name.clone()
-                                                }
-                                            })
-                                    })
-                                    .collect()
-                            })
-                            .unwrap_or_default();
-                        others.sort();
-                        if others.is_empty() {
-                            ui.label(theme::muted("nothing"));
-                        }
-                        for other in others {
-                            ui.label(theme::muted(other).monospace());
-                        }
+                        ui.label(theme::muted(
+                            "files and folders whose names start with a dot",
+                        ));
                     });
                 });
                 ui.add_space(6.0);
@@ -376,11 +353,11 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
         ui.set_width(560.0);
         widgets::kv(ui, "name", |ui| {
             ui.label(theme::strong(&template.name));
-            ui.label(theme::muted(format!("from {GAME_FILE}")));
+            ui.label(theme::muted(format!("from {SETTINGS_FILE}")));
         });
         widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
         widgets::kv(ui, "holds", |ui| {
-            let mut parts: Vec<String> = vec![GAME_FILE.to_owned(), "every fixture".to_owned()];
+            let mut parts: Vec<String> = vec![SETTINGS_FILE.to_owned(), "every fixture".to_owned()];
             for (table, keys) in &template.rows {
                 let own: Vec<&str> = keys
                     .iter()
@@ -394,159 +371,6 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
             ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
         });
     });
-}
-
-fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Option<ModalDialog> {
-    let mut outcome = None;
-    let mut pressed = DialogKeys::default();
-    let groups: Vec<UsageSummary> = match (&dialog.target, &editor.project) {
-        (RenameTarget::Row { table, key }, Some(project)) => {
-            rows::usage_groups(project, table, key)
-        }
-        _ => Vec::new(),
-    };
-    let rows: usize = groups.iter().map(|group| group.keys.len()).sum();
-    let title = match &dialog.target {
-        RenameTarget::Row { table, key } => format!("Rename {table}/{key}"),
-        RenameTarget::Layer { area, layer } => format!("Rename layer {layer} of {area}"),
-        RenameTarget::Folder { table, folder } => format!("Rename folder {folder} of {table}"),
-    };
-    card(ctx, "rename", 600.0, |ui| {
-        pressed = keys(ui);
-        ui.label(RichText::new(title).strong().size(18.0));
-        ui.add_space(8.0);
-        let response = ui.add(
-            egui::TextEdit::singleline(&mut dialog.draft)
-                .desired_width(f32::INFINITY)
-                .font(egui::TextStyle::Monospace),
-        );
-        widgets::default_focus(ui, &response);
-        ui.add_space(6.0);
-        if let RenameTarget::Layer { .. } = &dialog.target {
-            ui.label(theme::muted(
-                "The layer's grid file and every palette entry naming it change as one undo step.",
-            ));
-        } else if let RenameTarget::Folder { .. } = &dialog.target {
-            ui.label(theme::muted(
-                "The rows and folders in it move with it, as one undo step. Keys and files stay \
-                 as they are.",
-            ));
-        } else if let RenameTarget::Row { table, key } = &dialog.target {
-            ui.label(theme::muted(if rows == 0 {
-                "Nothing names it. Only the file changes.".to_owned()
-            } else {
-                format!(
-                    "{rows} row{} name it. The file and those rows change as one undo step.",
-                    widgets::plural(rows)
-                )
-            }));
-            if !groups.is_empty() {
-                ui.add_space(4.0);
-                egui::Frame::new()
-                    .fill(theme::INPUT)
-                    .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                    .corner_radius(4.0)
-                    .inner_margin(10.0)
-                    .show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(
-                            theme::mono(format!(
-                                "{}  →  {}.json",
-                                row_file(table, key),
-                                dialog.draft.trim()
-                            ))
-                            .color(theme::CODE),
-                        );
-                        for group in &groups {
-                            let shown: Vec<&str> =
-                                group.keys.iter().take(4).map(String::as_str).collect();
-                            let more = if group.keys.len() > 4 { ", …" } else { "" };
-                            ui.horizontal(|ui| {
-                                ui.label(theme::code(format!("{} · {}", group.table, group.field)));
-                                ui.label(
-                                    theme::mono(format!(
-                                        "{} · {}{more}",
-                                        group.keys.len(),
-                                        shown.join(", ")
-                                    ))
-                                    .color(theme::MUTED),
-                                );
-                            });
-                        }
-                    });
-            }
-            let prefixed = editor.project.as_ref().map_or_else(Vec::new, |project| {
-                rows::prefixed_local_keys(
-                    &project.files,
-                    &RowName::new(table, key),
-                    dialog.draft.trim(),
-                )
-            });
-            if let Some((first, to)) = prefixed.first() {
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.checkbox(
-                        &mut dialog.local_keys,
-                        format!("Also rename local keys that start with {key}_"),
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(
-                            theme::mono(format!("{} → {to} · {}", first.key, prefixed.len()))
-                                .color(theme::MUTED)
-                                .size(12.5),
-                        );
-                    });
-                });
-            }
-        }
-        if let Some(error) = &dialog.error {
-            ui.colored_label(theme::DANGER, error);
-        }
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            let label = if !matches!(dialog.target, RenameTarget::Row { .. }) || rows == 0 {
-                "Rename".to_owned()
-            } else {
-                format!("Rename and update {rows} row{}", widgets::plural(rows))
-            };
-            if widgets::primary(ui, &label).clicked() {
-                outcome = Some(true);
-            }
-            if ui.button("Cancel").clicked() {
-                outcome = Some(false);
-            }
-        });
-    });
-    if pressed.enter {
-        outcome = Some(true);
-    }
-    if pressed.escape {
-        outcome = Some(false);
-    }
-    match outcome {
-        Some(true) => {
-            let renamed = match &dialog.target {
-                RenameTarget::Layer { area, layer } => {
-                    layers::rename_layer(editor, area, layer, dialog.draft.trim())
-                }
-                RenameTarget::Row { table, key } => {
-                    rows::rename(editor, table, key, dialog.draft.trim(), dialog.local_keys)
-                }
-                RenameTarget::Folder { table, folder } => {
-                    folder_dialogs::rename(editor, table, folder, dialog.draft.trim())
-                }
-            };
-            match renamed {
-                Ok(()) => None,
-                Err(error) => {
-                    dialog.error = Some(error);
-                    Some(ModalDialog::Rename(dialog))
-                }
-            }
-        }
-        Some(false) => None,
-        None => Some(ModalDialog::Rename(dialog)),
-    }
 }
 
 fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalDialog> {
@@ -642,9 +466,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::NewGame(dialog) => new_game(editor, ctx, dialog),
         ModalDialog::Conflicts(mut conflicts) => {
             let conflict = conflicts.first().cloned()?;
-            let name = row_of(&conflict.file)
-                .map(|(table, key)| format!("{table}/{key}"))
-                .unwrap_or_else(|| conflict.file.clone());
+            let name = conflict.file.clone();
             let disk_text = conflict
                 .disk
                 .as_ref()
@@ -777,7 +599,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             }
             (!conflicts.is_empty()).then_some(ModalDialog::Conflicts(conflicts))
         }
-        ModalDialog::Rename(dialog) => rename(editor, ctx, dialog),
         ModalDialog::Delete(mut dialog) => {
             let mut outcome = None;
             let mut pressed = DialogKeys::default();
@@ -786,13 +607,9 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 ui.horizontal(|ui| {
                     glyph::show(ui, Mark::Cross, 16.0, theme::DANGER);
                     ui.label(
-                        RichText::new(format!(
-                            "Delete {}/{}",
-                            dialog.table,
-                            dialog.keys.join(", ")
-                        ))
-                        .strong()
-                        .size(18.0),
+                        RichText::new(rows::delete_title(&dialog))
+                            .strong()
+                            .size(18.0),
                     );
                 });
                 ui.add_space(4.0);
@@ -811,11 +628,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                         .filter(|group| group.decision == UsageDecision::Unpack)
                         .map(|group| group.usages.len())
                         .sum();
-                    let deleted = dialog.keys.len() + dialog.along.len();
-                    let label = if edits == 0 && dialog.along.is_empty() {
+                    let deleted = dialog.gone.len();
+                    let label = if edits == 0 && deleted <= 1 {
                         "Delete".to_owned()
                     } else if edits == 0 {
-                        format!("Delete {deleted} rows")
+                        format!("Delete {deleted} files")
                     } else if unpacked == edits {
                         format!(
                             "Delete and unpack {edits} placement{}",
@@ -849,42 +666,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 None => Some(ModalDialog::Delete(dialog)),
             }
         }
-        ModalDialog::Duplicate(dialog) => move_dialogs::duplicate_dialog(editor, ctx, dialog),
-        ModalDialog::MakeLocal(dialog) => move_dialogs::make_local_dialog(editor, ctx, dialog),
-        ModalDialog::MakeGlobal(dialog) => move_dialogs::make_global_dialog(editor, ctx, dialog),
-        ModalDialog::MoveTo(dialog) => move_dialogs::move_to_dialog(editor, ctx, dialog),
-        ModalDialog::Gather(dialog) => move_dialogs::gather_dialog(editor, ctx, dialog),
         ModalDialog::FindUnused(dialog) => unused_dialog::find_unused_dialog(editor, ctx, dialog),
-        ModalDialog::NewFolder(dialog) => folder_dialogs::new_folder_dialog(editor, ctx, dialog),
-        ModalDialog::NewRow(mut dialog) => {
-            let mut outcome = None;
-            let title = match &dialog.owner {
-                Some(owner) => format!("New local {} in {owner}", dialog.table),
-                None => format!("New {}", dialog.table),
-            };
-            window(ctx, &title, |ui| {
-                rows::new_row_body(editor, ui, &mut dialog);
-                ui.horizontal(|ui| {
-                    if ui.button("Create").clicked() {
-                        outcome = Some(true);
-                    }
-                    if ui.button("Cancel").clicked() {
-                        outcome = Some(false);
-                    }
-                });
-            });
-            match outcome {
-                Some(true) => match rows::create(editor, &dialog) {
-                    Ok(()) => None,
-                    Err(error) => {
-                        dialog.error = Some(error);
-                        Some(ModalDialog::NewRow(dialog))
-                    }
-                },
-                Some(false) => None,
-                None => Some(ModalDialog::NewRow(dialog)),
-            }
-        }
         ModalDialog::Binaries => {
             let mut open = true;
             card(ctx, "binaries", 560.0, |ui| {
@@ -936,9 +718,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             });
             (open && !pressed.escape).then_some(ModalDialog::Keys)
         }
-        ModalDialog::MakeBlueprint(dialog) => {
-            area::make_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::MakeBlueprint)
-        }
         ModalDialog::Resize(dialog) => {
             resize::resize_dialog(editor, ctx, dialog).map(ModalDialog::Resize)
         }
@@ -958,16 +737,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             let mut outcome = None;
             window(ctx, &dialog.title, |ui| {
                 let keys: Vec<String> = if dialog.options.is_empty() {
-                    let reader = dialog.then.reader();
                     editor
                         .project
                         .as_ref()
-                        .map(|p| {
-                            p.files
-                                .keys_in_reach(&dialog.table, Some(&reader))
-                                .map(str::to_owned)
-                                .collect()
-                        })
+                        .map(|p| p.files.paths_of(&dialog.table))
                         .unwrap_or_default()
                 } else {
                     dialog.options.clone()
@@ -1025,14 +798,13 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
             index,
             module,
         } => {
-            if let Some(mut value) = editor.row_value(&table, &key) {
+            if let Some(mut value) = editor.row_value(&key) {
                 value["modules"][index] = module;
                 let mut edit = ContentEdit::new(format!("Replace module {index} of {table}/{key}"));
-                edit.write_json(row_file(&table, &key), &value);
+                edit.write_json(fields_file(&key), &value);
                 editor.apply(edit);
             }
         }
-        ConfirmAction::RemoveLayer { area, layer } => area::remove_layer(editor, &area, &layer),
         ConfirmAction::DeleteScriptNodes { script, names } => {
             script::delete_nodes_now(editor, &script, names)
         }
@@ -1066,3 +838,24 @@ fn key_sheet_columns() -> Vec<Vec<KeyScope>> {
 }
 
 const KEY_SHEET_COLUMNS: usize = 3;
+
+pub(super) fn title(ui: &mut Ui, text: &str) {
+    ui.label(RichText::new(text).strong().size(18.0));
+    ui.add_space(8.0);
+}
+
+pub(super) fn error_line(ui: &mut Ui, error: &Option<String>) {
+    if let Some(error) = error {
+        ui.colored_label(theme::DANGER, error);
+    }
+}
+
+pub(super) fn answer(outcome: Option<bool>, pressed: &DialogKeys) -> Option<bool> {
+    if pressed.escape {
+        Some(false)
+    } else if pressed.enter {
+        Some(true)
+    } else {
+        outcome
+    }
+}

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, ModuleRule, RowName, row_file};
+use engine::core::content::{ContentFile, ModuleRule, fields_file};
 use engine::core::vfx::VfxShaderDef;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::AreaDef;
@@ -36,7 +36,7 @@ use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
-use crate::rows::new_row_into;
+use crate::rows::new_file_into;
 use crate::ui::browser::{self, RowMenu};
 use crate::value::RowValue;
 use crate::views::{class, model, skill, tileset, vfx};
@@ -102,8 +102,8 @@ pub fn show_row(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
 }
 
 fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool) {
-    let file = row_file(table, key);
-    let Some(mut value) = editor.row_value(table, key) else {
+    let file = fields_file(key);
+    let Some(mut value) = editor.row_value(key) else {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
@@ -248,11 +248,10 @@ fn row_card(
     let mut changed = FormChange::default();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        let owners = cx.files.owners();
-        let mut open_owner = None;
+        let mut open_folder = None;
         widgets::card_header_with(
             ui,
-            |ui| open_owner = breadcrumb::show(ui, &owners, table, key),
+            |ui| open_folder = breadcrumb::show(ui, key),
             if fixture { "fixture" } else { "" },
             |ui| {
                 if ui.button("Copy as JSON").clicked() {
@@ -260,17 +259,14 @@ fn row_card(
                         .copy_text(serde_json::to_string_pretty(&*value).unwrap_or_default());
                     ui.close();
                 }
-                let menu = RowMenu::of(cx.files, cx.usages, fixture, &RowName::new(table, key));
+                let menu = RowMenu::of(key);
                 if let Some(action) = browser::row_menu(ui, &menu, false) {
                     cx.actions.push(FormAction::RowAction(action));
                 }
             },
         );
-        if let Some(owner) = open_owner {
-            cx.actions.push(FormAction::OpenRow {
-                table: owner.table,
-                key: owner.key,
-            });
+        if let Some(folder) = open_folder {
+            cx.actions.push(FormAction::Reveal { path: folder });
         }
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
@@ -674,7 +670,7 @@ pub fn with_row_form(
     key: &str,
     show: impl FnOnce(&mut FormCx) -> bool,
 ) -> bool {
-    let Some(root) = editor.row_value(table, key) else {
+    let Some(root) = editor.row_value(key) else {
         return false;
     };
     editor
@@ -690,7 +686,7 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         FormAction::OpenNode { .. } => {}
         FormAction::PickPlace { path } => {
             editor.pick = Some(PlacePick {
-                file: row_file(table, key),
+                file: fields_file(key),
                 pointer: path,
                 area: None,
             });
@@ -702,16 +698,13 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         FormAction::NewRow {
             table: into_table,
             path,
-            owner,
         } => {
-            new_row_into(
-                editor,
-                &into_table,
-                owner,
-                Some((row_file(table, key), path)),
-            );
+            if let Err(error) = new_file_into(editor, &into_table, &fields_file(key), &path) {
+                editor.toast(error);
+            }
         }
         FormAction::RowAction(action) => browser::act(editor, table, key, action),
+        FormAction::Reveal { path } => crate::ui::content_tree::reveal(editor, &path),
     }
 }
 

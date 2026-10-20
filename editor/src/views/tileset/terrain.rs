@@ -484,11 +484,11 @@ fn add_set(
     tileset: &OpenTileset,
     dialog: &NewTerrainSetDialog,
 ) -> Result<(), String> {
-    let set = rows::key_from_name(&dialog.name);
+    let set = rows::name_from(&dialog.name);
     let terrains: Vec<String> = dialog
         .terrains
         .split(',')
-        .map(rows::key_from_name)
+        .map(rows::name_from)
         .filter(|terrain| !terrain.is_empty())
         .collect();
     if set.is_empty() {

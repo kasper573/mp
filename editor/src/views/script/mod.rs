@@ -12,7 +12,7 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use engine::core::content::{ContentRow, OWNER_FIELD, RowName, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::core::script::RunnerKindDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{RunnerKind, ScriptDef};
@@ -23,51 +23,55 @@ use serde_json::{Map, Value};
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
 use crate::keymap::EditorKey;
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, Project, RowSelection, catalogue_of};
+use crate::scene_graph;
 use crate::tabs::{DockRequest, EditorTab};
 use crate::thumbs;
 use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
 use crate::value::RowValue;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Where in its file a module that runs a script is: a module by its pointer, the place of a
+/// module in a list of modules or of a node in a scene, or one of an object's scripts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ScriptPath {
-    Module(usize),
-    ObjectScript { object: usize, script: usize },
+    Module(String),
+    ObjectScript { object: String, script: usize },
 }
 
 impl ScriptPath {
     pub fn parse(pointer: &str) -> Option<ScriptPath> {
-        let rest = pointer.strip_prefix("/modules/")?;
-        let mut parts = rest.split('/');
-        let module = parts.next()?.parse().ok()?;
-        if parts.next() != Some("scripts") {
+        let module = scene_graph::module_pointer(pointer)?;
+        let rest = &pointer[module.len()..];
+        let Some(script) = rest
+            .strip_prefix("/scripts/")
+            .and_then(|rest| rest.split('/').next())
+            .and_then(|index| index.parse().ok())
+        else {
             return Some(ScriptPath::Module(module));
-        }
-        let script = parts.next()?.parse().ok()?;
+        };
         Some(ScriptPath::ObjectScript {
             object: module,
             script,
         })
     }
 
-    pub fn pointer(self) -> String {
+    pub fn pointer(&self) -> String {
         match self {
-            ScriptPath::Module(module) => format!("/modules/{module}"),
-            ScriptPath::ObjectScript { object, script } => {
-                format!("/modules/{object}/scripts/{script}")
-            }
+            ScriptPath::Module(module) => module.clone(),
+            ScriptPath::ObjectScript { object, script } => format!("{object}/scripts/{script}"),
         }
     }
 
-    pub fn object(self) -> Option<usize> {
+    pub fn object(&self) -> Option<&str> {
         match self {
             ScriptPath::Module(_) => None,
             ScriptPath::ObjectScript { object, .. } => Some(object),
         }
     }
 
-    pub fn module(self) -> usize {
+    pub fn module(&self) -> &str {
         match self {
             ScriptPath::Module(module) | ScriptPath::ObjectScript { object: module, .. } => module,
         }
@@ -102,7 +106,7 @@ impl ScriptRow {
     }
 
     pub fn title(&self) -> String {
-        format!("{}/{}", ScriptDef::TABLE, self.key)
+        crate::tabs::file_title(&self.key).to_owned()
     }
 
     pub fn row(&self) -> (String, String) {
@@ -110,15 +114,11 @@ impl ScriptRow {
     }
 
     pub fn file(&self) -> String {
-        row_file(ScriptDef::TABLE, &self.key)
+        fields_file(&self.key)
     }
 
     pub fn slug(&self) -> String {
         format!("script-{}", self.key)
-    }
-
-    pub fn renamed(&self, table: &str, key: &str, new_key: &str) -> Option<ScriptRow> {
-        self.is_row(table, key).then(|| ScriptRow::new(new_key))
     }
 
     pub fn is_row(&self, table: &str, key: &str) -> bool {
@@ -132,18 +132,34 @@ pub struct ScriptDoc {
     pub file: String,
     pub script: Value,
     pub kind: RunnerKind,
+    /// The one npc that names the script, who speaks its lines unless a line says otherwise.
+    pub speaker: Option<String>,
 }
 
 impl ScriptDoc {
     pub fn load(editor: &Editor, at: &ScriptRow) -> Option<ScriptDoc> {
-        let script = editor.row_value(ScriptDef::TABLE, &at.key)?;
+        let script = editor.row_value(&at.key)?;
         if !script.is_object() || !script["nodes"].is_object() {
             return None;
         }
+        let project = editor.project.as_ref()?;
+        let mut npcs: Vec<&str> = project
+            .usages
+            .of_content(&at.key)
+            .iter()
+            .filter_map(|usage| content_of(&usage.file))
+            .filter(|(table, _)| *table == NpcDef::TABLE)
+            .map(|(_, npc)| npc)
+            .collect();
+        npcs.dedup();
         Some(ScriptDoc {
             at: at.clone(),
             file: at.file(),
             kind: script.text("runs_on").parse().unwrap_or(RunnerKind::Any),
+            speaker: match npcs.as_slice() {
+                [npc] => Some((*npc).to_owned()),
+                _ => None,
+            },
             script,
         })
     }
@@ -152,14 +168,10 @@ impl ScriptDoc {
         self.script["nodes"].as_object().expect("a nodes map")
     }
 
-    pub fn owner(&self) -> Option<RowName> {
-        serde_json::from_value(self.script[OWNER_FIELD].clone()).ok()
-    }
-
     pub fn default_speaker(&self) -> LineSpeaker {
-        match (self.kind, self.owner()) {
-            (RunnerKind::Npc, Some(owner)) if owner.table == NpcDef::TABLE => LineSpeaker::Npc {
-                npc: owner.key,
+        match (self.kind, &self.speaker) {
+            (RunnerKind::Npc, Some(npc)) => LineSpeaker::Npc {
+                npc: npc.clone(),
                 face: None,
             },
             (RunnerKind::Object, _) => LineSpeaker::Object,
@@ -503,8 +515,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
     } else {
         RowSelection::row(&table, &key)
     };
-    let row = RowName::new(ScriptDef::TABLE, &at.key);
-    sidebar::inspector(editor, ui, "script", Some(row), |editor, ui| {
+    sidebar::inspector(editor, ui, "script", |editor, ui| {
         inspect::show(editor, ui, &doc, &selection)
     });
     egui::CentralPanel::default()
@@ -725,9 +736,6 @@ pub fn chip_title(editor: &Editor, doc: &ScriptDoc) -> String {
         doc.kind.name(),
         widgets::plural(count)
     );
-    if let Some(owner) = doc.owner() {
-        text.push_str(&format!(" · local to {owner}"));
-    }
     if editor.shapes.is_fixture(ScriptDef::TABLE, &doc.at.key) {
         text.push_str(" · from New Game");
     }
@@ -1238,8 +1246,7 @@ pub fn add_node(
         node["lines"] = serde_json::json!([doc.default_speaker().blank_line()]);
     }
     if let (Some(schema), Some(project)) = (nodes::node_schema(root), editor.project.as_ref()) {
-        let reader = RowName::new(ScriptDef::TABLE, &doc.at.key);
-        nodes::fill_references(root, schema, &mut node, &project.files, &reader);
+        nodes::fill_references(root, schema, &mut node, &project.files);
     }
     if nodes::is_event(&node) {
         let catalogue = catalogue_of(editor.project.as_ref());

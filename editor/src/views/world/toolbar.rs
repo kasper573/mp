@@ -1,6 +1,6 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::quest::QuestDef;
@@ -207,7 +207,7 @@ fn results(
         QuestDef::TABLE,
         ShopDef::TABLE,
     ] {
-        let Some(keys) = map.content.table_named(table).map(|rows| rows.keys()) else {
+        let Some(keys) = map.content.table_named(table).map(|rows| rows.paths()) else {
             continue;
         };
         rows.extend(

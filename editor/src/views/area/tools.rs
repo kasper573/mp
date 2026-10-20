@@ -1,23 +1,21 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::{AreaDef, AreaModuleKind};
+use engine::systems::area::AreaModuleKind;
 use strum::VariantArray;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
-use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
+use super::modules::{context_menu_at, open_add_menu, show_add_menu};
 use super::select::{
     copy_selection, delete_selection, duplicate_selection, move_selection, paste_anchor,
-    paste_in_place, select_input, selected_indices, snapped_delta, start_paste,
+    paste_in_place, select_input, selected_nodes, snapped_delta, start_paste,
 };
 use super::{
-    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, placement, scenery, shapes,
+    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, nodes, placement, shapes,
     stamp,
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::RowSelection;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
@@ -225,8 +223,8 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             if let Some(tile) = frame.pointer_tile {
                 let alt = painter.ctx().input(|i| EditorKey::Unsnapped.held(i));
                 let (dx, dy) = snapped_delta(*from, tile, alt);
-                for index in selected_indices(editor, &frame.area_key) {
-                    if let Some(bounds) = frame.module_bounds(index) {
+                for node in selected_nodes(editor, frame) {
+                    if let Some(bounds) = frame.module_bounds(&node) {
                         let moved = bounds.translate(Offset::new(dx, dy));
                         painter.rect_stroke(
                             canvas.rect(moved),
@@ -434,17 +432,13 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             }
             AreaTool::Stamp => stamp::flip_stamp(editor, view_key, horizontal),
             _ => {
-                let indices = selected_indices(editor, &frame.area_key);
-                if !indices.is_empty() {
-                    change_modules(editor, &frame.area_key, |modules| {
-                        for &index in &indices {
-                            shapes::flip_field(modules.get_mut(index)?, horizontal);
+                let flipped = selected_nodes(editor, frame);
+                if !flipped.is_empty() {
+                    nodes::change_scene(editor, &frame.area_key, |scene| {
+                        for node in &flipped {
+                            shapes::flip_field(scene.pointer_mut(node)?, horizontal);
                         }
-                        Some(format!(
-                            "Flip {} modules in {}",
-                            indices.len(),
-                            frame.area_key
-                        ))
+                        Some(format!("Flip {} modules", flipped.len()))
                     });
                 }
             }
@@ -458,11 +452,13 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         }
         return;
     }
-    if pressed(EditorKey::Confirm) {
-        let indices = selected_indices(editor, &frame.area_key);
-        if indices.len() == 1 && frame.modules[indices[0]].is_module(AreaModuleKind::Blueprint) {
-            placement::edit_in_place(editor, view_key, frame, indices[0]);
-        }
+    if pressed(EditorKey::Confirm)
+        && let [node] = selected_nodes(editor, frame).as_slice()
+        && frame
+            .module(node)
+            .is_some_and(|module| module.is_module(AreaModuleKind::Blueprint))
+    {
+        placement::edit_in_place(editor, view_key, frame, node);
     }
     if pressed(EditorKey::Delete) {
         delete_selection(editor, frame);
@@ -492,9 +488,6 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     if pressed(EditorKey::Duplicate) {
         duplicate_selection(editor, frame);
     }
-    if pressed(EditorKey::JoinScenery) {
-        scenery::join_scenery(editor, frame);
-    }
     if pressed(EditorKey::MakeBlueprint) {
         blueprint::make_blueprint_from_selection(editor, frame);
     }
@@ -504,7 +497,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         } else {
             1.0
         };
-        if !editor.selection.parts.is_empty() && editor.selection.table == AreaDef::TABLE {
+        if !editor.selection.parts.is_empty() {
             move_selection(editor, frame, x as f32 * step, y as f32 * step);
         } else {
             let view = editor.views.area.view_mut(view_key);
@@ -517,11 +510,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     {
         let tile = cursor.center();
         if let Some(hit) = frame.hit(tile) {
-            editor.selection = RowSelection {
-                table: AreaDef::TABLE.to_owned(),
-                keys: vec![frame.area_key.clone()],
-                parts: vec![super::module_part(hit)],
-            };
+            nodes::select(editor, &frame.area_key, vec![hit]);
         }
     }
     if pressed(EditorKey::ContextMenu) {

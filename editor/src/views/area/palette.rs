@@ -26,7 +26,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content,
         .table::<TilesetDef>()
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
-        .map(|(id, def)| (id.key(content).to_owned(), def))
+        .map(|(id, def)| (id.path(content).to_owned(), def))
         .collect();
     let used = area::load(content, area_id).grids.tilesets();
     let view = editor.views.area.view(view_key);
@@ -243,7 +243,7 @@ fn tile_sheet(
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
                     }
                     if let Some(surface) = data.surface {
-                        info.push_str(&format!(" · {}", surface.key(content)));
+                        info.push_str(&format!(" · {}", surface.path(content)));
                     }
                     if !data.animation.is_empty() {
                         info.push_str(&format!(" · {} frames", data.animation.len()));

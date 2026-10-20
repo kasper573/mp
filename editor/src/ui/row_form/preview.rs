@@ -3,7 +3,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::audio::playback::SfxDef;
 use engine::core::babble::BabbleDef;
-use engine::core::content::{Content, ContentRow};
+use engine::core::content::{Content, ContentFile};
 use engine::core::gui::ImageSource;
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
@@ -89,7 +89,7 @@ pub fn preview_place(table: &str) -> Option<PreviewPlace> {
 /// The row as the game shows it, beside its form: the actor, item or quest card it stands for, a
 /// status effect on an actor, a skill cast over and over.
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
-    let Some(value) = editor.row_value(table, key) else {
+    let Some(value) = editor.row_value(key) else {
         return;
     };
     match table {
@@ -155,11 +155,11 @@ fn show_status(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(theme::muted("the preview plays once the content loads"));
         return;
     };
-    let Some(effect) = content.by_key::<StatusEffectDef>(key) else {
+    let Some(effect) = content.by_path::<StatusEffectDef>(key) else {
         ui.label(theme::muted("the preview plays once the row loads"));
         return;
     };
-    let models: Vec<String> = content.table::<ModelDef>().keys().to_vec();
+    let models: Vec<String> = content.table::<ModelDef>().paths().to_vec();
     let state = &mut editor.views.preview;
     let chosen = state.status_model.get_or_insert_with(|| {
         content
@@ -167,7 +167,7 @@ fn show_status(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .player
             .get(&content)
             .model
-            .key(&content)
+            .path(&content)
             .to_owned()
     });
     ui.horizontal(|ui| {
@@ -188,7 +188,7 @@ fn show_status(editor: &mut Editor, ui: &mut Ui, key: &str) {
             state.status_applied = !state.status_applied;
         }
     });
-    let Some(model) = content.by_key::<ModelDef>(chosen) else {
+    let Some(model) = content.by_path::<ModelDef>(chosen) else {
         ui.label(theme::warn("pick a model to show the effect on"));
         return;
     };
@@ -207,7 +207,7 @@ fn show_skill(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(theme::muted("the preview plays once the content loads"));
         return;
     };
-    let Some(skill) = content.by_key::<SkillDef>(key) else {
+    let Some(skill) = content.by_path::<SkillDef>(key) else {
         ui.label(theme::muted("the preview plays once the row loads"));
         return;
     };
@@ -280,7 +280,7 @@ pub(super) fn draw_preview(
     let center = stage::center(&content);
     let mut posed = Posed::default();
     if table == ItemDef::TABLE {
-        posed.items.extend(content.by_key::<ItemDef>(key));
+        posed.items.extend(content.by_path::<ItemDef>(key));
     } else {
         let model_key = match table {
             ModelDef::TABLE => key.to_owned(),
@@ -289,11 +289,11 @@ pub(super) fn draw_preview(
                 .player
                 .get(&content)
                 .model
-                .key(&content)
+                .path(&content)
                 .to_owned(),
             _ => value["model"].as_str().unwrap_or_default().to_owned(),
         };
-        let Some(model) = content.by_key::<ModelDef>(&model_key) else {
+        let Some(model) = content.by_path::<ModelDef>(&model_key) else {
             ui.label(theme::muted("pick a model to see it"));
             return;
         };
@@ -345,7 +345,7 @@ fn plate_of(content: &Content, table: &str, key: &str, value: &Value) -> Option<
 }
 
 fn quest_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &str) {
-    let Some(quest) = content.by_key::<QuestDef>(key) else {
+    let Some(quest) = content.by_path::<QuestDef>(key) else {
         return;
     };
     if !content.has_built::<RiftScripts>() {
@@ -367,7 +367,7 @@ fn quest_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &
 }
 
 fn item_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &str) {
-    let Some(item) = content.by_key::<ItemDef>(key) else {
+    let Some(item) = content.by_path::<ItemDef>(key) else {
         return;
     };
     let def = item.get(content);

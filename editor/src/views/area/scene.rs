@@ -9,10 +9,11 @@ use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
-use engine::core::content::{Content, asset_file};
+use engine::core::content::Content;
 use engine::core::math::{Pos, Rect};
 use engine::core::render::{self, TILE, ToScreen};
 use engine::core::tiling::{TileSize, Tiles};
+use engine::systems::area::scene::SceneNode;
 use engine::systems::area::{self, AreaId, AreaModule, Flip, Scenery};
 use engine::systems::screen::area::TileSheets;
 
@@ -84,7 +85,7 @@ pub struct AreaSceneOf(pub usize);
 
 #[derive(Default)]
 pub struct AreaScenes {
-    pub by_key: HashMap<String, AreaScene>,
+    pub by_path: HashMap<String, AreaScene>,
     images: HashMap<String, (String, Handle<Image>)>,
     next_layer: usize,
     free_layers: Vec<usize>,
@@ -110,13 +111,13 @@ pub fn sync(
     let now = world.resource::<Time<Real>>().elapsed();
     let mut spawned = 0;
     for request in requests {
-        if let Some(scene) = scenes.by_key.get_mut(&request.key) {
+        if let Some(scene) = scenes.by_path.get_mut(&request.key) {
             scene.seen_at = now;
         }
         let Some(content) = content else {
             continue;
         };
-        let respawn = match scenes.by_key.get(&request.key) {
+        let respawn = match scenes.by_path.get(&request.key) {
             Some(scene) => scene.generation != request.generation || scene.spec != request.spec,
             None => true,
         };
@@ -128,7 +129,7 @@ pub fn sync(
             despawn(scenes, &request.key, world);
             spawn(scenes, &request, content, files, world, now);
         }
-        let Some(scene) = scenes.by_key.get_mut(&request.key) else {
+        let Some(scene) = scenes.by_path.get_mut(&request.key) else {
             continue;
         };
         let wanted = [request.width.max(1), request.height.max(1)];
@@ -185,7 +186,7 @@ pub fn sync(
         }
     }
     let stale: Vec<String> = scenes
-        .by_key
+        .by_path
         .iter()
         .filter(|(_, scene)| now.saturating_sub(scene.seen_at) > IDLE_FOR)
         .map(|(key, _)| key.clone())
@@ -196,7 +197,7 @@ pub fn sync(
 }
 
 pub fn clear(scenes: &mut AreaScenes, world: &mut World) {
-    let keys: Vec<String> = scenes.by_key.keys().cloned().collect();
+    let keys: Vec<String> = scenes.by_path.keys().cloned().collect();
     for key in keys {
         despawn(scenes, &key, world);
     }
@@ -225,7 +226,7 @@ fn target_image(alloc: [u32; 2]) -> Image {
 }
 
 fn despawn(scenes: &mut AreaScenes, key: &str, world: &mut World) {
-    let Some(scene) = scenes.by_key.remove(key) else {
+    let Some(scene) = scenes.by_path.remove(key) else {
         return;
     };
     let tiles: Vec<Entity> = world
@@ -251,7 +252,7 @@ fn spawn(
     world: &mut World,
     now: Duration,
 ) {
-    let Some(area_id) = content.by_key::<area::AreaDef>(&request.spec.ground) else {
+    let Some(area_id) = content.by_path::<area::AreaDef>(&request.spec.ground) else {
         return;
     };
     let layer = scenes.free_layers.pop().unwrap_or_else(|| {
@@ -316,7 +317,7 @@ fn spawn(
     world
         .run_system_once_with(spawn_tiles, spec)
         .expect("spawn_tiles runs on the editor world");
-    scenes.by_key.insert(
+    scenes.by_path.insert(
         request.key.clone(),
         AreaScene {
             texture,
@@ -349,11 +350,9 @@ pub fn parts_scenery(
     at: Pos<Tiles>,
     values: &serde_json::Value,
 ) -> Vec<Scenery> {
-    let Some(module) = stamp::placement_module(content, blueprint, at, Flip::None, values) else {
-        return Vec::new();
-    };
+    let placement = SceneNode::Module(stamp::placement_json(blueprint, at, Flip::None, values));
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(content, &[module], &mut errors);
+    let flattening = area::blueprint::flatten(content, &[placement], &mut errors);
     flattening
         .modules
         .into_iter()
@@ -386,7 +385,7 @@ pub fn image_handle(
     path: &str,
     world: &mut World,
 ) -> Handle<Image> {
-    let file = asset_file(path);
+    let file = path.to_owned();
     let Some(bytes) = files.get(&file) else {
         return Handle::default();
     };

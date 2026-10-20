@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
-use engine::core::content::{ContentRow, RowName, row_file, row_holding};
+use engine::core::content::{ContentFile, fields_file};
 use engine::core::script::{NodeKind, RunnerKindDef};
 use engine::systems::area::blueprint::holes;
 use engine::systems::memory::MemoryDef;
@@ -16,6 +16,7 @@ use super::{RenameNodeDialog, ScriptDoc, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
 use crate::ui::browser::{self, RowMenu};
 use crate::ui::{row_form, sidebar, theme, widgets};
@@ -89,13 +90,8 @@ fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
 pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
     let key = doc.at.key.clone();
-    let owners = editor
-        .project
-        .as_ref()
-        .map(|project| project.files.owners())
-        .unwrap_or_default();
-    if let Some(owner) = crate::ui::breadcrumb::show(ui, &owners, ScriptDef::TABLE, &key) {
-        editor.open_row(&owner.table, &owner.key);
+    if let Some(folder) = crate::ui::breadcrumb::show(ui, &key) {
+        crate::ui::content_tree::reveal(editor, &folder);
     }
     ui.add_space(4.0);
     let shapes = editor.shapes.clone();
@@ -106,11 +102,7 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .unwrap_or(Value::Null);
     let mut script = doc.script.clone();
     let mut actions = Vec::new();
-    let what = if doc.owner().is_some() {
-        "local script"
-    } else {
-        "script"
-    };
+    let what = "script";
     let mut picked = None;
     let changed = {
         let mut cx = doc.form_cx(editor, root, &mut actions);
@@ -118,8 +110,7 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 widgets::card_header(ui, &key, what, |ui| {
-                    let row = RowName::new(ScriptDef::TABLE, &key);
-                    let menu = RowMenu::of(cx.files, cx.usages, false, &row);
+                    let menu = RowMenu::of(&key);
                     picked = browser::row_menu(ui, &menu, false);
                 });
                 let mut changed = FormChange::default();
@@ -270,7 +261,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|project| {
             project
                 .usages
-                .of_row(ScriptDef::TABLE, &key)
+                .of_content(&key)
                 .iter()
                 .filter(|u| ScriptRef::parse(&u.pointer).node.is_none())
                 .count()
@@ -399,10 +390,10 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     };
     let callers: Vec<Caller> = project
         .usages
-        .of_row(ScriptDef::TABLE, &key)
+        .of_content(&key)
         .iter()
         .filter_map(|usage| {
-            let (table, row_key) = row_holding(&usage.file)?;
+            let (table, row_key) = content_of(&usage.file)?;
             let at = ScriptRef::parse(&usage.pointer);
             Some(Caller {
                 row: format!("{table}/{row_key}"),
@@ -739,7 +730,7 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
 }
 
 fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &str) {
-    let Some(mut row) = editor.row_value(MemoryDef::TABLE, memory) else {
+    let Some(mut row) = editor.row_value(memory) else {
         return;
     };
     let shapes = editor.shapes.clone();
@@ -768,7 +759,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
     }
     if changed.is_some() {
         let mut edit = ContentEdit::new(format!("Edit memory/{memory}"));
-        edit.write_json(row_file(MemoryDef::TABLE, memory), &row);
+        edit.write_json(fields_file(memory), &row);
         editor.apply(edit);
     }
 }

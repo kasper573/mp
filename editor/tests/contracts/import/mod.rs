@@ -11,6 +11,7 @@ use editor::import::tileset;
 use engine::systems::area::grid::{self, PaletteRow};
 use image::RgbaImage;
 use serde_json::Value;
+use testkit::path;
 
 use self::art::{FRAME, TILE, fill};
 
@@ -32,8 +33,11 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
     assert!(plan.missing.is_empty());
     assert_eq!(plan.ready(), Ok(()));
     assert_eq!(plan.cues_kept(), plan.cues_total);
-    let built = model::build(&plan, &export, Some(&row), "walker").expect("builds");
-    assert_eq!(built.image, "models/walker.png");
+    let built = model::build(&plan, &export, Some(&row), &path("model", "walker")).expect("builds");
+    assert_eq!(
+        built.image,
+        format!("{}/sprites.png", path("model", "walker"))
+    );
     let image = formats::decode_image_bytes(&built.png).expect("a png");
     assert_eq!(image.dimensions(), (8 * FRAME.0, 40 * FRAME.1));
     for (name, frames) in &strips {
@@ -331,8 +335,9 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     image::GenericImage::copy_from(&mut wide, &old, 0, 0).unwrap();
     fill(&mut wide, old.width(), 0, 64, 16, [200, 90, 120, 255]);
     let island = art::island_palette();
-    let palettes = vec![("island".to_owned(), palette(&island))];
-    let plan = tileset::tile_plan(&old, &row, &wide, "beach", &palettes).expect("plans");
+    let palettes = vec![(path("area", "island"), palette(&island))];
+    let plan =
+        tileset::tile_plan(&old, &row, &wide, &path("tileset", "beach"), &palettes).expect("plans");
     assert_eq!(
         (plan.old_columns, plan.new_columns),
         (art::COLUMNS, art::COLUMNS + 4)
@@ -345,7 +350,8 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
         "found by pixels at the same column and row"
     );
     assert_eq!(plan.ready(), Ok(()));
-    let (new_row, rewritten) = tileset::apply_tile_plan(&plan, &row, "beach", &palettes).unwrap();
+    let (new_row, rewritten) =
+        tileset::apply_tile_plan(&plan, &row, &path("tileset", "beach"), &palettes).unwrap();
     let old_tiles = row["tiles"].as_object().unwrap();
     let new_tiles = new_row["tiles"].as_object().unwrap();
     assert_eq!(
@@ -376,7 +382,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     }
     let (_, text) = rewritten
         .iter()
-        .find(|(area, _)| area == "island")
+        .find(|(area, _)| *area == path("area", "island"))
         .expect("island rewritten");
     let before = palette(&island);
     let after = palette(text);
@@ -388,14 +394,15 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
 
     let game = dir.path().join("game");
     beach_game().write_to(&game);
-    wide.save(game.join("assets/tilesets/beach.png")).unwrap();
+    let beach = game.join(path("tileset", "beach"));
+    wide.save(beach.join("image.png")).unwrap();
     std::fs::write(
-        game.join("tables/tileset/beach.json"),
+        beach.join("config.json"),
         serde_json::to_string_pretty(&new_row).unwrap(),
     )
     .unwrap();
     for (area, text) in &rewritten {
-        std::fs::write(game.join(format!("tables/area/{area}/palette.csv")), text).unwrap();
+        std::fs::write(game.join(format!("{area}/palette.csv")), text).unwrap();
     }
     let loaded = engine::systems::load_content(
         std::sync::Arc::new(engine::core::content::FilesystemFolder(game)),
@@ -419,21 +426,22 @@ fn a_gone_tile_still_painted_blocks_until_replaced() {
         TILE,
         [1, 2, 3, 255],
     );
+    let beach = path("tileset", "beach");
     let palettes = vec![(
-        "island".to_owned(),
+        path("area", "island"),
         palette(&format!(
-            "tileset,tile,flip\nbeach,{},\nbeach,{},\n",
+            "tileset,tile,flip\n{beach},{},\n{beach},{},\n",
             art::PAVED,
             art::PAVED + 1
         )),
     )];
-    let mut plan = tileset::tile_plan(&old, &row, &changed, "beach", &palettes).expect("plans");
+    let mut plan = tileset::tile_plan(&old, &row, &changed, &beach, &palettes).expect("plans");
     assert_eq!(plan.gone, vec![art::PAVED]);
     assert!(plan.gone_used.contains_key(&art::PAVED));
     assert!(plan.ready().is_err());
     plan.replacements.insert(art::PAVED, Some(art::PAVED + 1));
     assert_eq!(plan.ready(), Ok(()));
-    let (_, rewritten) = tileset::apply_tile_plan(&plan, &row, "beach", &palettes).unwrap();
+    let (_, rewritten) = tileset::apply_tile_plan(&plan, &row, &beach, &palettes).unwrap();
     assert_eq!(palette(&rewritten[0].1)[0].tile, art::PAVED + 1);
 }
 
@@ -584,11 +592,11 @@ fn beach_game() -> testkit::Game {
         .row(
             "surface",
             "sand",
-            serde_json::json!({ "name": "Sand", "footstep": "step" }),
+            serde_json::json!({ "name": "Sand", "footstep": path("sfx", "step") }),
         )
         .row("tileset", "beach", art::tileset_row())
-        .asset("tilesets/beach.png", tileset)
-        .file("tables/area/island/palette.csv", art::island_palette())
+        .part("tileset", "beach", "image.png", tileset)
+        .part("area", "island", "palette.csv", art::island_palette())
         .whole()
 }
 

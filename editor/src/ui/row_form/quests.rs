@@ -1,6 +1,6 @@
 use egui::{Sense, Ui};
-use engine::core::content::{ContentRow, TABLES_DIR, row_file, row_of};
-use engine::systems::area::{AreaDef, AreaModuleKind};
+use engine::core::content::{ContentFile, fields_file};
+use engine::systems::area::{AreaDef, AreaModuleKind, BlueprintDef};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::{Fill, RiftEffectKind, ScriptDef};
 use serde::Deserialize;
@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::scene_graph;
 use crate::value::RowValue;
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
@@ -83,7 +84,7 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
                 (
                     format!("script/{name}"),
                     files
-                        .json(&row_file(ScriptDef::TABLE, &name))
+                        .json(&fields_file(&name))
                         .map(|row| row["nodes"].clone())
                         .unwrap_or(Value::Null),
                 )
@@ -113,30 +114,31 @@ fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
             }
         }
     };
-    let paths: Vec<String> = files
-        .paths_under(&format!("{TABLES_DIR}/"))
-        .cloned()
-        .collect();
-    for path in paths {
-        let Some((table, key)) = row_of(&path) else {
-            continue;
-        };
+    let index = files.index();
+    for (table, keys) in &index.content {
+        let table = table.as_str();
         if table == ScriptDef::TABLE || table == CharacterSnapshot::TABLE {
             continue;
         }
-        let Some(row) = files.json(&path) else {
-            continue;
-        };
-        for module in row["modules"].as_array().into_iter().flatten() {
-            scan(table, key, None, module);
-            if table == AreaDef::TABLE {
-                let object = module["name"]
-                    .as_str()
-                    .or(module["label"].as_str())
-                    .unwrap_or("object");
-                for script in module["scripts"].as_array().into_iter().flatten() {
-                    scan(table, key, Some(object), script);
+        for key in keys {
+            if table == AreaDef::TABLE || table == BlueprintDef::TABLE {
+                for (_, module) in scene_graph::modules_of(files, key) {
+                    scan(table, key, None, &module);
+                    let object = module["name"]
+                        .as_str()
+                        .or(module["title"].as_str())
+                        .unwrap_or("object");
+                    for script in module["scripts"].as_array().into_iter().flatten() {
+                        scan(table, key, Some(object), script);
+                    }
                 }
+                continue;
+            }
+            let Some(row) = files.json(&fields_file(key)) else {
+                continue;
+            };
+            for module in row["modules"].as_array().into_iter().flatten() {
+                scan(table, key, None, module);
             }
         }
     }

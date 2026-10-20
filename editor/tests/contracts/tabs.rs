@@ -7,10 +7,10 @@ use editor::tabs::{DockRequest, EditorTab};
 use editor::ui;
 use editor::user::{EditorSettings, UserFolder};
 use egui_dock::NodeIndex;
-use engine::core::content::{ContentFile, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::area::AreaDef;
 
-use crate::support::{AREA, game_folder};
+use crate::support::{area, game_folder};
 
 #[test]
 fn each_preview_takes_the_place_of_the_one_before() {
@@ -96,25 +96,18 @@ fn editing_what_a_preview_shows_keeps_it() {
     let folder = game_folder(scratch.path().join("game"));
     editor.project = Some(Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens"));
 
-    editor.preview_row(AreaDef::TABLE, AREA);
+    editor.preview_row(AreaDef::TABLE, &area());
     editor.place_tabs();
-    let mut row = editor
-        .row_value(AreaDef::TABLE, AREA)
-        .expect("the start area");
+    let mut row = editor.row_value(&area()).expect("the start area");
     row["name"] = "Renamed field".into();
     let mut edit = ContentEdit::new("Rename the area");
-    edit.write_json(row_file(AreaDef::TABLE, AREA), &row);
+    edit.write_json(fields_file(&area()), &row);
     editor.try_apply(edit).expect("the edit is applied");
     preview(&mut editor, EditorTab::Game);
 
     assert_eq!(
         tabs(&editor),
-        vec![
-            EditorTab::Area {
-                key: AREA.to_owned()
-            },
-            EditorTab::Game
-        ]
+        vec![EditorTab::Area { key: area() }, EditorTab::Game]
     );
 }
 

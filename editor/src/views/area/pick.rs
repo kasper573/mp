@@ -3,7 +3,7 @@ use engine::core::tiling::Tiles;
 use serde_json::Value;
 
 use super::placement::replace_with;
-use super::{AreaFrame, modules, shapes};
+use super::{AreaFrame, nodes, shapes};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::schema;
 use crate::value::RowValue;
@@ -42,9 +42,9 @@ pub fn picked_row(editor: &mut Editor, then: PickRowThen, picked: &str) {
         } => {
             module[field] = Value::String(picked.to_owned());
             let label = format!("Add {} to {area}", shapes::label(&module));
-            modules::append_modules(editor, &area, vec![module], &label);
+            nodes::add(editor, &area, vec![module], &label);
         }
-        PickRowThen::ReplaceBlueprint { area, index } => replace_with(editor, &area, index, picked),
+        PickRowThen::ReplaceBlueprint { area, node } => replace_with(editor, &area, &node, picked),
     }
 }
 

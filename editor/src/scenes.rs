@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
@@ -16,7 +16,7 @@ use crate::import::ImportStep;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::views::area::resize::ResizeDialog;
-use crate::views::area::{blueprint, shapes};
+use crate::views::area::{self as area_view, blueprint, shapes};
 use crate::views::character::CharacterSection;
 use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
@@ -49,7 +49,7 @@ pub enum SceneStep {
     Part {
         table: String,
         key: String,
-        modules: Vec<usize>,
+        nodes: Vec<String>,
     },
     Fold {
         table: String,
@@ -68,9 +68,8 @@ pub enum SceneStep {
         key: String,
     },
     Clipboard {
-        table: String,
         key: String,
-        module: usize,
+        node: String,
     },
     Script(String),
     Node(Vec<String>),
@@ -274,16 +273,11 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
             editor.select(RowSelection::row(BlueprintDef::TABLE, key));
             editor.open_tab(EditorTab::Blueprint { key: key.clone() });
         }
-        SceneStep::Part {
-            table,
-            key,
-            modules,
-        } => {
-            let parts: Vec<String> = modules.iter().map(|i| format!("/modules/{i}")).collect();
+        SceneStep::Part { table, key, nodes } => {
             editor.select(RowSelection {
                 table: table.clone(),
                 keys: vec![key.clone()],
-                parts,
+                parts: nodes.clone(),
             });
             editor.open_tab(EditorTab::for_row(table, key));
         }
@@ -292,7 +286,7 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
                 .project
                 .as_ref()
                 .and_then(|p| p.content.clone())
-                .and_then(|c| c.by_key::<AreaDef>(key).map(|id| area::load(&c, id).size));
+                .and_then(|c| c.by_path::<AreaDef>(key).map(|id| area::load(&c, id).size));
             editor.open_tab(EditorTab::Area { key: key.clone() });
             editor.dialogs.push(ModalDialog::Resize(ResizeDialog {
                 area: key.clone(),
@@ -314,12 +308,16 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
         }
         SceneStep::Fold { table, modules } => fold(editor, table, modules, true),
         SceneStep::Unfold { table, modules } => fold(editor, table, modules, false),
-        SceneStep::Delete { table, key } => rows::delete_dialog(editor, table, vec![key.clone()]),
-        SceneStep::Duplicate { table, key } => rows::duplicate(editor, table, key),
-        SceneStep::Clipboard { table, key, module } => {
-            let Some(module_value) = editor
-                .row_value(table, key)
-                .and_then(|value| value["modules"].get(*module).cloned())
+        SceneStep::Delete { key, .. } => rows::delete_dialog(editor, vec![key.clone()]),
+        SceneStep::Duplicate { key, .. } => {
+            if let Err(error) = rows::duplicate(editor, key) {
+                editor.toast(error);
+            }
+        }
+        SceneStep::Clipboard { key, node } => {
+            let Some(module_value) = area_view::nodes::scene_of(editor, key)
+                .pointer(node)
+                .cloned()
             else {
                 return;
             };
@@ -498,7 +496,7 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
             view.page = ModelPage::Busts;
             if let Some(face) = face {
                 view.face = Some(face.clone());
-                if let Some(row) = editor.row_value(ModelDef::TABLE, &key)
+                if let Some(row) = editor.row_value(&key)
                     && let Some(found) = busts::faces(&row)
                         .into_iter()
                         .find(|found| found.name == *face)

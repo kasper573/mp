@@ -11,11 +11,8 @@ pub mod tileset;
 pub mod vfx;
 pub mod world;
 
-use std::collections::HashMap;
-
 use bevy::prelude::*;
 use egui::Ui;
-use engine::core::content::RowName;
 use engine::core::tiling::TilePos;
 use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
@@ -25,11 +22,8 @@ use crate::play;
 use crate::project::AreaCameraState;
 use crate::stage::Stages;
 use crate::tabs::EditorTab;
-use crate::ui::assets::AssetsState;
-use crate::ui::content_list::ContentLists;
 use crate::ui::row_form::preview::RowPreviewState;
 use crate::ui::row_form::usages;
-use crate::ui::sidebar::RightPanels;
 use crate::ui::{self, theme};
 
 #[derive(Component)]
@@ -37,8 +31,6 @@ pub struct EditorCamera;
 
 #[derive(Default)]
 pub struct EditorViews {
-    pub content: ContentLists,
-    pub right: RightPanels,
     pub area: area::AreaViews,
     pub world: world::WorldView,
     pub script: script::ScriptViews,
@@ -49,11 +41,8 @@ pub struct EditorViews {
     pub character: character::CharacterView,
     pub class: class::ClassViews,
     pub vfx: vfx::VfxViews,
-    pub assets: AssetsState,
     pub preview: RowPreviewState,
     pub stage: Stages,
-    /// Rows whose suggestion to become local was turned down, with the users they had then.
-    pub declined: HashMap<RowName, Vec<RowName>>,
 }
 
 impl EditorViews {
@@ -151,8 +140,8 @@ pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
             egui::ScrollArea::vertical()
                 .id_salt("used-by")
                 .show(ui, |ui| match subject {
-                    UsedBySubject::Row { table, key } => {
-                        usages::show_usages_grouped(editor, ui, &table, &key, false);
+                    UsedBySubject::Row { key } => {
+                        usages::show_usages_grouped(editor, ui, &key, false);
                     }
                     UsedBySubject::Asset { path } => usages::show_asset_usages(editor, ui, &path),
                 });
@@ -165,7 +154,7 @@ pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
 
 /// What the active window's Used by panel lists the users of: the row or file it shows.
 enum UsedBySubject {
-    Row { table: String, key: String },
+    Row { key: String },
     Asset { path: String },
 }
 
@@ -175,8 +164,8 @@ impl UsedBySubject {
             return 0;
         };
         match self {
-            UsedBySubject::Row { table, key } => project.usages.of_row(table, key).len(),
-            UsedBySubject::Asset { path } => project.usages.of_asset(path).len(),
+            UsedBySubject::Row { key } => project.usages.of_content(key).len(),
+            UsedBySubject::Asset { path } => project.usages.of_media(path).len(),
         }
     }
 }
@@ -185,9 +174,7 @@ fn used_by_subject(editor: &Editor) -> Option<UsedBySubject> {
     match ui::active_tab(editor)? {
         EditorTab::World | EditorTab::Rows { .. } | EditorTab::Spreadsheet { .. } => None,
         EditorTab::Asset { path } => Some(UsedBySubject::Asset { path }),
-        tab => tab
-            .row()
-            .map(|(table, key)| UsedBySubject::Row { table, key }),
+        tab => tab.row().map(|(_, key)| UsedBySubject::Row { key }),
     }
 }
 
@@ -199,7 +186,7 @@ pub fn play_here(editor: &mut Editor) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
-    let Some(area) = content.by_key::<AreaDef>(&hover.area) else {
+    let Some(area) = content.by_path::<AreaDef>(&hover.area) else {
         return;
     };
     play::start(

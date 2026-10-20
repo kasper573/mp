@@ -1,12 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use engine::core::content::{
-    ContentOwners, MemoryFolder, OWNER_FIELD, RowName, TABLES_DIR, row_of, table_folder,
-};
+use engine::core::content::files::{self, GameFile};
+use engine::core::content::{MemoryFolder, SETTINGS_FILE, bundle_of, table_of};
 use engine::systems::registry;
 use walkdir::WalkDir;
 
@@ -15,7 +14,38 @@ pub type FileBytes = Arc<[u8]>;
 #[derive(Clone, Default)]
 pub struct ProjectFiles {
     map: BTreeMap<String, Stored>,
-    owners: OnceLock<Arc<ContentOwners>>,
+    index: OnceLock<Arc<FolderIndex>>,
+}
+
+/// What the files of the game folder are, as the loader sorts them by name and place.
+#[derive(Default)]
+pub struct FolderIndex {
+    /// Every content file's path, by its type.
+    pub content: BTreeMap<String, BTreeSet<String>>,
+    /// Every folder that isn't a bundle, at any depth, empty or not.
+    pub folders: BTreeSet<String>,
+    pub media: BTreeSet<String>,
+    pub notes: BTreeSet<String>,
+    /// Files and folders the loader takes for nothing it may hold.
+    pub unknown: BTreeSet<String>,
+}
+
+impl FolderIndex {
+    pub fn paths_of(&self, table: &str) -> impl Iterator<Item = &str> {
+        self.content
+            .get(table)
+            .into_iter()
+            .flatten()
+            .map(String::as_str)
+    }
+
+    pub fn is_content(&self, path: &str) -> bool {
+        table_of(path).is_some_and(|table| {
+            self.content
+                .get(table)
+                .is_some_and(|paths| paths.contains(path))
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -29,8 +59,12 @@ impl ProjectFiles {
     pub fn read_dir(root: &Path) -> io::Result<ProjectFiles> {
         let mut files = ProjectFiles::default();
         for file in content_files(root)? {
-            let bytes = std::fs::read(root.join(&file))?;
-            files.insert(file, FileBytes::from(bytes));
+            let bytes = if is_folder(&file) {
+                FileBytes::from([])
+            } else {
+                FileBytes::from(std::fs::read(root.join(&file))?)
+            };
+            files.insert(file, bytes);
         }
         Ok(files)
     }
@@ -48,7 +82,7 @@ impl ProjectFiles {
     }
 
     pub fn insert(&mut self, path: String, bytes: FileBytes) {
-        self.owners = OnceLock::new();
+        self.index = OnceLock::new();
         let hash = hash(&bytes);
         self.map.insert(
             path,
@@ -61,32 +95,35 @@ impl ProjectFiles {
     }
 
     pub fn remove(&mut self, path: &str) {
-        self.owners = OnceLock::new();
+        self.index = OnceLock::new();
         self.map.remove(path);
     }
 
-    /// Which row each local row belongs to, as the files name it now, saved or not.
-    pub fn owners(&self) -> Arc<ContentOwners> {
-        self.owners
-            .get_or_init(|| {
-                Arc::new(ContentOwners::new(self.paths_under(TABLES_DIR).filter_map(
-                    |path| {
-                        let (table, key) = row_of(path)?;
-                        let owner = self.json(path)?.get(OWNER_FIELD)?.clone();
-                        let owner: RowName = serde_json::from_value(owner).ok()?;
-                        Some((RowName::new(table, key), owner))
-                    },
-                )))
-            })
+    pub fn index(&self) -> Arc<FolderIndex> {
+        self.index
+            .get_or_init(|| Arc::new(FolderIndex::of(self.map.keys())))
             .clone()
     }
 
+    pub fn paths_of(&self, table: &str) -> Vec<String> {
+        self.index().paths_of(table).map(str::to_owned).collect()
+    }
+
+    /// Every file's path, leaving out the folders kept as entries.
     pub fn paths(&self) -> impl Iterator<Item = &String> {
+        self.map.keys().filter(|path| !is_folder(path))
+    }
+
+    /// Every file and every kept folder, as saving and history see them.
+    pub fn entries(&self) -> impl Iterator<Item = &String> {
         self.map.keys()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &FileBytes)> {
-        self.map.iter().map(|(path, stored)| (path, &stored.bytes))
+        self.map
+            .iter()
+            .filter(|(path, _)| !is_folder(path))
+            .map(|(path, stored)| (path, &stored.bytes))
     }
 
     pub fn hashes(&self) -> BTreeMap<String, String> {
@@ -116,9 +153,8 @@ impl ProjectFiles {
         MemoryFolder {
             name: name.to_owned(),
             files: self
-                .map
                 .iter()
-                .map(|(path, stored)| (path.clone(), stored.bytes.clone()))
+                .map(|(path, bytes)| (path.clone(), bytes.clone()))
                 .collect(),
         }
     }
@@ -134,31 +170,13 @@ impl ProjectFiles {
         files
     }
 
-    pub fn keys_of(&self, table: &str) -> impl Iterator<Item = &str> {
-        let prefix = format!("{}/", table_folder(table));
-        self.map
-            .range::<str, _>((Bound::Included(prefix.as_str()), Bound::Unbounded))
-            .map(|(path, _)| path.as_str())
-            .take_while(move |path| path.starts_with(&prefix))
-            .filter_map(|path| row_of(path).map(|(_, key)| key))
-    }
-
-    /// Whether `reader` may name `table/key`: a global row, or one local to the reader or to an
-    /// owner above it; any row when the reader's table sees every row. `None` reads from above
-    /// every row, as the game's settings do.
-    pub fn reaches(&self, reader: Option<&RowName>, table: &str, key: &str) -> bool {
-        reader.is_some_and(|reader| registry().sees_all_rows(&reader.table))
-            || self.owners().in_reach(reader, table, key)
-    }
-
-    /// The keys of a table that `reader` may name.
-    pub fn keys_in_reach<'a>(
-        &'a self,
-        table: &'a str,
-        reader: Option<&'a RowName>,
-    ) -> impl Iterator<Item = &'a str> {
-        self.keys_of(table)
-            .filter(move |key| self.reaches(reader, table, key))
+    /// Every file that makes up the content file at `path`: itself, or a bundle's every part.
+    pub fn files_of(&self, path: &str) -> Vec<String> {
+        if path.ends_with(".json") {
+            vec![path.to_owned()]
+        } else {
+            self.paths_under(&folder_entry(path)).cloned().collect()
+        }
     }
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {
@@ -166,6 +184,79 @@ impl ProjectFiles {
             .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
             .map(|(path, _)| path)
             .take_while(move |path| path.starts_with(prefix))
+    }
+}
+
+/// The path of the content file that `file` is, or is a part of; `None` for the settings.
+pub fn content_holding(file: &str) -> Option<&str> {
+    match bundle_of(file) {
+        Some((bundle, _)) => Some(bundle),
+        None => (file.ends_with(".json") && file != SETTINGS_FILE).then_some(file),
+    }
+}
+
+/// The type and path of the content file that `file` is, or is a part of.
+pub fn content_of(file: &str) -> Option<(&str, &str)> {
+    let path = content_holding(file)?;
+    Some((table_of(path)?, path))
+}
+
+/// Whether `path`, an entry of the files, is a folder kept as one: a path ending in a slash.
+pub fn is_folder(path: &str) -> bool {
+    path.ends_with('/')
+}
+
+/// The entry that keeps `folder` while nothing is in it.
+pub fn folder_entry(folder: &str) -> String {
+    format!("{folder}/")
+}
+
+impl FolderIndex {
+    fn of<'a>(entries: impl Iterator<Item = &'a String>) -> FolderIndex {
+        let registry = registry();
+        let types = registry.file_types();
+        let mut index = FolderIndex::default();
+        let add_folders = |index: &mut FolderIndex, path: &str| {
+            let mut parent = files::parent_of(path);
+            while !parent.is_empty() && index.folders.insert(parent.to_owned()) {
+                parent = files::parent_of(parent);
+            }
+        };
+        for entry in entries {
+            if let Some(folder) = entry.strip_suffix('/') {
+                if bundle_of(entry).is_none() {
+                    index.folders.insert(folder.to_owned());
+                    add_folders(&mut index, folder);
+                }
+                continue;
+            }
+            let (path, dir) = match bundle_of(entry) {
+                Some((bundle, _)) => (bundle, true),
+                None => (entry.as_str(), false),
+            };
+            add_folders(&mut index, path);
+            match files::classify(path, dir, &types) {
+                Ok(Some(GameFile::Content { table, .. })) => {
+                    index
+                        .content
+                        .entry(table.to_owned())
+                        .or_default()
+                        .insert(path.to_owned());
+                }
+                Ok(Some(GameFile::Media(_))) => {
+                    index.media.insert(path.to_owned());
+                }
+                Ok(Some(GameFile::Note)) => {
+                    index.notes.insert(path.to_owned());
+                }
+                Ok(Some(GameFile::Settings)) => {}
+                Ok(None) => {}
+                Err(_) => {
+                    index.unknown.insert(path.to_owned());
+                }
+            }
+        }
+        index
     }
 }
 
@@ -200,7 +291,8 @@ impl PartialEq for FileChange {
     }
 }
 
-/// The folder-relative names of the files under `root` that make up its content.
+/// The folder-relative names of the files under `root` that make up its content, and of every
+/// folder there that holds nothing, as its entry.
 pub fn content_files(root: &Path) -> io::Result<Vec<String>> {
     let mut files = Vec::new();
     let entries = WalkDir::new(root)
@@ -210,11 +302,20 @@ pub fn content_files(root: &Path) -> io::Result<Vec<String>> {
         .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
     for entry in entries {
         let entry = entry?;
+        let file = folder_file(root, entry.path()).expect("a walked file lies under its root");
         if entry.file_type().is_file() {
-            files.push(folder_file(root, entry.path()).expect("a walked file lies under its root"));
+            files.push(file);
+        } else if empty_folder(entry.path())? {
+            files.push(folder_entry(&file));
         }
     }
     Ok(files)
+}
+
+fn empty_folder(path: &Path) -> io::Result<bool> {
+    Ok(std::fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .all(|entry| entry.file_name().to_str().is_some_and(hidden)))
 }
 
 /// Whether a file or folder of that name is kept out of the game folder's content: dotfiles, and

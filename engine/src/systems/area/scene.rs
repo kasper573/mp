@@ -522,21 +522,3 @@ pub fn holes(nodes: &[SceneNode]) -> Vec<String> {
 pub fn scene_file(bundle: &str) -> String {
     format!("{bundle}/{SCENE_FILE}")
 }
-
-/// A label for a new node among `siblings`: `base`, or `base (1)`, `base (2)`, the next free number,
-/// when a sibling has it already.
-pub fn free_label(base: &str, siblings: &[SceneNode]) -> String {
-    let taken = |label: &str| {
-        siblings
-            .iter()
-            .filter_map(SceneNode::label)
-            .any(|known| known.eq_ignore_ascii_case(label))
-    };
-    if !taken(base) {
-        return base.to_owned();
-    }
-    (1..)
-        .map(|n| format!("{base} ({n})"))
-        .find(|label| !taken(label))
-        .expect("a free number")
-}

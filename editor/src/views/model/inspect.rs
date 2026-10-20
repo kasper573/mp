@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::assets::AssetKind;
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::RowName;
-use engine::core::content::{ContentRow, row_of};
+use engine::core::content::ContentFile;
 use engine::systems::actor::model::MAX_FRAME_MS;
 use engine::systems::actor::{Action, ModelDef};
 use forms::FormCx;
@@ -17,6 +16,7 @@ use crate::app::Editor;
 use crate::forms::{self, FormChange};
 use crate::keymap::EditorKey;
 use crate::picker;
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{dialogs, row_form, theme, widgets};
 
@@ -27,7 +27,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(part) = selection.parts.first().cloned() else {
         return;
     };
-    let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
+    let Some(row) = editor.row_value(&key) else {
         return;
     };
     super::ensure_view(editor, &key);
@@ -512,7 +512,7 @@ fn cue_card(
                 ui.add_space(4.0);
                 ui.label(theme::muted("hear it on").size(12.0));
                 let chosen = editor.views.model.view(key).surface.clone();
-                let surfaces = super::sounds::surfaces(editor, Some(&RowName::new(ModelDef::TABLE, key)));
+                let surfaces = super::sounds::surfaces(editor);
                 let mut pick_surface = None;
                 for surface in &surfaces {
                     ui.horizontal(|ui| {
@@ -737,9 +737,9 @@ fn face_card(
         .collect();
     let title = super::users(editor, key)
         .first()
-        .and_then(|(table, user)| {
+        .and_then(|(_, user)| {
             editor
-                .row_value(table, user)
+                .row_value(user)
                 .and_then(|row| row["name"].as_str().map(str::to_owned))
         })
         .unwrap_or_else(|| key.to_owned());
@@ -752,7 +752,7 @@ fn face_card(
     let mut open = None;
     for line in own_lines.iter().take(shown) {
         ui.horizontal(|ui| {
-            let (table, row_key) = row_of(&line.file).unwrap_or(("", ""));
+            let (table, row_key) = content_of(&line.file).unwrap_or(("", ""));
             widgets::badge(ui, table);
             if ui
                 .link(theme::mono(format!("{table}/{row_key}")).size(12.5))
@@ -828,7 +828,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         return;
     };
     let faces = editor
-        .row_value(ModelDef::TABLE, key)
+        .row_value(key)
         .map(|row| super::busts::faces(&row))
         .unwrap_or_default();
     let mut decision = None;

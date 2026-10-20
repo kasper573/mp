@@ -20,7 +20,7 @@ use std::sync::mpsc::channel;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, Ui};
-use engine::core::content::{ContentRow, asset_file};
+use engine::core::content::ContentFile;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
 use formats::{AnimationExport, DroppedFiles};
@@ -241,7 +241,7 @@ fn scripted(editor: &mut Editor) {
             let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
-            let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
+            let Some(row) = editor.row_value(&key) else {
                 return;
             };
             let Some(strip) = strip.strip() else {
@@ -372,7 +372,7 @@ fn start_again(editor: &mut Editor, due: records::DueReimport) {
         (TilesetDef::TABLE, None) => ImportTarget::Tileset(due.key.clone()),
         _ => return,
     };
-    if editor.row_value(&due.table, &due.key).is_none() {
+    if editor.row_value(&due.key).is_none() {
         editor.imports.forget(&due.table, &due.key);
         return;
     }
@@ -399,24 +399,19 @@ fn names_of(job: &ImportReading) -> String {
 }
 
 fn asset_image(editor: &Editor, path: &str) -> Option<RgbaImage> {
-    let bytes = editor.project.as_ref()?.files.get(&asset_file(path))?;
+    let bytes = editor.project.as_ref()?.files.get(path)?;
     formats::decode_image_bytes(bytes).ok()
 }
 
-fn free_key(editor: &Editor, table: &str, export: &AnimationExport) -> String {
-    let wanted = export
+/// The name a new file made from `export` starts with: the export's own, as a name may hold it,
+/// or the type's.
+fn suggested_name(export: &AnimationExport, table: &str) -> String {
+    export
         .files
         .first()
-        .map(|file| formats::stem(file).replace(['-', ' '], "_").to_lowercase())
-        .unwrap_or_else(|| format!("new_{table}"));
-    match &editor.project {
-        Some(project) => rows::free_key(&project.files, table, &wanted),
-        None => wanted,
-    }
-}
-
-fn asset_name(folder: &str, key: &str) -> String {
-    format!("{folder}/{}.png", key.replace('_', "-"))
+        .map(|file| rows::name_from(&formats::stem(file).replace('-', "_")))
+        .filter(|name| engine::core::content::valid_name(name))
+        .unwrap_or_else(|| table.to_owned())
 }
 
 fn check_line(ui: &mut Ui, ok: bool, text: String) {

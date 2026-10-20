@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
-use engine::core::content::{Content, ContentScope, RowName, with_content};
+use engine::core::content::{Content, ContentScope, with_content};
 use engine::core::script::node::MAX_CALL_DEPTH;
 use engine::core::script::{EffectDef, EventDef, NodeKind, REFUSED, RunnerKindDef};
 use engine::systems::actor::model::Expression;
@@ -142,7 +142,7 @@ pub fn bust_file(content: Option<&Content>, speaker: &LineSpeaker) -> Option<Str
         return None;
     };
     let busts = content
-        .by_key::<NpcDef>(npc)?
+        .by_path::<NpcDef>(npc)?
         .get(content)
         .model
         .get(content)
@@ -561,18 +561,12 @@ fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
     Some(value)
 }
 
-/// Fills each empty reference in a new node with the first row the script may name.
-pub fn fill_references(
-    root: &Value,
-    schema: &Value,
-    value: &mut Value,
-    files: &ProjectFiles,
-    reader: &RowName,
-) {
+/// Fills each empty reference in a new node with the first file of its type.
+pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &ProjectFiles) {
     let schema = schema::resolve(root, schema);
     if let Some(table) = schema::table_of(schema) {
         if value.as_str().is_some_and(str::is_empty)
-            && let Some(key) = files.keys_in_reach(table, Some(reader)).min()
+            && let Some(key) = files.index().paths_of(table).min()
         {
             *value = Value::from(key);
         }
@@ -582,7 +576,7 @@ pub fn fill_references(
         schema::SchemaKind::Object => {
             for (name, field) in schema::properties(schema) {
                 if let Some(inner) = value.get_mut(name) {
-                    fill_references(root, field, inner, files, reader);
+                    fill_references(root, field, inner, files);
                 }
             }
         }
@@ -591,12 +585,12 @@ pub fn fill_references(
                 .iter()
                 .find(|alternative| schema::fits(root, alternative, value))
             {
-                fill_references(root, alternative, value, files, reader);
+                fill_references(root, alternative, value, files);
             }
         }
         schema::SchemaKind::Union(variants) => {
             if let Some(variant) = schema::variant_of(&variants, value) {
-                fill_references(root, variant.schema, value, files, reader);
+                fill_references(root, variant.schema, value, files);
             }
         }
         _ => {}
@@ -880,28 +874,28 @@ impl NodeReads {
     fn note(&mut self, content: &Content, query: &RiftQuery) {
         match query {
             RiftQuery::Memory { memory, .. } | RiftQuery::SetWithin { memory, .. } => {
-                self.memories.push(memory.key(content).to_owned());
+                self.memories.push(memory.path(content).to_owned());
             }
             RiftQuery::Holding { item, .. } => {
-                self.items.push(format!("holding {}", item.key(content)));
+                self.items.push(format!("holding {}", item.path(content)));
             }
             RiftQuery::Wearing { item, .. } => {
-                self.items.push(format!("wearing {}", item.key(content)));
+                self.items.push(format!("wearing {}", item.path(content)));
             }
             RiftQuery::Inside { object, .. } => self.places.push(format!("inside {object}")),
             RiftQuery::InArea { area, .. } => {
-                self.places.push(format!("in area/{}", area.key(content)));
+                self.places.push(format!("in area/{}", area.path(content)));
             }
             RiftQuery::KnowsArea { area, .. } => {
                 self.places
-                    .push(format!("knows area/{}", area.key(content)));
+                    .push(format!("knows area/{}", area.path(content)));
             }
             RiftQuery::OnQuest { quest, .. }
             | RiftQuery::QuestDone { quest, .. }
             | RiftQuery::QuestCooling { quest, .. }
             | RiftQuery::TaskDone { quest, .. }
             | RiftQuery::QuestResetsIn { quest, .. } => {
-                self.other.push(format!("quest/{}", quest.key(content)));
+                self.other.push(format!("quest/{}", quest.path(content)));
             }
             RiftQuery::Level { .. } => self.other.push("the level".to_owned()),
             _ => {}

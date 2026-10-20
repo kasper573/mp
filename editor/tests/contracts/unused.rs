@@ -1,40 +1,35 @@
 use std::sync::Arc;
 
 use editor::app::Editor;
-use editor::moves::ScopeMoves;
 use editor::project::Project;
+use editor::project::files::content_holding;
 use editor::rows;
 use editor::schema::SchemaShapes;
 use editor::unused::{self, UnusedRow};
 use editor::user::{EditorSettings, UserFolder};
-use engine::core::content::{RowName, row_file};
 use serde_json::json;
-use testkit::{Game, png};
+use testkit::{Game, path, png};
 
 use crate::support;
 
 /// Wren lives in the start, behind a rock blueprint drawn from its own tileset. The hermit lives
-/// nowhere, and a stray icon is named by nothing.
+/// nowhere, a cap is worn by no one, and a stray icon is named by nothing.
 fn hermitage() -> Game {
-    let rock = json!({ "parts": [
-        { "type": "scenery", "at": { "x": 0.0, "y": 0.0 }, "tileset": "rocks", "tiles": [[0]] }
-    ] });
+    let rock = json!([
+        { "type": "scenery", "at": { "x": 0.0, "y": 0.0 }, "tileset": path("tileset", "rocks"), "tiles": [[0]] }
+    ]);
     support::game()
         .npc("wren", 10.0, json!([]))
         .npc("hermit", 10.0, json!([]))
-        .row(
-            "tileset",
-            "rocks",
-            json!({ "image": "tilesets/rocks.png", "tile": 16, "tiles": {} }),
-        )
-        .asset("tilesets/rocks.png", png(16, 16))
-        .row("blueprint", "rock", rock)
+        .item("cap", json!({ "kind": { "type": "resource" } }))
+        .row("tileset", "rocks", json!({ "tile": 16, "tiles": {} }))
+        .part("tileset", "rocks", "image.png", png(16, 16))
+        .blueprint("rock", (1, 1), json!({}), rock)
         .asset("icons/stray.png", png(16, 16))
-        .edit("area", support::AREA, |area| {
-            area["modules"] = json!([
-                { "type": "resident", "npc": "wren", "at": { "x": 2.0, "y": 2.0 } },
-                { "type": "blueprint", "blueprint": "rock", "at": { "x": 4.0, "y": 4.0 } }
-            ])
+        .edit_scene("area", support::AREA, |scene| {
+            let nodes = scene.as_array_mut().expect("a scene");
+            nodes.push(json!({ "type": "resident", "npc": path("npc", "wren"), "at": { "x": 2.0, "y": 2.0 } }));
+            nodes.push(json!({ "type": "blueprint", "label": "rock", "blueprint": path("blueprint", "rock"), "at": { "x": 4.0, "y": 4.0 } }));
         })
 }
 
@@ -67,76 +62,86 @@ fn settled(editor: &mut Editor) -> &Project {
     project
 }
 
-fn row(name: &str) -> RowName {
-    let (table, key) = name.split_once('/').expect("table/key");
-    RowName::new(table, key)
-}
-
 #[test]
 fn what_nothing_in_use_reaches_is_unused_at_any_depth() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(hermitage(), &scratch);
     let project = settled(&mut editor);
 
-    let unused: Vec<(String, &UnusedRow)> = project
+    let unused: Vec<(&str, &UnusedRow)> = project
         .unused
         .rows()
-        .map(|(row, why)| (row.to_string(), why))
+        .map(|(row, why)| (row.as_str(), why))
         .collect();
 
     assert_eq!(
         unused,
         vec![
+            (path("item", "cap").as_str(), &UnusedRow::Unnamed),
             (
-                "model/hermit".to_owned(),
-                &UnusedRow::NamedByUnused(vec![row("npc/hermit")])
+                path("model", "hermit").as_str(),
+                &UnusedRow::NamedByUnused(vec![path("npc", "hermit")])
             ),
-            ("npc/hermit".to_owned(), &UnusedRow::Unnamed),
+            (path("npc", "hermit").as_str(), &UnusedRow::Unnamed),
+            (
+                path("sfx", "item").as_str(),
+                &UnusedRow::NamedByUnused(vec![path("item", "cap")])
+            ),
         ]
     );
     let assets: Vec<&str> = project.unused.assets().collect();
-    assert_eq!(assets, ["icons/stray.png", "models/hermit.png"]);
+    assert_eq!(assets, ["icons/cap.png", "icons/stray.png"]);
 }
 
 #[test]
-fn a_tileset_named_only_by_a_palette_or_a_blueprint_part_is_used_there() {
+fn a_tileset_named_only_by_a_palette_or_a_blueprint_scene_is_used_there() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(hermitage(), &scratch);
     let project = settled(&mut editor);
-    let moves = ScopeMoves::of(project);
+    let users = |tileset: &str| -> Vec<&str> {
+        let mut users: Vec<&str> = project
+            .usages
+            .of_content(&path("tileset", tileset))
+            .iter()
+            .filter_map(|usage| content_holding(&usage.file))
+            .collect();
+        users.dedup();
+        users
+    };
 
-    let ground = moves.users(&row("tileset/start_ground")).rows;
-    let rocks = moves.users(&row("tileset/rocks")).rows;
-
-    assert_eq!(ground.into_iter().collect::<Vec<_>>(), [row("area/start")]);
-    assert_eq!(
-        rocks.into_iter().collect::<Vec<_>>(),
-        [row("blueprint/rock")]
+    assert_eq!(users("start_ground"), [path("area", "start")]);
+    assert_eq!(users("rocks"), [path("blueprint", "rock")]);
+    assert!(
+        project
+            .unused
+            .row(&path("tileset", "start_ground"))
+            .is_none()
     );
-    assert!(project.unused.row("tileset", "start_ground").is_none());
-    assert!(project.unused.row("tileset", "rocks").is_none());
+    assert!(project.unused.row(&path("tileset", "rocks")).is_none());
 }
 
 #[test]
-fn deleting_unused_content_takes_the_rows_and_files_in_one_undo_step() {
+fn deleting_unused_content_takes_the_files_and_their_parts_in_one_undo_step() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(hermitage(), &scratch);
     let project = settled(&mut editor);
-    let rows: Vec<RowName> = project.unused.rows().map(|(row, _)| row.clone()).collect();
+    let rows: Vec<String> = project.unused.rows().map(|(row, _)| row.clone()).collect();
     let assets: Vec<String> = project.unused.assets().map(str::to_owned).collect();
+    let sprites = format!("{}/sprites.png", path("model", "hermit"));
 
     let deletion = unused::delete(project, &rows, &assets).expect("deletes");
     editor.try_apply(deletion.edit).expect("applies");
 
     let project = settled(&mut editor);
     assert!(project.unused.is_empty());
-    assert!(!project.files.contains(&row_file("npc", "hermit")));
-    assert!(!project.files.contains("assets/icons/stray.png"));
-    assert!(project.files.contains(&row_file("npc", "wren")));
+    assert!(!project.files.contains(&path("npc", "hermit")));
+    assert!(!project.files.contains(&sprites));
+    assert!(!project.files.contains("icons/stray.png"));
+    assert!(project.files.contains(&path("npc", "wren")));
     editor.undo();
     let project = settled(&mut editor);
-    assert!(project.files.contains(&row_file("npc", "hermit")));
-    assert!(project.files.contains("assets/models/hermit.png"));
+    assert!(project.files.contains(&path("npc", "hermit")));
+    assert!(project.files.contains(&sprites));
 }
 
 #[test]
@@ -144,37 +149,49 @@ fn deleting_is_refused_while_something_left_behind_names_what_goes() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(hermitage(), &scratch);
     let project = settled(&mut editor);
+    let (model, npc, cap) = (
+        path("model", "hermit"),
+        path("npc", "hermit"),
+        path("item", "cap"),
+    );
 
-    let model_alone = unused::delete(project, &[row("model/hermit")], &[]).err();
-    let image_alone = unused::delete(project, &[], &["models/hermit.png".to_owned()]).err();
+    let model_alone = unused::delete(project, std::slice::from_ref(&model), &[]).err();
+    let icon_alone = unused::delete(project, &[], &["icons/cap.png".to_owned()]).err();
 
     assert_eq!(
-        model_alone.as_deref(),
-        Some("npc/hermit still names model/hermit: tick it too, or keep model/hermit")
+        model_alone,
+        Some(format!(
+            "{npc} still names {model}: tick it too, or keep {model}"
+        ))
     );
     assert_eq!(
-        image_alone.as_deref(),
-        Some("model/hermit still names models/hermit.png: tick it too, or keep the file")
+        icon_alone,
+        Some(format!(
+            "{cap} still names icons/cap.png: tick it too, or keep the file"
+        ))
     );
 }
 
 #[test]
-fn renaming_a_tileset_rewrites_the_palettes_and_blueprint_parts_that_name_it() {
+fn renaming_a_tileset_rewrites_the_palettes_and_blueprint_scenes_that_name_it() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(hermitage(), &scratch);
 
-    rows::rename(&mut editor, "tileset", "start_ground", "meadow", false).expect("renamed");
-    rows::rename(&mut editor, "tileset", "rocks", "boulders", false).expect("renamed");
+    rows::rename(&mut editor, &path("tileset", "start_ground"), "meadow").expect("renamed");
+    rows::rename(&mut editor, &path("tileset", "rocks"), "boulders").expect("renamed");
 
     let project = settled(&mut editor);
     let palette = project
         .files
-        .text("tables/area/start/palette.csv")
+        .text(&format!("{}/palette.csv", path("area", "start")))
         .expect("the palette");
-    assert_eq!(palette, "tileset,tile,flip\nmeadow,0,\n");
+    assert_eq!(
+        palette,
+        format!("tileset,tile,flip\n{},0,\n", path("tileset", "meadow"))
+    );
     let rock = project
         .files
-        .json(&row_file("blueprint", "rock"))
+        .json(&format!("{}/scene.json", path("blueprint", "rock")))
         .expect("the rock");
-    assert_eq!(rock["parts"][0]["tileset"], "boulders");
+    assert_eq!(rock[0]["tileset"], path("tileset", "boulders"));
 }

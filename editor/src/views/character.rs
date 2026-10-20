@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::core::time::Seconds;
@@ -97,8 +97,8 @@ impl CharacterSection {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let file = row_file(CharacterSnapshot::TABLE, key);
-    let Some(mut value) = editor.row_value(CharacterSnapshot::TABLE, key) else {
+    let file = fields_file(key);
+    let Some(mut value) = editor.row_value(key) else {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
@@ -111,8 +111,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .map(|project| {
             project
                 .files
-                .keys_of(CharacterSnapshot::TABLE)
-                .map(str::to_owned)
+                .paths_of(CharacterSnapshot::TABLE)
+                .into_iter()
                 .collect()
         })
         .unwrap_or_default();
@@ -297,11 +297,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
 
 fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
-    let classes: Vec<String> = cx
-        .files
-        .keys_of(ClassDef::TABLE)
-        .map(str::to_owned)
-        .collect();
+    let classes: Vec<String> = cx.files.paths_of(ClassDef::TABLE).into_iter().collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
     let level = level_of(cx, value.text("class"), xp);
     card(ui, "Identity", |ui| {
@@ -369,11 +365,7 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     if !value["bag"].is_array() {
         value["bag"] = Value::Array(Vec::new());
     }
-    let items: Vec<String> = cx
-        .files
-        .keys_of(ItemDef::TABLE)
-        .map(str::to_owned)
-        .collect();
+    let items: Vec<String> = cx.files.paths_of(ItemDef::TABLE).into_iter().collect();
     let count = value["bag"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     card(ui, "Bag", |ui| {
@@ -442,9 +434,10 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .map(|slot| {
             let items = cx
                 .files
-                .keys_of(ItemDef::TABLE)
+                .paths_of(ItemDef::TABLE)
+                .into_iter()
                 .filter_map(|key| {
-                    let row = cx.files.json(&row_file(ItemDef::TABLE, key))?;
+                    let row = cx.files.json(&fields_file(&key))?;
                     (row["kind"]["type"] == "equipment"
                         && row["kind"]["slot"].as_str() == Some(slot))
                     .then(|| key.to_owned())
@@ -699,7 +692,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
 /// The character's class as the content last loaded knows it, with that content.
 fn class_def(cx: &FormCx, class: &str) -> Option<(Content, ClassDef)> {
     let content = cx.content.clone()?;
-    let def = content.by_key::<ClassDef>(class)?.get(&content).clone();
+    let def = content.by_path::<ClassDef>(class)?.get(&content).clone();
     Some((content, def))
 }
 
@@ -714,15 +707,15 @@ fn start(
 ) -> FormChange {
     let mut changed = FormChange::default();
     let scene_key = format!("character:{key}");
-    let file = row_file(CharacterSnapshot::TABLE, key);
+    let file = fields_file(key);
     let texture = area
         .scenes
-        .by_key
+        .by_path
         .get(&scene_key)
         .map(|scene| (scene.texture, scene.uv()));
     let spawn = cx.content.clone().map(|content| {
         let place = &content.built::<GameSettings>().initial_spawn;
-        (place.area.key(&content).to_owned(), place.at)
+        (place.area.path(&content).to_owned(), place.at)
     });
     let at_spawn = value["start"].as_str() == Some("initial_spawn");
     let (area_key, at) = if at_spawn {
@@ -772,7 +765,7 @@ fn start(
             }
         });
         if let Some(content) = cx.content.clone()
-            && let Some(area_id) = content.by_key::<AreaDef>(&area_key)
+            && let Some(area_id) = content.by_path::<AreaDef>(&area_key)
         {
             let size = area::load(&content, area_id).size;
             let (rect, _) = ui.allocate_exact_size(MAP, egui::Sense::hover());
@@ -860,8 +853,8 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .collect();
     let all: Vec<String> = cx
         .files
-        .keys_of(AreaDef::TABLE)
-        .map(str::to_owned)
+        .paths_of(AreaDef::TABLE)
+        .into_iter()
         .filter(|key| !known.contains(key))
         .collect();
     let mut remove: Option<String> = None;
@@ -974,14 +967,14 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
     let Some(content) = cx.content.clone() else {
         return Vec::new();
     };
-    let Some(id) = content.by_key::<QuestDef>(quest) else {
+    let Some(id) = content.by_path::<QuestDef>(quest) else {
         return Vec::new();
     };
     id.get(&content)
         .objectives()
         .map(|objective| match objective {
             Objective::Hold(stack) => {
-                let item = stack.item.key(&content).to_owned();
+                let item = stack.item.path(&content).to_owned();
                 ObjectiveLine {
                     label: format!("hold {item}"),
                     subject: item.clone(),
@@ -990,7 +983,7 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
                 }
             }
             Objective::Defeat { npc, count } => {
-                let npc = npc.key(&content).to_owned();
+                let npc = npc.path(&content).to_owned();
                 ObjectiveLine {
                     label: format!("defeat {npc}"),
                     subject: npc,
@@ -1005,7 +998,7 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
                 max: 1,
             },
             Objective::Deliver { item } => {
-                let item = item.key(&content).to_owned();
+                let item = item.path(&content).to_owned();
                 ObjectiveLine {
                     label: format!("deliver {item}"),
                     subject: item,
@@ -1025,11 +1018,7 @@ fn quests(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let all: Vec<String> = cx
-        .files
-        .keys_of(QuestDef::TABLE)
-        .map(str::to_owned)
-        .collect();
+    let all: Vec<String> = cx.files.paths_of(QuestDef::TABLE).into_iter().collect();
     let in_log: Vec<String> = value["quests"]
         .as_array()
         .into_iter()
@@ -1071,20 +1060,17 @@ fn quests(
                         .zip(parties.as_ref())
                         .and_then(|(content, parties)| {
                             content
-                                .by_key::<QuestDef>(quest)
+                                .by_path::<QuestDef>(quest)
                                 .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
                         });
-                let requires = cx
-                    .files
-                    .json(&row_file(QuestDef::TABLE, quest))
-                    .and_then(|row| {
-                        row["modules"].as_array().and_then(|modules| {
-                            modules
-                                .iter()
-                                .find(|m| m["type"] == "requires")
-                                .map(|m| condition::summary(&m["condition"]))
-                        })
-                    });
+                let requires = cx.files.json(&fields_file(quest)).and_then(|row| {
+                    row["modules"].as_array().and_then(|modules| {
+                        modules
+                            .iter()
+                            .find(|m| m["type"] == "requires")
+                            .map(|m| condition::summary(&m["condition"]))
+                    })
+                });
                 let subtitle = match standing {
                     Standing::NotTaken => requires
                         .map(|r| format!("needs {r}"))
@@ -1241,7 +1227,7 @@ fn quests(
 
 fn giver_of<'p>(cx: &FormCx, parties: Option<&'p Parties>, quest: &str) -> Option<&'p Party> {
     let content = cx.content.clone()?;
-    let id = content.by_key::<QuestDef>(quest)?;
+    let id = content.by_path::<QuestDef>(quest)?;
     parties?.giver(id)
 }
 
@@ -1273,7 +1259,7 @@ impl Moment {
     fn all(cx: &FormCx, quest: &str) -> Vec<Moment> {
         let mut moments = vec![Moment::JustOffered, Moment::ObjectivesMet];
         if let Some(content) = cx.content.clone()
-            && let Some(id) = content.by_key::<QuestDef>(quest)
+            && let Some(id) = content.by_path::<QuestDef>(quest)
         {
             for objective in id.get(&content).objectives() {
                 if let Objective::Decide { paths, .. } = objective {
@@ -1336,7 +1322,7 @@ fn apply_moment(
     let objectives = objectives_of(cx, quest);
     let giver_place = cx.content.as_ref().and_then(|content| {
         let home = area::residence(content, giver_of(cx, parties, quest)?.npc?)?;
-        Some((home.area.key(content).to_owned(), home.at))
+        Some((home.area.path(content).to_owned(), home.at))
     });
     match &moment {
         Moment::JustOffered => set_standing(value, quest, Standing::NotTaken),
@@ -1396,9 +1382,10 @@ fn memories(
     let mut changed = FormChange::default();
     let defs: Vec<MemoryEntry> = cx
         .files
-        .keys_of(MemoryDef::TABLE)
+        .paths_of(MemoryDef::TABLE)
+        .into_iter()
         .filter_map(|key| {
-            let row = cx.files.json(&row_file(MemoryDef::TABLE, key))?;
+            let row = cx.files.json(&fields_file(&key))?;
             Some(MemoryEntry {
                 key: key.to_owned(),
                 ty: row.kind_or("boolean").to_owned(),
@@ -1534,7 +1521,7 @@ fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
 }
 
 fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
-    let row = cx.files.json(&row_file(ItemDef::TABLE, item))?;
+    let row = cx.files.json(&fields_file(item))?;
     row["modules"]
         .as_array()?
         .iter()
@@ -1548,7 +1535,7 @@ pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(CharacterSnapshot::TABLE, key) else {
+    let Some(row) = editor.row_value(key) else {
         return;
     };
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
@@ -1557,7 +1544,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;
     let class = row.text("class");
     let def = content
-        .by_key::<ClassDef>(class)
+        .by_path::<ClassDef>(class)
         .map(|id| id.get(&content).clone());
     let tiers = def.as_ref().map_or(&[][..], |def| def.levels.as_slice());
     let level = def.as_ref().map_or(0, |def| def.level_at(xp));
@@ -1584,7 +1571,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ),
         _ => format!(
             "{} · the initial spawn",
-            settings.initial_spawn.area.key(&content)
+            settings.initial_spawn.area.path(&content)
         ),
     };
     widgets::kv_text(ui, "level", format!("{level}{next}"));
@@ -1609,7 +1596,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     );
     widgets::kv_text(ui, "health", format!("{} of {}", health, health));
     widgets::kv_text(ui, "starts", starts);
-    widgets::kv_code(ui, "file", row_file(CharacterSnapshot::TABLE, key));
+    widgets::kv_code(ui, "file", fields_file(key));
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if controls::marked_primary(ui, Mark::Play, format!("Play as {key}")).clicked() {

@@ -3,9 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, Ui};
 
-use super::dialogs::{DialogKeys, card, keys};
-use super::move_dialogs::{answer, error_line, title};
-use super::{content_list, theme, widgets};
+use super::dialogs::{DialogKeys, answer, card, error_line, keys, title};
+use super::{theme, widgets};
 use crate::app::{Editor, FindUnusedDialog, ModalDialog};
 use crate::rows;
 use crate::unused::{self, UnusedItem, UnusedRow};
@@ -123,8 +122,8 @@ pub fn find_unused_dialog(
     }
     if let Some(item) = opened {
         match item {
-            UnusedItem::Row(row) => editor.open_row(&row.table, &row.key),
-            UnusedItem::Asset(path) => content_list::open_asset(editor, path),
+            UnusedItem::Row(row) => editor.open_path(&row),
+            UnusedItem::Asset(path) => editor.open_media(&path),
         }
         return None;
     }
@@ -151,21 +150,18 @@ pub fn find_unused_dialog(
     }
 }
 
-fn delete(
-    editor: &mut Editor,
-    rows: &[engine::core::content::RowName],
-    assets: &[String],
-) -> Result<(), String> {
+fn delete(editor: &mut Editor, rows: &[String], assets: &[String]) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let deletion = unused::delete(project, rows, assets)?;
     let label = deletion.edit.label.clone();
     editor.try_apply(deletion.edit)?;
-    for row in deletion.rows.iter().chain(&deletion.along) {
-        rows::close_tabs(editor, &row.table, &row.key);
-        if editor.selection.table == row.table {
-            editor.selection.keys.retain(|key| *key != row.key);
-        }
+    for row in &deletion.rows {
+        rows::close_tabs(editor, row);
     }
+    editor
+        .selection
+        .keys
+        .retain(|key| !deletion.rows.contains(key));
     editor.toast(label.replacen("Delete", "Deleted", 1));
     Ok(())
 }
@@ -175,10 +171,9 @@ fn groups(editor: &Editor) -> Vec<Group> {
     let Some(project) = &editor.project else {
         return Vec::new();
     };
-    let owners = project.files.owners();
     let mut by_table: BTreeMap<&str, Vec<Member>> = BTreeMap::new();
     for (row, why) in project.unused.rows() {
-        let mut note = match why {
+        let note = match why {
             UnusedRow::Unnamed => "nothing names it".to_owned(),
             UnusedRow::NamedByUnused(by) => format!(
                 "named only by unused {}",
@@ -188,14 +183,14 @@ fn groups(editor: &Editor) -> Vec<Group> {
                     .join(", ")
             ),
         };
-        if let Some(owner) = owners.owner(&row.table, &row.key) {
-            note = format!("local to {owner} · {note}");
-        }
-        by_table.entry(&row.table).or_default().push(Member {
-            item: UnusedItem::Row(row.clone()),
-            name: row.key.clone(),
-            note,
-        });
+        by_table
+            .entry(engine::core::content::table_of(row).unwrap_or_default())
+            .or_default()
+            .push(Member {
+                item: UnusedItem::Row(row.clone()),
+                name: row.clone(),
+                note,
+            });
     }
     let mut groups: Vec<Group> = editor
         .shapes

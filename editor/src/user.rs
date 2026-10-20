@@ -107,18 +107,27 @@ pub struct EditorSettings {
     pub listeners: BTreeMap<String, [f32; 2]>,
     pub views: BTreeMap<String, SpreadsheetView>,
     pub last_play: Option<String>,
-    pub content_folds: BTreeMap<String, ContentFolds>,
-    /// By project folder, the content list folders kept with nothing listed in them yet, each
-    /// written `table/folder`.
-    pub folders: BTreeMap<String, std::collections::BTreeSet<String>>,
+    /// By project folder, how its content tree is shown.
+    pub content_trees: BTreeMap<String, TreeView>,
 }
 
-/// What a content list folded: categories folded or unfolded by hand, and the tables unfolded.
+/// How a tree is shown: the folders open, by path, and the kinds of rows left out.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct ContentFolds {
-    pub categories: BTreeMap<String, bool>,
-    pub tables: std::collections::BTreeSet<String>,
+pub struct TreeView {
+    pub open: std::collections::BTreeSet<String>,
+    pub hidden_kinds: std::collections::BTreeSet<String>,
+    pub hide_empty_folders: bool,
+}
+
+impl TreeView {
+    /// Keeps open the folders that moved, where they went.
+    pub fn moved(&mut self, moved: &dyn Fn(&str) -> Option<String>) {
+        self.open = std::mem::take(&mut self.open)
+            .into_iter()
+            .map(|path| moved(&path).unwrap_or(path))
+            .collect();
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

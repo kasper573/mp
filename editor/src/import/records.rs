@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::actor::ModelDef;
 use serde::{Deserialize, Serialize};
 
@@ -161,6 +161,20 @@ impl ImportRecords {
         self.records
             .retain(|seen| !(seen.table == table && seen.key == key));
         self.save();
+    }
+
+    /// Keeps the records of what moved, at where it went.
+    pub fn moved(&mut self, moved: &dyn Fn(&str) -> Option<String>) {
+        let mut changed = false;
+        for record in &mut self.records {
+            if let Some(to) = moved(&record.key) {
+                record.key = to;
+                changed = true;
+            }
+        }
+        if changed {
+            self.save();
+        }
     }
 
     pub fn remember(&mut self, record: ImportRecord) {

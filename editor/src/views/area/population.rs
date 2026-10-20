@@ -1,5 +1,5 @@
 use egui::{Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
@@ -19,7 +19,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
         return;
     };
-    let Some(row) = cx.files.json(&row_file(NpcDef::TABLE, &npc)) else {
+    let Some(row) = cx.files.json(&fields_file(&npc)) else {
         return;
     };
     widgets::section(ui, &format!("From npc/{npc}"));
@@ -118,7 +118,7 @@ pub fn npc_sprite(
     content: &Content,
     npc: &str,
 ) -> Option<NpcSprite> {
-    let def = content.by_key::<NpcDef>(npc)?.get(content);
+    let def = content.by_path::<NpcDef>(npc)?.get(content);
     model_sprite(editor, ctx, content, def.model)
 }
 

@@ -5,12 +5,9 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{Content, ContentRow, LoadReport, RowName, row_file};
+use engine::core::content::{Content, ContentFile, LoadReport, fields_file, parent_of};
 use engine::core::script::VariableType;
-use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
-use engine::systems::npc::NpcDef;
-use engine::systems::registry;
 use serde_json::{Map, Value};
 
 use crate::keymap::EditorKey;
@@ -79,7 +76,7 @@ impl<'a> FormCx<'a> {
         self.row_key = key.map(str::to_owned);
         self.locks = key.map_or_else(Vec::new, |key| self.shapes.locks(table, key).to_vec());
         self.load_errors = match (self.report, key) {
-            (Some(report), Some(key)) => crate::project::errors_in(report, &row_file(table, key))
+            (Some(report), Some(key)) => crate::project::errors_in(report, &fields_file(key))
                 .into_iter()
                 .collect(),
             _ => HashMap::new(),
@@ -87,41 +84,32 @@ impl<'a> FormCx<'a> {
         self
     }
 
-    /// The row this form edits, from which what it may name is reckoned.
-    pub fn reader(&self) -> Option<RowName> {
-        Some(RowName::new(
-            self.row_table.as_deref()?,
-            self.row_key.as_deref()?,
-        ))
+    /// Shows the load errors of `file` beside their fields instead: a part of the bundle being
+    /// edited that this form edits rather than its config.
+    pub fn errors_of(mut self, file: &str) -> FormCx<'a> {
+        self.load_errors = self
+            .report
+            .map(|report| {
+                crate::project::errors_in(report, file)
+                    .into_iter()
+                    .collect()
+            })
+            .unwrap_or_default();
+        self
     }
 
-    /// Whether the row this form edits may name any row of a table, local or not.
-    pub fn sees_all_rows(&self) -> bool {
-        self.row_table
-            .as_deref()
-            .is_some_and(|table| registry().sees_all_rows(table))
-    }
-
-    /// Whether the row this form edits may name `table/key`: a global row, or one local to it or
-    /// to an owner above it.
-    pub fn reaches(&self, table: &str, key: &str) -> bool {
-        self.files.reaches(self.reader().as_ref(), table, key)
-    }
-
-    /// Where rows in reach of this form's row live, nearest first: the row itself, each owner
-    /// above it, and then global (`None`). Empty for a row that sees every row.
-    pub fn scopes(&self) -> Vec<Option<RowName>> {
-        if self.sees_all_rows() {
-            return Vec::new();
-        }
-        let owners = self.files.owners();
-        let mut scopes = Vec::new();
-        if let Some(reader) = self.reader() {
-            scopes.extend(owners.chain(&reader.table, &reader.key).cloned().map(Some));
-            scopes.insert(0, Some(reader));
-        }
-        scopes.push(None);
-        scopes
+    /// How `path` reads from the file this form edits: how many folders up from it their paths
+    /// meet, and the path from there.
+    pub fn seen_from_here(&self, path: &str) -> (usize, String) {
+        let here: Vec<&str> = self.row_key.as_deref().map_or(Vec::new(), |own| {
+            parent_of(own)
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .collect()
+        });
+        let there: Vec<&str> = path.split('/').collect();
+        let shared = here.iter().zip(&there).take_while(|(a, b)| a == b).count();
+        (here.len() - shared, there[shared..].join("/"))
     }
 }
 
@@ -155,22 +143,12 @@ pub struct FormState {
 }
 
 pub enum FormAction {
-    OpenRow {
-        table: String,
-        key: String,
-    },
-    OpenNode {
-        name: String,
-    },
-    PickPlace {
-        path: String,
-    },
-    NewRow {
-        table: String,
-        path: String,
-        owner: Option<RowName>,
-    },
+    OpenRow { table: String, key: String },
+    OpenNode { name: String },
+    PickPlace { path: String },
+    NewRow { table: String, path: String },
     RowAction(browser::BrowserAction),
+    Reveal { path: String },
 }
 
 #[derive(Default)]
@@ -1558,9 +1536,9 @@ fn asset(
 fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let mut faces: Vec<String> = busts::generic().map(str::to_owned).collect();
     if let Some(speaker) = &cx.speaker
-        && let Some(npc) = cx.files.json(&row_file(NpcDef::TABLE, speaker))
+        && let Some(npc) = cx.files.json(&fields_file(speaker))
         && let Some(model) = npc["model"].as_str()
-        && let Some(model) = cx.files.json(&row_file(ModelDef::TABLE, model))
+        && let Some(model) = cx.files.json(&fields_file(model))
     {
         for module in model["modules"].as_array().into_iter().flatten() {
             if module["type"] == "bust" {

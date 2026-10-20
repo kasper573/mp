@@ -1,11 +1,12 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
-use engine::core::content::{Content, ContentRow, GAME_FILE, row_of};
+use engine::core::content::{Content, SETTINGS_FILE};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaDef, AreaId, ObjectShape};
+use engine::systems::area::{self, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, ProjectFiles};
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
@@ -29,7 +30,7 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for usage in project.usages.of_row(AreaDef::TABLE, area_key) {
+    for usage in project.usages.of_content(area_key) {
         let Some(parent) = usage.pointer.strip_suffix("/area") else {
             continue;
         };
@@ -42,7 +43,7 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
         let (Some(x), Some(y)) = (place["x"].as_f64(), place["y"].as_f64()) else {
             continue;
         };
-        let initial_spawn = usage.file == GAME_FILE && parent == INITIAL_SPAWN;
+        let initial_spawn = usage.file == SETTINGS_FILE && parent == INITIAL_SPAWN;
         out.push(ArrivalPin {
             file: usage.file.clone(),
             pointer: parent.to_owned(),
@@ -62,7 +63,7 @@ pub fn warp_objects(content: &Content, area_id: AreaId) -> Vec<ObjectShape> {
 
 impl ArrivalPin {
     pub fn names(&self, editor: &Editor) -> (String, Option<String>) {
-        let owner = row_of(&self.file)
+        let owner = content_of(&self.file)
             .map(|(_, key)| key.to_owned())
             .unwrap_or_else(|| self.file.clone());
         let spot = editor
@@ -172,7 +173,7 @@ pub fn open_pin(editor: &mut Editor, pin: PinHit) {
             editor.toast("The game's spawn: set in game.json; drag the pin to move it")
         }
         PinHit::Place { file, pointer } => {
-            if let Some((table, key)) = row_of(&file) {
+            if let Some((table, key)) = content_of(&file) {
                 let (table, key) = (table.to_owned(), key.to_owned());
                 editor.open_row(&table, &key);
                 editor.toast(format!("{table}/{key} {pointer}"));
@@ -206,7 +207,7 @@ pub fn set_spawn(editor: &mut Editor, area: &str, at: Pos<Tiles>) {
     let Some(mut game) = editor
         .project
         .as_ref()
-        .and_then(|p| p.files.json_owned(GAME_FILE))
+        .and_then(|p| p.files.json_owned(SETTINGS_FILE))
     else {
         return;
     };
@@ -215,12 +216,12 @@ pub fn set_spawn(editor: &mut Editor, area: &str, at: Pos<Tiles>) {
         "Set the initial spawn to {area} {}, {}",
         at.x, at.y
     ));
-    edit.write_json(GAME_FILE, &game);
+    edit.write_json(SETTINGS_FILE, &game);
     editor.apply(edit);
 }
 
 pub fn initial_spawn_place(files: &ProjectFiles) -> Option<(String, Pos<Tiles>)> {
-    let game = files.json(GAME_FILE)?;
+    let game = files.json(SETTINGS_FILE)?;
     let area = game["initial_spawn"]["area"].as_str()?.to_owned();
     let at = Pos::new(
         game["initial_spawn"]["x"].as_f64()? as f32,

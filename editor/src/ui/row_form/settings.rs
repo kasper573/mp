@@ -1,5 +1,5 @@
 use egui::Ui;
-use engine::core::content::GAME_FILE;
+use engine::core::content::SETTINGS_FILE;
 
 use super::theme;
 use crate::app::{Editor, PlacePick};
@@ -10,11 +10,11 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
     let Some(mut value) = editor
         .project
         .as_ref()
-        .and_then(|project| project.files.json_owned(GAME_FILE))
+        .and_then(|project| project.files.json_owned(SETTINGS_FILE))
     else {
         return;
     };
-    ui.label(theme::muted(GAME_FILE).monospace().size(13.0));
+    ui.label(theme::muted(SETTINGS_FILE).monospace().size(13.0));
     ui.add_space(4.0);
     let shapes = editor.shapes.clone();
     let mut actions = Vec::new();
@@ -41,7 +41,7 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
     };
     if changed.is_some() {
         let mut edit = ContentEdit::new("Edit the game");
-        edit.write_json(GAME_FILE, &value);
+        edit.write_json(SETTINGS_FILE, &value);
         editor.apply(edit);
     }
     for action in actions {
@@ -51,13 +51,16 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
             }
             FormAction::PickPlace { path } => {
                 editor.pick = Some(PlacePick {
-                    file: GAME_FILE.to_owned(),
+                    file: SETTINGS_FILE.to_owned(),
                     pointer: path,
                     area: None,
                 });
                 editor.toast("Click a walkable cell on an area to put the initial spawn there");
             }
-            FormAction::OpenNode { .. } | FormAction::NewRow { .. } | FormAction::RowAction(_) => {}
+            FormAction::OpenNode { .. }
+            | FormAction::NewRow { .. }
+            | FormAction::RowAction(_)
+            | FormAction::Reveal { .. } => {}
         }
     }
 }

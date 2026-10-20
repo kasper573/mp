@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
-use engine::core::content::{ModuleRule, row_file};
+use engine::core::content::{ModuleRule, fields_file};
 use engine::systems::registry;
 use engine::systems::script::ScriptModule;
 use serde_json::Value;
@@ -18,11 +18,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
     let values: Vec<(String, Value)> = selection
         .keys
         .iter()
-        .filter_map(|key| {
-            editor
-                .row_value(&table, key)
-                .map(|value| (key.clone(), value))
-        })
+        .filter_map(|key| editor.row_value(key).map(|value| (key.clone(), value)))
         .collect();
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(&table);
@@ -266,7 +262,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
     if !edits.is_empty() {
         let mut edit = ContentEdit::new(format!("Edit {} {table} rows", edits.len()));
         for (key, value) in &edits {
-            edit.write_json(row_file(&table, key), value);
+            edit.write_json(fields_file(key), value);
         }
         editor.apply(edit);
     }

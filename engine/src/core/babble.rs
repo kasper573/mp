@@ -24,7 +24,7 @@ use crate::core::time::{Hertz, PlaybackRate, Seconds};
 pub type BabbleId = ContentId<BabbleDef>;
 pub type BabbleBankId = ContentId<BabbleBankDef>;
 
-const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
+pub const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
 const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
 const WORD_GAP: Seconds = Seconds(0.05);
 const CLAUSE_GAP: Seconds = Seconds(0.12);

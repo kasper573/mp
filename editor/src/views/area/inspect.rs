@@ -1,35 +1,32 @@
-use std::collections::HashSet;
-use std::str::FromStr;
-
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, GAME_FILE, row_file};
+use engine::core::content::{Content, ContentFile, fields_file, table_of};
 use engine::core::math::Rng;
 use engine::core::script::VariableType;
-use engine::core::tiling::{Cell, CellPos, TileSize};
 use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::scene::scene_file;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind};
 use serde_json::Value;
 
-use super::pins::{self, INITIAL_SPAWN};
 use super::placement::{self, placement_extras};
 use super::population::from_npc;
 use super::preview::{clipboard_panel, pick_preview};
 use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
-use super::{AreaTool, AreaViewState, brush, grid, resize, stamp, terrain};
-use crate::app::{Editor, ModalDialog, PlacePick};
+use super::{AreaTool, AreaViewState, brush, grid, nodes, resize, stamp, terrain};
+use crate::app::{Editor, ModalDialog};
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
-use crate::ui::{breadcrumb, patterns, row_form, sidebar, theme, widgets};
+use crate::tabs::file_title;
+use crate::ui::{breadcrumb, content_tree, patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::{self, RowValue};
 use crate::{picker, schema, views};
 
-/// The area itself: its card, modules, palette, the spawn and the ways in.
+/// The area itself: where it is in the game folder, and its card.
 pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
     let Some(content) = editor
@@ -39,26 +36,17 @@ pub fn row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<AreaDef>(key) else {
+    let Some(area_id) = content.by_path::<AreaDef>(key) else {
         return;
     };
     if !editor.views.area.views.contains_key(&view_key) {
         return;
     }
-    let owners = editor
-        .project
-        .as_ref()
-        .map(|project| project.files.owners())
-        .unwrap_or_default();
-    if let Some(owner) = breadcrumb::show(ui, &owners, AreaDef::TABLE, key) {
-        editor.open_row(&owner.table, &owner.key);
+    if let Some(folder) = breadcrumb::show(ui, key) {
+        content_tree::reveal(editor, &folder);
     }
     ui.add_space(4.0);
     area_card(editor, ui, key, &content, area_id);
-    module_counts(editor, ui, &view_key, key);
-    palette_summary(ui, &content, area_id);
-    spawn_card(editor, ui, key, &content);
-    ways_in(editor, ui, key);
 }
 
 /// The area window's inspector: the selected modules, the blueprint parts edited in place, a paste
@@ -76,13 +64,8 @@ pub fn sidebar(editor: &mut Editor, ui: &mut Ui, key: &str) {
 
 fn selected_parts(editor: &Editor, key: &str) -> bool {
     let selection = &editor.selection;
-    let of_this_area =
-        selection.table == AreaDef::TABLE && selection.keys.first().is_some_and(|k| k == key);
-    (of_this_area
-        && selection
-            .parts
-            .iter()
-            .any(|part| super::module_index(part).is_some()))
+    let of_this_area = selection.keys.first().is_some_and(|k| k == key);
+    (of_this_area && !selection.parts.is_empty())
         || (selection.table == BlueprintDef::TABLE && !selection.parts.is_empty())
 }
 
@@ -95,7 +78,7 @@ fn tool(editor: &mut Editor, ui: &mut Ui, key: &str) {
     else {
         return;
     };
-    let Some(area_id) = content.by_key::<AreaDef>(key) else {
+    let Some(area_id) = content.by_path::<AreaDef>(key) else {
         return;
     };
     if !editor.views.area.views.contains_key(&view_key) {
@@ -218,20 +201,6 @@ fn flip_chip(ui: &mut Ui, axis: &str, key: EditorKey, on: bool) -> bool {
         .response
         .interact(Sense::click());
     response.clicked()
-}
-
-fn palette_summary(ui: &mut Ui, content: &Content, area_id: AreaId) {
-    let grids = &area::load(content, area_id).grids;
-    let tilesets: HashSet<&String> = grids.palette_keys.iter().map(|row| &row.tileset).collect();
-    widgets::section(ui, "Palette of this area");
-    widgets::hint(
-        ui,
-        &format!(
-            "{} tiles from {} tilesets",
-            widgets::thousands(grids.palette.len()),
-            tilesets.len()
-        ),
-    );
 }
 
 fn terrain_card(
@@ -366,14 +335,15 @@ fn repaint_layer(
     layer: usize,
 ) {
     let Some(def) = content
-        .by_key::<area::tileset::TilesetDef>(tileset)
+        .by_path::<area::tileset::TilesetDef>(tileset)
         .map(|id| id.get(content))
     else {
         return;
     };
-    let area = area::load(content, area_id);
-    let key = area_id.key(content).to_owned();
-    let mut draft = grid::GridDraft::of(&key, &area.grids);
+    let key = area_id.path(content).to_owned();
+    let Some(mut draft) = grid::GridDraft::own(content, &key) else {
+        return;
+    };
     let mut rng = Rng::new(editor.frame);
     let (changed, kept) = super::terrain::repaint(&mut draft, layer, def, tileset, set, &mut rng);
     if changed == 0 {
@@ -467,7 +437,9 @@ fn overlays_legend(ui: &mut Ui) {
 
 fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content) {
     let stamp = editor.views.area.view(view_key).stamp.clone();
-    let viewed = super::viewed_row(view_key).expect("an area or blueprint view");
+    let viewed = super::viewed_bundle(view_key)
+        .expect("an area or blueprint view")
+        .to_owned();
     let mut save = false;
     tool_card(ui, "Stamp", |ui| {
         let mut picked = stamp.clone().unwrap_or_default();
@@ -482,7 +454,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             let project = project.as_ref().expect("project");
             let root = Value::Null;
             let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                .editing(&viewed.table, Some(&viewed.key));
+                .editing(table_of(&viewed).unwrap_or_default(), Some(&viewed));
             widgets::kv(ui, "blueprint", |ui| {
                 if picker::row(
                     ui,
@@ -563,7 +535,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
         });
         let variables = content
-            .by_key::<BlueprintDef>(&stamp)
+            .by_path::<BlueprintDef>(&stamp)
             .map(|id| id.get(content).variables.clone())
             .unwrap_or_default();
         if variables.is_empty() {
@@ -582,7 +554,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 let mut actions = Vec::new();
                 let root = Value::Null;
                 let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
-                    .editing(&viewed.table, Some(&viewed.key));
+                    .editing(table_of(&viewed).unwrap_or_default(), Some(&viewed));
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
@@ -626,7 +598,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
 }
 
 fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, area_id: AreaId) {
-    let Some(mut row) = editor.row_value(AreaDef::TABLE, key) else {
+    let Some(mut row) = editor.row_value(key) else {
         return;
     };
     let area = area::load(content, area_id);
@@ -647,7 +619,7 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
                 menu_action = Some(AreaMenu::Play);
                 ui.close();
             }
-            if ui.button("Open as row").clicked() {
+            if ui.button("Open as file").clicked() {
                 menu_action = Some(AreaMenu::OpenRow);
                 ui.close();
             }
@@ -678,36 +650,11 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
                 ui.label(theme::mono(area.tile.to_string()))
             });
         });
-        widgets::kv(ui, "ground", |ui| {
-            forms::boxed_input(ui, None, |ui| {
-                ui.label(theme::mono(format!(
-                    "{} layers · under everyone",
-                    area.grids.ground.len()
-                )))
-            });
-        });
-        widgets::kv_text(
-            ui,
-            "palette",
-            format!(
-                "{} tiles · kept by the editor",
-                widgets::thousands(area.grids.palette.len())
-            ),
-        );
-        widgets::kv_text(
-            ui,
-            "walk",
-            if area.grids.walk.iter().any(Option::is_some) {
-                "its own grid · painted"
-            } else {
-                "its own grid · nothing painted"
-            },
-        );
     });
     if let Some(name) = rename {
         row["name"] = Value::String(name);
-        let mut edit = ContentEdit::new(format!("Rename area {key}"));
-        edit.write_json(row_file(AreaDef::TABLE, key), &row);
+        let mut edit = ContentEdit::new(format!("Rename area {}", file_title(key)));
+        edit.write_json(fields_file(key), &row);
         editor.apply(edit);
     }
     match menu_action {
@@ -735,212 +682,23 @@ enum AreaMenu {
     OpenRow,
 }
 
-fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
-    let Some((spawn_area, at)) = editor
-        .project
-        .as_ref()
-        .and_then(|project| pins::initial_spawn_place(&project.files))
-    else {
-        return;
-    };
-    widgets::section(ui, "The game's spawn");
-    let mut picked = spawn_area.clone();
-    let mut actions = Vec::new();
-    let mut go = false;
-    let mut pick = false;
-    widgets::card_frame(false).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        widgets::card_title(ui, "initial spawn");
-        ui.add_space(4.0);
-        {
-            let Editor {
-                project,
-                form,
-                shapes,
-                ..
-            } = editor;
-            let project = project.as_ref().expect("project");
-            let root = Value::Null;
-            let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
-            widgets::kv(ui, "initial spawn", |ui| {
-                picker::row(
-                    ui,
-                    &mut cx,
-                    "area",
-                    &mut picked,
-                    &format!("{INITIAL_SPAWN}/area"),
-                );
-            });
-        }
-        widgets::kv(ui, "at", |ui| {
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui
-                    .add(egui::Button::new("pick"))
-                    .on_hover_text("Click a walkable cell on the area")
-                    .clicked()
-                {
-                    pick = true;
-                }
-                forms::boxed_input(ui, Some("tiles"), |ui| {
-                    ui.label(theme::mono(format!(
-                        "{}, {}",
-                        forms::tiles(at.x),
-                        forms::tiles(at.y)
-                    )))
-                })
-            });
-        });
-        if spawn_area != key && ui.button("→ Go to").clicked() {
-            go = true;
-        }
-    });
-    if picked != spawn_area
-        && let Some(target) = content.by_key::<AreaDef>(&picked)
-    {
-        let grid = area::load(content, target).size.grid();
-        let middle = CellPos::new((grid.width / 2) as i32, (grid.height / 2) as i32).center();
-        pins::set_spawn(editor, &picked, middle);
-    }
-    for action in actions {
-        row_form::act(editor, action, AreaDef::TABLE, key);
-    }
-    if pick {
-        editor.pick = Some(PlacePick {
-            file: GAME_FILE.to_owned(),
-            pointer: INITIAL_SPAWN.to_owned(),
-            area: Some(key.to_owned()),
-        });
-        editor.toast(format!(
-            "Click a walkable cell to put the spawn there ({} click for any point)",
-            EditorKey::Unsnapped.name()
-        ));
-    }
-    if go {
-        super::open_area_at(editor, &spawn_area, Some(at), None);
-    }
-}
-
-fn ways_in(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let arrivals: Vec<pins::ArrivalPin> = pins::arrivals(editor, key)
-        .into_iter()
-        .filter(|arrival| !arrival.initial_spawn)
-        .collect();
-    let name = editor
-        .row_value(AreaDef::TABLE, key)
-        .and_then(|row| row["name"].as_str().map(str::to_owned))
-        .unwrap_or_else(|| key.to_owned());
-    widgets::section_count(ui, &format!("Ways into {name}"), arrivals.len());
-    let mut open: Option<pins::ArrivalPin> = None;
-    for arrival in arrivals.iter().take(3) {
-        let (owner, spot) = arrival.names(editor);
-        let spot = spot.unwrap_or_default();
-        let response = ui
-            .horizontal(|ui| {
-                widgets::badge(ui, "place");
-                ui.label(theme::mono(&owner).size(13.0).color(theme::CODE));
-                if !spot.is_empty() {
-                    ui.label(theme::faint("·"));
-                    ui.label(theme::mono(&spot).size(13.0));
-                }
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(
-                        theme::muted(format!(
-                            "{}, {}",
-                            forms::tiles(arrival.at.x),
-                            forms::tiles(arrival.at.y)
-                        ))
-                        .monospace()
-                        .size(12.0),
-                    );
-                });
-            })
-            .response
-            .interact(Sense::click());
-        if response.clicked() {
-            open = Some(arrival.clone());
-        }
-    }
-    if arrivals.len() > 3 {
-        ui.label(
-            theme::faint(format!("… {} more", arrivals.len() - 3))
-                .monospace()
-                .size(12.5),
-        );
-    }
-    if let Some(arrival) = open {
-        pins::open_pin(
-            editor,
-            pins::PinHit::Place {
-                file: arrival.file,
-                pointer: arrival.pointer,
-            },
-        );
-    }
-}
-
-fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
-    let Some(row) = editor.row_value(AreaDef::TABLE, key) else {
-        return;
-    };
-    let mut counts: Vec<(String, usize)> = Vec::new();
-    for module in row["modules"].as_array().into_iter().flatten() {
-        let kind = module.kind_or("module").to_owned();
-        match counts.iter_mut().find(|(k, _)| *k == kind) {
-            Some((_, n)) => *n += 1,
-            None => counts.push((kind, 1)),
-        }
-    }
-    counts.sort_by_key(|(kind, _)| {
-        AreaModuleKind::from_str(kind).map_or((true, 0), |kind| (false, kind as usize))
-    });
-    let total: usize = counts.iter().map(|(_, n)| n).sum();
-    widgets::section_count(ui, "Modules", total);
-    for (kind, count) in &counts {
-        ui.horizontal(|ui| {
-            widgets::badge(ui, kind);
-            ui.label(theme::mono(kind).size(13.0));
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.label(theme::muted(count.to_string()).monospace().size(12.0));
-            });
-        });
-    }
-    ui.add_space(4.0);
-    let response = egui::Frame::new()
-        .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(8, 4))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(theme::strong("+ Add module"));
-                widgets::key_chip(ui, EditorKey::ModuleTool);
-            });
-        })
-        .response
-        .interact(Sense::click());
-    if response.clicked() {
-        let view = editor.views.area.view_mut(view_key);
-        view.set_tool(AreaTool::Module);
-        editor.toast("Click the map to add a module there, or right-click anywhere");
-    }
-}
-
 pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    let Some(area_key) = selection.keys.first().cloned() else {
+    let Some(bundle) = selection.keys.first().cloned() else {
         return;
     };
-    let Some(mut row) = editor.row_value(AreaDef::TABLE, &area_key) else {
-        return;
-    };
-    let indices: Vec<usize> = selection
+    let mut scene = nodes::scene_of(editor, &bundle);
+    let selected: Vec<String> = selection
         .parts
         .iter()
-        .filter_map(|part| super::module_index(part))
+        .filter(|part| scene.pointer(part).is_some_and(nodes::is_module))
+        .cloned()
         .collect();
-    if indices.is_empty() {
+    if selected.is_empty() {
         return;
     }
     let shapes = editor.shapes.clone();
-    let shape = shapes.shape_of(AreaDef::TABLE);
+    let shape = &shapes.scene_module;
+    let table = table_of(&bundle).unwrap_or(AreaDef::TABLE).to_owned();
     let mut changed = false;
     let mut actions = Vec::new();
     let mut out = Followups::default();
@@ -955,23 +713,27 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         } = editor;
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .editing(AreaDef::TABLE, Some(&area_key));
-        if indices.len() == 1 {
-            let index = indices[0];
-            let view = views.area.views.get_mut(&super::area_view_key(&area_key));
-            label = super::shapes::label(&row["modules"][index]);
-            changed = module_inspector(ui, &mut cx, view, &area_key, &mut row, index, &mut out);
+            .editing(&table, Some(&bundle))
+            .errors_of(&scene_file(&bundle));
+        if let [node] = selected.as_slice() {
+            let view = views.area.views.get_mut(&super::area_view_key(&bundle));
+            label = super::shapes::label(scene.pointer(node).unwrap_or(&Value::Null));
+            changed = module_inspector(ui, &mut cx, view, &bundle, &mut scene, node, &mut out);
         } else {
-            label = format!("{} modules", indices.len());
+            label = format!("{} modules", selected.len());
             ui.label(
-                theme::muted(format!("area/{area_key} › {} modules", indices.len()))
-                    .monospace()
-                    .size(13.0),
+                theme::muted(format!(
+                    "{} › {} modules",
+                    file_title(&bundle),
+                    selected.len()
+                ))
+                .monospace()
+                .size(13.0),
             );
             ui.add_space(4.0);
             widgets::card_frame(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &format!("{} modules", indices.len()), "", |ui| {
+                widgets::card_header(ui, &format!("{} modules", selected.len()), "", |ui| {
                     if ui.button("Copy as JSON").clicked() {
                         out.actions.push(super::AreaAction::Copy);
                         ui.close();
@@ -989,7 +751,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     }
                 });
                 ui.add_space(4.0);
-                changed |= placement::shared_values(ui, &mut cx, &mut row, &indices);
+                changed |= placement::shared_values(ui, &mut cx, &mut scene, &selected);
             });
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -1005,15 +767,15 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         }
     }
     if changed {
-        let mut edit = ContentEdit::new(format!("Edit {label} of {area_key}"));
-        edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
+        let mut edit = ContentEdit::new(format!("Edit {label}"));
+        edit.write_json(scene_file(&bundle), &scene);
         editor.apply(edit);
     }
     for action in actions {
-        row_form::act(editor, action, AreaDef::TABLE, &area_key);
+        row_form::act(editor, action, &table, &bundle);
     }
     for action in out.actions {
-        if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &area_key) {
+        if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &bundle) {
             super::run_action(editor, &snapshot, action);
         }
     }
@@ -1027,21 +789,21 @@ fn module_inspector(
     ui: &mut Ui,
     cx: &mut FormCx,
     view: Option<&mut AreaViewState>,
-    area_key: &str,
-    row: &mut Value,
-    index: usize,
+    bundle: &str,
+    scene: &mut Value,
+    node: &str,
     out: &mut Followups,
 ) -> bool {
-    let variants = cx.shapes.module_variants(AreaDef::TABLE);
-    let path = super::module_part(index);
-    let kind = row["modules"][index]["type"]
-        .as_str()
-        .unwrap_or("module")
-        .to_owned();
-    let module_kind = row["modules"][index].module_kind();
+    let variants = cx.shapes.scene_variants();
+    let path = node.to_owned();
+    let Some(module) = scene.pointer_mut(node) else {
+        return false;
+    };
+    let kind = module["type"].as_str().unwrap_or("module").to_owned();
+    let module_kind = module.module_kind();
     let shown_kind = kind.replace('_', " ");
     ui.label(
-        theme::muted(format!("area/{area_key} › {shown_kind}"))
+        theme::muted(format!("{} › {shown_kind}", file_title(bundle)))
             .monospace()
             .size(13.0),
     );
@@ -1069,7 +831,6 @@ fn module_inspector(
             }
         });
         ui.add_space(4.0);
-        let module = &mut row["modules"][index];
         match schema::variant_of(&variants, module) {
             Some(variant) => {
                 changed |= forms::object_without(
@@ -1108,20 +869,19 @@ fn module_inspector(
             _ => {}
         }
     });
-    let module = &mut row["modules"][index];
     match module_kind {
-        Some(AreaModuleKind::Scenery) => scenery_extras(ui, cx, module, out, index),
+        Some(AreaModuleKind::Scenery) => scenery_extras(ui, cx, module, out, node),
         Some(AreaModuleKind::Blueprint) => {
             if let Some(blueprint) = module["blueprint"].as_str().map(str::to_owned)
                 && content
                     .as_ref()
                     .and_then(|c| {
-                        c.by_key::<BlueprintDef>(&blueprint)
+                        c.by_path::<BlueprintDef>(&blueprint)
                             .map(|id| !id.get(c).variables.is_empty())
                     })
                     .unwrap_or(false)
             {
-                widgets::section(ui, &format!("Values · {blueprint}"));
+                widgets::section(ui, &format!("Values · {}", file_title(&blueprint)));
                 widgets::card_frame(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     widgets::card_title(ui, "values");
@@ -1129,7 +889,7 @@ fn module_inspector(
                     changed |= placement::placement_card(ui, cx, content.as_ref(), module, &path);
                 });
             }
-            placement_extras(ui, cx, module, out, index);
+            placement_extras(ui, cx, module, out, node);
         }
         Some(AreaModuleKind::Population | AreaModuleKind::Resident) => from_npc(ui, cx, module),
         Some(AreaModuleKind::Object) => {
@@ -1138,7 +898,7 @@ fn module_inspector(
                 ui, cx, "area", module, "scripts", &path,
             )
             .is_some();
-            object_extras(ui, module, out, index);
+            object_extras(ui, module, out, node);
         }
         Some(AreaModuleKind::Soundscape) => changed |= soundscape_extras(ui, cx, module, &path),
         _ => {}
@@ -1161,7 +921,7 @@ pub(super) fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static 
     }
 }
 
-fn object_extras(ui: &mut Ui, module: &Value, out: &mut Followups, index: usize) {
+fn object_extras(ui: &mut Ui, module: &Value, out: &mut Followups, node: &str) {
     let destinations = placement::warp_destinations(module);
     if destinations.is_empty() {
         return;
@@ -1180,7 +940,7 @@ fn object_extras(ui: &mut Ui, module: &Value, out: &mut Followups, index: usize)
         }
         let hint = "An object with script/warp leading back here, on the nearest walkable cell outside the destination";
         if ui.button("← Return door").on_hover_text(hint).clicked() {
-            out.actions.push(super::AreaAction::ReturnDoor(index));
+            out.actions.push(super::AreaAction::ReturnDoor(node.to_owned()));
         }
     });
 }

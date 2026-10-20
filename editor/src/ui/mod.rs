@@ -1,13 +1,9 @@
-pub mod assets;
 pub mod breadcrumb;
 pub mod browser;
-pub mod categories;
-pub mod content_list;
+pub mod content_tree;
 pub mod dialogs;
-pub mod folder_dialogs;
 pub mod history;
 pub mod levels;
-pub mod move_dialogs;
 pub mod output;
 pub mod patterns;
 pub mod report;
@@ -29,12 +25,12 @@ use design_tokens::{ink, sheet, slip};
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
-use engine::core::content::{ContentRow, LoadReport, RowName, row_file};
+use engine::core::content::{ContentFile, LoadReport};
 use engine::core::vfx::{VfxDef, VfxShaderDef};
 use engine::systems::class::ClassDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 
-use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
+use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::{self, EditRefusal};
 use crate::tabs::{DockRequest, EditorTab};
@@ -64,6 +60,9 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
         start::show(editor, &mut root);
     }
     dialogs::show(editor, ctx);
+    if let Some(text) = editor.copied.take() {
+        ctx.copy_text(text);
+    }
     toast(editor, ctx);
     if ctx.input(|i| i.viewport().close_requested()) && !editor.quit {
         if editor.has_unsaved() {
@@ -100,27 +99,9 @@ pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
         })
 }
 
-/// Opens the owner of the row in the active tab, climbing one level at a time.
-fn open_owner(editor: &mut Editor) {
-    let Some((table, key)) = active_tab(editor).and_then(|tab| tab.row()) else {
-        return;
-    };
-    let owner = editor
-        .project
-        .as_ref()
-        .and_then(|project| project.files.owners().owner(&table, &key).cloned());
-    match owner {
-        Some(owner) => editor.open_row(&owner.table, &owner.key),
-        None => editor.toast(format!("{table}/{key} is global: it has no owner")),
-    }
-}
-
 fn shortcuts(editor: &mut Editor, ctx: &Context) {
     if ctx.text_edit_focused() {
         return;
-    }
-    if ctx.input_mut(|i| EditorKey::OpenOwner.consume(i)) {
-        open_owner(editor);
     }
     let script_tab = matches!(active_tab(editor), Some(EditorTab::Script(_)));
     let script_hovered = editor
@@ -151,8 +132,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         editor.undo();
     }
     if search {
-        editor.panels.left = LeftTab::Content;
-        content_list::focus_search(editor, &content_list::ContentSource::Global);
+        content_tree::focus_search(editor);
     }
     if quit {
         request_close(editor, CloseThen::Quit);
@@ -248,13 +228,6 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     }
                     ui.separator();
                     if ui
-                        .add_enabled(has_project, egui::Button::new("Gather local content…"))
-                        .clicked()
-                    {
-                        move_dialogs::gather(editor);
-                        ui.close();
-                    }
-                    if ui
                         .add_enabled(has_project, egui::Button::new("Find unused content…"))
                         .clicked()
                     {
@@ -332,20 +305,12 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
         .show_separator_line(false)
         .frame(egui::Frame::new())
         .show(root, |ui| {
-            let tabs = [
-                (LeftTab::Content, "Content".to_owned()),
-                (LeftTab::Assets, "Assets".to_owned()),
-            ];
-            widgets::tabs(ui, &tabs, &mut editor.panels.left);
+            let tabs = [((), "Content".to_owned())];
+            widgets::tabs(ui, &tabs, &mut ());
             panel_body(ui, |ui| {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(10, 8))
-                    .show(ui, |ui| match editor.panels.left {
-                        LeftTab::Content => {
-                            content_list::show(editor, ui, &content_list::ContentSource::Global)
-                        }
-                        LeftTab::Assets => assets::show(editor, ui),
-                    });
+                    .show(ui, |ui| content_tree::show(editor, ui));
             });
         });
     divide(root, content.response.rect, Edge::Right);
@@ -519,16 +484,7 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
     } else if left.is_empty() {
         let selection = &editor.selection;
         if selection.keys.len() == 1 && selection.parts.is_empty() {
-            let (table, key) = (&selection.table, &selection.keys[0]);
-            left.push(format!("{table}/{key}"));
-            if let Some(owner) = editor
-                .project
-                .as_ref()
-                .and_then(|project| project.files.owners().owner(table, key).cloned())
-            {
-                left.push(format!("local to {owner}"));
-            }
-            left.push(row_file(table, key));
+            left.push(selection.keys[0].clone());
         }
     }
     let right = mem::take(&mut editor.status.right);
@@ -570,21 +526,15 @@ impl TabViewer for Viewer<'_> {
     fn title(&mut self, tab: &mut EditorTab) -> egui::WidgetText {
         let title = tab.title();
         let project = self.editor.project.as_ref();
-        let unsaved = project
-            .zip(tab.row())
-            .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
-        let prefix = project.zip(tab.row()).and_then(|(project, (table, key))| {
-            breadcrumb::tab_prefix(&project.files.owners(), &table, &key)
+        let unsaved = project.zip(tab.row()).is_some_and(|(project, (_, key))| {
+            project
+                .files
+                .files_of(&key)
+                .iter()
+                .any(|file| project.is_unsaved(file))
         });
         let mut job = LayoutJob::default();
         let italics = self.editor.preview.as_ref() == Some(tab);
-        if let Some(prefix) = prefix {
-            let format = TextFormat {
-                italics,
-                ..TextRole::Tab.format(theme::FAINT)
-            };
-            job.append(&prefix, 0.0, format);
-        }
         let format = TextFormat {
             italics,
             ..TextRole::Tab.format(egui::Color32::PLACEHOLDER)
@@ -612,10 +562,6 @@ impl TabViewer for Viewer<'_> {
             | EditorTab::Rows { .. }
             | EditorTab::Game
             | EditorTab::Asset { .. } => {
-                if let EditorTab::Row { table, key } = tab {
-                    let row = RowName::new(table.as_str(), key.as_str());
-                    sidebar::local_content(self.editor, ui, "row", row);
-                }
                 egui::Frame::new()
                     .inner_margin(CONTENT_PADDING)
                     .show(ui, |ui| {

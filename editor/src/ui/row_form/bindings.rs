@@ -3,13 +3,14 @@ use bevy::input::mouse::MouseButton;
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
 use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::input::map::{InputBinding, InputBindingKind, InputDef, KeyModifiers};
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::forms::FormChange;
 use crate::project::ProjectFiles;
+use crate::tabs::file_title;
 
 pub(super) fn bindings_section(
     ui: &mut Ui,
@@ -235,17 +236,16 @@ fn key_code(key: Key) -> Option<KeyCode> {
 /// The other inputs that carry this same binding.
 fn also_bound(files: &ProjectFiles, key: &str, binding: &Value) -> Vec<String> {
     files
-        .keys_of(InputDef::TABLE)
-        .filter(|other| *other != key)
+        .paths_of(InputDef::TABLE)
+        .into_iter()
+        .filter(|other| other != key)
         .filter(|other| {
-            files
-                .json(&row_file(InputDef::TABLE, other))
-                .is_some_and(|row| {
-                    row["bindings"]
-                        .as_array()
-                        .is_some_and(|list| list.contains(binding))
-                })
+            files.json(&fields_file(other)).is_some_and(|row| {
+                row["bindings"]
+                    .as_array()
+                    .is_some_and(|list| list.contains(binding))
+            })
         })
-        .map(|other| format!("input/{other}"))
+        .map(|other| file_title(&other).to_owned())
         .collect()
 }

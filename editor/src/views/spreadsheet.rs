@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, RowName, row_file};
+use engine::core::content::{ContentFile, fields_file, parent_of};
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
@@ -13,8 +13,8 @@ use crate::forms::{self, FormCx, FormState};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
-use crate::tabs::EditorTab;
-use crate::ui::assets::ICON_DECODES_PER_FRAME;
+use crate::tabs::{EditorTab, file_title};
+use crate::ui::browser::ICON_DECODES_PER_FRAME;
 use crate::ui::{self, browser, sidebar, theme, widgets};
 use crate::user::SpreadsheetView;
 
@@ -43,8 +43,6 @@ pub struct SpreadsheetState {
     pub editing: Option<String>,
     pub form: FormState,
     pub last_edit: Option<(String, String, String)>,
-    /// Whether the sheet reads the table flat, local rows too, rather than its global rows only.
-    pub every_scope: bool,
     focus_editor: bool,
     columns: Option<(u64, Arc<Vec<SpreadsheetColumn>>)>,
 }
@@ -60,7 +58,7 @@ impl SpreadsheetState {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColumnSource {
     Key,
-    Owner,
+    Folder,
     First(Vec<String>),
     Module { tag: String, path: Vec<String> },
 }
@@ -77,7 +75,6 @@ pub struct SpreadsheetColumn {
 
 pub struct SpreadsheetRow {
     pub key: String,
-    pub owner: Option<RowName>,
     pub value: Arc<Value>,
 }
 
@@ -92,7 +89,7 @@ impl SpreadsheetRow {
 impl SpreadsheetColumn {
     pub fn get<'a>(&self, row: &'a Value) -> Option<&'a Value> {
         match &self.source {
-            ColumnSource::Key | ColumnSource::Owner => None,
+            ColumnSource::Key | ColumnSource::Folder => None,
             ColumnSource::First(path) => dig(row, path),
             ColumnSource::Module { tag, path } => {
                 let module = row["modules"]
@@ -106,27 +103,23 @@ impl SpreadsheetColumn {
 
     pub fn text(&self, row: &SpreadsheetRow) -> Option<String> {
         match self.source {
-            ColumnSource::Key => Some(row.key.clone()),
-            ColumnSource::Owner => Some(
-                row.owner
-                    .as_ref()
-                    .map_or_else(|| "global".to_owned(), RowName::to_string),
-            ),
+            ColumnSource::Key => Some(file_title(&row.key).to_owned()),
+            ColumnSource::Folder => Some(parent_of(&row.key).to_owned()),
             _ => self.get(&row.value).map(cell_text),
         }
     }
 
     /// Whether a cell of the column is written into its row, rather than read off the row's place.
     pub fn editable(&self) -> bool {
-        !matches!(self.source, ColumnSource::Key | ColumnSource::Owner)
+        !matches!(self.source, ColumnSource::Key | ColumnSource::Folder)
     }
 
-    fn owner() -> SpreadsheetColumn {
+    fn folder() -> SpreadsheetColumn {
         SpreadsheetColumn {
-            id: "#owner".to_owned(),
-            title: "owner".to_owned(),
+            id: "#folder".to_owned(),
+            title: "folder".to_owned(),
             sub: String::new(),
-            source: ColumnSource::Owner,
+            source: ColumnSource::Folder,
             schema: Value::Null,
             numeric: false,
         }
@@ -145,8 +138,8 @@ impl SpreadsheetColumn {
 
     pub fn origin(&self) -> String {
         match &self.source {
-            ColumnSource::Key => "the row's key".to_owned(),
-            ColumnSource::Owner => "the row's owner line".to_owned(),
+            ColumnSource::Key => "the file's name".to_owned(),
+            ColumnSource::Folder => "the folder the file sits in".to_owned(),
             ColumnSource::First(path) if path.len() == 1 => "the row itself".to_owned(),
             ColumnSource::First(path) => {
                 format!("the {} list", path[..path.len() - 1].join("."))
@@ -329,19 +322,22 @@ pub fn rows_of(editor: &Editor, table: &str) -> Vec<SpreadsheetRow> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let owners = project.files.owners();
     let mut rows: Vec<SpreadsheetRow> = project
         .files
-        .keys_of(table)
+        .paths_of(table)
+        .into_iter()
         .filter_map(|key| {
             Some(SpreadsheetRow {
-                key: key.to_owned(),
-                owner: owners.owner(table, key).cloned(),
-                value: project.files.json(&row_file(table, key))?,
+                value: project.files.json(&fields_file(&key))?,
+                key,
             })
         })
         .collect();
-    rows.sort_by(|a, b| a.key.cmp(&b.key));
+    rows.sort_by(|a, b| {
+        parent_of(&a.key)
+            .cmp(parent_of(&b.key))
+            .then_with(|| file_title(&a.key).cmp(file_title(&b.key)))
+    });
     rows
 }
 
@@ -391,7 +387,7 @@ fn can_be_fought(editor: &Editor) -> BTreeSet<String> {
     content
         .ids::<NpcDef>()
         .filter(|&id| npc::can_be_fought(scripts, id))
-        .map(|id| id.key(&content).to_owned())
+        .map(|id| id.path(&content).to_owned())
         .collect()
 }
 
@@ -495,17 +491,13 @@ pub fn shown_rows(
     let view = view_of(editor, table, &columns);
     let named = named_filters(editor, table);
     let filters = filters_of(&view);
-    let (search, every_scope) = editor
+    let search = editor
         .views
         .spreadsheet
         .views
         .get(table)
-        .map(|state| (state.search.clone(), state.every_scope))
+        .map(|state| state.search.clone())
         .unwrap_or_default();
-    let all: Vec<SpreadsheetRow> = all
-        .into_iter()
-        .filter(|row| every_scope || row.owner.is_none())
-        .collect();
     let total = all.len();
     let mut rows: Vec<SpreadsheetRow> = all
         .into_iter()
@@ -516,9 +508,9 @@ pub fn shown_rows(
         })
         .filter(|row| matches_search(row, &search, &columns))
         .collect();
-    let owner = SpreadsheetColumn::owner();
+    let folder = SpreadsheetColumn::folder();
     if let Some((id, descending)) = &view.sort
-        && let Some(column) = columns.iter().chain([&owner]).find(|c| c.id == *id)
+        && let Some(column) = columns.iter().chain([&folder]).find(|c| c.id == *id)
     {
         sort_rows(&mut rows, column, *descending);
     }
@@ -546,7 +538,7 @@ fn columns_cached(
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let selection = editor.selection.clone();
-    sidebar::inspector(editor, ui, "sheet-column", None, |editor, ui| {
+    sidebar::inspector(editor, ui, "sheet-column", |editor, ui| {
         if selection.table == table
             && selection
                 .parts
@@ -568,11 +560,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
 
 fn sheet(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let (rows, columns, mut view, total) = shown_rows(editor, table);
-    let every_scope = editor.views.spreadsheet.state_mut(table).every_scope;
-    let owner = SpreadsheetColumn::owner();
-    let shown: Vec<&SpreadsheetColumn> = every_scope
-        .then_some(&owner)
-        .into_iter()
+    let folder = SpreadsheetColumn::folder();
+    let shown: Vec<&SpreadsheetColumn> = std::iter::once(&folder)
         .chain(
             view.columns
                 .iter()
@@ -662,30 +651,6 @@ fn toolbar(
             }
             ui.memory_mut(|m| m.data.insert_temp(id, text));
         });
-        if let Some(project) = &editor.project {
-            let owners = project.files.owners();
-            let all = project.files.keys_of(table).count();
-            let global = project
-                .files
-                .keys_of(table)
-                .filter(|key| !owners.is_local(table, key))
-                .count();
-            let state = editor.views.spreadsheet.state_mut(table);
-            if global < all {
-                if widgets::toggle_chip(ui, &format!("global · {global}"), !state.every_scope)
-                    .on_hover_text("the table's global rows, as the content panel lists them")
-                    .clicked()
-                {
-                    state.every_scope = false;
-                }
-                if widgets::toggle_chip(ui, &format!("all · {all}"), state.every_scope)
-                    .on_hover_text("every row of the table, local or not, with its owner")
-                    .clicked()
-                {
-                    state.every_scope = true;
-                }
-            }
-        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(theme::muted(format!("{shown} of {total} rows")));
             ui.menu_button("columns", |ui| {
@@ -760,7 +725,7 @@ fn table_body(
         .iter()
         .map(|column| match column.source {
             ColumnSource::Key => KEY_W,
-            ColumnSource::Owner => 160.0,
+            ColumnSource::Folder => 220.0,
             _ if column.title == "name" => 120.0,
             _ if column.title == "script" => 150.0,
             _ => CELL_W,
@@ -928,7 +893,7 @@ fn table_body(
                         Some(text) => {
                             let color = match column.source {
                                 ColumnSource::Key => theme::CODE,
-                                ColumnSource::Owner if row.owner.is_none() => theme::FAINT,
+                                ColumnSource::Folder => theme::MUTED,
                                 _ => theme::TEXT,
                             };
                             (text, color)
@@ -996,8 +961,12 @@ fn table_body(
             state.selected = Some((hit.key.clone(), hit.column.clone()));
             state.editing = None;
         }
-        if hit.double || (same && hit.column != "key") {
+        let folder = hit.column == SpreadsheetColumn::folder().id;
+        if !folder && (hit.double || (same && hit.column != "key")) {
             state.open_cell(hit.column.clone());
+        }
+        if folder {
+            ui::content_tree::reveal(editor, &hit.key);
         }
         editor.select(RowSelection {
             table: table.to_owned(),
@@ -1108,16 +1077,12 @@ fn write_cells(
 ) {
     let mut rows: BTreeMap<String, Value> = BTreeMap::new();
     for (key, column, value) in cells {
-        let Some(row) = rows
-            .get(key)
-            .cloned()
-            .or_else(|| editor.row_value(table, key))
-        else {
+        let Some(row) = rows.get(key).cloned().or_else(|| editor.row_value(key)) else {
             continue;
         };
         let mut row = row;
         match &column.source {
-            ColumnSource::Key | ColumnSource::Owner => continue,
+            ColumnSource::Key | ColumnSource::Folder => continue,
             ColumnSource::First(path) => {
                 set_path(&mut row, path, value.clone());
             }
@@ -1141,7 +1106,7 @@ fn write_cells(
     }
     let mut edit = ContentEdit::new(label);
     for (key, row) in &rows {
-        edit.write_json(row_file(table, key), row);
+        edit.write_json(fields_file(key), row);
     }
     editor.apply(edit);
 }

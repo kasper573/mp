@@ -5,6 +5,8 @@ use engine::systems::area;
 use super::{AreaFrame, AreaTool, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::scene_graph;
+use crate::tabs::file_title;
 use crate::ui::{theme, widgets};
 
 pub(super) fn status_bar(
@@ -17,10 +19,11 @@ pub(super) fn status_bar(
     let mut left: Vec<String> = Vec::new();
     if let Some(place) = frame.in_place.last() {
         let parts = part_count(frame, &place.blueprint);
-        let picked = placement::selected_part_indices(editor, &place.blueprint);
-        match picked.as_slice() {
-            [one] => left.push(format!("{} · part {} of {parts}", place.blueprint, one + 1)),
-            _ => left.push(format!("{} · {parts} parts", place.blueprint)),
+        let picked = placement::selected_in_place(editor, &place.blueprint).len();
+        let title = file_title(&place.blueprint);
+        match picked {
+            0 => left.push(format!("{title} · {parts} parts")),
+            picked => left.push(format!("{title} · {picked} of {parts} parts selected")),
         }
         left.push(format!(
             "double-click a part to open it · {} goes up one level",
@@ -29,7 +32,8 @@ pub(super) fn status_bar(
     } else if let Some(blueprint) = &view.blueprint {
         let parts = part_count(frame, blueprint);
         left.push(format!(
-            "blueprint/{blueprint} · {parts} part{}",
+            "{} · {parts} part{}",
+            file_title(blueprint),
             widgets::plural(parts)
         ));
         left.push(
@@ -99,7 +103,7 @@ pub(super) fn status_bar(
                     "blocked".to_owned()
                 };
                 if let Some(surface) = area.footstep_at(cell) {
-                    what.push_str(&format!(" · {}", surface.key(&frame.content)));
+                    what.push_str(&format!(" · {}", surface.path(&frame.content)));
                 }
                 left.push(what);
             }
@@ -155,6 +159,8 @@ pub(super) fn status_bar(
 fn part_count(frame: &AreaFrame, blueprint: &str) -> usize {
     frame
         .content
-        .by_key::<area::blueprint::BlueprintDef>(blueprint)
-        .map_or(0, |id| id.get(&frame.content).parts.len())
+        .by_path::<area::blueprint::BlueprintDef>(blueprint)
+        .map_or(0, |id| {
+            scene_graph::scene_modules(&id.get(&frame.content).scene.nodes).len()
+        })
 }

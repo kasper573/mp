@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Align, Context, Layout, RichText, Ui};
-use engine::core::content::{GAME_FILE, row_of, version};
+use engine::core::content::{SETTINGS_FILE, version};
 
 use super::report::{self, ReportAction};
 use super::{theme, widgets};
 use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, content_version};
 use crate::keymap::EditorKey;
+use crate::project::files::content_of;
 use crate::project::journal::RecoveryJournal;
 use crate::templates;
 use crate::ui::{self, dialogs};
@@ -155,7 +156,7 @@ fn recent_list(editor: &mut Editor, ui: &mut Ui) {
 }
 
 pub fn game_name(folder: &Path) -> String {
-    std::fs::read_to_string(folder.join(GAME_FILE))
+    std::fs::read_to_string(folder.join(SETTINGS_FILE))
         .ok()
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
         .and_then(|game| game["name"].as_str().map(str::to_owned))
@@ -199,7 +200,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
                     .show(ui, |ui| {
                         for file in &data.files {
                             ui.horizontal(|ui| {
-                                let name = row_of(&file.path)
+                                let name = content_of(&file.path)
                                     .map(|(table, key)| format!("{table}/{key}"))
                                     .unwrap_or_else(|| file.path.clone());
                                 ui.add_sized(

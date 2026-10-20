@@ -1,13 +1,12 @@
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::assets::AssetKind;
-use engine::core::content::{ASSETS_DIR, asset_file, asset_of};
 
 use super::{Candidate, Category, Dragged, Pick, PickSource};
 use crate::forms::FormCx;
 use crate::ui::theme;
 
-/// Files under the assets folder of one kind.
+/// Media files of one kind, wherever they sit outside a bundle.
 pub struct AssetSource {
     kind: AssetKind,
 }
@@ -32,21 +31,21 @@ impl PickSource for AssetSource {
     }
 
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate> {
-        cx.files
-            .paths_under(&format!("{ASSETS_DIR}/"))
-            .map(|file| asset_of(file))
+        let index = cx.files.index();
+        index
+            .media
+            .iter()
             .filter(|path| AssetKind::of(path) == Some(self.kind))
-            .map(|path| Candidate {
-                pick: Pick::new(self.spoken(), path),
-                category: self.spoken().to_owned(),
-                name: String::new(),
-                hint: path
-                    .rsplit_once('/')
-                    .map(|(folder, _)| folder)
-                    .unwrap_or("")
-                    .to_owned(),
-                blocked: None,
-                scope: 0,
+            .map(|path| {
+                let (nearness, hint) = cx.seen_from_here(path);
+                Candidate {
+                    pick: Pick::new(self.spoken(), path),
+                    category: self.spoken().to_owned(),
+                    name: String::new(),
+                    hint,
+                    blocked: None,
+                    nearness,
+                }
             })
             .collect()
     }
@@ -54,7 +53,7 @@ impl PickSource for AssetSource {
     fn accepts(&self, _cx: &FormCx, dragged: &Dragged) -> Result<Pick, String> {
         let Dragged::Asset(path) = dragged else {
             return Err(format!(
-                "this field takes {} files, not rows",
+                "this field takes {} files, not content files",
                 self.spoken()
             ));
         };
@@ -68,7 +67,10 @@ impl PickSource for AssetSource {
     }
 
     fn shown(&self, pick: &Pick) -> (String, String) {
-        (format!("{ASSETS_DIR}/"), pick.key.clone())
+        match pick.key.rsplit_once('/') {
+            Some((folder, file)) => (format!("{folder}/"), file.to_owned()),
+            None => (String::new(), pick.key.clone()),
+        }
     }
 
     fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32) {
@@ -97,6 +99,6 @@ impl PickSource for AssetSource {
     }
 
     fn footer(&self, _cx: &FormCx, pick: &Pick) -> String {
-        asset_file(&pick.key)
+        pick.key.clone()
     }
 }

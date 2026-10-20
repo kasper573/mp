@@ -1,5 +1,5 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::render::TILE;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
@@ -218,7 +218,7 @@ fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let Some(content) = editor.loaded() else {
         return;
     };
-    let Some(model) = content.by_key::<ModelDef>(key) else {
+    let Some(model) = content.by_path::<ModelDef>(key) else {
         return;
     };
     let center = stage::center(&content);

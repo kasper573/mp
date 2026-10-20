@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use engine::core::content::{GAME_FILE, row_of};
+use engine::core::content::{SETTINGS_FILE, table_of};
 use include_dir::{Dir, include_dir};
 use walkdir::WalkDir;
 
+use crate::project::files::{content_holding, hidden};
 use crate::value::RowValue;
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
@@ -13,7 +14,7 @@ pub struct GameTemplate {
     pub key: String,
     pub name: String,
     pub initial_spawn: String,
-    /// The keys of the rows it holds, by table.
+    /// The paths of the content files it holds, by type.
     pub rows: BTreeMap<String, Vec<String>>,
 }
 
@@ -29,16 +30,20 @@ pub fn list() -> Vec<GameTemplate> {
         .map(|dir| {
             let key = dir.path().to_string_lossy().into_owned();
             let game = dir
-                .get_file(dir.path().join(GAME_FILE))
+                .get_file(dir.path().join(SETTINGS_FILE))
                 .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
                 .unwrap_or_default();
             let mut rows: BTreeMap<String, Vec<String>> = BTreeMap::new();
             for file in all_files(dir) {
                 let path = file.path().strip_prefix(dir.path()).unwrap_or(file.path());
-                if let Some((table, row)) = path.to_str().and_then(row_of) {
-                    rows.entry(table.to_owned())
-                        .or_default()
-                        .push(row.to_owned());
+                let Some(path) = path.to_str().and_then(content_holding) else {
+                    continue;
+                };
+                if let Some(table) = table_of(path) {
+                    let paths = rows.entry(table.to_owned()).or_default();
+                    if !paths.iter().any(|known| known == path) {
+                        paths.push(path.to_owned());
+                    }
                 }
             }
             GameTemplate {
@@ -81,20 +86,10 @@ pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String>
 }
 
 pub fn new_game_from(source: &Path, name: &str, folder: &Path) -> Result<(), String> {
-    if !source.join(GAME_FILE).is_file() {
-        return Err(format!("No {GAME_FILE} in {}", source.display()));
+    if !source.join(SETTINGS_FILE).is_file() {
+        return Err(format!("No {SETTINGS_FILE} in {}", source.display()));
     }
-    stage(folder, name, |staging| {
-        std::fs::copy(source.join(GAME_FILE), staging.join(GAME_FILE))
-            .map_err(|error| error.to_string())?;
-        for part in ["tables", "assets"] {
-            let from = source.join(part);
-            if from.is_dir() {
-                copy_dir(&from, &staging.join(part))?;
-            }
-        }
-        Ok(())
-    })
+    stage(folder, name, |staging| copy_dir(source, staging))
 }
 
 fn stage(
@@ -147,7 +142,7 @@ fn move_into_place(staging: &Path, folder: &Path) -> Result<(), String> {
 }
 
 fn write_name(folder: &Path, name: &str) -> Result<(), String> {
-    let path = folder.join(GAME_FILE);
+    let path = folder.join(SETTINGS_FILE);
     let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
     let mut game: serde_json::Value =
         serde_json::from_str(&text).map_err(|error| error.to_string())?;
@@ -158,7 +153,10 @@ fn write_name(folder: &Path, name: &str) -> Result<(), String> {
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
-    for entry in WalkDir::new(from) {
+    let entries = WalkDir::new(from)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name().to_str().is_none_or(|name| !hidden(name)));
+    for entry in entries {
         let entry = entry.map_err(|error| error.to_string())?;
         let target = to.join(
             entry

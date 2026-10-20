@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, RowName, row_file};
+use engine::core::content::{Content, parent_of};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::{self, AreaDef, AreaId, Flip};
+use engine::systems::area::scene::SceneNode;
+use engine::systems::area::{self, AreaId, Flip};
 use engine::systems::script::Variable;
 use serde_json::Value;
 
@@ -14,8 +15,7 @@ use super::holes::fill_holes;
 use super::{AreaFrame, modules, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::ContentEdit;
-use crate::ui::{theme, widgets};
+use crate::ui::theme;
 use crate::{rows, thumbs, value};
 
 pub fn placement_json(blueprint: &str, at: Pos<Tiles>, flip: Flip, values: &Value) -> Value {
@@ -65,29 +65,13 @@ pub fn stamp_panel(
     for placement in area::placements(content, area_id) {
         if placement.chain.len() <= 1 {
             *counts
-                .entry(placement.blueprint.key(content).to_owned())
+                .entry(placement.blueprint.path(content).to_owned())
                 .or_default() += 1;
         }
     }
-    let area_key = area_id.key(content).to_owned();
-    let area_row = RowName::new(AreaDef::TABLE, &area_key);
-    let owners = editor
-        .project
-        .as_ref()
-        .map(|project| project.files.owners())
-        .unwrap_or_default();
-    let keys = content.table::<BlueprintDef>().keys();
-    let local: Vec<&String> = keys
-        .iter()
-        .filter(|key| owners.owner(BlueprintDef::TABLE, key) == Some(&area_row))
-        .collect();
-    let global: Vec<&String> = keys
-        .iter()
-        .filter(|key| !owners.is_local(BlueprintDef::TABLE, key))
-        .collect();
-    let (show_global, needle) = {
+    let area_key = area_id.path(content).to_owned();
+    let needle = {
         let view = editor.views.area.view_mut(view_key);
-        let show_global = view.blueprints_global || local.is_empty();
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             ui.scope(|ui| {
@@ -99,35 +83,37 @@ pub fn stamp_panel(
                     None,
                 );
             });
-            ui.add_space(8.0);
-            for (value, label) in [
-                (false, format!("{area_key}'s · {}", local.len())),
-                (true, format!("global · {}", global.len())),
-            ] {
-                if widgets::toggle_chip(ui, &label, show_global == value).clicked() {
-                    view.blueprints_global = value;
-                }
-            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
                     theme::muted(format!(
-                        "one blueprint at a time · {} makes one from the selection, local to \
-                         {area_key}",
+                        "one blueprint at a time · {} makes one from the selection",
                         EditorKey::MakeBlueprint.name()
                     ))
                     .size(12.0),
                 );
             });
         });
-        (show_global, view.blueprint_search.to_lowercase())
+        view.blueprint_search.to_lowercase()
     };
-    let scope = if show_global { &global } else { &local };
-    let mut listed: Vec<(String, usize)> = scope
+    let mut listed: Vec<(usize, String, usize)> = content
+        .table::<BlueprintDef>()
+        .paths()
         .iter()
-        .filter(|k| needle.is_empty() || k.to_lowercase().contains(&needle))
-        .map(|k| ((*k).clone(), counts.get(*k).copied().unwrap_or(0)))
+        .filter(|path| needle.is_empty() || path.to_lowercase().contains(&needle))
+        .map(|path| {
+            let count = counts.get(path).copied().unwrap_or(0);
+            (folders_apart(&area_key, path), path.clone(), count)
+        })
         .collect();
-    listed.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    listed.sort_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then(b.2.cmp(&a.2))
+            .then_with(|| a.1.cmp(&b.1))
+    });
+    let listed: Vec<(String, usize)> = listed
+        .into_iter()
+        .map(|(_, path, count)| (path, count))
+        .collect();
     ui.add_space(6.0);
     let card = Vec2::new(72.0, 80.0);
     let gap = 8.0;
@@ -140,22 +126,13 @@ pub fn stamp_panel(
         listed.len()
     };
     let mut picked: Option<String> = None;
-    let mut copy_into: Option<String> = None;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = gap;
         for (key, count) in listed.iter().take(shown) {
             let selected = editor.views.area.view(view_key).stamp.as_deref() == Some(key);
             let response = blueprint_card(editor, ui, content, key, *count, selected, card);
-            if response.clicked() {
+            if response.on_hover_text(key).clicked() {
                 picked = Some(key.clone());
-            }
-            if show_global {
-                response.context_menu(|ui| {
-                    if ui.button(format!("Copy into {area_key}")).clicked() {
-                        copy_into = Some(key.clone());
-                        ui.close();
-                    }
-                });
             }
         }
         if listed.len() > shown {
@@ -166,11 +143,7 @@ pub fn stamp_panel(
                 EStroke::new(1.0, theme::BORDER),
                 egui::StrokeKind::Inside,
             );
-            let text = format!(
-                "{} more{}",
-                listed.len() - shown,
-                if show_global { "" } else { " here" }
-            );
+            let text = format!("{} more", listed.len() - shown);
             ui.painter().text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -180,10 +153,6 @@ pub fn stamp_panel(
             );
         }
     });
-    if let Some(key) = copy_into {
-        picked = local_copy(editor, &key, &area_row);
-        editor.views.area.view_mut(view_key).blueprints_global = false;
-    }
     if let Some(key) = picked {
         let view = editor.views.area.view_mut(view_key);
         view.set_tool(super::AreaTool::Stamp);
@@ -191,22 +160,18 @@ pub fn stamp_panel(
     }
 }
 
-/// Copies a global blueprint into a variant local to `area`, to edit freely, and answers its key.
-fn local_copy(editor: &mut Editor, key: &str, area: &RowName) -> Option<String> {
-    let project = editor.project.as_ref()?;
-    let value = project.files.json(&row_file(BlueprintDef::TABLE, key))?;
-    let copy = rows::free_key(
-        &project.files,
-        BlueprintDef::TABLE,
-        &format!("{}_{key}", area.key),
-    );
-    let mut edit = ContentEdit::new(format!("Copy blueprint/{key} into {area} as {copy}"));
-    edit.write_json(
-        row_file(BlueprintDef::TABLE, &copy),
-        &rows::owned_row(area, &value),
-    );
-    editor.try_apply(edit).ok()?;
-    Some(copy)
+/// How many folders up from `here` the path of `there` branches off: 0 for a file beside it.
+fn folders_apart(here: &str, there: &str) -> usize {
+    let folders = |path: &str| -> Vec<String> {
+        parent_of(path)
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
+    let (here, there) = (folders(here), folders(there));
+    let shared = here.iter().zip(&there).take_while(|(a, b)| a == b).count();
+    here.len() - shared
 }
 
 pub(super) fn stamp_values(editor: &Editor, stamp: Option<&str>) -> Value {
@@ -364,11 +329,9 @@ pub fn stamp_footprint(
     values: &Value,
 ) -> Size<Tiles> {
     let flip = stamp_flip(editor, stamp);
-    let Some(module) = placement_module(content, stamp, Pos::new(0.0, 0.0), flip, values) else {
-        return Size::splat(1.0);
-    };
+    let placement = SceneNode::Module(placement_json(stamp, Pos::new(0.0, 0.0), flip, values));
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(content, &[module], &mut errors);
+    let flattening = area::blueprint::flatten(content, &[placement], &mut errors);
     let mut bounds: Option<Rect<Tiles>> = None;
     for placed in flattening.modules {
         if let Ok(json) = value::json(&placed.module)
@@ -434,7 +397,7 @@ pub(super) fn place_stamps(
     placed: Vec<Pos<Tiles>>,
 ) {
     let content = frame.content.clone();
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(stamp) else {
+    let Some(id) = content.by_path::<area::blueprint::BlueprintDef>(stamp) else {
         return;
     };
     let def = id.get(&content);

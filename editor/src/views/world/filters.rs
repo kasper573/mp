@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::area::{AreaDef, AreaId, AreaModuleKind};
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
@@ -329,7 +329,7 @@ fn range_in(
     };
     let mut range = None;
     for key in keys {
-        let Some(row) = files.json(&row_file(table.table(), key)) else {
+        let Some(row) = files.json(&fields_file(key)) else {
             continue;
         };
         for value in numbers_at(&row, &color.field.path) {

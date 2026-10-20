@@ -8,7 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use animation::OffsetUnit;
 use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, RowName, row_file};
+use engine::core::content::{Content, ContentFile, fields_file};
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
 use serde_json::Value;
@@ -444,7 +444,7 @@ impl OpenTileset {
     pub fn surface(&self, tile: u32) -> Option<&str> {
         self.def
             .surface(tile)
-            .map(|surface| surface.key(&self.content))
+            .map(|surface| surface.path(&self.content))
     }
 
     pub fn terrains(&self, set: &str) -> &[String] {
@@ -480,7 +480,7 @@ pub fn try_change_tileset(
     change(&mut def);
     def.tiles.retain(|_, data| !is_blank(data));
     let json = value::untyped(&content, &def).ok_or("the tileset does not write")?;
-    edit.write_json(row_file(TilesetDef::TABLE, key), &json);
+    edit.write_json(fields_file(key), &json);
     editor.try_apply(edit)
 }
 
@@ -499,7 +499,7 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
     if editor.views.tileset.views.contains_key(key) {
         return;
     }
-    let surface = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)))
+    let surface = sounds::surfaces(editor)
         .into_iter()
         .next()
         .map(|surface| surface.key);
@@ -523,8 +523,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
     let selection = editor.selection.clone();
-    let row = RowName::new(TilesetDef::TABLE, key);
-    sidebar::inspector(editor, ui, "tileset", Some(row), |editor, ui| {
+    sidebar::inspector(editor, ui, "tileset", |editor, ui| {
         if selection.table == TilesetDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()
@@ -629,7 +628,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
 }
 
 fn typed_def(editor: &Editor, content: &Content, key: &str) -> Option<TilesetDef> {
-    value::typed(content, editor.row_value(TilesetDef::TABLE, key)?)
+    value::typed(content, editor.row_value(key)?)
 }
 
 fn is_blank(data: &TileData) -> bool {
@@ -640,7 +639,7 @@ fn is_blank(data: &TileData) -> bool {
 }
 
 fn unreadable(editor: &Editor, key: &str) -> String {
-    if editor.row(TilesetDef::TABLE, key).is_none() {
+    if editor.row(key).is_none() {
         format!("tileset/{key} is gone")
     } else {
         format!("tileset/{key} does not read as a tileset; its row on the left shows why")
@@ -716,7 +715,7 @@ fn refresh_counts(editor: &mut Editor) {
     let mut surfaces: HashMap<String, SurfaceUse> = HashMap::new();
     let mut with_surface = 0;
     for id in content.ids::<TilesetDef>() {
-        let tileset = id.key(&content);
+        let tileset = id.path(&content);
         for surface in id
             .get(&content)
             .tiles
@@ -725,7 +724,7 @@ fn refresh_counts(editor: &mut Editor) {
         {
             with_surface += 1;
             let entry = surfaces
-                .entry(surface.key(&content).to_owned())
+                .entry(surface.path(&content).to_owned())
                 .or_default();
             entry.tiles += 1;
             entry.tilesets.insert(tileset.to_owned());
@@ -775,8 +774,7 @@ fn status(editor: &mut Editor, tileset: &OpenTileset) {
                 .map_or(0, |counts| counts.with_surface);
             left.push(format!(
                 "{} surfaces · {} tiles have one",
-                sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, &tileset.key)))
-                    .len(),
+                sounds::surfaces(editor).len(),
                 widgets::thousands(with_surface)
             ));
         }

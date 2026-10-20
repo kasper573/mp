@@ -7,14 +7,15 @@ use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
-use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, run_action};
-use engine::core::content::{ContentFile, row_file};
+use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, nodes, run_action};
+use engine::core::content::ContentFile;
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
 use engine::systems::area::AreaDef;
+use engine::systems::area::scene::scene_file;
 use serde_json::{Value, json};
 
-use crate::support::{AREA, game_folder};
+use crate::support::{area, game_folder};
 
 fn barn_door() -> Value {
     json!({
@@ -32,29 +33,30 @@ fn editor_with_a_door(scratch: &tempfile::TempDir) -> Editor {
         EditorSettings::default(),
     );
     editor.project = Some(project);
-    let mut row = editor
-        .row_value(AreaDef::TABLE, AREA)
-        .expect("the start area");
-    row["modules"] = json!([barn_door()]);
+    let mut scene = nodes::scene_of(&editor, &area());
+    nodes::append(&mut scene, "", vec![barn_door()]);
     let mut edit = ContentEdit::new("Add a door");
-    edit.write_json(row_file(AreaDef::TABLE, AREA), &row);
+    edit.write_json(scene_file(&area()), &scene);
     editor.try_apply(edit).expect("the door is written");
     editor
 }
 
+/// The door's node: after the ground layer the area starts with.
+const DOOR: &str = "/1";
+
 fn modules(editor: &Editor) -> Vec<Value> {
-    editor.row_value(AreaDef::TABLE, AREA).expect("the area")["modules"]
-        .as_array()
-        .cloned()
-        .expect("modules")
+    nodes::modules(&nodes::scene_of(editor, &area()))
+        .into_iter()
+        .map(|module| module.json)
+        .collect()
 }
 
 #[test]
 fn duplicating_a_module_places_its_copy_one_tile_on_under_a_fresh_name() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    editor.selection = RowSelection::parts("area", AREA, vec!["/modules/0".to_owned()]);
-    let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
+    editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec![DOOR.to_owned()]);
+    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
 
     let copies = modules(&editor);
@@ -69,8 +71,8 @@ fn duplicating_a_module_places_its_copy_one_tile_on_under_a_fresh_name() {
 fn duplicating_is_one_undo_step() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    editor.selection = RowSelection::parts("area", AREA, vec!["/modules/0".to_owned()]);
-    let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
+    editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec![DOOR.to_owned()]);
+    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
     assert_eq!(modules(&editor).len(), 2);
 
@@ -82,8 +84,8 @@ fn duplicating_is_one_undo_step() {
 fn duplicating_with_nothing_selected_changes_nothing() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    editor.selection = RowSelection::row(AreaDef::TABLE, AREA);
-    let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
+    editor.selection = RowSelection::row(AreaDef::TABLE, &area());
+    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
     run_action(&mut editor, &snapshot, AreaAction::Duplicate);
     assert_eq!(modules(&editor), vec![barn_door()]);
 }
@@ -92,9 +94,14 @@ fn duplicating_with_nothing_selected_changes_nothing() {
 fn a_snapshot_lists_the_modules_of_its_area() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
-    assert_eq!(snapshot.modules, vec![barn_door()]);
-    assert_eq!(snapshot.area_key, AREA);
+    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let listed: Vec<(&str, &Value)> = snapshot
+        .modules
+        .iter()
+        .map(|module| (module.pointer.as_str(), &module.json))
+        .collect();
+    assert_eq!(listed, vec![(DOOR, &barn_door())]);
+    assert_eq!(snapshot.area_key, area());
     assert!(AreaSnapshot::for_area(&mut editor, "nowhere").is_none());
 }
 
@@ -102,9 +109,12 @@ fn a_snapshot_lists_the_modules_of_its_area() {
 fn switching_tools_ends_the_stroke_held_across_it() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
-    let snapshot = AreaSnapshot::for_area(&mut editor, AREA).expect("the area is open");
-    let draft = GridDraft::of(&snapshot.area_key, &snapshot.area().grids);
-    let view = editor.views.area.ensure_view(&area_view_key(AREA), AREA);
+    let snapshot = AreaSnapshot::for_area(&mut editor, &area()).expect("the area is open");
+    let draft = GridDraft::own(&snapshot.content, &snapshot.area_key).expect("the area's grids");
+    let view = editor
+        .views
+        .area
+        .ensure_view(&area_view_key(&area()), &area());
     view.set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,
@@ -151,13 +161,13 @@ fn show_area(
         events,
         ..Default::default()
     };
-    let mut output = ctx.run_ui(input, |ui| editor::views::area::show(editor, ui, AREA));
+    let mut output = ctx.run_ui(input, |ui| editor::views::area::show(editor, ui, &area()));
     output.textures_delta.clear();
 }
 
 fn hold_a_stroke(editor: &mut Editor) {
-    let snapshot = AreaSnapshot::for_area(editor, AREA).expect("the area is open");
-    let draft = GridDraft::of(&snapshot.area_key, &snapshot.area().grids);
+    let snapshot = AreaSnapshot::for_area(editor, &area()).expect("the area is open");
+    let draft = GridDraft::own(&snapshot.content, &snapshot.area_key).expect("the area's grids");
     view(editor).set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,
@@ -168,5 +178,8 @@ fn hold_a_stroke(editor: &mut Editor) {
 }
 
 fn view(editor: &mut Editor) -> &mut editor::views::area::AreaViewState {
-    editor.views.area.ensure_view(&area_view_key(AREA), AREA)
+    editor
+        .views
+        .area
+        .ensure_view(&area_view_key(&area()), &area())
 }

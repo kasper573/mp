@@ -1,7 +1,5 @@
 use egui_dock::DockState;
-use engine::core::content::{
-    ContentRow, Fixture, GAME_FILE, asset_file, row_file, row_folder, table_folder,
-};
+use engine::core::content::{ContentFile, Fixture, SETTINGS_FILE, fields_file, table_of};
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -10,6 +8,7 @@ use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
 
+use crate::project::files::content_holding;
 use crate::views::script::ScriptRow;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -51,13 +50,13 @@ impl EditorTab {
             EditorTab::Row { table, .. } if table == CharacterSnapshot::TABLE => {
                 "Test characters".to_owned()
             }
-            EditorTab::Row { table, key } => format!("{table}/{key}"),
+            EditorTab::Row { key, .. }
+            | EditorTab::Area { key }
+            | EditorTab::Blueprint { key }
+            | EditorTab::Model { key }
+            | EditorTab::Tileset { key } => file_title(key).to_owned(),
             EditorTab::Rows { table, keys } => format!("{} {table}s", keys.len()),
-            EditorTab::Area { key } => format!("{}/{key}", AreaDef::TABLE),
-            EditorTab::Blueprint { key } => format!("{}/{key}", BlueprintDef::TABLE),
             EditorTab::Script(owner) => owner.title(),
-            EditorTab::Model { key } => format!("{}/{key}", ModelDef::TABLE),
-            EditorTab::Tileset { key } => format!("{}/{key}", TilesetDef::TABLE),
             EditorTab::Spreadsheet { table } => format!("{table} table"),
             EditorTab::Game => "game".to_owned(),
             EditorTab::Asset { path } => path.rsplit('/').next().unwrap_or(path).to_owned(),
@@ -66,10 +65,7 @@ impl EditorTab {
 
     pub fn row(&self) -> Option<(String, String)> {
         match self {
-            EditorTab::World => Some((
-                WorldMapDef::TABLE.to_owned(),
-                WorldMap::World.key().to_owned(),
-            )),
+            EditorTab::World => Some((WorldMapDef::TABLE.to_owned(), WorldMap::World.path())),
             EditorTab::Row { table, key } => Some((table.clone(), key.clone())),
             EditorTab::Rows { .. } => None,
             EditorTab::Area { key } => Some((AreaDef::TABLE.to_owned(), key.clone())),
@@ -84,15 +80,13 @@ impl EditorTab {
     /// Whether `file` holds any of what the tab shows, so changing it changes the tab.
     pub fn shows(&self, file: &str) -> bool {
         match self {
-            EditorTab::Rows { table, keys } => keys.iter().any(|key| holds_row(table, key, file)),
-            EditorTab::Spreadsheet { table } => {
-                file.starts_with(&format!("{}/", table_folder(table)))
-            }
-            EditorTab::Game => file == GAME_FILE,
-            EditorTab::Asset { path } => file == asset_file(path),
-            other => other
-                .row()
-                .is_some_and(|(table, key)| holds_row(&table, &key, file)),
+            EditorTab::Rows { keys, .. } => keys.iter().any(|key| holds(key, file)),
+            EditorTab::Spreadsheet { table } => content_holding(file)
+                .and_then(table_of)
+                .is_some_and(|of| of == table),
+            EditorTab::Game => file == SETTINGS_FILE,
+            EditorTab::Asset { path } => file == path,
+            other => other.row().is_some_and(|(_, key)| holds(&key, file)),
         }
     }
 
@@ -198,6 +192,13 @@ pub(crate) fn serve(dock: &mut DockState<EditorTab>, request: DockRequest) {
     }
 }
 
-fn holds_row(table: &str, key: &str, file: &str) -> bool {
-    file == row_file(table, key) || file.starts_with(&format!("{}/", row_folder(table, key)))
+/// Whether `file` is the content file at `path` or one of its parts.
+fn holds(path: &str, file: &str) -> bool {
+    file == fields_file(path) || content_holding(file) == Some(path)
+}
+
+/// How a content file is named on its tab and in lists: its file name, without `.json`.
+pub fn file_title(path: &str) -> &str {
+    let file = path.rsplit('/').next().unwrap_or(path);
+    file.strip_suffix(".json").unwrap_or(file)
 }

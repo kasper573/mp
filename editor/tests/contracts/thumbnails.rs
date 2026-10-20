@@ -7,10 +7,7 @@ use editor::thumbs::Thumbnails;
 fn an_undecodable_asset_is_decoded_once_until_its_bytes_change() {
     let ctx = egui::Context::default();
     let mut files = ProjectFiles::default();
-    files.insert(
-        "assets/broken.png".to_owned(),
-        Arc::from(&b"not an image"[..]),
-    );
+    files.insert("broken.png".to_owned(), Arc::from(&b"not an image"[..]));
     let mut thumbs = Thumbnails::default();
 
     let mut budget = 1;
@@ -29,7 +26,7 @@ fn an_undecodable_asset_is_decoded_once_until_its_bytes_change() {
     );
     assert_eq!(budget, 1, "a known failure costs nothing on later frames");
 
-    files.insert("assets/broken.png".to_owned(), png(2, 2));
+    files.insert("broken.png".to_owned(), png(2, 2));
     let mut budget = 1;
     assert!(
         thumbs
@@ -43,7 +40,7 @@ fn an_undecodable_asset_is_decoded_once_until_its_bytes_change() {
 fn an_icon_fits_its_longest_side_and_keeps_the_aspect_ratio() {
     let ctx = egui::Context::default();
     let mut files = ProjectFiles::default();
-    files.insert("assets/wide.png".to_owned(), png(64, 16));
+    files.insert("wide.png".to_owned(), png(64, 16));
     let mut thumbs = Thumbnails::default();
     let mut budget = u32::MAX;
     let icon = thumbs

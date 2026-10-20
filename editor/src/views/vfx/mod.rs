@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
 use engine::core::content::{
-    Content, ContentRow, ContentScope, ErrorPlace, row_file, with_content,
+    Content, ContentFile, ContentScope, ErrorPlace, fields_file, with_content,
 };
 use engine::core::time::Seconds;
 use engine::core::vfx::{ParamFill, VfxDef, VfxLayer, VfxShaderDef, shader_file};
@@ -29,11 +29,8 @@ const HEADING_HEIGHT: f32 = 24.0;
 const MIN_TITLE_WIDTH: f32 = 60.0;
 
 pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(VfxDef::TABLE, key) else {
-        ui.label(theme::muted(format!(
-            "{} is gone",
-            row_file(VfxDef::TABLE, key)
-        )));
+    let Some(row) = editor.row_value(key) else {
+        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
         return;
     };
     let (layers, inside) = editor.loaded().map_or((Vec::new(), None), |content| {
@@ -43,7 +40,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 layers.clone()
             } else {
                 content
-                    .by_key::<VfxDef>(inner)
+                    .by_path::<VfxDef>(inner)
                     .map_or_else(Vec::new, |id| id.get(&content).layers.clone())
             }
         });
@@ -79,11 +76,8 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(VfxShaderDef::TABLE, key) else {
-        ui.label(theme::muted(format!(
-            "{} is gone",
-            row_file(VfxShaderDef::TABLE, key)
-        )));
+    let Some(row) = editor.row_value(key) else {
+        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
         return;
     };
     let def: Option<VfxShaderDef> = serde_json::from_value(row.clone()).ok();
@@ -124,7 +118,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             let Some((def, shader)) = def.as_ref().zip(
                 editor
                     .loaded()
-                    .and_then(|content| content.by_key::<VfxShaderDef>(key)),
+                    .and_then(|content| content.by_path::<VfxShaderDef>(key)),
             ) else {
                 return;
             };

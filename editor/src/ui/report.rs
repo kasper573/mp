@@ -1,7 +1,6 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, RichText, Ui};
-use engine::core::content::{ASSETS_DIR, GAME_FILE, TABLES_DIR};
 
 use super::{theme, widgets};
 use crate::app::Editor;
@@ -126,16 +125,23 @@ pub fn not_loaded(editor: &mut Editor, ctx: &Context) {
     }
 }
 
+/// Whether the line starts with the path of a file or a folder, as the lines naming a problem's
+/// place do.
+fn names_a_file(line: &str) -> bool {
+    !line.starts_with(' ')
+        && line
+            .split_whitespace()
+            .next()
+            .is_some_and(|word| word.contains('/') || word.contains('.'))
+}
+
 fn colored(line: &str) -> RichText {
     let text = RichText::new(line).monospace().size(13.0);
     if line.starts_with('#') {
         text.color(theme::WARN)
     } else if line.starts_with("result") {
         text.color(theme::DANGER)
-    } else if line.starts_with(TABLES_DIR)
-        || line.starts_with(ASSETS_DIR)
-        || line.starts_with(GAME_FILE)
-    {
+    } else if names_a_file(line) {
         text.color(theme::CODE)
     } else if line.starts_with("  ") {
         text.color(theme::TEXT)

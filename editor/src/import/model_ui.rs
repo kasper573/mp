@@ -4,7 +4,8 @@ use std::sync::Arc;
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
-use engine::core::content::{ContentRow, asset_file, row_file};
+use engine::core::content::files::NAME_RULE;
+use engine::core::content::{ContentFile, fields_file, valid_name};
 use engine::systems::actor::ModelDef;
 use image::RgbaImage;
 use serde_json::Value;
@@ -45,7 +46,10 @@ impl TextureCache {
 }
 
 pub struct ModelDialog {
+    /// The model's path when importing into one, or the name of the one to make.
     pub key: String,
+    /// The folder a new model is made in.
+    pub folder: String,
     pub new_row: bool,
     pub export: AnimationExport,
     pub mapping: BTreeMap<String, Option<String>>,
@@ -71,8 +75,8 @@ pub struct ModelReimport {
     pub old_frame: Option<(u32, u32)>,
 }
 
-fn sheet_of(editor: &Editor, row: &Value) -> Option<RgbaImage> {
-    super::asset_image(editor, row["sprites"]["image"].as_str()?)
+fn sheet_of(editor: &Editor, model: &str) -> Option<RgbaImage> {
+    super::asset_image(editor, &crate::parts::model_sprites(model))
 }
 
 fn asked_defaults(export: &AnimationExport) -> BTreeMap<String, String> {
@@ -96,9 +100,9 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
-    let row = editor.row_value(ModelDef::TABLE, key);
+    let row = editor.row_value(key);
     let record = editor.imports.record_for(ModelDef::TABLE, key).cloned();
-    let sheet = row.as_ref().and_then(|row| sheet_of(editor, row));
+    let sheet = row.as_ref().and_then(|_| sheet_of(editor, key));
     if let (Some(due), Some(record), Some(row)) = (again, &record, &row) {
         let mapping = model::recorded_mapping(record, &export);
         let plan = model::plan(
@@ -154,10 +158,10 @@ pub fn land(
 }
 
 pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::ImportDialog> {
-    let key = super::free_key(editor, ModelDef::TABLE, &export);
-    Some(super::ImportDialog::Model(Box::new(new_dialog(
-        key, true, export, None, None, None,
-    ))))
+    let name = super::suggested_name(&export, ModelDef::TABLE);
+    let mut dialog = new_dialog(name, true, export, None, None, None);
+    dialog.folder = crate::ui::content_tree::current_folder(editor);
+    Some(super::ImportDialog::Model(Box::new(dialog)))
 }
 
 fn new_dialog(
@@ -185,6 +189,7 @@ fn new_dialog(
     let selected = export.strips.first().map(|strip| strip.tag.clone());
     let mut dialog = ModelDialog {
         key,
+        folder: String::new(),
         new_row,
         export,
         mapping,
@@ -211,7 +216,7 @@ fn new_dialog(
 
 fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
     let row = (!dialog.new_row)
-        .then(|| editor.row_value(ModelDef::TABLE, &dialog.key))
+        .then(|| editor.row_value(&dialog.key))
         .flatten();
     let choices: BTreeMap<(String, usize, FrameCue), CuePlacement> = dialog
         .plan
@@ -289,7 +294,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 theme::strong(if dialog.new_row {
                     "Import a model".to_owned()
                 } else {
-                    format!("Import into model/{}", dialog.key)
+                    format!("Import into {}", dialog.key)
                 })
                 .size(17.0),
             );
@@ -329,7 +334,9 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
             if dialog.new_row {
                 ui.add_space(12.0);
                 ui.label(theme::muted("into"));
-                ui.label(theme::mono("model/").color(theme::CODE));
+                if !dialog.folder.is_empty() {
+                    ui.label(theme::mono(format!("{}/", dialog.folder)).color(theme::CODE));
+                }
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut dialog.key)
                         .desired_width(160.0)
@@ -338,7 +345,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 if response.changed() {
                     dialog.error = None;
                 }
-                ui.label(theme::faint("a new row"));
+                ui.label(theme::mono(".model").color(theme::CODE));
             }
         });
         ui.add_space(4.0);
@@ -404,14 +411,8 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
         ui.add_space(16.0);
         ui.horizontal(|ui| {
             let ready = dialog.plan.ready();
-            let key_problem = dialog
-                .new_row
-                .then(|| {
-                    editor.project.as_ref().and_then(|project| {
-                        rows::key_problem(&project.files, ModelDef::TABLE, dialog.key.trim())
-                    })
-                })
-                .flatten();
+            let key_problem = (dialog.new_row && !valid_name(dialog.key.trim()))
+                .then(|| format!("a name is {NAME_RULE}"));
             let enabled = ready.is_ok() && key_problem.is_none() && dialog.error.is_none();
             if ui
                 .add_enabled(enabled, egui::Button::new("Import, as one step"))
@@ -842,24 +843,29 @@ pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDi
 }
 
 fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String> {
-    let key = dialog.key.trim().to_owned();
-    let row = if dialog.new_row {
+    let (key, row) = if dialog.new_row {
         let project = editor.project.as_ref().ok_or("no folder is open")?;
-        if let Some(problem) = rows::key_problem(&project.files, ModelDef::TABLE, &key) {
-            return Err(problem);
+        let name = dialog.key.trim();
+        if !valid_name(name) {
+            return Err(format!("a name is {NAME_RULE}"));
         }
         let shape = editor
             .shapes
             .table(ModelDef::TABLE)
-            .ok_or("the model table has no shape")?;
-        Some(schema::template(&shape.shape, &shape.shape))
+            .ok_or("the model type has no shape")?;
+        (
+            rows::new_path(&project.files, &dialog.folder, ModelDef::TABLE, name),
+            Some(schema::template(&shape.shape, &shape.shape)),
+        )
     } else {
-        editor.row_value(ModelDef::TABLE, &key)
+        let key = dialog.key.clone();
+        let row = editor.row_value(&key);
+        (key, row)
     };
     let built = model::build(&dialog.plan, &dialog.export, row.as_ref(), &key)?;
     let names = formats::export_name(&dialog.export.files);
     let label = if dialog.new_row {
-        format!("Imported {names} as model/{key}")
+        format!("Imported {names} as {key}")
     } else {
         format!("Imported {names} into {key}")
     };
@@ -878,8 +884,8 @@ fn write(
     record: ImportRecord,
 ) -> Result<(), String> {
     let mut edit = ContentEdit::new(label);
-    edit.write(asset_file(&built.image), Arc::from(built.png));
-    edit.write_json(row_file(ModelDef::TABLE, key), &built.row);
+    edit.write(built.image.to_owned(), Arc::from(built.png));
+    edit.write_json(fields_file(key), &built.row);
     editor.try_apply(edit)?;
     editor.imports.remember(record);
     editor.views.model.reimports.remove(key);
@@ -904,7 +910,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     let Some(draft) = editor.views.model.reimports.get(key) else {
         return;
     };
-    let row = editor.row_value(ModelDef::TABLE, key);
+    let row = editor.row_value(key);
     let built = match model::build(&draft.plan, &draft.export, row.as_ref(), key) {
         Ok(built) => built,
         Err(error) => {

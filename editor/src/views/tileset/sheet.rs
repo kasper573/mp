@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use engine::core::content::RowName;
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{CONFIG_FILE, Content, ContentFile, parent_of};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
+use engine::systems::area::scene::scene_file;
 use engine::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
 use engine::systems::area::{AreaModule, Scenery, SceneryTile};
 use strum::VariantArray;
@@ -17,6 +15,7 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::file_title;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 use crate::views::model::sounds;
@@ -77,7 +76,7 @@ impl TileBrush {
             TileBrush::Surface(surface) => {
                 data.surface = surface
                     .as_deref()
-                    .and_then(|key| content.by_key::<SurfaceDef>(key));
+                    .and_then(|key| content.by_path::<SurfaceDef>(key));
             }
         }
     }
@@ -85,11 +84,10 @@ impl TileBrush {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mode = editor.views.tileset.view(&tileset.key).mode;
-    let surfaces: Vec<String> =
-        sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, &tileset.key)))
-            .into_iter()
-            .map(|surface| surface.key)
-            .collect();
+    let surfaces: Vec<String> = sounds::surfaces(editor)
+        .into_iter()
+        .map(|surface| surface.key)
+        .collect();
     let canvas = canvas(editor, ui, tileset, |painter, tile, cell| match mode {
         TilesetMode::Walk => walk_mark(painter, cell, tileset.def.walk(tile)),
         TilesetMode::Surface => {
@@ -229,7 +227,7 @@ pub fn walk_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn surface_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let surfaces = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)));
+    let surfaces = sounds::surfaces(editor);
     let view = editor.views.tileset.view_mut(key);
     for (index, surface) in surfaces.iter().enumerate() {
         let on = view.surface.as_deref() == Some(surface.key.as_str());
@@ -364,12 +362,14 @@ fn make_blueprint(
     name: &str,
 ) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = rows::key_problem(&project.files, BlueprintDef::TABLE, name) {
+    let folder = parent_of(&tileset.key);
+    if let Some(problem) = rows::name_problem(&project.files, folder, name, None) {
         return Err(problem);
     }
+    let path = rows::new_path(&project.files, folder, BlueprintDef::TABLE, name);
     let id = tileset
         .content
-        .by_key::<TilesetDef>(&tileset.key)
+        .by_path::<TilesetDef>(&tileset.key)
         .ok_or("the tileset is not loaded yet")?;
     let tiles = selection
         .rows(tileset.sheet.columns())
@@ -394,20 +394,20 @@ fn make_blueprint(
         blocks: Vec::new(),
     });
     let part = value::untyped(&tileset.content, &part).ok_or("the scenery part does not write")?;
-    let blueprint = BlueprintDef {
-        variables: BTreeMap::new(),
-        parts: vec![part],
-        modules: Vec::new(),
-    };
+    let tile = id.get(&tileset.content).tile;
+    let config = serde_json::json!({
+        "map": { "size": { "width": selection.w, "height": selection.h }, "tile": tile }
+    });
     let mut edit = ContentEdit::new(format!(
         "Make blueprint {name} from {} tiles of {}",
         selection.count(),
-        tileset.key
+        file_title(&tileset.key)
     ));
-    edit.write_row(row_file(BlueprintDef::TABLE, name), &blueprint);
+    edit.write_json(format!("{path}/{CONFIG_FILE}"), &config);
+    edit.write_json(scene_file(&path), &serde_json::json!([part]));
     editor.try_apply(edit)?;
-    editor.toast(format!("blueprint/{name} is ready to stamp"));
-    editor.select(RowSelection::row(BlueprintDef::TABLE, name));
+    editor.toast(format!("{} is ready to stamp", file_title(&path)));
+    editor.select(RowSelection::row(BlueprintDef::TABLE, &path));
     Ok(())
 }
 

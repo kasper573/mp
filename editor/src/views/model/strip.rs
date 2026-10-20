@@ -1,9 +1,6 @@
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
-use engine::core::content::RowName;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
-use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES};
 use serde_json::Value;
 use strum::VariantArray;
@@ -60,12 +57,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let frames = strip_of(row, strip);
     header(editor, ui, key, row, strip);
     keys(editor, ui, key, &frames, &sheet);
-    let frames = strip_of(
-        &editor
-            .row_value(ModelDef::TABLE, key)
-            .unwrap_or(row.clone()),
-        strip,
-    );
+    let frames = strip_of(&editor.row_value(key).unwrap_or(row.clone()), strip);
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
         let view = editor.views.model.view_mut(key);
@@ -721,9 +713,13 @@ pub fn set_cue(
             format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
         }
         FrameCueKind::Sound => {
-            let sound = editor.views.model.view(key).last_sound.clone().or_else(|| {
-                super::sounds::first_sfx(editor, Some(&RowName::new(ModelDef::TABLE, key)))
-            });
+            let sound = editor
+                .views
+                .model
+                .view(key)
+                .last_sound
+                .clone()
+                .or_else(|| super::sounds::first_sfx(editor));
             let Some(sound) = sound else {
                 editor.toast("No sound rows to pick from");
                 return;

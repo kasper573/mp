@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -12,12 +12,11 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, ContentRow, RowName, row_file, version};
+use engine::core::content::{Content, fields_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
-use engine::systems::area::AreaDef;
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
@@ -38,7 +37,7 @@ use crate::tabs::{self, DockRequest, EditorTab, TabOpening};
 use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
-use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
+use crate::views::area::ResizeDialog;
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptRow};
 use crate::views::world::ArrangeDialog;
 use crate::views::{self, EditorCamera, EditorViews};
@@ -116,6 +115,7 @@ pub struct Editor {
     pub journal: Option<RecoveryJournal>,
     pub dock: DockState<EditorTab>,
     pub panels: DockTabs,
+    pub content_tree: crate::ui::content_tree::ContentTree,
     pub status: StatusBar,
     pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
@@ -124,6 +124,8 @@ pub struct Editor {
     pub output: OutputLog,
     pub dialogs: Vec<ModalDialog>,
     pub toast: Option<(String, Instant)>,
+    /// Text to put on the system clipboard on the next frame.
+    pub copied: Option<String>,
     pub start: StartScreen,
     pub open_tabs: Vec<(EditorTab, TabOpening)>,
     pub preview: Option<EditorTab>,
@@ -175,15 +177,7 @@ impl OutputLog {
 
 #[derive(Default)]
 pub struct DockTabs {
-    pub left: LeftTab,
     pub bottom: BottomTab,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LeftTab {
-    #[default]
-    Content,
-    Assets,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, IntoStaticStr)]
@@ -237,22 +231,13 @@ pub struct PlacePick {
 
 pub enum ModalDialog {
     NewGame(NewGameDialog),
-    NewRow(NewRowDialog),
     Confirm(ConfirmDialog),
     Conflicts(Vec<FileConflict>),
-    Rename(RenameDialog),
     Delete(DeleteDialog),
-    Duplicate(DuplicateDialog),
-    MakeLocal(MakeLocalDialog),
-    MakeGlobal(MakeGlobalDialog),
-    MoveTo(MoveToDialog),
-    Gather(GatherDialog),
     FindUnused(FindUnusedDialog),
-    NewFolder(NewFolderDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
-    MakeBlueprint(MakeBlueprintDialog),
     Resize(ResizeDialog),
     Arrange(ArrangeDialog),
     Import(Box<import::ImportDialog>),
@@ -278,19 +263,8 @@ pub enum PickRowThen {
     },
     ReplaceBlueprint {
         area: String,
-        index: usize,
+        node: String,
     },
-}
-
-impl PickRowThen {
-    /// The row the picked key is written into.
-    pub fn reader(&self) -> RowName {
-        match self {
-            PickRowThen::AddModule { area, .. } | PickRowThen::ReplaceBlueprint { area, .. } => {
-                RowName::new(AreaDef::TABLE, area)
-            }
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -311,16 +285,6 @@ pub struct NewGameDialog {
 pub enum NewGameSource {
     Template(String),
     Copy(PathBuf),
-}
-
-pub struct NewRowDialog {
-    pub table: String,
-    pub key: String,
-    pub value: Value,
-    pub error: Option<String>,
-    pub into: Option<(String, String)>,
-    pub owner: Option<RowName>,
-    pub folder: Option<engine::core::content::RowFolder>,
 }
 
 pub struct ConfirmDialog {
@@ -345,10 +309,6 @@ pub enum ConfirmAction {
         index: usize,
         module: Value,
     },
-    RemoveLayer {
-        area: String,
-        layer: String,
-    },
     DeleteScriptNodes {
         script: ScriptRow,
         names: Vec<String>,
@@ -359,82 +319,17 @@ impl ConfirmAction {
     pub fn destroys(&self) -> bool {
         match self {
             ConfirmAction::ReplaceModule { .. } => false,
-            ConfirmAction::RemoveLayer { .. } | ConfirmAction::DeleteScriptNodes { .. } => true,
+            ConfirmAction::DeleteScriptNodes { .. } => true,
         }
     }
 }
 
-pub struct RenameDialog {
-    pub target: RenameTarget,
-    pub draft: String,
-    /// Whether a row's local rows keyed after it follow its new key.
-    pub local_keys: bool,
-    pub error: Option<String>,
-}
-
-pub enum RenameTarget {
-    Row {
-        table: String,
-        key: String,
-    },
-    Layer {
-        area: String,
-        layer: String,
-    },
-    Folder {
-        table: String,
-        folder: engine::core::content::RowFolder,
-    },
-}
-
-pub struct NewFolderDialog {
-    pub table: String,
-    pub parent: Option<engine::core::content::RowFolder>,
-    pub draft: String,
-    pub error: Option<String>,
-}
-
 pub struct DeleteDialog {
-    pub table: String,
-    pub keys: Vec<String>,
-    /// The rows local to the deleted ones, at any depth, which go with them.
-    pub along: Vec<RowName>,
+    /// The files and folders picked to delete.
+    pub paths: Vec<String>,
+    /// Every content file and media file that goes with them.
+    pub gone: Vec<String>,
     pub groups: Vec<rows::UsageGroup>,
-    pub error: Option<String>,
-}
-
-pub struct DuplicateDialog {
-    pub row: RowName,
-    pub draft: String,
-    pub error: Option<String>,
-}
-
-pub struct MakeLocalDialog {
-    pub row: RowName,
-    pub owner: RowName,
-    /// Rows the user unticked, which stay where they are.
-    pub kept: BTreeSet<RowName>,
-    pub error: Option<String>,
-}
-
-pub struct MakeGlobalDialog {
-    pub row: RowName,
-    pub kept: BTreeSet<RowName>,
-    pub error: Option<String>,
-}
-
-pub struct MoveToDialog {
-    pub row: RowName,
-    pub draft: String,
-    pub error: Option<String>,
-}
-
-pub struct GatherDialog {
-    pub ticks: BTreeMap<RowName, bool>,
-    pub open: BTreeSet<RowName>,
-    pub table: Option<String>,
-    /// The rows gathering would make local, worked out again whenever a tick changes.
-    pub plan: Option<Vec<crate::moves::Gathered>>,
     pub error: Option<String>,
 }
 
@@ -468,6 +363,7 @@ impl Editor {
             journal: None,
             dock: DockState::new(Vec::new()),
             panels: DockTabs::default(),
+            content_tree: Default::default(),
             status: StatusBar::default(),
             last_refusal: None,
             history_focus: None,
@@ -476,6 +372,7 @@ impl Editor {
             output: OutputLog::default(),
             dialogs: Vec::new(),
             toast: None,
+            copied: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
             preview: None,
@@ -501,6 +398,12 @@ impl Editor {
         let text = text.into();
         self.say(text.clone());
         self.toast = Some((text, Instant::now()));
+    }
+
+    pub fn copy_text(&mut self, text: impl Into<String>) {
+        let text = text.into();
+        self.toast(format!("Copied {text}"));
+        self.copied = Some(text);
     }
 
     pub fn save_settings(&self) {
@@ -800,6 +703,23 @@ impl Editor {
         self.selection = selection;
     }
 
+    /// Shows the media file at `path` in a preview tab, and in the content tree.
+    pub fn open_media(&mut self, path: &str) {
+        self.select(RowSelection::row("asset", path));
+        self.preview_tab(EditorTab::Asset {
+            path: path.to_owned(),
+        });
+        crate::ui::content_tree::reveal(self, path);
+    }
+
+    /// Opens the content file at `path` in its tab.
+    pub fn open_path(&mut self, path: &str) {
+        if let Some(table) = engine::core::content::table_of(path) {
+            let table = table.to_owned();
+            self.open_row(&table, path);
+        }
+    }
+
     pub fn open_row(&mut self, table: &str, key: &str) {
         self.select(RowSelection::row(table, key));
         self.open_tab(EditorTab::for_row(table, key));
@@ -816,12 +736,13 @@ impl Editor {
             .is_some_and(|project| !project.unsaved().is_empty())
     }
 
-    pub fn row(&self, table: &str, key: &str) -> Option<Arc<Value>> {
-        self.project.as_ref()?.files.json(&row_file(table, key))
+    /// The fields of the content file at `path` as the editor holds them now.
+    pub fn row(&self, path: &str) -> Option<Arc<Value>> {
+        self.project.as_ref()?.files.json(&fields_file(path))
     }
 
-    pub fn row_value(&self, table: &str, key: &str) -> Option<Value> {
-        self.row(table, key).map(|row| (*row).clone())
+    pub fn row_value(&self, path: &str) -> Option<Value> {
+        self.row(path).map(|row| (*row).clone())
     }
 
     pub fn thumb(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {

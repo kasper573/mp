@@ -7,7 +7,7 @@ use editor::project::{
     json_bytes,
 };
 use editor::schema::SchemaShapes;
-use engine::core::content::GAME_FILE;
+use engine::core::content::SETTINGS_FILE;
 
 use crate::support::game_folder;
 
@@ -23,11 +23,11 @@ fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     assert!(project.save().is_ok(), "the project saves");
     assert_eq!(project.history.saved(), Some(1));
 
-    let mut outside = project.files.json_owned(GAME_FILE).expect("game.json");
+    let mut outside = project.files.json_owned(SETTINGS_FILE).expect("game.json");
     outside["name"] = "Outside".into();
-    std::fs::write(folder.join(GAME_FILE), &*json_bytes(&outside)).expect("writes outside");
+    std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside)).expect("writes outside");
     let changes = project.outside_changes(FolderChange::Unknown);
-    assert!(changes.taken.iter().any(|file| file == GAME_FILE));
+    assert!(changes.taken.iter().any(|file| file == SETTINGS_FILE));
     assert_eq!(project.history.saved(), Some(0));
 
     for name in ["First", "Second", "Third"] {
@@ -101,12 +101,12 @@ fn viewpoint() -> EditViewpoint {
 }
 
 fn rename(project: &Project, name: &str) -> ContentEdit {
-    let mut game = project.files.json_owned(GAME_FILE).expect("game.json");
+    let mut game = project.files.json_owned(SETTINGS_FILE).expect("game.json");
     game["name"] = name.into();
     ContentEdit {
         label: format!("rename to {name}"),
         changes: vec![FileChange {
-            file: GAME_FILE.to_owned(),
+            file: SETTINGS_FILE.to_owned(),
             bytes: Some(json_bytes(&game)),
         }],
         merge: false,

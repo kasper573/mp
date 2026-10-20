@@ -10,7 +10,7 @@ use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::population::{self, NpcSprite};
-use super::{AreaFrame, AreaTool, modules, scenery, selected_parts, shapes};
+use super::{AreaFrame, AreaTool, nodes, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
@@ -125,14 +125,15 @@ pub(super) fn overlay_modules(
     let canvas = frame.canvas;
     let selected: HashSet<String> = selected_parts(editor, &frame.area_key);
     let view = editor.views.area.view(view_key);
-    let editing = view.in_place.first().copied();
+    let editing = view.in_place.first().cloned();
     let visible = canvas.visible();
     let hovered = match view.tool {
         AreaTool::Select | AreaTool::Module => frame.pointer_tile.and_then(|tile| frame.hit(tile)),
         _ => None,
     };
-    for (index, module) in frame.modules.iter().enumerate() {
-        let Some(bounds) = frame.module_bounds(index) else {
+    for node in &frame.modules {
+        let module = &node.json;
+        let Some(bounds) = frame.module_bounds(&node.pointer) else {
             continue;
         };
         if !visible.intersects(&bounds) {
@@ -144,9 +145,8 @@ pub(super) fn overlay_modules(
         if kind == AreaModuleKind::Population && module["roams"].is_null() {
             continue;
         }
-        let part = super::module_part(index);
-        let is_selected = selected.contains(&part);
-        let is_hovered = hovered == Some(index);
+        let is_selected = selected.contains(&node.pointer);
+        let is_hovered = hovered.as_ref() == Some(&node.pointer);
         if matches!(kind, AreaModuleKind::Blueprint | AreaModuleKind::Scenery)
             && !is_selected
             && !is_hovered
@@ -155,7 +155,7 @@ pub(super) fn overlay_modules(
         }
         let color = module_color(Some(kind));
         let rect = canvas.rect(bounds);
-        let dim = editing.is_some_and(|e| e != index);
+        let dim = editing.as_ref().is_some_and(|e| *e != node.pointer);
         let alpha = if dim {
             60
         } else if is_selected {
@@ -239,10 +239,12 @@ pub(super) fn overlay_selected_scenery(
     frame: &AreaFrame,
     area: &area::Area,
 ) {
-    let Some(index) = scenery::selected_scenery(editor, frame) else {
+    let Some(node) = scenery::selected_scenery(editor, frame) else {
         return;
     };
-    let module = &frame.modules[index];
+    let Some(module) = frame.module(&node) else {
+        return;
+    };
     let Some(rect) = shapes::scenery_rect(module) else {
         return;
     };
@@ -315,12 +317,9 @@ pub(super) fn overlay_selected_scenery(
         };
         let new_sort = snapped.clamp(0.0, height);
         if (new_sort - sort).abs() > f32::EPSILON {
-            modules::change_modules(editor, &frame.area_key, |modules| {
-                modules.get_mut(index)?["sort"] = Value::from(new_sort as f64);
-                Some(format!(
-                    "Move the sort line of the scenery in {}",
-                    frame.area_key
-                ))
+            nodes::change_scene(editor, &frame.area_key, |scene| {
+                scene.pointer_mut(&node)?["sort"] = Value::from(new_sort as f64);
+                Some("Move the sort line of the scenery".to_owned())
             });
         }
     }
@@ -342,10 +341,7 @@ pub(super) fn overlay_soundscape_reach(
 ) {
     let canvas = frame.canvas;
     for part in selected_parts(editor, &frame.area_key) {
-        let Some(index) = super::module_index(&part) else {
-            continue;
-        };
-        let Some(module) = frame.modules.get(index) else {
+        let Some(module) = frame.module(&part) else {
             continue;
         };
         if !module.is_module(AreaModuleKind::Soundscape) {
@@ -389,13 +385,13 @@ pub(super) fn overlay_populations(
     let live: HashSet<String> = frame
         .modules
         .iter()
-        .filter(|module| module.is_module(AreaModuleKind::Population))
-        .map(Value::to_string)
+        .filter(|module| module.json.is_module(AreaModuleKind::Population))
+        .map(|module| module.json.to_string())
         .collect();
     let view = editor.views.area.view_mut(view_key);
     view.population_previews.retain(|key, _| live.contains(key));
     let previews = view.population_previews.clone();
-    for module in frame.modules.iter() {
+    for module in frame.modules.iter().map(|module| &module.json) {
         if !module.is_module(AreaModuleKind::Population) {
             continue;
         }
@@ -482,7 +478,7 @@ pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &AreaFrame, area:
         let Some(surface) = area.footstep_at(cell) else {
             continue;
         };
-        let key = surface.key(&frame.content);
+        let key = surface.path(&frame.content);
         let color = match palette.iter().find(|(k, _)| k == key) {
             Some((_, color)) => *color,
             None => {

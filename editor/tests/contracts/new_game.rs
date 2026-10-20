@@ -1,18 +1,21 @@
 use std::path::Path;
 
 use editor::templates;
+use engine::core::content::SETTINGS_FILE;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
 use crate::support::{game_folder, game_name};
 
 #[test]
-fn new_game_from_a_game_copies_only_what_the_loader_reads() {
+fn new_game_from_a_game_copies_its_whole_folder_but_what_is_hidden() {
     let scratch = scratch();
     let source = game_folder(scratch.path().join("source"));
-    std::fs::write(source.join("README.md"), "not content").unwrap();
+    std::fs::write(source.join("plans.md"), "a note").unwrap();
     std::fs::create_dir_all(source.join("art")).unwrap();
-    std::fs::write(source.join("art/sketch.png"), b"\x89PNG").unwrap();
+    std::fs::write(source.join("art/sketch.png"), testkit::png(2, 2)).unwrap();
+    std::fs::create_dir_all(source.join(".git")).unwrap();
+    std::fs::write(source.join(".git/HEAD"), "ref").unwrap();
     let copy = scratch.path().join("copy");
 
     templates::new_game_from(&source, "Coral Bay", &copy).expect("copies");
@@ -20,7 +23,9 @@ fn new_game_from_a_game_copies_only_what_the_loader_reads() {
     assert_eq!(game_name(&copy), "Coral Bay");
     assert_eq!(game_name(&source), "Test", "the source keeps its name");
     let mut expected = walk(&source);
-    expected.retain(|path| !path.starts_with("README.md") && !path.starts_with("art/"));
+    expected.retain(|path| !path.starts_with(".git/"));
+    assert!(expected.contains(&"plans.md".to_owned()));
+    assert!(expected.contains(&"art/sketch.png".to_owned()));
     assert_eq!(walk(&copy), expected);
     assert!(
         !scratch.path().join(".copy.new-game").exists(),
@@ -30,7 +35,9 @@ fn new_game_from_a_game_copies_only_what_the_loader_reads() {
         std::sync::Arc::new(engine::core::content::FilesystemFolder(copy)),
         "cargo test failed",
     );
-    assert!(loaded.is_ok(), "the copy loads with this build");
+    if let Err(report) = loaded {
+        panic!("the copy loads with this build:\n{report}");
+    }
 }
 
 #[test]
@@ -64,7 +71,10 @@ fn a_source_or_template_that_is_not_there_is_refused() {
     )
     .unwrap_err();
 
-    assert!(missing.contains("No game.json"), "{missing}");
+    assert!(
+        missing.contains(&format!("No {SETTINGS_FILE}")),
+        "{missing}"
+    );
     assert!(unknown.contains("no built-in template"), "{unknown}");
     assert!(!scratch.path().join("nowhere").exists());
     assert!(!scratch.path().join("unknown").exists());

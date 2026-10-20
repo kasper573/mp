@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, TABLES_DIR, asset_file, row_file, row_holding, row_of};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::GenericExpression;
 use engine::systems::npc::NpcDef;
@@ -11,6 +11,7 @@ use serde_json::Value;
 use strum::VariantArray;
 
 use crate::app::Editor;
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs};
@@ -65,9 +66,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let faces = faces(row);
     let title = super::users(editor, key)
         .first()
-        .and_then(|(table, user)| {
+        .and_then(|(_, user)| {
             editor
-                .row_value(table, user)
+                .row_value(user)
                 .and_then(|row| row["name"].as_str().map(str::to_owned))
         })
         .unwrap_or_else(|| key.to_owned());
@@ -262,7 +263,7 @@ fn replace_file(editor: &mut Editor, key: &str, face: &BustFace, path: &Path) {
         }
     };
     let mut edit = ContentEdit::new(format!("Replace {} of {key}'s bust", face.name));
-    edit.write(asset_file(&face.file), bytes.into());
+    edit.write(face.file.to_owned(), bytes.into());
     editor.apply(edit);
 }
 
@@ -297,8 +298,8 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
         .expect("an array")
         .push(serde_json::json!({ "name": name, "file": file }));
     let mut edit = ContentEdit::new(format!("Add expression {name} to {key}'s bust"));
-    edit.write(asset_file(&file), bytes.into());
-    edit.write_json(row_file(ModelDef::TABLE, key), &changed);
+    edit.write(file.to_owned(), bytes.into());
+    edit.write_json(fields_file(key), &changed);
     if editor.apply(edit) {
         let view = editor.views.model.view_mut(key);
         view.face = Some(name.clone());
@@ -330,22 +331,22 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
         .map(|(_, key)| key)
         .collect();
     let mut found = Vec::new();
-    let files: Vec<String> = project
-        .files
-        .paths_under(&format!("{TABLES_DIR}/"))
-        .cloned()
+    let index = project.files.index();
+    let files: Vec<String> = [NpcDef::TABLE, ScriptDef::TABLE]
+        .into_iter()
+        .flat_map(|table| index.paths_of(table).map(str::to_owned).collect::<Vec<_>>())
         .collect();
     for file in files {
-        let Some((table, row_key)) = row_of(&file) else {
+        let Some((table, row_key)) = content_of(&file) else {
             continue;
         };
         let owners: Vec<String> = match table {
             NpcDef::TABLE => vec![row_key.to_owned()],
             ScriptDef::TABLE => project
                 .usages
-                .of_row(ScriptDef::TABLE, row_key)
+                .of_content(row_key)
                 .iter()
-                .filter_map(|usage| row_holding(&usage.file))
+                .filter_map(|usage| content_of(&usage.file))
                 .filter(|(table, _)| *table == NpcDef::TABLE)
                 .map(|(_, key)| key.to_owned())
                 .collect(),
@@ -400,7 +401,7 @@ fn find_nodes(row: &Value) -> Vec<(String, Value)> {
 }
 
 pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -> bool {
-    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(mut row) = editor.row_value(key) else {
         return false;
     };
     let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
@@ -418,12 +419,12 @@ pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -
         new_name,
         format!("Rename face {} of {key} to {new_name}", face.name),
     );
-    edit.write_json(row_file(ModelDef::TABLE, key), &row);
+    edit.write_json(fields_file(key), &row);
     editor.apply(edit)
 }
 
 pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str) -> bool {
-    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(mut row) = editor.row_value(key) else {
         return false;
     };
     let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
@@ -441,8 +442,8 @@ pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str
         replacement,
         format!("Remove face {} of {key}", face.name),
     );
-    edit.write_json(row_file(ModelDef::TABLE, key), &row);
-    edit.remove(asset_file(&face.file));
+    edit.write_json(fields_file(key), &row);
+    edit.remove(face.file.to_owned());
     editor.apply(edit)
 }
 

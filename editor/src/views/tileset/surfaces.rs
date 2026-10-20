@@ -1,9 +1,7 @@
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::RowName;
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentFile, fields_file, parent_of};
 use engine::systems::area::tileset::SurfaceDef;
-use engine::systems::area::tileset::TilesetDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
@@ -17,7 +15,7 @@ use crate::{forms, picker, rows, value};
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let surfaces = sounds::surfaces(editor, Some(&RowName::new(TilesetDef::TABLE, key)));
+    let surfaces = sounds::surfaces(editor);
     let brush = editor.views.tileset.view(key).surface.clone();
     let mut pick = None;
     let mut play = None;
@@ -76,7 +74,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
     if new {
         let dialog = NewSurfaceDialog {
-            footstep: sounds::first_sfx(editor, None).unwrap_or_default(),
+            footstep: sounds::first_sfx(editor).unwrap_or_default(),
             ..NewSurfaceDialog::default()
         };
         editor.views.tileset.view_mut(key).dialog = Some(TileSheetDialog::NewSurface(dialog));
@@ -87,11 +85,11 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
     let Some(content) = editor.loaded() else {
         return;
     };
-    let Some(id) = content.by_key::<SurfaceDef>(surface) else {
+    let Some(id) = content.by_path::<SurfaceDef>(surface) else {
         return;
     };
     let def = id.get(&content);
-    let footstep = def.footstep.key(&content).to_owned();
+    let footstep = def.footstep.path(&content).to_owned();
     widgets::section(ui, &format!("surface/{surface}"));
     let mut renamed = None;
     let mut new_footstep = None;
@@ -160,7 +158,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         write_surface(editor, &content, surface, &def, ContentEdit::new(label));
     }
     if let Some(footstep) = new_footstep
-        && let Some(sfx) = content.by_key::<SfxDef>(&footstep)
+        && let Some(sfx) = content.by_path::<SfxDef>(&footstep)
     {
         let label = format!("Footstep {footstep} for surface {surface}");
         let def = SurfaceDef {
@@ -177,7 +175,7 @@ pub fn new_surface_dialog(
     tileset: &str,
     mut dialog: NewSurfaceDialog,
 ) -> Option<NewSurfaceDialog> {
-    let footsteps = sounds::sfx_keys(editor, None);
+    let footsteps = sounds::sfx_keys(editor);
     let mut answer = None;
     dialogs::card(ctx, "new-surface", 400.0, |ui| {
         ui.label(RichText::new("New surface").size(16.0).strong());
@@ -226,22 +224,24 @@ fn add_surface(
     tileset: &str,
     dialog: &NewSurfaceDialog,
 ) -> Result<(), String> {
-    let key = rows::key_from_name(&dialog.name);
+    let name = rows::name_from(&dialog.name);
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = rows::key_problem(&project.files, SurfaceDef::TABLE, &key) {
+    let folder = parent_of(tileset);
+    if let Some(problem) = rows::name_problem(&project.files, folder, &name, None) {
         return Err(problem);
     }
+    let key = rows::new_path(&project.files, folder, SurfaceDef::TABLE, &name);
     let content = editor.loaded().ok_or("the folder does not load")?;
     let footstep = content
-        .by_key::<SfxDef>(&dialog.footstep)
+        .by_path::<SfxDef>(&dialog.footstep)
         .ok_or("pick a footstep")?;
     let def = SurfaceDef {
         name: dialog.name.trim().to_owned(),
         footstep,
     };
     let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
-    let mut edit = ContentEdit::new(format!("New surface {key}"));
-    edit.write_json(row_file(SurfaceDef::TABLE, &key), &json);
+    let mut edit = ContentEdit::new(format!("New surface {name}"));
+    edit.write_json(fields_file(&key), &json);
     editor.try_apply(edit)?;
     editor.views.tileset.view_mut(tileset).surface = Some(key);
     Ok(())
@@ -255,7 +255,7 @@ fn write_surface(
     mut edit: ContentEdit,
 ) {
     if let Some(json) = value::untyped(content, def) {
-        edit.write_json(row_file(SurfaceDef::TABLE, key), &json);
+        edit.write_json(fields_file(key), &json);
         editor.apply(edit);
     }
 }

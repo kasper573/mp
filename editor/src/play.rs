@@ -8,9 +8,7 @@ use std::time::{Duration, Instant};
 use design_tokens::controls::{self, Pill};
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{
-    Content, ContentRow, ContentScope, row_of, table_folder, version, with_content,
-};
+use engine::core::content::{Content, ContentFile, ContentScope, version, with_content};
 use engine::core::time::UtcHour;
 use engine::systems::GameSettings;
 use engine::systems::class::ClassDef;
@@ -574,14 +572,15 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
             .built::<GameSettings>()
             .initial_spawn
             .area
-            .key(content)
+            .path(content)
             .to_owned()
     });
     let mut characters: Vec<TestCharacter> = project
         .files
-        .paths_under(&format!("{}/", table_folder(CharacterSnapshot::TABLE)))
+        .paths_of(CharacterSnapshot::TABLE)
+        .iter()
         .filter_map(|file| {
-            let (_, key) = row_of(file)?;
+            let key = file.as_str();
             let row = project.files.json(file)?;
             let xp = row["xp"].as_u64().unwrap_or(0) as u32;
             let level = content
@@ -589,7 +588,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
                 .and_then(|content| {
                     row["class"]
                         .as_str()
-                        .and_then(|class| content.by_key::<ClassDef>(class))
+                        .and_then(|class| content.by_path::<ClassDef>(class))
                         .map(|class| class.get(content).level_at(xp))
                 })
                 .unwrap_or(0);

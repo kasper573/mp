@@ -5,6 +5,7 @@ use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
 use engine::core::content::locate;
 use engine::core::script::VariableType;
+use engine::systems::area::AreaModule;
 use engine::systems::registry;
 use engine::systems::script::Place;
 use serde_json::{Map, Value, json};
@@ -13,12 +14,17 @@ pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,
     pub order: Vec<String>,
     pub settings: Value,
+    /// The shape of one module of an area's or a blueprint's scene.
+    pub scene_module: Value,
 }
 
 pub fn shapes() -> ContentShapes {
-    let settings = schemars::generate::SchemaSettings::draft2020_12()
-        .with(|settings| settings.inline_subschemas = true);
-    registry().shapes(&settings)
+    registry().shapes(&schema_settings())
+}
+
+fn schema_settings() -> schemars::generate::SchemaSettings {
+    schemars::generate::SchemaSettings::draft2020_12()
+        .with(|settings| settings.inline_subschemas = true)
 }
 
 impl SchemaShapes {
@@ -36,6 +42,18 @@ impl SchemaShapes {
                 .map(|table| (table.table.clone(), table))
                 .collect(),
             settings: shapes.settings.unwrap_or_default(),
+            scene_module: schema_settings()
+                .into_generator()
+                .into_root_schema_for::<AreaModule>()
+                .to_value(),
+        }
+    }
+
+    /// The kinds of module a scene can hold, each with its shape within `scene_module`.
+    pub fn scene_variants(&self) -> Vec<SchemaVariant<'_>> {
+        match kind(&self.scene_module, &self.scene_module) {
+            SchemaKind::Union(variants) => variants,
+            _ => Vec::new(),
         }
     }
 

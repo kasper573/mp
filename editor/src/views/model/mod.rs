@@ -13,7 +13,7 @@ use std::ops::Not;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use engine::core::content::{ContentRow, RowName, row_file, row_holding};
+use engine::core::content::{ContentFile, fields_file};
 use engine::core::math::{Direction, FrameSize};
 use engine::systems::actor::{Action, ModelDef};
 use engine::systems::npc::NpcDef;
@@ -26,6 +26,7 @@ use crate::app::{BottomTab, Editor};
 use crate::audio::WaveformCache;
 use crate::import;
 use crate::keymap::EditorKey;
+use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection};
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
@@ -258,7 +259,7 @@ impl ModelSheet {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(row) = editor.row_value(key) else {
         ui.label(theme::muted(format!("model/{key} is gone")));
         return;
     };
@@ -270,8 +271,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         row_form::show_row(editor, ui, ModelDef::TABLE, key)
     });
     let selection = editor.selection.clone();
-    let name = RowName::new(ModelDef::TABLE, key);
-    sidebar::inspector(editor, ui, "model", Some(name), |editor, ui| {
+    sidebar::inspector(editor, ui, "model", |editor, ui| {
         if selection.table == ModelDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()
@@ -342,7 +342,7 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
         return;
     }
     editor.views.model.view_mut(key);
-    if let Some(row) = editor.row_value(ModelDef::TABLE, key)
+    if let Some(row) = editor.row_value(key)
         && let Some(index) = busts::module_index(&row)
     {
         let path = format!("{}/modules/{index}", ModelDef::TABLE);
@@ -378,7 +378,7 @@ pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
-    let Some(row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(row) = editor.row_value(key) else {
         return;
     };
     ensure_view(editor, key);
@@ -524,7 +524,7 @@ pub fn write_strip(
     frames: &[StripFrame],
     edit: ContentEdit,
 ) -> bool {
-    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(mut row) = editor.row_value(key) else {
         return false;
     };
     row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()] =
@@ -533,7 +533,7 @@ pub fn write_strip(
 }
 
 pub fn write_row(editor: &mut Editor, key: &str, row: &Value, mut edit: ContentEdit) -> bool {
-    edit.write_json(row_file(ModelDef::TABLE, key), row);
+    edit.write_json(fields_file(key), row);
     editor.apply(edit)
 }
 
@@ -588,9 +588,9 @@ pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
     };
     project
         .usages
-        .of_row(ModelDef::TABLE, key)
+        .of_content(key)
         .iter()
-        .filter_map(|usage| row_holding(&usage.file))
+        .filter_map(|usage| content_of(&usage.file))
         .filter(|(table, _)| matches!(*table, NpcDef::TABLE | PlayerDef::TABLE))
         .map(|(table, key)| (table.to_owned(), key.to_owned()))
         .collect()

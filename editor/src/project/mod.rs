@@ -16,7 +16,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use engine::core::content::ErrorPlace::WholeFile;
 use engine::core::content::{
-    Content, ContentProblem, ContentRow, GAME_FILE, LoadError, LoadReport,
+    Content, ContentFile, ContentProblem, LoadError, LoadReport, SETTINGS_FILE,
 };
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -257,8 +257,8 @@ pub fn errors_in(report: &LoadReport, file: &str) -> Vec<(String, String)> {
 
 impl Project {
     pub fn open(root: &Path, shapes: Arc<SchemaShapes>) -> Result<Project, String> {
-        if !root.join(GAME_FILE).is_file() {
-            return Err(format!("No {GAME_FILE} in this folder"));
+        if !root.join(SETTINGS_FILE).is_file() {
+            return Err(format!("No {SETTINGS_FILE} in this folder"));
         }
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
@@ -495,7 +495,7 @@ impl Project {
 
     pub fn unsaved(&self) -> Vec<String> {
         self.files
-            .paths()
+            .entries()
             .chain(self.disk.keys())
             .filter(|path| self.is_unsaved(path))
             .cloned()

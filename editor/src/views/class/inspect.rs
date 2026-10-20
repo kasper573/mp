@@ -1,6 +1,6 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow};
+use engine::core::content::{Content, ContentFile};
 use engine::systems::class::{ClassDef, NodeKey, SkillTree};
 use engine::systems::skill::SkillDef;
 use serde_json::{Map, Value};
@@ -21,7 +21,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         return;
     };
     let key = selection.keys[0].clone();
-    let Some(mut row) = editor.row_value(ClassDef::TABLE, &key) else {
+    let Some(mut row) = editor.row_value(&key) else {
         return;
     };
     if !row["tree"][&node].is_object() {

@@ -84,7 +84,7 @@ pub fn preview(
         ui.label(theme::muted("the preview plays once the content loads"));
         return;
     };
-    let models: Vec<String> = content.table::<ModelDef>().keys().to_vec();
+    let models: Vec<String> = content.table::<ModelDef>().paths().to_vec();
     let total = layers
         .iter()
         .map(|layer| layer.ends().0)
@@ -184,7 +184,7 @@ pub fn preview(
     let mut posed = Posed::default();
     let on = match &target {
         VfxTarget::Actor { model, action } => {
-            let Some(model) = content.by_key::<ModelDef>(model) else {
+            let Some(model) = content.by_path::<ModelDef>(model) else {
                 ui.label(theme::warn("pick a model to play the vfx on"));
                 return;
             };

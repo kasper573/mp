@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use egui::{Align, Layout, Ui};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::core::script::VariableType;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{RiftScripts, ScriptDef, ScriptModule};
@@ -178,7 +178,7 @@ pub(super) fn script_values(
     let Some(script) = module["script"].as_str().map(str::to_owned) else {
         return FormChange::default();
     };
-    let Some(row) = cx.files.json(&row_file(ScriptDef::TABLE, &script)) else {
+    let Some(row) = cx.files.json(&fields_file(&script)) else {
         return FormChange::default();
     };
     let Some(variables) = row["variables"].as_object() else {
