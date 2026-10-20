@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use engine::core::content::{ContentFile, locate};
+use engine::core::content::{Content, ContentFile, locate};
 use engine::core::script::VariableType;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::{self, hole_name};
@@ -9,10 +9,11 @@ use serde_json::Value;
 
 use super::placement;
 use crate::forms::HoleRequest;
+use crate::rows;
 use crate::schema::{self, SchemaKind, SchemaShapes};
-use crate::{rows, value};
 
 pub fn fill_holes(
+    content: &Content,
     value: &mut Value,
     values: &Value,
     variables: &BTreeMap<String, Variable>,
@@ -22,8 +23,7 @@ pub fn fill_holes(
         let replacement = values.get(name).cloned().or_else(|| {
             variables
                 .get(name)
-                .and_then(|v| v.default.as_ref())
-                .and_then(|d| value::json(d).ok())
+                .and_then(|variable| placement::variable_default(content, variable))
         });
         if let Some(replacement) = replacement {
             *value = replacement;
@@ -34,12 +34,12 @@ pub fn fill_holes(
     match value {
         Value::Object(map) => {
             for v in map.values_mut() {
-                filled += fill_holes(v, values, variables);
+                filled += fill_holes(content, v, values, variables);
             }
         }
         Value::Array(items) => {
             for item in items {
-                filled += fill_holes(item, values, variables);
+                filled += fill_holes(content, item, values, variables);
             }
         }
         _ => {}

@@ -4,8 +4,9 @@ use editor::app::Editor;
 use editor::project::{Project, RowSelection};
 use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
-use editor::views::area::{AreaAction, AreaSnapshot, nodes, run_action};
+use editor::views::area::{AreaAction, AreaSnapshot, nodes, placement, run_action};
 use engine::core::content::{Content, ContentFile};
+use engine::core::math::{Pos, Rect, Size};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::{Value, json};
@@ -188,6 +189,59 @@ fn unpacking_a_placement_leaves_a_folder_of_what_it_placed_and_the_area_as_it_wa
     assert_eq!(unpacked["label"], "pew (1)");
     assert_eq!(unpacked["children"][0]["type"], "scenery");
     assert_eq!(shown(settled(&mut editor)), before);
+}
+
+#[test]
+fn a_placement_covers_on_the_map_what_it_places() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(chapel(), &scratch);
+    settled(&mut editor);
+
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+
+    assert_eq!(
+        snapshot.module_bounds("/1/children/1"),
+        Some(Rect::new(Pos::new(2.0, 4.0), Size::new(2.0, 1.0)))
+    );
+    assert_eq!(
+        snapshot.hit(Pos::new(3.5, 4.5)).as_deref(),
+        Some("/1/children/1")
+    );
+}
+
+#[test]
+fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content() {
+    let spot = json!({ "area": area(), "x": 3.0, "y": 4.0 });
+    let warp = json!({
+        "runs_on": "object",
+        "variables": { "to": { "type": "place" } },
+        "nodes": {
+            "entered": { "type": "on", "event": "entered", "by": "characters", "next": "warp" },
+            "warp": { "type": "warp", "to": { "var": "to" } }
+        }
+    });
+    let door = json!([{
+        "type": "object",
+        "name": "door",
+        "shape": { "type": "rect", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0 },
+        "scripts": [{ "script": path("script", "warp"), "values": { "to": { "var": "spot" } } }]
+    }]);
+    let game = chapel().row("script", "warp", warp).blueprint(
+        "signpost",
+        (1, 1),
+        json!({ "spot": { "type": "place", "default": spot } }),
+        door,
+    );
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(game, &scratch);
+    let content = settled(&mut editor);
+
+    let signpost = content
+        .by_path::<BlueprintDef>(&path("blueprint", "signpost"))
+        .expect("the signpost loads");
+    let variable = &signpost.get(content).variables["spot"];
+
+    assert_eq!(placement::variable_default(content, variable), Some(spot));
 }
 
 /// A chapel: its ground layer, then a folder of two pews placed from a blueprint.

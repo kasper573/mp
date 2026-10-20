@@ -31,13 +31,13 @@ use crate::{scene_graph, schema};
 
 /// What each placement of a scene covers on the map, by its node's pointer: the modules it brings,
 /// placed.
-pub fn placement_bounds(placed: &[Flattened]) -> HashMap<String, Rect<Tiles>> {
+pub fn placement_bounds(content: &Content, placed: &[Flattened]) -> HashMap<String, Rect<Tiles>> {
     let mut out: HashMap<String, Rect<Tiles>> = HashMap::new();
     for placed in placed {
         if placed.chain.is_empty() {
             continue;
         }
-        let Ok(json) = value::json(&placed.module) else {
+        let Some(json) = value::untyped(content, &placed.module) else {
             continue;
         };
         let Some(bounds) = shapes::bounds(&json, None) else {
@@ -148,7 +148,7 @@ pub fn placement_card(
             ui.vertical(|ui| {
                 ui.set_min_width(ui.available_width());
                 let own = module["values"].get(name).cloned();
-                let default = variable.default.as_ref().and_then(|d| value::json(d).ok());
+                let default = variable_default(content, variable);
                 let value_path = format!("{path}/values/{name}");
                 match own {
                     Some(mut value) => {
@@ -185,6 +185,11 @@ pub fn placement_card(
         });
     }
     changed
+}
+
+/// The value a placement that leaves `variable` unset takes, as the scene would write it.
+pub fn variable_default(content: &Content, variable: &Variable) -> Option<Value> {
+    value::untyped(content, variable.default.as_ref()?)
 }
 
 pub fn variable_template(variable: &Variable) -> Value {
@@ -307,10 +312,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, scene: &mut Value, nodes: &[S
                 if value.is_null() {
                     ui.label(RichText::new("default").weak());
                     if ui.small_button("Set all").clicked() {
-                        let template = variable
-                            .default
-                            .as_ref()
-                            .and_then(|d| value::json(d).ok())
+                        let template = variable_default(&content, variable)
                             .unwrap_or_else(|| variable_template(variable));
                         set_all(scene, name, &template);
                         changed = true;

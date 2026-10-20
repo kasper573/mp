@@ -30,7 +30,6 @@ use crate::app::ChannelInbox;
 use crate::schema::SchemaShapes;
 use crate::unused::UnusedContent;
 use crate::usages::ContentUsages;
-use crate::value;
 use crate::views::script::nodes::NodeCatalogue;
 
 #[derive(Clone, Debug, Default)]
@@ -126,14 +125,6 @@ impl ContentEdit {
         let renamed = systems::registry().rename_beside(file, text, table, from, to)?;
         self.write(file.to_owned(), text_bytes(renamed));
         Some(())
-    }
-
-    pub fn write_row<T: serde::Serialize>(
-        &mut self,
-        file: impl Into<String>,
-        row: &T,
-    ) -> &mut ContentEdit {
-        self.write_json(file, &value::json(row).unwrap_or_default())
     }
 
     pub fn remove(&mut self, file: impl Into<String>) -> &mut ContentEdit {

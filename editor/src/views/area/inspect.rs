@@ -22,7 +22,7 @@ use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::file_title;
 use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
-use crate::value::{self, RowValue};
+use crate::value::RowValue;
 use crate::{picker, schema};
 
 /// The view's inspector: a paste or a pick under way, the selected nodes, the blueprint parts
@@ -673,10 +673,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
-                            variable
-                                .default
-                                .as_ref()
-                                .and_then(|d| value::json(d).ok())
+                            placement::variable_default(content, variable)
                                 .unwrap_or_else(|| placement::variable_template(variable))
                         });
                         if variable.ty == VariableType::Name {

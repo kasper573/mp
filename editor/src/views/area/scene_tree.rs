@@ -1636,7 +1636,12 @@ fn fill_copied_holes(snapshot: &AreaSnapshot, from: &str, to: &str, copied: &mut
     let variables = &id.get(&snapshot.content).variables;
     let mut open = 0;
     for node in copied {
-        super::holes::fill_holes(node, &Value::Object(Default::default()), variables);
+        super::holes::fill_holes(
+            &snapshot.content,
+            node,
+            &Value::Object(Default::default()),
+            variables,
+        );
         open += super::holes::holes_in(node, "").len();
     }
     open

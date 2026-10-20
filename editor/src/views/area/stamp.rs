@@ -49,7 +49,7 @@ pub fn placed_part(
     flip: Flip,
 ) -> Option<Value> {
     let mut json = part.clone();
-    fill_holes(&mut json, values, variables);
+    fill_holes(content, &mut json, values, variables);
     let mut module: area::AreaModule = value::typed(content, json)?;
     area::blueprint::place(&mut module, at, flip);
     value::untyped(content, &module)
@@ -348,7 +348,7 @@ pub fn stamp_footprint(
     let flattening = area::blueprint::flatten(content, &[placement], &mut errors);
     let mut bounds: Option<Rect<Tiles>> = None;
     for placed in flattening.modules {
-        if let Ok(json) = value::json(&placed.module)
+        if let Some(json) = value::untyped(content, &placed.module)
             && let Some(b) = shapes::bounds(&json, None)
         {
             bounds = Some(bounds.map_or(b, |known| known.union(&b)));

@@ -1258,7 +1258,7 @@ fn snapshot_parts(
         area::Kept::All
     };
     let picture = Arc::new(area::picture(content, pictured, kept)?);
-    let placement_bounds = placement::placement_bounds(&picture.placed);
+    let placement_bounds = placement::placement_bounds(content, &picture.placed);
     Some(SnapshotParts {
         pictured,
         picture,
