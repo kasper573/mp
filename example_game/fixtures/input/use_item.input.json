@@ -1,1 +1,10 @@
-../../../editor/templates/new_game/fixtures/input/use_item.input.json
+{
+  "label": "Use, wear or take off an item",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 2
+    }
+  ]
+}

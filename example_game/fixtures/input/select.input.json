@@ -1,1 +1,10 @@
-../../../editor/templates/new_game/fixtures/input/select.input.json
+{
+  "label": "Select a row or tick a box",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

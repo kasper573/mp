@@ -1,1 +1,3 @@
-../../../editor/templates/new_game/fixtures/attention/quest_locked.attention.json
+{
+  "icon": "assets/icons/attention/quest_locked.png"
+}

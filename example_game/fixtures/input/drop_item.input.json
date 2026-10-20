@@ -1,1 +1,11 @@
-../../../editor/templates/new_game/fixtures/input/drop_item.input.json
+{
+  "label": "Drop an item from your bag",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1,
+      "ctrl": true
+    }
+  ]
+}

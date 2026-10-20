@@ -1,1 +1,18 @@
-../../../editor/templates/new_game/fixtures/input/advance.input.json
+{
+  "label": "Finish or continue a line",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Space"
+    },
+    {
+      "type": "key",
+      "key": "Enter"
+    },
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/choice5.input.json
+{
+  "label": "Pick the fifth choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit5"
+    }
+  ]
+}

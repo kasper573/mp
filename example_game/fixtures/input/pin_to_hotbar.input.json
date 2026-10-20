@@ -1,1 +1,11 @@
-../../../editor/templates/new_game/fixtures/input/pin_to_hotbar.input.json
+{
+  "label": "Put something on the hotbar, or take it off",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1,
+      "shift": true
+    }
+  ]
+}

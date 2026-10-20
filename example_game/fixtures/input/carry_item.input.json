@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/carry_item.input.json
+{
+  "label": "Carry an item or a skill to where it goes",
+  "bindings": [
+    {
+      "type": "drag",
+      "button": "Left"
+    }
+  ]
+}

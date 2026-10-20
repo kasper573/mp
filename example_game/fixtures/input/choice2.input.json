@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/choice2.input.json
+{
+  "label": "Pick the second choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit2"
+    }
+  ]
+}

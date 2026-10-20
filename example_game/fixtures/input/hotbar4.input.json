@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/hotbar4.input.json
+{
+  "label": "Use hotbar slot 4",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit4"
+    }
+  ]
+}

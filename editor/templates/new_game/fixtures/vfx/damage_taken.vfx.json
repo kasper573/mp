@@ -1,27 +1,15 @@
 {
-  "name": "Damage taken",
+  "name": "damage_taken",
   "layers": [
     {
-      "type": "shader",
-      "shader": "visual-effects/vfx_shader/flash.vfx_shader",
-      "params": {
-        "color": [
-          255,
-          255,
-          255,
-          255
-        ],
-        "strength": 1.0
+      "type": "sprite",
+      "sheet": "blank.png",
+      "frame": {
+        "width": 1,
+        "height": 1
       },
-      "duration": 0.15
-    },
-    {
-      "type": "shader",
-      "shader": "visual-effects/vfx_shader/shake.vfx_shader",
-      "params": {
-        "amplitude": 0.05
-      },
-      "duration": 0.25
+      "frames": 1,
+      "fps": 1.0
     }
   ]
 }

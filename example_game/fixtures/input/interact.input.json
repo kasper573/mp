@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/interact.input.json
+{
+  "label": "Walk, attack, talk or pick up",
+  "bindings": [
+    {
+      "type": "mouse",
+      "button": "Left"
+    }
+  ]
+}

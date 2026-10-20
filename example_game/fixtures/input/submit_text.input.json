@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/submit_text.input.json
+{
+  "label": "Send what you typed",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Enter"
+    }
+  ]
+}

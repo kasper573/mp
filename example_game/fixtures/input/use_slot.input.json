@@ -1,1 +1,10 @@
-../../../editor/templates/new_game/fixtures/input/use_slot.input.json
+{
+  "label": "Use what a hotbar slot holds",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

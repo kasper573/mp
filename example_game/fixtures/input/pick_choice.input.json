@@ -1,1 +1,14 @@
-../../../editor/templates/new_game/fixtures/input/pick_choice.input.json
+{
+  "label": "Pick the selected choice, or the one clicked",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Enter"
+    },
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

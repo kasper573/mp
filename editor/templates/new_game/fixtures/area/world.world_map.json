@@ -1,11 +1,1 @@
-{
-  "cards": {
-    "world/area/start/start.area": {
-      "at": {
-        "x": 0.0,
-        "y": 0.0
-      },
-      "size": 100
-    }
-  }
-}
+{}

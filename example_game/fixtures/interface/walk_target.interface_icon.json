@@ -1,1 +1,3 @@
-../../../editor/templates/new_game/fixtures/interface/walk_target.interface_icon.json
+{
+  "image": "assets/icons/crosshairs/white/crosshair026.png"
+}

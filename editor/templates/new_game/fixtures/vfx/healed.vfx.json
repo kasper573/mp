@@ -1,19 +1,15 @@
 {
-  "name": "Healed",
+  "name": "healed",
   "layers": [
     {
-      "type": "shader",
-      "shader": "visual-effects/vfx_shader/tint.vfx_shader",
-      "params": {
-        "amount": 0.5,
-        "color": [
-          120,
-          232,
-          128,
-          255
-        ]
+      "type": "sprite",
+      "sheet": "blank.png",
+      "frame": {
+        "width": 1,
+        "height": 1
       },
-      "duration": 0.35
+      "frames": 1,
+      "fps": 1.0
     }
   ]
 }

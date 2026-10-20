@@ -1,5 +1,5 @@
 {
-  "role": "sound-and-voice/sfx_role/interface.sfx_role.json",
-  "volume": 0.29,
+  "role": "sounds.sfx_role.json",
+  "volume": 1.0,
   "pitch": 1.0
 }

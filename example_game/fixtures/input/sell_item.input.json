@@ -1,1 +1,10 @@
-../../../editor/templates/new_game/fixtures/input/sell_item.input.json
+{
+  "label": "Sell an item to the open shop",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Right",
+      "times": 1
+    }
+  ]
+}

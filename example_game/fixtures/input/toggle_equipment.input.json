@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/toggle_equipment.input.json
+{
+  "label": "Open or close the equipment",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyE"
+    }
+  ]
+}

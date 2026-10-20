@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/toggle_history.input.json
+{
+  "label": "Show or hide the conversation so far",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyH"
+    }
+  ]
+}

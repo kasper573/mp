@@ -1,7 +1,7 @@
 {
-  "image": "assets/icons/cursors/chest001.png",
+  "image": "blank.png",
   "hotspot": {
-    "x": 4,
-    "y": 4
+    "x": 0,
+    "y": 0
   }
 }

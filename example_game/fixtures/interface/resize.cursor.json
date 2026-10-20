@@ -1,1 +1,7 @@
-../../../editor/templates/new_game/fixtures/interface/resize.cursor.json
+{
+  "image": "assets/icons/cursors/move006.png",
+  "hotspot": {
+    "x": 32,
+    "y": 31
+  }
+}

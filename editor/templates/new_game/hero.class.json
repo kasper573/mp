@@ -1,0 +1,10 @@
+{
+  "name": "Hero",
+  "icon": "blank.png",
+  "levels": [
+    {
+      "xp": 0,
+      "skill_points": 1
+    }
+  ]
+}

@@ -1,1 +1,7 @@
-../../../editor/templates/new_game/fixtures/interface/open.cursor.json
+{
+  "image": "assets/icons/cursors/chest001.png",
+  "hotspot": {
+    "x": 4,
+    "y": 4
+  }
+}

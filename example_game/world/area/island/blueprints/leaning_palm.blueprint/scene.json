@@ -5,7 +5,7 @@
       "x": -0.5,
       "y": -0.5
     },
-    "tileset": "world/tileset/beach_tileset.tileset",
+    "tileset": "world/tileset/beach.tileset",
     "tiles": [
       [
         691,

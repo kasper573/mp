@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/toggle_quest_log.input.json
+{
+  "label": "Open or close the quest log",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyL"
+    }
+  ]
+}

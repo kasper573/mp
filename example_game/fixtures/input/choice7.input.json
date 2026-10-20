@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/choice7.input.json
+{
+  "label": "Pick the seventh choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit7"
+    }
+  ]
+}

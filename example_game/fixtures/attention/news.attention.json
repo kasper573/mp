@@ -1,1 +1,3 @@
-../../../editor/templates/new_game/fixtures/attention/news.attention.json
+{
+  "icon": "assets/icons/attention/news.png"
+}

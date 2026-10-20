@@ -1,1 +1,10 @@
-../../../editor/templates/new_game/fixtures/input/slot_options.input.json
+{
+  "label": "Open a hotbar slot's options",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Right",
+      "times": 1
+    }
+  ]
+}

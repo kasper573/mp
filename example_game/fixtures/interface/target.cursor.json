@@ -1,1 +1,7 @@
-../../../editor/templates/new_game/fixtures/interface/target.cursor.json
+{
+  "image": "assets/icons/crosshairs/outline/crosshair061.png",
+  "hotspot": {
+    "x": 36,
+    "y": 36
+  }
+}

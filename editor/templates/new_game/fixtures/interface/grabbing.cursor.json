@@ -1,7 +1,7 @@
 {
-  "image": "assets/icons/cursors/hand003.png",
+  "image": "blank.png",
   "hotspot": {
-    "x": 32,
-    "y": 30
+    "x": 0,
+    "y": 0
   }
 }

@@ -1,1 +1,9 @@
-../../../editor/templates/new_game/fixtures/input/toggle_stats.input.json
+{
+  "label": "Open or close the stats",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyK"
+    }
+  ]
+}

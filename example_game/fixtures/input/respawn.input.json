@@ -1,1 +1,8 @@
-../../../editor/templates/new_game/fixtures/input/respawn.input.json
+{
+  "label": "Get back up after dying",
+  "bindings": [
+    {
+      "type": "any_key"
+    }
+  ]
+}
