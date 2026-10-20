@@ -1,351 +1,376 @@
 [
   {
-    "type": "ground_layer",
-    "name": "floor"
-  },
-  {
-    "type": "ground_layer",
-    "name": "walls"
-  },
-  {
-    "type": "ground_layer",
-    "name": "rug"
-  },
-  {
-    "type": "ground_layer",
-    "name": "decor"
-  },
-  {
-    "type": "ground_layer",
-    "name": "decor_2"
-  },
-  {
-    "type": "object",
-    "name": "front-door",
-    "shape": {
-      "type": "rect",
-      "x": 7.5,
-      "y": 15.5,
-      "w": 2.0,
-      "h": 2.0
-    },
-    "scripts": [
+    "type": "folder",
+    "label": "Ground",
+    "children": [
       {
-        "script": "story/script/warp.script.json",
-        "values": {
-          "to": {
-            "area": "world/area/verdant/verdant.area",
-            "x": 10.5,
-            "y": 59.5
+        "type": "ground_layer",
+        "name": "floor"
+      },
+      {
+        "type": "ground_layer",
+        "name": "walls"
+      },
+      {
+        "type": "ground_layer",
+        "name": "rug"
+      },
+      {
+        "type": "ground_layer",
+        "name": "decor"
+      },
+      {
+        "type": "ground_layer",
+        "name": "decor_2"
+      }
+    ]
+  },
+  {
+    "type": "folder",
+    "label": "Sanctum",
+    "children": [
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 0.5,
+          "y": 2.5,
+          "w": 16.0,
+          "h": 4.0
+        },
+        "emit": 3.0,
+        "channels": [
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/stone_hum.flac",
+            "volume": 0.29
           }
-        }
-      }
-    ]
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/verdant_temple/npcs/archaeologist.npc.json",
-    "at": {
-      "x": 6.0,
-      "y": 13.0
-    }
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 0.5,
-      "y": 2.5,
-      "w": 16.0,
-      "h": 4.0
-    },
-    "emit": 3.0,
-    "channels": [
+        ],
+        "label": "Stone hum"
+      },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/stone_hum.flac",
-        "volume": 0.29
+        "type": "blueprint",
+        "label": "Coins",
+        "blueprint": "world/area/verdant_temple/blueprints/coins.blueprint",
+        "at": {
+          "x": 4.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Lantern",
+        "blueprint": "world/area/verdant_temple/blueprints/lantern.blueprint",
+        "at": {
+          "x": 12.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Serpent head",
+        "blueprint": "world/area/verdant_temple/blueprints/serpent_head.blueprint",
+        "at": {
+          "x": 1.0,
+          "y": 3.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Spirit brazier",
+        "blueprint": "world/area/verdant_temple/blueprints/spirit_brazier.blueprint",
+        "at": {
+          "x": 5.0,
+          "y": 3.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 7.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Spirit brazier (1)",
+        "blueprint": "world/area/verdant_temple/blueprints/spirit_brazier.blueprint",
+        "at": {
+          "x": 11.0,
+          "y": 3.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Serpent head (1)",
+        "blueprint": "world/area/verdant_temple/blueprints/serpent_head.blueprint",
+        "at": {
+          "x": 15.0,
+          "y": 3.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 1.5,
+          "y": 4.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            12,
+            13
+          ],
+          [
+            14,
+            15
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 3.5,
+          "y": 4.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            52,
+            53
+          ],
+          [
+            54,
+            55
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 14.5,
+          "y": 4.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            108,
+            109
+          ],
+          [
+            110,
+            111
+          ]
+        ],
+        "sort": 1.0
       }
     ]
   },
   {
-    "type": "blueprint",
-    "label": "verdant_temple_props_108",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_108.blueprint",
-    "at": {
-      "x": 4.0,
-      "y": 2.375
-    }
+    "type": "folder",
+    "label": "Archaeologist's camp",
+    "children": [
+      {
+        "type": "resident",
+        "npc": "world/area/verdant_temple/npcs/archaeologist.npc.json",
+        "at": {
+          "x": 6.0,
+          "y": 13.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Lantern",
+        "blueprint": "world/area/verdant_temple/blueprints/lantern.blueprint",
+        "at": {
+          "x": 14.0,
+          "y": 7.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Book",
+        "blueprint": "world/area/verdant_temple/blueprints/book.blueprint",
+        "at": {
+          "x": 4.0,
+          "y": 7.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Urn",
+        "blueprint": "world/area/verdant_temple/blueprints/urn.blueprint",
+        "at": {
+          "x": 1.0,
+          "y": 11.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Vine chest",
+        "blueprint": "world/area/verdant_temple/blueprints/vine_chest.blueprint",
+        "at": {
+          "x": 3.0,
+          "y": 11.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 1.5,
+          "y": 10.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            144,
+            145
+          ],
+          [
+            146,
+            147
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 3.5,
+          "y": 10.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            192,
+            193
+          ],
+          [
+            194,
+            195
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 13.5,
+          "y": 10.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            435,
+            436
+          ],
+          [
+            437,
+            438
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 13.5,
+          "y": 12.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            222,
+            223
+          ],
+          [
+            224,
+            225
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            98,
+            99
+          ],
+          [
+            100,
+            101
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 11.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/verdant_temple/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            234,
+            235
+          ],
+          [
+            236,
+            237
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
   },
   {
-    "type": "blueprint",
-    "label": "verdant_temple_props_85",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_85.blueprint",
-    "at": {
-      "x": 12.0,
-      "y": 2.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_props_85 (1)",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_85.blueprint",
-    "at": {
-      "x": 14.0,
-      "y": 7.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_props_105",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_105.blueprint",
-    "at": {
-      "x": 4.0,
-      "y": 7.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_props_53",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_53.blueprint",
-    "at": {
-      "x": 1.0,
-      "y": 11.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_props_192",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_props_192.blueprint",
-    "at": {
-      "x": 2.5,
-      "y": 11.4
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_furniture_2x2",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_furniture_2x2.blueprint",
-    "at": {
-      "x": 0.5,
-      "y": 2.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_furniture_2x2_2",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_furniture_2x2_2.blueprint",
-    "at": {
-      "x": 4.5,
-      "y": 2.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 7.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        0,
-        1
-      ],
-      [
-        2,
-        3
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_furniture_2x2_2 (1)",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_furniture_2x2_2.blueprint",
-    "at": {
-      "x": 10.5,
-      "y": 2.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "verdant_temple_furniture_2x2 (1)",
-    "blueprint": "world/area/verdant_temple/blueprints/verdant_temple_furniture_2x2.blueprint",
-    "at": {
-      "x": 14.5,
-      "y": 2.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 1.5,
-      "y": 4.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        12,
-        13
-      ],
-      [
-        14,
-        15
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 3.5,
-      "y": 4.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        52,
-        53
-      ],
-      [
-        54,
-        55
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 14.5,
-      "y": 4.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        108,
-        109
-      ],
-      [
-        110,
-        111
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 1.5,
-      "y": 10.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        144,
-        145
-      ],
-      [
-        146,
-        147
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 3.5,
-      "y": 10.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        192,
-        193
-      ],
-      [
-        194,
-        195
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 13.5,
-      "y": 10.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        435,
-        436
-      ],
-      [
-        437,
-        438
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 13.5,
-      "y": 12.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        222,
-        223
-      ],
-      [
-        224,
-        225
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        98,
-        99
-      ],
-      [
-        100,
-        101
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 11.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/verdant_temple/tilesets/verdant_temple_furniture.tileset",
-    "tiles": [
-      [
-        234,
-        235
-      ],
-      [
-        236,
-        237
-      ]
-    ],
-    "sort": 1.0
+    "type": "folder",
+    "label": "Doors",
+    "children": [
+      {
+        "type": "object",
+        "name": "front-door",
+        "shape": {
+          "type": "rect",
+          "x": 7.5,
+          "y": 15.5,
+          "w": 2.0,
+          "h": 2.0
+        },
+        "scripts": [
+          {
+            "script": "story/script/warp.script.json",
+            "values": {
+              "to": {
+                "area": "world/area/verdant/verdant.area",
+                "x": 10.5,
+                "y": 59.5
+              }
+            }
+          }
+        ]
+      }
+    ]
   }
 ]

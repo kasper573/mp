@@ -1,7 +1,7 @@
 use editor::project::{ContentEdit, ProjectFiles, json_bytes};
 use serde_json::{Value, json};
 
-const FILE: &str = "tables/world/hub.json";
+const FILE: &str = "world/hub.world.json";
 
 fn files_with(json: Value) -> ProjectFiles {
     let mut files = ProjectFiles::default();

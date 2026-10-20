@@ -3,7 +3,6 @@ use engine::core::math::{Pos, Rect};
 use engine::core::tiling::Tiles;
 use engine::systems::area::AreaModuleKind;
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::scene_file;
 use serde_json::{Value, json};
 
 use super::grid::{GridDraft, blueprint_of};
@@ -98,8 +97,8 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
     nodes::remove(&mut changed, &selected[1..]);
     let mut edit = ContentEdit::new(format!("Make blueprint {}", name_of(&path)));
     edit.write_json(format!("{path}/{CONFIG_FILE}"), &config);
-    edit.write_json(scene_file(&path), &Value::Array(blueprint_scene));
-    edit.write_json(scene_file(&bundle), &changed);
+    nodes::write_scene(&mut edit, &path, &Value::Array(blueprint_scene));
+    nodes::write_scene(&mut edit, &bundle, &changed);
     if let Err(error) = editor.try_apply(edit) {
         editor.toast(error);
         return;

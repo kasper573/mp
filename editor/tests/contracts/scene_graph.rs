@@ -10,8 +10,10 @@ use editor::views::area::flags::{Flag, SceneFlags, SceneLevel};
 use editor::views::area::nodes::{self, Landing};
 use editor::views::area::scene_tree::{self, SceneSource};
 use editor::views::area::{AreaSnapshot, drop_gone, layers, placement};
-use engine::core::content::{Content, ContentFile};
+use engine::core::content::{Content, ContentFile, write};
 use engine::systems::area::AreaDef;
+use engine::systems::area::scene::scene_file;
+use engine::systems::registry;
 use serde_json::{Value, json};
 use testkit::{Game, path, png};
 
@@ -179,6 +181,25 @@ fn grouping_and_naming_the_folder_is_one_undo_step() {
         names(&nodes::scene_of(&editor, &area()))[1..],
         ["a", "b", "c"]
     );
+}
+
+#[test]
+fn a_scene_the_editor_saves_reads_as_the_engine_writes_it() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(objects_game(), &scratch);
+    nodes::change_scene(&mut editor, &area(), |scene| {
+        let made = nodes::group(scene, &["/1".to_owned(), "/2".to_owned()], "Guards")?;
+        nodes::set_flag(scene, &[made], "locked", true);
+        Some("Lock the guards".to_owned())
+    });
+    assert!(editor.save());
+
+    let content = settled(&mut editor).clone();
+    let written = scratch.path().join("written");
+    write(registry(), content, &written).expect("the engine writes the game");
+    let file = scene_file(&area());
+    let read = |root: &std::path::Path| std::fs::read_to_string(root.join(&file)).expect("a scene");
+    assert_eq!(read(&scratch.path().join("game")), read(&written));
 }
 
 #[test]

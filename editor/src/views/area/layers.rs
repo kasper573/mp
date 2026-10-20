@@ -50,7 +50,7 @@ pub fn duplicate(editor: &mut Editor, bundle: &str, pointer: &str) {
         copy
     });
     let mut edit = ContentEdit::new(format!("Duplicate ground layer {name} as {fresh}"));
-    edit.write_json(scene_file(bundle), &scene);
+    nodes::write_scene(&mut edit, bundle, &scene);
     if let Some(bytes) = editor
         .project
         .as_ref()
@@ -124,7 +124,7 @@ pub fn rename(editor: &mut Editor, bundle: &str, old: &str, new: &str) -> Result
         if !renamed {
             continue;
         }
-        edit.write_json(scene_file(other), &scene);
+        nodes::write_scene(&mut edit, other, &scene);
         if let Some(bytes) = project.files.get(&layer_file(other, old)).cloned() {
             edit.remove(layer_file(other, old));
             edit.write(layer_file(other, new), bytes);

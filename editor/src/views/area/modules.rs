@@ -2,7 +2,6 @@ use egui::{Pos2, RichText, Ui, Vec2};
 use engine::core::math::Pos;
 use engine::core::tiling::{CellPos, TilePos, Tiles};
 use engine::systems::area::AreaModuleKind;
-use engine::systems::area::scene::scene_file;
 use engine::systems::script::Place;
 use serde_json::Value;
 
@@ -478,7 +477,7 @@ pub fn place_modules(
         let mut scene = scene.clone();
         let added = nodes::append(&mut scene, &folder, modules.to_vec());
         let mut edit = ContentEdit::new(label);
-        edit.write_json(scene_file(bundle), &scene);
+        nodes::write_scene(&mut edit, bundle, &scene);
         (edit, added)
     };
     let check = |editor: &Editor, edit: &ContentEdit| {

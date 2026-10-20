@@ -18,7 +18,7 @@ use crate::core::render::screen::ToScreen;
 use crate::core::render::transition::{
     self, ActiveTransition, ScreenTransitionPhase, WorldViewSystems,
 };
-use crate::core::render::{GroundDepth, RowDepths, TILE, dynamic_z};
+use crate::core::render::{GroundDepth, RowDepths, TILE};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::{TileSize, Tiles};
 use crate::core::time::Seconds;
@@ -330,22 +330,10 @@ fn spawn_area_tiles(
             (),
         );
     }
-    let flat_count = area
-        .scenery
-        .iter()
-        .filter(|scenery| scenery.sort_line().is_none())
-        .count();
-    let mut flat_index = 0;
-    for scenery in &area.scenery {
+    let depths = area::scenery_depths(&area.scenery, area.size.height, area.sort_base());
+    for (scenery, z) in area.scenery.iter().zip(depths) {
         let Some(sheet) = sheets.index(scenery.tileset) else {
             continue;
-        };
-        let z = match scenery.sort_line() {
-            Some(line) => dynamic_z(area.size.height, area.sort_base(), line),
-            None => {
-                flat_index += 1;
-                area.sort_base() - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
-            }
         };
         for (row, tiles) in scenery.tiles.iter().enumerate() {
             for (column, tile) in tiles.iter().enumerate() {

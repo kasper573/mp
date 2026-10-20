@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use engine::core::content::{ContentFile, name_of, numbered, table_of};
 use engine::systems::area::AreaDef;
-use engine::systems::area::scene::scene_file;
+use engine::systems::area::scene::{SceneNode, scene_file};
 use serde_json::Value;
 
 use crate::app::Editor;
@@ -233,8 +233,17 @@ pub fn scene_edit(
     let mut scene = scene_of(editor, bundle);
     let label = change(&mut scene)?;
     let mut edit = ContentEdit::new(label);
-    edit.write_json(scene_file(bundle), &scene);
+    write_scene(&mut edit, bundle, &scene);
     Some(edit)
+}
+
+/// Writes `scene` as `bundle`'s scene through the engine's own shape of it, so the file reads as the
+/// engine writes it whatever order the editor set a node's fields in.
+pub fn write_scene(edit: &mut ContentEdit, bundle: &str, scene: &Value) {
+    let written = serde_json::from_value::<Vec<SceneNode>>(scene.clone())
+        .and_then(serde_json::to_value)
+        .unwrap_or_else(|_| scene.clone());
+    edit.write_json(scene_file(bundle), &written);
 }
 
 pub fn change_scene(

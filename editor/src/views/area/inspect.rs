@@ -809,7 +809,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
     }
     if changed {
         let mut edit = ContentEdit::new(format!("Edit {label}"));
-        edit.write_json(scene_file(&bundle), &scene);
+        nodes::write_scene(&mut edit, &bundle, &scene);
         editor.apply(edit);
     }
     for action in actions {

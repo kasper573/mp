@@ -65,7 +65,7 @@ certificate to get past the browser's warning.
 
 `just test` runs every crate's tests, in seconds once built: unit and integration tests of the
 engine's mechanics and the editor, none of which starts a server, a client or the stack. A test
-declares the small game it needs in code, with [`testkit`](testkit)'s `Game` (only the rows it reads,
+declares the small game it needs in code, with [`testkit`](testkit)'s `Game` (only the files it reads,
 loaded through the engine's own loader), and plays it out in `testkit`'s `Sim`: a bare world holding
 that game, stepped tick by tick through only the engine systems the test adds, in the server's order.
 No test reads [`example_game/`](example_game) or the editor's templates; `just lint` checks that those
@@ -80,13 +80,13 @@ the game at the spawn location (compared against the reference image beside it i
 
 ## A game is a folder
 
-A game is a folder: `game.json` for its settings, one JSON row per file under `tables/<table>/`, and
-`assets/`. [`example_game/`](example_game) is one. The server loads the folder at start and serves it;
-clients sync it and keep it on the device; the same binaries run any folder that fits their build.
-
-A row whose file names an owner (`"owner": "area/island"`) is local to that row: only the owner and
-the rows inside it may use it, and the editor lists it in the owner's Local content rather than with
-the game's global rows.
+A game is a folder of folders, arranged however the game likes, in which each file says what it is
+by its name: `fire_priestess.npc.json` is an npc, and the folder `emberfall_shrine.area/` is an area
+whose scene and grids are its parts. The game's settings are `fixtures/game.json`, and the content
+the engine itself asks for has fixed places under `fixtures/`; everything else is found by its path,
+so folders only organize. [`example_game/`](example_game) is one. The server loads the folder at
+start and serves it; clients sync it and keep it on the device; the same binaries run any folder that
+fits their build.
 
 ```sh
 just editor               # build editor, game-server and desktop-client, open the editor on example_game/
@@ -94,11 +94,11 @@ just editor ~/my-game     # …or on another folder
 just archive              # the release: the three binaries and the example content, in target/archive
 ```
 
-The editor edits the folder in place, with undo across every row, and plays it through the two game
+The editor edits the folder in place, with undo across every file, and plays it through the two game
 binaries it finds beside itself (or in the folder its settings name). New games start from the
 templates built into the editor. Art comes in through the import dialogs: drop an Aseprite or
 TexturePacker export, a sheet, a numbered sequence, a GIF or an APNG onto a model or a tileset, and
-the editor maps it onto the row, keeps the cues and tile data that still fit, and watches the file
+the editor maps it onto the model or tileset, keeps the cues and tile data that still fit, and watches the file
 for changes.
 
 A content deploy needs no client build: the server restarts on the new folder, and players reconnect,

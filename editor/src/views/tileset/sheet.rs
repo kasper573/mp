@@ -1,9 +1,9 @@
+use crate::views::area::nodes;
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::core::content::{CONFIG_FILE, Content, ContentFile, parent_of};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
-use engine::systems::area::scene::scene_file;
 use engine::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
 use engine::systems::area::{AreaModule, Scenery, SceneryTile};
 use strum::VariantArray;
@@ -404,7 +404,7 @@ fn make_blueprint(
         file_title(&tileset.key)
     ));
     edit.write_json(format!("{path}/{CONFIG_FILE}"), &config);
-    edit.write_json(scene_file(&path), &serde_json::json!([part]));
+    nodes::write_scene(&mut edit, &path, &serde_json::json!([part]));
     editor.try_apply(edit)?;
     editor.toast(format!("{} is ready to stamp", file_title(&path)));
     editor.select(RowSelection::row(BlueprintDef::TABLE, &path));

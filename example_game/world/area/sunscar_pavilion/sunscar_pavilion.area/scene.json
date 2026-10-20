@@ -1,462 +1,499 @@
 [
   {
-    "type": "ground_layer",
-    "name": "floor"
-  },
-  {
-    "type": "ground_layer",
-    "name": "walls"
-  },
-  {
-    "type": "ground_layer",
-    "name": "rug"
-  },
-  {
-    "type": "ground_layer",
-    "name": "decor"
-  },
-  {
-    "type": "object",
-    "name": "front-door",
-    "shape": {
-      "type": "rect",
-      "x": 6.5,
-      "y": 11.5,
-      "w": 2.0,
-      "h": 2.0
-    },
-    "scripts": [
+    "type": "folder",
+    "label": "Ground",
+    "children": [
       {
-        "script": "story/script/warp.script.json",
-        "values": {
-          "to": {
-            "area": "world/area/sunscar/sunscar.area",
-            "x": 45.5,
-            "y": 15.5
-          }
+        "type": "ground_layer",
+        "name": "floor"
+      },
+      {
+        "type": "ground_layer",
+        "name": "walls"
+      },
+      {
+        "type": "ground_layer",
+        "name": "rug"
+      },
+      {
+        "type": "ground_layer",
+        "name": "decor"
+      }
+    ]
+  },
+  {
+    "type": "folder",
+    "label": "Lounge",
+    "children": [
+      {
+        "type": "resident",
+        "npc": "world/area/sunscar_pavilion/npcs/silk_prince.npc.json",
+        "at": {
+          "x": 7.0,
+          "y": 5.0
         }
-      }
-    ]
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/sunscar_pavilion/npcs/silk_prince.npc.json",
-    "at": {
-      "x": 7.0,
-      "y": 5.0
-    }
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 11.5,
-      "y": 7.5,
-      "w": 3.0,
-      "h": 3.0
-    },
-    "emit": 2.0,
-    "channels": [
+      },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/campfire.flac",
-        "volume": 0.22
+        "type": "blueprint",
+        "label": "Cushions",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/cushions.blueprint",
+        "at": {
+          "x": 3.0,
+          "y": 4.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Cushions (1)",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/cushions.blueprint",
+        "at": {
+          "x": 8.0,
+          "y": 4.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Silver tea set",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/silver_tea_set.blueprint",
+        "at": {
+          "x": 3.0,
+          "y": 7.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 6.5,
+          "y": 6.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            4,
+            5
+          ],
+          [
+            6,
+            7
+          ]
+        ],
+        "sort": 1.0
       }
     ]
   },
   {
-    "type": "scenery",
-    "at": {
-      "x": -1.0,
-      "y": -0.625
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_props.tileset",
-    "tiles": [
-      [
-        null,
-        null,
-        null,
-        null
-      ],
-      [
-        null,
-        1453,
-        1454,
-        1455
-      ],
-      [
-        null,
-        1485,
-        1486,
-        1487
-      ],
-      [
-        null,
-        1517,
-        1518,
-        1519
-      ]
-    ],
-    "sort": 3.5
+    "type": "folder",
+    "label": "Treasures",
+    "children": [
+      {
+        "type": "blueprint",
+        "label": "Gold coins",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/gold_coins.blueprint",
+        "at": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Jewel box",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/jewel_box.blueprint",
+        "at": {
+          "x": 12.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Mirror",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/mirror.blueprint",
+        "at": {
+          "x": 11.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": -1.5,
+          "y": 6.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/props.tileset",
+        "tiles": [
+          [
+            null,
+            null,
+            30,
+            31
+          ],
+          [
+            null,
+            null,
+            62,
+            63
+          ],
+          [
+            null,
+            null,
+            94,
+            95
+          ],
+          [
+            null,
+            null,
+            126,
+            127
+          ]
+        ],
+        "sort": 3.5
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            12,
+            13
+          ],
+          [
+            14,
+            15
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 12.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            202,
+            203
+          ],
+          [
+            204,
+            205
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 3.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            70,
+            71
+          ],
+          [
+            72,
+            73
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 5.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            82,
+            83
+          ],
+          [
+            84,
+            85
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 8.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            40,
+            41
+          ],
+          [
+            42,
+            43
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
   },
   {
-    "type": "scenery",
-    "at": {
-      "x": 12.0,
-      "y": -0.625
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_props.tileset",
-    "tiles": [
-      [
-        null,
-        null,
-        null,
-        null
-      ],
-      [
-        1452,
-        1453,
-        1454,
-        1455
-      ],
-      [
-        1484,
-        1485,
-        1486,
-        1487
-      ],
-      [
-        1516,
-        1517,
-        1518,
-        1519
-      ]
-    ],
-    "sort": 3.5
+    "type": "folder",
+    "label": "Back wall",
+    "children": [
+      {
+        "type": "scenery",
+        "at": {
+          "x": -1.0,
+          "y": -0.625
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/props.tileset",
+        "tiles": [
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            1453,
+            1454,
+            1455
+          ],
+          [
+            null,
+            1485,
+            1486,
+            1487
+          ],
+          [
+            null,
+            1517,
+            1518,
+            1519
+          ]
+        ],
+        "sort": 3.5
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 12.0,
+          "y": -0.625
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/props.tileset",
+        "tiles": [
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            1452,
+            1453,
+            1454,
+            1455
+          ],
+          [
+            1484,
+            1485,
+            1486,
+            1487
+          ],
+          [
+            1516,
+            1517,
+            1518,
+            1519
+          ]
+        ],
+        "sort": 3.5
+      },
+      {
+        "type": "blueprint",
+        "label": "Incense burner",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/incense_burner.blueprint",
+        "at": {
+          "x": 3.0,
+          "y": 0.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Incense burner (1)",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/incense_burner.blueprint",
+        "at": {
+          "x": 8.0,
+          "y": 0.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Lute",
+        "blueprint": "world/area/sunscar_pavilion/blueprints/lute.blueprint",
+        "at": {
+          "x": 7.0,
+          "y": 0.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 6.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            186,
+            187
+          ],
+          [
+            188,
+            189
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
   },
   {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_22",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_22.blueprint",
-    "at": {
-      "x": 3.0,
-      "y": 0.375
-    }
+    "type": "folder",
+    "label": "Hearth corner",
+    "children": [
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 11.5,
+          "y": 7.5,
+          "w": 3.0,
+          "h": 3.0
+        },
+        "emit": 2.0,
+        "channels": [
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/campfire.flac",
+            "volume": 0.22
+          }
+        ],
+        "label": "Campfire"
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 10.5,
+          "y": 3.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            24,
+            25
+          ],
+          [
+            26,
+            27
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 12.5,
+          "y": 7.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            16,
+            17
+          ],
+          [
+            18,
+            19
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 9.5,
+          "y": 9.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            122,
+            123
+          ],
+          [
+            124,
+            125
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 11.5,
+          "y": 9.5
+        },
+        "tileset": "world/area/sunscar_pavilion/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            114,
+            115
+          ],
+          [
+            116,
+            117
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
   },
   {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_22 (1)",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_22.blueprint",
-    "at": {
-      "x": 8.0,
-      "y": 0.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_54",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_54.blueprint",
-    "at": {
-      "x": 7.2,
-      "y": 0.4
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_82",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_82.blueprint",
-    "at": {
-      "x": 1.0,
-      "y": 1.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_88",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_88.blueprint",
-    "at": {
-      "x": 12.0,
-      "y": 2.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_119",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_119.blueprint",
-    "at": {
-      "x": 11.0,
-      "y": 2.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_0",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_0.blueprint",
-    "at": {
-      "x": 3.0,
-      "y": 4.1
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_0 (1)",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_0.blueprint",
-    "at": {
-      "x": 8.0,
-      "y": 4.1
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": -1.5,
-      "y": 6.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_props.tileset",
-    "tiles": [
-      [
-        null,
-        null,
-        30,
-        31
-      ],
-      [
-        null,
-        null,
-        62,
-        63
-      ],
-      [
-        null,
-        null,
-        94,
-        95
-      ],
-      [
-        null,
-        null,
-        126,
-        127
-      ]
-    ],
-    "sort": 3.5
-  },
-  {
-    "type": "blueprint",
-    "label": "sunscar_pavilion_props_9",
-    "blueprint": "world/area/sunscar_pavilion/blueprints/sunscar_pavilion_props_9.blueprint",
-    "at": {
-      "x": 3.1,
-      "y": 6.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        12,
-        13
-      ],
-      [
-        14,
-        15
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 6.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        186,
-        187
-      ],
-      [
-        188,
-        189
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 12.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        202,
-        203
-      ],
-      [
-        204,
-        205
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 3.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        70,
-        71
-      ],
-      [
-        72,
-        73
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 10.5,
-      "y": 3.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        24,
-        25
-      ],
-      [
-        26,
-        27
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 5.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        82,
-        83
-      ],
-      [
-        84,
-        85
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 6.5,
-      "y": 6.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        4,
-        5
-      ],
-      [
-        6,
-        7
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 12.5,
-      "y": 7.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        16,
-        17
-      ],
-      [
-        18,
-        19
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 8.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        40,
-        41
-      ],
-      [
-        42,
-        43
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 9.5,
-      "y": 9.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        122,
-        123
-      ],
-      [
-        124,
-        125
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 11.5,
-      "y": 9.5
-    },
-    "tileset": "world/area/sunscar_pavilion/tilesets/sunscar_pavilion_furniture.tileset",
-    "tiles": [
-      [
-        114,
-        115
-      ],
-      [
-        116,
-        117
-      ]
-    ],
-    "sort": 1.0
+    "type": "folder",
+    "label": "Doors",
+    "children": [
+      {
+        "type": "object",
+        "name": "front-door",
+        "shape": {
+          "type": "rect",
+          "x": 6.5,
+          "y": 11.5,
+          "w": 2.0,
+          "h": 2.0
+        },
+        "scripts": [
+          {
+            "script": "story/script/warp.script.json",
+            "values": {
+              "to": {
+                "area": "world/area/sunscar/sunscar.area",
+                "x": 45.5,
+                "y": 15.5
+              }
+            }
+          }
+        ]
+      }
+    ]
   }
 ]

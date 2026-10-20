@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use engine::core::content::{SETTINGS_FILE, fields_file};
 use engine::systems::launch;
+use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::Place;
 use serde_json::Value;
 use walkdir::WalkDir;
@@ -106,6 +107,7 @@ impl Playtest {
     /// character would.
     pub fn join_as(&mut self, character: &str, start: Option<Place>) -> Player {
         let account = self.next_account();
+        let character = content::id::<CharacterSnapshot>(character).path(content::content());
         self.server.hand_over(&account, character, start);
         self.enter_world(&account)
     }

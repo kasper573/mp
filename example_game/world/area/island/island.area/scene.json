@@ -1,533 +1,575 @@
 [
   {
-    "type": "ground_layer",
-    "name": "background"
-  },
-  {
-    "type": "ground_layer",
-    "name": "under"
-  },
-  {
-    "type": "ground_layer",
-    "name": "upper"
-  },
-  {
-    "type": "object",
-    "name": "forest-road",
-    "shape": {
-      "type": "rect",
-      "x": 38.5,
-      "y": 25.5,
-      "w": 1.0,
-      "h": 1.0
-    },
-    "scripts": [
+    "type": "folder",
+    "label": "Ground",
+    "children": [
       {
-        "script": "world/area/island/scripts/forest_road.script.json"
+        "type": "ground_layer",
+        "name": "background"
+      },
+      {
+        "type": "ground_layer",
+        "name": "under"
+      },
+      {
+        "type": "ground_layer",
+        "name": "upper"
       }
     ]
   },
   {
-    "type": "object",
-    "name": "notice-board",
-    "title": "Harbour notices",
-    "shape": {
-      "type": "point",
-      "x": 40.0,
-      "y": 19.0
-    },
-    "look": "assets/icons/misc/scroll.png",
-    "scripts": [
+    "type": "folder",
+    "label": "Monsters",
+    "children": [
       {
-        "script": "world/area/island/scripts/notice_board.script.json"
+        "type": "population",
+        "npc": "characters/npc/orc.npc.json",
+        "count": 6
+      },
+      {
+        "type": "population",
+        "npc": "characters/npc/skeleton.npc.json",
+        "count": 8
+      },
+      {
+        "type": "population",
+        "npc": "world/area/island/npcs/vampire_bat.npc.json",
+        "count": 5
+      },
+      {
+        "type": "population",
+        "npc": "characters/npc/bat.npc.json",
+        "count": 4
+      },
+      {
+        "type": "population",
+        "npc": "characters/npc/orc_chief.npc.json",
+        "count": 2
       }
     ]
   },
   {
-    "type": "object",
-    "name": "tide-chest",
-    "title": "Tide chest",
-    "shape": {
-      "type": "point",
-      "x": 46.0,
-      "y": 29.0
-    },
-    "look": "assets/icons/misc/chest.png",
-    "scripts": [
+    "type": "folder",
+    "label": "Harbour",
+    "children": [
       {
-        "script": "world/area/island/scripts/tide_chest.script.json"
-      }
-    ]
-  },
-  {
-    "type": "object",
-    "name": "honesty-box",
-    "title": "Honesty box",
-    "shape": {
-      "type": "point",
-      "x": 42.0,
-      "y": 26.0
-    },
-    "look": "assets/icons/misc/crate.png",
-    "scripts": [
-      {
-        "script": "world/area/island/scripts/honesty_box.script.json"
-      }
-    ]
-  },
-  {
-    "type": "object",
-    "name": "ferry-pier",
-    "shape": {
-      "type": "rect",
-      "x": 45.5,
-      "y": 24.5,
-      "w": 3.0,
-      "h": 3.0
-    },
-    "scripts": [
-      {
-        "script": "world/area/island/scripts/ferry_pier.script.json"
-      }
-    ]
-  },
-  {
-    "type": "population",
-    "npc": "characters/npc/orc.npc.json",
-    "count": 6
-  },
-  {
-    "type": "population",
-    "npc": "characters/npc/skeleton.npc.json",
-    "count": 8
-  },
-  {
-    "type": "population",
-    "npc": "world/area/island/npcs/vampire_bat.npc.json",
-    "count": 5
-  },
-  {
-    "type": "population",
-    "npc": "characters/npc/bat.npc.json",
-    "count": 4
-  },
-  {
-    "type": "population",
-    "npc": "characters/npc/orc_chief.npc.json",
-    "count": 2
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/grisha.npc.json",
-    "at": {
-      "x": 30.0,
-      "y": 27.0
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/mara.npc.json",
-    "at": {
-      "x": 43.0,
-      "y": 21.0
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/tobb.npc.json",
-    "at": {
-      "x": 50.0,
-      "y": 26.0
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/bram.npc.json",
-    "at": {
-      "x": 44.0,
-      "y": 28.0
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/wren.npc.json",
-    "at": {
-      "x": 33.0,
-      "y": 29.0
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/pell.npc.json",
-    "at": {
-      "x": 43.0,
-      "y": 30.0
-    },
-    "shown": {
-      "type": "all",
-      "of": [
-        {
-          "type": "not",
-          "of": {
-            "type": "memory",
-            "memory": "world/area/island/memories/pell_fighting.memory.json"
-          }
+        "type": "object",
+        "name": "forest-road",
+        "shape": {
+          "type": "rect",
+          "x": 38.5,
+          "y": 25.5,
+          "w": 1.0,
+          "h": 1.0
         },
-        {
-          "type": "not",
-          "of": {
-            "type": "set_within",
-            "memory": "world/area/island/memories/pell_dead.memory.json",
-            "seconds": 1800
+        "scripts": [
+          {
+            "script": "world/area/island/scripts/forest_road.script.json"
           }
+        ]
+      },
+      {
+        "type": "object",
+        "name": "notice-board",
+        "title": "Harbour notices",
+        "shape": {
+          "type": "point",
+          "x": 40.0,
+          "y": 19.0
+        },
+        "look": "assets/icons/misc/scroll.png",
+        "scripts": [
+          {
+            "script": "world/area/island/scripts/notice_board.script.json"
+          }
+        ]
+      },
+      {
+        "type": "object",
+        "name": "tide-chest",
+        "title": "Tide chest",
+        "shape": {
+          "type": "point",
+          "x": 46.0,
+          "y": 29.0
+        },
+        "look": "assets/icons/misc/chest.png",
+        "scripts": [
+          {
+            "script": "world/area/island/scripts/tide_chest.script.json"
+          }
+        ]
+      },
+      {
+        "type": "object",
+        "name": "honesty-box",
+        "title": "Honesty box",
+        "shape": {
+          "type": "point",
+          "x": 42.0,
+          "y": 26.0
+        },
+        "look": "assets/icons/misc/crate.png",
+        "scripts": [
+          {
+            "script": "world/area/island/scripts/honesty_box.script.json"
+          }
+        ]
+      },
+      {
+        "type": "object",
+        "name": "ferry-pier",
+        "shape": {
+          "type": "rect",
+          "x": 45.5,
+          "y": 24.5,
+          "w": 3.0,
+          "h": 3.0
+        },
+        "scripts": [
+          {
+            "script": "world/area/island/scripts/ferry_pier.script.json"
+          }
+        ]
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/grisha.npc.json",
+        "at": {
+          "x": 30.0,
+          "y": 27.0
         }
-      ]
-    }
-  },
-  {
-    "type": "resident",
-    "npc": "world/area/island/npcs/ilsa.npc.json",
-    "at": {
-      "x": 36.0,
-      "y": 25.0
-    }
-  },
-  {
-    "type": "safe_zone",
-    "rect": {
-      "x": -0.75,
-      "y": -0.813,
-      "w": 64.313,
-      "h": 61.313
-    }
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 29.5,
-      "y": 12.5,
-      "w": 18.0,
-      "h": 22.0
-    },
-    "emit": 0.0,
-    "channels": [
-      {
-        "channel": 1,
-        "file": "assets/audio/music/harbour.flac",
-        "volume": 0.25,
-        "category": "music"
       },
       {
-        "channel": 2,
-        "file": "assets/audio/ambient/surf.flac",
-        "volume": 0.29
+        "type": "resident",
+        "npc": "world/area/island/npcs/mara.npc.json",
+        "at": {
+          "x": 43.0,
+          "y": 21.0
+        }
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/tobb.npc.json",
+        "at": {
+          "x": 50.0,
+          "y": 26.0
+        }
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/bram.npc.json",
+        "at": {
+          "x": 44.0,
+          "y": 28.0
+        }
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/wren.npc.json",
+        "at": {
+          "x": 33.0,
+          "y": 29.0
+        }
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/pell.npc.json",
+        "at": {
+          "x": 43.0,
+          "y": 30.0
+        },
+        "shown": {
+          "type": "all",
+          "of": [
+            {
+              "type": "not",
+              "of": {
+                "type": "memory",
+                "memory": "world/area/island/memories/pell_fighting.memory.json"
+              }
+            },
+            {
+              "type": "not",
+              "of": {
+                "type": "set_within",
+                "memory": "world/area/island/memories/pell_dead.memory.json",
+                "seconds": 1800
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "resident",
+        "npc": "world/area/island/npcs/ilsa.npc.json",
+        "at": {
+          "x": 36.0,
+          "y": 25.0
+        }
+      },
+      {
+        "type": "safe_zone",
+        "rect": {
+          "x": -0.75,
+          "y": -0.813,
+          "w": 64.313,
+          "h": 61.313
+        }
+      },
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 29.5,
+          "y": 12.5,
+          "w": 18.0,
+          "h": 22.0
+        },
+        "emit": 0.0,
+        "channels": [
+          {
+            "channel": 1,
+            "file": "assets/audio/music/harbour.flac",
+            "volume": 0.25,
+            "category": "music"
+          },
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/surf.flac",
+            "volume": 0.29
+          }
+        ],
+        "label": "Harbour"
+      },
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "ellipse",
+          "x": 3.5,
+          "y": 14.5,
+          "w": 29.0,
+          "h": 23.0
+        },
+        "emit": 0.0,
+        "channels": [
+          {
+            "channel": 1,
+            "file": "assets/audio/music/lagoon.flac",
+            "volume": 0.24,
+            "category": "music"
+          },
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/surf.flac",
+            "volume": 0.29
+          },
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/jungle.flac",
+            "volume": 0.32,
+            "pan": -0.2
+          }
+        ],
+        "label": "Lagoon"
+      },
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 45.5,
+          "y": 23.0,
+          "w": 5.0,
+          "h": 5.0
+        },
+        "emit": 2.0,
+        "channels": [
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/lapping_water.flac",
+            "volume": 0.36
+          },
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/timbers.flac",
+            "volume": 0.28
+          }
+        ],
+        "label": "Lapping water"
+      },
+      {
+        "type": "blueprint",
+        "label": "Palm",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 36.0,
+          "y": 19.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Leaning palm",
+        "blueprint": "world/area/island/blueprints/leaning_palm.blueprint",
+        "at": {
+          "x": 39.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Tall palm",
+        "blueprint": "world/area/island/blueprints/tall_palm.blueprint",
+        "at": {
+          "x": 24.0,
+          "y": 22.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Hammock",
+        "blueprint": "world/area/island/blueprints/hammock.blueprint",
+        "at": {
+          "x": 32.0,
+          "y": 23.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Palm (1)",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 22.0,
+          "y": 26.0
+        }
       }
     ]
   },
   {
-    "type": "soundscape",
-    "shape": {
-      "type": "ellipse",
-      "x": 3.5,
-      "y": 14.5,
-      "w": 29.0,
-      "h": 23.0
-    },
-    "emit": 0.0,
-    "channels": [
+    "type": "folder",
+    "label": "North-east isle",
+    "children": [
       {
-        "channel": 1,
-        "file": "assets/audio/music/lagoon.flac",
-        "volume": 0.24,
-        "category": "music"
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 62.5,
+          "y": 11.5,
+          "w": 37.0,
+          "h": 26.0
+        },
+        "emit": 0.0,
+        "channels": [
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/surf.flac",
+            "volume": 0.36
+          },
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/jungle.flac",
+            "volume": 0.23,
+            "pan": -0.2
+          }
+        ],
+        "label": "Surf"
       },
       {
-        "channel": 2,
-        "file": "assets/audio/ambient/surf.flac",
-        "volume": 0.29
+        "type": "blueprint",
+        "label": "Palm",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 94.0,
+          "y": 19.0
+        }
       },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/jungle.flac",
-        "volume": 0.32,
-        "pan": -0.2
+        "type": "blueprint",
+        "label": "Leaning palm",
+        "blueprint": "world/area/island/blueprints/leaning_palm.blueprint",
+        "at": {
+          "x": 97.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Tall palm",
+        "blueprint": "world/area/island/blueprints/tall_palm.blueprint",
+        "at": {
+          "x": 82.0,
+          "y": 22.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Hammock",
+        "blueprint": "world/area/island/blueprints/hammock.blueprint",
+        "at": {
+          "x": 90.0,
+          "y": 23.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Palm (1)",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 80.0,
+          "y": 26.0
+        }
       }
     ]
   },
   {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 45.5,
-      "y": 23.0,
-      "w": 5.0,
-      "h": 5.0
-    },
-    "emit": 2.0,
-    "channels": [
+    "type": "folder",
+    "label": "South-west isle",
+    "children": [
       {
-        "channel": 2,
-        "file": "assets/audio/ambient/lapping_water.flac",
-        "volume": 0.36
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 3.5,
+          "y": 57.5,
+          "w": 46.0,
+          "h": 30.0
+        },
+        "emit": 0.0,
+        "channels": [
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/surf.flac",
+            "volume": 0.36
+          },
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/jungle.flac",
+            "volume": 0.23,
+            "pan": -0.2
+          }
+        ],
+        "label": "Surf"
       },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/timbers.flac",
-        "volume": 0.28
+        "type": "blueprint",
+        "label": "Palm",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 36.0,
+          "y": 66.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Leaning palm",
+        "blueprint": "world/area/island/blueprints/leaning_palm.blueprint",
+        "at": {
+          "x": 39.0,
+          "y": 67.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Tall palm",
+        "blueprint": "world/area/island/blueprints/tall_palm.blueprint",
+        "at": {
+          "x": 24.0,
+          "y": 69.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Hammock",
+        "blueprint": "world/area/island/blueprints/hammock.blueprint",
+        "at": {
+          "x": 32.0,
+          "y": 70.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Palm (1)",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 22.0,
+          "y": 73.0
+        }
       }
     ]
   },
   {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 62.5,
-      "y": 11.5,
-      "w": 37.0,
-      "h": 26.0
-    },
-    "emit": 0.0,
-    "channels": [
+    "type": "folder",
+    "label": "South-east isle",
+    "children": [
       {
-        "channel": 2,
-        "file": "assets/audio/ambient/surf.flac",
-        "volume": 0.36
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 62.5,
+          "y": 57.5,
+          "w": 37.0,
+          "h": 30.0
+        },
+        "emit": 0.0,
+        "channels": [
+          {
+            "channel": 2,
+            "file": "assets/audio/ambient/surf.flac",
+            "volume": 0.36
+          },
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/jungle.flac",
+            "volume": 0.23,
+            "pan": -0.2
+          }
+        ],
+        "label": "Surf"
       },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/jungle.flac",
-        "volume": 0.23,
-        "pan": -0.2
-      }
-    ]
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 3.5,
-      "y": 57.5,
-      "w": 46.0,
-      "h": 30.0
-    },
-    "emit": 0.0,
-    "channels": [
-      {
-        "channel": 2,
-        "file": "assets/audio/ambient/surf.flac",
-        "volume": 0.36
+        "type": "blueprint",
+        "label": "Palm",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 94.0,
+          "y": 66.0
+        }
       },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/jungle.flac",
-        "volume": 0.23,
-        "pan": -0.2
-      }
-    ]
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 62.5,
-      "y": 57.5,
-      "w": 37.0,
-      "h": 30.0
-    },
-    "emit": 0.0,
-    "channels": [
-      {
-        "channel": 2,
-        "file": "assets/audio/ambient/surf.flac",
-        "volume": 0.36
+        "type": "blueprint",
+        "label": "Leaning palm",
+        "blueprint": "world/area/island/blueprints/leaning_palm.blueprint",
+        "at": {
+          "x": 97.0,
+          "y": 67.0
+        }
       },
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/jungle.flac",
-        "volume": 0.23,
-        "pan": -0.2
+        "type": "blueprint",
+        "label": "Tall palm",
+        "blueprint": "world/area/island/blueprints/tall_palm.blueprint",
+        "at": {
+          "x": 82.0,
+          "y": 69.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Hammock",
+        "blueprint": "world/area/island/blueprints/hammock.blueprint",
+        "at": {
+          "x": 90.0,
+          "y": 70.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Palm (1)",
+        "blueprint": "world/area/island/blueprints/palm.blueprint",
+        "at": {
+          "x": 80.0,
+          "y": 73.0
+        }
       }
     ]
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 35.5,
-      "y": 18.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (1)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 93.5,
-      "y": 18.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4_2",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4_2.blueprint",
-    "at": {
-      "x": 38.5,
-      "y": 19.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4_2 (1)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4_2.blueprint",
-    "at": {
-      "x": 96.5,
-      "y": 19.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x6",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x6.blueprint",
-    "at": {
-      "x": 23.5,
-      "y": 21.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x6 (1)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x6.blueprint",
-    "at": {
-      "x": 81.5,
-      "y": 21.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x4",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x4.blueprint",
-    "at": {
-      "x": 31.5,
-      "y": 22.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x4 (1)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x4.blueprint",
-    "at": {
-      "x": 89.5,
-      "y": 22.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (2)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 21.5,
-      "y": 25.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (3)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 79.5,
-      "y": 25.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (4)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 35.5,
-      "y": 65.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (5)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 93.5,
-      "y": 65.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4_2 (2)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4_2.blueprint",
-    "at": {
-      "x": 38.5,
-      "y": 66.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4_2 (3)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4_2.blueprint",
-    "at": {
-      "x": 96.5,
-      "y": 66.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x6 (2)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x6.blueprint",
-    "at": {
-      "x": 23.5,
-      "y": 68.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x6 (3)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x6.blueprint",
-    "at": {
-      "x": 81.5,
-      "y": 68.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x4 (2)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x4.blueprint",
-    "at": {
-      "x": 31.5,
-      "y": 69.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_5x4 (3)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_5x4.blueprint",
-    "at": {
-      "x": 89.5,
-      "y": 69.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (6)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 21.5,
-      "y": 72.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "beach_tileset_3x4 (7)",
-    "blueprint": "world/area/island/blueprints/beach_tileset_3x4.blueprint",
-    "at": {
-      "x": 79.5,
-      "y": 72.5
-    }
   }
 ]

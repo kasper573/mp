@@ -1,1026 +1,1082 @@
 [
   {
-    "type": "ground_layer",
-    "name": "floor"
-  },
-  {
-    "type": "ground_layer",
-    "name": "walls"
-  },
-  {
-    "type": "ground_layer",
-    "name": "rug"
-  },
-  {
-    "type": "ground_layer",
-    "name": "decor"
-  },
-  {
-    "type": "object",
-    "name": "gate-door",
-    "shape": {
-      "type": "rect",
-      "x": 12.5,
-      "y": 25.5,
-      "w": 2.0,
-      "h": 2.0
-    },
-    "scripts": [
+    "type": "folder",
+    "label": "Ground",
+    "children": [
       {
-        "script": "story/script/warp.script.json",
-        "values": {
-          "to": {
-            "area": "world/area/sakura/sakura.area",
-            "x": 27.0,
-            "y": 41.5
-          }
+        "type": "ground_layer",
+        "name": "floor"
+      },
+      {
+        "type": "ground_layer",
+        "name": "walls"
+      },
+      {
+        "type": "ground_layer",
+        "name": "rug"
+      },
+      {
+        "type": "ground_layer",
+        "name": "decor"
+      }
+    ]
+  },
+  {
+    "type": "folder",
+    "label": "Audience hall",
+    "children": [
+      {
+        "type": "resident",
+        "npc": "world/area/sakura_estate/npcs/samurai_lord.npc.json",
+        "at": {
+          "x": 17.0,
+          "y": 6.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 9.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            220,
+            221
+          ],
+          [
+            222,
+            223
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Banner",
+        "blueprint": "world/area/sakura_estate/blueprints/banner.blueprint",
+        "at": {
+          "x": 13.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 15.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            4,
+            5
+          ],
+          [
+            6,
+            7
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Banner (1)",
+        "blueprint": "world/area/sakura_estate/blueprints/banner.blueprint",
+        "at": {
+          "x": 20.0,
+          "y": 2.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 22.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            20,
+            21
+          ],
+          [
+            22,
+            23
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 15.5,
+          "y": 4.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            244,
+            245
+          ]
+        ],
+        "sort": 0.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Floor cushions",
+        "blueprint": "world/area/sakura_estate/blueprints/floor_cushions.blueprint",
+        "at": {
+          "x": 14.0,
+          "y": 8.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Floor cushions (1)",
+        "blueprint": "world/area/sakura_estate/blueprints/floor_cushions.blueprint",
+        "at": {
+          "x": 19.0,
+          "y": 8.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Lit lantern",
+        "blueprint": "world/area/sakura_estate/blueprints/lit_lantern.blueprint",
+        "at": {
+          "x": 10.0,
+          "y": 10.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Lit lantern (1)",
+        "blueprint": "world/area/sakura_estate/blueprints/lit_lantern.blueprint",
+        "at": {
+          "x": 23.0,
+          "y": 10.0
         }
       }
     ]
   },
   {
-    "type": "object",
-    "name": "kitchen-door",
-    "shape": {
-      "type": "rect",
-      "x": 29.5,
-      "y": 25.5,
-      "w": 2.0,
-      "h": 2.0
-    },
-    "scripts": [
+    "type": "folder",
+    "label": "Shrine room",
+    "children": [
       {
-        "script": "story/script/warp.script.json",
-        "values": {
-          "to": {
-            "area": "world/area/sakura/sakura.area",
-            "x": 32.0,
-            "y": 41.5
-          }
+        "type": "blueprint",
+        "label": "Red cushion",
+        "blueprint": "world/area/sakura_estate/blueprints/red_cushion.blueprint",
+        "at": {
+          "x": 2.0,
+          "y": 4.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            224,
+            225
+          ],
+          [
+            226,
+            227
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            16,
+            17
+          ],
+          [
+            18,
+            19
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 4.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            240,
+            241
+          ],
+          [
+            243,
+            242
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 4.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            200,
+            201
+          ],
+          [
+            202,
+            203
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 9.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            28,
+            29
+          ],
+          [
+            30,
+            31
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 5.5,
+          "y": 9.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            282,
+            283
+          ],
+          [
+            284,
+            285
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
+  },
+  {
+    "type": "folder",
+    "label": "Bedroom",
+    "children": [
+      {
+        "type": "blueprint",
+        "label": "Sandals",
+        "blueprint": "world/area/sakura_estate/blueprints/sandals.blueprint",
+        "at": {
+          "x": 25.0,
+          "y": 6.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 28.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            76,
+            77
+          ],
+          [
+            78,
+            79
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 34.5,
+          "y": 1.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            90,
+            91
+          ],
+          [
+            92,
+            93
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 26.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            190
+          ],
+          [
+            191
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 30.5,
+          "y": 2.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            84,
+            85
+          ],
+          [
+            86,
+            87
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Futon",
+        "blueprint": "world/area/sakura_estate/blueprints/futon.blueprint",
+        "at": {
+          "x": 29.0,
+          "y": 7.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Futon (1)",
+        "blueprint": "world/area/sakura_estate/blueprints/futon.blueprint",
+        "at": {
+          "x": 32.0,
+          "y": 7.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 31.5,
+          "y": 9.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            629,
+            630
+          ],
+          [
+            631,
+            632
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Standing lantern",
+        "blueprint": "world/area/sakura_estate/blueprints/standing_lantern.blueprint",
+        "at": {
+          "x": 36.0,
+          "y": 10.0
         }
       }
     ]
   },
   {
-    "type": "resident",
-    "npc": "world/area/sakura_estate/npcs/samurai_lord.npc.json",
-    "at": {
-      "x": 17.0,
-      "y": 6.0
-    }
-  },
-  {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 25.5,
-      "y": 13.5,
-      "w": 5.0,
-      "h": 3.0
-    },
-    "emit": 2.0,
-    "channels": [
+    "type": "folder",
+    "label": "Tea room",
+    "children": [
       {
-        "channel": 3,
-        "file": "assets/audio/ambient/campfire.flac",
-        "volume": 0.25
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 1.5,
+          "y": 17.5,
+          "w": 4.0,
+          "h": 3.0
+        },
+        "emit": 1.5,
+        "channels": [
+          {
+            "channel": 4,
+            "file": "assets/audio/ambient/campfire.flac",
+            "volume": 0.2
+          }
+        ],
+        "label": "Campfire"
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            403,
+            404
+          ],
+          [
+            405,
+            406
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            407,
+            408
+          ],
+          [
+            409,
+            410
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 4.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            411,
+            412
+          ],
+          [
+            413,
+            414
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 18.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            399,
+            400
+          ],
+          [
+            401,
+            402
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 4.5,
+          "y": 20.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            646,
+            647
+          ]
+        ],
+        "sort": 0.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 2.5,
+          "y": 21.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            679,
+            680
+          ],
+          [
+            681,
+            682
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 0.5,
+          "y": 23.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            499,
+            500
+          ],
+          [
+            501,
+            502
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Large jar",
+        "blueprint": "world/area/sakura_estate/blueprints/large_jar.blueprint",
+        "at": {
+          "x": 6.0,
+          "y": 24.0
+        }
       }
     ]
   },
   {
-    "type": "soundscape",
-    "shape": {
-      "type": "rect",
-      "x": 1.5,
-      "y": 17.5,
-      "w": 4.0,
-      "h": 3.0
-    },
-    "emit": 1.5,
-    "channels": [
+    "type": "folder",
+    "label": "Entrance hall",
+    "children": [
       {
-        "channel": 4,
-        "file": "assets/audio/ambient/campfire.flac",
-        "volume": 0.2
+        "type": "scenery",
+        "at": {
+          "x": 9.5,
+          "y": 15.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            309,
+            310
+          ]
+        ],
+        "sort": 0.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 15.5,
+          "y": 15.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            24,
+            25
+          ],
+          [
+            26,
+            27
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Standing lantern",
+        "blueprint": "world/area/sakura_estate/blueprints/standing_lantern.blueprint",
+        "at": {
+          "x": 10.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Standing lantern (1)",
+        "blueprint": "world/area/sakura_estate/blueprints/standing_lantern.blueprint",
+        "at": {
+          "x": 17.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 10.5,
+          "y": 23.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            730,
+            733
+          ],
+          [
+            731,
+            732
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 14.5,
+          "y": 23.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            487,
+            488
+          ],
+          [
+            489,
+            490
+          ]
+        ],
+        "sort": 1.0
       }
     ]
   },
   {
-    "type": "blueprint",
-    "label": "sakura_estate_props_102",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_102.blueprint",
-    "at": {
-      "x": 2.0,
-      "y": 4.375
-    }
+    "type": "folder",
+    "label": "Storeroom",
+    "children": [
+      {
+        "type": "blueprint",
+        "label": "Pot",
+        "blueprint": "world/area/sakura_estate/blueprints/pot.blueprint",
+        "at": {
+          "x": 20.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Jar",
+        "blueprint": "world/area/sakura_estate/blueprints/jar.blueprint",
+        "at": {
+          "x": 20.0,
+          "y": 21.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 19.5,
+          "y": 14.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            531,
+            532
+          ],
+          [
+            533,
+            534
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 21.5,
+          "y": 14.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            331
+          ],
+          [
+            332
+          ],
+          [
+            331
+          ],
+          [
+            332
+          ]
+        ],
+        "sort": 3.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Basket",
+        "blueprint": "world/area/sakura_estate/blueprints/basket.blueprint",
+        "at": {
+          "x": 22.0,
+          "y": 22.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 19.5,
+          "y": 23.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            457,
+            458
+          ],
+          [
+            459,
+            460
+          ]
+        ],
+        "sort": 1.0
+      }
+    ]
   },
   {
-    "type": "blueprint",
-    "label": "sakura_estate_props_121",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_121.blueprint",
-    "at": {
-      "x": 25.0,
-      "y": 6.375
-    }
+    "type": "folder",
+    "label": "Kitchen",
+    "children": [
+      {
+        "type": "soundscape",
+        "shape": {
+          "type": "rect",
+          "x": 25.5,
+          "y": 13.5,
+          "w": 5.0,
+          "h": 3.0
+        },
+        "emit": 2.0,
+        "channels": [
+          {
+            "channel": 3,
+            "file": "assets/audio/ambient/campfire.flac",
+            "volume": 0.25
+          }
+        ],
+        "label": "Campfire"
+      },
+      {
+        "type": "blueprint",
+        "label": "Rice bowl",
+        "blueprint": "world/area/sakura_estate/blueprints/rice_bowl.blueprint",
+        "at": {
+          "x": 30.0,
+          "y": 18.0
+        }
+      },
+      {
+        "type": "blueprint",
+        "label": "Bucket",
+        "blueprint": "world/area/sakura_estate/blueprints/bucket.blueprint",
+        "at": {
+          "x": 24.0,
+          "y": 20.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 24.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            615,
+            616
+          ],
+          [
+            617,
+            618
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 26.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            40,
+            41
+          ],
+          [
+            42,
+            43
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 28.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            80,
+            81
+          ],
+          [
+            82,
+            83
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Large jar",
+        "blueprint": "world/area/sakura_estate/blueprints/large_jar.blueprint",
+        "at": {
+          "x": 33.0,
+          "y": 14.0
+        }
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 34.5,
+          "y": 13.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            619,
+            620
+          ],
+          [
+            621,
+            622
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 26.5,
+          "y": 18.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            503,
+            504
+          ],
+          [
+            505,
+            506
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 29.5,
+          "y": 18.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            140,
+            141
+          ],
+          [
+            142,
+            143
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 32.5,
+          "y": 18.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            603,
+            604
+          ],
+          [
+            605,
+            606
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 34.5,
+          "y": 19.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            156,
+            157
+          ],
+          [
+            158,
+            159
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 25.5,
+          "y": 21.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            52,
+            53
+          ],
+          [
+            54,
+            55
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "scenery",
+        "at": {
+          "x": 24.5,
+          "y": 23.5
+        },
+        "tileset": "world/area/sakura_estate/tilesets/furniture.tileset",
+        "tiles": [
+          [
+            331
+          ],
+          [
+            332
+          ]
+        ],
+        "sort": 1.0
+      },
+      {
+        "type": "blueprint",
+        "label": "Basket",
+        "blueprint": "world/area/sakura_estate/blueprints/basket.blueprint",
+        "at": {
+          "x": 36.0,
+          "y": 24.0
+        }
+      }
+    ]
   },
   {
-    "type": "blueprint",
-    "label": "sakura_estate_props_87",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_87.blueprint",
-    "at": {
-      "x": 30.0,
-      "y": 18.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_props_100",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_100.blueprint",
-    "at": {
-      "x": 20.0,
-      "y": 20.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_props_103",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_103.blueprint",
-    "at": {
-      "x": 24.0,
-      "y": 20.375
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_props_117",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_props_117.blueprint",
-    "at": {
-      "x": 20.0,
-      "y": 21.375
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        224,
-        225
-      ],
-      [
-        226,
-        227
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        16,
-        17
-      ],
-      [
-        18,
-        19
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 4.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        240,
-        241
-      ],
-      [
-        243,
-        242
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 9.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        220,
-        221
-      ],
-      [
-        222,
-        223
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2.blueprint",
-    "at": {
-      "x": 12.5,
-      "y": 1.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 15.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        4,
-        5
-      ],
-      [
-        6,
-        7
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2.blueprint",
-    "at": {
-      "x": 19.5,
-      "y": 1.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 22.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        20,
-        21
-      ],
-      [
-        22,
-        23
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 28.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        76,
-        77
-      ],
-      [
-        78,
-        79
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 34.5,
-      "y": 1.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        90,
-        91
-      ],
-      [
-        92,
-        93
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 26.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        190
-      ],
-      [
-        191
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 30.5,
-      "y": 2.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        84,
-        85
-      ],
-      [
-        86,
-        87
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 4.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        200,
-        201
-      ],
-      [
-        202,
-        203
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 15.5,
-      "y": 4.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        244,
-        245
-      ]
-    ],
-    "sort": 0.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_2",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_2.blueprint",
-    "at": {
-      "x": 28.5,
-      "y": 6.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_2 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_2.blueprint",
-    "at": {
-      "x": 31.5,
-      "y": 6.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_3",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_3.blueprint",
-    "at": {
-      "x": 13.5,
-      "y": 7.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_3 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_3.blueprint",
-    "at": {
-      "x": 18.5,
-      "y": 7.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 9.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        28,
-        29
-      ],
-      [
-        30,
-        31
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 5.5,
-      "y": 9.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        282,
-        283
-      ],
-      [
-        284,
-        285
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_4",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_4.blueprint",
-    "at": {
-      "x": 9.5,
-      "y": 9.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_4 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_4.blueprint",
-    "at": {
-      "x": 22.5,
-      "y": 9.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 31.5,
-      "y": 9.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        629,
-        630
-      ],
-      [
-        631,
-        632
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_1x2",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_1x2.blueprint",
-    "at": {
-      "x": 35.5,
-      "y": 9.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        403,
-        404
-      ],
-      [
-        405,
-        406
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        407,
-        408
-      ],
-      [
-        409,
-        410
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 4.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        411,
-        412
-      ],
-      [
-        413,
-        414
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 24.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        615,
-        616
-      ],
-      [
-        617,
-        618
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 26.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        40,
-        41
-      ],
-      [
-        42,
-        43
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 28.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        80,
-        81
-      ],
-      [
-        82,
-        83
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_5",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_5.blueprint",
-    "at": {
-      "x": 32.5,
-      "y": 13.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 34.5,
-      "y": 13.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        619,
-        620
-      ],
-      [
-        621,
-        622
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 19.5,
-      "y": 14.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        531,
-        532
-      ],
-      [
-        533,
-        534
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 21.5,
-      "y": 14.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        331
-      ],
-      [
-        332
-      ],
-      [
-        331
-      ],
-      [
-        332
-      ]
-    ],
-    "sort": 3.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 9.5,
-      "y": 15.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        309,
-        310
-      ]
-    ],
-    "sort": 0.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 15.5,
-      "y": 15.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        24,
-        25
-      ],
-      [
-        26,
-        27
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 18.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        399,
-        400
-      ],
-      [
-        401,
-        402
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 26.5,
-      "y": 18.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        503,
-        504
-      ],
-      [
-        505,
-        506
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 29.5,
-      "y": 18.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        140,
-        141
-      ],
-      [
-        142,
-        143
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 32.5,
-      "y": 18.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        603,
-        604
-      ],
-      [
-        605,
-        606
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_1x2 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_1x2.blueprint",
-    "at": {
-      "x": 9.5,
-      "y": 19.5
-    }
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_1x2 (2)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_1x2.blueprint",
-    "at": {
-      "x": 16.5,
-      "y": 19.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 34.5,
-      "y": 19.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        156,
-        157
-      ],
-      [
-        158,
-        159
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 4.5,
-      "y": 20.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        646,
-        647
-      ]
-    ],
-    "sort": 0.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 2.5,
-      "y": 21.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        679,
-        680
-      ],
-      [
-        681,
-        682
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_1x2_2",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_1x2_2.blueprint",
-    "at": {
-      "x": 21.5,
-      "y": 21.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 25.5,
-      "y": 21.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        52,
-        53
-      ],
-      [
-        54,
-        55
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 0.5,
-      "y": 23.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        499,
-        500
-      ],
-      [
-        501,
-        502
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_2x2_5 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_2x2_5.blueprint",
-    "at": {
-      "x": 5.5,
-      "y": 23.5
-    }
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 10.5,
-      "y": 23.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        730,
-        733
-      ],
-      [
-        731,
-        732
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 14.5,
-      "y": 23.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        487,
-        488
-      ],
-      [
-        489,
-        490
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 19.5,
-      "y": 23.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        457,
-        458
-      ],
-      [
-        459,
-        460
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "scenery",
-    "at": {
-      "x": 24.5,
-      "y": 23.5
-    },
-    "tileset": "world/area/sakura_estate/tilesets/sakura_estate_furniture.tileset",
-    "tiles": [
-      [
-        331
-      ],
-      [
-        332
-      ]
-    ],
-    "sort": 1.0
-  },
-  {
-    "type": "blueprint",
-    "label": "sakura_estate_furniture_1x2_2 (1)",
-    "blueprint": "world/area/sakura_estate/blueprints/sakura_estate_furniture_1x2_2.blueprint",
-    "at": {
-      "x": 35.5,
-      "y": 23.5
-    }
+    "type": "folder",
+    "label": "Doors",
+    "children": [
+      {
+        "type": "object",
+        "name": "gate-door",
+        "shape": {
+          "type": "rect",
+          "x": 12.5,
+          "y": 25.5,
+          "w": 2.0,
+          "h": 2.0
+        },
+        "scripts": [
+          {
+            "script": "story/script/warp.script.json",
+            "values": {
+              "to": {
+                "area": "world/area/sakura/sakura.area",
+                "x": 27.0,
+                "y": 41.5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "object",
+        "name": "kitchen-door",
+        "shape": {
+          "type": "rect",
+          "x": 29.5,
+          "y": 25.5,
+          "w": 2.0,
+          "h": 2.0
+        },
+        "scripts": [
+          {
+            "script": "story/script/warp.script.json",
+            "values": {
+              "to": {
+                "area": "world/area/sakura/sakura.area",
+                "x": 32.0,
+                "y": 41.5
+              }
+            }
+          }
+        ]
+      }
+    ]
   }
 ]

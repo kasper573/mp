@@ -2,7 +2,6 @@ use egui::{RichText, Vec2};
 use engine::core::content::{ContentFile, fields_file, table_of};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::GridSize;
-use engine::systems::area::scene::scene_file;
 use engine::systems::area::{self, AreaDef, AreaModuleKind};
 use serde_json::Value;
 
@@ -270,7 +269,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         dialog.height
     ));
     edit.write_json(fields_file(bundle), &row);
-    edit.write_json(scene_file(bundle), &scene);
+    nodes::write_scene(&mut edit, bundle, &scene);
     resized.write_all_into(&mut edit);
     if dx != 0.0 || dy != 0.0 {
         let files = &editor.project.as_ref().ok_or("no folder")?.files;

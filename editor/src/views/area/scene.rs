@@ -12,7 +12,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
 use engine::core::content::Content;
 use engine::core::math::{Pos, Rect, Size};
-use engine::core::render::{self, TILE, ToScreen};
+use engine::core::render::{TILE, ToScreen};
 use engine::core::tiling::{TileSize, Tiles};
 use engine::systems::area::scene::SceneNode;
 use engine::systems::area::{self, AreaGrids, AreaModule, Flip, Picture, Scenery};
@@ -522,22 +522,10 @@ fn spawn_tiles(
             scene_tag.clone(),
         );
     }
-    let flat_count = picture
-        .scenery
-        .iter()
-        .filter(|s| s.sort_line().is_none())
-        .count();
-    let mut flat_index = 0;
-    for scenery in &picture.scenery {
+    let depths = area::scenery_depths(&picture.scenery, picture.size.height, picture.sort_base);
+    for (scenery, z) in picture.scenery.iter().zip(depths) {
         let Some(sheet) = spec.sheets.index(scenery.tileset) else {
             continue;
-        };
-        let z = match scenery.sort_line() {
-            Some(line) => render::dynamic_z(picture.size.height, picture.sort_base, line),
-            None => {
-                flat_index += 1;
-                picture.sort_base - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
-            }
         };
         for (row, tiles) in scenery.tiles.iter().enumerate() {
             for (column, tile) in tiles.iter().enumerate() {

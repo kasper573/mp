@@ -13,7 +13,7 @@ pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
 pub use scene::{Scene, SceneNode};
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io;
 use std::sync::Arc;
 
@@ -37,6 +37,7 @@ use crate::core::content::{
     LoadError, LoadStep, Loading, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Offset, Pos, Rect, Size};
+use crate::core::render::dynamic_z;
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
@@ -430,6 +431,34 @@ impl Scenery {
     pub fn sort_line(&self) -> Option<Tiles> {
         Some(Tiles(self.bounds().min().y + self.sort?))
     }
+}
+
+/// The depth each of `scenery` is drawn at in an area `height` tiles tall whose ground ends at
+/// `base`: a sorted one at its sort line, among whoever stands there, and a flat one under them
+/// all, later ones over earlier. The renderer orders equal depths as it likes, and that changes when
+/// unrelated scenery moves, so scenery sharing a sort line is spread just below it in scene order,
+/// staying under anyone standing on the line.
+pub fn scenery_depths(scenery: &[Scenery], height: f32, base: f32) -> Vec<f32> {
+    let flat_count = scenery.iter().filter(|s| s.sort_line().is_none()).count();
+    let mut flat_index = 0;
+    let mut depths: Vec<f32> = scenery
+        .iter()
+        .map(|s| match s.sort_line() {
+            Some(line) => dynamic_z(height, base, line),
+            None => {
+                flat_index += 1;
+                base - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
+            }
+        })
+        .collect();
+    let mut lowest: HashMap<u32, f32> = HashMap::new();
+    for depth in depths.iter_mut().rev() {
+        let line = depth.to_bits();
+        let placed = lowest.get(&line).map_or(*depth, |below| below.next_down());
+        lowest.insert(line, placed);
+        *depth = placed;
+    }
+    depths
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
