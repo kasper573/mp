@@ -34,6 +34,7 @@ use engine::systems::status::StatusEffectDef;
 use crate::project::files::FolderIndex;
 use crate::project::{Project, ProjectFiles};
 use crate::thumbs::{self, Thumbnails};
+use crate::ui::theme;
 use crate::views::model::{self, ModelStrip};
 
 /// The largest picture, in pixels each way, that still reads as an icon; a bigger one leaves its
@@ -44,11 +45,34 @@ pub const PREVIEW_MAX: f32 = 64.0;
 pub const DECODES_PER_FRAME: u32 = 4;
 
 /// The icon of a kind of file, with a smaller badge on its corner for a kind that is a variant of
-/// another.
+/// another, in the colour of its family when it has one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KindIcon {
     pub icon: Icon,
     pub badge: Option<Icon>,
+    pub family: Option<KindFamily>,
+    /// Whether a file of the kind may stand in by a picture of its own in place of the icon.
+    pub pictured: bool,
+}
+
+/// Kinds of content that share a colour: the colour tells a file's family at a glance, its icon
+/// the exact kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KindFamily {
+    World,
+    Characters,
+    Items,
+    Abilities,
+    Story,
+    Sound,
+    Interface,
+}
+
+/// How strongly an icon reads: as itself, or faded with a row or control that is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IconTone {
+    Normal,
+    Dim,
 }
 
 impl KindIcon {
@@ -56,6 +80,8 @@ impl KindIcon {
         KindIcon {
             icon: Icon::regular(glyph),
             badge: None,
+            family: None,
+            pictured: true,
         }
     }
 
@@ -63,11 +89,37 @@ impl KindIcon {
         KindIcon {
             icon: Icon::regular(glyph),
             badge: Some(Icon::fill(badge)),
+            family: None,
+            pictured: true,
         }
     }
 
-    pub fn paint(self, painter: &Painter, rect: Rect, color: Color32) {
-        self.icon.paint(painter, rect, color);
+    /// For a kind whose files' pictures say little about them at an icon's size.
+    const fn unpictured(self) -> KindIcon {
+        KindIcon {
+            pictured: false,
+            ..self
+        }
+    }
+
+    const fn in_family(self, family: KindFamily) -> KindIcon {
+        KindIcon {
+            family: Some(family),
+            ..self
+        }
+    }
+
+    pub fn color(self, tone: IconTone) -> Color32 {
+        match (self.family, tone) {
+            (Some(family), IconTone::Normal) => family.color(),
+            (Some(family), IconTone::Dim) => family.color().gamma_multiply(0.45),
+            (None, IconTone::Normal) => theme::MUTED,
+            (None, IconTone::Dim) => theme::FAINT,
+        }
+    }
+
+    pub fn paint(self, painter: &Painter, rect: Rect, tone: IconTone) {
+        self.icon.paint(painter, rect, self.color(tone));
         let Some(badge) = self.badge else {
             return;
         };
@@ -87,16 +139,61 @@ impl From<Mark> for KindIcon {
         KindIcon {
             icon: mark.icon(),
             badge: None,
+            family: None,
+            pictured: true,
+        }
+    }
+}
+
+impl KindFamily {
+    pub fn of_table(table: &str) -> Option<KindFamily> {
+        Some(match table {
+            AreaDef::TABLE
+            | BlueprintDef::TABLE
+            | TilesetDef::TABLE
+            | SurfaceDef::TABLE
+            | WorldMapDef::TABLE => KindFamily::World,
+            NpcDef::TABLE
+            | PlayerDef::TABLE
+            | CharacterSnapshot::TABLE
+            | ClassDef::TABLE
+            | ModelDef::TABLE => KindFamily::Characters,
+            ItemDef::TABLE | ShopDef::TABLE => KindFamily::Items,
+            SkillDef::TABLE | StatusEffectDef::TABLE | VfxDef::TABLE | VfxShaderDef::TABLE => {
+                KindFamily::Abilities
+            }
+            QuestDef::TABLE | MemoryDef::TABLE | NotificationDef::TABLE | ScriptDef::TABLE => {
+                KindFamily::Story
+            }
+            SfxDef::TABLE | SfxRoleDef::TABLE | BabbleDef::TABLE | BabbleBankDef::TABLE => {
+                KindFamily::Sound
+            }
+            InputDef::TABLE | CursorDef::TABLE | InterfaceIconDef::TABLE | AttentionDef::TABLE => {
+                KindFamily::Interface
+            }
+            _ => return None,
+        })
+    }
+
+    pub fn color(self) -> Color32 {
+        match self {
+            KindFamily::World => theme::FAMILY_WORLD,
+            KindFamily::Characters => theme::FAMILY_CHARACTERS,
+            KindFamily::Items => theme::FAMILY_ITEMS,
+            KindFamily::Abilities => theme::FAMILY_ABILITIES,
+            KindFamily::Story => theme::FAMILY_STORY,
+            KindFamily::Sound => theme::FAMILY_SOUND,
+            KindFamily::Interface => theme::FAMILY_INTERFACE,
         }
     }
 }
 
 /// The icon of the content files of `table`.
 pub fn of_table(table: &str) -> KindIcon {
-    match table {
+    let icon = match table {
         AreaDef::TABLE => KindIcon::plain(phosphor::MAP_TRIFOLD),
         BlueprintDef::TABLE => KindIcon::plain(phosphor::STAMP),
-        TilesetDef::TABLE => KindIcon::plain(phosphor::SQUARES_FOUR),
+        TilesetDef::TABLE => KindIcon::plain(phosphor::SQUARES_FOUR).unpictured(),
         SurfaceDef::TABLE => KindIcon::plain(phosphor::FOOTPRINTS),
         WorldMapDef::TABLE => KindIcon::plain(phosphor::GLOBE_HEMISPHERE_WEST),
         NpcDef::TABLE => KindIcon::plain(phosphor::ROBOT),
@@ -123,6 +220,10 @@ pub fn of_table(table: &str) -> KindIcon {
         VfxDef::TABLE => KindIcon::plain(phosphor::SPARKLE),
         VfxShaderDef::TABLE => KindIcon::plain(phosphor::MAGIC_WAND),
         _ => FILE,
+    };
+    match KindFamily::of_table(table) {
+        Some(family) => icon.in_family(family),
+        None => icon,
     }
 }
 
@@ -186,7 +287,11 @@ pub fn picture_of(project: &Project, path: &str) -> Option<Picture> {
         })
     };
     let worn = |model| sprite(&*project.read_id::<ModelDef>(model)?);
-    match table_of(path)? {
+    let table = table_of(path)?;
+    if !of_table(table).pictured {
+        return None;
+    }
+    match table {
         ModelDef::TABLE => sprite(&*project.read::<ModelDef>(path).ok()?),
         NpcDef::TABLE => worn(project.read::<NpcDef>(path).ok()?.model),
         PlayerDef::TABLE => worn(project.read::<PlayerDef>(path).ok()?.model),
@@ -273,11 +378,11 @@ pub fn paint_file(
     rect: Rect,
     preview: Option<Preview>,
     kind: KindIcon,
-    color: Color32,
+    tone: IconTone,
 ) {
     match preview {
         Some(preview) => preview.paint(painter, rect),
-        None => kind.paint(painter, rect, color),
+        None => kind.paint(painter, rect, tone),
     }
 }
 

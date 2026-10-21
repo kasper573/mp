@@ -18,7 +18,7 @@ use engine::systems::class::ClassDef;
 use engine::systems::input::map::InputDef;
 use engine::systems::quest::{ObjectiveKind, QuestDef};
 use engine::systems::registry;
-use engine::systems::script::ScriptModule;
+use engine::systems::script::{ListedScriptModule, ScriptModule};
 use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
@@ -402,8 +402,11 @@ fn modules_column(
         let summary = if is_script {
             cx.project
                 .reader()
-                .from_json::<ScriptModule>(module)
-                .map_or_else(|error| error, |typed| script_summary(cx.project, &typed))
+                .from_json::<ListedScriptModule>(module)
+                .map_or_else(
+                    |error| error,
+                    |ListedScriptModule::Script(typed)| script_summary(cx.project, &typed),
+                )
         } else if table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some() {
             objectives += 1;
             format!("objective {objectives}")
@@ -517,9 +520,15 @@ pub(super) fn card_body(
     let mut changed = FormChange::default();
     match schema::variant_of(variants, module) {
         Some(variant) if variant.tag == ScriptModule::TAG => {
-            changed |= forms::as_type::<ScriptModule>(ui, cx, module, path, |ui, cx, typed| {
-                script_module_body(ui, cx, table, typed, path)
-            });
+            changed |= forms::as_type(
+                ui,
+                cx,
+                module,
+                path,
+                |ui, cx, ListedScriptModule::Script(typed)| {
+                    script_module_body(ui, cx, table, typed, path)
+                },
+            );
         }
         Some(variant) => {
             if schema::is_fieldless(variant.schema) {

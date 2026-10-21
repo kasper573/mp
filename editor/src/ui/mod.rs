@@ -31,6 +31,7 @@ use engine::systems::class::ClassDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, ModalDialog};
+use crate::icons::IconTone;
 use crate::keymap::EditorKey;
 use crate::project::{self, EditRefusal};
 use crate::tabs::{DockRequest, EditorTab};
@@ -559,13 +560,13 @@ impl TabViewer for Viewer<'_> {
             italics,
             ..TextRole::Tab.format(egui::Color32::PLACEHOLDER)
         };
-        let icon = tab.icon().icon;
+        let kind = tab.icon();
         job.append(
-            icon.glyph,
+            kind.icon.glyph,
             0.0,
             TextFormat::simple(
-                egui::FontId::new(TextRole::Tab.size(), icon.weight.family()),
-                theme::MUTED,
+                egui::FontId::new(TextRole::Tab.size(), kind.icon.weight.family()),
+                kind.color(IconTone::Normal),
             ),
         );
         job.append(&title, 6.0, format);

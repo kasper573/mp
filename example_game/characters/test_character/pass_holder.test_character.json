@@ -49,7 +49,7 @@
   "basic_attack": "items-and-skills/skill/slash.skill.json",
   "bag": [
     {
-      "item": "world/area/island/items/road_pass.item.json"
+      "item": "world/areas/island/items/road_pass.item.json"
     }
   ],
   "equipment": {

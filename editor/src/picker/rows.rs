@@ -169,7 +169,8 @@ impl PickSource for RowSource {
     }
 
     fn layout(&self) -> PickLayout {
-        if !self.several() && PICTURE_TABLES.contains(&self.tables[0].as_str()) {
+        let table = self.tables[0].as_str();
+        if !self.several() && PICTURE_TABLES.contains(&table) && icons::of_table(table).pictured {
             PickLayout::Grid
         } else {
             PickLayout::List

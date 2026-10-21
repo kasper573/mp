@@ -1,0 +1,30 @@
+{
+  "name": "Oak Staff",
+  "icon": "assets/icons/weapon_and_tool/wooden_staff.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_stone.sfx",
+    "trade": "sound-and-voice/sfx/trade_stone.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon",
+    "requires": {
+      "type": "is_class",
+      "class": "characters/class/hunter.class.json"
+    },
+    "grants": [
+      "world/areas/island/npcs/thorn_lash.skill.json"
+    ]
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Thorns sprout from the grain when a hunter grips it."
+    },
+    {
+      "type": "script",
+      "script": "world/areas/island/npcs/oak_staff_activated.script.json"
+    }
+  ]
+}

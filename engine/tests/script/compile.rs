@@ -1,15 +1,19 @@
 use std::sync::Arc;
 
+use engine::core::content::serial::TypeTag;
 use engine::core::content::{Content, ContentFile, ContentId};
+use engine::core::content::{ContentScope, with_content};
 use engine::core::math::Pos;
 use engine::core::script::compile::compile_owner;
 use engine::core::script::{EffectDef, Expr, ScriptError};
 use engine::systems::area::AreaDef;
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
+use engine::systems::npc::NpcModule;
 use engine::systems::quest::QuestDef;
 use engine::systems::script::{
-    EventKind, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptDef, ScriptModule,
+    EventKind, ListedScriptModule, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptDef,
+    ScriptModule,
 };
 use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
@@ -56,6 +60,25 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
             );
         }
     }
+}
+
+#[test]
+fn a_script_module_reads_and_writes_as_a_row_lists_it() {
+    let module = module("flow_pay_later");
+    let (listed, _) = with_content(ContentScope::of(content()), || {
+        serde_json::to_value(NpcModule::Script(module.clone()))
+    });
+    let listed = listed.expect("an npc's script module writes");
+    assert_eq!(
+        TypeTag::of_json(&listed).as_deref(),
+        Some(ScriptModule::TAG)
+    );
+    let ListedScriptModule::Script(read) =
+        parse_in::<ListedScriptModule>(content(), listed.clone());
+    let (written, _) = with_content(ContentScope::of(content()), || {
+        serde_json::to_value(ListedScriptModule::Script(read))
+    });
+    assert_eq!(written.expect("the listed module writes"), listed);
 }
 
 #[test]

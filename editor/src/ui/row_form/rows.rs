@@ -5,7 +5,7 @@ use egui::{RichText, Ui};
 use engine::core::content::serial::TypeTag;
 use engine::core::content::{MODULES, ModuleRule, fields_file};
 use engine::systems::registry;
-use engine::systems::script::ScriptModule;
+use engine::systems::script::{ListedScriptModule, ScriptModule};
 use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup, theme, widgets};
@@ -167,9 +167,11 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                         let mut by_script: BTreeMap<String, Vec<String>> = BTreeMap::new();
                         for (key, _, module) in &firsts {
                             let script = reader
-                                .from_json::<ScriptModule>(module)
+                                .from_json::<ListedScriptModule>(module)
                                 .ok()
-                                .and_then(|module| reader.path_of(module.script).map(str::to_owned))
+                                .and_then(|ListedScriptModule::Script(module)| {
+                                    reader.path_of(module.script).map(str::to_owned)
+                                })
                                 .unwrap_or_else(|| "?".to_owned());
                             by_script.entry(script).or_default().push((*key).clone());
                         }

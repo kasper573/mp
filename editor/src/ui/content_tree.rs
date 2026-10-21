@@ -11,10 +11,11 @@ use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::registry;
 
 use super::browser::{self, BrowserAction, RowMenu};
+use super::theme;
 use super::tree::{self, Narrowing, TreeDrop, TreeRow, TreeSource, TreeState};
-use super::{theme, widgets};
+use super::widgets::{self, KindMark};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
-use crate::icons::{self, Preview};
+use crate::icons::{self, IconTone, Preview};
 use crate::keymap::EditorKey;
 use crate::moves::{file_name, fixed_place};
 use crate::picker::Dragged;
@@ -497,15 +498,14 @@ fn filters(editor: &mut Editor, ui: &mut Ui, folder_key: &str) -> bool {
                 ui,
                 view,
                 &kinds,
+                &kind_mark,
                 &mut [
                     Narrowing {
                         label: "Only unsaved files",
-                        short: "unsaved",
                         on: only_unsaved,
                     },
                     Narrowing {
                         label: "Only unused files",
-                        short: "unused",
                         on: only_unused,
                     },
                 ],
@@ -533,6 +533,14 @@ const MEDIA_KIND: &str = "media";
 const NOTES_KIND: &str = "notes";
 
 /// Every kind of file Show ▾ offers: every type of content the game can hold, media and notes.
+fn kind_mark(kind: &str) -> KindMark<'_> {
+    KindMark::Icon(match kind {
+        MEDIA_KIND => icons::IMAGE,
+        NOTES_KIND => icons::NOTE,
+        table => icons::of_table(table),
+    })
+}
+
 fn kinds(editor: &Editor) -> Vec<String> {
     let registry = registry();
     editor
@@ -1002,7 +1010,8 @@ impl TreeSource for GameFolder<'_> {
             row.spoken = Some(format!("{}, missing {table}", row.name));
         } else if self.index.is_content(id) {
             let table = table_of(id).unwrap_or_default();
-            row.suffix = Some((format!(".{table}"), theme::ACCENT));
+            let ink = icons::of_table(table).color(IconTone::Normal);
+            row.suffix = Some((format!(".{table}"), ink));
             row.spoken = Some(format!("{}, {table}", row.name));
             row.preview = self.preview(id);
         } else if self.index.media.contains(id) {

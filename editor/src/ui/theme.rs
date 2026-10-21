@@ -23,6 +23,13 @@ pub const CANVAS: Color32 = Color32::from_rgb(219, 207, 178);
 pub const BLOCKED: Color32 = ink::RUBRIC;
 pub const SORT_LINE: Color32 = ink::AZURE;
 pub const DROP: Color32 = ink::AZURE;
+pub const FAMILY_WORLD: Color32 = Color32::from_rgb(0x2F, 0x62, 0xB0);
+pub const FAMILY_CHARACTERS: Color32 = Color32::from_rgb(0x2F, 0x8A, 0x52);
+pub const FAMILY_ITEMS: Color32 = Color32::from_rgb(0xC0, 0x8A, 0x12);
+pub const FAMILY_ABILITIES: Color32 = Color32::from_rgb(0x8A, 0x44, 0xB0);
+pub const FAMILY_STORY: Color32 = Color32::from_rgb(0xB3, 0x40, 0x2A);
+pub const FAMILY_SOUND: Color32 = Color32::from_rgb(0x1F, 0x80, 0x88);
+pub const FAMILY_INTERFACE: Color32 = Color32::from_rgb(0x5C, 0x68, 0x78);
 
 pub fn apply(ctx: &Context) {
     design_tokens::apply(ctx);

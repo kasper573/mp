@@ -58,6 +58,19 @@ fn a_content_file_stands_in_by_the_picture_it_names() {
 }
 
 #[test]
+fn a_kind_that_keeps_its_icon_never_stands_in_by_its_files_pictures() {
+    let ctx = egui::Context::default();
+    let (_scratch, project) =
+        open(support::game().area("field", &testkit::Map::open(2, 2), json!([])));
+    let mut thumbs = Thumbnails::default();
+    let mut budget = u32::MAX;
+    let tileset = testkit::path("tileset", "field_ground");
+    assert!(!icons::of_table("tileset").pictured);
+    assert!(icons::preview(&ctx, &mut thumbs, &project, &tileset, &mut budget).is_none());
+    assert!(icons::picture(&ctx, &mut thumbs, &project, &tileset, &mut budget).is_none());
+}
+
+#[test]
 fn a_model_stands_in_by_what_its_first_frame_idling_toward_the_camera_draws() {
     let ctx = egui::Context::default();
     let model = |game: Game, name: &str, frame: u32, figure: (u32, u32)| {

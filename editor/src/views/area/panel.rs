@@ -23,7 +23,8 @@ use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::tree::{self, DropAt, TreeState};
-use crate::ui::{breadcrumb, content_tree, row_form, theme, widgets};
+use crate::ui::widgets::{self, KindMark};
+use crate::ui::{breadcrumb, content_tree, row_form, theme};
 use crate::views;
 
 /// The left panel's own state between frames: the scene graph's tree, its filter, and what was
@@ -436,7 +437,7 @@ fn filter_row(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 panel.filter.clear();
             }
         },
-        |ui| tree::show_menu(ui, view, &kinds, &mut []),
+        |ui| tree::show_menu(ui, view, &kinds, &|kind| KindMark::Badge(kind), &mut []),
     );
     if changed {
         editor.save_settings();

@@ -223,6 +223,13 @@ impl<V: Vocabulary> ScriptModule<V> {
     pub const TAG: &'static str = "script";
 }
 
+/// A script module as a row lists it among its modules, tagged with its `type`.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "", tag = "type", rename_all = "snake_case")]
+pub enum ListedScriptModule<V: Vocabulary> {
+    Script(ScriptModule<V>),
+}
+
 #[derive(
     JsonSchema,
     Serialize,

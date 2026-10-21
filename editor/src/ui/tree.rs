@@ -12,8 +12,9 @@ use egui_ltreeview::{
     TreeViewBuilder, TreeViewState,
 };
 
-use super::{theme, widgets};
-use crate::icons::{self, KindIcon, Preview};
+use super::theme;
+use super::widgets::{self, KindMark};
+use crate::icons::{self, IconTone, KindIcon, Preview};
 use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 
@@ -66,8 +67,6 @@ pub struct TreeRow {
     pub badge: Option<(String, Color32)>,
     /// The row's eye and padlock, when it has them.
     pub toggles: Option<RowToggles>,
-    /// Where new rows land: marked on the folder's left edge.
-    pub inserting: bool,
     /// A closed folder with something selected inside.
     pub holds_selected: bool,
     /// Lit for what the pointer is over elsewhere, such as on the map.
@@ -430,6 +429,9 @@ const FLASH: f64 = 0.9;
 const HOVER_OPENS: f64 = 0.5;
 const MARK: f32 = 14.0;
 const ICON: f32 = 15.0;
+const ICON_GAP: f32 = 2.0;
+const TOGGLE: f32 = 17.0;
+const TOGGLE_GLYPH: f32 = 14.0;
 const SHOW_MENU_WIDTH: f32 = 220.0;
 
 struct Line {
@@ -566,9 +568,9 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
             });
         } else if let Some(icon) = icon {
             node = node.icon(move |ui: &mut Ui| {
-                let color = if dim { theme::FAINT } else { theme::MUTED };
+                let tone = if dim { IconTone::Dim } else { IconTone::Normal };
                 let rect = Rect::from_center_size(ui.max_rect().center(), Vec2::splat(ICON));
-                icons::paint_file(ui.painter(), rect, preview, icon, color);
+                icons::paint_file(ui.painter(), rect, preview, icon, tone);
             });
         }
         builder.node(node);
@@ -581,16 +583,10 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
 
 fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
     let rect = ui.max_rect();
+    ui.add_space(ICON_GAP);
     if row.lit {
         ui.painter()
             .rect_filled(rect.expand2(Vec2::new(2.0, 1.0)), 3.0, theme::ACCENT_SOFT);
-    }
-    if row.inserting {
-        let bar = Rect::from_min_size(
-            egui::pos2(rect.left() - INDENT - 9.0, rect.top() + 2.0),
-            Vec2::new(3.0, rect.height() - 4.0),
-        );
-        ui.painter().rect_filled(bar, 1.0, theme::DROP);
     }
     let mut right = rect.right() - 6.0;
     if let Some(toggles) = row.toggles {
@@ -798,7 +794,8 @@ fn row_toggles(
         (Toggle::Lock, toggles.locked),
         (Toggle::Hide, toggles.hidden),
     ] {
-        let rect = Rect::from_center_size(egui::pos2(x - MARK / 2.0, center_y), Vec2::splat(MARK));
+        let rect =
+            Rect::from_center_size(egui::pos2(x - TOGGLE / 2.0, center_y), Vec2::splat(TOGGLE));
         let sense = if toggles.disabled {
             egui::Sense::hover()
         } else {
@@ -819,11 +816,11 @@ fn row_toggles(
         };
         mark.paint(
             ui.painter(),
-            Rect::from_center_size(rect.center(), Vec2::splat(11.0)),
+            Rect::from_center_size(rect.center(), Vec2::splat(TOGGLE_GLYPH)),
             color,
         );
         if state == ToggleState::Inherited {
-            let y = rect.center().y + 7.0;
+            let y = rect.center().y + TOGGLE_GLYPH / 2.0 + 1.5;
             for dot in 0..3 {
                 ui.painter().circle_filled(
                     egui::pos2(rect.center().x - 4.0 + dot as f32 * 4.0, y),
@@ -851,7 +848,7 @@ fn row_toggles(
                 only: ui.input(|i| EditorKey::ShowOnly.held(i)),
             });
         }
-        x -= MARK;
+        x -= TOGGLE;
     }
     x - 4.0
 }
@@ -889,38 +886,25 @@ pub fn filter_row<R>(
 /// checkbox above the kinds.
 pub struct Narrowing<'a> {
     pub label: &'a str,
-    /// What Show ▾ says while the narrowing is on.
-    pub short: &'a str,
     pub on: &'a mut bool,
 }
 
 /// Show ▾: which kinds of row a tree lists, whether folders with nothing shown stay, and the
-/// tree's narrowings. Answers whether what the user's settings keep changed.
+/// tree's narrowings, each kind after its mark. Answers whether what the user's settings keep
+/// changed.
 pub fn show_menu(
     ui: &mut Ui,
     view: &mut crate::user::TreeView,
     kinds: &[String],
+    mark_of: &dyn Fn(&str) -> KindMark,
     narrowings: &mut [Narrowing],
 ) -> bool {
     let shown = kinds
         .iter()
         .filter(|kind| !view.hidden_kinds.contains(*kind))
         .count();
-    let narrowed: Vec<&str> = narrowings
-        .iter()
-        .filter(|narrowing| *narrowing.on)
-        .map(|narrowing| narrowing.short)
-        .collect();
-    let mut label = if shown == kinds.len() {
-        "Show".to_owned()
-    } else {
-        format!("Show {shown} of {}", kinds.len())
-    };
-    if !narrowed.is_empty() {
-        label = format!("{label} · {}", narrowed.join(", "));
-    }
     let mut changed = false;
-    let button = controls::dropdown(ui, label);
+    let button = controls::dropdown(ui, "Show");
     let menu = egui::Popup::from_toggle_button_response(&button)
         .width(SHOW_MENU_WIDTH)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
@@ -947,7 +931,7 @@ pub fn show_menu(
             .show(ui, |ui| {
                 for kind in kinds {
                     let mut on = !view.hidden_kinds.contains(kind);
-                    if ui.checkbox(&mut on, kind).changed() {
+                    if widgets::kind_checkbox(ui, mark_of(kind), kind, &mut on).changed() {
                         if on {
                             view.hidden_kinds.remove(kind);
                         } else {

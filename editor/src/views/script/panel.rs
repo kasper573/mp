@@ -6,8 +6,8 @@ use engine::core::script::{Expr, MayDo};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::script::{
-    Node, OwnerRow, Place, Reach, RiftEffect, RiftScripting, RiftScripts, RunnerKind, ScriptDef,
-    ScriptModule, VarValue,
+    ListedScriptModule, Node, OwnerRow, Place, Reach, RiftEffect, RiftScripting, RiftScripts,
+    RunnerKind, ScriptDef, VarValue,
 };
 use engine::systems::stat::StatKind;
 
@@ -684,16 +684,17 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         };
         for pointer in pointers {
             let at = ScriptRef::parse(&pointer);
-            let module = at
-                .module
-                .as_ref()
-                .and_then(|module| project.value_at::<ScriptModule>(&file, &module.pointer()));
+            let module = at.module.as_ref().and_then(|module| {
+                project.value_at::<ListedScriptModule>(&file, &module.pointer())
+            });
             let (name, what) = match at.node {
                 Some(node) => (node, "run node".to_owned()),
                 None => (
                     String::new(),
                     module
-                        .map(|module| summarise_values(&text, &module.values))
+                        .map(|ListedScriptModule::Script(module)| {
+                            summarise_values(&text, &module.values)
+                        })
                         .unwrap_or_default(),
                 ),
             };

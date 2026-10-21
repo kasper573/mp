@@ -656,13 +656,6 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mut picked = None;
     let mut import = None;
     ui.horizontal(|ui| {
-        ui.label(theme::mono(shown_path(key)).color(theme::CODE));
-        ui.add_space(8.0);
-        for option in TilesetMode::VARIANTS {
-            if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
-                picked = Some(*option);
-            }
-        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             widgets::dropdown_menu(ui, "Import", |ui| {
                 if ui.button("Onto this tileset…").clicked() {
@@ -673,6 +666,18 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     import = Some(Reimport::Animation);
                     ui.close();
                 }
+            });
+            ui.add_space(8.0);
+            for option in TilesetMode::VARIANTS.iter().rev() {
+                if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
+                    picked = Some(*option);
+                }
+            }
+            ui.add_space(8.0);
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::Label::new(theme::mono(shown_path(key)).color(theme::CODE)).truncate(),
+                );
             });
         });
     });

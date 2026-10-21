@@ -16,7 +16,7 @@ use engine::core::content::{ContentFile, ContentId};
 
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
-use crate::icons::{self, KindIcon};
+use crate::icons::{self, IconTone, KindIcon};
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
@@ -775,7 +775,8 @@ fn face(
         &pick.key,
         budget,
     );
-    icons::paint_file(ui.painter(), rect, picture, source.icon(pick), theme::MUTED);
+    let icon = source.icon(pick);
+    icons::paint_file(ui.painter(), rect, picture, icon, IconTone::Normal);
 }
 
 fn close(ui: &mut Ui, id: egui::Id) {

@@ -85,7 +85,6 @@ pub struct SceneSource<'a> {
     /// The rows that pass the filter and Show, among those shown.
     hits: HashSet<String>,
     needle: String,
-    insertion: Option<String>,
     holding: HashSet<String>,
     problems: HashMap<String, String>,
     cells: &'a HashMap<String, usize>,
@@ -116,7 +115,6 @@ impl<'a> SceneSource<'a> {
             shown: None,
             hits: HashSet::new(),
             needle: filter.trim().to_lowercase(),
-            insertion: None,
             holding: HashSet::new(),
             problems: problems(project, snapshot),
             cells,
@@ -133,22 +131,10 @@ impl<'a> SceneSource<'a> {
                 parent = source.parent(&parent);
             }
         }
-        source.insertion = source.insertion_of(&selected);
         if !source.needle.is_empty() || !view.hidden_kinds.is_empty() || view.hide_empty_folders {
             source.narrow(view);
         }
         source
-    }
-
-    /// The folder new rows land in, by its row; `None` for the top level.
-    fn insertion_of(&self, selected: &[String]) -> Option<String> {
-        let [one] = selected else {
-            return None;
-        };
-        if self.is_folder(one) {
-            return Some(one.clone());
-        }
-        Some(self.parent(one)).filter(|parent| !parent.is_empty())
     }
 
     fn narrow(&mut self, view: &crate::user::TreeView) {
@@ -785,7 +771,6 @@ impl TreeSource for SceneSource<'_> {
                 || self.outside(id)
                 || (self.shown.is_some() && !self.hits.contains(id)),
             problem: self.problems.get(id).cloned(),
-            inserting: self.insertion.as_deref() == Some(id),
             holds_selected: self.holding.contains(id),
             lit: self.lit.as_deref() == Some(id),
             matched: tree::matched(&name, &self.needle),

@@ -13,7 +13,7 @@ use testkit::path;
 use crate::support;
 
 const WIDTH: f32 = 300.0;
-const GUARD: &str = "world/area/island/npcs/a_rather_long_named_harbour_guard";
+const GUARD: &str = "world/areas/island/npcs/a_rather_long_named_harbour_guard";
 
 fn open(scratch: &tempfile::TempDir) -> Editor {
     let line = |face: &str, text: &str| json!({ "by": { "type": "npc", "npc": path("npc", GUARD), "face": face }, "text": [text] });

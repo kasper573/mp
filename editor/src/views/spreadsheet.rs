@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{self, FormCx, FormState};
-use crate::icons;
+use crate::icons::{self, IconTone};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
@@ -888,7 +888,7 @@ fn table_body(
                         icon,
                         preview,
                         icons::of_table(table),
-                        theme::MUTED,
+                        IconTone::Normal,
                     );
                 }
                 x += 22.0;

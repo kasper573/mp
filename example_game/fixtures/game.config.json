@@ -2,7 +2,7 @@
   "name": "Rift",
   "content_version": "67b119fc",
   "initial_spawn": {
-    "area": "world/area/island/island.area",
+    "area": "world/areas/island/island.area",
     "x": 39.0,
     "y": 29.0
   },

@@ -11,7 +11,7 @@ use engine::core::content::LoadError;
 use engine::core::time::{Seconds, UnixMillis};
 
 use super::theme;
-use crate::icons::KindIcon;
+use crate::icons::{IconTone, KindIcon};
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
 
@@ -215,16 +215,62 @@ pub fn kind_option(ui: &mut Ui, kind: KindIcon, label: &str, selected: bool) -> 
     paint_kind(ui, kind, id, laid)
 }
 
+/// What stands for a kind: a file kind's icon, or the lettered badge of a module kind.
+#[derive(Clone, Copy)]
+pub enum KindMark<'a> {
+    Icon(KindIcon),
+    Badge(&'a str),
+}
+
+impl KindMark<'_> {
+    fn color(self) -> Color32 {
+        match self {
+            KindMark::Icon(icon) => icon.color(IconTone::Normal),
+            KindMark::Badge(kind) => theme::badge_color(kind),
+        }
+    }
+
+    fn paint(self, painter: &egui::Painter, rect: Rect) {
+        match self {
+            KindMark::Icon(icon) => icon.paint(painter, rect, IconTone::Normal),
+            KindMark::Badge(kind) => paint_badge(painter, rect, kind),
+        }
+    }
+}
+
+/// A checkbox reading `label` after a kind's mark, both in the kind's colour.
+pub fn kind_checkbox(ui: &mut Ui, mark: KindMark, label: &str, on: &mut bool) -> Response {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        let mut response = ui.add(egui::Checkbox::without_text(on));
+        let id = ui.id().with(("kind checkbox", label));
+        let text = egui::RichText::new(label).color(mark.color());
+        let laid = egui::Button::new((egui::Atom::custom(id, Vec2::splat(KIND_ICON)), text))
+            .frame(false)
+            .atom_ui(ui);
+        if let Some(rect) = laid.rect(id) {
+            mark.paint(ui.painter(), rect);
+        }
+        let named = laid.response;
+        if named.clicked() {
+            *on = !*on;
+            response.mark_changed();
+        }
+        response | named
+    })
+    .inner
+}
+
 const KIND_ICON: f32 = 14.0;
 
 fn paint_kind(ui: &Ui, kind: KindIcon, id: egui::Id, laid: egui::AtomLayoutResponse) -> Response {
     if let Some(rect) = laid.rect(id) {
-        let color = if ui.is_enabled() {
-            theme::MUTED
+        let tone = if ui.is_enabled() {
+            IconTone::Normal
         } else {
-            theme::FAINT
+            IconTone::Dim
         };
-        kind.paint(ui.painter(), rect, color);
+        kind.paint(ui.painter(), rect, tone);
     }
     laid.response
 }
@@ -263,15 +309,17 @@ pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
 pub const BADGE_SIZE: f32 = 16.0;
 
 pub fn badge(ui: &mut Ui, kind: &str) {
-    let color = theme::badge_color(kind);
-    let letter = theme::badge_letter(kind);
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(BADGE_SIZE), Sense::hover());
-    ui.painter().rect_filled(rect, 3.0, color);
-    ui.painter().text(
+    paint_badge(ui.painter(), rect, kind);
+}
+
+fn paint_badge(painter: &egui::Painter, rect: Rect, kind: &str) {
+    painter.rect_filled(rect, 3.0, theme::badge_color(kind));
+    painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,
-        letter,
-        FontId::monospace(11.0),
+        theme::badge_letter(kind),
+        FontId::monospace(rect.height() * 0.7),
         ink::CREAM,
     );
 }
