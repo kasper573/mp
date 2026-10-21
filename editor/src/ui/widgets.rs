@@ -15,6 +15,10 @@ use crate::icons::KindIcon;
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
 
+const CHIP_HEIGHT: f32 = 20.0;
+const CHIP_PADDING: f32 = 8.0;
+const CHIP_GAP: f32 = 4.0;
+
 pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)
         .font(Face::SmallCapsBold.id(TextRole::Section.size()))
@@ -414,23 +418,41 @@ pub fn submenu<R>(
     inner.map(|inner| inner.inner)
 }
 
+/// Drawn at a fixed height under the controls' own, so a chip appearing in a row of controls
+/// never makes the row taller.
 fn chip_framed(ui: &mut Ui, text: RichText, fill: Color32, ink: Color32, caret: bool) -> Response {
-    egui::Frame::new()
-        .fill(fill)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(3.0)
-        .inner_margin(egui::Margin::symmetric(8, 2))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
-                ui.label(text.size(12.5).color(ink));
-                if caret {
-                    ui.label(Mark::CaretDown.text(10.0).color(ink));
-                }
-            });
-        })
-        .response
-        .interact(Sense::click())
+    let galley = |text: RichText| {
+        egui::WidgetText::from(text.color(ink)).into_galley(
+            ui,
+            Some(egui::TextWrapMode::Extend),
+            f32::INFINITY,
+            egui::TextStyle::Body,
+        )
+    };
+    let label = galley(text.size(12.5));
+    let mark = caret.then(|| galley(Mark::CaretDown.text(10.0)));
+    let marked = mark.as_ref().map_or(0.0, |mark| mark.size().x + CHIP_GAP);
+    let size = Vec2::new(label.size().x + marked + 2.0 * CHIP_PADDING, CHIP_HEIGHT);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label.text())
+    });
+    let painter = ui.painter();
+    painter.rect(
+        rect,
+        3.0,
+        fill,
+        Stroke::new(1.0, theme::BORDER),
+        egui::StrokeKind::Inside,
+    );
+    let left = rect.left() + CHIP_PADDING;
+    let at = |x: f32, height: f32| egui::pos2(x, rect.center().y - height / 2.0);
+    let mark_x = left + label.size().x + CHIP_GAP;
+    painter.galley(at(left, label.size().y), label, ink);
+    if let Some(mark) = mark {
+        painter.galley(at(mark_x, mark.size().y), mark, ink);
+    }
+    response
 }
 
 pub fn plural<N: PartialEq + From<u8>>(count: N) -> &'static str {

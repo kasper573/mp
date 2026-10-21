@@ -4,7 +4,7 @@ use std::sync::Arc;
 use editor::app::Editor;
 use editor::project::{Project, RowSelection};
 use editor::schema::SchemaShapes;
-use editor::ui::tree::{DropAt, TreeDrop, TreeSource};
+use editor::ui::tree::{DropAt, Toggle, TreeDrop, TreeSource};
 use editor::user::{EditorSettings, TreeView, UserFolder};
 use editor::views::area::flags::{Flag, SceneFlags, SceneLevel};
 use editor::views::area::nodes::{self, Landing, NodeFlag, SceneTree};
@@ -156,6 +156,35 @@ fn showing_only_a_row_hides_everything_else_for_the_moment() {
     assert!(!flags.hidden("/0"));
     assert!(!flags.hidden("/0/children/0"));
     assert_eq!(flags.row("/1").hidden, Flag::Inherited);
+}
+
+#[test]
+fn hiding_a_row_shows_in_the_open_view_before_the_folder_loads_again() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(painted_game(), &scratch);
+    settled(&mut editor);
+    editor.views.area.ensure_view(&area());
+    let shown = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    let rug = nodes::modules(shown.def.nodes())
+        .into_iter()
+        .find(|module| module.node.label.as_deref() == Some("rug"))
+        .expect("the rug's placement")
+        .pointer;
+
+    scene_tree::toggle(
+        &mut editor,
+        &area(),
+        std::slice::from_ref(&rug),
+        Toggle::Hide,
+    );
+
+    assert!(editor.project.as_ref().expect("a project").loading());
+    let hidden = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    assert!(hidden.flags.hidden(&rug));
+    assert_ne!(hidden.picture.ground, shown.picture.ground);
+    settled(&mut editor);
+    let loaded = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    assert_eq!(loaded.picture.ground, hidden.picture.ground);
 }
 
 #[test]
@@ -334,11 +363,7 @@ fn a_layer_name_taken_anywhere_it_reaches_is_refused() {
     let mut editor = open(painted_game(), &scratch);
     let rug = path("blueprint", "rug");
     nodes::change_scene(&mut editor, &rug, |scene| {
-        let carpet = SceneNode::GroundLayer(GroundLayer {
-            name: "carpet".to_owned(),
-            hidden: false,
-            locked: false,
-        });
+        let carpet = SceneNode::GroundLayer(GroundLayer::named("carpet"));
         SceneTree::new(scene).append("", vec![carpet]);
         Some("Add a layer".to_owned())
     });

@@ -120,6 +120,17 @@ impl SceneFlags {
         (!said.is_empty()).then(|| said.join(", "))
     }
 
+    /// Whether `other` hides the same rows, so a picture drawn for either draws the other.
+    pub fn hides_alike(&self, other: &SceneFlags) -> bool {
+        self.rows.len() == other.rows.len()
+            && self.rows.iter().all(|(id, row)| {
+                other
+                    .rows
+                    .get(id)
+                    .is_some_and(|theirs| theirs.hidden.on() == row.hidden.on())
+            })
+    }
+
     pub fn any_hidden(&self) -> bool {
         self.rows.values().any(|row| row.hidden.on())
     }

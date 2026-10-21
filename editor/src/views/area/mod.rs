@@ -953,6 +953,7 @@ pub struct AreaSnapshot {
 #[derive(Clone)]
 struct SnapshotCache {
     generation: u64,
+    revision: u64,
     show_only: Option<String>,
     in_place: Vec<String>,
     snapshot: SnapshotParts,
@@ -988,24 +989,35 @@ impl Deref for AreaFrame<'_> {
 }
 
 impl AreaSnapshot {
-    /// The snapshot of an open view, made again only when the content or the view's flags change.
+    /// The snapshot of an open view, made again when the files, the content or the view's flags
+    /// change. Its picture is drawn again only when the content or what's hidden changes, so a
+    /// change to the scene shows without waiting for the folder to load again.
     pub fn for_view(editor: &mut Editor, view_key: &str) -> Option<Self> {
         let project = editor.project.as_ref()?;
         let content = project.content.clone()?;
         let generation = project.generation;
+        let revision = project.files.revision();
         let view = editor.views.area.views.get(view_key)?;
         let bundle = view.bundle.clone();
-        let fresh = view.cache.as_ref().filter(|cache| {
+        let current = view.cache.as_ref().filter(|cache| {
             cache.generation == generation
                 && cache.show_only == view.show_only
                 && cache.in_place == view.in_place
         });
-        let parts = match fresh {
+        let parts = match current.filter(|cache| cache.revision == revision) {
             Some(cache) => cache.snapshot.clone(),
             None => {
+                let drawn = current.map(|cache| cache.snapshot.clone());
                 let show_only = view.show_only.clone();
                 let path = view.in_place.clone();
-                let made = snapshot_parts(editor, &content, &bundle, &path, show_only.as_deref());
+                let made = snapshot_parts(
+                    editor,
+                    &content,
+                    &bundle,
+                    &path,
+                    show_only.as_deref(),
+                    drawn.as_ref(),
+                );
                 let view = editor.views.area.view_mut(view_key);
                 let Some(parts) = made else {
                     view.in_place.clear();
@@ -1017,6 +1029,7 @@ impl AreaSnapshot {
                 }
                 view.cache = Some(SnapshotCache {
                     generation,
+                    revision,
                     show_only,
                     in_place: view.in_place.clone(),
                     snapshot: parts.clone(),
@@ -1034,7 +1047,7 @@ impl AreaSnapshot {
             return Self::for_view(editor, &key);
         }
         let content = editor.project.as_ref()?.content.clone()?;
-        let parts = snapshot_parts(editor, &content, bundle, &[], None)?;
+        let parts = snapshot_parts(editor, &content, bundle, &[], None, None)?;
         Some(Self::from_parts(content, bundle.to_owned(), parts))
     }
 
@@ -1251,12 +1264,15 @@ impl AreaSnapshot {
     }
 }
 
+/// The snapshot of `bundle` as its files read now, its picture `drawn`'s when that one was drawn
+/// from the same content with the same rows hidden.
 fn snapshot_parts(
     editor: &Editor,
     content: &Content,
     bundle: &str,
     in_place: &[String],
     show_only: Option<&str>,
+    drawn: Option<&SnapshotParts>,
 ) -> Option<SnapshotParts> {
     let pictured = match table_of(bundle)? {
         AreaDef::TABLE => Pictured::Area(content.by_path::<AreaDef>(bundle)?),
@@ -1277,14 +1293,20 @@ fn snapshot_parts(
         });
     }
     let flags = SceneFlags::of(&levels, show_only);
-    let keep = |path: &[&str]| flags.keep(path);
-    let kept = if flags.any_hidden() {
-        area::Kept::Only(&keep)
-    } else {
-        area::Kept::All
+    let (picture, placement_bounds) = match drawn.filter(|drawn| drawn.flags.hides_alike(&flags)) {
+        Some(drawn) => (drawn.picture.clone(), drawn.placement_bounds.clone()),
+        None => {
+            let keep = |path: &[&str]| flags.keep(path);
+            let kept = if flags.any_hidden() {
+                area::Kept::Only(&keep)
+            } else {
+                area::Kept::All
+            };
+            let picture = Arc::new(area::picture(content, pictured, kept)?);
+            let placement_bounds = Arc::new(placement::placement_bounds(&picture.placed));
+            (picture, placement_bounds)
+        }
     };
-    let picture = Arc::new(area::picture(content, pictured, kept)?);
-    let placement_bounds = placement::placement_bounds(&picture.placed);
     Some(SnapshotParts {
         pictured,
         picture,
@@ -1293,7 +1315,7 @@ fn snapshot_parts(
         reader,
         flags: Arc::new(flags),
         in_place,
-        placement_bounds: Arc::new(placement_bounds),
+        placement_bounds,
     })
 }
 
