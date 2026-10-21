@@ -414,10 +414,7 @@ pub fn delete_dialog(editor: &mut Editor, paths: Vec<String>) {
         .collect();
     let mut groups: Vec<UsageGroup> = Vec::new();
     for path in &gone {
-        let target = table_of(path)
-            .filter(|_| index.is_content(path))
-            .unwrap_or(MEDIA)
-            .to_owned();
+        let target = target_of(project, path).to_owned();
         let usages = match target.as_str() {
             MEDIA => project.usages.of_media(path),
             _ => project.usages.of_content(path),
@@ -685,6 +682,13 @@ fn is_beside(file: &str) -> bool {
     !file.ends_with(".json")
 }
 
+/// What the uses of `path` name: its type when it is a content file, or `MEDIA`.
+fn target_of<'p>(project: &Project, path: &'p str) -> &'p str {
+    table_of(path)
+        .filter(|_| project.files.index().is_content(path))
+        .unwrap_or(MEDIA)
+}
+
 pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) {
     let Some(project) = &editor.project else {
         return;
@@ -778,16 +782,21 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
                 widgets::card_frame(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
-                        let badge = if group.kind.is_empty() {
-                            &group.table
-                        } else {
-                            &group.kind
-                        };
-                        widgets::badge(ui, badge);
-                        ui.label(theme::strong(&title));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let candidates = candidates(&group.target);
                             decision_picker(ui, &project.shapes, index, group, &candidates);
+                            ui.with_layout(
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    let badge = if group.kind.is_empty() {
+                                        &group.table
+                                    } else {
+                                        &group.kind
+                                    };
+                                    widgets::badge(ui, badge);
+                                    ui.add(egui::Label::new(theme::strong(&title)).truncate());
+                                },
+                            );
                         });
                     });
                     ui.add_space(2.0);
@@ -986,37 +995,41 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
                 .push((usage, group));
         }
     }
+    let mut renames: BTreeMap<String, String> = BTreeMap::new();
+    let mut repointed: Vec<&str> = Vec::new();
     for (file, mut entries) in by_file {
-        if is_beside(&file) {
-            for (_, group) in &entries {
-                if let UsageDecision::Repoint(to) = &group.decision {
-                    for gone in dialog
-                        .gone
-                        .iter()
-                        .filter(|gone| table_of(gone) == Some(&group.target))
-                    {
-                        edit.rename_beside(&project.files, &file, &group.target, gone, to);
-                    }
-                }
-            }
-            continue;
-        }
-        let Some(mut value) = project.files.json_owned(&file) else {
-            continue;
-        };
         entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
+        let mut value = None;
         for (usage, group) in entries {
             match &group.decision {
                 UsageDecision::Repoint(to) => {
-                    moves::rewrite(&mut value, usage, &project.usages, &file, to)
+                    renames.extend(
+                        dialog
+                            .gone
+                            .iter()
+                            .filter(|gone| target_of(project, gone) == group.target)
+                            .map(|gone| (gone.clone(), to.clone())),
+                    );
+                    repointed.push(&usage.file);
                 }
-                UsageDecision::Remove => remove_entry(&mut value, &usage.pointer),
-                UsageDecision::Unpack => unpack_entry(project, &file, &mut value, &usage.pointer),
+                UsageDecision::Remove | UsageDecision::Unpack => {
+                    let Some(value) = value.get_or_insert_with(|| project.files.json_owned(&file))
+                    else {
+                        continue;
+                    };
+                    match group.decision {
+                        UsageDecision::Remove => remove_entry(value, &usage.pointer),
+                        _ => unpack_entry(project, &file, value, &usage.pointer),
+                    }
+                }
                 UsageDecision::Undecided => {}
             }
         }
-        edit.write_json(file, &value);
+        if let Some(Some(value)) = value {
+            edit.write_json(file, &value);
+        }
     }
+    moves::rewrite_renamed(project, &mut edit, repointed, &renames)?;
     for path in &dialog.paths {
         let inside = folder_entry(path);
         let entries: Vec<String> = if project.files.index().folders.contains(path) {
@@ -1029,6 +1042,9 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         }
         moves::keep_folder(&project.files, &mut edit, parent_of(path));
     }
+    project
+        .check(&edit)
+        .map_err(|refusal| format!("{}: {}", refusal.place(), refusal.sentence()))?;
     editor.try_apply(edit)?;
     for path in &dialog.gone {
         close_tabs(editor, path);

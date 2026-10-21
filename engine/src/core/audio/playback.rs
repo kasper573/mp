@@ -16,7 +16,8 @@ use crate::core::audio::loader::AudioLoader;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::{Lufs, decibels};
 use crate::core::content::{
-    Bundle, Content, ContentFile, ContentId, FileWriter, PartSpec, Parts, RowCheck, Shape,
+    Bundle, Content, ContentFile, ContentId, FileWriter, NamedContent, PartSpec, Parts, RowCheck,
+    Shape,
 };
 use crate::core::math::{Pos, Rng, Size};
 use crate::core::tiling::Tiles;
@@ -94,6 +95,12 @@ pub type SfxRoleId = ContentId<SfxRoleDef>;
 pub struct SfxRoleDef {
     pub name: String,
     pub loudness: Lufs,
+}
+
+impl NamedContent for SfxRoleDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ContentFile for SfxRoleDef {

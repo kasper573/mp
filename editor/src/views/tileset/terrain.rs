@@ -364,14 +364,14 @@ pub fn set_corner(
         corner.code(),
         tileset.key
     ));
-    super::change_tileset(editor, &tileset.key, edit, |def| {
+    super::change_tileset(editor, &tileset.key, edit, |def, _| {
         tile_mut(def, tile).corners.insert(set.to_owned(), corners);
     });
 }
 
 pub fn remove_set(editor: &mut Editor, tileset: &OpenTileset, set: &str) {
     let edit = ContentEdit::new(format!("Remove terrain set {set} from {}", tileset.key));
-    super::change_tileset(editor, &tileset.key, edit, |def| {
+    super::change_tileset(editor, &tileset.key, edit, |def, _| {
         def.terrains.remove(set);
         for data in def.tiles.values_mut() {
             data.corners.remove(set);
@@ -501,7 +501,7 @@ fn add_set(
         return Err("two to eight terrains, separated by commas".to_owned());
     }
     let edit = ContentEdit::new(format!("New terrain set {set} on {}", tileset.key));
-    try_change_tileset(editor, &tileset.key, edit, |def| {
+    try_change_tileset(editor, &tileset.key, edit, |def, _| {
         def.terrains.insert(set.clone(), terrains);
     })?;
     editor.views.tileset.view_mut(&tileset.key).pick_set(set);

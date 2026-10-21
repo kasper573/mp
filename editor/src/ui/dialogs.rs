@@ -868,7 +868,7 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
             index,
             module,
         } => {
-            let (Some(value), Some(reader)) = (editor.row_value(&key), editor.reader()) else {
+            let (Some(value), Some(reader)) = (editor.fields_json(&key), editor.reader()) else {
                 return;
             };
             let replaced = reader.modules_in(&table, &value).and_then(|mut modules| {

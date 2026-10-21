@@ -98,13 +98,13 @@ pub fn verdict(ui: &mut Ui, ok: bool, text: &str) {
 
 pub fn kv_text(ui: &mut Ui, key: &str, value: impl Into<String>) {
     kv(ui, key, |ui| {
-        ui.label(value.into());
+        ui.add(egui::Label::new(value.into()).truncate());
     });
 }
 
 pub fn kv_code(ui: &mut Ui, key: &str, value: impl Into<String>) {
     kv(ui, key, |ui| {
-        ui.label(theme::mono(value.into()));
+        ui.add(egui::Label::new(theme::mono(value.into())).truncate());
     });
 }
 

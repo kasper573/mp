@@ -160,8 +160,6 @@ pub struct BesideFile {
     pub name: &'static str,
     /// Every content file the part names, where it is written.
     pub names: fn(&str) -> Vec<BesideName>,
-    /// The part with every name of the `table` file at `from` written as `to`.
-    pub rename: fn(text: &str, table: &str, from: &str, to: &str) -> String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -218,7 +216,7 @@ impl ContentRegistry {
         self.hook(LoadStep::Rows, module_rules::<Row>)
     }
 
-    /// Marks the files of `Row` as carrying the name a player reads them by.
+    /// Marks the files of `Row` as carrying a name, the one `NamedContent` shows.
     pub fn named<Row: NamedContent>(&mut self) -> &mut ContentRegistry {
         self.named.push((Row::TABLE, |json| {
             let (parsed, _) = with_content(ContentScope::new(), || parse_value::<Row>(json).ok());
@@ -227,8 +225,7 @@ impl ContentRegistry {
         self
     }
 
-    /// The name a player reads `row`, a file of `table` as JSON, by, when its type carries one
-    /// and it reads.
+    /// The name `row`, a file of `table` as JSON, shows, when its type carries one and it reads.
     pub fn shown_name(&self, table: &str, row: &serde_json::Value) -> Option<String> {
         let (_, name) = self.named.iter().find(|(named, _)| *named == table)?;
         name(row)
@@ -462,20 +459,6 @@ impl ContentRegistry {
             || self.json_part_of(file).is_some()
     }
 
-    /// `text`, a part of a bundle at `file`, with every name of the `table` file at `from` written
-    /// as `to`; `None` when no such part names content.
-    pub fn rename_beside(
-        &self,
-        file: &str,
-        text: &str,
-        table: &str,
-        from: &str,
-        to: &str,
-    ) -> Option<String> {
-        self.beside_of(file)
-            .map(|beside| (beside.rename)(text, table, from, to))
-    }
-
     fn beside_of(&self, file: &str) -> Option<&BesideFile> {
         let (bundle, part) = bundle_of(file)?;
         let table = table_of(bundle)?;
@@ -568,6 +551,13 @@ impl ContentRegistry {
 
     pub(super) fn settings_loader(&self) -> Option<&dyn SettingsLoader> {
         self.settings.as_deref()
+    }
+
+    pub(super) fn loader_named(&self, table: &str) -> Option<&dyn TableLoader> {
+        self.rows
+            .iter()
+            .find(|loader| loader.name() == table)
+            .map(Box::as_ref)
     }
 
     pub(super) fn loader_of<Row: ContentFile>(&self) -> Option<&dyn TableLoader> {

@@ -827,13 +827,11 @@ impl Editor {
         self.apply(edit)
     }
 
-    /// The fields of the content file at `path` as the editor holds them now.
-    pub fn row(&self, path: &str) -> Option<Arc<Value>> {
-        self.project.as_ref()?.files.json(&fields_file(path))
-    }
-
-    pub fn row_value(&self, path: &str) -> Option<Value> {
-        self.row(path).map(|row| (*row).clone())
+    /// The fields of the content file at `path` as raw JSON, as the editor holds them now: for
+    /// the forms that walk a file by its type's schema, which know no field by name. Code that
+    /// names a field reads the file as its type with `read`.
+    pub fn fields_json(&self, path: &str) -> Option<Value> {
+        self.project.as_ref()?.files.json_owned(&fields_file(path))
     }
 
     pub fn thumb(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {

@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentFile, ContentProblem, Loading, RowCheck, id, key_of, serial,
+    Content, ContentFile, ContentProblem, Loading, NamedContent, RowCheck, id, key_of, serial,
 };
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
@@ -62,6 +62,12 @@ pub struct CharacterSnapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub history: Vec<SnapshotRecord>,
     pub start: CharacterStart,
+}
+
+impl NamedContent for CharacterSnapshot {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ContentFile for CharacterSnapshot {

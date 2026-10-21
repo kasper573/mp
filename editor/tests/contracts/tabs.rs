@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use editor::app::Editor;
-use editor::project::{ContentEdit, Project};
+use editor::project::Project;
 use editor::schema::SchemaShapes;
 use editor::tabs::{DockRequest, EditorTab};
 use editor::ui;
 use editor::user::{EditorSettings, UserFolder};
 use egui_dock::NodeIndex;
-use engine::core::content::{ContentFile, fields_file};
+use engine::core::content::ContentFile;
 use engine::systems::area::AreaDef;
 
 use crate::support::{area, game_folder};
@@ -98,11 +98,10 @@ fn editing_what_a_preview_shows_keeps_it() {
 
     editor.preview_row(AreaDef::TABLE, &area());
     editor.place_tabs();
-    let mut row = editor.row_value(&area()).expect("the start area");
-    row["name"] = "Renamed field".into();
-    let mut edit = ContentEdit::new("Rename the area");
-    edit.write_json(fields_file(&area()), &row);
-    editor.try_apply(edit).expect("the edit is applied");
+    let read = editor.read::<AreaDef>(&area()).expect("a project");
+    let mut row = AreaDef::clone(&read.expect("the start area reads"));
+    row.name = "Renamed field".to_owned();
+    assert!(editor.write_content("Rename the area", &area(), &row));
     preview(&mut editor, EditorTab::Game);
 
     assert_eq!(

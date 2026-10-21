@@ -2,6 +2,7 @@ use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -13,7 +14,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::files::{bundle_of, name_of};
+use super::files::{bundle_of, name_of, table_of};
 use super::report::ContentProblem;
 use super::table::{Content, ContentFile};
 
@@ -224,6 +225,7 @@ pub(super) type ScopePaths = HashMap<TypeId, (&'static str, Vec<String>), NoOpHa
 pub struct ContentScope {
     paths: Arc<ScopePaths>,
     media: Option<Arc<Vec<String>>>,
+    renames: Option<Arc<BTreeMap<String, String>>>,
     leaves: Vec<Leaf>,
 }
 
@@ -232,6 +234,7 @@ impl ContentScope {
         ContentScope {
             paths: Arc::new(HashMap::default()),
             media: None,
+            renames: None,
             leaves: Vec::new(),
         }
     }
@@ -240,6 +243,7 @@ impl ContentScope {
         ContentScope {
             paths: content.scope_paths(),
             media: None,
+            renames: None,
             leaves: Vec::new(),
         }
     }
@@ -250,6 +254,28 @@ impl ContentScope {
 
     pub fn table_by_type(&mut self, type_id: TypeId, name: &'static str, paths: Vec<String>) {
         Arc::make_mut(&mut self.paths).insert(type_id, (name, paths));
+    }
+
+    /// This scope with every path `renames` names as a key written as its value: the files and
+    /// media that move, each still read where it was, so a file naming them is written naming
+    /// where they go.
+    pub fn renaming(&self, renames: &BTreeMap<String, String>) -> ContentScope {
+        let mut scope = self.clone();
+        for from in renames.keys() {
+            let table = table_of(from);
+            let paths = Arc::make_mut(&mut scope.paths)
+                .values_mut()
+                .find(|(name, _)| Some(*name) == table)
+                .map(|(_, paths)| paths)
+                .or_else(|| scope.media.as_mut().map(Arc::make_mut));
+            if let Some(paths) = paths
+                && let Err(at) = paths.binary_search_by(|path| path.as_bytes().cmp(from.as_bytes()))
+            {
+                paths.insert(at, from.clone());
+            }
+        }
+        scope.renames = Some(Arc::new(renames.clone()));
+        scope
     }
 
     /// Checks every media path read from here on against `files`.
@@ -319,11 +345,19 @@ impl ContentScope {
     }
 
     fn path<Row: ContentFile>(&self, index: u32) -> Option<String> {
-        self.paths
+        let path = self
+            .paths
             .get(&TypeId::of::<Row>())?
             .1
-            .get(index as usize)
-            .cloned()
+            .get(index as usize)?;
+        Some(self.written(path))
+    }
+
+    fn written(&self, path: &str) -> String {
+        self.renames
+            .as_ref()
+            .and_then(|renames| renames.get(path))
+            .map_or_else(|| path.to_owned(), Clone::clone)
     }
 
     fn resolve<Row: ContentFile>(&mut self, path: String) -> ContentId<Row> {
@@ -359,6 +393,16 @@ impl Default for ContentScope {
 
 thread_local! {
     static SCOPE: RefCell<Option<ContentScope>> = const { RefCell::new(None) };
+}
+
+/// `path` as the scope being written in names it: where it goes when the scope renames it.
+pub fn written_path(path: &str) -> String {
+    SCOPE.with(|scope| {
+        scope
+            .borrow()
+            .as_ref()
+            .map_or_else(|| path.to_owned(), |scope| scope.written(path))
+    })
 }
 
 pub fn scope_asset(path: &str) {

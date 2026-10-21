@@ -64,6 +64,7 @@ pub fn content(registry: &mut ContentRegistry) {
     registry
         .bundle::<tileset::TilesetDef>()
         .file::<tileset::SurfaceDef>()
+        .named::<tileset::SurfaceDef>()
         .bundle::<BlueprintDef>()
         .bundle::<AreaDef>()
         .named::<AreaDef>()

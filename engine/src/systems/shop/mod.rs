@@ -8,7 +8,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, serial,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
+    serial,
 };
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -39,6 +40,12 @@ pub struct ShopDef {
     pub mark: AttentionId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<ShopModule>,
+}
+
+impl NamedContent for ShopDef {
+    fn shown_name(&self) -> &str {
+        &self.title
+    }
 }
 
 impl ContentFile for ShopDef {

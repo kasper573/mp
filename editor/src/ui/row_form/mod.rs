@@ -102,7 +102,7 @@ pub fn show_row(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
 
 fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool) {
     let file = fields_file(key);
-    let Some(mut value) = editor.row_value(key) else {
+    let Some(mut value) = editor.fields_json(key) else {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
@@ -650,7 +650,7 @@ pub fn with_row_form(
     key: &str,
     show: impl FnOnce(&mut FormCx) -> bool,
 ) -> bool {
-    let Some(root) = editor.row_value(key) else {
+    let Some(root) = editor.fields_json(key) else {
         return false;
     };
     editor

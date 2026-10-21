@@ -108,13 +108,18 @@ fn recent_list(editor: &mut Editor, ui: &mut Ui) {
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.horizontal(|ui| {
-                            ui.label(theme::strong(name));
-                            ui.label(theme::muted(path).monospace().size(12.5));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                                     folder_menu(ui, folder, &mut picks);
                                 });
                                 ui.label(theme::faint(ago).monospace().size(12.0));
+                                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                    ui.label(theme::strong(name));
+                                    ui.add(
+                                        egui::Label::new(theme::muted(path).monospace().size(12.5))
+                                            .truncate(),
+                                    );
+                                });
                             });
                         });
                     });

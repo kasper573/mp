@@ -1,7 +1,7 @@
 use design_tokens::glyph::Mark;
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::{Content, ContentFile, fields_file, parent_of};
+use engine::core::content::{ContentFile, parent_of};
 use engine::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
@@ -12,7 +12,7 @@ use crate::tabs::shown_path;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
-use crate::{forms, picker, rows, value};
+use crate::{forms, picker, rows};
 
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
@@ -84,14 +84,11 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
-    let Some(content) = editor.loaded() else {
+    let (Some(Ok(def)), Some(reader)) = (editor.read::<SurfaceDef>(surface), editor.reader())
+    else {
         return;
     };
-    let Some(id) = content.by_path::<SurfaceDef>(surface) else {
-        return;
-    };
-    let def = id.get(&content);
-    let footstep = def.footstep.path(&content).to_owned();
+    let footstep = reader.path_of(def.footstep).unwrap_or_default().to_owned();
     widgets::section(ui, shown_path(surface));
     let mut renamed = None;
     let mut new_footstep = None;
@@ -155,19 +152,19 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         let label = format!("Name surface {surface} {name}");
         let def = SurfaceDef {
             name,
-            ..def.clone()
+            ..SurfaceDef::clone(&def)
         };
-        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
+        editor.write_content(&label, surface, &def);
     }
     if let Some(footstep) = new_footstep
-        && let Some(sfx) = content.by_path::<SfxDef>(&footstep)
+        && let Some(sfx) = reader.id_of::<SfxDef>(&footstep)
     {
         let label = format!("Footstep {footstep} for surface {surface}");
         let def = SurfaceDef {
             footstep: sfx,
-            ..def.clone()
+            ..SurfaceDef::clone(&def)
         };
-        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
+        editor.write_content(&label, surface, &def);
     }
 }
 
@@ -233,33 +230,19 @@ fn add_surface(
         return Err(problem);
     }
     let key = rows::new_path(&project.files, folder, SurfaceDef::TABLE, &name);
-    let content = editor.loaded().ok_or("the folder does not load")?;
-    let footstep = content
-        .by_path::<SfxDef>(&dialog.footstep)
+    let reader = project.reader();
+    let footstep = reader
+        .id_of::<SfxDef>(&dialog.footstep)
         .ok_or("pick a footstep")?;
     let def = SurfaceDef {
         name: dialog.name.trim().to_owned(),
         footstep,
     };
-    let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
     let mut edit = ContentEdit::new(format!("New surface {name}"));
-    edit.write_json(fields_file(&key), &json);
+    edit.write_content_in(&reader, &key, &def)?;
     editor.try_apply(edit)?;
     editor.views.tileset.view_mut(tileset).surface = Some(key);
     Ok(())
-}
-
-fn write_surface(
-    editor: &mut Editor,
-    content: &Content,
-    key: &str,
-    def: &SurfaceDef,
-    mut edit: ContentEdit,
-) {
-    if let Some(json) = value::untyped(content, def) {
-        edit.write_json(fields_file(key), &json);
-        editor.apply(edit);
-    }
 }
 
 fn footstep_level(editor: &Editor, footstep: &str, wave: Option<&Waveform>) -> String {

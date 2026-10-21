@@ -525,7 +525,7 @@ fn animate(
     frames: &[OffsetFrame],
     edit: ContentEdit,
 ) -> bool {
-    change_tileset(editor, key, edit, |def| {
+    change_tileset(editor, key, edit, |def, _| {
         for tile in tiles {
             tile_mut(def, *tile).animation = frames.iter().map(|frame| frame.on(*tile)).collect();
         }

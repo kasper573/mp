@@ -76,6 +76,19 @@ pub struct GroundLayer {
     pub locked: bool,
 }
 
+impl GroundLayer {
+    /// The name of the layer a new scene starts with.
+    pub const FIRST: &str = "ground";
+
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            hidden: false,
+            locked: false,
+        }
+    }
+}
+
 /// A module of a scene, with the label and flags the editor keeps for its node; the game never
 /// reads them.
 #[derive(Clone)]

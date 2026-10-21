@@ -1,12 +1,11 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use engine::core::content::{FIXTURES_DIR, locate, name_of, numbered, parent_of, table_of};
+use engine::core::content::{FIXTURES_DIR, SETTINGS_FILE, name_of, numbered, parent_of};
 use engine::systems::registry;
-use serde_json::Value;
 
 use crate::app::Editor;
-use crate::project::files::{FolderIndex, folder_entry, is_folder};
-use crate::project::{ContentEdit, MovedOutside, Project, ProjectFiles};
+use crate::project::files::{FolderIndex, content_of, folder_entry, is_folder};
+use crate::project::{ContentEdit, FileBytes, MovedOutside, Project, ProjectFiles};
 use crate::tabs::EditorTab;
 use crate::usages::{ContentUsage, ContentUsages};
 use crate::user::UserFolder;
@@ -116,7 +115,7 @@ pub fn plan(project: &Project, moves: &[PathMove], label: String) -> Result<Plan
     let files = &project.files;
     let mut edit = ContentEdit::new(label);
     let named = named_inside(&project.usages, moves);
-    let files_rewritten = rewrite_named(project, &mut edit, &named);
+    let files_rewritten = rewrite_named(project, &mut edit, &named)?;
     for step in moves {
         let entries: Vec<String> = files
             .entries()
@@ -156,7 +155,6 @@ pub fn repoint(editor: &mut Editor, moved: &[MovedOutside]) -> Result<usize, Str
                 .of_content(&step.from)
                 .iter()
                 .chain(usages.of_media(&step.from))
-                .filter(|usage| still_names(&project.files, usage, &step.from))
                 .map(|usage| (usage, step.from.clone(), step.to.clone()))
         })
         .collect();
@@ -165,7 +163,7 @@ pub fn repoint(editor: &mut Editor, moved: &[MovedOutside]) -> Result<usize, Str
         many => format!("Point {} moved paths at where they are", many.len()),
     };
     let mut edit = ContentEdit::new(label);
-    rewrite_named(project, &mut edit, &named);
+    rewrite_named(project, &mut edit, &named)?;
     let count = named.len();
     editor.try_apply(edit)?;
     Ok(count)
@@ -220,56 +218,61 @@ fn moved_folder(step: &MovedOutside, index: &FolderIndex) -> Option<(String, Str
     (!folder.is_empty() && !index.folders.contains(&folder)).then_some((folder, went))
 }
 
-/// Whether the reference `usage` was read from still names `from` in the file as it is now.
-fn still_names(files: &ProjectFiles, usage: &ContentUsage, from: &str) -> bool {
-    let Some(value) = files.json(&usage.file) else {
-        return true;
-    };
-    let named = |value: &Value| value.as_str() == Some(from);
-    if value.pointer(&usage.pointer).is_some_and(named) {
-        return true;
-    }
-    let (parent, key) = split_pointer(&usage.pointer);
-    key == from
-        && value
-            .pointer(parent)
-            .and_then(Value::as_object)
-            .is_some_and(|map| map.contains_key(from))
-}
-
-/// Writes each reference's new path into the files that hold them. Gives how many files that
-/// touched.
+/// Writes each reference's new path into the files that hold them, each file read and written
+/// back by its type. Gives how many files that touched.
 fn rewrite_named(
     project: &Project,
     edit: &mut ContentEdit,
     named: &[(&ContentUsage, String, String)],
-) -> usize {
-    let files = &project.files;
-    let mut by_file: BTreeMap<&str, Vec<(&ContentUsage, &str, &str)>> = BTreeMap::new();
-    for (usage, from, to) in named {
-        by_file
-            .entry(usage.file.as_str())
-            .or_default()
-            .push((usage, to.as_str(), from.as_str()));
+) -> Result<usize, String> {
+    let renames: BTreeMap<String, String> = named
+        .iter()
+        .map(|(_, from, to)| (from.clone(), to.clone()))
+        .collect();
+    rewrite_renamed(
+        project,
+        edit,
+        named.iter().map(|(usage, ..)| usage.file.as_str()),
+        &renames,
+    )
+}
+
+/// Writes every path `renames` names as a key as its value in the content files and settings
+/// that `files` belong to, each read as its type and written back as the game writes it, as the
+/// folder stands once `edit` is applied. Gives how many files that touched.
+pub fn rewrite_renamed<'f>(
+    project: &Project,
+    edit: &mut ContentEdit,
+    files: impl IntoIterator<Item = &'f str>,
+    renames: &BTreeMap<String, String>,
+) -> Result<usize, String> {
+    let holders: BTreeSet<&str> = files
+        .into_iter()
+        .filter_map(|file| match file {
+            SETTINGS_FILE => Some(SETTINGS_FILE),
+            file => content_of(file).map(|(_, path)| path),
+        })
+        .collect();
+    if holders.is_empty() {
+        return Ok(0);
     }
-    let files_rewritten = by_file.len();
-    for (file, mut uses) in by_file {
-        if !file.ends_with(".json") {
-            for (_, to, from) in &uses {
-                let table = table_of(from).unwrap_or_default();
-                edit.rename_beside(files, file, table, from, to);
+    let reader = project.reader_after(edit);
+    for holder in &holders {
+        if *holder == SETTINGS_FILE {
+            for (file, bytes) in reader.rewritten_settings(renames)? {
+                edit.write(file, FileBytes::from(bytes));
             }
             continue;
         }
-        uses.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
-        edit.update_json(files, file, |value| {
-            for (usage, to, _) in &uses {
-                rewrite(value, usage, &project.usages, file, to);
-            }
-            Some(())
-        });
+        let written = reader.rewritten(holder, renames)?;
+        for (file, bytes) in written.files {
+            edit.write(file, FileBytes::from(bytes));
+        }
+        for file in written.removed {
+            edit.remove(file);
+        }
     }
-    files_rewritten
+    Ok(holders.len())
 }
 
 /// Moves and renames as one step, and points every open tab and the selection at where things
@@ -396,37 +399,6 @@ fn names_in(files: &ProjectFiles, folder: &str, leaving: &[String]) -> HashSet<S
         .filter(|name| !name.is_empty())
         .map(str::to_lowercase)
         .collect()
-}
-
-/// Writes `to` where the use names what moved: the value at its pointer, or the key it is.
-pub fn rewrite(
-    value: &mut Value,
-    usage: &ContentUsage,
-    usages: &ContentUsages,
-    file: &str,
-    to: &str,
-) {
-    let pointer = usage.pointer.as_str();
-    let is_key = usages
-        .in_file(file)
-        .iter()
-        .any(|reference| reference.pointer == pointer && reference.key);
-    if is_key {
-        let (parent, name) = split_pointer(pointer);
-        if let Some(map) = value.pointer_mut(parent).and_then(Value::as_object_mut)
-            && let Some(entry) = map.remove(&name)
-        {
-            map.insert(to.to_owned(), entry);
-        }
-    } else if let Some(slot) = value.pointer_mut(pointer) {
-        *slot = Value::String(to.to_owned());
-    }
-}
-
-fn split_pointer(pointer: &str) -> (&str, String) {
-    let cut = pointer.rfind('/').unwrap_or(0);
-    let name = locate::unescape(&pointer[cut + 1..]);
-    (&pointer[..cut], name)
 }
 
 fn plural(count: usize) -> &'static str {

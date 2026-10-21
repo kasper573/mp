@@ -32,7 +32,7 @@ use strum::{AsRefStr, VariantArray};
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
-use crate::tabs::{EditorTab, shown_path};
+use crate::tabs::{EditorTab, file_title, shown_path};
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
 use crate::views::area::AreaViews;
@@ -196,8 +196,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
         ui.add_space(14.0);
         let preview_width = stage::preview_width(ui.available_width() / 3.0);
+        let middle = ui.available_width() - preview_width - 16.0;
+        let columns = if middle >= 2.0 * (COLUMN + 32.0) {
+            egui::Layout::left_to_right(egui::Align::Min)
+        } else {
+            egui::Layout::top_down(egui::Align::Min)
+        };
         ui.vertical(|ui| {
-            ui.set_width(ui.available_width() - preview_width - 16.0);
+            ui.set_width(middle);
             let Editor {
                 project,
                 form,
@@ -211,10 +217,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             let character = &mut character;
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
-                ui.horizontal_top(|ui| {
+                ui.with_layout(columns, |ui| {
                     for column in [left, right] {
                         ui.vertical(|ui| {
                             ui.set_width(COLUMN + 16.0);
+                            ui.set_max_width(COLUMN + 16.0);
                             for card in column {
                                 let result = match card {
                                     CharacterSection::Identity => {
@@ -355,6 +362,7 @@ fn identity(
             let mut picked = current.clone();
             widgets::combo("character-class")
                 .width(ui.available_width() - 8.0)
+                .truncate()
                 .selected_text(theme::mono(shown_path(&current)).size(13.0))
                 .show_ui(ui, |ui| {
                     for class in classes {
@@ -728,8 +736,15 @@ fn start(
     card(ui, "Start", |ui| {
         widgets::kv(ui, "area", |ui| {
             if at_spawn {
-                ui.label(theme::mono(shown_path(&area_key)).size(13.0));
-                ui.label(theme::faint("· the initial spawn").size(12.0));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(theme::faint("· the initial spawn").size(12.0));
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add(
+                            egui::Label::new(theme::mono(shown_path(&area_key)).size(13.0))
+                                .truncate(),
+                        );
+                    });
+                });
             } else if let CharacterStart::At(place) = &mut character.start {
                 let area = format!("{path}{}", field!(Place, area));
                 if picker::content(ui, cx, &mut place.area, &area) {
@@ -1557,8 +1572,8 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     widgets::kv_text(ui, "starts", starts);
     widgets::kv_code(ui, "file", shown_path(key));
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        if controls::marked_primary(ui, Mark::Play, format!("Play as {}", shown_path(key)))
+    ui.horizontal_wrapped(|ui| {
+        if controls::marked_primary(ui, Mark::Play, format!("Play as {}", file_title(key)))
             .clicked()
         {
             editor.play.character = Some(key.to_owned());

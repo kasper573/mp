@@ -8,7 +8,7 @@ use strum::{AsRefStr, EnumString};
 use super::Tilemap;
 use super::scene::PALETTE_FILE;
 use super::tileset::TilesetDef;
-use crate::core::content::id::Leaf;
+use crate::core::content::id::{Leaf, written_path};
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
     BesideFile, BesideName, Content, ContentFile, ContentProblem, ContentScope, ErrorPlace,
@@ -99,7 +99,6 @@ pub fn palette_beside(table: &'static str) -> BesideFile {
         table,
         name: PALETTE_FILE,
         names: palette_names,
-        rename: rename_in_palette,
     }
 }
 
@@ -118,19 +117,6 @@ fn palette_names(text: &str) -> Vec<BesideName> {
         .collect()
 }
 
-fn rename_in_palette(text: &str, table: &str, from: &str, to: &str) -> String {
-    let file = GridFile { path: "", text };
-    match read_palette(file, &mut Vec::new()) {
-        Some(mut rows) if table == TilesetDef::TABLE => {
-            for row in rows.iter_mut().filter(|row| row.tileset == from) {
-                row.tileset = to.to_owned();
-            }
-            write_palette(&rows)
-        }
-        _ => text.to_owned(),
-    }
-}
-
 pub fn write_palette(rows: &[PaletteRow]) -> String {
     let header = PALETTE_HEADER.map(str::to_owned).to_vec();
     write_records(std::iter::once(header).chain(rows.iter().map(|row| {
@@ -139,7 +125,11 @@ pub fn write_palette(rows: &[PaletteRow]) -> String {
         } else {
             row.flip.as_ref()
         };
-        vec![row.tileset.clone(), row.tile.to_string(), flip.to_owned()]
+        vec![
+            written_path(&row.tileset),
+            row.tile.to_string(),
+            flip.to_owned(),
+        ]
     })))
 }
 

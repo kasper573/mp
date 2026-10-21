@@ -1,5 +1,5 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentFile, parent_of};
+use engine::core::content::{ContentFile, FolderReader, parent_of};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
@@ -70,13 +70,13 @@ impl TileBrush {
         }
     }
 
-    pub fn paint(&self, data: &mut TileData, content: &Content) {
+    pub fn paint(&self, data: &mut TileData, reader: &FolderReader) {
         match self {
             TileBrush::Walk(brush) => data.walk = brush.walk(),
             TileBrush::Surface(surface) => {
                 data.surface = surface
                     .as_deref()
-                    .and_then(|key| content.by_path::<SurfaceDef>(key));
+                    .and_then(|key| reader.id_of::<SurfaceDef>(key));
             }
         }
     }
@@ -339,10 +339,9 @@ fn paint(editor: &mut Editor, ui: &Ui, tileset: &OpenTileset, canvas: &SheetCanv
         && stroke.is_some_and(|stroke| !stroke.contains(&tile))
     {
         if brush.changes(tileset, tile) {
-            let content = tileset.content.clone();
             let edit = ContentEdit::new(format!("Paint {} on {key}", brush.label())).merging();
-            change_tileset(editor, key, edit, |def| {
-                brush.paint(tile_mut(def, tile), &content);
+            change_tileset(editor, key, edit, |def, reader| {
+                brush.paint(tile_mut(def, tile), reader);
             });
         }
         if let Some(stroke) = &mut editor.views.tileset.view_mut(key).stroke {

@@ -7,8 +7,8 @@ use strum::{IntoStaticStr, VariantArray};
 
 use super::ParamValue;
 use crate::core::content::{
-    Bundle, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading, PartSpec,
-    Parts, RowCheck, Shape,
+    Bundle, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading, NamedContent,
+    PartSpec, Parts, RowCheck, Shape,
 };
 use crate::core::math::Rgba;
 
@@ -249,6 +249,12 @@ pub fn prelude_names() -> Vec<String> {
             .map(|shape| format!("SHAPE_{}", shape.name())),
     );
     names
+}
+
+impl NamedContent for VfxShaderDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ContentFile for VfxShaderDef {

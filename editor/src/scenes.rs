@@ -59,9 +59,12 @@ pub enum SceneStep {
         table: String,
         modules: Vec<usize>,
     },
+    /// Asks to delete `key`, pointing whatever names it at `repoint` when one is given.
     Delete {
         table: String,
         key: String,
+        #[serde(default)]
+        repoint: Option<String>,
     },
     Duplicate {
         table: String,
@@ -309,7 +312,16 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
         }
         SceneStep::Fold { table, modules } => fold(editor, table, modules, true),
         SceneStep::Unfold { table, modules } => fold(editor, table, modules, false),
-        SceneStep::Delete { key, .. } => rows::delete_dialog(editor, vec![key.clone()]),
+        SceneStep::Delete { key, repoint, .. } => {
+            rows::delete_dialog(editor, vec![key.clone()]);
+            if let (Some(target), Some(ModalDialog::Delete(dialog))) =
+                (repoint, editor.dialogs.last_mut())
+            {
+                for group in &mut dialog.groups {
+                    group.decision = rows::UsageDecision::Repoint(target.clone());
+                }
+            }
+        }
         SceneStep::Duplicate { key, .. } => {
             if let Err(error) = rows::duplicate(editor, key) {
                 editor.toast(error);

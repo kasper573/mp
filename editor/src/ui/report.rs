@@ -107,15 +107,15 @@ pub fn not_loaded(editor: &mut Editor, ctx: &Context) {
                     ui.label(theme::muted(format!(
                         "{rewrote} files changed on disk. The editor loaded the folder again and it was refused. Nothing was written."
                     )));
+                    ui.add_space(12.0);
+                    action = panel(ui, &folder, &text, false);
+                    ui.add_space(8.0);
+                    ui.label(theme::muted(match unsaved {
+                        0 => "Nothing is unsaved here.".to_owned(),
+                        1 => "Your unsaved edit is kept and comes back when the folder loads.".to_owned(),
+                        n => format!("Your {n} unsaved edits are kept and come back when the folder loads."),
+                    }));
                 });
-            column.add_space(12.0);
-            action = panel(&mut column, &folder, &text, false);
-            column.add_space(8.0);
-            column.label(theme::muted(match unsaved {
-                0 => "Nothing is unsaved here.".to_owned(),
-                1 => "Your unsaved edit is kept and comes back when the folder loads.".to_owned(),
-                n => format!("Your {n} unsaved edits are kept and come back when the folder loads."),
-            }));
         });
     if matches!(action, ReportAction::LoadAgain)
         && let Some(project) = &mut editor.project

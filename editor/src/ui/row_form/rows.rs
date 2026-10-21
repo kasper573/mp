@@ -19,20 +19,19 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
     let values: Vec<(String, Value)> = selection
         .keys
         .iter()
-        .filter_map(|key| editor.row_value(key).map(|value| (key.clone(), value)))
+        .filter_map(|key| editor.fields_json(key).map(|value| (key.clone(), value)))
         .collect();
     let Some(reader) = editor.reader() else {
         return;
     };
-    let modules: Vec<(String, Vec<Value>)> = values
-        .iter()
-        .filter_map(|(key, value)| Some((key.clone(), reader.modules_in(&table, value).ok()?)))
-        .collect();
-    let unread: Vec<&str> = values
-        .iter()
-        .map(|(key, _)| key.as_str())
-        .filter(|key| modules.iter().all(|(read, _)| read != key))
-        .collect();
+    let mut modules: Vec<(String, Vec<Value>)> = Vec::new();
+    let mut unread: Vec<(String, String)> = Vec::new();
+    for (key, value) in &values {
+        match reader.modules_in(&table, value) {
+            Ok(list) => modules.push((key.clone(), list)),
+            Err(error) => unread.push((key.clone(), error)),
+        }
+    }
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(&table);
     let mut module_edits: Vec<(String, Vec<Value>)> = Vec::new();
@@ -119,11 +118,11 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
             }
             let all = all.unwrap_or_default();
             widgets::section(ui, &format!("Modules in all {}", modules.len()));
-            if !unread.is_empty() {
-                widgets::hint(
-                    ui,
-                    &format!("the modules of {} show once they read", unread.join(", ")),
-                );
+            for (key, error) in &unread {
+                ui.label(
+                    theme::warn(format!("{key} is left out: its modules don't read")).size(12.5),
+                )
+                .on_hover_text(error);
             }
             for tag in &all {
                 let firsts: Vec<(&String, usize, &Value)> = modules
@@ -267,6 +266,13 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                 skipped.join(", ")
             ));
         }
+    }
+    if !module_edits.is_empty() && !unread.is_empty() {
+        let left_out: Vec<&str> = unread.iter().map(|(key, _)| key.as_str()).collect();
+        editor.toast(format!(
+            "Left out of the edit, their modules don't read: {}",
+            left_out.join(", ")
+        ));
     }
     for (key, list) in module_edits {
         let Some((_, value)) = values.iter().find(|(held, _)| *held == key) else {

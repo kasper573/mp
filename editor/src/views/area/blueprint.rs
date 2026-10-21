@@ -72,13 +72,7 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
     let layers = GridDraft::of(&bundle, own.blueprint())
         .layer_names()
         .into_iter()
-        .map(|name| {
-            SceneNode::GroundLayer(GroundLayer {
-                name,
-                hidden: false,
-                locked: false,
-            })
-        });
+        .map(|name| SceneNode::GroundLayer(GroundLayer::named(name)));
     let map = Tilemap {
         size: MapSize {
             width: (bounds.max().x - origin.x + 0.5).ceil().max(1.0) as u32,

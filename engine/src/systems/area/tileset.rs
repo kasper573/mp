@@ -8,7 +8,8 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
 use crate::core::content::{
-    Bundle, ContentFile, ContentId, ContentProblem, FileWriter, PartSpec, Parts, RowCheck, Shape,
+    Bundle, ContentFile, ContentId, ContentProblem, FileWriter, NamedContent, PartSpec, Parts,
+    RowCheck, Shape,
 };
 use crate::core::math::{Pos, Rect, Size, WorldPx};
 
@@ -171,6 +172,12 @@ pub struct TileFrame {
 pub struct SurfaceDef {
     pub name: String,
     pub footstep: SfxId,
+}
+
+impl NamedContent for SurfaceDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ContentFile for SurfaceDef {

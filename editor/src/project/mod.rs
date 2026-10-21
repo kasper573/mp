@@ -136,22 +136,6 @@ impl ContentEdit {
         }
     }
 
-    /// Writes every name of the `table` row `from` as `to` in a file beside a row that names rows.
-    pub fn rename_beside(
-        &mut self,
-        files: &ProjectFiles,
-        file: &str,
-        table: &str,
-        from: &str,
-        to: &str,
-    ) -> Option<()> {
-        let bytes = self.pending_bytes(files, file)?;
-        let text = std::str::from_utf8(&bytes).ok()?;
-        let renamed = systems::registry().rename_beside(file, text, table, from, to)?;
-        self.write(file.to_owned(), text_bytes(renamed));
-        Some(())
-    }
-
     /// Writes `row` as the content file at `path`: its fields, and the parts its type writes.
     pub fn write_content<Row: ContentFile>(
         &mut self,
@@ -608,11 +592,32 @@ impl Project {
         self.adopt(next);
     }
 
+    /// Refuses `edit` when loading the whole folder after it finds problems the folder doesn't
+    /// have now: the rules across files that `apply` leaves to the next load, checked up front
+    /// for an edit that reaches many files at once.
     pub fn check(&self, edit: &ContentEdit) -> Result<(), Box<EditRefusal>> {
-        let next = self.files.with(&edit.changes);
-        load(&next, &self.root.display().to_string())
-            .map_err(|report| Box::new(EditRefusal::of(&report)))?;
-        Ok(())
+        let name = self.root.display().to_string();
+        let Err(report) = load(&self.files.with(&edit.changes), &name) else {
+            return Ok(());
+        };
+        let known: HashSet<(String, &str, String)> = if self.loads() && !self.loading() {
+            HashSet::new()
+        } else {
+            load(&self.files, &name)
+                .err()
+                .map(|report| report.errors.iter().map(error_key).collect())
+                .unwrap_or_default()
+        };
+        let introduced: Vec<LoadError> = report
+            .errors
+            .into_iter()
+            .filter(|error| !known.contains(&error_key(error)))
+            .collect();
+        if introduced.is_empty() {
+            Ok(())
+        } else {
+            Err(Box::new(EditRefusal::of_errors(&introduced)))
+        }
     }
 
     /// The problems `changes` bring into the files they touch, and into the files naming what they

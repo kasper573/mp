@@ -9,7 +9,7 @@ use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentFile, fields_file};
+use engine::core::content::{Content, ContentFile, ContentScope, FolderReader};
 use engine::core::math::Pos;
 use engine::core::script::{FlowSteering, Pause, RunnerKindDef, Value as ScriptValue, ValueType};
 use engine::core::tiling::Tiles;
@@ -40,13 +40,12 @@ use super::panel::{ScriptBinding, bindings};
 use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::RowSelection;
 use crate::project::files::content_of;
-use crate::project::{ProjectFiles, RowSelection};
 use crate::stage::live;
 use crate::tabs::EditorTab;
 use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
-use crate::value;
 use crate::views::character::Standing;
 
 const CLIENT: u32 = 1;
@@ -1067,7 +1066,7 @@ fn start_run(
     let mut world = live::sandbox(&content, area_id, RUN_SEED, clock);
     world.insert_resource(FlowTrace::default());
     world.insert_resource(FlowSteering::default());
-    let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.files)?;
+    let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.reader())?;
     let area = area::load(&content, area_id);
     let at = area
         .grid
@@ -1195,7 +1194,7 @@ fn locate_owner(
 fn snapshot_for(
     content: &Content,
     key: Option<&str>,
-    files: &ProjectFiles,
+    reader: &FolderReader,
 ) -> Result<CharacterSnapshot, String> {
     let Some(key) = key else {
         let settings = content.built::<GameSettings>();
@@ -1205,11 +1204,9 @@ fn snapshot_for(
             settings.player.get(content),
         ));
     };
-    let json = files
-        .json_owned(&fields_file(key))
-        .ok_or_else(|| format!("no test character {}", shown_path(key)))?;
-    value::typed(content, json)
-        .ok_or_else(|| format!("test character {} does not read", shown_path(key)))
+    reader
+        .read_in(key, &ContentScope::of(content))
+        .map_err(|_| format!("test character {} does not read", shown_path(key)))
 }
 
 impl ScriptRun {

@@ -77,11 +77,10 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(key) else {
-        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
+    let Some(read) = editor.read::<VfxShaderDef>(key) else {
         return;
     };
-    let def: Option<VfxShaderDef> = serde_json::from_value(row.clone()).ok();
+    let def = read.as_ref().ok();
     let file = shader_file(key);
     let current = editor
         .project
@@ -104,11 +103,11 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.add_space(COLUMN_GAP);
         ui.vertical(|ui| {
             ui.set_width(code_width);
-            match def.as_ref() {
-                Some(def) => code_pane(editor, ui, def, key, &file, &current),
-                None => {
+            match &read {
+                Ok(def) => code_pane(editor, ui, def, key, &file, &current),
+                Err(errors) => {
                     widgets::section(ui, &format!("code · {file}"));
-                    ui.label(theme::warn("the row does not parse as a shader yet"));
+                    widgets::unreadable(ui, key, errors);
                 }
             }
         });
@@ -116,7 +115,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            let Some((def, shader)) = def.as_ref().zip(
+            let Some((def, shader)) = def.zip(
                 editor
                     .loaded()
                     .and_then(|content| content.by_path::<VfxShaderDef>(key)),

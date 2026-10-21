@@ -334,9 +334,9 @@ fn actor_look(editor: &Editor, content: &Content, table: &str, key: &str) -> Opt
         }
         CharacterSnapshot::TABLE => {
             let snapshot = project.read::<CharacterSnapshot>(key).ok()?;
-            let player = content.built::<GameSettings>().player.get(content);
+            let player = project.read_id(project.settings().ok()?.player)?;
             Some(ActorLook {
-                model: player.model.path(content).to_owned(),
+                model: reader.path_of(player.model)?.to_owned(),
                 tint: player.tint(),
                 plate: Some(PlateLabel::player(&snapshot.name)),
             })

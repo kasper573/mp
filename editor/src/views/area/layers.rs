@@ -18,11 +18,7 @@ pub fn add(editor: &mut Editor, bundle: &str, folder: &str) -> Option<String> {
     let name = free_name("layer", &names(&nodes::scene_of(editor, bundle)));
     let mut made = Vec::new();
     nodes::change_scene(editor, bundle, |scene| {
-        let layer = SceneNode::GroundLayer(GroundLayer {
-            name: name.clone(),
-            hidden: false,
-            locked: false,
-        });
+        let layer = SceneNode::GroundLayer(GroundLayer::named(name.clone()));
         made = nodes::SceneTree::new(scene).append(folder, vec![layer]);
         Some(format!("Add ground layer {name}"))
     });

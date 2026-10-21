@@ -143,10 +143,9 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
     if let Some(brush) = picked
         && brush.changes(tileset, tile)
     {
-        let content = tileset.content.clone();
         let edit = ContentEdit::new(format!("Set {} on tile {tile} of {key}", brush.label()));
-        change_tileset(editor, key, edit, |def| {
-            brush.paint(tile_mut(def, tile), &content);
+        change_tileset(editor, key, edit, |def, reader| {
+            brush.paint(tile_mut(def, tile), reader);
         });
     }
 }

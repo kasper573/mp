@@ -67,44 +67,6 @@ fn an_areas_palette_names_each_tileset_at_its_line() {
     assert_eq!(tilesets, [("start_ground.tileset", 2, true)]);
 }
 
-#[test]
-fn renaming_a_tileset_rewrites_the_palettes_that_name_it_and_nothing_else() {
-    let (_, file, text) = loaded_with_text(game(), "start.area/palette.csv");
-
-    let renamed = registry()
-        .rename_beside(
-            &file,
-            &text,
-            "tileset",
-            "start_ground.tileset",
-            "meadow.tileset",
-        )
-        .expect("a palette is read for references");
-    let untouched = registry()
-        .rename_beside(
-            &file,
-            &text,
-            "tileset",
-            "elsewhere.tileset",
-            "meadow.tileset",
-        )
-        .expect("a palette is read for references");
-
-    assert_eq!(renamed, "tileset,tile,flip\nmeadow.tileset,0,\n");
-    assert_eq!(untouched, text);
-    assert!(
-        registry()
-            .rename_beside(
-                "start.area/walk.csv",
-                "",
-                "tileset",
-                "start_ground.tileset",
-                "meadow.tileset"
-            )
-            .is_none()
-    );
-}
-
 fn loaded_with_text(game: testkit::Game, file: &str) -> (Content, String, String) {
     let folder = tempfile::tempdir().expect("a scratch folder");
     game.write_to(folder.path());

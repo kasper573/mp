@@ -676,9 +676,12 @@ fn name_label(ui: &mut Ui, row: &TreeRow, width: f32) {
             egui::TextFormat::simple(FontId::monospace(13.0), color),
         );
     }
-    job.wrap = egui::text::TextWrapping::truncate_at_width(width);
     let spoken = row.spoken.clone().unwrap_or_else(|| row.name.clone());
-    let response = ui.add(egui::Label::new(job).selectable(false));
+    let response = ui
+        .allocate_ui(Vec2::new(width, ui.available_height()), |ui| {
+            ui.add(egui::Label::new(job).selectable(false).truncate())
+        })
+        .inner;
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &spoken));
     let tip: Vec<&str> = [row.problem.as_deref(), row.tip.as_deref()]
         .into_iter()

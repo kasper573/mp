@@ -78,12 +78,13 @@ pub struct SpreadsheetColumn {
 }
 
 /// A file of the table as its sheet reads it: its fields, and its modules each as its type
-/// writes it.
+/// writes it, or why they don't read.
 #[derive(Clone)]
 pub struct SpreadsheetRow {
     pub key: String,
     pub value: Arc<Value>,
     pub modules: Arc<Vec<Value>>,
+    pub unread: Option<String>,
 }
 
 impl SpreadsheetRow {
@@ -137,8 +138,16 @@ impl SpreadsheetColumn {
 
     pub fn lacks_module(&self, row: &SpreadsheetRow) -> bool {
         match &self.source {
-            ColumnSource::Module { tag, .. } => !row.has_module(tag),
+            ColumnSource::Module { tag, .. } => row.unread.is_none() && !row.has_module(tag),
             _ => false,
+        }
+    }
+
+    /// Why the cell can't show the row's value: its modules don't read.
+    pub fn unread<'r>(&self, row: &'r SpreadsheetRow) -> Option<&'r str> {
+        match &self.source {
+            ColumnSource::Module { .. } => row.unread.as_deref(),
+            _ => None,
         }
     }
 
@@ -341,14 +350,19 @@ fn rows_of(editor: &Editor, table: &str) -> Vec<SpreadsheetRow> {
         .into_iter()
         .filter_map(|key| {
             let value = project.files.json(&fields_file(&key))?;
-            let modules = if holds_modules {
-                reader.modules_in(table, &value).unwrap_or_default()
+            let read = if holds_modules {
+                reader.modules_in(table, &value)
             } else {
-                Vec::new()
+                Ok(Vec::new())
+            };
+            let (modules, unread) = match read {
+                Ok(modules) => (modules, None),
+                Err(error) => (Vec::new(), Some(error)),
             };
             Some(SpreadsheetRow {
                 value,
                 modules: Arc::new(modules),
+                unread,
                 key,
             })
         })
@@ -939,7 +953,16 @@ fn table_body(
                             (text, color)
                         }
                         None if column.lacks_module(row) => ("—".to_owned(), theme::FAINT),
-                        None => (String::new(), theme::FAINT),
+                        None => match column.unread(row) {
+                            Some(reason) => {
+                                response.clone().on_hover_text(format!(
+                                    "The modules of {} don't read: {reason}",
+                                    row.key
+                                ));
+                                ("doesn't read".to_owned(), theme::WARN)
+                            }
+                            None => (String::new(), theme::FAINT),
+                        },
                     };
                     let (align, tx) = if column.numeric {
                         (egui::Align2::RIGHT_CENTER, cell.max.x - 6.0)
@@ -1126,7 +1149,7 @@ fn write_cells(
 ) {
     let mut rows: BTreeMap<String, Value> = BTreeMap::new();
     for (key, column, value) in cells {
-        let Some(row) = rows.get(key).cloned().or_else(|| editor.row_value(key)) else {
+        let Some(row) = rows.get(key).cloned().or_else(|| editor.fields_json(key)) else {
             continue;
         };
         let mut row = row;
@@ -1139,8 +1162,12 @@ fn write_cells(
                 let Some(reader) = editor.reader() else {
                     continue;
                 };
-                let Ok(mut modules) = reader.modules_in(table, &row) else {
-                    continue;
+                let mut modules = match reader.modules_in(table, &row) {
+                    Ok(modules) => modules,
+                    Err(error) => {
+                        editor.toast(format!("{key}: the modules don't read: {error}"));
+                        continue;
+                    }
                 };
                 let index = match modules
                     .iter()

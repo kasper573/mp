@@ -29,7 +29,8 @@ pub trait ContentFile: DeserializeOwned + Serialize + JsonSchema + Send + Sync +
     fn read_held(&self) {}
 }
 
-/// A type of content file that carries the name a player reads it by.
+/// A type of content file that carries a name: the one a player reads it by, or for content no
+/// player sees, the one a designer knows it by.
 pub trait NamedContent: ContentFile {
     fn shown_name(&self) -> &str;
 }

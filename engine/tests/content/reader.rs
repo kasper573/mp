@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use engine::core::audio::playback::{SfxDef, SfxRoleDef};
@@ -61,6 +62,36 @@ fn a_file_naming_a_path_no_file_has_does_not_read() {
         .err()
         .expect("refused");
     assert!(!errors.is_empty());
+}
+
+#[test]
+fn a_file_read_in_another_scope_names_the_ids_of_its_paths() {
+    let held = game().sfx("hit");
+    let other = game().sfx("hit").row(
+        "sfx_role",
+        "alarms",
+        json!({ "name": "Alarms", "loudness": -28.0 }),
+    );
+    let other = reader(&other);
+    let sfx: SfxDef = reader(&held)
+        .read_in(&path("sfx", "hit"), other.scope())
+        .expect("reads");
+
+    assert_eq!(
+        other.path_of(sfx.role),
+        Some(path("sfx_role", "sounds").as_str())
+    );
+}
+
+#[test]
+fn a_file_the_other_scope_does_not_hold_does_not_read_in_it() {
+    let held = game().sfx("hit");
+    let other = reader(&game().sfx("miss"));
+    assert!(
+        reader(&held)
+            .read_in::<SfxDef>(&path("sfx", "hit"), other.scope())
+            .is_err()
+    );
 }
 
 #[test]
@@ -129,4 +160,94 @@ fn a_part_an_area_no_longer_writes_is_removed() {
     let ground = format!("{area}/layers/ground.csv");
     assert!(!written.files.contains_key(&ground));
     assert_eq!(written.removed, [ground]);
+}
+
+fn renames(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+    pairs
+        .iter()
+        .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
+        .collect()
+}
+
+fn text(files: &BTreeMap<String, Vec<u8>>, file: &str) -> String {
+    String::from_utf8(files[file].clone()).expect("text")
+}
+
+#[test]
+fn a_rename_writes_the_new_path_wherever_a_file_names_the_old_one() {
+    let game = game();
+    let area = path("area", "start");
+    let ground = path("tileset", "start_ground");
+    let meadow = path("tileset", "meadow");
+
+    let written = reader(&game)
+        .rewritten(&area, &renames(&[(&ground, &meadow)]))
+        .expect("rewritten");
+
+    let palette = text(&written.files, &format!("{area}/palette.csv"));
+    assert_eq!(palette, format!("tileset,tile,flip\n{meadow},0,\n"));
+    assert!(written.removed.is_empty());
+}
+
+#[test]
+fn a_rename_of_a_path_a_file_does_not_name_writes_it_back_unchanged() {
+    let game = game().sfx("hit");
+    let hit = path("sfx", "hit");
+
+    let reader = reader(&game);
+    let sfx: SfxDef = reader.read(&hit).expect("reads");
+
+    let written = reader
+        .rewritten(&hit, &renames(&[("elsewhere.npc.json", "moved.npc.json")]))
+        .expect("rewritten");
+
+    assert_eq!(
+        written.files,
+        reader.write(&hit, &sfx).expect("writes").files
+    );
+}
+
+#[test]
+fn a_file_naming_a_path_that_moved_away_reads_and_names_where_it_went() {
+    let gone = "lost/sounds.sfx_role.json";
+    let sounds = path("sfx_role", "sounds");
+    let game = game().sfx("hit").edit("sfx", "hit", |sfx| {
+        sfx["role"] = json!(gone);
+    });
+    let hit = path("sfx", "hit");
+    assert!(reader(&game).read::<SfxDef>(&hit).is_err());
+
+    let written = reader(&game)
+        .rewritten(&hit, &renames(&[(gone, &sounds)]))
+        .expect("rewritten");
+
+    let fields = text(&written.files, &engine::core::content::fields_file(&hit));
+    assert!(fields.contains(&format!("\"{sounds}\"")), "{fields}");
+    assert!(!fields.contains(gone), "{fields}");
+}
+
+#[test]
+fn a_rename_reaches_the_games_settings() {
+    let game = game();
+    let start = path("area", "start");
+    let harbour = path("area", "harbour");
+
+    let written = reader(&game)
+        .rewritten_settings(&renames(&[(&start, &harbour)]))
+        .expect("rewritten");
+
+    let settings = text(&written, engine::core::content::SETTINGS_FILE);
+    assert!(settings.contains(&format!("\"{harbour}\"")), "{settings}");
+    assert!(!settings.contains(&format!("\"{start}\"")), "{settings}");
+}
+
+#[test]
+fn a_file_that_does_not_read_is_not_rewritten() {
+    let game = game().sfx("hit").edit("sfx", "hit", |sfx| {
+        sfx["role"] = json!("nowhere/gone.sfx_role.json");
+    });
+
+    let refused = reader(&game).rewritten(&path("sfx", "hit"), &BTreeMap::new());
+
+    assert!(refused.is_err());
 }

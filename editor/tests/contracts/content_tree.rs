@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use editor::app::Editor;
+use editor::app::{Editor, ModalDialog};
 use editor::moves;
 use editor::project::watch::FolderChange;
 use editor::project::{MovedOutside, Project, ProjectFiles};
-use editor::rows;
+use editor::rows::{self, UsageDecision};
 use editor::schema::SchemaShapes;
 use editor::ui::content_tree;
 use editor::ui::tree::TreeRow;
@@ -283,6 +283,66 @@ fn moving_a_file_into_a_folder_rewrites_what_names_it_in_one_undo_step() {
     let scene = files(&mut editor).json(&resident()).expect("the scene");
     assert_eq!(scene[1]["npc"], orc);
     assert!(files(&mut editor).contains(&orc));
+}
+
+#[test]
+fn deleting_a_file_can_point_what_named_it_at_another_in_one_step() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(camp().npc("goblin", 8.0, json!([])), &scratch);
+    let (orc, goblin) = (path("npc", "orc"), path("npc", "goblin"));
+
+    rows::delete_dialog(&mut editor, vec![orc.clone()]);
+    let Some(ModalDialog::Delete(mut dialog)) = editor.dialogs.pop() else {
+        panic!("a delete dialog");
+    };
+    for group in &mut dialog.groups {
+        group.decision = UsageDecision::Repoint(goblin.clone());
+    }
+    rows::delete(&mut editor, &dialog).expect("deleted");
+
+    assert!(!files(&mut editor).contains(&orc));
+    let scene = files(&mut editor)
+        .json(&format!("{}/scene.json", area()))
+        .expect("the scene");
+    assert_eq!(scene[1]["npc"], goblin);
+    assert!(editor.project.as_ref().expect("a project").loads());
+}
+
+#[test]
+fn deleting_a_file_refuses_to_point_what_named_it_where_the_game_would_refuse_it() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let crier = path("npc", "crier");
+    let game = camp()
+        .babble("crier")
+        .npc(
+            "crier",
+            8.0,
+            json!([{ "type": "voice", "babble": path("babble", "crier") }]),
+        )
+        .row(
+            "notification",
+            "call",
+            json!({ "kind": { "type": "speech", "speaker": crier }, "text": ["Hear ye!"] }),
+        );
+    let mut editor = open(game, &scratch);
+
+    rows::delete_dialog(&mut editor, vec![crier.clone()]);
+    let Some(ModalDialog::Delete(mut dialog)) = editor.dialogs.pop() else {
+        panic!("a delete dialog");
+    };
+    for group in &mut dialog.groups {
+        group.decision = UsageDecision::Repoint(path("npc", "orc"));
+    }
+    let refused = rows::delete(&mut editor, &dialog);
+
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|reason| reason.contains("voice")),
+        "{refused:?}"
+    );
+    assert!(files(&mut editor).contains(&crier));
+    assert!(editor.project.as_ref().expect("a project").loads());
 }
 
 #[test]

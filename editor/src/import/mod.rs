@@ -20,7 +20,7 @@ use std::sync::mpsc::channel;
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Context, Ui};
-use engine::core::content::ContentFile;
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
 use formats::{AnimationExport, DroppedFiles};
@@ -373,7 +373,11 @@ fn start_again(editor: &mut Editor, due: records::DueReimport) {
         (TilesetDef::TABLE, None) => ImportTarget::Tileset(due.key.clone()),
         _ => return,
     };
-    if editor.row_value(&due.key).is_none() {
+    let present = editor
+        .project
+        .as_ref()
+        .is_some_and(|project| project.files.contains(&fields_file(&due.key)));
+    if !present {
         editor.imports.forget(&due.table, &due.key);
         return;
     }

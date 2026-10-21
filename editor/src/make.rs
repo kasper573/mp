@@ -70,11 +70,7 @@ fn blank_parts(table: &str) -> Vec<(String, FileBytes)> {
 
 /// The scene of a new area: one ground layer to paint.
 fn blank_scene() -> Value {
-    let ground = SceneNode::GroundLayer(GroundLayer {
-        name: "ground".to_owned(),
-        hidden: false,
-        locked: false,
-    });
+    let ground = SceneNode::GroundLayer(GroundLayer::named(GroundLayer::FIRST));
     scene::write_nodes(&[ground]).expect("a ground layer writes")
 }
 

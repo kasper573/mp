@@ -117,7 +117,10 @@ impl PickSource for RowSource {
                     pick: Pick::new(table.as_str(), key),
                     category,
                     name: display_name(cx, table, key),
-                    hint: format!("{from_here} · {}", pick_hint(cx, table, key)),
+                    hint: match pick_hint(cx, table, key) {
+                        Some(detail) => format!("{} · {detail}", shown_path(&from_here)),
+                        None => shown_path(&from_here).to_owned(),
+                    },
                     blocked: blocked(cx, table, &self.path, key),
                     nearness,
                 });
@@ -246,15 +249,13 @@ fn script_runner(cx: &FormCx, key: &str) -> String {
     )
 }
 
-fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
+/// What sets the file `key` of `table` apart in the picker, beside its path, for the types that
+/// say more about a file than how often it's used.
+fn pick_hint(cx: &FormCx, table: &str, key: &str) -> Option<String> {
     match table {
         NpcDef::TABLE => {
-            let Some(content) = cx.content.clone() else {
-                return String::new();
-            };
-            let Some(id) = content.by_path::<NpcDef>(key) else {
-                return String::new();
-            };
+            let content = cx.content.clone()?;
+            let id = content.by_path::<NpcDef>(key)?;
             let mut places: Vec<String> = Vec::new();
             for area in content.ids::<AreaDef>() {
                 let count: u32 = area::placed(&content, area)
@@ -271,20 +272,14 @@ fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
                     places.push(format!("{} × {count}", shown_path(area.path(&content))));
                 }
             }
-            if places.is_empty() {
+            Some(if places.is_empty() {
                 "placed nowhere".to_owned()
             } else {
                 places.join(" · ")
-            }
+            })
         }
-        ScriptDef::TABLE => {
-            let uses = cx.usages.of_content(key).len();
-            format!("{} · used by {uses}", script_runner(cx, key))
-        }
-        _ => {
-            let uses = cx.usages.of_content(key).len();
-            format!("used by {uses}")
-        }
+        ScriptDef::TABLE => Some(script_runner(cx, key)).filter(|runner| !runner.is_empty()),
+        _ => None,
     }
 }
 

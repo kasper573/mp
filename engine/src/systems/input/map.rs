@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, ContentFile, Fixture, serial};
+use crate::core::content::{Content, ContentFile, Fixture, NamedContent, serial};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -147,6 +147,12 @@ impl GestureKind {
 pub struct InputDef {
     pub label: String,
     pub bindings: Vec<InputBinding>,
+}
+
+impl NamedContent for InputDef {
+    fn shown_name(&self) -> &str {
+        &self.label
+    }
 }
 
 impl ContentFile for InputDef {
