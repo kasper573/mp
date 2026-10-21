@@ -46,6 +46,7 @@ use crate::project::files::content_of;
 use crate::project::{ProjectFiles, RowSelection, catalogue_of};
 use crate::stage::live;
 use crate::tabs::EditorTab;
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 use crate::value;
 use crate::views::character::Standing;
@@ -170,7 +171,9 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         ui.spacing_mut().item_spacing.x = 8.0;
         let can_fire = !bound.is_empty() && !events.is_empty();
         if ui
-            .add_enabled_ui(can_fire, |ui| widgets::primary(ui, "▶ Fire"))
+            .add_enabled_ui(can_fire, |ui| {
+                controls::marked_primary(ui, Mark::Play, "Fire")
+            })
             .inner
             .clicked()
         {
@@ -249,7 +252,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     ui.selectable_value(
                         &mut setup.character,
                         Some(key.clone()),
-                        format!("{name} · test_character/{key}"),
+                        format!("{name} · {}", shown_path(key)),
                     );
                 }
             });
@@ -258,21 +261,21 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 start = true;
             }
             if ui
-                .button("Step ▶")
+                .button(("Step", Mark::CaretRight.text(12.0)))
                 .on_hover_text("One tick at a time")
                 .clicked()
             {
                 step = true;
             }
             if ui
-                .button("■ Stop")
+                .button((Mark::Stop.text(12.0), "Stop"))
                 .on_hover_text(EditorKey::Cancel.name())
                 .clicked()
             {
                 stop = true;
             }
         }
-        ui.menu_button(theme::faint("…"), |ui| {
+        ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
             ui.set_min_width(220.0);
             ui.horizontal(|ui| {
                 ui.label(theme::muted("clock"));
@@ -445,7 +448,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     skip = true;
                 }
                 if matches!(run.state, ScriptRunState::Stepping | ScriptRunState::Paused { .. })
-                    && ui.button("▶ Run on").clicked()
+                    && ui.button((Mark::Play.text(12.0), "Run on")).clicked()
                 {
                     resume = true;
                 }
@@ -758,7 +761,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
             let ty = id.get(content).ty;
             let is_set = set.contains(key);
             let value = memory::get(run.world(), subject, id);
-            widgets::kv(ui, key, |ui| {
+            widgets::kv(ui, shown_path(key), |ui| {
                 let mut changed = None;
                 match (ty, value) {
                     (ValueType::Boolean, value) => {
@@ -879,7 +882,7 @@ fn quests_card(
             };
             let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("quest/ {key}"), None, true).clicked() {
+                if widgets::keyed_button(ui, shown_path(key), None, true).clicked() {
                     *open = Some(EditorTab::for_row(QuestDef::TABLE, key));
                 }
                 let mut picked = standing;
@@ -950,7 +953,7 @@ fn bag_card(
                 .map(|stack| stack.count)
                 .sum::<u32>();
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("item/ {key}"), None, true).clicked() {
+                if widgets::keyed_button(ui, shown_path(key), None, true).clicked() {
                     *open = Some(EditorTab::for_row(ItemDef::TABLE, key));
                 }
                 let mut picked = count;
@@ -973,8 +976,7 @@ fn bag_card(
 
 fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Option<String> {
     let mut add = None;
-    let response = ui.add(egui::Button::new(theme::muted(label).size(12.5)));
-    egui::Popup::from_toggle_button_response(&response).show(|ui| {
+    widgets::dropdown_menu(ui, theme::muted(label).size(12.5), |ui| {
         ui.set_min_width(180.0);
         egui::ScrollArea::vertical()
             .max_height(240.0)
@@ -983,7 +985,7 @@ fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Opti
                 for key in all.iter().filter(|key| !shown.contains(key)) {
                     any = true;
                     if ui
-                        .selectable_label(false, theme::mono(key).size(12.5))
+                        .selectable_label(false, theme::mono(shown_path(key)).size(12.5))
                         .clicked()
                     {
                         add = Some(key.clone());
@@ -1118,7 +1120,7 @@ fn start_run(
         |_| true,
     );
     run.log.push(RunLogLine::Note(format!(
-        "▶ {} raised on {}",
+        "{} raised on {}",
         setup.event, owner.label
     )));
     Ok(run)
@@ -1206,8 +1208,9 @@ fn snapshot_for(
     };
     let json = files
         .json_owned(&fields_file(key))
-        .ok_or_else(|| format!("no test character {key}"))?;
-    value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
+        .ok_or_else(|| format!("no test character {}", shown_path(key)))?;
+    value::typed(content, json)
+        .ok_or_else(|| format!("test character {} does not read", shown_path(key)))
 }
 
 impl ScriptRun {

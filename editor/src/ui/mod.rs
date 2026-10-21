@@ -146,6 +146,9 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
             .dock
             .remove_tab(egui_dock::TabPath::from((path, leaf.active)));
     }
+    if ctx.input_mut(|i| EditorKey::FrameRate.consume(i)) {
+        toggle_frame_rate(editor);
+    }
     if ctx.input_mut(|i| EditorKey::KeySheet.consume(i))
         && !editor
             .dialogs
@@ -245,6 +248,18 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         editor.dialogs.push(ModalDialog::Keys);
                         ui.close();
                     }
+                    let frame_rate = if editor.settings.frame_rate {
+                        "Hide FPS"
+                    } else {
+                        "Show FPS"
+                    };
+                    if ui
+                        .add(widgets::shortcut_button(frame_rate, EditorKey::FrameRate))
+                        .clicked()
+                    {
+                        toggle_frame_rate(editor);
+                        ui.close();
+                    }
                     if ui
                         .add(widgets::shortcut_button("Quit", EditorKey::Quit))
                         .clicked()
@@ -281,6 +296,11 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
             });
         });
     divide(root, bar.response.rect, Edge::Bottom);
+}
+
+fn toggle_frame_rate(editor: &mut Editor) {
+    editor.settings.frame_rate = !editor.settings.frame_rate;
+    editor.save_settings();
 }
 
 pub fn pretty_path(path: &Path) -> String {
@@ -382,7 +402,7 @@ fn empty_centre(ui: &mut egui::Ui) {
 }
 
 const TOP_BAR_HEIGHT: f32 = 42.0;
-const STATUS_HEIGHT: f32 = 24.0;
+pub const STATUS_HEIGHT: f32 = 24.0;
 
 #[derive(Clone, Copy)]
 pub enum Edge {
@@ -484,7 +504,7 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
     } else if left.is_empty() {
         let selection = &editor.selection;
         if selection.keys.len() == 1 && selection.parts.is_empty() {
-            left.push(selection.keys[0].clone());
+            left.push(crate::tabs::shown_path(&selection.keys[0]).to_owned());
         }
     }
     let right = mem::take(&mut editor.status.right);
@@ -539,7 +559,16 @@ impl TabViewer for Viewer<'_> {
             italics,
             ..TextRole::Tab.format(egui::Color32::PLACEHOLDER)
         };
-        job.append(&title, 0.0, format);
+        let icon = tab.icon().icon;
+        job.append(
+            icon.glyph,
+            0.0,
+            TextFormat::simple(
+                egui::FontId::new(TextRole::Tab.size(), icon.weight.family()),
+                theme::MUTED,
+            ),
+        );
+        job.append(&title, 6.0, format);
         if unsaved {
             job.append(" \u{2022}", 0.0, TextRole::Tab.format(ink::OCHRE));
         }

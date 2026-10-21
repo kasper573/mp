@@ -3,32 +3,30 @@ use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::systems::area;
 use engine::systems::script::Place;
-use serde_json::Value;
 
 use super::scene::{AreaSceneRequest, AreaSceneSpec};
 use super::{pins, select};
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor};
 use crate::forms;
 use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 use crate::views::navigation;
 
 pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
-    let Some(clip) = &editor.clipboard else {
+    let Some(clip) = editor.clipboard.as_ref().and_then(Clipboard::scene) else {
         return;
     };
-    let modules = clip.modules.clone();
     ui.label(
         theme::muted(format!(
-            "clipboard · {} module{}",
-            modules.len(),
-            widgets::plural(modules.len())
+            "clipboard · {} row{}",
+            clip.count,
+            widgets::plural(clip.count)
         ))
         .monospace()
         .size(13.0),
     );
     ui.add_space(4.0);
-    let text = serde_json::to_string_pretty(&Value::Array(modules)).unwrap_or_default();
+    let text = clip.nodes.text();
     let shown: String = text.lines().take(40).collect::<Vec<_>>().join("\n");
     widgets::code_block(ui, &shown);
     if text.lines().count() > 40 {
@@ -49,9 +47,8 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     };
     let generation = project.generation;
     let mut area_key = pick.area.clone().or_else(|| {
-        project.files.json(&pick.file)?.pointer(&pick.pointer)?["area"]
-            .as_str()
-            .map(str::to_owned)
+        let place = project.value_at::<Place>(&pick.file, &pick.pointer)?;
+        project.reader().path_of(place.area).map(str::to_owned)
     });
     let mut areas: Vec<String> = content
         .ids::<area::AreaDef>()

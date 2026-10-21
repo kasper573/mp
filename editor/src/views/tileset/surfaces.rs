@@ -1,3 +1,4 @@
+use design_tokens::glyph::Mark;
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
 use engine::core::content::{Content, ContentFile, fields_file, parent_of};
@@ -7,6 +8,7 @@ use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
 use crate::audio::Waveform;
 use crate::project::ContentEdit;
+use crate::tabs::shown_path;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{row_form, theme, widgets};
 use crate::views::model::sounds;
@@ -25,7 +27,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.spacing_mut().item_spacing = Vec2::new(10.0, 10.0);
         for surface in &surfaces {
             let on = brush.as_deref() == Some(surface.key.as_str());
-            let wave = sounds::wave_of_sfx(editor, &surface.footstep);
+            let wave = sounds::wave_of_sfx(editor, ui.ctx(), &surface.footstep);
             let level = footstep_level(editor, &surface.footstep, wave.as_ref());
             let used = editor.views.tileset.surface_use(&surface.key);
             let response = widgets::card_frame(on)
@@ -38,7 +40,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    if widgets::chip(ui, "▶").clicked() {
+                                    if widgets::chip(ui, Mark::Play.text(12.0)).clicked() {
                                         play = Some(surface.footstep.clone());
                                     }
                                 },
@@ -90,7 +92,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
     };
     let def = id.get(&content);
     let footstep = def.footstep.path(&content).to_owned();
-    widgets::section(ui, &format!("surface/{surface}"));
+    widgets::section(ui, shown_path(surface));
     let mut renamed = None;
     let mut new_footstep = None;
     let mut play = false;
@@ -113,7 +115,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             }
         });
         widgets::kv(ui, "footstep", |ui| {
-            play = widgets::chip(ui, "▶").clicked();
+            play = widgets::chip(ui, Mark::Play.text(12.0)).clicked();
             let mut picked = footstep.clone();
             let changed = row_form::with_row_form(editor, SurfaceDef::TABLE, surface, |cx| {
                 picker::row(ui, cx, SfxDef::TABLE, &mut picked, "/footstep")
@@ -123,7 +125,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             }
         });
     });
-    let wave = sounds::wave_of_sfx(editor, &footstep);
+    let wave = sounds::wave_of_sfx(editor, ui.ctx(), &footstep);
     let (rect, _) =
         ui.allocate_exact_size(Vec2::new(ui.available_width() - 8.0, 36.0), Sense::hover());
     if let Some(wave) = &wave {

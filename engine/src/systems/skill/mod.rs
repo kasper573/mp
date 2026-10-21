@@ -27,8 +27,8 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, RowCheck,
-    serial,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
+    RowCheck, serial,
 };
 use crate::core::geometry::{Footprint, Shape};
 use crate::core::math::Pos;
@@ -191,6 +191,12 @@ impl ContentFile for SkillDef {
                 );
             }
         }
+    }
+}
+
+impl NamedContent for SkillDef {
+    fn shown_name(&self) -> &str {
+        &self.name
     }
 }
 

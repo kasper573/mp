@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use design_tokens::glyph::{self, Mark};
+use design_tokens::glyph::Mark;
 use egui::{Align2, FontId, Sense, Ui};
 use serde_json::Value;
 
@@ -10,6 +10,7 @@ use crate::keymap::EditorKey;
 use crate::project::FileBytes;
 use crate::project::files::content_of;
 use crate::project::history::EditStep;
+use crate::tabs::shown_path;
 
 const ROW: f32 = 28.0;
 
@@ -124,9 +125,8 @@ fn row(
         current,
     ));
     let ink = if done { theme::TEXT } else { theme::FAINT };
-    glyph::paint(
+    (mark_of(label)).paint(
         ui.painter(),
-        mark_of(label),
         egui::Rect::from_center_size(
             rect.left_center() + egui::vec2(20.0, 0.0),
             egui::vec2(12.0, 12.0),
@@ -179,11 +179,11 @@ fn mark_of(label: &str) -> Mark {
     match verb.as_str() {
         "move" | "drag" | "place" | "stamp" | "resize" => Mark::Move,
         "delete" | "remove" | "erase" | "clear" => Mark::Cross,
-        "paint" | "fill" => Mark::Spark,
-        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => Mark::Asterisk,
+        "paint" | "fill" => Mark::Paint,
+        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => Mark::Edit,
         "add" | "new" | "duplicate" | "paste" | "make" | "import" => Mark::Plus,
         "rename" => Mark::Tag,
-        "open" | "recover" => Mark::Page,
+        "open" | "recover" => Mark::File,
         _ => Mark::Dot,
     }
 }
@@ -209,7 +209,7 @@ fn step_card(editor: &Editor, ui: &mut Ui) {
         let before = step.before.iter().find(|b| b.file == change.file);
         ui.horizontal(|ui| {
             let name = content_of(&change.file)
-                .map(|(table, key)| format!("{table}/{key}"))
+                .map(|(_, key)| shown_path(key).to_owned())
                 .unwrap_or_else(|| change.file.clone());
             ui.label(theme::mono(name).size(13.0));
             ui.label(

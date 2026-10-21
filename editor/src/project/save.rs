@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::path::Path;
@@ -8,7 +7,7 @@ use walkdir::WalkDir;
 
 use engine::core::content::parent_of;
 
-use super::files::{FileBytes, ProjectFiles, folder_entry, is_folder};
+use super::files::{DiskHashes, FileBytes, ProjectFiles, folder_entry, is_folder};
 
 pub struct SaveOutcome {
     pub written: Vec<String>,
@@ -24,7 +23,7 @@ pub struct SaveError {
 pub fn save(
     root: &Path,
     files: &ProjectFiles,
-    disk: &mut BTreeMap<String, String>,
+    disk: &mut DiskHashes,
 ) -> Result<SaveOutcome, SaveError> {
     let mut done = SaveOutcome {
         written: Vec::new(),
@@ -36,14 +35,12 @@ pub fn save(
         let bytes = files.get(path).expect("an entry of the files");
         match disk.get(path) {
             None => new_files.push((path, bytes)),
-            Some(known) if Some(known.as_str()) != files.hash_of(path) => {
-                changed.push((path, bytes))
-            }
+            Some(known) if Some(known) != files.hash_of(path) => changed.push((path, bytes)),
             _ => {}
         }
     }
     let removals: Vec<String> = disk
-        .keys()
+        .paths()
         .filter(|path| !files.contains(path))
         .cloned()
         .collect();

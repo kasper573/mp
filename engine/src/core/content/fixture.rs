@@ -5,16 +5,19 @@ use serde_json::Value;
 use strum::VariantArray;
 
 use super::check::RowCheck;
-use super::files::{FIXTURES_DIR, content_path};
+use super::files::{content_path, fixture_dir};
 use super::id::ContentId;
+use super::locate::unescape;
+use super::serial::TypeTag;
 use super::table::{Content, ContentFile};
 
 /// Content code reads by name, which every game provides at the path the fixture's declaration
 /// builds: `fixtures/<FOLDER>/<variant>.<type>`, as one file or a bundle by its type's shape.
 pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
     type Row: ContentFile;
-    /// The folder under `fixtures/` of the system that declares the fixture.
-    const FOLDER: &'static str;
+    /// The folder under `fixtures/` of the system that declares the fixture, or `None` for
+    /// `fixtures/` itself.
+    const FOLDER: Option<&'static str>;
     /// Whether the fixtures are every file of their type, which content adds none of its own to.
     const WHOLE_TABLE: bool = false;
 
@@ -24,7 +27,7 @@ pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
 
     fn path(self) -> String {
         content_path(
-            &format!("{FIXTURES_DIR}/{}", Self::FOLDER),
+            &fixture_dir(Self::FOLDER),
             self.name(),
             Self::Row::TABLE,
             Self::Row::SHAPE,
@@ -64,6 +67,23 @@ pub enum FixtureLock {
 }
 
 impl FixtureLock {
+    /// A lock on the list at `list` keeping an entry that carries `entry`'s fields at `fields` as
+    /// `entry` has them.
+    pub fn entry<T: Serialize>(list: &str, entry: &T, fields: &[&str]) -> FixtureLock {
+        let whole = serde_json::to_value(entry).unwrap_or_default();
+        let carried = fields
+            .iter()
+            .filter_map(|field| {
+                let value = whole.pointer(field)?.clone();
+                Some((unescape(field.strip_prefix('/')?), value))
+            })
+            .collect();
+        FixtureLock::Entry {
+            list: list.to_owned(),
+            entry: Value::Object(carried),
+        }
+    }
+
     /// Whether `held`, an entry of the list at `list`, is one this lock keeps.
     pub fn keeps(&self, list: &str, held: &Value) -> bool {
         matches!(self, FixtureLock::Entry { list: locked, entry } if locked == list && carries(held, entry))
@@ -107,8 +127,8 @@ impl FixtureLock {
             }
             FixtureLock::Variants { list, variants } => {
                 for (index, held) in entries(row, list) {
-                    let variant = held.get("type").and_then(Value::as_str).unwrap_or_default();
-                    if !variants.iter().any(|known| known == variant) {
+                    let variant = TypeTag::of_json(held).unwrap_or_default();
+                    if !variants.iter().any(|known| *known == variant) {
                         check.error(
                             format!("{list}/{index}"),
                             "variant the engine never reads",

@@ -29,6 +29,19 @@ fn main() {
         .as_std_path()
         .join("src");
     check_crate(&engine.name, &src, &mut violations);
+    for package in metadata
+        .packages
+        .iter()
+        .filter(|package| CONTENT_CODE.contains(&package.name.as_str()))
+    {
+        let src = package
+            .manifest_path
+            .parent()
+            .expect("a manifest has a parent directory")
+            .as_std_path()
+            .join("src");
+        check_json_keys(&package.name, &src, &mut violations);
+    }
     let root = metadata.workspace_root.as_std_path();
     let scratch = metadata.target_directory.as_std_path().join("lint");
     for game in SHIPPED_GAMES {
@@ -36,7 +49,7 @@ fn main() {
     }
 
     if violations.is_empty() {
-        println!("lint: layering, content keys and shipped games OK");
+        println!("lint: layering, content keys, JSON keys and shipped games OK");
         return;
     }
     for violation in &violations {
@@ -69,12 +82,46 @@ fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
         if !rel.starts_with("core/content/") {
             for (line, call) in content_keys(&file) {
                 out.push(format!(
-                    "[{name}] src/{rel}:{line}: `{call}` — code names content: use a fixture, or a setting in game.json"
+                    "[{name}] src/{rel}:{line}: `{call}` — code names content: use a fixture, or a setting in game.config.json"
                 ));
             }
         }
     }
 }
+
+/// Code reads and writes JSON through the types that declare its fields; only code that walks a
+/// JSON Schema, and so takes its keys from the schema or names the schema's own, handles JSON by
+/// key.
+fn check_json_keys(name: &str, src: &Path, out: &mut Vec<String>) {
+    let files = WalkDir::new(src)
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(DirEntry::into_path)
+        .filter(|path| path.extension().is_some_and(|ext| ext == "rs"));
+    for file in files {
+        let rel = file
+            .strip_prefix(src)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if SCHEMA_WALKERS.contains(&(name, rel.as_str())) {
+            continue;
+        }
+        for (line, access) in json_keys(&file) {
+            out.push(format!(
+                "[{name}] src/{rel}:{line}: `{access}` — JSON by literal key: read and write it as the type that declares the field"
+            ));
+        }
+    }
+}
+
+/// The packages whose code reads and writes game content. Tests and the testkit declare their games
+/// as JSON literals, as the files hold them: the loader reads every one and refuses fields its
+/// types don't have, so a stale literal fails its test loudly.
+const CONTENT_CODE: &[&str] = &["engine", "editor", "showcase", "driver"];
+
+/// The files that walk a JSON Schema, keyed by the package they are in.
+const SCHEMA_WALKERS: &[(&str, &str)] = &[("editor", "schema.rs"), ("editor", "forms.rs")];
 
 /// The game folders the repo ships: the example game, and the template the editor starts new games
 /// from.
@@ -217,6 +264,110 @@ impl<'ast> Visit<'ast> for KeyLookups {
             ));
         }
         visit::visit_expr_call(self, call);
+    }
+}
+
+fn json_keys(file: &Path) -> Vec<(usize, String)> {
+    let mut found = JsonKeys::default();
+    if let Ok(source) = fs::read_to_string(file)
+        && let Ok(ast) = syn::parse_file(&source)
+    {
+        found.visit_file(&ast);
+    }
+    found.hits
+}
+
+const KEYED_ACCESS: &[&str] = &[
+    "get",
+    "get_mut",
+    "pointer",
+    "pointer_mut",
+    "remove",
+    "insert",
+    "contains_key",
+    "entry",
+];
+
+#[derive(Default)]
+struct JsonKeys {
+    hits: Vec<(usize, String)>,
+}
+
+impl<'ast> Visit<'ast> for JsonKeys {
+    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
+        if !walks_a_schema(&item.sig) {
+            visit::visit_item_fn(self, item);
+        }
+    }
+
+    fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
+        if !walks_a_schema(&item.sig) {
+            visit::visit_impl_item_fn(self, item);
+        }
+    }
+
+    fn visit_expr_index(&mut self, index: &'ast syn::ExprIndex) {
+        if let Some(key) = string_literal(&index.index) {
+            self.hits.push((
+                index.bracket_token.span.open().start().line,
+                format!("[{key:?}]"),
+            ));
+        }
+        visit::visit_expr_index(self, index);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if KEYED_ACCESS.contains(&call.method.to_string().as_str())
+            && let Some(key) = call.args.first().and_then(string_literal)
+        {
+            self.hits.push((
+                call.method.span().start().line,
+                format!(".{}({key:?})", call.method),
+            ));
+        }
+        visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        let builds_object = mac.path.segments.last().is_some_and(|last| last.ident == "json")
+            && mac.tokens.clone().into_iter().next().is_some_and(|token| {
+                matches!(token, proc_macro2::TokenTree::Group(group) if group.delimiter() == proc_macro2::Delimiter::Brace)
+            });
+        if builds_object && let Some(last) = mac.path.segments.last() {
+            self.hits
+                .push((last.ident.span().start().line, "json!({…})".to_owned()));
+        }
+        visit::visit_macro(self, mac);
+    }
+}
+
+/// Whether a function takes or makes a JSON Schema, whose keys are the schema's own vocabulary.
+fn walks_a_schema(sig: &syn::Signature) -> bool {
+    let names_a_schema = |ty: &syn::Type| {
+        let mut found = SchemaTypes::default();
+        found.visit_type(ty);
+        found.0
+    };
+    let output = match &sig.output {
+        syn::ReturnType::Type(_, ty) => names_a_schema(ty),
+        syn::ReturnType::Default => false,
+    };
+    output
+        || sig.inputs.iter().any(|input| match input {
+            syn::FnArg::Typed(typed) => names_a_schema(&typed.ty),
+            syn::FnArg::Receiver(_) => false,
+        })
+}
+
+#[derive(Default)]
+struct SchemaTypes(bool);
+
+impl<'ast> Visit<'ast> for SchemaTypes {
+    fn visit_path_segment(&mut self, segment: &'ast syn::PathSegment) {
+        if segment.ident == "Schema" || segment.ident == "SchemaGenerator" {
+            self.0 = true;
+        }
+        visit::visit_path_segment(self, segment);
     }
 }
 

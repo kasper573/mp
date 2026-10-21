@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde_json::Value;
+use engine::systems::area::scene::SceneNode;
 
 use super::nodes;
 
@@ -38,7 +38,7 @@ pub struct RowFlags {
 pub struct SceneLevel<'a> {
     /// The row the scene opens under, "" for the bundle's own.
     pub under: String,
-    pub scene: &'a Value,
+    pub scene: &'a [SceneNode],
 }
 
 /// Which rows of a scene graph are hidden or locked, through the folders above them and a passing
@@ -124,7 +124,7 @@ impl SceneFlags {
         self.rows.values().any(|row| row.hidden.on())
     }
 
-    fn add(&mut self, scene: &Value, prefix: &str, above: RowFlags, own_scene: bool) {
+    fn add(&mut self, scene: &[SceneNode], prefix: &str, above: RowFlags, own_scene: bool) {
         let mut stack: Vec<(String, RowFlags)> = Vec::new();
         nodes::walk(scene, &mut |pointer, node| {
             while let Some((folder, _)) = stack.last() {
@@ -135,8 +135,8 @@ impl SceneFlags {
             }
             let inherited = stack.last().map_or(above, |(_, flags)| *flags);
             let row = RowFlags {
-                hidden: Flag::of(flag(node, "hidden"), inherited.hidden.on()),
-                locked: Flag::of(flag(node, "locked"), inherited.locked.on()),
+                hidden: Flag::of(node.hidden(), inherited.hidden.on()),
+                locked: Flag::of(node.locked(), inherited.locked.on()),
             };
             if own_scene && !nodes::is_folder(node) {
                 self.hidden += usize::from(row.hidden.on());
@@ -148,8 +148,4 @@ impl SceneFlags {
             self.rows.insert(format!("{prefix}{pointer}"), row);
         });
     }
-}
-
-fn flag(node: &Value, field: &str) -> bool {
-    node[field].as_bool().unwrap_or(false)
 }

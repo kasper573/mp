@@ -2,14 +2,18 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::ops::Range;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Align2, Color32, FontId, Id, Pos2, Rangef, Rect, Stroke, StrokeKind, Ui, Vec2};
+use design_tokens::controls;
+use design_tokens::glyph::Mark;
+use egui::{
+    Align, Align2, Color32, FontId, Id, Layout, Pos2, Rangef, Rect, Stroke, StrokeKind, Ui, Vec2,
+};
 use egui_ltreeview::{
     Action, CloserState, DirPosition, IndentHintStyle, NodeBuilder, RowLayout, TreeView,
     TreeViewBuilder, TreeViewState,
 };
 
 use super::{theme, widgets};
+use crate::icons::{self, KindIcon, Preview};
 use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 
@@ -40,8 +44,10 @@ pub trait TreeSource {
 #[derive(Clone, Debug, Default)]
 pub struct TreeRow {
     pub folder: bool,
-    /// The row's glyph; a folder's is the folder's own.
-    pub icon: Option<Mark>,
+    /// The row's icon; a folder's is the folder's own.
+    pub icon: Option<KindIcon>,
+    /// A picture of what the row holds, drawn in place of its icon.
+    pub preview: Option<Preview>,
     pub name: String,
     /// Read after the name in its own colour, such as a content file's type.
     pub suffix: Option<(String, Color32)>,
@@ -392,6 +398,18 @@ pub fn show<S: TreeSource>(
         *drag_hover = None;
     }
 
+    let clicked = response.clicked() && ui.input(|i| i.modifiers.is_none());
+    if clicked
+        && out.toggled.is_none()
+        && let Some(pointer) = ui.input(|i| i.pointer.interact_pos())
+        && let Some(row) = drawn.iter().find(|row| row.contains(pointer))
+        && row.folder
+        && renaming.as_ref().is_none_or(|renaming| renaming.id != row.id)
+        // The tree toggles a folder itself when its closer is clicked.
+        && view.is_open(&row.id).unwrap_or(row.open) == row.open
+    {
+        view.set_openness(row.id.clone(), !row.open);
+    }
     let mut changed = false;
     if !narrowed {
         for (folder, was_open) in folders {
@@ -411,6 +429,8 @@ const INDENT: f32 = 14.0;
 const FLASH: f64 = 0.9;
 const HOVER_OPENS: f64 = 0.5;
 const MARK: f32 = 14.0;
+const ICON: f32 = 15.0;
+const SHOW_MENU_WIDTH: f32 = 220.0;
 
 struct Line {
     id: String,
@@ -491,33 +511,35 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
         } = line;
         let folder = row.folder;
         let icon = match (folder, open) {
-            (true, true) => Some(Mark::FolderOpen),
-            (true, false) => Some(Mark::Folder),
+            (true, true) => Some(KindIcon::from(Mark::FolderOpen)),
+            (true, false) => Some(KindIcon::from(Mark::Folder)),
             (false, _) => row.icon,
         };
+        let preview = row.preview;
         let badge = row.badge.clone().filter(|_| !folder);
         let dim = row.dim;
         let label_id = id.clone();
         let mut node = if folder {
-            NodeBuilder::dir(id.clone()).default_open(open)
+            NodeBuilder::dir(id.clone())
+                .default_open(open)
+                .activatable(true)
         } else {
             NodeBuilder::leaf(id.clone())
         };
         node = node
             .closer(|ui: &mut Ui, closer: CloserState| {
                 let mark = if closer.is_open {
-                    Mark::ChevronDown
+                    Mark::CaretDown
                 } else {
-                    Mark::ChevronRight
+                    Mark::CaretRight
                 };
                 let color = if closer.is_hovered {
                     theme::TEXT
                 } else {
                     theme::FAINT
                 };
-                glyph::paint(
+                mark.paint(
                     ui.painter(),
-                    mark,
                     Rect::from_center_size(ui.max_rect().center(), Vec2::splat(10.0)),
                     color,
                 );
@@ -542,15 +564,11 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
                     design_tokens::ink::CREAM,
                 );
             });
-        } else if let Some(mark) = icon {
+        } else if let Some(icon) = icon {
             node = node.icon(move |ui: &mut Ui| {
                 let color = if dim { theme::FAINT } else { theme::MUTED };
-                glyph::paint(
-                    ui.painter(),
-                    mark,
-                    Rect::from_center_size(ui.max_rect().center(), Vec2::splat(13.0)),
-                    color,
-                );
+                let rect = Rect::from_center_size(ui.max_rect().center(), Vec2::splat(ICON));
+                icons::paint_file(ui.painter(), rect, preview, icon, color);
             });
         }
         builder.node(node);
@@ -590,16 +608,16 @@ fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
     let left = ui.cursor().min.x;
     let width = (right - reserved - left).max(24.0);
     let mut x = right;
-    for (mark, color) in &marks {
-        glyph::paint(
-            ui.painter(),
-            *mark,
-            Rect::from_center_size(
-                egui::pos2(x - MARK / 2.0, rect.center().y),
-                Vec2::splat(10.0),
-            ),
-            *color,
-        );
+    for (index, mark) in marks.iter().enumerate() {
+        let at = egui::pos2(x - MARK / 2.0, rect.center().y);
+        let painted = Rect::from_center_size(at, Vec2::splat(10.0));
+        mark.mark.paint(ui.painter(), painted, mark.color);
+        ui.interact(
+            Rect::from_center_size(at, Vec2::splat(MARK)),
+            Id::new(("tree mark", id, index)),
+            egui::Sense::hover(),
+        )
+        .on_hover_text(&mark.tip);
         x -= MARK;
     }
     if let Some(detail) = detail {
@@ -716,21 +734,49 @@ fn rename_box(ui: &mut Ui, cx: &RowsCx, renaming: &mut Renaming, width: f32) {
 
 /// The marks at a row's right end, rightmost first. A folder shows a problem or an unsaved file
 /// inside it only while it is closed, the rows inside showing their own while it is open.
-fn row_marks(row: &TreeRow, inside: bool) -> Vec<(Mark, Color32)> {
+fn row_marks(row: &TreeRow, inside: bool) -> Vec<RowMark> {
     let mut marks = Vec::new();
-    if inside && row.problem.is_some() {
-        marks.push((Mark::Warning, theme::DANGER));
+    if inside && let Some(problem) = &row.problem {
+        marks.push(RowMark {
+            mark: Mark::Warning,
+            color: theme::DANGER,
+            tip: problem.clone(),
+        });
     }
     if inside && row.unsaved {
-        marks.push((Mark::Dot, theme::WARN));
+        let tip = if row.folder {
+            "holds unsaved changes"
+        } else {
+            "unsaved changes"
+        };
+        marks.push(RowMark {
+            mark: Mark::Dot,
+            color: theme::WARN,
+            tip: tip.to_owned(),
+        });
     }
     if inside && row.holds_selected {
-        marks.push((Mark::Dot, theme::DANGER));
+        marks.push(RowMark {
+            mark: Mark::Dot,
+            color: theme::DANGER,
+            tip: "holds what is selected".to_owned(),
+        });
     }
-    if row.locked.is_some() {
-        marks.push((Mark::Padlock, theme::FAINT));
+    if let Some(reason) = &row.locked {
+        marks.push(RowMark {
+            mark: Mark::Lock,
+            color: theme::FAINT,
+            tip: format!("Stays where it is: {reason}, so it can't be renamed or moved"),
+        });
     }
     marks
+}
+
+/// A mark at a row's right end, and what it says while the pointer rests on it.
+struct RowMark {
+    mark: Mark,
+    color: Color32,
+    tip: String,
 }
 
 /// Draws a row's eye and padlock at its right end and takes presses on them; answers where the
@@ -757,8 +803,8 @@ fn row_toggles(
         };
         let response = ui.interact(rect, Id::new(("tree toggle", id, toggle as u8)), sense);
         let (on, off, verb, undo) = match toggle {
-            Toggle::Hide => (Mark::EyeClosed, Mark::Eye, "Hide", "Show"),
-            Toggle::Lock => (Mark::Padlock, Mark::PadlockOpen, "Lock", "Unlock"),
+            Toggle::Hide => (Mark::EyeSlash, Mark::Eye, "Hide", "Show"),
+            Toggle::Lock => (Mark::Lock, Mark::Unlock, "Lock", "Unlock"),
         };
         let (mark, color) = match state {
             ToggleState::Off if toggles.disabled => (off, theme::alpha(theme::FAINT, 120)),
@@ -768,9 +814,8 @@ fn row_toggles(
             ToggleState::Own => (on, theme::TEXT),
             ToggleState::Inherited => (on, theme::FAINT),
         };
-        glyph::paint(
+        mark.paint(
             ui.painter(),
-            mark,
             Rect::from_center_size(rect.center(), Vec2::splat(11.0)),
             color,
         );
@@ -817,22 +862,72 @@ pub fn matched(name: &str, needle: &str) -> Option<Range<usize>> {
     Some(start..start + needle.len()).filter(|range| name.is_char_boundary(range.end))
 }
 
-/// Show ▾: which kinds of row a tree lists, and whether folders with nothing shown stay.
-pub fn show_menu(ui: &mut Ui, view: &mut crate::user::TreeView, kinds: &[String]) -> bool {
+/// A tree's search field, filling the row, with Show ▾ at its right. Answers what `search`
+/// answers and whether the menu changed what the tree keeps in the user's settings.
+pub fn filter_row<R>(
+    ui: &mut Ui,
+    search: impl FnOnce(&mut Ui) -> R,
+    menu: impl FnOnce(&mut Ui) -> bool,
+) -> (R, bool) {
+    ui.horizontal(|ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let changed = menu(ui);
+            let searched = ui
+                .with_layout(Layout::left_to_right(Align::Center), search)
+                .inner;
+            (searched, changed)
+        })
+        .inner
+    })
+    .inner
+}
+
+/// A narrowing of what a tree lists that lives as long as the editor runs, shown in Show ▾ as a
+/// checkbox above the kinds.
+pub struct Narrowing<'a> {
+    pub label: &'a str,
+    /// What Show ▾ says while the narrowing is on.
+    pub short: &'a str,
+    pub on: &'a mut bool,
+}
+
+/// Show ▾: which kinds of row a tree lists, whether folders with nothing shown stay, and the
+/// tree's narrowings. Answers whether what the user's settings keep changed.
+pub fn show_menu(
+    ui: &mut Ui,
+    view: &mut crate::user::TreeView,
+    kinds: &[String],
+    narrowings: &mut [Narrowing],
+) -> bool {
     let shown = kinds
         .iter()
         .filter(|kind| !view.hidden_kinds.contains(*kind))
         .count();
-    let label = if shown == kinds.len() {
+    let narrowed: Vec<&str> = narrowings
+        .iter()
+        .filter(|narrowing| *narrowing.on)
+        .map(|narrowing| narrowing.short)
+        .collect();
+    let mut label = if shown == kinds.len() {
         "Show".to_owned()
     } else {
         format!("Show {shown} of {}", kinds.len())
     };
+    if !narrowed.is_empty() {
+        label = format!("{label} · {}", narrowed.join(", "));
+    }
     let mut changed = false;
-    let button = design_tokens::controls::marked(ui, Mark::ChevronDown, label);
+    let button = controls::dropdown(ui, label);
     let menu = egui::Popup::from_toggle_button_response(&button)
+        .width(SHOW_MENU_WIDTH)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
     menu.show(|ui| {
+        for narrowing in narrowings.iter_mut() {
+            ui.checkbox(narrowing.on, narrowing.label);
+        }
+        if !narrowings.is_empty() {
+            ui.separator();
+        }
         let mut all = shown == kinds.len();
         if ui.checkbox(&mut all, "All").changed() {
             view.hidden_kinds = if all {
@@ -845,6 +940,7 @@ pub fn show_menu(ui: &mut Ui, view: &mut crate::user::TreeView, kinds: &[String]
         ui.separator();
         egui::ScrollArea::vertical()
             .max_height(360.0)
+            .auto_shrink([false, true])
             .show(ui, |ui| {
                 for kind in kinds {
                     let mut on = !view.hidden_kinds.contains(kind);

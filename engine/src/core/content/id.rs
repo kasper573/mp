@@ -216,7 +216,7 @@ pub enum LeafProblem {
     Unsafe,
 }
 
-type ScopePaths = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
+pub(super) type ScopePaths = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
 
 /// Resolves paths while reading and collects every reference it met, so one parse reports every
 /// dangling reference instead of stopping at the first.
@@ -237,11 +237,11 @@ impl ContentScope {
     }
 
     pub fn of(content: &Content) -> ContentScope {
-        let mut scope = ContentScope::new();
-        for (type_id, table) in content.tables() {
-            Arc::make_mut(&mut scope.paths).insert(type_id, (table.name(), table.paths().to_vec()));
+        ContentScope {
+            paths: content.scope_paths(),
+            media: None,
+            leaves: Vec::new(),
         }
-        scope
     }
 
     pub fn table<Row: ContentFile>(&mut self, paths: Vec<String>) {
@@ -288,6 +288,34 @@ impl ContentScope {
             value: path.to_owned(),
             problem,
         });
+    }
+
+    /// The path `id` stands for in this scope.
+    pub fn path_of<Row: ContentFile>(&self, id: ContentId<Row>) -> Option<&str> {
+        self.paths_of::<Row>().get(id.index()).map(String::as_str)
+    }
+
+    /// The id `path` resolves to in this scope, when a file of the type is there.
+    pub fn id_of<Row: ContentFile>(&self, path: &str) -> Option<ContentId<Row>> {
+        self.paths_of::<Row>()
+            .binary_search_by(|candidate| candidate.as_bytes().cmp(path.as_bytes()))
+            .ok()
+            .map(|index| ContentId::new(index as u32))
+    }
+
+    /// Every path of a file of the type named `table`, sorted bytewise.
+    pub fn paths_named(&self, table: &str) -> &[String] {
+        self.paths
+            .values()
+            .find(|(name, _)| *name == table)
+            .map_or(&[][..], |(_, paths)| paths.as_slice())
+    }
+
+    /// Every path of a file of the type, sorted bytewise, so each one's index is its id.
+    pub fn paths_of<Row: ContentFile>(&self) -> &[String] {
+        self.paths
+            .get(&TypeId::of::<Row>())
+            .map_or(&[][..], |(_, paths)| paths.as_slice())
     }
 
     fn path<Row: ContentFile>(&self, index: u32) -> Option<String> {
@@ -346,6 +374,28 @@ pub fn with_content<T>(scope: ContentScope, f: impl FnOnce() -> T) -> (T, Conten
     let result = f();
     let scope = SCOPE.with(|slot| slot.replace(previous));
     (result, scope.expect("the scope installed above"))
+}
+
+/// `value` with every id it holds moved from the paths of `from` to those of `to`: the same files,
+/// named by the ids they have there. Fails when a file it names isn't among `to`'s.
+pub fn rescoped<T: Serialize + serde::de::DeserializeOwned>(
+    value: &T,
+    from: &ContentScope,
+    to: &ContentScope,
+) -> Result<T, String> {
+    let (json, _) = with_content(from.clone(), || serde_json::to_value(value));
+    let json = json.map_err(|error| error.to_string())?;
+    let (read, scope) = with_content(to.clone(), || serde_json::from_value::<T>(json));
+    let read = read.map_err(|error| error.to_string())?;
+    match scope.leaves().iter().find_map(Leaf::reported) {
+        Some(problem) => Err(problem.to_string()),
+        None => Ok(read),
+    }
+}
+
+/// What `f` makes of the scope being read in, when there is one.
+pub fn in_scope<T>(f: impl FnOnce(&ContentScope) -> T) -> Option<T> {
+    SCOPE.with(|slot| slot.borrow().as_ref().map(f))
 }
 
 /// Runs `f` in a copy of the scope being read in, and keeps the references it met that `keep`

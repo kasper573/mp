@@ -17,6 +17,7 @@ use crate::app::Editor;
 use crate::condition;
 use crate::project::RowSelection;
 use crate::project::files::content_of;
+use crate::tabs::shown_path;
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::{theme, widgets};
 
@@ -100,7 +101,7 @@ pub fn owner_row(
                     )
                 }
                 None => bound(
-                    format!("area/{key}"),
+                    shown_path(&key).to_owned(),
                     OwnerRow {
                         kind: RunnerKind::Area,
                         row: area.raw(),
@@ -118,7 +119,11 @@ pub fn owner_row(
                         placement.blueprint == blueprint && !placement.scripts.is_empty()
                     })?;
                 Some(bound(
-                    format!("blueprint/{key} in {} {ordinal}", area.path(content)),
+                    format!(
+                        "{} in {} {ordinal}",
+                        shown_path(&key),
+                        shown_path(area.path(content))
+                    ),
                     OwnerRow {
                         kind: RunnerKind::Blueprint,
                         row: area.raw(),
@@ -129,7 +134,7 @@ pub fn owner_row(
         }
         RunnerKind::Object | RunnerKind::Any => return None,
         kind => bound(
-            format!("{table}/{key}"),
+            shown_path(key).to_owned(),
             OwnerRow {
                 kind,
                 row: content.table_named(table)?.raw_of(key)?,
@@ -297,14 +302,14 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         let by = match speakers.as_slice() {
             [] => String::new(),
             [one] if one == "narrator" => ", all by the narrator".to_owned(),
-            [one] => format!(", all lines by npc/{one}"),
+            [one] => format!(", all lines by {}", shown_path(one)),
             many => format!(
                 ", by {}",
                 many.iter()
                     .map(|s| if s == "narrator" || s == "object" {
                         s.clone()
                     } else {
-                        format!("npc/{s}")
+                        shown_path(s).to_owned()
                     })
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -327,7 +332,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .reaches
         .iter()
         .filter_map(|r| match r {
-            Reach::OpensShop(shop) => Some(format!("shop/{}", shop.path(content))),
+            Reach::OpensShop(shop) => Some(shown_path(shop.path(content)).to_owned()),
             _ => None,
         })
         .collect();
@@ -341,7 +346,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         let calls: Vec<String> = may
             .calls
             .iter()
-            .map(|script| format!("script/{script}"))
+            .map(|script| shown_path(script).to_owned())
             .collect();
         rows.push(MayRow::present("runs", calls.join(" · ")));
     }
@@ -411,7 +416,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         ));
     }
     let notices = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Notifies(n) => Some(format!("notification/{}", n.path(content))),
+        Reach::Notifies(n) => Some(shown_path(n.path(content)).to_owned()),
         _ => None,
     }));
     if !notices.is_empty() {
@@ -447,14 +452,14 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
                     [head @ .., last] => format!("{} and {last}", head.join(", ")),
                     [] => String::new(),
                 };
-                format!("{verbs} quest/{quest}")
+                format!("{verbs} {}", shown_path(quest))
             })
             .collect::<Vec<_>>()
             .join(" · ");
         rows.push(MayRow::present("quests", text));
     }
     let npcs = unique(may.reaches.iter().filter_map(|reach| match reach {
-        Reach::Spawns(npc) => Some(format!("spawns npc/{}", npc.path(content))),
+        Reach::Spawns(npc) => Some(format!("spawns {}", shown_path(npc.path(content)))),
         Reach::Hostile => Some("may turn hostile".to_owned()),
         Reach::Friendly => Some("may turn friendly".to_owned()),
         Reach::Despawns => Some("despawns".to_owned()),
@@ -467,15 +472,15 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let stats = unique(may.reaches.iter().filter_map(|reach| match reach {
         Reach::Heals => Some("heals".to_owned()),
-        Reach::Applies(effect) => Some(format!("applies {}", effect.path(content))),
+        Reach::Applies(effect) => Some(format!("applies {}", shown_path(effect.path(content)))),
         Reach::Cleanses => Some("removes statuses".to_owned()),
         Reach::Boosts(stat, _) => Some(format!("boosts {}", stat_name(*stat))),
         Reach::GrantsXp => Some("grants xp".to_owned()),
-        Reach::Casts(skill) => Some(format!("casts {}", skill.path(content))),
+        Reach::Casts(skill) => Some(format!("casts {}", shown_path(skill.path(content)))),
         Reach::ResetsSkills => Some("resets skills".to_owned()),
         Reach::Animates => Some("plays an action".to_owned()),
         Reach::ShowsVfx => Some("shows vfx".to_owned()),
-        Reach::Plays(sfx) => Some(format!("plays {}", sfx.path(content))),
+        Reach::Plays(sfx) => Some(format!("plays {}", shown_path(sfx.path(content)))),
         Reach::Says => Some("says a chat line".to_owned()),
         _ => None,
     }));
@@ -528,11 +533,11 @@ fn stack_text(doc: &ScriptDoc, field: &str, item: &str) -> String {
         for stack in node[field].as_array().into_iter().flatten() {
             if stack["item"].as_str() == Some(item) {
                 let count = stack["count"].as_u64().unwrap_or(1);
-                return format!("{count} {item}");
+                return format!("{count} {}", shown_path(item));
             }
         }
     }
-    item.to_owned()
+    shown_path(item).to_owned()
 }
 
 fn read_by_rows(content: &Content, may: &MayDo<RiftScripting>) -> Vec<(String, String)> {
@@ -589,18 +594,20 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
             place.area.path(content),
             place_coords(place)
         ),
-        Reach::Takes(item) => format!("takes {}", item.path(content)),
-        Reach::Gives(item) => format!("gives {}", item.path(content)),
-        Reach::Drops(item) => format!("drops {}", item.path(content)),
-        Reach::Offers(quest) => format!("offers quest {}", quest.path(content)),
-        Reach::Accepts(quest) => format!("accepts quest {}", quest.path(content)),
-        Reach::TurnsIn(quest) => format!("turns in quest {}", quest.path(content)),
-        Reach::Fails(quest) => format!("fails quest {}", quest.path(content)),
-        Reach::Completes(quest) => format!("completes a task of {}", quest.path(content)),
-        Reach::Decides(quest) => format!("decides a path of {}", quest.path(content)),
-        Reach::Remembers(memory) => format!("remembers {}", memory.path(content)),
-        Reach::OpensShop(shop) => format!("opens shop {}", shop.path(content)),
-        Reach::Spawns(npc) => format!("spawns {}", npc.path(content)),
+        Reach::Takes(item) => format!("takes {}", shown_path(item.path(content))),
+        Reach::Gives(item) => format!("gives {}", shown_path(item.path(content))),
+        Reach::Drops(item) => format!("drops {}", shown_path(item.path(content))),
+        Reach::Offers(quest) => format!("offers quest {}", shown_path(quest.path(content))),
+        Reach::Accepts(quest) => format!("accepts quest {}", shown_path(quest.path(content))),
+        Reach::TurnsIn(quest) => format!("turns in quest {}", shown_path(quest.path(content))),
+        Reach::Fails(quest) => format!("fails quest {}", shown_path(quest.path(content))),
+        Reach::Completes(quest) => {
+            format!("completes a task of {}", shown_path(quest.path(content)))
+        }
+        Reach::Decides(quest) => format!("decides a path of {}", shown_path(quest.path(content))),
+        Reach::Remembers(memory) => format!("remembers {}", shown_path(memory.path(content))),
+        Reach::OpensShop(shop) => format!("opens shop {}", shown_path(shop.path(content))),
+        Reach::Spawns(npc) => format!("spawns {}", shown_path(npc.path(content))),
         Reach::Hostile => "may turn hostile".to_owned(),
         Reach::Friendly => "may turn friendly".to_owned(),
         Reach::Despawns => "despawns".to_owned(),
@@ -608,18 +615,20 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
         Reach::Walks => "walks".to_owned(),
         Reach::Damages => "damages".to_owned(),
         Reach::Heals => "heals".to_owned(),
-        Reach::Applies(effect) => format!("applies {}", effect.path(content)),
+        Reach::Applies(effect) => format!("applies {}", shown_path(effect.path(content))),
         Reach::Cleanses => "removes statuses".to_owned(),
         Reach::Boosts(stat, _) => format!("boosts {}", stat_name(*stat)),
         Reach::GrantsXp => "grants xp".to_owned(),
-        Reach::Casts(skill) => format!("casts {}", skill.path(content)),
+        Reach::Casts(skill) => format!("casts {}", shown_path(skill.path(content))),
         Reach::ResetsSkills => "resets skills".to_owned(),
         Reach::Animates => "plays an action".to_owned(),
         Reach::ShowsVfx => "shows vfx".to_owned(),
-        Reach::Notifies(notification) => format!("notifies {}", notification.path(content)),
+        Reach::Notifies(notification) => {
+            format!("notifies {}", shown_path(notification.path(content)))
+        }
         Reach::Says => "says".to_owned(),
-        Reach::Plays(sfx) => format!("plays {}", sfx.path(content)),
-        Reach::Speaks(npc) => format!("speaks as {}", npc.path(content)),
+        Reach::Plays(sfx) => format!("plays {}", shown_path(sfx.path(content))),
+        Reach::Speaks(npc) => format!("speaks as {}", shown_path(npc.path(content))),
     }
 }
 
@@ -695,10 +704,8 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     .horizontal(|ui| {
                         ui.add_sized(
                             egui::vec2(150.0, 20.0),
-                            egui::Label::new(
-                                theme::code(format!("{}/{}", row.table, row.key)).size(13.0),
-                            )
-                            .truncate(),
+                            egui::Label::new(theme::code(shown_path(&row.key)).size(13.0))
+                                .truncate(),
                         );
                         ui.add_sized(
                             egui::vec2(120.0, 20.0),

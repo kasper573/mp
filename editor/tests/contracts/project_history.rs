@@ -23,7 +23,10 @@ fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     assert!(project.save().is_ok(), "the project saves");
     assert_eq!(project.history.saved(), Some(1));
 
-    let mut outside = project.files.json_owned(SETTINGS_FILE).expect("game.json");
+    let mut outside = project
+        .files
+        .json_owned(SETTINGS_FILE)
+        .expect("game.config.json");
     outside["name"] = "Outside".into();
     std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside)).expect("writes outside");
     let changes = project.outside_changes(FolderChange::Unknown);
@@ -37,6 +40,48 @@ fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     }
     assert_eq!(project.history.steps().len(), 3);
     assert_eq!(project.history.saved(), Some(0));
+}
+
+#[test]
+fn the_unsaved_files_follow_edits_saves_and_changes_on_disk() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let folder = game_folder(scratch.path().join("game"));
+    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
+    assert!(project.unsaved().is_empty());
+
+    project
+        .apply(rename(&project, "Lowtide"), viewpoint())
+        .expect("applies");
+    assert_eq!(&*project.unsaved(), [SETTINGS_FILE.to_owned()]);
+
+    assert!(project.save().is_ok(), "the project saves");
+    assert!(
+        project.unsaved().is_empty(),
+        "saving leaves nothing unsaved"
+    );
+
+    let mut outside = project
+        .files
+        .json_owned(SETTINGS_FILE)
+        .expect("game.config.json");
+    outside["name"] = "Outside".into();
+    std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside)).expect("writes outside");
+    project.outside_changes(FolderChange::Files(vec![SETTINGS_FILE.to_owned()]));
+    assert!(
+        project.unsaved().is_empty(),
+        "a change taken in from disk is saved"
+    );
+
+    project
+        .apply(rename(&project, "Again"), viewpoint())
+        .expect("applies");
+    std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside["name"])).expect("writes");
+    project.outside_changes(FolderChange::Files(vec![SETTINGS_FILE.to_owned()]));
+    assert_eq!(
+        &*project.unsaved(),
+        [SETTINGS_FILE.to_owned()],
+        "an edit made here that disk now differs from stays unsaved"
+    );
 }
 
 #[test]
@@ -101,7 +146,10 @@ fn viewpoint() -> EditViewpoint {
 }
 
 fn rename(project: &Project, name: &str) -> ContentEdit {
-    let mut game = project.files.json_owned(SETTINGS_FILE).expect("game.json");
+    let mut game = project
+        .files
+        .json_owned(SETTINGS_FILE)
+        .expect("game.config.json");
     game["name"] = name.into();
     ContentEdit {
         label: format!("rename to {name}"),

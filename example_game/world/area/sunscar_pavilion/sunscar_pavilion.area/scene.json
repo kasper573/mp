@@ -372,6 +372,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 11.5,
@@ -386,8 +387,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.22
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",

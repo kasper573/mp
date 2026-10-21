@@ -1,6 +1,6 @@
 use design_tokens::card::{self, Card};
 use design_tokens::face::{self, Face, TextRole};
-use design_tokens::glyph::Kind;
+use design_tokens::glyph::{Icon, Kind, Mark, Weight};
 use design_tokens::motion::{self, Clock};
 use design_tokens::sheet::{Depth, Sheet};
 use design_tokens::{controls, ink};
@@ -39,6 +39,26 @@ fn every_face_lays_out_text_in_its_own_font() {
                 .x
         });
         assert!(width > 10.0, "{face:?} lays out nothing");
+    }
+}
+
+#[test]
+fn every_mark_is_an_icon_of_the_icon_font_in_every_weight() {
+    let ctx = context();
+    pass(&ctx, |_| {});
+    for &mark in Mark::VARIANTS {
+        for &weight in Weight::VARIANTS {
+            let icon = Icon {
+                weight,
+                ..mark.icon()
+            };
+            let font = egui::FontId::new(16.0, weight.family());
+            let glyph = icon.glyph.chars().next().expect("an icon is one glyph");
+            assert!(
+                ctx.fonts_mut(|fonts| fonts.has_glyph(&font, glyph)),
+                "{mark:?} has no {weight:?} icon"
+            );
+        }
     }
 }
 

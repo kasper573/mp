@@ -1,8 +1,9 @@
 pub mod app;
-mod audio;
+pub mod audio;
 mod condition;
 pub mod drafts;
 mod forms;
+pub mod icons;
 pub mod import;
 pub mod keymap;
 pub mod make;

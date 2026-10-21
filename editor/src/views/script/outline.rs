@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
-use design_tokens::glyph::{self, Mark};
+use design_tokens::glyph::Mark;
 use egui::{Align2, Color32, FontId, Sense, Ui};
 use engine::core::content::ContentFile;
 use engine::systems::script::ScriptDef;
@@ -242,7 +242,7 @@ fn draw(
     };
     let put_mark = |ui: &Ui, mark: Mark, ink: Color32| {
         let at = egui::Rect::from_min_size(egui::pos2(x.get(), y - 5.0), egui::vec2(10.0, 10.0));
-        glyph::paint(ui.painter(), mark, at, ink);
+        mark.paint(ui.painter(), at, ink);
         x.set(at.right() + 2.0);
     };
     if let Some(via) = row.via.as_deref() {

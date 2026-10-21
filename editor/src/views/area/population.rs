@@ -1,64 +1,56 @@
 use egui::{Ui, Vec2};
-use engine::core::content::{Content, ContentFile, fields_file};
+use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
 use engine::core::time::{PlaybackRate, Seconds};
 use engine::systems::actor::model::ModelId;
 use engine::systems::actor::{Action, ActorModel};
-use engine::systems::area;
-use engine::systems::npc::NpcDef;
-use serde_json::Value;
+use engine::systems::area::{self, Population};
+use engine::systems::npc::{NpcDef, NpcModule};
+use engine::systems::stat::StatKind;
 
+use super::placement::short_value;
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
+use crate::tabs::shown_path;
 use crate::thumbs;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 
-pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
-    let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
+/// What the npc at `npc` brings to every module placing it: when it respawns, its scripts and its
+/// health, and a way to open it.
+pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
+    let Ok(row) = cx.project.read::<NpcDef>(npc) else {
         return;
     };
-    let Some(row) = cx.files.json(&fields_file(&npc)) else {
-        return;
-    };
-    widgets::section(ui, &format!("From npc/{npc}"));
-    let modules = row["modules"].as_array().cloned().unwrap_or_default();
-    let respawn = modules
-        .iter()
-        .find(|m| m["type"] == "respawn")
-        .and_then(|m| m["after"].as_f64());
+    let reader = cx.project.reader();
+    widgets::section(ui, &format!("From {}", shown_path(npc)));
+    let respawn = row.modules.iter().find_map(|module| match module {
+        NpcModule::Respawn(respawn) => Some(respawn.after),
+        _ => None,
+    });
     widgets::kv_text(
         ui,
         "respawn",
-        respawn.map_or("never".to_owned(), |after| format!("{} s", after)),
+        respawn.map_or("never".to_owned(), |after| format!("{} s", after.0)),
     );
-    let scripts: Vec<String> = modules
+    let scripts: Vec<String> = row
+        .modules
         .iter()
-        .filter(|module| module.is_script_module())
-        .filter_map(|m| {
-            let script = m["script"].as_str()?;
-            let values: Vec<String> = m["values"]
-                .as_object()
-                .into_iter()
-                .flat_map(|v| v.iter())
-                .map(|(k, v)| {
-                    format!(
-                        "{k} {}",
-                        v.as_f64()
-                            .map(|number| number.to_string())
-                            .unwrap_or_else(|| v
-                                .as_str()
-                                .map(str::to_owned)
-                                .unwrap_or_else(|| v.to_string()))
-                    )
-                })
+        .filter_map(|module| match module {
+            NpcModule::Script(script) => Some(script),
+            _ => None,
+        })
+        .map(|script| {
+            let named = shown_path(reader.path_of(script.script).unwrap_or_default());
+            let values: Vec<String> = script
+                .values
+                .iter()
+                .map(|(name, value)| format!("{name} {}", short_value(value, cx.project)))
                 .collect();
-            Some(if values.is_empty() {
-                script.to_owned()
-            } else {
-                format!("{script} · {}", values.join(" · "))
-            })
+            match values.is_empty() {
+                true => named.to_owned(),
+                false => format!("{named} · {}", values.join(" · ")),
+            }
         })
         .collect();
     widgets::kv_text(
@@ -70,21 +62,29 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
             scripts.join(", ")
         },
     );
-    if let Some(health) = row["stats"]["health"].as_f64() {
+    if let Some(health) = row.stats.0.get(&StatKind::Health) {
         widgets::kv_text(ui, "health", health.to_string());
     }
     ui.add_space(4.0);
-    if widgets::chip_colored(ui, &format!("npc/ {npc} →"), theme::INPUT, theme::CODE).clicked() {
+    if widgets::chip_colored(
+        ui,
+        &format!("{} →", shown_path(npc)),
+        theme::INPUT,
+        theme::CODE,
+    )
+    .clicked()
+    {
         cx.actions.push(FormAction::OpenRow {
             table: NpcDef::TABLE.to_owned(),
-            key: npc.clone(),
+            key: npc.to_owned(),
         });
     }
 }
 
-pub fn population_places(area: &area::Area, module: &Value, seed: u64) -> Vec<Pos<Tiles>> {
-    let count = module["count"].as_u64().unwrap_or(0) as usize;
-    let nodes: Vec<Pos<Tiles>> = match super::shapes::rect_of(&module["roams"]) {
+/// Where a preview of `population` stands its npcs in `area`, rolled from `seed`.
+pub fn population_places(area: &area::Area, population: &Population, seed: u64) -> Vec<Pos<Tiles>> {
+    let count = population.count as usize;
+    let nodes: Vec<Pos<Tiles>> = match population.roams {
         Some(bounds) => area
             .wild_grid
             .nodes()
@@ -99,7 +99,7 @@ pub fn population_places(area: &area::Area, module: &Value, seed: u64) -> Vec<Po
     }
     let mut rng = Rng::new(
         seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)
-            .wrapping_add(module["count"].as_u64().unwrap_or(0)),
+            .wrapping_add(population.count as u64),
     );
     (0..count)
         .map(|_| nodes[rng.rand_range(0..nodes.len() as u32) as usize])

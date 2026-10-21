@@ -139,6 +139,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Stone hum",
         "shape": {
           "type": "rect",
           "x": 0.5,
@@ -153,8 +154,7 @@
             "file": "assets/audio/ambient/stone_hum.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Stone hum"
+        ]
       },
       {
         "type": "blueprint",
@@ -217,6 +217,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 16.5,
@@ -231,8 +232,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",

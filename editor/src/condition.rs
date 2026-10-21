@@ -276,7 +276,7 @@ fn block(
                     changed = FormChange::at(path);
                 }
             });
-            let response = glyph::button(ui, Mark::ChevronDown, 12.0, theme::FAINT, "Pick");
+            let response = glyph::button(ui, Mark::CaretDown, 12.0, theme::FAINT, "Pick");
             changed |=
                 picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
@@ -289,7 +289,7 @@ fn block(
                     changed = FormChange::at(path);
                 }
             });
-            let response = glyph::button(ui, Mark::ChevronDown, 12.0, theme::FAINT, "Pick");
+            let response = glyph::button(ui, Mark::CaretDown, 12.0, theme::FAINT, "Pick");
             changed |=
                 picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
@@ -357,7 +357,7 @@ fn block(
                             value["a"] = a;
                             changed = FormChange::at(path);
                         }
-                        let response = chip(ui, shown, theme::INPUT, theme::CODE);
+                        let response = dropdown_chip(ui, shown, theme::INPUT, theme::CODE);
                         egui::Popup::from_toggle_button_response(&response)
                             .id(ui.id().with(path).with("op"))
                             .show(|ui| {
@@ -469,9 +469,8 @@ fn list_block(
                             ui.id().with(path).with(("remove", index)),
                             egui::Sense::click(),
                         );
-                        glyph::paint(
+                        Mark::Cross.paint(
                             ui.painter(),
-                            Mark::Cross,
                             egui::Rect::from_center_size(at, egui::vec2(9.0, 9.0)),
                             theme::FAINT,
                         );
@@ -480,7 +479,7 @@ fn list_block(
                         }
                     }
                 }
-                let add = chip(ui, "+ condition", theme::INPUT, theme::TEXT);
+                let add = dropdown_chip(ui, "+ condition", theme::INPUT, theme::TEXT);
                 let id = ui.id().with(path).with("add");
                 egui::Popup::from_toggle_button_response(&add)
                     .id(id)
@@ -552,7 +551,7 @@ fn query_block(
                 if optional {
                     continue;
                 }
-                let fresh = schema::template(cx.root, field);
+                let fresh = schema::template(cx.root, field, cx.nearby());
                 value[name] = fresh;
             }
             let child = value.get_mut(name).expect("set above");
@@ -588,13 +587,34 @@ fn tag_chip(ui: &mut Ui, tag: &str) -> egui::Response {
 }
 
 fn chip(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> egui::Response {
+    framed_chip(ui, text, fill, ink, false)
+}
+
+/// A chip that opens a list to choose from, its caret on the right.
+fn dropdown_chip(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> egui::Response {
+    framed_chip(ui, text, fill, ink, true)
+}
+
+fn framed_chip(
+    ui: &mut Ui,
+    text: &str,
+    fill: Color32,
+    ink: Color32,
+    caret: bool,
+) -> egui::Response {
     egui::Frame::new()
         .fill(fill)
         .stroke(Stroke::new(1.0, theme::BORDER))
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(7, 2))
         .show(ui, |ui| {
-            ui.label(RichText::new(text).monospace().size(12.5).color(ink));
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                ui.label(RichText::new(text).monospace().size(12.5).color(ink));
+                if caret {
+                    ui.label(Mark::CaretDown.text(10.0).color(ink));
+                }
+            });
         })
         .response
         .interact(egui::Sense::click())
@@ -649,7 +669,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                 widgets::section(ui, group.title());
                 for variant in members {
                     if entry(ui, &variant.tag) {
-                        picked = Some(schema::variant_template(cx.root, variant));
+                        picked = Some(schema::variant_template(cx.root, variant, cx.nearby()));
                     }
                 }
             }
@@ -659,7 +679,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     if let Some(variant) = palette.variant(kind.name())
                         && chip(ui, kind.name(), theme::INPUT, theme::TEXT).clicked()
                     {
-                        picked = Some(schema::variant_template(cx.root, variant));
+                        picked = Some(schema::variant_template(cx.root, variant, cx.nearby()));
                     }
                 }
                 if palette.has_var
@@ -675,13 +695,13 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     if let Some(variant) = palette.variant(kind.name())
                         && chip(ui, &title(kind.name()), theme::INPUT, theme::TEXT).clicked()
                     {
-                        picked = Some(schema::variant_template(cx.root, variant));
+                        picked = Some(schema::variant_template(cx.root, variant, cx.nearby()));
                     }
                 }
                 if let Some(variant) = palette.variant(ExprKind::Equal.name())
                     && chip(ui, "compare", theme::INPUT, theme::TEXT).clicked()
                 {
-                    let mut fresh = schema::variant_template(cx.root, variant);
+                    let mut fresh = schema::variant_template(cx.root, variant, cx.nearby());
                     fresh["a"] = Value::from(0);
                     fresh["b"] = Value::from(0);
                     picked = Some(fresh);
@@ -690,7 +710,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     if let Some(variant) = palette.variant(ExprKind::Add.name())
                         && chip(ui, "arithmetic", theme::INPUT, theme::TEXT).clicked()
                     {
-                        let mut fresh = schema::variant_template(cx.root, variant);
+                        let mut fresh = schema::variant_template(cx.root, variant, cx.nearby());
                         fresh["a"] = Value::from(0);
                         fresh["b"] = Value::from(0);
                         picked = Some(fresh);

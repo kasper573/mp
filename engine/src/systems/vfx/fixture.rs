@@ -3,7 +3,7 @@ use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
 use crate::core::content::{Content, Fixture};
-use crate::core::vfx::{ParamKind, VfxDef, VfxParams, VfxShaderDef, VfxSite};
+use crate::core::vfx::{ParamKind, ShaderParam, VfxDef, VfxParams, VfxShaderDef, VfxSite};
 
 /// The parameter the engine sets when it draws the ground an area skill is aimed at: whether the
 /// skill hurts whom it lands on.
@@ -22,7 +22,7 @@ pub enum VfxFixture {
 
 impl Fixture for VfxFixture {
     type Row = VfxDef;
-    const FOLDER: &'static str = "vfx";
+    const FOLDER: Option<&'static str> = Some("vfx");
 }
 
 /// The shaders every game provides, drawn by the engine itself: the ground an area skill is aimed
@@ -40,7 +40,7 @@ pub enum VfxShaderFixture {
 
 impl Fixture for VfxShaderFixture {
     type Row = VfxShaderDef;
-    const FOLDER: &'static str = "vfx";
+    const FOLDER: Option<&'static str> = Some("vfx");
 
     fn locks(self) -> Vec<FixtureLock> {
         let set: &[(&str, ParamKind)] = match self {
@@ -52,9 +52,22 @@ impl Fixture for VfxShaderFixture {
             | VfxShaderFixture::LevelPop => &[],
         };
         set.iter()
-            .map(|(name, kind)| FixtureLock::Entry {
-                list: "/params".to_owned(),
-                entry: serde_json::json!({ "name": name, "kind": kind }),
+            .map(|&(name, kind)| {
+                let param = ShaderParam {
+                    name: name.to_owned(),
+                    kind,
+                    default: kind.blank(),
+                    min: None,
+                    max: None,
+                };
+                FixtureLock::entry(
+                    crate::field!(VfxShaderDef, params),
+                    &param,
+                    &[
+                        crate::field!(ShaderParam, name),
+                        crate::field!(ShaderParam, kind),
+                    ],
+                )
             })
             .collect()
     }

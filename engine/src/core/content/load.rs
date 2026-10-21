@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
+use std::ops::Bound;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
@@ -15,13 +16,14 @@ use serde::de::DeserializeOwned;
 use super::bundle::{Bundle, PartSpec, Parts};
 use super::check::RowCheck;
 use super::files::{
-    CONFIG_FILE, FIXTURES_DIR, FileType, Listing, SETTINGS_FILE, Shape, bundle_of, fields_file,
+    CONFIG_FILE, FileType, Listing, SETTINGS_FILE, Shape, bundle_of, fields_file, fixture_dir,
     table_of,
 };
 use super::fixture::{Fixture, FixtureIds, FixtureLock};
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
+use super::serial::TypeTag;
 use super::table::{Content, ContentBuilder, ContentFile, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
 
@@ -48,7 +50,7 @@ type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
 type FixtureCheck = Box<dyn Fn(&mut Loading, bool) + Send + Sync>;
 struct FixtureEntry {
     table: &'static str,
-    folder: &'static str,
+    folder: Option<&'static str>,
     whole_table: bool,
     paths: Vec<(String, Vec<FixtureLock>)>,
     check: FixtureCheck,
@@ -154,6 +156,7 @@ impl ContentRegistry {
         self.rows.push(Box::new(RowLoader::<Row> {
             parts: Some(BundleParts {
                 specs: Row::PARTS,
+                written: Row::WRITTEN,
                 read: Row::read_parts,
                 write: Row::write_parts,
             }),
@@ -191,7 +194,8 @@ impl ContentRegistry {
         modules: &[serde_json::Value],
         module: &serde_json::Value,
     ) -> bool {
-        let held = modules.iter().any(|known| known["type"] == module["type"]);
+        let tag = TypeTag::of_json(module);
+        let held = modules.iter().any(|known| TypeTag::of_json(known) == tag);
         !held || self.module_rule(table, module) != Some(ModuleRule::AtMostOne)
     }
 
@@ -322,7 +326,7 @@ impl ContentRegistry {
     pub fn fixture_folders(&self) -> BTreeSet<String> {
         self.fixtures
             .iter()
-            .map(|fixture| format!("{FIXTURES_DIR}/{}", fixture.folder))
+            .map(|fixture| fixture_dir(fixture.folder))
             .collect()
     }
 
@@ -482,6 +486,13 @@ impl ContentRegistry {
         self.settings.as_deref()
     }
 
+    pub(super) fn loader_of<Row: ContentFile>(&self) -> Option<&dyn TableLoader> {
+        self.rows
+            .iter()
+            .find(|loader| loader.row_type() == TypeId::of::<Row>())
+            .map(Box::as_ref)
+    }
+
     pub(super) fn row_loaders(&self) -> &[Box<dyn TableLoader>] {
         &self.rows
     }
@@ -549,28 +560,42 @@ impl ContentFolder for MemoryFolder {
         self.name.clone()
     }
 
+    /// Seeks from entry to entry in the sorted paths, so a folder costs what it holds directly
+    /// rather than what the whole folder holds.
     fn entries(&self, dir: &str) -> Vec<FolderEntry> {
         let prefix = if dir.is_empty() {
             String::new()
         } else {
             format!("{dir}/")
         };
-        let mut entries: Vec<FolderEntry> = self
+        let mut entries = Vec::new();
+        let mut from = prefix.clone();
+        while let Some((path, _)) = self
             .files
-            .keys()
-            .filter_map(|path| path.strip_prefix(&prefix))
-            .map(|rest| match rest.split_once('/') {
-                Some((name, _)) => FolderEntry {
-                    name: name.to_owned(),
-                    dir: true,
-                },
-                None => FolderEntry {
-                    name: rest.to_owned(),
-                    dir: false,
-                },
-            })
-            .collect();
-        entries.dedup();
+            .range::<str, _>((Bound::Included(from.as_str()), Bound::Unbounded))
+            .next()
+        {
+            let Some(rest) = path.strip_prefix(&prefix) else {
+                break;
+            };
+            match rest.split_once('/') {
+                Some((name, _)) => {
+                    entries.push(FolderEntry {
+                        name: name.to_owned(),
+                        dir: true,
+                    });
+                    // Past every path inside it: '0' is the character after '/'.
+                    from = format!("{prefix}{name}0");
+                }
+                None => {
+                    entries.push(FolderEntry {
+                        name: rest.to_owned(),
+                        dir: false,
+                    });
+                    from = format!("{path}\0");
+                }
+            }
+        }
         entries
     }
 
@@ -603,7 +628,7 @@ pub fn load(
         indexes: HashMap::new(),
         failed: HashSet::new(),
     };
-    loading.parse(registry);
+    loading.parse(registry, None);
     loading.check_rows(registry);
     loading.run_hooks(registry, LoadStep::Rows);
     loading.hash_files();
@@ -631,6 +656,78 @@ pub fn load(
             loading.errors,
         ))
     }
+}
+
+/// The problems the files at `files` have on their own, as a load reports them: what their names
+/// say, the shape and references of the content each belongs to, that content's parts and the
+/// rules of its type, and whether their media decodes. Only what the rest of the game says of them
+/// is left to a whole load, so whatever writes content can ask before it writes.
+pub fn check_files(
+    registry: &ContentRegistry,
+    folder: Arc<dyn ContentFolder>,
+    files: &[String],
+) -> Vec<LoadError> {
+    let (listing, errors) = super::files::list(folder.as_ref(), &registry.file_types());
+    let touches = |file: &str| {
+        files.iter().any(|touched| {
+            touched == file
+                || file.starts_with(&format!("{touched}/"))
+                || touched.starts_with(&format!("{file}/"))
+        })
+    };
+    let contents: HashSet<String> = files
+        .iter()
+        .filter_map(|file| content_of(&listing, file))
+        .collect();
+    let media: Vec<String> = files
+        .iter()
+        .filter(|file| super::is_media_file(file))
+        .filter(|file| listing.media.contains(file) || bundle_of(file).is_some())
+        .cloned()
+        .collect();
+    let mut loading = Loading {
+        folder,
+        listing,
+        builder: ContentBuilder::default(),
+        snapshot: None,
+        errors: errors
+            .into_iter()
+            .filter(|error| touches(&error.file))
+            .collect(),
+        indexes: HashMap::new(),
+        failed: HashSet::new(),
+    };
+    loading.parse(registry, Some(&contents));
+    loading.check_rows(registry);
+    for file in media {
+        if let Ok(bytes) = loading.read(&file)
+            && let Some(problem) = super::media::problem_of(&file, &bytes)
+        {
+            loading.file_error(file, ErrorPlace::WholeFile, problem);
+        }
+    }
+    loading.errors
+}
+
+/// The content `file` is, or is a part of, when the listing holds it: a content file, a bundle or
+/// the settings.
+fn content_of(listing: &Listing, file: &str) -> Option<String> {
+    if file == SETTINGS_FILE {
+        return Some(file.to_owned());
+    }
+    let held = match bundle_of(file) {
+        Some((bundle, _)) => bundle,
+        None => file,
+    };
+    listing
+        .content
+        .values()
+        .any(|paths| {
+            paths
+                .binary_search_by(|path| path.as_bytes().cmp(held.as_bytes()))
+                .is_ok()
+        })
+        .then(|| held.to_owned())
 }
 
 pub struct Loading {
@@ -793,16 +890,10 @@ impl Loading {
         Some(index)
     }
 
-    fn parse(&mut self, registry: &ContentRegistry) {
-        let mut scope = ContentScope::new();
-        for loader in registry.row_loaders() {
-            scope.table_by_type(
-                loader.row_type(),
-                loader.name(),
-                self.listing.paths_of(loader.name()),
-            );
-        }
-        scope.media(self.listing.media.clone());
+    /// Parses every content file, or only the content in `only` and the settings when it holds
+    /// them.
+    fn parse(&mut self, registry: &ContentRegistry, only: Option<&HashSet<String>>) {
+        let scope = listing_scope(registry, &self.listing);
         self.builder.built(self.listing.files());
 
         let jobs: Vec<(usize, String)> = registry
@@ -813,6 +904,7 @@ impl Loading {
                 self.listing
                     .paths_of(loader.name())
                     .into_iter()
+                    .filter(|path| only.is_none_or(|only| only.contains(path)))
                     .map(move |path| (index, path))
             })
             .collect();
@@ -821,19 +913,8 @@ impl Loading {
         let parsed: Vec<(usize, String, ParsedFile)> = jobs
             .into_par_iter()
             .map(|(index, path)| {
-                let loader = &registry.row_loaders()[index];
-                let file = read_file(root.as_ref(), &fields_file(&path));
-                let mut parsed = parse_read(file, &scope, &registry.list_kinds, &|value| {
-                    loader.parse_value(value)
-                });
-                if let Some(row) = parsed.row.as_mut() {
-                    let parts = listing.parts.get(&path).map_or(&[][..], Vec::as_slice);
-                    let mut reader = Parts::new(&path, parts, &root, &scope);
-                    loader.read_parts(row.as_mut(), &mut reader);
-                    let (errors, indexes) = reader.finish();
-                    parsed.errors.extend(errors);
-                    parsed.parts.extend(indexes);
-                }
+                let loader = registry.row_loaders()[index].as_ref();
+                let parsed = parse_file(registry, loader, &root, listing, &scope, &path);
                 (index, path, parsed)
             })
             .collect();
@@ -863,17 +944,10 @@ impl Loading {
         }
         self.snapshot = None;
 
-        let settings = parse_read(
-            read_file(root.as_ref(), SETTINGS_FILE),
-            &scope,
-            &registry.list_kinds,
-            &|value| {
-                registry
-                    .settings_loader()
-                    .map(|loader| loader.parse_value(value))
-                    .unwrap_or_else(|| Ok(Box::new(())))
-            },
-        );
+        if only.is_some_and(|only| !only.contains(SETTINGS_FILE)) {
+            return;
+        }
+        let settings = parse_settings(registry, root.as_ref(), &scope);
         self.errors.extend(settings.errors);
         if let Some(index) = settings.index {
             self.indexes.insert(SETTINGS_FILE.to_owned(), index);
@@ -1002,11 +1076,11 @@ pub struct FileHash {
 
 pub struct FileHashes(pub BTreeMap<String, FileHash>);
 
-struct ParsedFile {
-    row: Option<Box<dyn Any + Send + Sync>>,
+pub(super) struct ParsedFile {
+    pub(super) row: Option<Box<dyn Any + Send + Sync>>,
     index: Option<Arc<JsonIndex>>,
     parts: Vec<(String, Arc<JsonIndex>)>,
-    errors: Vec<LoadError>,
+    pub(super) errors: Vec<LoadError>,
 }
 
 pub struct ParseError {
@@ -1030,6 +1104,64 @@ struct ReadFile {
     value: Option<serde_json::Value>,
     index: Option<Arc<JsonIndex>>,
     errors: Vec<LoadError>,
+}
+
+/// The scope of every content and media path `listing` holds, which the files it lists are read
+/// in.
+pub(super) fn listing_scope(registry: &ContentRegistry, listing: &Listing) -> ContentScope {
+    let mut scope = ContentScope::new();
+    for loader in registry.row_loaders() {
+        scope.table_by_type(
+            loader.row_type(),
+            loader.name(),
+            listing.paths_of(loader.name()),
+        );
+    }
+    scope.media(listing.media.clone());
+    scope
+}
+
+/// The content file at `path` read and parsed by `loader`, with the parts of its bundle.
+pub(super) fn parse_file(
+    registry: &ContentRegistry,
+    loader: &dyn TableLoader,
+    root: &Arc<dyn ContentFolder>,
+    listing: &Listing,
+    scope: &ContentScope,
+    path: &str,
+) -> ParsedFile {
+    let file = read_file(root.as_ref(), &fields_file(path));
+    let mut parsed = parse_read(file, scope, &registry.list_kinds, &|value| {
+        loader.parse_value(value)
+    });
+    if let Some(row) = parsed.row.as_mut() {
+        let parts = listing.parts.get(path).map_or(&[][..], Vec::as_slice);
+        let mut reader = Parts::new(path, parts, root, scope);
+        loader.read_parts(row.as_mut(), &mut reader);
+        let (errors, indexes) = reader.finish();
+        parsed.errors.extend(errors);
+        parsed.parts.extend(indexes);
+    }
+    parsed
+}
+
+/// The game's settings read and parsed by the registry's settings type.
+pub(super) fn parse_settings(
+    registry: &ContentRegistry,
+    root: &dyn ContentFolder,
+    scope: &ContentScope,
+) -> ParsedFile {
+    parse_read(
+        read_file(root, SETTINGS_FILE),
+        scope,
+        &registry.list_kinds,
+        &|value| {
+            registry
+                .settings_loader()
+                .map(|loader| loader.parse_value(value))
+                .unwrap_or_else(|| Ok(Box::new(())))
+        },
+    )
 }
 
 fn read_file(root: &dyn ContentFolder, file: &str) -> ReadFile {
@@ -1152,6 +1284,9 @@ fn placed<'a>(
     needed: impl Fn(&Leaf) -> bool,
     probe: impl Fn(&str) -> bool,
 ) -> Vec<(&'a Leaf, Option<&'a IndexedValue>)> {
+    if !leaves.iter().any(&needed) {
+        return leaves.iter().map(|leaf| (leaf, None)).collect();
+    }
     let mut occurrences: HashMap<&'a str, Vec<&'a IndexedValue>> = HashMap::new();
     for value in index.strings() {
         if let Some(string) = value.string.as_deref() {
@@ -1370,6 +1505,7 @@ pub(super) trait TableLoader: Send + Sync {
     fn row_type(&self) -> TypeId;
     fn shape(&self) -> Shape;
     fn parts(&self) -> &'static [PartSpec];
+    fn written_parts(&self) -> &'static [PartSpec];
     fn schema(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn picked_from_table(&self) -> bool;
     fn parse_value(&self, value: &serde_json::Value) -> ParseResult;
@@ -1382,6 +1518,7 @@ pub(super) trait TableLoader: Send + Sync {
     );
     fn check_rows(&self, content: &Content, errors: &mut Vec<(&'static str, String, RowCheck)>);
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()>;
+    fn write_row(&self, row: &dyn Any, path: &str, writer: &mut FileWriter) -> io::Result<()>;
 }
 
 fn shape_of<T: JsonSchema>(settings: &SchemaSettings) -> serde_json::Value {
@@ -1399,6 +1536,7 @@ struct RowLoader<Row> {
 
 struct BundleParts<Row> {
     specs: &'static [PartSpec],
+    written: &'static [PartSpec],
     read: fn(&mut Row, &mut Parts),
     write: fn(&Row, &str, &mut FileWriter) -> io::Result<()>,
 }
@@ -1418,6 +1556,10 @@ impl<Row: ContentFile> TableLoader for RowLoader<Row> {
 
     fn parts(&self) -> &'static [PartSpec] {
         self.parts.as_ref().map_or(&[], |parts| parts.specs)
+    }
+
+    fn written_parts(&self) -> &'static [PartSpec] {
+        self.parts.as_ref().map_or(&[], |parts| parts.written)
     }
 
     fn schema(&self, settings: &SchemaSettings) -> serde_json::Value {
@@ -1472,11 +1614,18 @@ impl<Row: ContentFile> TableLoader for RowLoader<Row> {
 
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         for (id, row) in content.table::<Row>().iter() {
-            let path = id.path(content);
-            writer.json(&fields_file(path), row)?;
-            if let Some(bundle) = &self.parts {
-                (bundle.write)(row, path, writer)?;
-            }
+            self.write_row(row, id.path(content), writer)?;
+        }
+        Ok(())
+    }
+
+    fn write_row(&self, row: &dyn Any, path: &str, writer: &mut FileWriter) -> io::Result<()> {
+        let row = row
+            .downcast_ref::<Row>()
+            .expect("a file written by its own loader");
+        writer.json(&fields_file(path), row)?;
+        if let Some(bundle) = &self.parts {
+            (bundle.write)(row, path, writer)?;
         }
         Ok(())
     }
@@ -1503,6 +1652,7 @@ pub(super) trait SettingsLoader: Send + Sync {
     fn built(&self, content: &Content) -> bool;
     fn version<'a>(&self, content: &'a Content) -> Option<&'a ContentVersion>;
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()>;
+    fn write_value(&self, settings: &dyn Any, writer: &mut FileWriter) -> io::Result<()>;
 }
 
 struct SettingsOf<G>(PhantomData<fn() -> G>);
@@ -1534,9 +1684,16 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
 
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         if self.built(content) {
-            writer.json(SETTINGS_FILE, content.built::<G>())?;
+            self.write_value(content.built::<G>(), writer)?;
         }
         Ok(())
+    }
+
+    fn write_value(&self, settings: &dyn Any, writer: &mut FileWriter) -> io::Result<()> {
+        let settings = settings
+            .downcast_ref::<G>()
+            .expect("settings written by their own loader");
+        writer.json(SETTINGS_FILE, settings)
     }
 }
 
@@ -1545,19 +1702,16 @@ fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
     let mut errors: Vec<(ContentId<Row>, usize, String)> = Vec::new();
     with_content(ContentScope::of(&content), || {
         for (id, row) in content.table::<Row>().iter() {
-            let mut seen: Vec<String> = Vec::new();
+            let mut seen = Vec::new();
             for (index, module) in row.modules().iter().enumerate() {
                 if Row::rule(module) != ModuleRule::AtMostOne {
                     continue;
                 }
-                let tag = serde_json::to_value(module)
-                    .ok()
-                    .and_then(|value| value.get("type")?.as_str().map(str::to_owned))
-                    .unwrap_or_default();
-                if seen.contains(&tag) {
-                    errors.push((id, index, tag));
+                let kind = std::mem::discriminant(module);
+                if seen.contains(&kind) {
+                    errors.push((id, index, TypeTag::of(module).unwrap_or_default()));
                 } else {
-                    seen.push(tag);
+                    seen.push(kind);
                 }
             }
         }
@@ -1598,17 +1752,39 @@ pub fn valid_key(key: &str) -> bool {
 }
 
 pub struct FileWriter {
-    root: PathBuf,
+    into: WrittenInto,
     written: Vec<String>,
     kept: usize,
+}
+
+enum WrittenInto {
+    Folder(PathBuf),
+    Memory(BTreeMap<String, Vec<u8>>),
 }
 
 impl FileWriter {
     pub fn new(root: &Path) -> FileWriter {
         FileWriter {
-            root: root.to_path_buf(),
+            into: WrittenInto::Folder(root.to_path_buf()),
             written: Vec::new(),
             kept: 0,
+        }
+    }
+
+    /// A writer that keeps what it writes, for [`FileWriter::into_files`].
+    pub fn in_memory() -> FileWriter {
+        FileWriter {
+            into: WrittenInto::Memory(BTreeMap::new()),
+            written: Vec::new(),
+            kept: 0,
+        }
+    }
+
+    /// Every file written in memory, by its path from the game folder.
+    pub fn into_files(self) -> BTreeMap<String, Vec<u8>> {
+        match self.into {
+            WrittenInto::Memory(files) => files,
+            WrittenInto::Folder(_) => BTreeMap::new(),
         }
     }
 
@@ -1621,7 +1797,15 @@ impl FileWriter {
     /// A file shared with another folder through a symlink is written where the link points, so the
     /// one copy changes rather than the link turning into a copy of its own.
     pub fn file(&mut self, file: &str, bytes: &[u8]) -> io::Result<()> {
-        let linked = self.root.join(file);
+        let root = match &mut self.into {
+            WrittenInto::Folder(root) => root,
+            WrittenInto::Memory(files) => {
+                files.insert(file.to_owned(), bytes.to_vec());
+                self.written.push(file.to_owned());
+                return Ok(());
+            }
+        };
+        let linked = root.join(file);
         let path = std::fs::canonicalize(&linked).unwrap_or(linked);
         if std::fs::read(&path).is_ok_and(|current| current == bytes) {
             self.kept += 1;
@@ -1718,8 +1902,8 @@ fn check_fixture<F: Fixture>(loading: &mut Loading, required: bool) {
                     "file the engine never reads",
                     path,
                     format!(
-                        "only the {table} fixtures the engine requires, under {FIXTURES_DIR}/{}/",
-                        F::FOLDER
+                        "only the {table} fixtures the engine requires, under {}/",
+                        fixture_dir(F::FOLDER)
                     ),
                 ),
             );

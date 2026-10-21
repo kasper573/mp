@@ -1,18 +1,19 @@
-use engine::core::content::{CONFIG_FILE, Content, ContentFile, name_of, parent_of};
+use std::collections::BTreeMap;
+
+use engine::core::content::{Content, ContentFile, FolderReader, name_of, parent_of, rescoped};
 use engine::core::math::{Pos, Rect};
 use engine::core::tiling::Tiles;
-use engine::systems::area::AreaModuleKind;
-use engine::systems::area::blueprint::BlueprintDef;
-use serde_json::{Value, json};
+use engine::systems::area::blueprint::{BlueprintDef, Placement};
+use engine::systems::area::scene::{GroundLayer, ModuleNode, Scene, SceneGrids, SceneNode};
+use engine::systems::area::{AreaModule, MapSize, Tilemap};
 
-use super::grid::{GridDraft, blueprint_of};
+use super::grid::GridDraft;
 use super::{AreaSnapshot, nodes, placement, shapes};
 use crate::app::Editor;
 use crate::moves::free_path;
 use crate::project::ContentEdit;
 use crate::rows;
 use crate::tabs::file_title;
-use crate::value::RowValue;
 
 /// Makes a blueprint of the selection at once: a new bundle beside the one being edited holds the
 /// selected nodes, or what a selected folder holds, and one placement of it takes their place. The
@@ -20,27 +21,31 @@ use crate::value::RowValue;
 /// came from, so what it paints lands in layers of the same name.
 pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     let bundle = frame.bundle.clone();
-    let scene = nodes::scene_of(editor, &bundle);
+    let Some(own) = nodes::bundle_of(editor, &bundle) else {
+        return;
+    };
+    let scene = own.nodes().to_vec();
     let selected = selected_nodes(editor, &bundle, &scene);
     let Some(first) = selected.first().cloned() else {
         editor.toast("Select modules or a folder to make a blueprint of");
         return;
     };
-    let node = |pointer: &str| scene.pointer(pointer).cloned().unwrap_or(Value::Null);
-    let held: Vec<Value> = match selected.as_slice() {
-        [only] if nodes::is_folder(&node(only)) => node(only)["children"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default(),
-        many => many.iter().map(|pointer| node(pointer)).collect(),
+    let node = |pointer: &str| nodes::node(&scene, pointer).cloned();
+    let held: Vec<SceneNode> = match selected.as_slice() {
+        [only] => match node(only) {
+            Some(SceneNode::Folder(folder)) => folder.children,
+            only => only.into_iter().collect(),
+        },
+        many => many.iter().filter_map(|pointer| node(pointer)).collect(),
     };
+    let reader = frame.reader.clone();
     let label = match selected.as_slice() {
-        [only] => node(only)["label"]
-            .as_str()
-            .map_or_else(|| shapes::label(&node(only)), str::to_owned),
+        [only] => node(only)
+            .map(|node| shapes::node_label(&node, reader.as_ref()))
+            .unwrap_or_default(),
         _ => "blueprint".to_owned(),
     };
-    let Some(bounds) = covered(&frame.content, &held) else {
+    let Some(bounds) = covered(&frame.content, &reader, &held) else {
         editor.toast("The selection has no place on the map");
         return;
     };
@@ -64,42 +69,70 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
     for node in &mut shifted {
         shift_tree(node, -origin.x, -origin.y);
     }
-    let content = frame.content.clone();
-    let tile = blueprint_of(&content, &bundle).map_or(16, |own| own.map.tile);
-    let layers: Vec<Value> = GridDraft::own(&content, &bundle)
-        .map(|draft| draft.layer_names())
-        .unwrap_or_default()
+    let layers = GridDraft::of(&bundle, own.blueprint())
+        .layer_names()
         .into_iter()
-        .map(|layer| json!({ "type": "ground_layer", "name": layer }))
-        .collect();
-    let blueprint_scene: Vec<Value> = layers.into_iter().chain(shifted).collect();
-    let count = nodes::modules(&Value::Array(blueprint_scene.clone())).len();
-    let config = json!({
-        "map": {
-            "size": {
-                "width": (bounds.max().x - origin.x + 0.5).ceil().max(1.0) as u32,
-                "height": (bounds.max().y - origin.y + 0.5).ceil().max(1.0) as u32,
-            },
-            "tile": tile,
-        }
-    });
-    let placement = json!({
-        "type": "blueprint",
-        "label": label,
-        "blueprint": path,
-        "at": { "x": origin.x, "y": origin.y },
-    });
-    let mut changed = scene;
-    let Some(slot) = changed.pointer_mut(&first) else {
+        .map(|name| {
+            SceneNode::GroundLayer(GroundLayer {
+                name,
+                hidden: false,
+                locked: false,
+            })
+        });
+    let map = Tilemap {
+        size: MapSize {
+            width: (bounds.max().x - origin.x + 0.5).ceil().max(1.0) as u32,
+            height: (bounds.max().y - origin.y + 0.5).ceil().max(1.0) as u32,
+        },
+        tile: own.blueprint().map.tile,
+    };
+    let made = BlueprintDef {
+        variables: BTreeMap::new(),
+        scene: Scene {
+            nodes: layers.chain(shifted).collect(),
+            grids: SceneGrids::empty(&map),
+        },
+        map,
+    };
+    let count = nodes::modules(&made.scene.nodes).len();
+    let mut edit = ContentEdit::new(format!("Make blueprint {}", name_of(&path)));
+    if let Err(error) = edit.write_content(project, &path, &made) {
+        editor.toast(error);
+        return;
+    }
+    let after = project.reader_after(&edit);
+    let Some(written) = after.id_of::<BlueprintDef>(&path).and_then(|made| {
+        let mut changed = own.blueprint().clone();
+        changed.variables = rescoped(&changed.variables, reader.scope(), after.scope()).ok()?;
+        changed.scene.nodes = nodes::CopiedNodes::of(&reader, &changed.scene.nodes)?
+            .read(&after, &changed.variables)
+            .ok()?;
+        *nodes::node_mut(&mut changed.scene.nodes, &first)? = SceneNode::Module(ModuleNode {
+            label: Some(label.clone()),
+            ..ModuleNode::new(AreaModule::Blueprint(Placement {
+                blueprint: made,
+                at: origin,
+                flip: Default::default(),
+                values: BTreeMap::new(),
+            }))
+        });
+        nodes::SceneTree::new(&mut changed.scene.nodes).remove(&selected[1..]);
+        Some(changed)
+    }) else {
+        editor.toast("The new blueprint doesn't read where it was made");
         return;
     };
-    *slot = placement;
-    nodes::remove(&mut changed, &selected[1..]);
-    let mut edit = ContentEdit::new(format!("Make blueprint {}", name_of(&path)));
-    edit.write_json(format!("{path}/{CONFIG_FILE}"), &config);
-    nodes::write_scene(&mut edit, &path, &Value::Array(blueprint_scene));
-    nodes::write_scene(&mut edit, &bundle, &changed);
-    if let Err(error) = editor.try_apply(edit) {
+    let wrote = match own {
+        nodes::SceneBundle::Area(area) => {
+            let mut area = (*area).clone();
+            area.blueprint = written;
+            edit.write_content_in(&after, &bundle, &area).map(|_| ())
+        }
+        nodes::SceneBundle::Blueprint(_) => {
+            edit.write_content_in(&after, &bundle, &written).map(|_| ())
+        }
+    };
+    if let Err(error) = wrote.and_then(|()| editor.try_apply(edit)) {
         editor.toast(error);
         return;
     }
@@ -113,7 +146,7 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
 
 /// The nodes of `bundle` selected, ground layers aside, in tree order and without any held by
 /// another selected folder.
-fn selected_nodes(editor: &Editor, bundle: &str, scene: &Value) -> Vec<String> {
+fn selected_nodes(editor: &Editor, bundle: &str, scene: &[SceneNode]) -> Vec<String> {
     let selected = super::selected_parts(editor, bundle);
     let mut found: Vec<String> = Vec::new();
     nodes::walk(scene, &mut |pointer, node| {
@@ -127,35 +160,41 @@ fn selected_nodes(editor: &Editor, bundle: &str, scene: &Value) -> Vec<String> {
     found
 }
 
-/// What the modules among `nodes` cover on the map, through their folders, a placement by what
-/// its blueprint holds.
-pub(super) fn covered(content: &Content, nodes: &[Value]) -> Option<Rect<Tiles>> {
-    nodes::modules(&Value::Array(nodes.to_vec()))
+/// What the modules among `nodes`, read among `reader`'s paths, cover on the map, through their
+/// folders, a placement by what its blueprint holds.
+pub(super) fn covered(
+    content: &Content,
+    reader: &FolderReader,
+    nodes: &[SceneNode],
+) -> Option<Rect<Tiles>> {
+    nodes::modules(nodes)
         .iter()
-        .filter_map(|module| match module.json.module_kind() {
-            Some(AreaModuleKind::Blueprint) => {
-                placement::nested_bounds(content, module.json.text("blueprint"), &module.json)
+        .filter_map(|module| match module.module() {
+            AreaModule::Blueprint(placement) => {
+                placement::nested_bounds(content, reader, placement)
             }
-            _ => shapes::bounds(&module.json, None),
+            module => shapes::bounds(module, None),
         })
         .reduce(|a, b| a.union(&b))
 }
 
-pub(super) fn shift_tree(node: &mut Value, dx: f32, dy: f32) {
-    if nodes::is_folder(node) {
-        for child in node["children"].as_array_mut().into_iter().flatten() {
-            shift_tree(child, dx, dy);
+pub fn shift_tree(node: &mut SceneNode, dx: f32, dy: f32) {
+    match node {
+        SceneNode::Folder(folder) => {
+            for child in &mut folder.children {
+                shift_tree(child, dx, dy);
+            }
         }
-    } else if nodes::is_module(node) {
-        shapes::shift(node, dx, dy);
+        SceneNode::Module(module) => shapes::shift(&mut module.module, dx, dy),
+        SceneNode::GroundLayer(_) => {}
     }
 }
 
-/// Where the modules of `modules` start on the map: the top-left of what they cover.
-pub fn selection_origin(modules: &[Value]) -> Option<Pos<Tiles>> {
-    modules
+/// Where the modules among `nodes` start on the map: the top-left of what they cover.
+pub fn selection_origin(nodes: &[SceneNode]) -> Option<Pos<Tiles>> {
+    super::nodes::modules(nodes)
         .iter()
-        .filter_map(|m| shapes::bounds(m, None))
+        .filter_map(|module| shapes::bounds(module.module(), None))
         .reduce(|a, b| a.union(&b))
         .map(|r| r.min())
 }

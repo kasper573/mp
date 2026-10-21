@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
+use std::any::TypeId;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{LazyLock, Mutex, OnceLock, PoisonError};
 
-use engine::core::assets::AudioRef;
+use engine::core::assets::{AssetKind, AudioRef};
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
 use engine::core::content::locate;
@@ -9,6 +11,8 @@ use engine::systems::area::AreaModule;
 use engine::systems::registry;
 use engine::systems::script::Place;
 use serde_json::{Map, Value, json};
+
+use crate::project::ProjectFiles;
 
 pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,
@@ -443,7 +447,51 @@ pub fn maximum(schema: &Value) -> Option<f64> {
     schema.get("maximum").and_then(Value::as_f64)
 }
 
-pub fn template(root: &Value, schema: &Value) -> Value {
+/// Where a fresh value is written, so a template names content and media that is there: the file
+/// it goes in, and the files of the game around it.
+#[derive(Clone, Copy)]
+pub struct Nearby<'a> {
+    pub files: &'a ProjectFiles,
+    /// The file the value is written into, when it is known yet.
+    pub from: Option<&'a str>,
+}
+
+impl<'a> Nearby<'a> {
+    /// Values made for no game, naming nothing: what a catalogue of every kind of value reads.
+    pub fn nowhere() -> Nearby<'static> {
+        static NONE: LazyLock<ProjectFiles> = LazyLock::new(ProjectFiles::default);
+        Nearby {
+            files: &NONE,
+            from: None,
+        }
+    }
+
+    /// The file of `table` nearest the file written into, by how far up their paths meet.
+    pub fn content(&self, table: &str) -> Option<String> {
+        self.nearest(self.files.index().paths_of(table))
+    }
+
+    /// The media file of `kind` nearest the file written into.
+    pub fn media(&self, kind: AssetKind) -> Option<String> {
+        let index = self.files.index();
+        let of_kind = index
+            .media
+            .iter()
+            .map(String::as_str)
+            .filter(|path| AssetKind::of(path) == Some(kind));
+        self.nearest(of_kind)
+    }
+
+    fn nearest<'p>(&self, paths: impl Iterator<Item = &'p str>) -> Option<String> {
+        paths
+            .min_by_key(|path| (crate::forms::seen_from(self.from, path).0, *path))
+            .map(str::to_owned)
+    }
+}
+
+/// A fresh value of `schema`: its default, or the least value of its shape, naming the content and
+/// media nearest where it is written wherever it names some.
+pub fn template(root: &Value, schema: &Value, nearby: Nearby) -> Value {
     if let Some(default) = schema.get("default") {
         return default.clone();
     }
@@ -453,7 +501,7 @@ pub fn template(root: &Value, schema: &Value) -> Value {
         SchemaKind::Enum(values) => Value::String(values.first().cloned().unwrap_or_default()),
         SchemaKind::Union(variants) => variants
             .first()
-            .map(|variant| variant_template(root, variant))
+            .map(|variant| variant_template(root, variant, nearby))
             .unwrap_or(Value::Null),
         SchemaKind::Choice(alternatives) => alternatives
             .iter()
@@ -465,24 +513,24 @@ pub fn template(root: &Value, schema: &Value) -> Value {
                     .iter()
                     .find(|alternative| !type_names(alternative).contains(&"null"))
             })
-            .map(|alternative| template(root, alternative))
+            .map(|alternative| template(root, alternative, nearby))
             .unwrap_or(Value::Null),
         SchemaKind::Object => {
             let required = required(schema);
             let mut object = Map::new();
             for (name, field) in properties(schema) {
                 if required.contains(&name.as_str()) {
-                    object.insert(name.clone(), template(root, field));
+                    object.insert(name.clone(), template(root, field, nearby));
                 }
             }
             Value::Object(object)
         }
         SchemaKind::Array(items) => {
             let least = schema["minItems"].as_u64().unwrap_or(0);
-            Value::Array((0..least).map(|_| template(root, items)).collect())
+            Value::Array((0..least).map(|_| template(root, items, nearby)).collect())
         }
         SchemaKind::Map(_) => Value::Object(Map::new()),
-        SchemaKind::Text => Value::String(String::new()),
+        SchemaKind::Text => Value::String(named(schema, nearby).unwrap_or_default()),
         SchemaKind::Integer => Value::from(minimum(schema).unwrap_or(0.0) as i64),
         SchemaKind::Number => Value::from(minimum(schema).unwrap_or(0.0)),
         SchemaKind::Boolean => Value::Bool(false),
@@ -490,12 +538,21 @@ pub fn template(root: &Value, schema: &Value) -> Value {
     }
 }
 
-pub fn variant_template(root: &Value, variant: &SchemaVariant) -> Value {
-    let mut value = template(root, variant.schema);
+pub fn variant_template(root: &Value, variant: &SchemaVariant, nearby: Nearby) -> Value {
+    let mut value = template(root, variant.schema, nearby);
     if let Some(object) = value.as_object_mut() {
         object.insert(variant.field.clone(), Value::String(variant.tag.clone()));
     }
     value
+}
+
+/// The content or media file nearest where a text of `schema` is written, when it names one.
+fn named(schema: &Value, nearby: Nearby) -> Option<String> {
+    if let Some(table) = table_of(schema) {
+        return nearby.content(table);
+    }
+    let kind = schema.get("x-asset").and_then(Value::as_str)?;
+    nearby.media(kind.parse().ok()?)
 }
 
 pub fn variant_of<'a>(
@@ -597,10 +654,105 @@ fn number_paths_in(
     }
 }
 
+/// The schema of `T` as the game reads it, made once per type.
+pub fn of_type<T: schemars::JsonSchema + 'static>() -> &'static Value {
+    static MADE: OnceLock<Mutex<HashMap<TypeId, &'static Value>>> = OnceLock::new();
+    let mut made = MADE
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    made.entry(TypeId::of::<T>())
+        .or_insert_with(|| Box::leak(Box::new(schema_of::<T>())))
+}
+
 fn schema_of<T: schemars::JsonSchema>() -> Value {
     let schema = schemars::generate::SchemaSettings::draft2020_12()
         .with(|settings| settings.inline_subschemas = true)
         .into_generator()
         .into_root_schema_for::<T>();
     serde_json::to_value(schema).expect("a schema is json")
+}
+
+/// A field of a value a blueprint can leave to a variable: where it is in the value, the type of
+/// variable that fills it, and the table it names when it names a file.
+pub struct HoleableField {
+    pub pointer: String,
+    pub kind: VariableType,
+    pub table: Option<String>,
+}
+
+/// Every field of `value`, a value of the type whose schema is `root`, a variable could fill.
+pub fn holeable_fields(root: &Value, value: &Value) -> Vec<HoleableField> {
+    let mut out = Vec::new();
+    collect_holeable(root, root, value, "", &mut out);
+    out
+}
+
+fn collect_holeable(
+    root: &Value,
+    schema: &Value,
+    value: &Value,
+    pointer: &str,
+    out: &mut Vec<HoleableField>,
+) {
+    let schema = resolve(root, schema);
+    let kind = match marker(schema) {
+        Some("x-name") => Some(VariableType::Name),
+        Some("x-condition") => Some(VariableType::Condition),
+        Some("x-place") => Some(VariableType::Place),
+        Some("x-table") => Some(VariableType::Row),
+        Some("x-asset") => (schema["x-asset"] == "audio").then_some(VariableType::Audio),
+        Some(_) => return,
+        None => match kind(root, schema) {
+            SchemaKind::Text => Some(VariableType::Text),
+            SchemaKind::Integer => Some(VariableType::Integer),
+            SchemaKind::Number => Some(VariableType::Number),
+            SchemaKind::Boolean => Some(VariableType::Boolean),
+            SchemaKind::Choice(_) | SchemaKind::Any => Some(value_kind(value)),
+            SchemaKind::Object => {
+                for (name, field) in properties(schema) {
+                    if let Some(child) = value.get(name) {
+                        let at = format!("{pointer}/{}", locate::escape(name));
+                        collect_holeable(root, field, child, &at, out);
+                    }
+                }
+                return;
+            }
+            SchemaKind::Array(items) => {
+                for (index, child) in value.as_array().into_iter().flatten().enumerate() {
+                    collect_holeable(root, items, child, &format!("{pointer}/{index}"), out);
+                }
+                return;
+            }
+            SchemaKind::Map(values) => {
+                for (name, child) in value.as_object().into_iter().flatten() {
+                    let at = format!("{pointer}/{}", locate::escape(name));
+                    collect_holeable(root, values, child, &at, out);
+                }
+                return;
+            }
+            _ => None,
+        },
+    };
+    if let Some(kind) = kind
+        && !pointer.is_empty()
+    {
+        out.push(HoleableField {
+            pointer: pointer.to_owned(),
+            kind,
+            table: table_of(schema).map(str::to_owned),
+        });
+    }
+}
+
+/// The type of variable a value of no one schema reads as, by what it holds now.
+fn value_kind(value: &Value) -> VariableType {
+    match value {
+        Value::Number(n) if n.is_i64() => VariableType::Integer,
+        Value::Number(_) => VariableType::Number,
+        Value::Bool(_) => VariableType::Boolean,
+        Value::Object(o) if o.contains_key("area") => VariableType::Place,
+        Value::Object(_) => VariableType::Condition,
+        _ => VariableType::Text,
+    }
 }

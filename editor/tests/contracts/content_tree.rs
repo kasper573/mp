@@ -392,3 +392,83 @@ fn a_folder_moved_on_disk_is_followed_file_by_file_and_said_to_be_a_folder() {
     files(&mut editor);
     assert!(editor.project.as_ref().expect("a project").loads());
 }
+
+#[test]
+fn a_click_anywhere_on_a_folder_row_opens_or_closes_it_once() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(camp(), &scratch);
+    let ctx = egui::Context::default();
+    editor::ui::theme::apply(&ctx);
+    let mut clock = 0.0;
+    let name = drawn_text(&frame(&ctx, &mut editor, &mut clock, Vec::new()), "icons")
+        .expect("the icons folder is drawn");
+
+    for x in (1..ROW_END as u32 / 2).map(|step| step as f32 * 2.0) {
+        let was_open = view(&mut editor).open.contains("icons");
+        let at = egui::pos2(x, name.center().y);
+        frame(
+            &ctx,
+            &mut editor,
+            &mut clock,
+            vec![egui::Event::PointerMoved(at)],
+        );
+        frame(&ctx, &mut editor, &mut clock, vec![press(at, true)]);
+        frame(&ctx, &mut editor, &mut clock, vec![press(at, false)]);
+        assert_ne!(
+            view(&mut editor).open.contains("icons"),
+            was_open,
+            "a click at x {x} toggles the folder once"
+        );
+    }
+}
+
+const TREE_WIDTH: f32 = 320.0;
+/// Where the panel's margin starts, past the right end of every row.
+const ROW_END: f32 = TREE_WIDTH - 8.0;
+
+fn frame(
+    ctx: &egui::Context,
+    editor: &mut Editor,
+    clock: &mut f64,
+    events: Vec<egui::Event>,
+) -> egui::FullOutput {
+    *clock += 0.05;
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(TREE_WIDTH, 600.0),
+        )),
+        time: Some(*clock),
+        events,
+        ..Default::default()
+    };
+    let mut output = ctx.run_ui(input, |ui| content_tree::show(editor, ui));
+    output.textures_delta.clear();
+    output
+}
+
+fn press(at: egui::Pos2, pressed: bool) -> egui::Event {
+    egui::Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    }
+}
+
+/// Where `text` was drawn in the frame.
+fn drawn_text(output: &egui::FullOutput, text: &str) -> Option<egui::Rect> {
+    fn find(shape: &egui::Shape, text: &str) -> Option<egui::Rect> {
+        match shape {
+            egui::Shape::Text(shape) if shape.galley.text() == text => {
+                Some(egui::Rect::from_min_size(shape.pos, shape.galley.size()))
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| find(shape, text)),
+            _ => None,
+        }
+    }
+    output
+        .shapes
+        .iter()
+        .find_map(|clipped| find(&clipped.shape, text))
+}

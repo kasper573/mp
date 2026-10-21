@@ -15,6 +15,7 @@ use strum::VariantArray;
 use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
 use crate::{picker, rows, thumbs};
@@ -582,7 +583,10 @@ fn canvas(
         *changed = Some("Remove node");
         select_node(editor, key, None);
     }
-    editor.status.left.push(format!("class {key} › tree"));
+    editor
+        .status
+        .left
+        .push(format!("{} › tree", shown_path(key)));
     editor.status.left.push(
         "click a node to inspect it · drag to move · right-click or Delete removes it".to_owned(),
     );

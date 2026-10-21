@@ -21,6 +21,7 @@ use super::{
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::tabs::shown_path;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::area::scene;
 use crate::views::navigation::{self, Viewport};
@@ -376,20 +377,12 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
     if drawing.layers.givers {
         for giver in atlas.givers(card.area) {
             let at = giver.at.map_or(card.art.center(), on_art);
-            painter.circle(at, 5.0, theme::WARN, Stroke::new(1.0, Color32::BLACK));
-            painter.text(
-                at,
-                Align2::CENTER_CENTER,
-                "!",
-                FontId::proportional(9.0),
-                Color32::BLACK,
-            );
+            glyph::alert(painter, at, 6.0);
         }
     }
     if drawing.shown.cards[&card.area].pinned {
-        glyph::paint(
+        Mark::Pin.paint(
             painter,
-            Mark::Pin,
             Rect::from_min_size(
                 card.art.right_top() + Vec2::new(-14.0, 2.0),
                 Vec2::splat(11.0),
@@ -1312,7 +1305,7 @@ fn tile_facts(map: &OpenWorldMap, hit: &MapTileHit) -> String {
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map_or_else(
             || "no npc placed".to_owned(),
-            |(npc, tiles)| format!("npc {npc} {} tiles away", tiles.round()),
+            |(npc, tiles)| format!("{} {} tiles away", shown_path(npc), tiles.round()),
         );
     let nearest_door = info
         .doors

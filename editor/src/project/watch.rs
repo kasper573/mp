@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
-use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
+use notify::event::{AccessKind, AccessMode, ModifyKind};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
 
 use super::files;
 use crate::app::ChannelInbox;
@@ -50,12 +51,9 @@ impl FolderWatcher {
     pub fn poll(&mut self) -> Option<FolderChange> {
         for event in self.events.drain() {
             match event {
-                Ok(event) => {
-                    if event.need_rescan() {
-                        self.lost = true;
-                    }
-                    self.pending.extend(event.paths);
-                }
+                Ok(event) if event.need_rescan() => self.lost = true,
+                Ok(event) if !changes_content(&event.kind) => continue,
+                Ok(event) => self.pending.extend(event.paths),
                 Err(_) => self.lost = true,
             }
             self.quiet_since = Some(Instant::now());
@@ -78,6 +76,16 @@ impl FolderWatcher {
         paths.sort();
         paths.dedup();
         (!paths.is_empty()).then_some(FolderChange::Files(paths))
+    }
+}
+
+/// Whether an event can change what a file holds or where it is. Opening and reading a file is
+/// no change, and must not count as one: taking a change in reads the files it names.
+fn changes_content(kind: &EventKind) -> bool {
+    match kind {
+        EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,
+        EventKind::Access(_) | EventKind::Modify(ModifyKind::Metadata(_)) => false,
+        _ => true,
     }
 }
 

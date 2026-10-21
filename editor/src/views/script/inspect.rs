@@ -4,7 +4,6 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::content::{ContentFile, fields_file};
 use engine::core::script::{NodeKind, RunnerKindDef};
-use engine::systems::area::blueprint::holes;
 use engine::systems::memory::MemoryDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{RiftEffectKind, ScriptDef};
@@ -18,6 +17,7 @@ use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection, catalogue_of};
+use crate::tabs::shown_path;
 use crate::ui::browser::{self, RowMenu};
 use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::value::RowValue;
@@ -109,7 +109,7 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &key, what, |ui| {
+                widgets::card_header(ui, shown_path(&key), what, |ui| {
                     let menu = RowMenu::of(&key);
                     picked = browser::row_menu(ui, &menu, false);
                 });
@@ -150,7 +150,7 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         act(editor, action, doc);
     }
     if changed.is_some() {
-        write(editor, doc, script, format!("Edit script/{key}"));
+        write(editor, doc, script, format!("Edit {}", shown_path(&key)));
     }
     if let Some(action) = picked {
         browser::act(editor, ScriptDef::TABLE, &key, action);
@@ -206,7 +206,7 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             .unwrap_or_default();
         let response = ui
             .horizontal(|ui| {
-                glyph::show(ui, Mark::ChevronRight, 12.0, theme::FAINT);
+                glyph::show(ui, Mark::CaretRight, 12.0, theme::FAINT);
                 ui.label(theme::strong(&event).monospace().size(13.0));
                 ui.label(
                     theme::muted(detail.replace(" tiles", ""))
@@ -278,7 +278,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .iter()
                 .filter(|(_, node)| {
                     let mut names = Vec::new();
-                    holes(node, &mut names);
+                    super::nodes::vars_in(node, &mut names);
                     names.contains(name)
                 })
                 .map(|(node_name, _)| node_name.clone())
@@ -373,13 +373,14 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             editor,
             doc,
             script,
-            format!("Edit the variables of script/{key}"),
+            format!("Edit the variables of {}", shown_path(&key)),
         );
     }
 }
 
 struct Caller {
-    row: String,
+    table: String,
+    key: String,
     node: String,
 }
 
@@ -396,19 +397,24 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             let (table, row_key) = content_of(&usage.file)?;
             let at = ScriptRef::parse(&usage.pointer);
             Some(Caller {
-                row: format!("{table}/{row_key}"),
+                table: table.to_owned(),
+                key: row_key.to_owned(),
                 node: at.node?,
             })
         })
         .collect();
     if !callers.is_empty() {
         widgets::section_count(ui, "Run by", callers.len());
-        let mut open: Option<String> = None;
+        let mut open: Option<&Caller> = None;
         for caller in &callers {
             let response = ui
                 .horizontal(|ui| {
                     widgets::badge(ui, "script");
-                    ui.label(theme::strong(&caller.row).monospace().size(13.0));
+                    ui.label(
+                        theme::strong(shown_path(&caller.key))
+                            .monospace()
+                            .size(13.0),
+                    );
                     ui.label(
                         theme::muted(format!("from run · {}", caller.node))
                             .monospace()
@@ -421,11 +427,11 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .clicked()
             {
-                open = Some(caller.row.clone());
+                open = Some(caller);
             }
         }
-        if let Some((table, row_key)) = open.as_deref().and_then(|row| row.split_once('/')) {
-            editor.open_row(table, row_key);
+        if let Some(caller) = open {
+            editor.open_row(&caller.table, &caller.key);
         }
     }
     let speakers: BTreeSet<String> = doc
@@ -440,10 +446,10 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         for npc in &speakers {
             ui.horizontal(|ui| {
                 widgets::badge(ui, "npc");
-                ui.label(theme::strong(format!("npc/{npc}")).monospace().size(13.0));
+                ui.label(theme::strong(shown_path(npc)).monospace().size(13.0));
                 let through = callers
                     .iter()
-                    .any(|caller| caller.row == format!("npc/{npc}"));
+                    .any(|caller| caller.table == NpcDef::TABLE && caller.key == *npc);
                 ui.label(
                     theme::muted(if through {
                         "through its script"
@@ -460,38 +466,9 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 
 fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     ui.add_space(8.0);
-    let outline = editor
-        .views
-        .script
-        .view(&doc.at)
-        .is_some_and(|view| view.outline);
-    let mut fire = false;
-    let mut toggle_outline = false;
-    ui.horizontal(|ui| {
-        if widgets::keyed_button(ui, "▶ Run", Some(EditorKey::RunScript), true).clicked() {
-            fire = true;
-        }
-        if widgets::keyed_button(
-            ui,
-            if outline { "Canvas" } else { "Outline" },
-            Some(EditorKey::Outline),
-            true,
-        )
-        .clicked()
-        {
-            toggle_outline = true;
-        }
-    });
-    if fire {
+    if widgets::keyed_button(ui, "Run", Some(EditorKey::RunScript), true).clicked() {
         editor.panels.bottom = BottomTab::Run;
         editor.views.script.fire(&doc.at);
-    }
-    if toggle_outline {
-        editor
-            .views
-            .script
-            .view_mut(&doc.at, &editor.user, editor.project.as_ref())
-            .toggle_outline();
     }
 }
 
@@ -741,7 +718,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &format!("memory/{memory}"), "row", |ui| {
+                widgets::card_header(ui, shown_path(memory), "row", |ui| {
                     if ui.button("Open the row").clicked() {
                         cx.actions.push(FormAction::OpenRow {
                             table: MemoryDef::TABLE.to_owned(),
@@ -868,7 +845,7 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
             });
     });
     if picked != current
-        && let Some(fresh) = nodes::template_event(root, &picked)
+        && let Some(fresh) = nodes::template_event(root, &picked, cx.nearby())
     {
         let next = node.get("next").cloned();
         *node = fresh;
@@ -1049,34 +1026,34 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) 
     let mut go: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        ui.horizontal(|ui| {
-            let id = ui.id().with(choice_path).with("label");
-            let edit = spans::line(
-                ui,
-                &choice["label"],
-                id,
-                egui::FontId::new(13.5, theme::medium()),
-                "the choice",
-            );
-            if let Some(spans) = edit.spans {
-                choice["label"] = spans;
-                changed = FormChange::at(choice_path);
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.menu_button(theme::faint("…"), |ui| {
-                    if index > 0 && ui.button("Move up").clicked() {
-                        menu.swap = Some((index, index - 1));
-                        ui.close();
-                    }
-                    if index + 1 < count && ui.button("Move down").clicked() {
-                        menu.swap = Some((index, index + 1));
-                        ui.close();
-                    }
-                    if ui.button("Remove the choice").clicked() {
-                        menu.remove = Some(index);
-                        ui.close();
-                    }
-                });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
+                if index > 0 && ui.button("Move up").clicked() {
+                    menu.swap = Some((index, index - 1));
+                    ui.close();
+                }
+                if index + 1 < count && ui.button("Move down").clicked() {
+                    menu.swap = Some((index, index + 1));
+                    ui.close();
+                }
+                if ui.button("Remove the choice").clicked() {
+                    menu.remove = Some(index);
+                    ui.close();
+                }
+            });
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                let id = ui.id().with(choice_path).with("label");
+                let edit = spans::line(
+                    ui,
+                    &choice["label"],
+                    id,
+                    egui::FontId::new(13.5, theme::medium()),
+                    "the choice",
+                );
+                if let Some(spans) = edit.spans {
+                    choice["label"] = spans;
+                    changed = FormChange::at(choice_path);
+                }
             });
         });
         widgets::kv(ui, "condition", |ui| match choice.get("requires") {

@@ -1,8 +1,11 @@
 use egui::{
-    Align2, Color32, ColorImage, FontId, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
-    TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo, WidgetType,
+    Align2, Color32, ColorImage, FontFamily, FontId, Id, Painter, Pos2, Rect, Response, RichText,
+    Sense, Shape, Stroke, TextureHandle, TextureId, TextureOptions, Ui, Vec2, WidgetInfo,
+    WidgetType,
 };
 use strum::VariantArray;
+
+pub use egui_phosphor::regular as phosphor;
 
 use crate::face::TextRole;
 use crate::ink;
@@ -76,17 +79,17 @@ impl Kind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray)]
 pub enum Mark {
-    Tick,
+    Check,
     Cross,
     Flag,
-    Padlock,
-    PadlockOpen,
-    ChevronUp,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
+    Lock,
+    Unlock,
+    CaretUp,
+    CaretDown,
+    CaretLeft,
+    CaretRight,
     Warning,
     Play,
     Pause,
@@ -95,46 +98,47 @@ pub enum Mark {
     Dot,
     Plus,
     Minus,
-    Glass,
-    Note,
+    Search,
+    Music,
     Reload,
     Undo,
     Pin,
     Eye,
-    EyeClosed,
+    EyeSlash,
     Folder,
     FolderOpen,
-    Gear,
+    Settings,
     Bell,
     Speaker,
     Mute,
-    Fork,
-    Spark,
-    Asterisk,
+    Duplicate,
+    Paint,
+    Edit,
     Move,
-    Page,
+    File,
     Copy,
-    Target,
+    Crosshair,
     Grid,
+    List,
     Tag,
-    Ellipsis,
+    More,
     Shift,
     Arrow,
-    Bump,
+    Raise,
 }
 
 impl Mark {
     pub fn word(self) -> &'static str {
         match self {
-            Mark::Tick => "yes",
+            Mark::Check => "yes",
             Mark::Cross => "no",
             Mark::Flag => "flag",
-            Mark::Padlock => "locked",
-            Mark::PadlockOpen => "unlocked",
-            Mark::ChevronUp => "up",
-            Mark::ChevronDown => "down",
-            Mark::ChevronLeft => "left",
-            Mark::ChevronRight => "right",
+            Mark::Lock => "locked",
+            Mark::Unlock => "unlocked",
+            Mark::CaretUp => "up",
+            Mark::CaretDown => "down",
+            Mark::CaretLeft => "left",
+            Mark::CaretRight => "right",
             Mark::Warning => "warning",
             Mark::Play => "play",
             Mark::Pause => "pause",
@@ -143,361 +147,162 @@ impl Mark {
             Mark::Dot => "dot",
             Mark::Plus => "add",
             Mark::Minus => "remove",
-            Mark::Glass => "search",
-            Mark::Note => "sound",
+            Mark::Search => "search",
+            Mark::Music => "sound",
             Mark::Reload => "reload",
             Mark::Undo => "undo",
             Mark::Pin => "pin",
             Mark::Eye => "shown",
-            Mark::EyeClosed => "hidden",
+            Mark::EyeSlash => "hidden",
             Mark::Folder => "folder",
             Mark::FolderOpen => "open folder",
-            Mark::Gear => "settings",
+            Mark::Settings => "settings",
             Mark::Bell => "bell",
             Mark::Speaker => "sound on",
             Mark::Mute => "sound off",
-            Mark::Fork => "duplicate",
-            Mark::Spark => "paint",
-            Mark::Asterisk => "edit",
+            Mark::Duplicate => "duplicate",
+            Mark::Paint => "paint",
+            Mark::Edit => "edit",
             Mark::Move => "move",
-            Mark::Page => "page",
+            Mark::File => "page",
             Mark::Copy => "copy",
-            Mark::Target => "pick",
+            Mark::Crosshair => "pick",
             Mark::Grid => "tiles",
+            Mark::List => "list",
             Mark::Tag => "rename",
-            Mark::Ellipsis => "more",
+            Mark::More => "more",
             Mark::Shift => "Shift",
             Mark::Arrow => "arrow",
-            Mark::Bump => "above",
+            Mark::Raise => "above",
         }
     }
 }
 
-pub fn paint(painter: &Painter, mark: Mark, rect: Rect, color: Color32) {
-    let size = rect.width().min(rect.height());
-    let rect = Rect::from_center_size(rect.center(), Vec2::splat(size));
-    let c = rect.center();
-    let s = size;
-    let u = |x: f32, y: f32| Pos2::new(rect.min.x + x * s, rect.min.y + y * s);
-    let thin = Stroke::new((s / 9.0).max(1.0), color);
-    let line = |points: Vec<Pos2>| painter.add(Shape::line(points, thin));
-    match mark {
-        Mark::Tick => {
-            line(vec![u(0.12, 0.55), u(0.4, 0.82), u(0.9, 0.2)]);
+impl Mark {
+    pub fn paint(self, painter: &Painter, rect: Rect, color: Color32) {
+        self.icon().paint(painter, rect, color);
+    }
+
+    pub fn text(self, size: f32) -> RichText {
+        self.icon().text(size)
+    }
+
+    pub fn icon(self) -> Icon {
+        Icon::regular(match self {
+            Mark::Check => phosphor::CHECK,
+            Mark::Cross => phosphor::X,
+            Mark::Flag => phosphor::FLAG,
+            Mark::Lock => phosphor::LOCK,
+            Mark::Unlock => phosphor::LOCK_OPEN,
+            Mark::CaretUp => phosphor::CARET_UP,
+            Mark::CaretDown => phosphor::CARET_DOWN,
+            Mark::CaretLeft => phosphor::CARET_LEFT,
+            Mark::CaretRight => phosphor::CARET_RIGHT,
+            Mark::Warning => phosphor::WARNING,
+            Mark::Play => phosphor::PLAY,
+            Mark::Pause => phosphor::PAUSE,
+            Mark::Stop => phosphor::STOP,
+            Mark::Skip => phosphor::SKIP_FORWARD,
+            Mark::Dot => phosphor::DOT_OUTLINE,
+            Mark::Plus => phosphor::PLUS,
+            Mark::Minus => phosphor::MINUS,
+            Mark::Search => phosphor::MAGNIFYING_GLASS,
+            Mark::Music => phosphor::MUSIC_NOTE,
+            Mark::Reload => phosphor::ARROW_CLOCKWISE,
+            Mark::Undo => phosphor::ARROW_COUNTER_CLOCKWISE,
+            Mark::Pin => phosphor::PUSH_PIN,
+            Mark::Eye => phosphor::EYE,
+            Mark::EyeSlash => phosphor::EYE_SLASH,
+            Mark::Folder => phosphor::FOLDER,
+            Mark::FolderOpen => phosphor::FOLDER_OPEN,
+            Mark::Settings => phosphor::GEAR_SIX,
+            Mark::Bell => phosphor::BELL,
+            Mark::Speaker => phosphor::SPEAKER_HIGH,
+            Mark::Mute => phosphor::SPEAKER_X,
+            Mark::Duplicate => phosphor::COPY_SIMPLE,
+            Mark::Paint => phosphor::PAINT_BRUSH,
+            Mark::Edit => phosphor::PENCIL_SIMPLE,
+            Mark::Move => phosphor::ARROWS_OUT_CARDINAL,
+            Mark::File => phosphor::FILE,
+            Mark::Copy => phosphor::COPY,
+            Mark::Crosshair => phosphor::CROSSHAIR,
+            Mark::Grid => phosphor::GRID_FOUR,
+            Mark::List => phosphor::LIST,
+            Mark::Tag => phosphor::TAG,
+            Mark::More => phosphor::DOTS_THREE,
+            Mark::Shift => phosphor::ARROW_FAT_UP,
+            Mark::Arrow => phosphor::ARROW_RIGHT,
+            Mark::Raise => phosphor::ARROW_LINE_UP,
+        })
+    }
+}
+
+/// The weights the icon font comes in; every weight draws the same icons at the same codepoints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray)]
+pub enum Weight {
+    Regular,
+    Fill,
+}
+
+impl Weight {
+    pub fn family(self) -> FontFamily {
+        FontFamily::Name(self.key().into())
+    }
+
+    pub(crate) fn key(self) -> &'static str {
+        match self {
+            Weight::Regular => "phosphor",
+            Weight::Fill => "phosphor fill",
         }
-        Mark::Cross => {
-            painter.line_segment([u(0.18, 0.18), u(0.82, 0.82)], thin);
-            painter.line_segment([u(0.82, 0.18), u(0.18, 0.82)], thin);
+    }
+
+    pub(crate) fn font(self) -> &'static [u8] {
+        match self {
+            Weight::Regular => egui_phosphor::bytes::regular::FONT,
+            Weight::Fill => egui_phosphor::bytes::fill::FONT,
         }
-        Mark::Flag => {
-            painter.line_segment([u(0.2, 0.05), u(0.2, 0.98)], thin);
-            painter.add(Shape::convex_polygon(
-                vec![u(0.2, 0.08), u(0.9, 0.3), u(0.2, 0.55)],
-                color,
-                Stroke::NONE,
-            ));
+    }
+}
+
+/// One icon of the icon font, by its codepoint in [`phosphor`], in one of its weights.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Icon {
+    pub glyph: &'static str,
+    pub weight: Weight,
+}
+
+impl Icon {
+    pub const fn regular(glyph: &'static str) -> Icon {
+        Icon {
+            glyph,
+            weight: Weight::Regular,
         }
-        Mark::Padlock => padlock(painter, c, s * 0.8, color),
-        Mark::PadlockOpen => padlock_open(painter, c, s * 0.8, color),
-        Mark::ChevronUp => {
-            line(vec![u(0.2, 0.65), u(0.5, 0.33), u(0.8, 0.65)]);
+    }
+
+    pub const fn fill(glyph: &'static str) -> Icon {
+        Icon {
+            glyph,
+            weight: Weight::Fill,
         }
-        Mark::ChevronDown => {
-            line(vec![u(0.2, 0.35), u(0.5, 0.67), u(0.8, 0.35)]);
-        }
-        Mark::ChevronLeft => {
-            line(vec![u(0.65, 0.2), u(0.33, 0.5), u(0.65, 0.8)]);
-        }
-        Mark::ChevronRight => {
-            line(vec![u(0.35, 0.2), u(0.67, 0.5), u(0.35, 0.8)]);
-        }
-        Mark::Warning => {
-            painter.add(Shape::closed_line(
-                vec![u(0.5, 0.08), u(0.95, 0.9), u(0.05, 0.9)],
-                thin,
-            ));
-            painter.line_segment([u(0.5, 0.38), u(0.5, 0.62)], thin);
-            painter.circle_filled(u(0.5, 0.76), thin.width * 0.8, color);
-        }
-        Mark::Play => {
-            painter.add(Shape::convex_polygon(
-                vec![u(0.22, 0.1), u(0.9, 0.5), u(0.22, 0.9)],
-                color,
-                Stroke::NONE,
-            ));
-        }
-        Mark::Pause => {
-            painter.rect_filled(Rect::from_min_max(u(0.2, 0.12), u(0.42, 0.88)), 1.0, color);
-            painter.rect_filled(Rect::from_min_max(u(0.58, 0.12), u(0.8, 0.88)), 1.0, color);
-        }
-        Mark::Stop => {
-            painter.rect_filled(Rect::from_min_max(u(0.18, 0.18), u(0.82, 0.82)), 1.0, color);
-        }
-        Mark::Skip => {
-            painter.add(Shape::convex_polygon(
-                vec![u(0.1, 0.15), u(0.5, 0.5), u(0.1, 0.85)],
-                color,
-                Stroke::NONE,
-            ));
-            painter.add(Shape::convex_polygon(
-                vec![u(0.5, 0.15), u(0.9, 0.5), u(0.5, 0.85)],
-                color,
-                Stroke::NONE,
-            ));
-        }
-        Mark::Dot => {
-            painter.circle_filled(c, s * 0.22, color);
-        }
-        Mark::Plus => {
-            painter.line_segment([u(0.5, 0.15), u(0.5, 0.85)], thin);
-            painter.line_segment([u(0.15, 0.5), u(0.85, 0.5)], thin);
-        }
-        Mark::Minus => {
-            painter.line_segment([u(0.15, 0.5), u(0.85, 0.5)], thin);
-        }
-        Mark::Glass => {
-            painter.circle_stroke(u(0.42, 0.42), s * 0.28, thin);
-            painter.line_segment([u(0.63, 0.63), u(0.92, 0.92)], thin);
-        }
-        Mark::Note => {
-            painter.line_segment([u(0.62, 0.12), u(0.62, 0.72)], thin);
-            painter.line_segment([u(0.62, 0.12), u(0.85, 0.25)], thin);
-            painter.circle_filled(u(0.47, 0.75), s * 0.17, color);
-        }
-        Mark::Reload => {
-            arc(painter, c, s * 0.34, 0.3, 5.6, thin);
-            arrow_head(
-                painter,
-                u(0.78, 0.22),
-                Vec2::new(-0.3, 1.0),
-                s * 0.22,
-                color,
-            );
-        }
-        Mark::Undo => {
-            arc(painter, c, s * 0.34, 3.5, 8.8, thin);
-            arrow_head(painter, u(0.22, 0.22), Vec2::new(0.3, 1.0), s * 0.22, color);
-        }
-        Mark::Pin => {
-            painter.circle_stroke(u(0.5, 0.36), s * 0.24, thin);
-            painter.line_segment([u(0.5, 0.6), u(0.5, 0.95)], thin);
-        }
-        Mark::Eye => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.05, 0.5),
-                    u(0.3, 0.25),
-                    u(0.7, 0.25),
-                    u(0.95, 0.5),
-                    u(0.7, 0.75),
-                    u(0.3, 0.75),
-                ],
-                thin,
-            ));
-            painter.circle_filled(c, s * 0.14, color);
-        }
-        Mark::EyeClosed => {
-            line(vec![
-                u(0.05, 0.42),
-                u(0.3, 0.62),
-                u(0.7, 0.62),
-                u(0.95, 0.42),
-            ]);
-            for (from, to) in [
-                ((0.3, 0.62), (0.22, 0.8)),
-                ((0.5, 0.66), (0.5, 0.86)),
-                ((0.7, 0.62), (0.78, 0.8)),
-            ] {
-                painter.line_segment([u(from.0, from.1), u(to.0, to.1)], thin);
-            }
-        }
-        Mark::Folder => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.06, 0.2),
-                    u(0.4, 0.2),
-                    u(0.5, 0.32),
-                    u(0.94, 0.32),
-                    u(0.94, 0.84),
-                    u(0.06, 0.84),
-                ],
-                thin,
-            ));
-        }
-        Mark::FolderOpen => {
-            line(vec![
-                u(0.06, 0.84),
-                u(0.06, 0.2),
-                u(0.4, 0.2),
-                u(0.5, 0.32),
-                u(0.84, 0.32),
-                u(0.84, 0.46),
-            ]);
-            painter.add(Shape::closed_line(
-                vec![u(0.06, 0.84), u(0.22, 0.46), u(0.98, 0.46), u(0.84, 0.84)],
-                thin,
-            ));
-        }
-        Mark::Gear => {
-            for step in 0..8 {
-                let angle = step as f32 * std::f32::consts::TAU / 8.0;
-                let dir = Vec2::new(angle.cos(), angle.sin());
-                painter.line_segment([c + dir * s * 0.22, c + dir * s * 0.44], thin);
-            }
-            painter.circle_stroke(c, s * 0.22, thin);
-        }
-        Mark::Bell => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.15, 0.72),
-                    u(0.25, 0.6),
-                    u(0.28, 0.32),
-                    u(0.5, 0.12),
-                    u(0.72, 0.32),
-                    u(0.75, 0.6),
-                    u(0.85, 0.72),
-                ],
-                thin,
-            ));
-            painter.circle_filled(u(0.5, 0.86), thin.width, color);
-        }
-        Mark::Speaker | Mark::Mute => {
-            painter.add(Shape::convex_polygon(
-                vec![
-                    u(0.1, 0.38),
-                    u(0.3, 0.38),
-                    u(0.55, 0.15),
-                    u(0.55, 0.85),
-                    u(0.3, 0.62),
-                    u(0.1, 0.62),
-                ],
-                color,
-                Stroke::NONE,
-            ));
-            if mark == Mark::Speaker {
-                arc(painter, u(0.55, 0.5), s * 0.25, -0.9, 0.9, thin);
-            } else {
-                painter.line_segment([u(0.65, 0.35), u(0.92, 0.65)], thin);
-                painter.line_segment([u(0.92, 0.35), u(0.65, 0.65)], thin);
-            }
-        }
-        Mark::Fork => {
-            painter.line_segment([u(0.5, 0.1), u(0.5, 0.9)], thin);
-            line(vec![u(0.5, 0.5), u(0.82, 0.3), u(0.82, 0.12)]);
-            painter.circle_filled(u(0.5, 0.9), thin.width, color);
-        }
-        Mark::Spark => {
-            for step in 0..4 {
-                let angle = step as f32 * std::f32::consts::FRAC_PI_4;
-                let dir = Vec2::new(angle.cos(), angle.sin()) * s * 0.4;
-                painter.line_segment([c - dir, c + dir], thin);
-            }
-        }
-        Mark::Asterisk => {
-            for step in 0..3 {
-                let angle = step as f32 * std::f32::consts::FRAC_PI_3 + std::f32::consts::FRAC_PI_2;
-                let dir = Vec2::new(angle.cos(), angle.sin()) * s * 0.36;
-                painter.line_segment([c - dir, c + dir], thin);
-            }
-        }
-        Mark::Move => {
-            painter.line_segment([u(0.15, 0.85), u(0.8, 0.2)], thin);
-            arrow_head(
-                painter,
-                u(0.85, 0.15),
-                Vec2::new(1.0, -1.0),
-                s * 0.26,
-                color,
-            );
-        }
-        Mark::Page => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.22, 0.08),
-                    u(0.62, 0.08),
-                    u(0.78, 0.26),
-                    u(0.78, 0.92),
-                    u(0.22, 0.92),
-                ],
-                thin,
-            ));
-            painter.line_segment([u(0.62, 0.08), u(0.62, 0.26)], thin);
-            painter.line_segment([u(0.62, 0.26), u(0.78, 0.26)], thin);
-        }
-        Mark::Copy => {
-            painter.rect_stroke(
-                Rect::from_min_max(u(0.12, 0.12), u(0.64, 0.64)),
-                1.0,
-                thin,
-                egui::StrokeKind::Middle,
-            );
-            painter.rect_stroke(
-                Rect::from_min_max(u(0.36, 0.36), u(0.88, 0.88)),
-                1.0,
-                thin,
-                egui::StrokeKind::Middle,
-            );
-        }
-        Mark::Target => {
-            painter.circle_stroke(c, s * 0.3, thin);
-            painter.line_segment([u(0.5, 0.05), u(0.5, 0.32)], thin);
-            painter.line_segment([u(0.5, 0.68), u(0.5, 0.95)], thin);
-            painter.line_segment([u(0.05, 0.5), u(0.32, 0.5)], thin);
-            painter.line_segment([u(0.68, 0.5), u(0.95, 0.5)], thin);
-        }
-        Mark::Grid => {
-            painter.rect_stroke(
-                Rect::from_min_max(u(0.12, 0.12), u(0.88, 0.88)),
-                0.0,
-                thin,
-                egui::StrokeKind::Middle,
-            );
-            painter.line_segment([u(0.5, 0.12), u(0.5, 0.88)], thin);
-            painter.line_segment([u(0.12, 0.5), u(0.88, 0.5)], thin);
-        }
-        Mark::Tag => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.1, 0.3),
-                    u(0.6, 0.3),
-                    u(0.92, 0.5),
-                    u(0.6, 0.7),
-                    u(0.1, 0.7),
-                ],
-                thin,
-            ));
-            painter.circle_filled(u(0.25, 0.5), thin.width * 0.8, color);
-        }
-        Mark::Ellipsis => {
-            for x in [0.2, 0.5, 0.8] {
-                painter.circle_filled(u(x, 0.5), s * 0.09, color);
-            }
-        }
-        Mark::Shift => {
-            painter.add(Shape::closed_line(
-                vec![
-                    u(0.5, 0.08),
-                    u(0.92, 0.5),
-                    u(0.68, 0.5),
-                    u(0.68, 0.9),
-                    u(0.32, 0.9),
-                    u(0.32, 0.5),
-                    u(0.08, 0.5),
-                ],
-                thin,
-            ));
-        }
-        Mark::Arrow => {
-            painter.line_segment([u(0.1, 0.5), u(0.75, 0.5)], thin);
-            arrow_head(painter, u(0.92, 0.5), Vec2::new(1.0, 0.0), s * 0.3, color);
-        }
-        Mark::Bump => {
-            painter.add(Shape::convex_polygon(
-                vec![u(0.5, 0.15), u(0.9, 0.85), u(0.1, 0.85)],
-                color,
-                Stroke::NONE,
-            ));
-        }
+    }
+
+    /// The icon as text `size` tall, for a widget that shows text.
+    pub fn text(self, size: f32) -> RichText {
+        RichText::new(self.glyph)
+            .family(self.weight.family())
+            .size(size)
+    }
+
+    /// Draws the icon as large as fits in `rect`, centred on it.
+    pub fn paint(self, painter: &Painter, rect: Rect, color: Color32) {
+        let size = rect.width().min(rect.height());
+        painter.text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            self.glyph,
+            FontId::new(size, self.weight.family()),
+            color,
+        );
     }
 }
 
@@ -505,7 +310,7 @@ pub fn show(ui: &mut Ui, mark: Mark, size: f32, color: Color32) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, mark.word()));
     if ui.is_rect_visible(rect) {
-        paint(ui.painter(), mark, rect, color);
+        mark.paint(ui.painter(), rect, color);
     }
     response
 }
@@ -518,12 +323,22 @@ pub fn button(ui: &mut Ui, mark: Mark, size: f32, color: Color32, label: &str) -
             ui.painter().rect_filled(rect, 3.0, ink::ink_wash(0.1));
         }
         let color = if ui.is_enabled() { color } else { ink::INK3 };
-        paint(ui.painter(), mark, rect.shrink(size * 0.15), color);
+        mark.paint(ui.painter(), rect.shrink(size * 0.15), color);
         if response.has_focus() {
             crate::controls::focus_ring(ui.painter(), rect, 3.0);
         }
     }
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// A bright disc with an exclamation mark on it, `radius` across from `at`, for what needs a look.
+pub fn alert(painter: &Painter, at: Pos2, radius: f32) {
+    painter.circle(at, radius, ink::GOLD2, Stroke::new(1.0, ink::INK));
+    Icon::fill(phosphor::EXCLAMATION_MARK).paint(
+        painter,
+        Rect::from_center_size(at, Vec2::splat(radius * 1.5)),
+        ink::INK,
+    );
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -553,55 +368,6 @@ pub fn haloed(
     }
     painter.galley(rect.min, galley, color);
     rect
-}
-
-/// A padlock `width` across, centred at `at`.
-pub fn padlock(painter: &Painter, at: Pos2, width: f32, color: Color32) {
-    let body = Rect::from_center_size(
-        at + Vec2::new(0.0, width * 0.25),
-        Vec2::new(width, width * 0.75),
-    );
-    painter.rect_filled(body, width * 0.12, color);
-    let shackle: Vec<Pos2> = (0..=10)
-        .map(|step| {
-            let angle = std::f32::consts::PI * step as f32 / 10.0;
-            at + Vec2::new(
-                -angle.cos() * width * 0.32,
-                -width * 0.12 - angle.sin() * width * 0.42,
-            )
-        })
-        .collect();
-    painter.add(Shape::line(
-        shackle,
-        Stroke::new((width * 0.12).max(1.0), color),
-    ));
-}
-
-/// A padlock whose shackle is lifted clear of its body on one side.
-pub fn padlock_open(painter: &Painter, at: Pos2, width: f32, color: Color32) {
-    let body = Rect::from_center_size(
-        at + Vec2::new(0.0, width * 0.25),
-        Vec2::new(width, width * 0.75),
-    );
-    painter.rect_filled(body, width * 0.12, color);
-    let lift = Vec2::new(width * 0.3, -width * 0.2);
-    let shackle: Vec<Pos2> = (0..=10)
-        .map(|step| {
-            let angle = std::f32::consts::PI * step as f32 / 10.0;
-            at + lift
-                + Vec2::new(
-                    -angle.cos() * width * 0.32,
-                    -width * 0.12 - angle.sin() * width * 0.42,
-                )
-        })
-        .chain(std::iter::once(
-            at + lift + Vec2::new(width * 0.32, width * 0.12),
-        ))
-        .collect();
-    painter.add(Shape::line(
-        shackle,
-        Stroke::new((width * 0.12).max(1.0), color),
-    ));
 }
 
 /// Faint diagonal hatching over a rect, for something held out of use.
@@ -675,17 +441,6 @@ fn arrow_head(painter: &Painter, tip: Pos2, dir: Vec2, size: f32, color: Color32
         color,
         Stroke::NONE,
     ));
-}
-
-fn arc(painter: &Painter, center: Pos2, radius: f32, from: f32, to: f32, stroke: Stroke) {
-    let steps = 24;
-    let points: Vec<Pos2> = (0..=steps)
-        .map(|step| {
-            let angle = from + (to - from) * step as f32 / steps as f32;
-            center + Vec2::new(angle.cos(), angle.sin()) * radius
-        })
-        .collect();
-    painter.add(Shape::line(points, stroke));
 }
 
 fn load(ctx: &egui::Context, name: &str, png: &[u8]) -> TextureHandle {

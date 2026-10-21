@@ -4,16 +4,18 @@ use editor::app::Editor;
 use editor::project::{Project, RowSelection};
 use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
+use editor::views::area::nodes::SceneTree;
 use editor::views::area::{AreaAction, AreaSnapshot, nodes, placement, run_action};
 use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Pos, Rect, Size};
-use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::{self, AreaDef, AreaModuleKind};
-use serde_json::{Value, json};
+use engine::systems::area::blueprint::{BlueprintDef, Placement};
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{self, AreaDef, AreaModule, AreaModuleKind};
+use serde_json::json;
 use strum::VariantArray;
 use testkit::{Game, path, png};
 
-use crate::support::{self, area};
+use crate::support::{self, area, folder, names, object};
 
 #[test]
 fn every_kind_of_scene_module_has_a_shape_to_add_it_from() {
@@ -35,63 +37,50 @@ fn every_kind_of_scene_module_has_a_shape_to_add_it_from() {
 
 #[test]
 fn removing_nodes_takes_each_named_one_whatever_order_they_are_named_in() {
-    let mut scene = json!([
-        { "type": "object", "name": "a" },
-        { "type": "folder", "label": "Hall", "children": [
-            { "type": "object", "name": "b" },
-            { "type": "object", "name": "c" }
-        ] },
-        { "type": "object", "name": "d" }
+    let mut scene = vec![
+        object("a"),
+        folder("Hall", vec![object("b"), object("c")]),
+        object("d"),
+    ];
+
+    let taken = SceneTree::new(&mut scene).remove(&[
+        "/1/children/0".to_owned(),
+        "/2".to_owned(),
+        "/0".to_owned(),
     ]);
 
-    let taken = nodes::remove(
-        &mut scene,
-        &["/1/children/0".to_owned(), "/2".to_owned(), "/0".to_owned()],
-    );
-
-    let names: Vec<&str> = taken
-        .iter()
-        .filter_map(|node| node["name"].as_str())
-        .collect();
-    assert_eq!(names, ["b", "d", "a"]);
-    assert_eq!(
-        scene,
-        json!([{ "type": "folder", "label": "Hall", "children": [{ "type": "object", "name": "c" }] }])
-    );
+    assert_eq!(names(&taken), ["b", "d", "a"]);
+    assert_eq!(names(&scene), ["Hall", "c"]);
 }
 
 #[test]
 fn a_duplicate_lands_right_after_its_original_labelled_apart_from_its_siblings() {
-    let mut scene = json!([
-        { "type": "folder", "label": "Pews", "children": [
-            { "type": "blueprint", "label": "Pew", "blueprint": "pew.blueprint", "at": { "x": 1.0, "y": 1.0 } },
-            { "type": "blueprint", "label": "Pew (1)", "blueprint": "pew.blueprint", "at": { "x": 3.0, "y": 1.0 } }
-        ] },
-        { "type": "object", "name": "door" }
-    ]);
+    let mut scene = vec![
+        folder(
+            "Pews",
+            vec![folder("Pew", Vec::new()), folder("Pew (1)", Vec::new())],
+        ),
+        object("door"),
+    ];
 
-    let made = nodes::duplicate(
-        &mut scene,
+    let made = SceneTree::new(&mut scene).duplicate(
         &["/0/children/0".to_owned(), "/1".to_owned()],
-        Value::clone,
+        SceneNode::clone,
     );
 
     assert_eq!(made, ["/0/children/1", "/2"]);
-    let labels: Vec<&str> = scene[0]["children"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|node| node["label"].as_str())
-        .collect();
-    assert_eq!(labels, ["Pew", "Pew (2)", "Pew (1)"]);
-    assert_eq!(scene[2]["name"], "door");
+    assert_eq!(
+        names(nodes::children_of(&scene[0])),
+        ["Pew", "Pew (2)", "Pew (1)"]
+    );
+    assert_eq!(names(&scene[2..]), ["door"]);
 }
 
 #[test]
 fn new_nodes_land_in_the_selected_folder_or_beside_the_selected_node() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(chapel(), &scratch);
-    let door = json!({ "type": "object", "name": "door", "shape": { "type": "point", "x": 1.0, "y": 1.0 } });
+    let door = object("door");
 
     nodes::select(&mut editor, &area(), vec!["/1".to_owned()]);
     assert_eq!(nodes::insertion_folder(&editor, &area()), "/1");
@@ -101,15 +90,11 @@ fn new_nodes_land_in_the_selected_folder_or_beside_the_selected_node() {
     assert_eq!(nodes::insertion_folder(&editor, &area()), "");
 
     nodes::select(&mut editor, &area(), vec!["/1/children/1".to_owned()]);
-    assert!(nodes::add(
-        &mut editor,
-        &area(),
-        vec![door.clone()],
-        "Add a door"
-    ));
+    assert!(nodes::add(&mut editor, &area(), vec![door], "Add a door"));
 
     let scene = nodes::scene_of(&editor, &area());
-    assert_eq!(scene.pointer("/1/children/2"), Some(&door));
+    let added = nodes::node(&scene, "/1/children/2").expect("the door");
+    assert_eq!(names(std::slice::from_ref(added)), ["door"]);
     assert_eq!(editor.selection.parts, ["/1/children/2"]);
 }
 
@@ -117,20 +102,23 @@ fn new_nodes_land_in_the_selected_folder_or_beside_the_selected_node() {
 fn a_new_placement_takes_its_blueprints_name_numbered_past_its_siblings() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(chapel(), &scratch);
-    let pew = json!({ "type": "blueprint", "blueprint": path("blueprint", "pew"), "at": { "x": 5.0, "y": 5.0 } });
+    let reader = editor.reader().expect("a reader");
+    let pew = SceneNode::Module(ModuleNode::new(AreaModule::Blueprint(Placement {
+        blueprint: reader
+            .id_of(&path("blueprint", "pew"))
+            .expect("the pew blueprint"),
+        at: Pos::new(5.0, 5.0),
+        flip: Default::default(),
+        values: Default::default(),
+    })));
 
     nodes::select(&mut editor, &area(), vec!["/1".to_owned()]);
     nodes::add(&mut editor, &area(), vec![pew.clone(), pew], "Add pews");
 
     let scene = nodes::scene_of(&editor, &area());
-    assert_eq!(
-        scene.pointer("/1/children/2/label"),
-        Some(&json!("pew (2)"))
-    );
-    assert_eq!(
-        scene.pointer("/1/children/3/label"),
-        Some(&json!("pew (3)"))
-    );
+    let label = |pointer: &str| nodes::node(&scene, pointer).and_then(SceneNode::label);
+    assert_eq!(label("/1/children/2"), Some("pew (2)"));
+    assert_eq!(label("/1/children/3"), Some("pew (3)"));
     settled(&mut editor);
 }
 
@@ -146,20 +134,18 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
 
     let made = path("blueprint", "pews");
     let scene = nodes::scene_of(&editor, &area());
-    assert_eq!(scene[1]["type"], "blueprint");
-    assert_eq!(scene[1]["label"], "Pews");
-    assert_eq!(scene[1]["blueprint"], made);
+    let reader = editor.reader().expect("a reader");
+    let placed = nodes::placement_of(&scene[1]).expect("a placement");
+    assert_eq!(scene[1].label(), Some("Pews"));
+    assert_eq!(reader.path_of(placed.blueprint), Some(made.as_str()));
     assert_eq!(editor.selection.parts, ["/1"]);
     let content = settled(&mut editor);
     let blueprint = content
         .by_path::<BlueprintDef>(&made)
         .expect("the new blueprint loads");
-    let held = nodes::modules(
-        &serde_json::to_value(&blueprint.get(content).scene.nodes).expect("a scene"),
-    );
-    let kinds: Vec<&str> = held
+    let kinds: Vec<&str> = nodes::modules(&blueprint.get(content).scene.nodes)
         .iter()
-        .map(|module| module.json["type"].as_str().unwrap_or_default())
+        .map(|module| module.module().kind().tag())
         .collect();
     assert_eq!(kinds, ["blueprint", "blueprint"]);
     assert_eq!(shown(content), before);
@@ -167,7 +153,7 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
     editor.undo();
     let content = settled(&mut editor);
     assert!(content.by_path::<BlueprintDef>(&made).is_none());
-    assert_eq!(nodes::scene_of(&editor, &area())[1]["type"], "folder");
+    assert!(nodes::is_folder(&nodes::scene_of(&editor, &area())[1]));
 }
 
 #[test]
@@ -184,10 +170,16 @@ fn unpacking_a_placement_leaves_a_folder_of_what_it_placed_and_the_area_as_it_wa
     );
 
     let scene = nodes::scene_of(&editor, &area());
-    let unpacked = scene.pointer("/1/children/1").expect("the folder");
-    assert_eq!(unpacked["type"], "folder");
-    assert_eq!(unpacked["label"], "pew (1)");
-    assert_eq!(unpacked["children"][0]["type"], "scenery");
+    let unpacked = nodes::node(&scene, "/1/children/1").expect("the folder");
+    assert!(nodes::is_folder(unpacked));
+    assert_eq!(unpacked.label(), Some("pew (1)"));
+    assert!(matches!(
+        nodes::children_of(unpacked),
+        [SceneNode::Module(ModuleNode {
+            module: AreaModule::Scenery(_),
+            ..
+        })]
+    ));
     assert_eq!(shown(settled(&mut editor)), before);
 }
 
@@ -234,14 +226,15 @@ fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content()
     );
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(game, &scratch);
-    let content = settled(&mut editor);
+    settled(&mut editor);
+    let reader = editor.reader().expect("a reader");
+    let signpost = editor
+        .read::<BlueprintDef>(&path("blueprint", "signpost"))
+        .and_then(Result::ok)
+        .expect("the signpost reads");
+    let variable = &signpost.variables["spot"];
 
-    let signpost = content
-        .by_path::<BlueprintDef>(&path("blueprint", "signpost"))
-        .expect("the signpost loads");
-    let variable = &signpost.get(content).variables["spot"];
-
-    assert_eq!(placement::variable_default(content, variable), Some(spot));
+    assert_eq!(placement::variable_default(&reader, variable), Some(spot));
 }
 
 /// A chapel: its ground layer, then a folder of two pews placed from a blueprint.

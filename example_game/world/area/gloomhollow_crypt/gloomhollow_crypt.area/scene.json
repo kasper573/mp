@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 3.5,
@@ -41,8 +42,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.27
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",
@@ -363,6 +363,7 @@
   },
   {
     "type": "soundscape",
+    "label": "Stone hum",
     "shape": {
       "type": "rect",
       "x": 0.5,
@@ -377,7 +378,6 @@
         "file": "assets/audio/ambient/stone_hum.flac",
         "volume": 0.32
       }
-    ],
-    "label": "Stone hum"
+    ]
   }
 ]

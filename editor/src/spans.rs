@@ -29,6 +29,7 @@ const INPUT_TOKEN: &str = "⟨input⟩";
 pub struct SpanLineEdit {
     pub spans: Option<Value>,
     pub entered: bool,
+    pub response: egui::Response,
 }
 
 pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) -> SpanLineEdit {
@@ -129,6 +130,7 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
         return SpanLineEdit {
             spans: None,
             entered: false,
+            response: response.response,
         };
     }
     if entered || committed(ui, &response) {
@@ -137,12 +139,14 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
             return SpanLineEdit {
                 spans: Some(spans_now),
                 entered,
+                response: response.response,
             };
         }
     }
     SpanLineEdit {
         spans: None,
         entered,
+        response: response.response,
     }
 }
 
@@ -231,7 +235,7 @@ fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<V
                     ("voice", names::<TextVoice>()),
                     ("motion", names::<TextMotion>()),
                 ] {
-                    ui.menu_button(RichText::new(field).size(12.0), |ui| {
+                    crate::ui::widgets::dropdown_menu(ui, RichText::new(field).size(12.0), |ui| {
                         for option in options {
                             if ui.button(option).clicked() {
                                 outcome = Some(restyle(spans, (start, end), |map| {
@@ -482,7 +486,7 @@ pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -
             *value = spans;
             changed = FormChange::at(path);
         }
-        ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
+        edit.response
     });
     let count = value.as_array().map_or(0, Vec::len);
     for index in 0..count {

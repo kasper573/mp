@@ -10,12 +10,13 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{self, FormCx, FormState};
+use crate::icons;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
+use crate::tabs::shown_path;
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::browser::ICON_DECODES_PER_FRAME;
-use crate::ui::{self, browser, sidebar, theme, widgets};
+use crate::ui::{self, sidebar, theme, widgets};
 use crate::user::SpreadsheetView;
 
 const ROW_H: f32 = 29.0;
@@ -611,7 +612,7 @@ fn toolbar(
             filters.remove(index);
             changed = true;
         }
-        ui.menu_button("+ filter", |ui| {
+        widgets::dropdown_menu(ui, "+ filter", |ui| {
             if table == NpcDef::TABLE && ui.button(CAN_BE_FOUGHT).clicked() {
                 filters.push(CAN_BE_FOUGHT.to_owned());
                 changed = true;
@@ -653,7 +654,7 @@ fn toolbar(
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(theme::muted(format!("{shown} of {total} rows")));
-            ui.menu_button("columns", |ui| {
+            widgets::dropdown_menu(ui, "columns", |ui| {
                 ui.set_min_width(220.0);
                 egui::ScrollArea::vertical()
                     .max_height(400.0)
@@ -793,7 +794,7 @@ fn table_body(
         egui::Stroke::new(1.0, theme::BORDER),
     );
     let mut more_note = None;
-    let mut icon_budget = ICON_DECODES_PER_FRAME;
+    let mut icon_budget = icons::DECODES_PER_FRAME;
     let output = egui::ScrollArea::both()
         .id_salt(("sheet", table))
         .auto_shrink([false, false])
@@ -821,21 +822,25 @@ fn table_body(
                     egui::Stroke::new(1.0, theme::BORDER.gamma_multiply(0.6)),
                 );
                 let mut x = line.min.x;
-                if let Some(image) = editor.project.as_ref().and_then(|project| {
-                    browser::row_icon(
-                        &ui.ctx().clone(),
-                        &mut editor.form,
+                if let Some(project) = &editor.project {
+                    let preview = icons::preview(
+                        ui.ctx(),
+                        &mut editor.form.thumbnails,
                         project,
-                        table,
                         &row.key,
                         &mut icon_budget,
-                    )
-                }) {
+                    );
                     let icon = egui::Rect::from_center_size(
                         egui::pos2(x + 11.0, line.center().y),
-                        image.size,
+                        Vec2::splat(16.0),
                     );
-                    painter.image(image.texture, icon, image.uv, Color32::WHITE);
+                    icons::paint_file(
+                        &painter,
+                        icon,
+                        preview,
+                        icons::of_table(table),
+                        theme::MUTED,
+                    );
                 }
                 x += 22.0;
                 for (column_index, (column, width)) in shown.iter().zip(&widths).enumerate() {
@@ -1040,7 +1045,16 @@ fn edit_cell(
     let mut value = column
         .get(&row.value)
         .cloned()
-        .unwrap_or_else(|| schema::template(root, &schema));
+        .unwrap_or_else(|| match &editor.project {
+            Some(project) => {
+                let nearby = schema::Nearby {
+                    files: &project.files,
+                    from: Some(&row.key),
+                };
+                schema::template(root, &schema, nearby)
+            }
+            None => Value::Null,
+        });
     let path = format!("/{}", column.id.replace('.', "/"));
     let mut actions = Vec::new();
     let Editor {
@@ -1091,7 +1105,7 @@ fn write_cells(
                 let index = match modules.iter().position(|module| module["type"] == *tag) {
                     Some(index) => index,
                     None => {
-                        let Some(template) = module_template(editor, table, tag) else {
+                        let Some(template) = module_template(editor, table, key, tag) else {
                             continue;
                         };
                         modules.push(template);
@@ -1111,14 +1125,19 @@ fn write_cells(
     editor.apply(edit);
 }
 
-fn module_template(editor: &Editor, table: &str, tag: &str) -> Option<Value> {
+fn module_template(editor: &Editor, table: &str, key: &str, tag: &str) -> Option<Value> {
     let root = &editor.shapes.table(table)?.shape;
     let variant = editor
         .shapes
         .module_variants(table)
         .into_iter()
         .find(|v| v.tag == tag)?;
-    Some(schema::variant_template(root, &variant))
+    let files = &editor.project.as_ref()?.files;
+    let nearby = schema::Nearby {
+        files,
+        from: Some(key),
+    };
+    Some(schema::variant_template(root, &variant, nearby))
 }
 
 fn set_path(target: &mut Value, path: &[String], value: Value) {
@@ -1367,7 +1386,7 @@ fn status(
         && let Some(column) = shown.iter().find(|c| c.id == *column_id)
         && let Some(row) = rows.iter().find(|r| r.key == *key)
     {
-        let mut cell = format!("{table}/{key} · {}", column.title);
+        let mut cell = format!("{} · {}", shown_path(key), column.title);
         if let Some(text) = column.text(row) {
             cell.push_str(&format!(" · {text}"));
         }
@@ -1375,7 +1394,7 @@ fn status(
             && last_key == key
             && last_column == column_id
         {
-            cell = format!("{table}/{key} · {} · {change}", column.title);
+            cell = format!("{} · {} · {change}", shown_path(key), column.title);
         }
         left.push(cell);
     } else {
@@ -1476,7 +1495,7 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         }
     }
     ui.add_space(10.0);
-    widgets::section(ui, &format!("{table}/{key}"));
+    widgets::section(ui, shown_path(&key));
     if let Some(row) = rows.iter().find(|r| r.key == key) {
         let brief: Vec<&SpreadsheetColumn> = columns
             .iter()

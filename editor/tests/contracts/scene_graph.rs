@@ -7,85 +7,82 @@ use editor::schema::SchemaShapes;
 use editor::ui::tree::{DropAt, TreeDrop, TreeSource};
 use editor::user::{EditorSettings, TreeView, UserFolder};
 use editor::views::area::flags::{Flag, SceneFlags, SceneLevel};
-use editor::views::area::nodes::{self, Landing};
+use editor::views::area::nodes::{self, Landing, NodeFlag, SceneTree};
 use editor::views::area::scene_tree::{self, SceneSource};
 use editor::views::area::{AreaSnapshot, drop_gone, layers, placement};
 use engine::core::content::{Content, ContentFile, write};
 use engine::systems::area::AreaDef;
-use engine::systems::area::scene::scene_file;
+use engine::systems::area::scene::{self, GroundLayer, SceneNode, scene_file};
 use engine::systems::registry;
 use serde_json::{Value, json};
 use testkit::{Game, path, png};
 
-use crate::support::{self, area};
+use crate::support::{self, area, folder, names, object};
 
-fn object(name: &str) -> Value {
+fn object_json(name: &str) -> Value {
     json!({ "type": "object", "name": name, "shape": { "type": "point", "x": 1.5, "y": 1.5 } })
 }
 
-fn folder(label: &str, children: Vec<Value>) -> Value {
+fn folder_json(label: &str, children: Vec<Value>) -> Value {
     json!({ "type": "folder", "label": label, "children": children })
 }
 
-fn names(nodes: &Value) -> Vec<String> {
-    let mut found = Vec::new();
-    nodes::walk(nodes, &mut |_, node| {
-        let name = node["name"].as_str().or(node["label"].as_str());
-        found.push(name.unwrap_or_default().to_owned());
-    });
-    found
+fn flagged(node: SceneNode, flag: NodeFlag) -> SceneNode {
+    let mut nodes = vec![node];
+    SceneTree::new(&mut nodes).set_flag(&["/0".to_owned()], flag, true);
+    nodes.remove(0)
 }
 
 #[test]
 fn grouping_puts_the_rows_in_order_into_a_new_folder_where_the_first_was() {
-    let mut scene = json!([object("a"), object("b"), object("c"), object("d")]);
+    let mut scene = vec![object("a"), object("b"), object("c"), object("d")];
 
-    let made = nodes::group(&mut scene, &["/2".to_owned(), "/1".to_owned()], "Storage");
+    let made = SceneTree::new(&mut scene).group(&["/2".to_owned(), "/1".to_owned()], "Storage");
 
     assert_eq!(made.as_deref(), Some("/1"));
     assert_eq!(names(&scene), ["a", "Storage", "b", "c", "d"]);
-    assert_eq!(scene[1]["children"].as_array().map(Vec::len), Some(2));
+    assert_eq!(nodes::children_of(&scene[1]).len(), 2);
 }
 
 #[test]
 fn grouping_rows_of_several_folders_makes_the_folder_in_the_one_holding_them_all() {
-    let mut scene = json!([
+    let mut scene = vec![
         folder("Hall", vec![object("a"), object("b")]),
         folder("Altar", vec![object("c")]),
         object("d"),
-    ]);
+    ];
 
-    let made = nodes::group(
-        &mut scene,
+    let made = SceneTree::new(&mut scene).group(
         &["/0/children/1".to_owned(), "/1/children/0".to_owned()],
         "Picked",
     );
 
     assert_eq!(made.as_deref(), Some("/0"));
-    assert_eq!(scene[0]["label"], "Picked");
-    assert_eq!(names(&scene[0]["children"]), ["b", "c"]);
-    assert_eq!(names(&scene[1]["children"]), ["a"]);
+    assert_eq!(scene[0].label(), Some("Picked"));
+    assert_eq!(names(nodes::children_of(&scene[0])), ["b", "c"]);
+    assert_eq!(names(nodes::children_of(&scene[1])), ["a"]);
 }
 
 #[test]
 fn ungrouping_puts_what_a_folder_held_in_its_place_in_order() {
-    let mut scene = json!([
+    let mut scene = vec![
         object("a"),
         folder("Hall", vec![object("b"), object("c")]),
-        object("d")
-    ]);
+        object("d"),
+    ];
 
-    nodes::ungroup(&mut scene, &["/1".to_owned()]);
+    SceneTree::new(&mut scene).ungroup(&["/1".to_owned()]);
 
     assert_eq!(names(&scene), ["a", "b", "c", "d"]);
 }
 
 #[test]
 fn moving_rows_into_a_folder_lands_them_where_asked() {
-    let mut scene = json!([object("a"), object("b"), folder("Hall", vec![object("c")])]);
+    let mut scene = vec![object("a"), object("b"), folder("Hall", vec![object("c")])];
 
-    let landed =
-        nodes::move_nodes(&mut scene, &["/0".to_owned()], "/2", &Landing::First).expect("the move");
+    let landed = SceneTree::new(&mut scene)
+        .move_nodes(&["/0".to_owned()], "/2", &Landing::First)
+        .expect("the move");
 
     assert_eq!(landed, ["/1/children/0"]);
     assert_eq!(names(&scene), ["b", "Hall", "a", "c"]);
@@ -93,39 +90,38 @@ fn moving_rows_into_a_folder_lands_them_where_asked() {
 
 #[test]
 fn a_folder_never_moves_into_itself() {
-    let mut scene = json!([folder("Hall", vec![folder("Nave", vec![])])]);
-    let before = scene.clone();
+    let mut scene = vec![folder("Hall", vec![folder("Nave", vec![])])];
+    let before = scene::write_nodes(&scene).expect("written");
 
-    let moved = nodes::move_nodes(
-        &mut scene,
-        &["/0".to_owned()],
-        "/0/children/0",
-        &Landing::End,
-    );
+    let moved =
+        SceneTree::new(&mut scene).move_nodes(&["/0".to_owned()], "/0/children/0", &Landing::End);
 
     assert!(moved.is_none());
-    assert_eq!(scene, before);
+    assert_eq!(scene::write_nodes(&scene).expect("written"), before);
 }
 
 #[test]
 fn reordering_moves_each_row_one_place_among_its_siblings() {
-    let mut scene = json!([object("a"), object("b"), object("c")]);
+    let mut scene = vec![object("a"), object("b"), object("c")];
 
-    nodes::reorder(&mut scene, &["/1".to_owned()], -1);
+    SceneTree::new(&mut scene).reorder(&["/1".to_owned()], -1);
 
     assert_eq!(names(&scene), ["b", "a", "c"]);
 }
 
 #[test]
 fn a_folders_hide_and_lock_reach_what_it_holds_without_touching_their_own() {
-    let scene = json!([
-        { "type": "folder", "label": "Pews", "hidden": true, "children": [
-            { "type": "object", "name": "a", "hidden": true },
-            { "type": "object", "name": "b" },
-        ] },
-        { "type": "folder", "label": "Guards", "locked": true, "children": [object("c")] },
+    let scene = vec![
+        flagged(
+            folder(
+                "Pews",
+                vec![flagged(object("a"), NodeFlag::Hidden), object("b")],
+            ),
+            NodeFlag::Hidden,
+        ),
+        flagged(folder("Guards", vec![object("c")]), NodeFlag::Locked),
         object("d"),
-    ]);
+    ];
 
     let flags = SceneFlags::of(
         &[SceneLevel {
@@ -147,7 +143,7 @@ fn a_folders_hide_and_lock_reach_what_it_holds_without_touching_their_own() {
 
 #[test]
 fn showing_only_a_row_hides_everything_else_for_the_moment() {
-    let scene = json!([folder("Pews", vec![object("a")]), object("b")]);
+    let scene = vec![folder("Pews", vec![object("a")]), object("b")];
 
     let flags = SceneFlags::of(
         &[SceneLevel {
@@ -174,8 +170,8 @@ fn grouping_and_naming_the_folder_is_one_undo_step() {
     scene_tree::rename_grouped(&mut editor, &snapshot, &id, "Storage", &step);
 
     let scene = nodes::scene_of(&editor, &area());
-    assert_eq!(scene[1]["label"], "Storage");
-    assert_eq!(names(&scene[1]["children"]), ["a", "b"]);
+    assert_eq!(scene[1].label(), Some("Storage"));
+    assert_eq!(names(nodes::children_of(&scene[1])), ["a", "b"]);
     editor.undo();
     assert_eq!(
         names(&nodes::scene_of(&editor, &area()))[1..],
@@ -188,8 +184,9 @@ fn a_scene_the_editor_saves_reads_as_the_engine_writes_it() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(objects_game(), &scratch);
     nodes::change_scene(&mut editor, &area(), |scene| {
-        let made = nodes::group(scene, &["/1".to_owned(), "/2".to_owned()], "Guards")?;
-        nodes::set_flag(scene, &[made], "locked", true);
+        let mut tree = SceneTree::new(scene);
+        let made = tree.group(&["/1".to_owned(), "/2".to_owned()], "Guards")?;
+        tree.set_flag(&[made], NodeFlag::Locked, true);
         Some("Lock the guards".to_owned())
     });
     assert!(editor.save());
@@ -213,7 +210,7 @@ fn a_new_folder_lands_in_the_insertion_folder_and_never_shares_a_label() {
     let second = scene_tree::new_folder(&mut editor, &snapshot, "").expect("a folder");
 
     let scene = nodes::scene_of(&editor, &area());
-    let label = |id: &str| scene.pointer(id).map(|node| node["label"].clone());
+    let label = |id: &str| nodes::node(&scene, id).and_then(SceneNode::label);
     assert_ne!(label(&first), label(&second));
 }
 
@@ -240,12 +237,12 @@ fn deleting_a_folder_takes_all_it_holds_in_one_step() {
 fn a_selected_folder_moves_what_it_holds_that_is_shown_and_unlocked() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let game = support::game().edit_scene("area", support::AREA, |scene| {
-        let mut locked = object("b");
+        let mut locked = object_json("b");
         locked["locked"] = Value::Bool(true);
         scene
             .as_array_mut()
             .expect("a scene")
-            .push(folder("Pews", vec![object("a"), locked]));
+            .push(folder_json("Pews", vec![object_json("a"), locked]));
     });
     let mut editor = open(game, &scratch);
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
@@ -267,7 +264,7 @@ fn rows_never_drop_onto_a_placement_or_into_themselves() {
         .blueprint("pew", (1, 1), json!({}), json!([]))
         .edit_scene("area", support::AREA, |scene| {
             let rows = scene.as_array_mut().expect("a scene");
-            rows.push(folder("Hall", vec![folder("Nave", vec![])]));
+            rows.push(folder_json("Hall", vec![folder_json("Nave", vec![])]));
             rows.push(json!({
                 "type": "blueprint",
                 "label": "pew",
@@ -337,11 +334,12 @@ fn a_layer_name_taken_anywhere_it_reaches_is_refused() {
     let mut editor = open(painted_game(), &scratch);
     let rug = path("blueprint", "rug");
     nodes::change_scene(&mut editor, &rug, |scene| {
-        nodes::append(
-            scene,
-            "",
-            vec![json!({ "type": "ground_layer", "name": "carpet" })],
-        );
+        let carpet = SceneNode::GroundLayer(GroundLayer {
+            name: "carpet".to_owned(),
+            hidden: false,
+            locked: false,
+        });
+        SceneTree::new(scene).append("", vec![carpet]);
         Some("Add a layer".to_owned())
     });
 
@@ -364,7 +362,7 @@ fn a_blueprint_that_would_hold_itself_is_refused_with_the_chain() {
         json!([{ "type": "blueprint", "label": "rug", "blueprint": path("blueprint", "rug"), "at": { "x": 0.0, "y": 0.0 } }]),
     );
     let editor = open(game, &scratch);
-    let files = &editor.project.as_ref().expect("a project").files;
+    let files = editor.project.as_ref().expect("a project");
     let rug = path("blueprint", "rug");
     let dais = path("blueprint", "dais");
 
@@ -396,7 +394,7 @@ fn a_change_on_disk_drops_only_the_selected_nodes_it_took_away() {
 fn objects_game() -> Game {
     support::game().edit_scene("area", support::AREA, |scene| {
         let rows = scene.as_array_mut().expect("a scene");
-        rows.extend([object("a"), object("b"), object("c")]);
+        rows.extend([object_json("a"), object_json("b"), object_json("c")]);
     })
 }
 

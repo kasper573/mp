@@ -4,16 +4,13 @@ use std::io;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::blueprint::BlueprintDef;
-use super::blueprint::{HOLE, stand_in_holes};
+use super::blueprint::{self, BlueprintDef};
 use super::grid::{
     GridFile, PaletteRow, palette_cell, read_grid, read_palette, walk_cell, write_grid_cells,
     write_palette, write_walk,
 };
-use super::{AreaModule, MAX_GROUND_LAYERS, Tilemap};
-use crate::core::content::id::read_aside;
+use super::{AreaModule, AreaModuleKind, MAX_GROUND_LAYERS, Tilemap};
 use crate::core::content::load::{JsonPart, ParseError, parse_value, shape_problem};
-use crate::core::content::locate::escape;
 use crate::core::content::{
     Content, ContentProblem, ErrorPlace, FileWriter, PartSpec, Parts, serial, valid_name,
 };
@@ -49,31 +46,20 @@ pub const SCENE_PARTS: &[PartSpec] = &[SCENE, PALETTE, WALK, LAYERS];
 /// Folders of a scene nest at most this deep.
 pub const MAX_FOLDER_DEPTH: usize = 16;
 
-/// The fields a module node keeps beside its module's own: its label in the editor and its hide and
-/// lock flags. The game never reads them.
-pub const NODE_FIELDS: [&str; 3] = ["label", "hidden", "locked"];
-
 /// One node of a scene graph. Folders only organize and ground layers name the grids their cells
-/// are painted in; every other node is a module, kept as JSON so a blueprint's holes stay until a
-/// placement fills them.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+/// are painted in; every other node is a module.
+#[derive(Clone)]
 pub enum SceneNode {
     Folder(SceneFolder),
     GroundLayer(GroundLayer),
-    #[serde(untagged)]
-    Module(Value),
+    Module(ModuleNode),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone)]
 pub struct SceneFolder {
     pub label: String,
-    #[serde(default, skip_serializing_if = "serial::is_false")]
     pub hidden: bool,
-    #[serde(default, skip_serializing_if = "serial::is_false")]
     pub locked: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<SceneNode>,
 }
 
@@ -90,12 +76,29 @@ pub struct GroundLayer {
     pub locked: bool,
 }
 
+/// A module of a scene, with the label and flags the editor keeps for its node; the game never
+/// reads them.
+#[derive(Clone)]
+pub struct ModuleNode {
+    pub label: Option<String>,
+    pub hidden: bool,
+    pub locked: bool,
+    pub module: AreaModule,
+    pub holes: Holes,
+}
+
+/// The holes a blueprint leaves in a module for each placement to fill, by their JSON pointer in
+/// the module, each with the name of the variable that fills it. The module holds a stand-in of
+/// the variable's type at each: its default, or any value of the type.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Holes(pub BTreeMap<String, String>);
+
 impl SceneNode {
     pub fn label(&self) -> Option<&str> {
         match self {
             SceneNode::Folder(folder) => Some(&folder.label),
             SceneNode::GroundLayer(_) => None,
-            SceneNode::Module(module) => module.get("label").and_then(Value::as_str),
+            SceneNode::Module(node) => node.label.as_deref(),
         }
     }
 
@@ -103,7 +106,7 @@ impl SceneNode {
         match self {
             SceneNode::Folder(folder) => folder.hidden,
             SceneNode::GroundLayer(layer) => layer.hidden,
-            SceneNode::Module(module) => flag(module, "hidden"),
+            SceneNode::Module(node) => node.hidden,
         }
     }
 
@@ -111,33 +114,21 @@ impl SceneNode {
         match self {
             SceneNode::Folder(folder) => folder.locked,
             SceneNode::GroundLayer(layer) => layer.locked,
-            SceneNode::Module(module) => flag(module, "locked"),
-        }
-    }
-
-    /// The module's kind, `"blueprint"` for a placement.
-    pub fn kind(&self) -> &str {
-        match self {
-            SceneNode::Folder(_) => "folder",
-            SceneNode::GroundLayer(_) => "ground_layer",
-            SceneNode::Module(module) => module.get("type").and_then(Value::as_str).unwrap_or(""),
+            SceneNode::Module(node) => node.locked,
         }
     }
 }
 
-fn flag(module: &Value, field: &str) -> bool {
-    module.get(field).and_then(Value::as_bool).unwrap_or(false)
-}
-
-/// What a module node's module reads: its JSON without the node's label and flags.
-pub fn module_json(node: &Value) -> Value {
-    let mut json = node.clone();
-    if let Some(fields) = json.as_object_mut() {
-        for field in NODE_FIELDS {
-            fields.shift_remove(field);
+impl ModuleNode {
+    pub fn new(module: AreaModule) -> ModuleNode {
+        ModuleNode {
+            label: None,
+            hidden: false,
+            locked: false,
+            module,
+            holes: Holes::default(),
         }
     }
-    json
 }
 
 /// Every node under `nodes`, depth first in tree order, with its JSON pointer in the scene and how
@@ -177,14 +168,15 @@ pub fn layers(nodes: &[SceneNode]) -> Vec<&GroundLayer> {
 }
 
 /// A scene and the grids painted for it.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Default)]
 pub struct Scene {
     pub nodes: Vec<SceneNode>,
     pub grids: SceneGrids,
 }
 
 /// The grids of a bundle as written: its palette's rows, its forced walk cells and the cells of
-/// each ground layer by name, one per cell of the map, empty where nothing is painted.
+/// each ground layer by name, one per cell of the map, empty where nothing is painted. Only the
+/// layers the scene's nodes name are written.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SceneGrids {
     pub palette: Vec<PaletteRow>,
@@ -222,10 +214,18 @@ pub fn read(
     let Some(file) = parts.required(SCENE) else {
         return;
     };
-    let Some(nodes) = parts.json::<Vec<SceneNode>>(file, |nodes| read_held(nodes, variables))
-    else {
+    let mut read = None;
+    parts.json::<Vec<NodeFile>>(file, |files| read = Some(nodes_of(files, "", variables)));
+    let Some(Read { nodes, problems }) = read else {
         return;
     };
+    let read_whole = problems.is_empty();
+    for (pointer, problem) in problems {
+        parts.json_error(SCENE_FILE, &pointer, problem);
+    }
+    if !read_whole {
+        return;
+    }
     check(&nodes, parts);
     scene.grids = read_grids(&nodes, map, parts);
     scene.nodes = nodes;
@@ -237,7 +237,8 @@ pub fn write(
     bundle: &str,
     writer: &mut FileWriter,
 ) -> io::Result<()> {
-    writer.json(&format!("{bundle}/{SCENE_FILE}"), &scene.nodes)?;
+    let files = files_of(&scene.nodes).map_err(io::Error::other)?;
+    writer.json(&format!("{bundle}/{SCENE_FILE}"), &files)?;
     let size = map.size.grid();
     let grids = &scene.grids;
     if !grids.palette.is_empty() {
@@ -252,15 +253,39 @@ pub fn write(
             write_walk(size, &grids.walk).as_bytes(),
         )?;
     }
-    for (name, cells) in &grids.layers {
+    for layer in layers(&scene.nodes) {
+        let Some(cells) = grids.layers.get(&layer.name) else {
+            continue;
+        };
         if cells.iter().any(Option::is_some) {
             writer.file(
-                &format!("{bundle}/{LAYERS_FOLDER}/{name}.csv"),
+                &format!("{bundle}/{LAYERS_FOLDER}/{}.csv", layer.name),
                 write_grid_cells(size, cells).as_bytes(),
             )?;
         }
     }
     Ok(())
+}
+
+/// `nodes` as a scene file holds them, in the scope being written in: how nodes travel apart from
+/// their bundle, copied to be pasted elsewhere.
+pub fn write_nodes(nodes: &[SceneNode]) -> Result<Value, serde_json::Error> {
+    serde_json::to_value(files_of(nodes)?)
+}
+
+/// The nodes `json` holds as a scene file does, read as a blueprint declaring `variables` reads
+/// its own, in the scope being read in; each problem at its pointer.
+pub fn read_nodes(
+    json: &Value,
+    variables: &BTreeMap<String, Variable<RiftScripting>>,
+) -> Result<Vec<SceneNode>, Vec<(String, ContentProblem)>> {
+    let files = parse_value::<Vec<NodeFile>>(json)
+        .map_err(|error| vec![(error.pointer.clone(), shape_problem(&error))])?;
+    let read = nodes_of(&files, "", variables);
+    match read.problems.is_empty() {
+        true => Ok(read.nodes),
+        false => Err(read.problems),
+    }
 }
 
 /// The scene of each bundle of `table`, read for the content its modules name.
@@ -273,28 +298,229 @@ pub fn json_part(table: &'static str) -> JsonPart {
 }
 
 fn read_part(content: &Content, bundle: &str, value: &Value) -> Result<(), ParseError> {
-    let nodes = parse_value::<Vec<SceneNode>>(value)?;
+    let files = parse_value::<Vec<NodeFile>>(value)?;
     let variables = content
         .by_path::<BlueprintDef>(bundle)
         .map(|blueprint| blueprint.get(content).variables.clone())
         .unwrap_or_default();
-    read_held(&nodes, &variables);
+    nodes_of(&files, "", &variables);
     Ok(())
 }
 
-/// Reads, as the modules they make, the nodes a scene holds as JSON, standing in for each hole, so
-/// the content they name counts as the bundle's references.
-fn read_held(nodes: &[SceneNode], variables: &BTreeMap<String, Variable<RiftScripting>>) {
-    walk(nodes, &mut |_, node, _| {
-        if let SceneNode::Module(module) = node {
-            let mut json = module_json(module);
-            stand_in_holes(&mut json, variables);
-            read_aside(
-                || serde_json::from_value::<AreaModule>(json).ok(),
-                |leaf| leaf.value != HOLE,
-            );
+/// A scene's nodes as its file holds them, read.
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum NodeFile {
+    Folder(FolderFile<NodeFile>),
+    GroundLayer(GroundLayer),
+    #[serde(untagged)]
+    Module(ModuleFile),
+}
+
+/// A scene's nodes as its file holds them, written: a module's kind first, then its node's label
+/// and flags, then its own fields.
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum NodeOut {
+    Folder(FolderFile<NodeOut>),
+    GroundLayer(GroundLayer),
+    #[serde(untagged)]
+    Module(ModuleOut),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FolderFile<Node> {
+    label: String,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    hidden: bool,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    locked: bool,
+    #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+    children: Vec<Node>,
+}
+
+#[derive(Serialize)]
+struct ModuleOut {
+    #[serde(rename = "type")]
+    kind: AreaModuleKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    #[serde(skip_serializing_if = "serial::is_false")]
+    hidden: bool,
+    #[serde(skip_serializing_if = "serial::is_false")]
+    locked: bool,
+    #[serde(flatten)]
+    fields: serde_json::Map<String, Value>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ModuleFile {
+    #[serde(flatten)]
+    module: serde_json::Map<String, Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    label: Option<NonEmpty>,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    hidden: bool,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    locked: bool,
+}
+
+/// A label of text that isn't empty.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+struct NonEmpty(String);
+
+impl TryFrom<String> for NonEmpty {
+    type Error = &'static str;
+
+    fn try_from(text: String) -> Result<NonEmpty, &'static str> {
+        match text.is_empty() {
+            true => Err("an empty label"),
+            false => Ok(NonEmpty(text)),
         }
-    });
+    }
+}
+
+impl From<NonEmpty> for String {
+    fn from(label: NonEmpty) -> String {
+        label.0
+    }
+}
+
+/// What a node that isn't a module says it is, read apart so a folder or a layer node that fails
+/// to read as one is reported as what it says it is rather than as an unknown module.
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum StructureFile {
+    Folder(FolderFile<NodeFile>),
+    GroundLayer(GroundLayer),
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum StructureKind {
+    Folder,
+    GroundLayer,
+}
+
+#[derive(Deserialize)]
+struct StructureTag {
+    #[serde(rename = "type")]
+    _kind: StructureKind,
+}
+
+struct Read {
+    nodes: Vec<SceneNode>,
+    problems: Vec<(String, ContentProblem)>,
+}
+
+/// The nodes `files` hold, read in the scope being read in, so the content their modules name
+/// counts as the bundle's references.
+fn nodes_of(
+    files: &[NodeFile],
+    prefix: &str,
+    variables: &BTreeMap<String, Variable<RiftScripting>>,
+) -> Read {
+    let mut read = Read {
+        nodes: Vec::new(),
+        problems: Vec::new(),
+    };
+    for (index, file) in files.iter().enumerate() {
+        read_node(file, &format!("{prefix}/{index}"), variables, &mut read);
+    }
+    read
+}
+
+fn read_node(
+    file: &NodeFile,
+    pointer: &str,
+    variables: &BTreeMap<String, Variable<RiftScripting>>,
+    read: &mut Read,
+) {
+    match file {
+        NodeFile::Folder(folder) => {
+            let inner = nodes_of(&folder.children, &format!("{pointer}/children"), variables);
+            read.problems.extend(inner.problems);
+            read.nodes.push(SceneNode::Folder(SceneFolder {
+                label: folder.label.clone(),
+                hidden: folder.hidden,
+                locked: folder.locked,
+                children: inner.nodes,
+            }));
+        }
+        NodeFile::GroundLayer(layer) => read.nodes.push(SceneNode::GroundLayer(layer.clone())),
+        NodeFile::Module(file) => {
+            let json = Value::Object(file.module.clone());
+            if parse_value::<StructureTag>(&json).is_ok() {
+                let mut whole = json;
+                if let Value::Object(map) = &mut whole {
+                    map.extend(module_file_fields(file));
+                }
+                match parse_value::<StructureFile>(&whole) {
+                    Ok(StructureFile::Folder(folder)) => {
+                        read_node(&NodeFile::Folder(folder), pointer, variables, read)
+                    }
+                    Ok(StructureFile::GroundLayer(layer)) => {
+                        read.nodes.push(SceneNode::GroundLayer(layer))
+                    }
+                    Err(error) => read
+                        .problems
+                        .push((format!("{pointer}{}", error.pointer), shape_problem(&error))),
+                }
+                return;
+            }
+            match blueprint::read_module(json, variables) {
+                Ok((module, holes)) => read.nodes.push(SceneNode::Module(ModuleNode {
+                    label: file.label.as_ref().map(|label| label.0.clone()),
+                    hidden: file.hidden,
+                    locked: file.locked,
+                    module,
+                    holes,
+                })),
+                Err((at, problem)) => read.problems.push((format!("{pointer}{at}"), problem)),
+            }
+        }
+    }
+}
+
+/// The node fields of a module file, as the node writes them.
+fn module_file_fields(file: &ModuleFile) -> serde_json::Map<String, Value> {
+    let fields = ModuleFile {
+        module: serde_json::Map::new(),
+        label: file.label.as_ref().map(|label| NonEmpty(label.0.clone())),
+        hidden: file.hidden,
+        locked: file.locked,
+    };
+    match serde_json::to_value(fields) {
+        Ok(Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    }
+}
+
+/// The files `nodes` are written as, in the scope being written in.
+fn files_of(nodes: &[SceneNode]) -> Result<Vec<NodeOut>, serde_json::Error> {
+    nodes
+        .iter()
+        .map(|node| {
+            Ok(match node {
+                SceneNode::Folder(folder) => NodeOut::Folder(FolderFile {
+                    label: folder.label.clone(),
+                    hidden: folder.hidden,
+                    locked: folder.locked,
+                    children: files_of(&folder.children)?,
+                }),
+                SceneNode::GroundLayer(layer) => NodeOut::GroundLayer(layer.clone()),
+                SceneNode::Module(node) => NodeOut::Module(ModuleOut {
+                    kind: node.module.kind(),
+                    label: node.label.clone(),
+                    hidden: node.hidden,
+                    locked: node.locked,
+                    fields: blueprint::write_module(&node.module, &node.holes)?,
+                }),
+            })
+        })
+        .collect()
 }
 
 fn check(nodes: &[SceneNode], parts: &mut Parts) {
@@ -340,8 +566,20 @@ fn check(nodes: &[SceneNode], parts: &mut Parts) {
                 }
                 layers.push((layer.name.clone(), pointer.to_owned()));
             }
-            SceneNode::Module(module) => check_module(pointer, module, parts),
-            SceneNode::Folder(_) => {}
+            SceneNode::Module(node)
+                if matches!(node.module, AreaModule::Blueprint(_)) && node.label.is_none() =>
+            {
+                parts.json_error(
+                    SCENE_FILE,
+                    pointer,
+                    ContentProblem::new(
+                        "missing field",
+                        "a placement without a label",
+                        "a label on every placement, its name in the editor",
+                    ),
+                );
+            }
+            SceneNode::Module(_) | SceneNode::Folder(_) => {}
         }
     });
     if layers.len() > MAX_GROUND_LAYERS {
@@ -356,61 +594,6 @@ fn check(nodes: &[SceneNode], parts: &mut Parts) {
         );
     }
     check_labels(nodes, "", parts);
-}
-
-fn check_module(pointer: &str, module: &Value, parts: &mut Parts) {
-    // A folder or a layer node that didn't read as one falls to the module catch-all; reading it as
-    // what it says it is tells what is wrong with it.
-    let kind = module.get("type").and_then(Value::as_str).unwrap_or("");
-    let mut fields = module.clone();
-    if let Some(fields) = fields.as_object_mut() {
-        fields.shift_remove("type");
-    }
-    let misread = match kind {
-        "folder" => parse_value::<SceneFolder>(&fields).err(),
-        "ground_layer" => parse_value::<GroundLayer>(&fields).err(),
-        _ => None,
-    };
-    if let Some(error) = misread {
-        parts.json_error(
-            SCENE_FILE,
-            &format!("{pointer}{}", error.pointer),
-            shape_problem(&error),
-        );
-        return;
-    }
-    let label = module.get("label");
-    if label.is_some_and(|label| !label.as_str().is_some_and(|label| !label.is_empty())) {
-        parts.json_error(
-            SCENE_FILE,
-            &format!("{pointer}/label"),
-            ContentProblem::new("wrong type", "a label that isn't text", "a label of text"),
-        );
-    }
-    if kind == "blueprint" && label.is_none() {
-        parts.json_error(
-            SCENE_FILE,
-            pointer,
-            ContentProblem::new(
-                "missing field",
-                "a placement without a label",
-                "a label on every placement, its name in the editor",
-            ),
-        );
-    }
-    for flag in ["hidden", "locked"] {
-        if module.get(flag).is_some_and(|value| !value.is_boolean()) {
-            parts.json_error(
-                SCENE_FILE,
-                &format!("{pointer}/{}", escape(flag)),
-                ContentProblem::new(
-                    "wrong type",
-                    "a flag that isn't true or false",
-                    "true or false",
-                ),
-            );
-        }
-    }
 }
 
 /// Labels are unique among siblings ignoring case, as file names are in a folder.
@@ -507,12 +690,16 @@ fn read_grids(nodes: &[SceneNode], map: &Tilemap, parts: &mut Parts) -> SceneGri
     grids
 }
 
-/// The holes of every module node, by the variable each names.
+/// The variables the holes of every module node name.
 pub fn holes(nodes: &[SceneNode]) -> Vec<String> {
-    let mut found = Vec::new();
+    let mut found: Vec<String> = Vec::new();
     walk(nodes, &mut |_, node, _| {
-        if let SceneNode::Module(module) = node {
-            super::blueprint::holes(&module_json(module), &mut found);
+        if let SceneNode::Module(node) = node {
+            for name in blueprint::variables_of(&node.holes) {
+                if !found.iter().any(|known| known == name) {
+                    found.push(name.to_owned());
+                }
+            }
         }
     });
     found

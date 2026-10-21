@@ -367,7 +367,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let (play, arrow) = ui
         .scope(|ui| {
             ui.spacing_mut().item_spacing.x = 1.0;
-            let arrow = glyph::button(ui, Mark::ChevronDown, 14.0, theme::TEXT, "Test character")
+            let arrow = glyph::button(ui, Mark::CaretDown, 14.0, theme::TEXT, "Test character")
                 .on_hover_text("Pick the test character");
             let play = controls::marked_primary(ui, Mark::Play, "Play").on_hover_text(format!(
                 "Save, then play as the picked test character from its own start ({})",
@@ -706,7 +706,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let mut next_to = false;
     ui.horizontal(|ui| {
         if ok {
-            glyph::show(ui, Mark::Gear, 18.0, theme::TEXT);
+            glyph::show(ui, Mark::Settings, 18.0, theme::TEXT);
         } else {
             glyph::show(ui, Mark::Warning, 18.0, theme::WARN);
         }
@@ -744,7 +744,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
                 egui::Layout::right_to_left(egui::Align::Center),
                 |ui| match state {
                     Some(true) => {
-                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                        glyph::show(ui, Mark::Check, 14.0, theme::OK);
                     }
                     Some(false) => {
                         glyph::show(ui, Mark::Cross, 14.0, theme::DANGER);

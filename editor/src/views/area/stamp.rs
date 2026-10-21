@@ -1,58 +1,34 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::{Content, parent_of};
+use engine::core::content::{Content, ContentScope, FolderReader, parent_of, rescoped};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::SceneNode;
-use engine::systems::area::{self, Flip};
-use engine::systems::script::Variable;
-use serde_json::Value;
+use engine::systems::area::blueprint::{BlueprintDef, BlueprintId, Placement};
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{self, AreaModule, Flip};
+use engine::systems::script::VarValue;
 
-use super::holes::fill_holes;
 use super::{AreaFrame, modules, nodes, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::theme;
-use crate::value::RowValue;
-use crate::{rows, thumbs, value};
+use crate::{rows, thumbs};
 
-pub fn placement_json(blueprint: &str, at: Pos<Tiles>, flip: Flip, values: &Value) -> Value {
-    let mut module = serde_json::json!({ "type": "blueprint", "blueprint": blueprint, "at": { "x": at.x, "y": at.y } });
-    if !flip.is_none() {
-        module["flip"] = serde_json::json!(flip);
-    }
-    if values.as_object().is_some_and(|values| !values.is_empty()) {
-        module["values"] = values.clone();
-    }
-    module
-}
-
-pub fn placement_module(
-    content: &Content,
-    blueprint: &str,
+/// A placement of the blueprint `blueprint`, an id among the paths it was read against.
+pub fn placement_node(
+    blueprint: BlueprintId,
     at: Pos<Tiles>,
     flip: Flip,
-    values: &Value,
-) -> Option<area::AreaModule> {
-    value::typed(content, placement_json(blueprint, at, flip, values))
-}
-
-pub fn placed_part(
-    content: &Content,
-    part: &Value,
-    values: &Value,
-    variables: &BTreeMap<String, Variable>,
-    at: Pos<Tiles>,
-    flip: Flip,
-) -> Option<Value> {
-    let mut json = part.clone();
-    fill_holes(content, &mut json, values, variables);
-    let mut module: area::AreaModule = value::typed(content, json)?;
-    area::blueprint::place(&mut module, at, flip);
-    value::untyped(content, &module)
+    values: BTreeMap<String, VarValue>,
+) -> SceneNode {
+    SceneNode::Module(ModuleNode::new(AreaModule::Blueprint(Placement {
+        blueprint,
+        at,
+        flip,
+        values,
+    })))
 }
 
 pub fn stamp_panel(
@@ -63,11 +39,13 @@ pub fn stamp_panel(
     bundle: &str,
 ) {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    for module in nodes::modules(&nodes::scene_of(editor, bundle)) {
-        if module.json.is_module(area::AreaModuleKind::Blueprint) {
-            *counts
-                .entry(module.json.text("blueprint").to_owned())
-                .or_default() += 1;
+    if let Some(reader) = editor.reader() {
+        for module in nodes::modules(&nodes::scene_of(editor, bundle)) {
+            if let AreaModule::Blueprint(placement) = module.module()
+                && let Some(path) = reader.path_of(placement.blueprint)
+            {
+                *counts.entry(path.to_owned()).or_default() += 1;
+            }
         }
     }
     let area_key = bundle.to_owned();
@@ -134,7 +112,7 @@ pub fn stamp_panel(
             let refused = editor
                 .project
                 .as_ref()
-                .and_then(|project| super::placement::holds_itself(&project.files, &area_key, key));
+                .and_then(|project| super::placement::holds_itself(project, &area_key, key));
             let response = blueprint_card(editor, ui, content, key, *count, selected, card);
             match refused {
                 Some(reason) => {
@@ -188,12 +166,24 @@ fn folders_apart(here: &str, there: &str) -> usize {
     here.len() - shared
 }
 
-pub(super) fn stamp_values(editor: &Editor, stamp: Option<&str>) -> Value {
-    let values = stamp
-        .and_then(|stamp| editor.settings.stamps.get(stamp))
-        .map(|settings| settings.values.clone())
-        .unwrap_or_default();
-    Value::Object(values.into_iter().collect())
+/// The values the stamp `stamp` places with, as the user last set them, read among the files as
+/// they stand now; one that no longer reads is left to its default.
+pub(super) fn stamp_values(editor: &Editor, stamp: Option<&str>) -> BTreeMap<String, VarValue> {
+    let (Some(stamp), Some(reader)) = (stamp, editor.reader()) else {
+        return BTreeMap::new();
+    };
+    editor
+        .settings
+        .stamps
+        .get(stamp)
+        .map(|settings| {
+            settings
+                .values
+                .iter()
+                .filter_map(|(name, value)| Some((name.clone(), reader.from_json(value).ok()?)))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(super) fn blueprint_card(
@@ -238,12 +228,20 @@ pub fn draw_blueprint_art(
     key: &str,
     into: ERect,
 ) {
-    let sceneries = super::scene::parts_scenery(
-        content,
-        key,
-        Pos::new(0.0, 0.0),
-        &Value::Object(Default::default()),
-    );
+    let sceneries = content
+        .by_path::<BlueprintDef>(key)
+        .map(|blueprint| {
+            super::scene::parts_scenery(
+                content,
+                &Placement {
+                    blueprint,
+                    at: Pos::new(0.0, 0.0),
+                    flip: Flip::None,
+                    values: BTreeMap::new(),
+                },
+            )
+        })
+        .unwrap_or_default();
     if sceneries.is_empty() {
         ui.painter_at(into).text(
             into.center(),
@@ -336,21 +334,26 @@ pub(super) fn stamp_flip(editor: &Editor, stamp: &str) -> Flip {
     Flip::of(settings.flip_x, settings.flip_y)
 }
 
+/// What one placement of the stamp covers, `values` read among `reader`'s paths.
 pub fn stamp_footprint(
     editor: &Editor,
     content: &Content,
+    reader: &FolderReader,
     stamp: &str,
-    values: &Value,
+    values: &BTreeMap<String, VarValue>,
 ) -> Size<Tiles> {
     let flip = stamp_flip(editor, stamp);
-    let placement = SceneNode::Module(placement_json(stamp, Pos::new(0.0, 0.0), flip, values));
+    let loaded = content
+        .by_path::<BlueprintDef>(stamp)
+        .and_then(|blueprint| {
+            let values = rescoped(values, reader.scope(), &ContentScope::of(content)).ok()?;
+            Some(placement_node(blueprint, Pos::new(0.0, 0.0), flip, values))
+        });
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(content, &[placement], &mut errors);
+    let flattening = area::blueprint::flatten(content, loaded.as_slice(), &mut errors);
     let mut bounds: Option<Rect<Tiles>> = None;
     for placed in flattening.modules {
-        if let Some(json) = value::untyped(content, &placed.module)
-            && let Some(b) = shapes::bounds(&json, None)
-        {
+        if let Some(b) = shapes::bounds(&placed.module, None) {
             bounds = Some(bounds.map_or(b, |known| known.union(&b)));
         }
     }
@@ -370,7 +373,7 @@ pub fn stamp_input(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Are
     };
     let at = select::snap_to(tile, alt);
     let values = stamp_values(editor, Some(&stamp));
-    let footprint = stamp_footprint(editor, &frame.content, &stamp, &values);
+    let footprint = stamp_footprint(editor, &frame.content, &frame.reader, &stamp, &values);
     let spacing = editor
         .settings
         .stamps
@@ -407,14 +410,16 @@ pub(super) fn place_stamps(
     editor: &mut Editor,
     frame: &AreaFrame,
     stamp: &str,
-    values: &Value,
+    values: &BTreeMap<String, VarValue>,
     placed: Vec<Pos<Tiles>>,
 ) {
-    let content = frame.content.clone();
-    let Some(id) = content.by_path::<area::blueprint::BlueprintDef>(stamp) else {
+    let reader = frame.reader.clone();
+    let (Some(blueprint), Some(Ok(def))) = (
+        reader.id_of::<BlueprintDef>(stamp),
+        editor.read::<BlueprintDef>(stamp),
+    ) else {
         return;
     };
-    let def = id.get(&content);
     let flip = stamp_flip(editor, stamp);
     let mut taken: HashSet<String> = frame.object_names();
     let mut modules = Vec::new();
@@ -422,25 +427,19 @@ pub(super) fn place_stamps(
         let mut own = values.clone();
         for (name, variable) in &def.variables {
             if variable.ty == VariableType::Name {
-                let base = own
-                    .get(name)
-                    .and_then(Value::as_str)
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_owned)
-                    .or_else(|| {
-                        variable
-                            .default
-                            .as_ref()
-                            .and_then(|d| value::json(d).ok())
-                            .and_then(|v| v.as_str().map(str::to_owned))
-                    })
+                let text = |value: Option<&VarValue>| match value {
+                    Some(VarValue::Str(text)) if !text.is_empty() => Some(text.clone()),
+                    _ => None,
+                };
+                let base = text(own.get(name))
+                    .or_else(|| text(variable.default.as_ref()))
                     .unwrap_or_else(|| name.clone());
                 let fresh = rows::free_name(&base, &taken);
                 taken.insert(fresh.clone());
-                own[name] = Value::String(fresh);
+                own.insert(name.clone(), VarValue::Str(fresh));
             }
         }
-        modules.push(placement_json(stamp, *at, flip, &own));
+        modules.push(placement_node(blueprint, *at, flip, own));
     }
     let count = modules.len();
     let label = if count == 1 {
@@ -482,7 +481,7 @@ pub fn stamp_overlay(
     };
     let alt = painter.ctx().input(|i| EditorKey::Unsnapped.held(i));
     let values = stamp_values(editor, Some(&stamp));
-    let footprint = stamp_footprint(editor, &frame.content, &stamp, &values);
+    let footprint = stamp_footprint(editor, &frame.content, &frame.reader, &stamp, &values);
     let color = Color32::from_rgb(90, 220, 220);
     let draw_ghost = |at: Pos<Tiles>| {
         let rect = Rect::new(Pos::new(at.x - 0.5, at.y - 0.5), footprint);

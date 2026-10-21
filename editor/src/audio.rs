@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use engine::core::audio;
 use engine::core::audio::loader::{self, DecodedAudio};
 
+use std::sync::mpsc::TryRecvError;
+
+use crate::app::ChannelInbox;
 use crate::project::ProjectFiles;
 
 pub const BINS: usize = 160;
@@ -32,23 +35,89 @@ pub fn gain_db(gain: f32) -> f64 {
     f64::from(audio::decibels(gain).0)
 }
 
+/// The waveforms of sounds, each measured once per version of its file, away from the frame that
+/// asks: decoding a sound and measuring its loudness takes far longer than a frame.
 #[derive(Default)]
 pub struct WaveformCache {
-    waves: HashMap<String, (String, Option<Waveform>)>,
+    waves: HashMap<String, Measured>,
+}
+
+/// What is known of a sound's waveform.
+#[derive(Clone)]
+pub enum WaveState {
+    Measuring,
+    Ready(Waveform),
+    /// The file is missing or doesn't decode.
+    Unreadable,
+}
+
+impl WaveState {
+    pub fn ready(self) -> Option<Waveform> {
+        match self {
+            WaveState::Ready(wave) => Some(wave),
+            WaveState::Measuring | WaveState::Unreadable => None,
+        }
+    }
+}
+
+struct Measured {
+    hash: String,
+    state: Measuring,
+}
+
+enum Measuring {
+    Pending(ChannelInbox<Option<Waveform>>),
+    Done(Option<Waveform>),
 }
 
 impl WaveformCache {
-    pub fn wave(&mut self, files: &ProjectFiles, path: &str) -> Option<Waveform> {
-        let file = path.to_owned();
-        let hash = files.hash_of(&file)?;
-        if let Some((seen, wave)) = self.waves.get(&file)
-            && seen == hash
-        {
-            return wave.clone();
+    /// The waveform of the sound at `path`, once it is measured; until then the measuring runs
+    /// on, and `ctx` is asked to draw again when it ends.
+    pub fn wave(
+        &mut self,
+        ctx: &egui::Context,
+        files: &ProjectFiles,
+        path: &str,
+    ) -> Option<Waveform> {
+        self.state(ctx, files, path).ready()
+    }
+
+    pub fn state(&mut self, ctx: &egui::Context, files: &ProjectFiles, path: &str) -> WaveState {
+        let (Some(hash), Some(bytes)) = (files.hash_of(path), files.get(path)) else {
+            return WaveState::Unreadable;
+        };
+        let measured = match self.waves.get_mut(path) {
+            Some(measured) if measured.hash == hash => measured,
+            _ => {
+                let (sender, receiver) = std::sync::mpsc::channel();
+                let bytes = bytes.clone();
+                let ctx = ctx.clone();
+                std::thread::spawn(move || {
+                    let _ = sender.send(analyse(&bytes));
+                    ctx.request_repaint();
+                });
+                self.waves.insert(
+                    path.to_owned(),
+                    Measured {
+                        hash: hash.to_owned(),
+                        state: Measuring::Pending(ChannelInbox::new(receiver)),
+                    },
+                );
+                self.waves.get_mut(path).expect("just measured")
+            }
+        };
+        if let Measuring::Pending(inbox) = &measured.state {
+            match inbox.try_recv() {
+                Ok(wave) => measured.state = Measuring::Done(wave),
+                Err(TryRecvError::Empty) => return WaveState::Measuring,
+                Err(TryRecvError::Disconnected) => measured.state = Measuring::Done(None),
+            }
         }
-        let wave = files.get(&file).and_then(|bytes| analyse(bytes));
-        self.waves.insert(file, (hash.to_owned(), wave.clone()));
-        wave
+        match &measured.state {
+            Measuring::Done(Some(wave)) => WaveState::Ready(wave.clone()),
+            Measuring::Done(None) => WaveState::Unreadable,
+            Measuring::Pending(_) => WaveState::Measuring,
+        }
     }
 }
 

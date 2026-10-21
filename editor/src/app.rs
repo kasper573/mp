@@ -12,11 +12,13 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use engine::core::content::{Content, fields_file, version};
+use engine::core::content::{Content, ContentFile, FolderReader, Unreadable, fields_file, version};
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
+use engine::core::tiling::{CellPos, Tiles};
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
+use engine::systems::area::AreaModuleKind;
+use engine::systems::frame_rate::{self, FrameCountPlugin, FrameRates};
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
@@ -38,6 +40,7 @@ use crate::thumbs::Thumbnail;
 use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
 use crate::views::area::ResizeDialog;
+use crate::views::area::nodes::CopiedNodes;
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptRow};
 use crate::views::world::ArrangeDialog;
 use crate::views::{self, EditorCamera, EditorViews};
@@ -74,6 +77,7 @@ impl Plugin for EditorPlugin {
         }
         app.add_plugins((
             EguiPlugin::default(),
+            FrameCountPlugin,
             bevy_tilemap::TilemapPlugin,
             bevy::sprite_render::Material2dPlugin::<VfxMaterial>::default(),
         ))
@@ -92,6 +96,8 @@ impl Plugin for EditorPlugin {
         );
     }
 }
+
+const FRAME_RATE_MARGIN: f32 = 8.0;
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, PrimaryEguiContext, EditorCamera));
@@ -256,10 +262,11 @@ pub struct PickRowDialog {
 }
 
 pub enum PickRowThen {
+    /// Adds a module of `kind` at `at` to `area`, naming the picked file.
     AddModule {
         area: String,
-        module: Value,
-        field: String,
+        kind: AreaModuleKind,
+        at: Option<CellPos>,
     },
     ReplaceBlueprint {
         area: String,
@@ -291,11 +298,37 @@ impl PickRowThen {
     }
 }
 
+/// What was copied last: nodes of a scene, or modules of a row's list.
 #[derive(Clone)]
-pub struct Clipboard {
+pub enum Clipboard {
+    Scene(SceneClip),
+    Modules(ModuleClip),
+}
+
+/// Nodes copied out of the scene of the area or blueprint `from`, moved so what they cover starts
+/// at the map's top-left; `origin` is where it started.
+#[derive(Clone)]
+pub struct SceneClip {
+    pub from: String,
+    pub nodes: CopiedNodes,
+    pub count: usize,
+    pub origin: Pos<Tiles>,
+}
+
+/// Modules copied out of the list of the row `from`.
+#[derive(Clone)]
+pub struct ModuleClip {
     pub from: String,
     pub modules: Vec<Value>,
-    pub origin: Option<Pos<Tiles>>,
+}
+
+impl Clipboard {
+    pub fn scene(&self) -> Option<&SceneClip> {
+        match self {
+            Clipboard::Scene(clip) => Some(clip),
+            Clipboard::Modules(_) => None,
+        }
+    }
 }
 
 pub struct NewGameDialog {
@@ -760,6 +793,40 @@ impl Editor {
             .is_some_and(|project| !project.unsaved().is_empty())
     }
 
+    /// The content file at `path` as the game reads it, as the editor holds it now; `None` without
+    /// a project.
+    pub fn read<Row: ContentFile>(&self, path: &str) -> Option<Result<Arc<Row>, Arc<Unreadable>>> {
+        Some(self.project.as_ref()?.read::<Row>(path))
+    }
+
+    /// What reads the project's files as they stand now; `None` without a project.
+    pub fn reader(&self) -> Option<Arc<FolderReader>> {
+        Some(self.project.as_ref()?.reader())
+    }
+
+    /// Writes `row` as the content file at `path`, as one History step labelled `label`.
+    pub fn write_content<Row: ContentFile>(&mut self, label: &str, path: &str, row: &Row) -> bool {
+        self.write_content_as(ContentEdit::new(label), path, row)
+    }
+
+    /// Writes `row` as the content file at `path` as part of `edit`, merging or amending as it
+    /// says.
+    pub fn write_content_as<Row: ContentFile>(
+        &mut self,
+        mut edit: ContentEdit,
+        path: &str,
+        row: &Row,
+    ) -> bool {
+        let Some(project) = &self.project else {
+            return false;
+        };
+        if let Err(reason) = edit.write_content(project, path, row) {
+            self.toast(format!("{}: {reason}", edit.label));
+            return false;
+        }
+        self.apply(edit)
+    }
+
     /// The fields of the content file at `path` as the editor holds them now.
     pub fn row(&self, path: &str) -> Option<Arc<Value>> {
         self.project.as_ref()?.files.json(&fields_file(path))
@@ -914,11 +981,7 @@ impl Editor {
             files: unsaved
                 .iter()
                 .map(|path| {
-                    RecoveryJournalFile::of(
-                        path,
-                        project.disk.get(path).map(String::as_str),
-                        project.files.get(path),
-                    )
+                    RecoveryJournalFile::of(path, project.disk_hash(path), project.files.get(path))
                 })
                 .collect(),
         };
@@ -939,6 +1002,15 @@ fn editor_ui(world: &mut World) {
         editor.frame += 1;
         let started = Instant::now();
         ui::show(&mut editor, &ctx);
+        if editor.settings.frame_rate {
+            frame_rate::show_meter(
+                &ctx,
+                world.resource::<FrameRates>(),
+                egui::Order::Foreground,
+                egui::Align2::RIGHT_BOTTOM,
+                egui::vec2(-FRAME_RATE_MARGIN, -ui::STATUS_HEIGHT - FRAME_RATE_MARGIN),
+            );
+        }
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;
         let tab = ui::active_tab(&editor).map(|tab| tab.title());
         if let Some(log) = &mut editor.frame_log {

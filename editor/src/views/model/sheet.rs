@@ -1,5 +1,5 @@
 use egui::{Color32, Sense, Ui, Vec2};
-use serde_json::Value;
+use engine::systems::actor::ModelDef;
 
 use super::{ModelStrip, strip::DraggedFrame, strip_of};
 use crate::app::Editor;
@@ -8,7 +8,7 @@ use crate::ui::{theme, widgets};
 
 const CELL: f32 = 76.0;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let view = editor.views.model.view(key);

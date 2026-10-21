@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use design_tokens::glyph::{self, Mark};
+use design_tokens::glyph::Mark;
 use design_tokens::ink;
 use egui::emath::TSTransform;
 use egui::text::{LayoutJob, TextFormat};
@@ -462,7 +462,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(big(14.0)), egui::Sense::hover());
             ui.painter()
                 .rect_filled(rect, big(3.0), theme::alpha(color, 70));
-            glyph::paint(ui.painter(), mark, rect.shrink(big(3.0)), color);
+            mark.paint(ui.painter(), rect.shrink(big(3.0)), color);
             let title = card_title(&name, &node);
             ui.add(egui::Label::new(theme::strong(title).monospace().size(big(12.5))).truncate());
         });
@@ -881,7 +881,7 @@ fn kind_fill(node: &Value) -> Color32 {
 pub fn kind_mark(node: &Value) -> (Mark, Color32) {
     match nodes::kind_of(node) {
         NodeKind::On => (Mark::Play, theme::WARN),
-        NodeKind::Run => (Mark::ChevronRight, RUN),
+        NodeKind::Run => (Mark::CaretRight, RUN),
         NodeKind::Dialogue => (Mark::Dot, DIALOGUE),
         NodeKind::Effect => (Mark::Warning, theme::OK),
         NodeKind::If
@@ -889,7 +889,7 @@ pub fn kind_mark(node: &Value) -> (Mark, Color32) {
         | NodeKind::Repeat
         | NodeKind::Wait
         | NodeKind::Set
-        | NodeKind::Return => (Mark::Asterisk, WIRE),
+        | NodeKind::Return => (Mark::Edit, WIRE),
     }
 }
 

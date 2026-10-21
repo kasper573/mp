@@ -219,6 +219,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Harbour",
         "shape": {
           "type": "rect",
           "x": 29.5,
@@ -239,11 +240,11 @@
             "file": "assets/audio/ambient/surf.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Harbour"
+        ]
       },
       {
         "type": "soundscape",
+        "label": "Lagoon",
         "shape": {
           "type": "ellipse",
           "x": 3.5,
@@ -270,11 +271,11 @@
             "volume": 0.32,
             "pan": -0.2
           }
-        ],
-        "label": "Lagoon"
+        ]
       },
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": 45.5,
@@ -294,8 +295,7 @@
             "file": "assets/audio/ambient/timbers.flac",
             "volume": 0.28
           }
-        ],
-        "label": "Lapping water"
+        ]
       },
       {
         "type": "blueprint",
@@ -350,6 +350,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Surf",
         "shape": {
           "type": "rect",
           "x": 62.5,
@@ -370,8 +371,7 @@
             "volume": 0.23,
             "pan": -0.2
           }
-        ],
-        "label": "Surf"
+        ]
       },
       {
         "type": "blueprint",
@@ -426,6 +426,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Surf",
         "shape": {
           "type": "rect",
           "x": 3.5,
@@ -446,8 +447,7 @@
             "volume": 0.23,
             "pan": -0.2
           }
-        ],
-        "label": "Surf"
+        ]
       },
       {
         "type": "blueprint",
@@ -502,6 +502,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Surf",
         "shape": {
           "type": "rect",
           "x": 62.5,
@@ -522,8 +523,7 @@
             "volume": 0.23,
             "pan": -0.2
           }
-        ],
-        "label": "Surf"
+        ]
       },
       {
         "type": "blueprint",

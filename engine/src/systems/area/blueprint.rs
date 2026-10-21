@@ -6,12 +6,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::grid::{AreaGrids, Flip, LayerGrid, PaletteEntry};
-use super::scene::{self, SCENE_FILE, SCENE_PARTS, Scene, SceneNode, module_json, scene_file};
+use super::scene::{
+    self, Holes, ModuleNode, SCENE_FILE, SCENE_PARTS, Scene, SceneNode, scene_file,
+};
 use super::{AreaId, AreaModule, ObjectShape, Tilemap};
 use crate::core::audio::soundscape::SoundscapeShape;
-use crate::core::content::id::{Leaf, nearest, nearest_path};
-use crate::core::content::load::{ParseError, shape_problem};
-use crate::core::content::locate::escape;
+use crate::core::content::id::{Leaf, in_scope, nearest, nearest_path, read_aside};
+use crate::core::content::load::{ParseError, parse_value, shape_problem};
+use crate::core::content::locate::{escape, unescape};
 use crate::core::content::{
     Bundle, CONFIG_FILE, Content, ContentFile, ContentId, ContentProblem, ContentScope, FileWriter,
     PartSpec, Parts, RowCheck, Shape, serial, valid_key, with_content,
@@ -19,7 +21,7 @@ use crate::core::content::{
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
 use crate::core::tiling::{Cell, CellPos, GridDims, TilePos, Tiles};
-use crate::systems::script::{RiftScripting, ScriptModule};
+use crate::systems::script::{Place, RiftScripting, ScriptModule};
 
 pub type BlueprintId = ContentId<BlueprintDef>;
 
@@ -70,6 +72,7 @@ impl ContentFile for BlueprintDef {
 
 impl Bundle for BlueprintDef {
     const PARTS: &'static [PartSpec] = SCENE_PARTS;
+    const WRITTEN: &'static [PartSpec] = SCENE_PARTS;
 
     fn read_parts(&mut self, parts: &mut Parts) {
         scene::read(&mut self.scene, &self.map, &self.variables, parts);
@@ -94,39 +97,203 @@ impl Bundle for BlueprintDef {
     }
 }
 
-/// What a hole without a value reads as while its module is read for references: a path no file
-/// has, whose reference is left out.
-pub(super) const HOLE: &str = "\u{1}hole";
+/// What a hole reads as while its module is read for the content it names: a path no file has,
+/// whose reference is left out.
+const HOLE: &str = "\u{1}hole";
 
-/// Fills each hole with its variable's default, or with a stand-in of the variable's type, so the
-/// rest of the module reads as a module would.
-pub(super) fn stand_in_holes(
-    json: &mut Value,
+/// A hole in a module: a value left for each placement to fill, written in its place.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HoleMark {
+    var: String,
+}
+
+/// Reads the module of a node as a blueprint declaring `variables` holds it: each hole is stood in
+/// and kept apart by its pointer. A problem is answered with its pointer in the module.
+pub(super) fn read_module(
+    mut json: Value,
     variables: &BTreeMap<String, Variable<RiftScripting>>,
-) {
-    if let Some(name) = hole_name(json) {
-        let variable = variables.get(name);
-        let default = variable
-            .and_then(|variable| variable.default.as_ref())
-            .and_then(|default| serde_json::to_value(default).ok());
-        *json = default.unwrap_or_else(|| match variable.map(|variable| variable.ty) {
-            Some(VariableType::Integer | VariableType::Number) => Value::from(0),
-            Some(VariableType::Boolean) => Value::Bool(false),
-            Some(VariableType::Condition) => Value::Bool(true),
-            Some(VariableType::Text | VariableType::Name) => Value::String(String::new()),
-            Some(VariableType::Place) => serde_json::json!({ "area": HOLE, "x": 0, "y": 0 }),
-            Some(VariableType::Row | VariableType::Audio) | None => Value::String(HOLE.to_owned()),
-        });
+) -> Result<(AreaModule, Holes), (String, ContentProblem)> {
+    let misread = |error: ParseError| (error.pointer.clone(), shape_problem(&error));
+    let mut found = BTreeMap::new();
+    find_holes(&json, "", &mut found);
+    if found.is_empty() {
+        let module = parse_value::<AreaModule>(&json).map_err(misread)?;
+        return Ok((module, Holes::default()));
+    }
+    let mut named = json.clone();
+    for (pointer, name) in &found {
+        let Some(variable) = variables.get(name) else {
+            return Err((
+                format!("{pointer}/var"),
+                ContentProblem::new(
+                    "unknown variable",
+                    format!("{name:?}"),
+                    "a variable the blueprint declares",
+                )
+                .near(nearest(variables.keys(), name).map(|near| format!("{near:?}"))),
+            ));
+        };
+        let Some(stand_in) = stand_in(variable) else {
+            return Err((
+                pointer.clone(),
+                ContentProblem::new(
+                    "missing file",
+                    format!("a {} variable with no file to name", variable.ty.name()),
+                    "a file of the variable's type in the game",
+                ),
+            ));
+        };
+        let named_stand_in = match variable.default {
+            Some(_) => stand_in.clone(),
+            None => unnamed(stand_in.clone()),
+        };
+        put(&mut named, pointer, named_stand_in);
+        put(&mut json, pointer, stand_in);
+    }
+    read_aside(
+        || parse_value::<AreaModule>(&named),
+        |leaf| leaf.value != HOLE,
+    )
+    .map_err(misread)?;
+    let module = read_aside(|| parse_value::<AreaModule>(&json), |_| false).map_err(misread)?;
+    Ok((module, Holes(found)))
+}
+
+/// The fields of a module, without its kind, as its file holds them: a hole at each of its holes.
+pub(super) fn write_module(
+    module: &AreaModule,
+    holes: &Holes,
+) -> Result<serde_json::Map<String, Value>, serde_json::Error> {
+    // Through text, since a `Value` holds an f32 widened to the f64 nearest it, which writes far
+    // longer than the f32 itself does.
+    let text = match module {
+        AreaModule::Object(fields) => serde_json::to_string(fields),
+        AreaModule::SafeZone(fields) => serde_json::to_string(fields),
+        AreaModule::Soundscape(fields) => serde_json::to_string(fields),
+        AreaModule::Scenery(fields) => serde_json::to_string(fields),
+        AreaModule::Blueprint(fields) => serde_json::to_string(fields),
+        AreaModule::Population(fields) => serde_json::to_string(fields),
+        AreaModule::Resident(fields) => serde_json::to_string(fields),
+        AreaModule::Script(fields) => serde_json::to_string(fields),
+    }?;
+    let mut json: Value = serde_json::from_str(&text)?;
+    for (pointer, name) in &holes.0 {
+        let mark = serde_json::to_value(HoleMark { var: name.clone() })?;
+        put(&mut json, pointer, mark);
+    }
+    match json {
+        Value::Object(fields) => Ok(fields),
+        _ => Err(serde::ser::Error::custom(
+            "a module's fields written as an object",
+        )),
+    }
+}
+
+/// The module of `node` with each hole filled by the value `values` gives its variable, or else
+/// the variable's default; `None` when a hole is left with neither or the filled module doesn't
+/// read. Ids are those of `scope`, which `values` and the module were read in.
+pub fn fill_module(
+    scope: &ContentScope,
+    node: &ModuleNode,
+    values: &BTreeMap<String, VarValue<RiftScripting>>,
+    variables: &BTreeMap<String, Variable<RiftScripting>>,
+) -> Option<AreaModule> {
+    if node.holes.0.is_empty() {
+        return Some(node.module.clone());
+    }
+    with_content(scope.clone(), || {
+        let mut json = serde_json::to_value(&node.module).ok()?;
+        for (at, name) in &node.holes.0 {
+            let value = values
+                .get(name)
+                .or_else(|| variables.get(name)?.default.as_ref())?;
+            put(&mut json, at, serde_json::to_value(value).ok()?);
+        }
+        serde_json::from_value::<AreaModule>(json).ok()
+    })
+    .0
+}
+
+/// The variables a module's holes name.
+pub fn variables_of(holes: &Holes) -> impl Iterator<Item = &str> {
+    holes.0.values().map(String::as_str)
+}
+
+fn find_holes(json: &Value, pointer: &str, found: &mut BTreeMap<String, String>) {
+    if let Ok(mark) = HoleMark::deserialize(json) {
+        found.insert(pointer.to_owned(), mark.var);
         return;
     }
     match json {
-        Value::Object(map) => map
-            .values_mut()
-            .for_each(|value| stand_in_holes(value, variables)),
-        Value::Array(items) => items
-            .iter_mut()
-            .for_each(|item| stand_in_holes(item, variables)),
+        Value::Object(map) => {
+            for (key, value) in map {
+                find_holes(value, &format!("{pointer}/{}", escape(key)), found);
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                find_holes(item, &format!("{pointer}/{index}"), found);
+            }
+        }
         _ => {}
+    }
+}
+
+/// A value of the variable's type: its default, or else any value of the type, in the scope being
+/// read in.
+fn stand_in(variable: &Variable<RiftScripting>) -> Option<Value> {
+    if let Some(default) = &variable.default {
+        return serde_json::to_value(default).ok();
+    }
+    match variable.ty {
+        VariableType::Integer | VariableType::Number => Some(Value::from(0)),
+        VariableType::Boolean => Some(Value::Bool(false)),
+        VariableType::Condition => Some(Value::Bool(true)),
+        VariableType::Text | VariableType::Name | VariableType::Audio => {
+            Some(Value::String(String::new()))
+        }
+        VariableType::Place => serde_json::to_value(Place {
+            area: AreaId::new(0),
+            at: Pos::new(0.0, 0.0),
+        })
+        .ok(),
+        VariableType::Row => in_scope(|scope| {
+            scope
+                .paths_named(variable.table.as_deref()?)
+                .first()
+                .cloned()
+        })
+        .flatten()
+        .map(Value::String),
+    }
+}
+
+/// `value` with every text in it a hole's, so the files a stand-in names count as no reference.
+fn unnamed(value: Value) -> Value {
+    match value {
+        Value::String(_) => Value::String(HOLE.to_owned()),
+        Value::Array(items) => Value::Array(items.into_iter().map(unnamed).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(key, value)| (key, unnamed(value)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
+/// Puts `value` at `pointer`, adding the field it names when the object has none.
+fn put(json: &mut Value, pointer: &str, value: Value) {
+    if let Some(at) = json.pointer_mut(pointer) {
+        *at = value;
+        return;
+    }
+    let Some((parent, key)) = pointer.rsplit_once('/') else {
+        return;
+    };
+    if let Some(Value::Object(map)) = json.pointer_mut(parent) {
+        map.insert(unescape(key), value);
     }
 }
 
@@ -238,19 +405,15 @@ pub fn flatten_kept(
     let mut placements = Vec::new();
     let mut found = Vec::new();
     scene::walk(nodes, &mut |pointer, node, _| {
-        if let SceneNode::Module(module) = node
+        if let SceneNode::Module(node) = node
             && keep(&[pointer])
         {
-            found.push((pointer.to_owned(), module));
+            found.push((pointer.to_owned(), &node.module));
         }
     });
     for (pointer, module) in found {
-        let module = with_content(ContentScope::of(content), || {
-            serde_path_to_error::deserialize::<_, AreaModule>(module_json(module))
-        })
-        .0;
         match module {
-            Ok(AreaModule::Blueprint(placement)) => {
+            AreaModule::Blueprint(placement) => {
                 let mut cx = Expansion {
                     content,
                     errors: &mut *errors,
@@ -262,14 +425,13 @@ pub fn flatten_kept(
                     keep,
                     holes_open: false,
                 };
-                cx.expand(&placement, placement.at, placement.flip, &placement.values);
+                cx.expand(placement, placement.at, placement.flip, &placement.values);
             }
-            Ok(module) => out.push(Flattened {
-                module,
+            module => out.push(Flattened {
+                module: module.clone(),
                 origin: pointer,
                 chain: Vec::new(),
             }),
-            Err(error) => errors.push(misread(FlattenAt::Area(pointer), error)),
         }
     }
     if out.len() > MAX_AREA_PARTS {
@@ -501,23 +663,34 @@ impl Expansion<'_> {
             .chain(self.chain.iter().map(|(_, pointer)| pointer.as_str()))
             .collect();
         scene::walk(&def.scene.nodes, &mut |pointer, node, _| {
-            if let SceneNode::Module(module) = node {
+            if let SceneNode::Module(node) = node {
                 let path: Vec<&str> = above.iter().copied().chain([pointer]).collect();
                 if keep(&path) {
-                    nodes.push((pointer.to_owned(), module));
+                    nodes.push((pointer.to_owned(), node));
                 }
             }
         });
         for (pointer, node) in nodes {
-            let mut json = module_json(node);
-            let mut unknown: Vec<(String, String)> = Vec::new();
-            fill(&mut json, &filled, &def.variables, &pointer, &mut unknown);
-            for (pointer, name) in unknown {
-                let at = FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, pointer);
-                self.unknown_variable(at, placement.blueprint, def, &name);
-            }
             let site = FlattenAt::Blueprint(placement.blueprint, SCENE_FILE, pointer.clone());
-            let module = {
+            let module = if node.holes.0.is_empty() {
+                node.module.clone()
+            } else {
+                let (written, _) = with_content(ContentScope::of(&content), || {
+                    serde_json::to_value(&node.module)
+                });
+                let Ok(mut json) = written else {
+                    continue;
+                };
+                let mut open = false;
+                for (at, name) in &node.holes.0 {
+                    match filled.get(name) {
+                        Some(value) => put(&mut json, at, value.clone()),
+                        None => open = true,
+                    }
+                }
+                if open {
+                    continue;
+                }
                 let (result, scope) = with_content(ContentScope::of(&content), || {
                     serde_path_to_error::deserialize::<_, AreaModule>(json)
                 });
@@ -785,78 +958,11 @@ fn typed_value(
     }
 }
 
-fn fill(
-    json: &mut Value,
-    values: &BTreeMap<String, Value>,
-    declared: &BTreeMap<String, Variable<RiftScripting>>,
-    pointer: &str,
-    unknown: &mut Vec<(String, String)>,
-) {
-    if let Some(name) = hole_name(json).map(str::to_owned) {
-        match values.get(&name) {
-            Some(value) => *json = value.clone(),
-            None if !declared.contains_key(&name) => unknown.push((format!("{pointer}/var"), name)),
-            None => {}
-        }
-        return;
-    }
-    match json {
-        Value::Object(map) => {
-            for (key, value) in map.iter_mut() {
-                let pointer = format!("{pointer}/{}", escape(key));
-                fill(value, values, declared, &pointer, unknown);
-            }
-        }
-        Value::Array(items) => {
-            for (index, item) in items.iter_mut().enumerate() {
-                fill(
-                    item,
-                    values,
-                    declared,
-                    &format!("{pointer}/{index}"),
-                    unknown,
-                );
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn hole_name(json: &Value) -> Option<&str> {
-    let map = json.as_object()?;
-    if map.len() != 1 {
-        return None;
-    }
-    map.get("var")?.as_str()
-}
-
 fn strings(json: &Value, into: &mut Vec<String>) {
     match json {
         Value::String(text) => into.push(text.clone()),
         Value::Object(map) => map.values().for_each(|value| strings(value, into)),
         Value::Array(items) => items.iter().for_each(|item| strings(item, into)),
-        _ => {}
-    }
-}
-
-pub fn holes(json: &Value, into: &mut Vec<String>) {
-    if let Some(name) = hole_name(json) {
-        if !into.iter().any(|known| known == name) {
-            into.push(name.to_owned());
-        }
-        return;
-    }
-    match json {
-        Value::Object(map) => {
-            for value in map.values() {
-                holes(value, into);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                holes(item, into);
-            }
-        }
         _ => {}
     }
 }

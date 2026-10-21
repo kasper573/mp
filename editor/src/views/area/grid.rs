@@ -5,10 +5,12 @@ use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, TilePos, Tiles};
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::grid::{self, Flip, LayerGrid, PaletteRow};
-use engine::systems::area::scene::{self, LAYERS_FOLDER, PALETTE_FILE, WALK_FILE};
+use engine::systems::area::grid::{Flip, LayerGrid, PaletteRow};
+use engine::systems::area::scene;
 
-use crate::project::{ContentEdit, ProjectFiles, text_bytes};
+use super::nodes;
+use crate::app::Editor;
+use crate::project::Project;
 
 /// The grids an area's or a blueprint's bundle keeps, being painted: its palette, its ground
 /// layers in tree order and its forced walk cells. What placed blueprints paint over them is not
@@ -31,12 +33,11 @@ enum GridPart {
 }
 
 impl GridDraft {
-    /// The grids of the area or blueprint bundle at `bundle`, as `content` loaded them.
-    pub fn own(content: &Content, bundle: &str) -> Option<GridDraft> {
-        let blueprint = blueprint_of(content, bundle)?;
+    /// The grids of `blueprint`, the area's or blueprint's at `bundle`.
+    pub fn of(bundle: &str, blueprint: &BlueprintDef) -> GridDraft {
         let map = &blueprint.map;
         let grids = &blueprint.scene.grids;
-        Some(GridDraft {
+        GridDraft {
             bundle: bundle.to_owned(),
             size: map.size.grid(),
             palette: grids.palette.clone(),
@@ -49,7 +50,45 @@ impl GridDraft {
                 .collect(),
             walk: grids.walk.clone(),
             touched: HashSet::new(),
+        }
+    }
+
+    /// The grids of the area or blueprint at `bundle`, as its files read now.
+    pub fn own(editor: &Editor, bundle: &str) -> Option<GridDraft> {
+        GridDraft::own_in(editor.project.as_ref()?, bundle)
+    }
+
+    /// The grids of the area or blueprint at `bundle` of `project`, as its files read now.
+    pub fn own_in(project: &Project, bundle: &str) -> Option<GridDraft> {
+        Some(GridDraft::of(
+            bundle,
+            nodes::bundle_in(project, bundle)?.blueprint(),
+        ))
+    }
+
+    /// The grids of the area or blueprint at `bundle`, as `content` loaded them.
+    pub fn loaded(content: &Content, bundle: &str) -> Option<GridDraft> {
+        Some(GridDraft::of(bundle, blueprint_of(content, bundle)?))
+    }
+
+    /// Writes these grids into their bundle as one step labelled `label`.
+    pub fn commit(&self, editor: &mut Editor, label: String) -> bool {
+        nodes::change_blueprint(editor, &self.bundle, |blueprint| {
+            self.apply_to(blueprint);
+            Some(label)
         })
+    }
+
+    /// Puts these grids into `blueprint`, whose scene names the same ground layers.
+    pub fn apply_to(&self, blueprint: &mut BlueprintDef) {
+        let grids = &mut blueprint.scene.grids;
+        grids.palette = self.palette.clone();
+        grids.walk = self.walk.clone();
+        grids.layers = self
+            .ground
+            .iter()
+            .map(|layer| (layer.name.clone(), layer.cells.clone()))
+            .collect();
     }
 
     pub fn index(&self, cell: CellPos) -> Option<usize> {
@@ -218,48 +257,6 @@ impl GridDraft {
         self.touched.insert(GridPart::Palette);
     }
 
-    pub fn write_into(&self, edit: &mut ContentEdit) {
-        self.write_parts(edit, |part| self.touched.contains(part));
-    }
-
-    pub fn write_all_into(&self, edit: &mut ContentEdit) {
-        self.write_parts(edit, |_| true);
-    }
-
-    // An empty grid is no file, so a bundle keeps only what was painted.
-    fn write_parts(&self, edit: &mut ContentEdit, wanted: impl Fn(&GridPart) -> bool) {
-        let bundle = &self.bundle;
-        if wanted(&GridPart::Palette) {
-            let file = format!("{bundle}/{PALETTE_FILE}");
-            if self.palette.is_empty() {
-                edit.remove(file)
-            } else {
-                edit.write(file, text_bytes(grid::write_palette(&self.palette)))
-            };
-        }
-        if wanted(&GridPart::Walk) {
-            let file = format!("{bundle}/{WALK_FILE}");
-            if self.walk.iter().all(Option::is_none) {
-                edit.remove(file)
-            } else {
-                edit.write(file, text_bytes(grid::write_walk(self.size, &self.walk)))
-            };
-        }
-        for layer in &self.ground {
-            if wanted(&GridPart::Layer(layer.name.clone())) {
-                let file = layer_file(bundle, &layer.name);
-                if layer.cells.iter().all(Option::is_none) {
-                    edit.remove(file)
-                } else {
-                    edit.write(
-                        file,
-                        text_bytes(grid::write_grid_cells(self.size, &layer.cells)),
-                    )
-                };
-            }
-        }
-    }
-
     /// Makes what a placement of `placed` at `at`, flipped as `flip`, paints this bundle's own:
     /// its cells into the layers of the same name and its forced walk cells. Answers the names of
     /// the layers it paints that this bundle has none of.
@@ -330,33 +327,21 @@ impl GridDraft {
     }
 }
 
-/// The palette of every area and blueprint bundle that has one, by the bundle's path.
-pub fn palettes(files: &ProjectFiles) -> Vec<(String, Vec<PaletteRow>)> {
-    let index = files.index();
-    index
-        .paths_of(AreaDef::TABLE)
-        .chain(index.paths_of(BlueprintDef::TABLE))
-        .filter_map(|bundle| {
-            let path = palette_file(bundle);
-            let text = files.text(&path)?;
-            let file = grid::GridFile {
-                path: &path,
-                text: &text,
-            };
-            let rows = grid::read_palette(file, &mut Vec::new())?;
-            Some((bundle.to_owned(), rows))
-        })
+/// The palette of every area and blueprint that has one, as its files read now, by its path.
+pub fn palettes(project: &Project) -> Vec<(String, Vec<PaletteRow>)> {
+    let reader = project.reader();
+    let areas = reader.paths_of::<AreaDef>().iter().filter_map(|path| {
+        let area = project.read::<AreaDef>(path).ok()?;
+        Some((path.clone(), area.blueprint.scene.grids.palette.clone()))
+    });
+    let blueprints = reader.paths_of::<BlueprintDef>().iter().filter_map(|path| {
+        let blueprint = project.read::<BlueprintDef>(path).ok()?;
+        Some((path.clone(), blueprint.scene.grids.palette.clone()))
+    });
+    areas
+        .chain(blueprints)
+        .filter(|(_, palette)| !palette.is_empty())
         .collect()
-}
-
-/// The palette file of the area or blueprint bundle at `bundle`.
-pub fn palette_file(bundle: &str) -> String {
-    format!("{bundle}/{PALETTE_FILE}")
-}
-
-/// The grid file of the ground layer `name` in the bundle at `bundle`.
-pub fn layer_file(bundle: &str, name: &str) -> String {
-    format!("{bundle}/{LAYERS_FOLDER}/{name}.csv")
 }
 
 /// The blueprint an area or blueprint bundle holds, as `content` loaded it.

@@ -35,6 +35,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Timbers",
         "shape": {
           "type": "rect",
           "x": 0.5,
@@ -49,8 +50,7 @@
             "file": "assets/audio/ambient/timbers.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Timbers"
+        ]
       },
       {
         "type": "blueprint",

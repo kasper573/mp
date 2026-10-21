@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use design_tokens::glyph::{self, Mark};
+use design_tokens::glyph::Mark;
 use egui::{Align2, Pos2, Ui};
 use engine::core::script::RunnerKindDef;
 
@@ -438,13 +438,13 @@ fn group_row(
     }
     let font = egui::FontId::monospace(12.5);
     let ink = if selected { theme::TEXT } else { theme::MUTED };
-    glyph::paint(
+    (if open {
+        Mark::CaretDown
+    } else {
+        Mark::CaretRight
+    })
+    .paint(
         ui.painter(),
-        if open {
-            Mark::ChevronDown
-        } else {
-            Mark::ChevronRight
-        },
         egui::Rect::from_min_size(
             rect.left_center() + egui::vec2(6.0, -4.5),
             egui::vec2(9.0, 9.0),

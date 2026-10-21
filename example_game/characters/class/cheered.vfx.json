@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/tint.vfx_shader",
+      "shader": "vfx/tint.vfx_shader",
       "params": {
         "amount": 0.45,
         "color": [
@@ -17,7 +17,7 @@
     },
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/scale.vfx_shader",
+      "shader": "vfx/scale.vfx_shader",
       "params": {
         "end": 1.15,
         "start": 1.0

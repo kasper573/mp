@@ -4,10 +4,8 @@ use super::{content_tree, widgets};
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
 use crate::moves::fixed_place;
-use crate::picker::{self, PictureFrame};
-use crate::project::Project;
+use crate::rows;
 use crate::tabs::EditorTab;
-use crate::{forms, rows, thumbs};
 use engine::core::content::table_of;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,16 +36,6 @@ impl RowMenu {
             fixed: fixed_place(path),
         }
     }
-}
-
-/// How many icons a list decodes in one frame, so opening a long list never stalls a frame.
-pub const ICON_DECODES_PER_FRAME: u32 = 4;
-
-#[derive(Clone, Copy)]
-pub struct IconImage {
-    pub texture: egui::TextureId,
-    pub uv: egui::Rect,
-    pub size: egui::Vec2,
 }
 
 /// The menu of what can be done to one content file, each with its shortcut. In the content tree
@@ -89,48 +77,6 @@ pub fn row_menu(ui: &mut Ui, menu: &RowMenu, in_tree: bool) -> Option<BrowserAct
         }
     }
     picked
-}
-
-pub fn row_icon(
-    ctx: &egui::Context,
-    form: &mut forms::FormState,
-    project: &Project,
-    table: &str,
-    key: &str,
-    budget: &mut u32,
-) -> Option<IconImage> {
-    let picture = picker::picture_of(&project.files, table, key)?;
-    match picture.frame {
-        PictureFrame::Sprite { size, frame } => {
-            let thumb = form
-                .thumbnails
-                .image_within(ctx, &project.files, &picture.path, budget)?;
-            let frame = thumbs::sprite_frame(size, frame, &thumb);
-            let scale = 18.0 / frame.size.y;
-            Some(IconImage {
-                texture: thumb.texture.id(),
-                uv: frame.uv,
-                size: frame.size * scale,
-            })
-        }
-        PictureFrame::Whole => {
-            let thumb = form
-                .thumbnails
-                .icon(ctx, &project.files, &picture.path, budget)?;
-            Some(icon_image(&thumb))
-        }
-        PictureFrame::Tile(_) => None,
-    }
-}
-
-pub fn icon_image(thumb: &thumbs::Thumbnail) -> IconImage {
-    let [w, h] = thumb.size;
-    let scale = (16.0 / h.max(1) as f32).min(16.0 / w.max(1) as f32);
-    IconImage {
-        texture: thumb.texture.id(),
-        uv: thumbs::FULL_UV,
-        size: egui::vec2(w as f32 * scale, h as f32 * scale),
-    }
 }
 
 /// The shortcuts of a content file's menu, while its tab is the active one.

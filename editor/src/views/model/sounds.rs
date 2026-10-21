@@ -1,6 +1,7 @@
+use design_tokens::glyph::Mark;
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::audio::playback::{SfxDef, SfxRoleDef, SfxScalar};
-use engine::core::content::{ContentFile, fields_file};
+use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::SurfaceDef;
 
 use crate::app::Editor;
@@ -10,17 +11,17 @@ use crate::ui::{theme, widgets};
 
 pub const PEAK_CEILING_DBFS: f64 = -12.0;
 
-pub fn wave_of_sfx(editor: &mut Editor, sfx: &str) -> Option<Waveform> {
+pub fn wave_of_sfx(editor: &mut Editor, ctx: &egui::Context, sfx: &str) -> Option<Waveform> {
     let path = sfx_file(editor, sfx)?;
     let Editor { project, views, .. } = editor;
     let project = project.as_ref()?;
-    views.model.bank.wave(&project.files, &path)
+    views.model.bank.wave(ctx, &project.files, &path)
 }
 
+/// The clip the sfx at `sfx` plays.
 pub fn sfx_file(editor: &Editor, sfx: &str) -> Option<String> {
-    editor
-        .row_value(sfx)
-        .and_then(|row| row["file"].as_str().map(str::to_owned))
+    let sfx = editor.read::<SfxDef>(sfx)?.ok()?;
+    Some(sfx.file.as_str().to_owned())
 }
 
 pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], color: Color32) {
@@ -52,26 +53,26 @@ pub struct SfxRole {
 }
 
 pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
-    let Some(project) = editor.project.as_ref() else {
+    let Some(reader) = editor.reader() else {
         return Vec::new();
     };
-    let mut keys = project.files.paths_of(SfxRoleDef::TABLE);
-    keys.sort_unstable();
-    keys.into_iter()
-        .filter_map(|key| sfx_role(editor, &key))
+    reader
+        .paths_of::<SfxRoleDef>()
+        .iter()
+        .filter_map(|key| sfx_role(editor, key))
         .collect()
 }
 
 pub fn role_of_sfx(editor: &Editor, sfx: &str) -> Option<SfxRole> {
-    let row = editor.row_value(sfx)?;
-    sfx_role(editor, row["role"].as_str()?)
+    let sfx = editor.read::<SfxDef>(sfx)?.ok()?;
+    let reader = editor.reader()?;
+    sfx_role(editor, reader.path_of(sfx.role)?)
 }
 
 fn sfx_role(editor: &Editor, key: &str) -> Option<SfxRole> {
-    let row = editor.row_value(key)?;
     Some(SfxRole {
         key: key.to_owned(),
-        def: serde_json::from_value(row).ok()?,
+        def: (*editor.read::<SfxRoleDef>(key)?.ok()?).clone(),
     })
 }
 
@@ -122,12 +123,10 @@ pub fn first_sfx(editor: &Editor) -> Option<String> {
 }
 
 pub fn sfx_keys(editor: &Editor) -> Vec<String> {
-    let Some(project) = editor.project.as_ref() else {
-        return Vec::new();
-    };
-    let mut keys = project.files.paths_of(SfxDef::TABLE);
-    keys.sort();
-    keys
+    editor
+        .reader()
+        .map(|reader| reader.paths_of::<SfxDef>().to_vec())
+        .unwrap_or_default()
 }
 
 pub struct FootstepSurface {
@@ -137,18 +136,18 @@ pub struct FootstepSurface {
 }
 
 pub fn surfaces(editor: &Editor) -> Vec<FootstepSurface> {
-    let Some(project) = editor.project.as_ref() else {
+    let Some(reader) = editor.reader() else {
         return Vec::new();
     };
-    let mut keys = project.files.paths_of(SurfaceDef::TABLE);
-    keys.sort_unstable();
-    keys.into_iter()
+    reader
+        .paths_of::<SurfaceDef>()
+        .iter()
         .filter_map(|key| {
-            let row = project.files.json(&fields_file(&key))?;
+            let surface = editor.read::<SurfaceDef>(key)?.ok()?;
             Some(FootstepSurface {
-                name: row["name"].as_str().unwrap_or(&key).to_owned(),
-                key,
-                footstep: row["footstep"].as_str()?.to_owned(),
+                name: surface.name.clone(),
+                key: key.clone(),
+                footstep: reader.path_of(surface.footstep)?.to_owned(),
             })
         })
         .collect()
@@ -202,15 +201,16 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         {
             continue;
         }
-        listed.push((sfx.clone(), wave_of_sfx(editor, sfx)));
+        listed.push((sfx.clone(), wave_of_sfx(editor, ui.ctx(), sfx)));
     }
     let view = editor.views.model.view(key);
     let (selected_cue, strip) = (view.cue, view.strip);
     let current_sound = selected_cue
         .filter(|(_, kind)| *kind == super::FrameCueKind::Sound)
         .and_then(|(index, _)| {
-            let row = editor.row_value(key)?;
-            super::strip_of(&row, strip).get(index)?.sound.clone()
+            let model = editor.read::<ModelDef>(key)?.ok()?;
+            let sound = super::strip_of(&model, strip).get(index)?.sound?;
+            Some(editor.reader()?.path_of(sound)?.to_owned())
         });
     let mut play = None;
     let mut choose = None;
@@ -250,11 +250,14 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let view = editor.views.model.view_mut(key);
         view.last_sound = Some(sfx.clone());
         if let Some((index, super::FrameCueKind::Sound)) = selected_cue
-            && let Some(row) = editor.row_value(key)
+            && let Some(Ok(model)) = editor.read::<ModelDef>(key)
+            && let Some(id) = editor
+                .reader()
+                .and_then(|reader| reader.id_of::<SfxDef>(&sfx))
         {
-            let mut frames = super::strip_of(&row, strip);
+            let mut frames = super::strip_of(&model, strip);
             if let Some(frame) = frames.get_mut(index) {
-                frame.sound = Some(sfx.clone());
+                frame.sound = Some(id);
                 let label = format!(
                     "Sound {sfx} on frame {} of {} of {key}",
                     index + 1,
@@ -290,11 +293,9 @@ fn sound_row(
         egui::Stroke::new(1.0, theme::BORDER),
         egui::StrokeKind::Inside,
     );
-    painter.text(
-        button.center(),
-        egui::Align2::CENTER_CENTER,
-        "▶",
-        egui::FontId::proportional(11.0),
+    Mark::Play.paint(
+        &painter,
+        ERect::from_center_size(button.center(), Vec2::splat(12.0)),
         theme::TEXT,
     );
     if ui
@@ -328,17 +329,18 @@ fn sound_row(
 }
 
 pub fn volume_of(editor: &Editor, sfx: &str) -> (String, f32) {
-    scalar_text(scalar_of(editor, sfx, "volume"))
+    scalar_text(scalar_of(editor, sfx, |sfx| sfx.volume))
 }
 
 pub fn pitch_of(editor: &Editor, sfx: &str) -> String {
-    scalar_text(scalar_of(editor, sfx, "pitch")).0
+    scalar_text(scalar_of(editor, sfx, |sfx| sfx.pitch)).0
 }
 
-fn scalar_of(editor: &Editor, sfx: &str, field: &str) -> SfxScalar {
+fn scalar_of(editor: &Editor, sfx: &str, field: impl Fn(&SfxDef) -> SfxScalar) -> SfxScalar {
     editor
-        .row_value(sfx)
-        .and_then(|row| serde_json::from_value(row[field].clone()).ok())
+        .read::<SfxDef>(sfx)
+        .and_then(Result::ok)
+        .map(|sfx| field(&sfx))
         .unwrap_or_default()
 }
 

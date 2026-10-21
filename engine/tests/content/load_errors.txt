@@ -5,12 +5,12 @@ missing file  3    not walkable  2    palette out of range  1
 start not known  1    wrong type  1
 
 ## Errors, by file and line
-fixtures/game.json:3:20  /initial_spawn
+fixtures/game.config.json:3:20  /initial_spawn
   rule      not walkable
   found     start.area 40, 40
   expected  a place on a walkable cell of start.area, outside every warp object
   nearest   9, 7
-fixtures/game.json:8:13  /player
+fixtures/game.config.json:8:13  /player
   rule      missing file
   found     "heroo.player.json"
   expected  the path of a player file

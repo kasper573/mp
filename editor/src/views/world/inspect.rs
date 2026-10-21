@@ -3,9 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
 use engine::core::content::{ContentFile, Fixture};
-use engine::systems::area::world_map::{
-    MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap, WorldMapDef,
-};
+use engine::systems::area::world_map::{MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap};
 use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
 
@@ -16,7 +14,7 @@ use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
-use crate::tabs::EditorTab;
+use crate::tabs::{EditorTab, shown_path};
 use crate::ui::browser::{self, BrowserAction};
 use crate::ui::{sidebar, theme, widgets};
 use crate::views::area as area_view;
@@ -252,11 +250,13 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             ui.label(theme::faint(color.field.name()).size(11.0));
             ui.end_row();
             for (row, bump) in rows.iter().zip(&bumps) {
-                ui.label(
-                    theme::mono(format!("{}{}", row.key, if *bump { " ▲" } else { "" }))
-                        .size(12.5)
-                        .color(if *bump { theme::WARN } else { theme::TEXT }),
-                );
+                ui.horizontal(|ui| {
+                    let ink = if *bump { theme::WARN } else { theme::TEXT };
+                    ui.label(theme::mono(shown_path(&row.key)).size(12.5).color(ink));
+                    if *bump {
+                        ui.label(Mark::Raise.text(12.0).color(ink));
+                    }
+                });
                 ui.label(
                     theme::mono(
                         row.distance
@@ -270,7 +270,10 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         });
     if bumps.contains(&true) {
         ui.add_space(6.0);
-        ui.label(theme::muted("▲ above the curve: stronger than areas further out.").size(12.0));
+        ui.horizontal(|ui| {
+            ui.label(Mark::Raise.text(12.0).color(theme::WARN));
+            ui.label(theme::muted("above the curve: stronger than areas further out.").size(12.0));
+        });
     }
     if next != color {
         editor.views.world.color = Some(next);
@@ -430,7 +433,7 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
 fn check(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
         if ok {
-            glyph::show(ui, Mark::Tick, 14.0, theme::OK)
+            glyph::show(ui, Mark::Check, 14.0, theme::OK)
         } else {
             ui.label(RichText::new("·").color(theme::WARN))
         };
@@ -525,8 +528,8 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         widgets::kv(ui, "size", |ui| {
             let mut size = card.size;
             let by: i32 = match (
-                ui.small_button("−").clicked(),
-                ui.small_button("+").clicked(),
+                glyph::button(ui, Mark::Minus, 18.0, theme::MUTED, "Smaller").clicked(),
+                glyph::button(ui, Mark::Plus, 18.0, theme::MUTED, "Larger").clicked(),
             ) {
                 (true, _) => -10,
                 (_, true) => 10,
@@ -598,11 +601,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     }
     widgets::section(
         ui,
-        &format!(
-            "Stored in {}/{}.json",
-            WorldMapDef::TABLE,
-            WorldMap::World.path()
-        ),
+        &format!("Stored in {}", shown_path(&WorldMap::Game.path())),
     );
     let stored: serde_json::Map<String, serde_json::Value> = cards
         .iter()

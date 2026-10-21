@@ -34,7 +34,7 @@ use crate::core::audio::soundscape::{
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, FileWriter,
-    LoadError, LoadStep, Loading, PartSpec, Parts, RowCheck, Shape, serial,
+    LoadError, LoadStep, Loading, NamedContent, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::render::dynamic_z;
@@ -120,8 +120,15 @@ impl ContentFile for AreaDef {
     }
 }
 
+impl NamedContent for AreaDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
+}
+
 impl Bundle for AreaDef {
     const PARTS: &'static [PartSpec] = SCENE_PARTS;
+    const WRITTEN: &'static [PartSpec] = SCENE_PARTS;
 
     fn read_parts(&mut self, parts: &mut Parts) {
         let blueprint = &mut self.blueprint;
@@ -219,7 +226,10 @@ pub enum AreaModule {
     Script(ScriptModule),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, EnumString, IntoStaticStr, VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum AreaModuleKind {
     Object,

@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/flash.vfx_shader",
+      "shader": "vfx/flash.vfx_shader",
       "params": {
         "color": [
           120,
@@ -17,7 +17,7 @@
     },
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/ring.vfx_shader",
+      "shader": "vfx/ring.vfx_shader",
       "params": {
         "color": [
           120,

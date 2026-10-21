@@ -1,4 +1,5 @@
 use design_tokens::card::{self};
+use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::audio::playback::SfxDef;
@@ -223,10 +224,10 @@ fn show_skill(editor: &mut Editor, ui: &mut Ui, key: &str) {
 fn show_sfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let sound = &mut editor.views.sound;
     if sound.sounding.contains(key) {
-        if widgets::primary(ui, "■ stop").clicked() {
+        if controls::marked_primary(ui, Mark::Stop, "stop").clicked() {
             sound.stop.push(key.to_owned());
         }
-    } else if widgets::primary(ui, "▶ play").clicked() {
+    } else if controls::marked_primary(ui, Mark::Play, "play").clicked() {
         sound.play.push(key.to_owned());
     }
 }
@@ -240,10 +241,10 @@ fn show_babble(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .desired_width(f32::INFINITY),
     );
     if sound.babbling() {
-        if widgets::primary(ui, "■ stop").clicked() {
+        if controls::marked_primary(ui, Mark::Stop, "stop").clicked() {
             sound.stop_babble = true;
         }
-    } else if widgets::primary(ui, "▶ play").clicked() {
+    } else if controls::marked_primary(ui, Mark::Play, "play").clicked() {
         sound.babble = Some(BabbleRequest {
             babble: key.to_owned(),
             text: sound.babble_text.clone(),

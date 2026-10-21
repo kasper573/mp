@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use engine::core::content::{SETTINGS_FILE, fields_file};
+use std::sync::Arc;
+
+use engine::core::content::{ContentFile, FilesystemFolder, FolderReader, WrittenFiles};
 use engine::systems::launch;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::Place;
-use serde_json::Value;
+use engine::systems::{GameSettings, registry};
 use walkdir::WalkDir;
 
 use crate::content;
@@ -27,40 +29,37 @@ pub struct PlaytestSetup {
     pub recorded: bool,
 }
 
-/// A content file, and how a deploy changes it.
+/// A content file, and how a deploy changes it: read as its type, changed, and written back as
+/// the editor writes it.
 pub struct DeployEdit<'a> {
-    file: DeployFile,
-    change: &'a dyn Fn(&mut Value),
-}
-
-enum DeployFile {
-    Settings,
-    Content { table: String, name: String },
+    apply: Box<dyn Fn(&FolderReader) -> WrittenFiles + 'a>,
 }
 
 impl<'a> DeployEdit<'a> {
-    pub fn game(change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
+    pub fn game(change: impl Fn(&mut GameSettings) + 'a) -> DeployEdit<'a> {
         DeployEdit {
-            file: DeployFile::Settings,
-            change,
+            apply: Box::new(move |reader| {
+                let mut settings: GameSettings = reader.settings().expect("the game's settings");
+                change(&mut settings);
+                WrittenFiles {
+                    files: reader
+                        .write_settings(&settings)
+                        .expect("the game's settings written"),
+                    removed: Vec::new(),
+                }
+            }),
         }
     }
 
-    /// An edit of the fields of the one content file of the type `table` named `name`.
-    pub fn file(table: &str, name: &str, change: &'a dyn Fn(&mut Value)) -> DeployEdit<'a> {
+    /// An edit of the one content file of its type named `name`.
+    pub fn file<Row: ContentFile>(name: &str, change: impl Fn(&mut Row) + 'a) -> DeployEdit<'a> {
+        let path = content::path_named(Row::TABLE, name);
         DeployEdit {
-            file: DeployFile::Content {
-                table: table.to_owned(),
-                name: name.to_owned(),
-            },
-            change,
-        }
-    }
-
-    fn path(&self) -> String {
-        match &self.file {
-            DeployFile::Settings => SETTINGS_FILE.to_owned(),
-            DeployFile::Content { table, name } => fields_file(content::path_named(table, name)),
+            apply: Box::new(move |reader| {
+                let mut row: Row = reader.read(path).expect("a content file to deploy");
+                change(&mut row);
+                reader.write(path, &row).expect("a deployed content file")
+            }),
         }
     }
 }
@@ -133,12 +132,15 @@ impl Playtest {
             copy_folder(&self.content, &deployed);
         }
         for edit in edits {
-            let path = deployed.join(edit.path());
-            let text = std::fs::read_to_string(&path).expect("a content file to deploy");
-            let mut row: Value = serde_json::from_str(&text).expect("a content row");
-            (edit.change)(&mut row);
-            let text = serde_json::to_string_pretty(&row).expect("a content row");
-            std::fs::write(&path, text + "\n").expect("a deployed content file");
+            let reader =
+                FolderReader::new(registry(), Arc::new(FilesystemFolder(deployed.clone())));
+            let written = (edit.apply)(&reader);
+            for (file, bytes) in written.files {
+                std::fs::write(deployed.join(file), bytes).expect("a deployed content file");
+            }
+            for file in written.removed {
+                std::fs::remove_file(deployed.join(file)).expect("a part no longer deployed");
+            }
         }
         self.server.restart_on(&deployed, while_down);
         edits.len()

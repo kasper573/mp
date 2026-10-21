@@ -29,11 +29,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                 if !editor.views.world.search.trim().is_empty() {
                     pick = results(editor, ui, map, &search);
                 }
-                ui.menu_button(RichText::new("Layers").size(12.5), |ui| {
+                widgets::dropdown_menu(ui, RichText::new("Layers").size(12.5), |ui| {
                     ui.set_width(220.0);
                     layer_rows(editor, ui, map);
                 });
-                ui.menu_button(RichText::new("Color by").size(12.5), |ui| {
+                widgets::dropdown_menu(ui, RichText::new("Color by").size(12.5), |ui| {
                     ui.set_width(260.0);
                     if let Some(color) = color_menu(editor, ui) {
                         pick = Some(Pick::Color(color));
@@ -137,7 +137,7 @@ fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> eg
             ui.set_min_width(SEARCH_WIDTH);
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
+                glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
                 let view = &mut editor.views.world;
                 let mut chip = |ui: &mut Ui, text: &str, which: Chip| {
                     if widgets::chip_closable(ui, text).1 {

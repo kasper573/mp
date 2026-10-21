@@ -45,8 +45,17 @@ impl Bundle for ModelDef {
     fn read_parts(&mut self, parts: &mut Parts) {
         if let Some(sheet) = parts.required(MODEL_SPRITES) {
             self.sprites.image = ImageRef::new(parts.path(sheet));
+            if let Some(size) = parts.image_size(sheet) {
+                let mut cx = RowCheck::default();
+                check_sheet(&self.sprites, size, &mut cx);
+                parts.config_errors(cx);
+            }
         }
         let keyed = parts.keyed(MODEL_BUSTS);
+        let measured: Vec<(String, Option<(u32, u32)>, Option<FileSize>)> = keyed
+            .iter()
+            .map(|(_, file)| (parts.path(file), parts.image_size(file), parts.weight(file)))
+            .collect();
         let busts = self.modules.iter_mut().find_map(|module| match module {
             ModelModule::Bust(busts) => Some(busts),
             _ => None,
@@ -89,6 +98,9 @@ impl Bundle for ModelDef {
                 file: ImageRef::new(parts.path(file)),
             })
             .collect();
+        let mut cx = RowCheck::default();
+        check_busts(&measured, &mut cx);
+        parts.config_errors(cx);
     }
 
     fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
@@ -103,6 +115,7 @@ impl ContentFile for ModelDef {
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");
         cx.range("/hitbox/height", self.hitbox.height, 0.1, 8.0, "tiles");
+        check_strips(&self.sprites, cx);
         let sheet = &self.sprites;
         cx.range(
             "/sprites/frame_size/width",
@@ -372,131 +385,7 @@ pub fn build_all(loading: &mut Loading) {
     let mut cast = CastWeight::default();
     for ((id, def), busts) in rows.into_iter().zip(files) {
         let mut check = RowCheck::default();
-        let sheet = &def.sprites;
-        let image = sizes.0.get(sheet.image.as_str()).copied();
-        if let Some((width, height)) = image
-            && (width % sheet.frame_size.width.max(1) != 0
-                || height % sheet.frame_size.height.max(1) != 0)
-        {
-            check.error(
-                "/sprites/frame_size",
-                "image size",
-                format!(
-                    "{width} × {height}, not a multiple of {} × {}",
-                    sheet.frame_size.width, sheet.frame_size.height
-                ),
-                "an image of whole frames",
-            );
-        }
-        let frames = image.map(|(width, height)| {
-            (width / sheet.frame_size.width.max(1)) * (height / sheet.frame_size.height.max(1))
-        });
-        for &action in Action::VARIANTS {
-            let Some(strips) = sheet.actions.get(&action) else {
-                check.error(
-                    "/sprites/actions",
-                    "missing frames",
-                    format!("no {} action", action.as_ref()),
-                    format!("every action: {}", listed(Action::VARIANTS)),
-                );
-                continue;
-            };
-            for &direction in Direction::VARIANTS {
-                let pointer = format!(
-                    "/sprites/actions/{}/{}",
-                    action.as_ref(),
-                    direction.as_ref()
-                );
-                let Some(strip) = strips.get(&direction) else {
-                    check.error(
-                        format!("/sprites/actions/{}", action.as_ref()),
-                        "missing frames",
-                        format!("direction {} has no frames", direction.as_ref()),
-                        format!(
-                            "1 to {MAX_STRIP_FRAMES} frames in each of {}",
-                            listed(Direction::VARIANTS)
-                        ),
-                    );
-                    continue;
-                };
-                check.count(&pointer, strip.len(), 1, MAX_STRIP_FRAMES, "frames");
-                let mut apexes = Vec::new();
-                for (index, frame) in strip.iter().enumerate() {
-                    check.range(
-                        format!("{pointer}/{index}/ms"),
-                        frame.ms,
-                        1,
-                        MAX_FRAME_MS,
-                        "whole milliseconds",
-                    );
-                    if let Some(frames) = frames
-                        && frame.frame >= frames
-                    {
-                        check.error(
-                            format!("{pointer}/{index}/frame"),
-                            "tile out of range",
-                            format!("frame {} of {frames}", frame.frame),
-                            format!("0 to {}", frames.saturating_sub(1)),
-                        );
-                    }
-                    if frame.apex {
-                        apexes.push(index);
-                    }
-                }
-                if (apexes.len() > 1) || (!apexes.is_empty() && action != Action::Attack) {
-                    check.error(
-                        &pointer,
-                        "apex out of place",
-                        format!(
-                            "{} · {}: frames {}",
-                            action.as_ref(),
-                            direction.as_ref(),
-                            apexes
-                                .iter()
-                                .map(|i| i.to_string())
-                                .collect::<Vec<_>>()
-                                .join(" and ")
-                        ),
-                        "one apex, in attack strips only",
-                    );
-                }
-            }
-        }
-        if let Some(busts) = def.busts() {
-            let mut size: Option<(u32, u32, &str)> = None;
-            for bust in busts.all() {
-                let Some(&own) = sizes.0.get(bust.as_str()) else {
-                    continue;
-                };
-                match size {
-                    None => size = Some((own.0, own.1, bust.as_str())),
-                    Some((w, h, first)) if (w, h) != own => {
-                        check.error(
-                            "/modules",
-                            "bust sizes differ",
-                            format!(
-                                "{} is {} × {}, {first} is {w} × {h}",
-                                bust.as_str(),
-                                own.0,
-                                own.1
-                            ),
-                            "every bust of one model at one size",
-                        );
-                        break;
-                    }
-                    Some(_) => {}
-                }
-            }
-        }
         for (bust, weight) in &busts.weights {
-            if *weight > MAX_BUST_BYTES {
-                check.error(
-                    "/modules",
-                    "bust too heavy",
-                    format!("{bust} weighs {weight}"),
-                    format!("at most {MAX_BUST_BYTES}"),
-                );
-            }
             if let Some(total) = cast.add(bust, *weight) {
                 check.error(
                     "/modules",
@@ -507,6 +396,7 @@ pub fn build_all(loading: &mut Loading) {
             }
         }
         if check.is_empty() {
+            let image = sizes.0.get(def.sprites.image.as_str()).copied();
             models[id.index()] = Some(ActorModel::new(def, image, busts.figure));
         } else {
             loading.row_errors(id, check);
@@ -514,6 +404,140 @@ pub fn build_all(loading: &mut Loading) {
         }
     }
     loading.built(Models(models));
+}
+
+/// What a model's sheet must be to its config: whole frames, each of the frames the strips show.
+fn check_sheet(sheet: &SpriteSheet, (width, height): (u32, u32), cx: &mut RowCheck) {
+    let frame = sheet.frame_size;
+    if width % frame.width.max(1) != 0 || height % frame.height.max(1) != 0 {
+        cx.error(
+            "/sprites/frame_size",
+            "image size",
+            format!(
+                "{width} × {height}, not a multiple of {} × {}",
+                frame.width, frame.height
+            ),
+            "an image of whole frames",
+        );
+    }
+    let frames = (width / frame.width.max(1)) * (height / frame.height.max(1));
+    for (action, strips) in &sheet.actions {
+        for (direction, strip) in strips {
+            for (index, shown) in strip.iter().enumerate() {
+                if shown.frame >= frames {
+                    cx.error(
+                        format!(
+                            "/sprites/actions/{}/{}/{index}/frame",
+                            action.as_ref(),
+                            direction.as_ref()
+                        ),
+                        "tile out of range",
+                        format!("frame {} of {frames}", shown.frame),
+                        format!("0 to {}", frames.saturating_sub(1)),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// What a model's busts must be to each other: one size, each light enough to download.
+fn check_busts(busts: &[(String, Option<(u32, u32)>, Option<FileSize>)], cx: &mut RowCheck) {
+    let mut first: Option<(&str, (u32, u32))> = None;
+    for (bust, size, weight) in busts {
+        if let Some(weight) = weight
+            && *weight > MAX_BUST_BYTES
+        {
+            cx.error(
+                "/modules",
+                "bust too heavy",
+                format!("{bust} weighs {weight}"),
+                format!("at most {MAX_BUST_BYTES}"),
+            );
+        }
+        let Some(own) = *size else {
+            continue;
+        };
+        match first {
+            None => first = Some((bust, own)),
+            Some((earlier, (w, h))) if (w, h) != own => {
+                cx.error(
+                    "/modules",
+                    "bust sizes differ",
+                    format!("{bust} is {} × {}, {earlier} is {w} × {h}", own.0, own.1),
+                    "every bust of one model at one size",
+                );
+                return;
+            }
+            Some(_) => {}
+        }
+    }
+}
+
+/// What a model's strips must be on their own: frames for every action in every direction, each
+/// shown a while, with one apex in each attack strip at most.
+fn check_strips(sheet: &SpriteSheet, cx: &mut RowCheck) {
+    for &action in Action::VARIANTS {
+        let Some(strips) = sheet.actions.get(&action) else {
+            cx.error(
+                "/sprites/actions",
+                "missing frames",
+                format!("no {} action", action.as_ref()),
+                format!("every action: {}", listed(Action::VARIANTS)),
+            );
+            continue;
+        };
+        for &direction in Direction::VARIANTS {
+            let pointer = format!(
+                "/sprites/actions/{}/{}",
+                action.as_ref(),
+                direction.as_ref()
+            );
+            let Some(strip) = strips.get(&direction) else {
+                cx.error(
+                    format!("/sprites/actions/{}", action.as_ref()),
+                    "missing frames",
+                    format!("direction {} has no frames", direction.as_ref()),
+                    format!(
+                        "1 to {MAX_STRIP_FRAMES} frames in each of {}",
+                        listed(Direction::VARIANTS)
+                    ),
+                );
+                continue;
+            };
+            cx.count(&pointer, strip.len(), 1, MAX_STRIP_FRAMES, "frames");
+            let mut apexes = Vec::new();
+            for (index, frame) in strip.iter().enumerate() {
+                cx.range(
+                    format!("{pointer}/{index}/ms"),
+                    frame.ms,
+                    1,
+                    MAX_FRAME_MS,
+                    "whole milliseconds",
+                );
+                if frame.apex {
+                    apexes.push(index);
+                }
+            }
+            if (apexes.len() > 1) || (!apexes.is_empty() && action != Action::Attack) {
+                cx.error(
+                    &pointer,
+                    "apex out of place",
+                    format!(
+                        "{} · {}: frames {}",
+                        action.as_ref(),
+                        direction.as_ref(),
+                        apexes
+                            .iter()
+                            .map(|i| i.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" and ")
+                    ),
+                    "one apex, in attack strips only",
+                );
+            }
+        }
+    }
 }
 
 pub struct ActorModel {

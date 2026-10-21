@@ -1,8 +1,11 @@
 use std::str::FromStr;
 
+use design_tokens::glyph::Mark;
 use egui::{Align, Layout, Ui};
 use engine::core::content::{ContentFile, fields_file};
 use engine::core::script::VariableType;
+use engine::systems::actor::ModelDef;
+use engine::systems::actor::model::ModelModule;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{RiftScripts, ScriptDef, ScriptModule};
 use serde_json::Value;
@@ -44,7 +47,7 @@ pub fn script_cards(
             ui.horizontal(|ui| {
                 ui.label(theme::strong(ScriptModule::TAG).monospace());
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.menu_button(theme::faint("…"), |ui| {
+                    ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                         if ui.button("Duplicate").clicked() {
                             duplicate = Some(index);
                             ui.close();
@@ -62,7 +65,7 @@ pub fn script_cards(
         ui.add_space(2.0);
     }
     if design_tokens::controls::button(ui, "+ Add script").clicked() {
-        let template = schema::template(cx.root, item_schema);
+        let template = schema::template(cx.root, item_schema, cx.nearby());
         holder[field]
             .as_array_mut()
             .expect("scripts")
@@ -145,7 +148,7 @@ fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path
     }
     if let Some(script) = module["script"].as_str().filter(|key| !key.is_empty()) {
         ui.add_space(4.0);
-        if ui.button("→ Open script").clicked() {
+        if ui.button((Mark::Arrow.text(13.0), "Open script")).clicked() {
             cx.actions.push(FormAction::OpenRow {
                 table: ScriptDef::TABLE.to_owned(),
                 key: script.to_owned(),
@@ -215,18 +218,20 @@ pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
     (table == NpcDef::TABLE).then(|| key.to_owned())
 }
 
-pub fn summary_of(root: &Value, module: &Value) -> String {
+pub fn summary_of(cx: &FormCx, module: &Value) -> String {
     let Some(object) = module.as_object() else {
         return String::new();
     };
-    let shape = module_shape(root, module);
+    let shape = module_shape(cx.root, module);
     let mut parts = Vec::new();
-    if object.get("type").and_then(Value::as_str) == Some("bust") {
-        let own = object
-            .get("own")
-            .and_then(Value::as_array)
-            .map_or(0, Vec::len);
-        return format!("{} expressions", busts::generic().count() + own);
+    if cx.row_table.as_deref() == Some(ModelDef::TABLE)
+        && let Ok(ModelModule::Bust(_)) = serde_json::from_value::<ModelModule>(module.clone())
+    {
+        let model = cx
+            .row_key
+            .as_deref()
+            .and_then(|key| cx.project.read::<ModelDef>(key).ok());
+        return format!("{} expressions", busts::face_names(model.as_deref()).len());
     }
     for (name, field) in object {
         if name == "type" {
@@ -237,7 +242,7 @@ pub fn summary_of(root: &Value, module: &Value) -> String {
             Value::Number(number) => {
                 let number = number.as_f64().unwrap_or(0.0);
                 parts.push(
-                    schema::number_shorthand(root, &shape["properties"][name], number)
+                    schema::number_shorthand(cx.root, &shape["properties"][name], number)
                         .unwrap_or_else(|| format!("{name} {number}")),
                 );
             }

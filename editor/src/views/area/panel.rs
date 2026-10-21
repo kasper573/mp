@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
+use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::content::{ContentFile, fields_file, name_of};
@@ -18,7 +19,6 @@ use crate::project::ContentEdit;
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::tree::{self, DropAt, TreeState};
 use crate::ui::{breadcrumb, content_tree, row_form, theme, widgets};
-use crate::value::RowValue;
 use crate::{schema, views};
 
 /// The left panel's own state between frames: the scene graph's tree, its filter, and what was
@@ -94,9 +94,9 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             let mark = if folded {
-                Mark::ChevronRight
+                Mark::CaretRight
             } else {
-                Mark::ChevronDown
+                Mark::CaretDown
             };
             if glyph::button(ui, mark, 11.0, theme::MUTED, "Fold the box").clicked() {
                 fold = true;
@@ -106,7 +106,7 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
                 ui.label(theme::muted(&facts).size(12.5));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.menu_button(theme::faint("…"), |ui| {
+                ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                     if ui.button("Resize…").clicked() {
                         menu = Some(BoxMenu::Resize);
                         ui.close();
@@ -287,7 +287,7 @@ fn set_by(editor: &Editor, bundle: &str) -> HashMap<String, (usize, usize)> {
 
 fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnapshot) {
     let mut count = 0;
-    nodes::walk(&snapshot.scene, &mut |_, node| {
+    nodes::walk(snapshot.nodes(), &mut |_, node| {
         count += usize::from(!nodes::is_folder(node));
     });
     let selected = scene_tree::selected_ids(snapshot, &editor.selection).len();
@@ -308,7 +308,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnaps
             widgets::chip(ui, &format!("{selected} selected"));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.menu_button(theme::faint("…"), |ui| {
+            ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                 let mut item = |ui: &mut Ui, text: String, key: Option<EditorKey>, picked| {
                     let clicked = match key {
                         Some(key) => ui.add(widgets::shortcut_button(text, key)).clicked(),
@@ -346,7 +346,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnaps
                 );
             });
             let plus = ui
-                .button(theme::mono("+"))
+                .button(Mark::Plus.text(14.0))
                 .on_hover_text("Add into the insertion folder");
             egui::Popup::menu(&plus).show(|ui| {
                 let folder = insertion_row(editor, snapshot);
@@ -357,8 +357,8 @@ fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnaps
     match action {
         Some(HeaderAction::FirstFlagged) => {
             let mut first = None;
-            nodes::walk(&snapshot.scene, &mut |pointer, node| {
-                let flagged = node["hidden"] == true || node["locked"] == true;
+            nodes::walk(snapshot.nodes(), &mut |pointer, node| {
+                let flagged = node.hidden() || node.locked();
                 if first.is_none() && flagged {
                     first = Some(pointer.to_owned());
                 }
@@ -410,30 +410,26 @@ fn filter_row(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         return;
     };
     let key = scene_tree::tree_key(project, &editor.views.area.view(view_key).bundle);
-    let mut changed = false;
-    ui.horizontal(|ui| {
-        let width = ui.available_width() - 74.0;
-        let panel = &mut editor.views.area.view_mut(view_key).scene;
-        let response = ui
-            .scope(|ui| {
-                ui.set_width(width.max(80.0));
-                widgets::search_box(
-                    ui,
-                    &mut panel.filter,
-                    "Filter the scene",
-                    Some(EditorKey::FilterScene),
-                )
-            })
-            .inner;
-        if std::mem::take(&mut panel.focus_filter) {
-            response.request_focus();
-        }
-        if response.has_focus() && ui.input(|i| EditorKey::Cancel.pressed(i)) {
-            panel.filter.clear();
-        }
-        let view = editor.settings.scene_trees.entry(key.clone()).or_default();
-        changed = tree::show_menu(ui, view, &kinds);
-    });
+    let panel = &mut editor.views.area.view_mut(view_key).scene;
+    let view = editor.settings.scene_trees.entry(key).or_default();
+    let ((), changed) = tree::filter_row(
+        ui,
+        |ui| {
+            let response = widgets::search_box(
+                ui,
+                &mut panel.filter,
+                "Filter the scene",
+                Some(EditorKey::FilterScene),
+            );
+            if std::mem::take(&mut panel.focus_filter) {
+                response.request_focus();
+            }
+            if response.has_focus() && ui.input(|i| EditorKey::Cancel.pressed(i)) {
+                panel.filter.clear();
+            }
+        },
+        |ui| tree::show_menu(ui, view, &kinds, &mut []),
+    );
     if changed {
         editor.save_settings();
     }
@@ -441,7 +437,7 @@ fn filter_row(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
 
 /// Every kind of node Show ▾ offers: ground layers and every kind of module.
 fn scene_kinds() -> Vec<String> {
-    std::iter::once("ground_layer".to_owned())
+    std::iter::once(nodes::GROUND_LAYER.to_owned())
         .chain(
             AreaModuleKind::VARIANTS
                 .iter()
@@ -453,7 +449,7 @@ fn scene_kinds() -> Vec<String> {
 /// The Walk row pinned above the tree: the bundle's forced walk cells, its eye the walk overlay and
 /// its padlock against the walk brush. It is no node: it can't move, nest or go.
 fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnapshot) {
-    let forced = GridDraft::own(&snapshot.content, &snapshot.bundle)
+    let forced = GridDraft::own(editor, &snapshot.bundle)
         .map_or(0, |draft| draft.walk.iter().flatten().count());
     let selected = super::armed(editor, snapshot) == super::Armed::Walk;
     let (overlay, locked) = {
@@ -498,13 +494,8 @@ fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSna
     );
     let mut toggled = None;
     for (index, (on, off, is_on, said)) in [
-        (
-            Mark::Padlock,
-            Mark::PadlockOpen,
-            locked,
-            "Lock the walk brush",
-        ),
-        (Mark::Eye, Mark::EyeClosed, overlay, "The walk overlay"),
+        (Mark::Lock, Mark::Unlock, locked, "Lock the walk brush"),
+        (Mark::Eye, Mark::EyeSlash, overlay, "The walk overlay"),
     ]
     .into_iter()
     .enumerate()
@@ -515,9 +506,8 @@ fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSna
             .interact(hit, ui.id().with(("walk toggle", index)), Sense::click())
             .on_hover_text(said);
         let color = if is_on { theme::TEXT } else { theme::FAINT };
-        glyph::paint(
+        (if is_on { on } else { off }).paint(
             ui.painter(),
-            if is_on { on } else { off },
             egui::Rect::from_center_size(center, Vec2::splat(11.0)),
             color,
         );
@@ -628,7 +618,7 @@ fn scene_graph(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &Area
         ui.label(theme::faint(format!("{hits} of {total}")).size(12.0));
     }
     let mut open = shown_kinds.open.clone();
-    let empty = !nodes_beyond_layers(&snapshot.scene);
+    let empty = snapshot.nodes().iter().all(nodes::is_layer);
     let (response, changed) = egui::ScrollArea::vertical()
         .id_salt(("scene graph", view_key))
         .auto_shrink([false, false])
@@ -668,7 +658,8 @@ fn scene_graph(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &Area
     for id in response.activated {
         let placement = snapshot
             .scene_node(&id)
-            .is_some_and(|node| node.is_module(AreaModuleKind::Blueprint));
+            .and_then(nodes::placement_of)
+            .is_some();
         let action = if double && placement {
             SceneAction::EditInPlace(id)
         } else {
@@ -720,13 +711,6 @@ fn insertion_of(selected: &[String], source: &SceneSource, snapshot: &AreaSnapsh
     }
 }
 
-/// Whether a scene holds anything but ground layers.
-fn nodes_beyond_layers(scene: &Value) -> bool {
-    scene
-        .as_array()
-        .is_some_and(|nodes| nodes.iter().any(|node| !nodes::is_layer(node)))
-}
-
 /// Below a scene of nothing but its ground: what goes here, and the two ways to start.
 fn empty_state(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnapshot) {
     let mut action = None;
@@ -736,7 +720,7 @@ fn empty_state(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &Area
             theme::muted("Nothing placed yet. Modules, placements and folders go here.").size(12.5),
         );
         ui.horizontal(|ui| {
-            let add = ui.button("+ Add");
+            let add = controls::dropdown(ui, "+ Add");
             egui::Popup::menu(&add).show(|ui| {
                 action = scene_tree::add_menu(ui, "", snapshot);
             });
@@ -758,7 +742,7 @@ fn count_cells(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, gen
     if panel.counted == Some(generation) {
         return;
     }
-    let cells: HashMap<String, usize> = GridDraft::own(&snapshot.content, &snapshot.bundle)
+    let cells: HashMap<String, usize> = GridDraft::own(editor, &snapshot.bundle)
         .map(|draft| {
             draft
                 .ground
@@ -824,7 +808,11 @@ fn act(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, action: Sce
     let bundle_of = |id: &str| scene_tree::bundle_of_row(snapshot, id);
     let begin_rename = |editor: &mut Editor, id: &str| {
         let label = AreaSnapshot::for_view(editor, view_key)
-            .and_then(|fresh| fresh.scene_node(id).map(shapes::node_label))
+            .and_then(|fresh| {
+                fresh
+                    .scene_node(id)
+                    .map(|node| shapes::node_label(node, fresh.reader.as_ref()))
+            })
             .unwrap_or_default();
         editor
             .views
@@ -854,7 +842,8 @@ fn act(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, action: Sce
         SceneAction::OpenBlueprint(id) => {
             if let Some(blueprint) = snapshot
                 .scene_node(&id)
-                .and_then(|node| node["blueprint"].as_str())
+                .and_then(nodes::placement_of)
+                .and_then(|placement| snapshot.reader.path_of(placement.blueprint))
             {
                 super::run_action(
                     editor,
@@ -950,7 +939,7 @@ fn act(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, action: Sce
         SceneAction::OpenAll | SceneAction::CloseAll => {
             let open = matches!(action, SceneAction::OpenAll);
             let mut folders = Vec::new();
-            nodes::walk(&snapshot.scene, &mut |pointer, node| {
+            nodes::walk(snapshot.nodes(), &mut |pointer, node| {
                 if nodes::is_folder(node) {
                     folders.push(pointer.to_owned());
                 }
@@ -993,13 +982,14 @@ fn folder_child(folder: &str, snapshot: &AreaSnapshot) -> String {
 
 fn edit_in_place(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, id: &str) {
     let level = id.matches("/in/").count();
-    let Some(node) = snapshot.scene_node(id) else {
+    let Some(blueprint) = snapshot
+        .scene_node(id)
+        .and_then(nodes::placement_of)
+        .and_then(|placement| snapshot.reader.path_of(placement.blueprint))
+        .map(str::to_owned)
+    else {
         return;
     };
-    if !node.is_module(AreaModuleKind::Blueprint) {
-        return;
-    }
-    let blueprint = node.text_or("blueprint", "").to_owned();
     let view = editor.views.area.view_mut(view_key);
     view.in_place.truncate(level);
     view.in_place.push(scene_tree::local(id).to_owned());
@@ -1059,7 +1049,7 @@ fn move_to_dialog(editor: &mut Editor, snapshot: &AreaSnapshot, ids: Vec<String>
             "Move {} to…",
             snapshot
                 .scene_node(one)
-                .map(shapes::node_label)
+                .map(|node| shapes::node_label(node, snapshot.reader.as_ref()))
                 .unwrap_or_default()
         ),
         many => format!("Move {} rows to…", many.len()),
@@ -1224,7 +1214,7 @@ fn typeahead(
         .find(|id| {
             snapshot
                 .scene_node(id)
-                .map(shapes::node_label)
+                .map(|node| shapes::node_label(node, snapshot.reader.as_ref()))
                 .is_some_and(|label| label.to_lowercase().starts_with(&wanted))
         })
         .cloned();

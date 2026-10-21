@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/tint.vfx_shader",
+      "shader": "vfx/tint.vfx_shader",
       "params": {
         "amount": 0.45,
         "color": [
@@ -18,7 +18,7 @@
     },
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/motes.vfx_shader",
+      "shader": "vfx/motes.vfx_shader",
       "params": {
         "color": [
           120,

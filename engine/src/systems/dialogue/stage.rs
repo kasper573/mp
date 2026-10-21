@@ -1016,9 +1016,9 @@ fn pills(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<(ItemId,
         match shown {
             ChoiceChip::Needs { what, met } => {
                 let (mark, pill) = if *met {
-                    (Mark::Tick, Pill::Verdigris)
+                    (Mark::Check, Pill::Verdigris)
                 } else {
-                    (Mark::Padlock, Pill::Rubric)
+                    (Mark::Lock, Pill::Rubric)
                 };
                 controls::pill_with(ui, pill, |ui| {
                     glyph::show(ui, mark, PILL_ICON, pill.color());
@@ -1073,7 +1073,7 @@ fn foot(ui: &mut Ui, world: &mut World, body: Rect) {
         .is_some_and(|shown| shown.typed_since.is_some() && !shown.choosing());
     if waits {
         let mark = Rect::from_min_max(body.max - Vec2::splat(CONTINUE_MARK), body.max);
-        glyph::paint(ui.painter(), Mark::ChevronDown, mark, ink::INK3);
+        Mark::CaretDown.paint(ui.painter(), mark, ink::INK3);
     }
 }
 

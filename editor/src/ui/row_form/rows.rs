@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use design_tokens::controls;
 use egui::{RichText, Ui};
 use engine::core::content::{ModuleRule, fields_file};
 use engine::systems::registry;
@@ -193,7 +194,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                 });
             }
             ui.add_space(6.0);
-            let button = ui.button(format!("+ Add module to all {}", values.len()));
+            let button = controls::dropdown(ui, format!("+ Add module to all {}", values.len()));
             egui::Popup::from_toggle_button_response(&button)
                 .id(ui.id().with("add-all"))
                 .width(330.0)
@@ -383,7 +384,7 @@ pub(super) fn free_singles(
     variants
         .iter()
         .filter(|variant| {
-            let template = schema::variant_template(cx.root, variant);
+            let template = schema::variant_template(cx.root, variant, cx.nearby());
             registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne)
                 && registry.takes_module(table, &list, &template)
         })

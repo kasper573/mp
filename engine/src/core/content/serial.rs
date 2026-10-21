@@ -3,6 +3,23 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::core::math::{Pos, Rect, Size};
 
+/// The variant a value of a tagged enum is, by the tag every tagged content type writes it with.
+#[derive(Deserialize)]
+pub struct TypeTag {
+    #[serde(rename = "type")]
+    pub tag: String,
+}
+
+impl TypeTag {
+    pub fn of_json(json: &serde_json::Value) -> Option<String> {
+        TypeTag::deserialize(json).ok().map(|tagged| tagged.tag)
+    }
+
+    pub fn of<T: Serialize>(value: &T) -> Option<String> {
+        TypeTag::of_json(&serde_json::to_value(value).ok()?)
+    }
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(extend("x-rect" = true))]

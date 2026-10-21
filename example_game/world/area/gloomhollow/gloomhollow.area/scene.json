@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Forest",
         "shape": {
           "type": "rect",
           "x": -0.5,
@@ -47,8 +48,7 @@
             "file": "assets/audio/ambient/forest_air.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Forest"
+        ]
       }
     ]
   },
@@ -92,6 +92,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": 4.5,
@@ -106,8 +107,7 @@
             "file": "assets/audio/ambient/lapping_water.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Lapping water"
+        ]
       },
       {
         "type": "scenery",
@@ -2921,6 +2921,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Timbers",
         "shape": {
           "type": "rect",
           "x": 9.5,
@@ -2935,8 +2936,7 @@
             "file": "assets/audio/ambient/timbers.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Timbers"
+        ]
       },
       {
         "type": "blueprint",
@@ -3439,6 +3439,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Stone hum",
         "shape": {
           "type": "rect",
           "x": 39.5,
@@ -3453,8 +3454,7 @@
             "file": "assets/audio/ambient/stone_hum.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Stone hum"
+        ]
       },
       {
         "type": "scenery",
@@ -4743,6 +4743,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Stone hum",
         "shape": {
           "type": "rect",
           "x": 32.5,
@@ -4757,8 +4758,7 @@
             "file": "assets/audio/ambient/stone_hum.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Stone hum"
+        ]
       },
       {
         "type": "blueprint",

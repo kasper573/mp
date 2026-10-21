@@ -13,6 +13,7 @@ pub enum EditorKey {
     CloseTab,
     Quit,
     KeySheet,
+    FrameRate,
     PlayFromStart,
     PlayHere,
     StopPlay,
@@ -231,11 +232,12 @@ impl EditorKey {
     pub fn scope(self) -> KeyScope {
         use EditorKey::*;
         match self {
-            Search | Save | Undo | Redo | CloseTab | Quit | KeySheet | PlayFromStart | PlayHere
-            | StopPlay | PlayedCharacter | Rename | NewAgain | CopyPath | Usages | Duplicate
-            | Delete | Confirm | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste
-            | SelectAll | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
-            | ContextMenu | FirstLine | LastLine => KeyScope::Everywhere,
+            Search | Save | Undo | Redo | CloseTab | Quit | KeySheet | FrameRate
+            | PlayFromStart | PlayHere | StopPlay | PlayedCharacter | Rename | NewAgain
+            | CopyPath | Usages | Duplicate | Delete | Confirm | NewLine | OpenInNewTab
+            | Cancel | Move | Pick | Copy | Paste | SelectAll | ToggleSelection
+            | ExtendSelection | FineStep | Unsnapped | Pan | Zoom | ContextMenu | FirstLine
+            | LastLine => KeyScope::Everywhere,
             SelectTool | PaintTool | TerrainTool | FillTool | EraseTool | EyedropperTool
             | StampTool | ModuleTool | BrushSmaller | BrushBigger | FlipHorizontal
             | FlipVertical | WalkOverlay | SelectAtCursor | PasteInPlace | MakeBlueprint
@@ -262,6 +264,7 @@ impl EditorKey {
             CloseTab => "close the tab",
             Quit => "quit",
             KeySheet => "this sheet",
+            FrameRate => "show or hide the frame rate",
             PlayFromStart => "play from its own start",
             PlayHere => "play here",
             StopPlay => "stop playing",
@@ -361,6 +364,7 @@ impl EditorKey {
             CloseTab => press(command, Key::W),
             Quit => press(command, Key::Q),
             KeySheet => press(plain, Key::F1),
+            FrameRate => press(plain, Key::F3),
             PlayFromStart => press(plain, Key::F5),
             PlayHere => press(plain, Key::F6),
             StopPlay => press(Modifiers::SHIFT, Key::F5),

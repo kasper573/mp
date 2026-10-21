@@ -531,6 +531,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
             } else {
                 canvas(editor, ui, &doc, &mut actions);
             }
+            view_switch(editor, ui, at);
         });
     palette::show(editor, ui, &doc);
     for action in actions {
@@ -551,6 +552,34 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow, tab: BottomTab) 
         _ => ScriptPanel::MayDo,
     };
     panel::show(editor, ui, &doc, panel);
+}
+
+/// Canvas and Outline, at the top right of the view they switch between.
+fn view_switch(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
+    let view = editor
+        .views
+        .script
+        .view_mut(at, &editor.user, editor.project.as_ref());
+    let mut switch = false;
+    let corner = egui::UiBuilder::new()
+        .max_rect(ui.max_rect().shrink(10.0))
+        .layout(egui::Layout::right_to_left(egui::Align::Min));
+    ui.scope_builder(corner, |ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        for (label, outline) in [("Outline", true), ("Canvas", false)] {
+            let tip = format!("{} switches between them", EditorKey::Outline.name());
+            if widgets::mode_chip(ui, label, view.outline == outline)
+                .on_hover_text(tip)
+                .clicked()
+                && view.outline != outline
+            {
+                switch = true;
+            }
+        }
+    });
+    if switch {
+        view.toggle_outline();
+    }
 }
 
 fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
@@ -1238,15 +1267,19 @@ pub fn add_node(
 ) {
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
-    let Some(mut node) = nodes::template(root, kind) else {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let nearby = crate::schema::Nearby {
+        files: &project.files,
+        from: Some(&doc.file),
+    };
+    let Some(mut node) = nodes::template(root, kind, nearby) else {
         editor.toast(format!("No node kind {kind}"));
         return;
     };
     if nodes::is_dialogue(&node) {
         node["lines"] = serde_json::json!([doc.default_speaker().blank_line()]);
-    }
-    if let (Some(schema), Some(project)) = (nodes::node_schema(root), editor.project.as_ref()) {
-        nodes::fill_references(root, schema, &mut node, &project.files);
     }
     if nodes::is_event(&node) {
         let catalogue = catalogue_of(editor.project.as_ref());
@@ -1254,7 +1287,7 @@ pub fn add_node(
         if let Some((event, _)) = catalogue.events.iter().find(|(event, _)| {
             catalogue.event_refusal(event, doc.kind).is_none() && !used.contains(event.as_str())
         }) {
-            node = nodes::template_event(root, event).unwrap_or(node);
+            node = nodes::template_event(root, event, nearby).unwrap_or(node);
         }
     }
     let base = if nodes::is_dialogue(&node) {

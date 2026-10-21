@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
 use engine::core::content::{self, Content, ContentScope};
-use engine::systems::area::AreaModuleKind;
 use engine::systems::script::ScriptModule;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -30,10 +27,6 @@ pub fn rgba(value: &Value) -> [u8; 4] {
     serde_json::from_value(value.clone()).unwrap_or([255; 4])
 }
 
-pub fn empty_object() -> Value {
-    Value::Object(serde_json::Map::new())
-}
-
 // Rows the engine refuses still open in the editor, so a missing field is an ordinary case here,
 // never an error.
 pub trait RowValue {
@@ -45,14 +38,6 @@ pub trait RowValue {
 
     fn is_script_module(&self) -> bool {
         self.kind() == ScriptModule::TAG
-    }
-
-    fn module_kind(&self) -> Option<AreaModuleKind> {
-        AreaModuleKind::from_str(self.kind()).ok()
-    }
-
-    fn is_module(&self, kind: AreaModuleKind) -> bool {
-        self.module_kind() == Some(kind)
     }
 }
 

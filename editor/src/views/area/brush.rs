@@ -10,7 +10,6 @@ use engine::systems::script::Place;
 use super::{AreaFrame, AreaSnapshot, AreaTool, Armed, grid, nodes, pins, select, terrain};
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
-use crate::project::ContentEdit;
 use crate::thumbs;
 use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
@@ -119,7 +118,7 @@ pub(super) fn grid_stroke(
         return;
     };
     if pressed && editor.views.area.view(view_key).stroke().is_none() {
-        let Some(draft) = grid::GridDraft::own(&frame.content, &frame.bundle) else {
+        let Some(draft) = grid::GridDraft::own(editor, &frame.bundle) else {
             return;
         };
         let layer = match kind {
@@ -281,9 +280,7 @@ pub(super) fn finish_stroke(editor: &mut Editor, view_key: &str, frame: &AreaFra
     if stroke.kind == BrushStrokeKind::Erase {
         draft.compact_palette();
     }
-    let mut edit = ContentEdit::new(label);
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    draft.commit(editor, label);
 }
 
 pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell: CellPos) {
@@ -292,7 +289,7 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
     let walking = view.armed == Armed::Walk;
     let walk_value = view.walk_value;
     let brush = editor.settings.brush.clone();
-    let Some(mut draft) = grid::GridDraft::own(&frame.content, &frame.bundle) else {
+    let Some(mut draft) = grid::GridDraft::own(editor, &frame.bundle) else {
         return;
     };
     let layer = target_layer(editor, frame, &draft);
@@ -309,10 +306,10 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
         for cell in cells {
             draft.set_walk(cell, walk_value);
         }
-        let mut edit =
-            ContentEdit::new(format!("Walk grid: fill {count} cells in {}", frame.bundle));
-        draft.write_into(&mut edit);
-        editor.apply(edit);
+        draft.commit(
+            editor,
+            format!("Walk grid: fill {count} cells in {}", frame.bundle),
+        );
         return;
     };
     let Some(tileset) = pick.tileset.clone() else {
@@ -336,12 +333,10 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
         draft.set(layer, c, Some(entry));
     }
     let layer_name = draft.layer_names().get(layer).cloned().unwrap_or_default();
-    let mut edit = ContentEdit::new(format!(
-        "Fill {count} cells of {layer_name} in {}",
-        frame.bundle
-    ));
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    draft.commit(
+        editor,
+        format!("Fill {count} cells of {layer_name} in {}", frame.bundle),
+    );
 }
 
 pub(super) fn eyedrop(
@@ -374,8 +369,8 @@ pub(super) fn eyedrop(
         };
         let name = grids.ground[layer].name.clone();
         let mut pointer = None;
-        nodes::walk(&frame.scene, &mut |at, node| {
-            if nodes::is_layer(node) && node["name"] == name.as_str() {
+        nodes::walk(frame.nodes(), &mut |at, node| {
+            if nodes::layer_name(node) == Some(name.as_str()) {
                 pointer = Some(at.to_owned());
             }
         });

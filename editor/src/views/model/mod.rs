@@ -9,17 +9,17 @@ pub mod sounds;
 pub mod strip;
 
 use std::collections::HashMap;
-use std::ops::Not;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use engine::core::content::{ContentFile, fields_file};
-use engine::core::math::{Direction, FrameSize};
+use engine::core::content::{ContentFile, FolderReader};
+use engine::core::math::Direction;
+use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
 use engine::systems::npc::NpcDef;
 use engine::systems::player::PlayerDef;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Deserialize;
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
@@ -28,9 +28,9 @@ use crate::import;
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::shown_path;
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
-use crate::value::{self, RowValue};
 
 #[derive(Default)]
 pub struct ModelViews {
@@ -157,58 +157,49 @@ pub struct FaceRemoval {
     pub uses: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct StripFrame {
-    pub frame: u32,
-    pub ms: u32,
-    #[serde(skip_serializing_if = "Not::not")]
-    pub step: bool,
-    #[serde(skip_serializing_if = "Not::not")]
-    pub apex: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sound: Option<String>,
-}
-
-impl Default for StripFrame {
-    fn default() -> StripFrame {
-        StripFrame {
-            frame: 0,
-            ms: 100,
-            step: false,
-            apex: false,
-            sound: None,
-        }
+/// A frame of `frame` on the sheet, shown `ms` long, with no cues.
+pub fn plain_frame(frame: u32, ms: u32) -> SheetFrame {
+    SheetFrame {
+        frame,
+        ms,
+        step: false,
+        apex: false,
+        sound: None,
     }
 }
 
-impl StripFrame {
-    pub fn cues(&self) -> Vec<FrameCue> {
-        let mut cues = Vec::new();
-        if self.apex {
-            cues.push(FrameCue::Apex);
-        }
-        cues.extend(self.sound.clone().map(FrameCue::Sound));
-        if self.step {
-            cues.push(FrameCue::Step);
-        }
-        cues
+/// The cues on `frame`, its sound named by its path among `reader`'s files.
+pub fn cues_of(frame: &SheetFrame, reader: &FolderReader) -> Vec<FrameCue> {
+    let mut cues = Vec::new();
+    if frame.apex {
+        cues.push(FrameCue::Apex);
     }
-
-    pub fn mark(&mut self, cue: &FrameCue) {
-        match cue {
-            FrameCue::Apex => self.apex = true,
-            FrameCue::Sound(sound) => self.sound = Some(sound.clone()),
-            FrameCue::Step => self.step = true,
-        }
+    cues.extend(
+        frame
+            .sound
+            .and_then(|sound| reader.path_of(sound))
+            .map(|sound| FrameCue::Sound(sound.to_owned())),
+    );
+    if frame.step {
+        cues.push(FrameCue::Step);
     }
+    cues
+}
 
-    pub fn has(&self, kind: FrameCueKind) -> bool {
-        match kind {
-            FrameCueKind::Apex => self.apex,
-            FrameCueKind::Sound => self.sound.is_some(),
-            FrameCueKind::Step => self.step,
-        }
+/// Puts `cue` on `frame`; a sound no file of `reader`'s has stays off.
+pub fn mark(frame: &mut SheetFrame, cue: &FrameCue, reader: &FolderReader) {
+    match cue {
+        FrameCue::Apex => frame.apex = true,
+        FrameCue::Sound(sound) => frame.sound = reader.id_of(sound).or(frame.sound),
+        FrameCue::Step => frame.step = true,
+    }
+}
+
+pub fn has_cue(frame: &SheetFrame, kind: FrameCueKind) -> bool {
+    match kind {
+        FrameCueKind::Apex => frame.apex,
+        FrameCueKind::Sound => frame.sound.is_some(),
+        FrameCueKind::Step => frame.step,
     }
 }
 
@@ -258,9 +249,19 @@ impl ModelSheet {
     }
 }
 
+/// The model at `key` as the game reads it, or `None` once `ui` says why it doesn't read.
+pub fn read_model(editor: &Editor, ui: &mut Ui, key: &str) -> Option<Arc<ModelDef>> {
+    match editor.read::<ModelDef>(key)? {
+        Ok(model) => Some(model),
+        Err(errors) => {
+            widgets::unreadable(ui, key, &errors);
+            None
+        }
+    }
+}
+
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(key) else {
-        ui.label(theme::muted(format!("model/{key} is gone")));
+    let Some(row) = read_model(editor, ui, key) else {
         return;
     };
     ensure_view(editor, key);
@@ -308,7 +309,7 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
     let view = editor.views.model.view_mut(key);
     let in_strip = matches!(page, ModelPage::Timing | ModelPage::Cues);
     ui.horizontal(|ui| {
-        ui.label(theme::mono(format!("model/{key}")).color(theme::CODE));
+        ui.label(theme::mono(shown_path(key)).color(theme::CODE));
         ui.add_space(8.0);
         for (target, label) in [
             (ModelPage::Matrix, "strips"),
@@ -342,8 +343,8 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
         return;
     }
     editor.views.model.view_mut(key);
-    if let Some(row) = editor.row_value(key)
-        && let Some(index) = busts::module_index(&row)
+    if let Some(Ok(model)) = editor.read::<ModelDef>(key)
+        && let Some(index) = busts::module_index(&model)
     {
         let path = format!("{}/modules/{index}", ModelDef::TABLE);
         if !editor.form.unfolded.contains(&path) {
@@ -378,7 +379,7 @@ pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
-    let Some(row) = editor.row_value(key) else {
+    let Some(row) = read_model(editor, ui, key) else {
         return;
     };
     ensure_view(editor, key);
@@ -390,30 +391,28 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
     }
 }
 
-pub fn strip_of(row: &Value, strip: ModelStrip) -> Vec<StripFrame> {
-    row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()]
-        .as_array()
-        .map(|frames| {
-            frames
-                .iter()
-                .map(|frame| serde_json::from_value(frame.clone()).unwrap_or_default())
-                .collect()
-        })
+pub fn strip_of(model: &ModelDef, strip: ModelStrip) -> Vec<SheetFrame> {
+    model
+        .sprites
+        .actions
+        .get(&strip.action)
+        .and_then(|strips| strips.get(&strip.direction))
+        .cloned()
         .unwrap_or_default()
 }
 
-pub fn frame_size(row: &Value) -> Option<(u32, u32)> {
-    let size = FrameSize::deserialize(&row["sprites"]["frame_size"]).ok()?;
-    (size.width > 0 && size.height > 0).then_some((size.width, size.height))
+pub fn set_strip(model: &mut ModelDef, strip: ModelStrip, frames: Vec<SheetFrame>) {
+    model
+        .sprites
+        .actions
+        .entry(strip.action)
+        .or_default()
+        .insert(strip.direction, frames);
 }
 
-pub fn frames_json(frames: &[StripFrame]) -> Value {
-    Value::Array(
-        frames
-            .iter()
-            .filter_map(|frame| value::json(frame).ok())
-            .collect(),
-    )
+pub fn frame_size(model: &ModelDef) -> Option<(u32, u32)> {
+    let size = model.sprites.frame_size;
+    (size.width > 0 && size.height > 0).then_some((size.width, size.height))
 }
 
 pub fn shifted<T: Copy + PartialEq>(all: &[T], current: T, by: isize) -> T {
@@ -421,15 +420,15 @@ pub fn shifted<T: Copy + PartialEq>(all: &[T], current: T, by: isize) -> T {
     all[(at + by).clamp(0, all.len() as isize - 1) as usize]
 }
 
-pub fn total_ms(frames: &[StripFrame]) -> u32 {
+pub fn total_ms(frames: &[SheetFrame]) -> u32 {
     frames.iter().map(|frame| frame.ms).sum()
 }
 
-pub fn starts_at(frames: &[StripFrame], index: usize) -> u32 {
+pub fn starts_at(frames: &[SheetFrame], index: usize) -> u32 {
     frames.iter().take(index).map(|frame| frame.ms).sum()
 }
 
-pub fn lengths(frames: &[StripFrame]) -> Vec<u32> {
+pub fn lengths(frames: &[SheetFrame]) -> Vec<u32> {
     frames.iter().map(|frame| frame.ms).collect()
 }
 
@@ -452,7 +451,7 @@ impl ActionTiming {
     }
 }
 
-pub fn action_timing(row: &Value, action: Action) -> ActionTiming {
+pub fn action_timing(row: &ModelDef, action: Action) -> ActionTiming {
     let strips: Vec<Vec<u32>> = Direction::VARIANTS
         .iter()
         .map(|&direction| lengths(&strip_of(row, ModelStrip { action, direction })))
@@ -494,9 +493,9 @@ pub fn play_rule_long(action: Action) -> &'static str {
     }
 }
 
-pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> ModelSheet {
-    let image = row["sprites"].text("image").to_owned();
-    let (frame_width, frame_height) = frame_size(row).unwrap_or((1, 1));
+pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, model: &ModelDef) -> ModelSheet {
+    let image = model.sprites.image.as_str().to_owned();
+    let (frame_width, frame_height) = frame_size(model).unwrap_or((1, 1));
     let thumb = editor.thumb(ctx, &image);
     let (columns, rows) = thumb
         .as_ref()
@@ -521,20 +520,15 @@ pub fn write_strip(
     editor: &mut Editor,
     key: &str,
     strip: ModelStrip,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     edit: ContentEdit,
 ) -> bool {
-    let Some(mut row) = editor.row_value(key) else {
+    let Some(Ok(model)) = editor.read::<ModelDef>(key) else {
         return false;
     };
-    row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()] =
-        frames_json(frames);
-    write_row(editor, key, &row, edit)
-}
-
-pub fn write_row(editor: &mut Editor, key: &str, row: &Value, mut edit: ContentEdit) -> bool {
-    edit.write_json(fields_file(key), row);
-    editor.apply(edit)
+    let mut model = (*model).clone();
+    set_strip(&mut model, strip, frames.to_vec());
+    editor.write_content_as(edit, key, &model)
 }
 
 pub fn select_strip(editor: &mut Editor, key: &str, strip: ModelStrip) {

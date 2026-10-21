@@ -11,11 +11,11 @@ use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
 use engine::core::content::{Content, ContentFile, fields_file};
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
-use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
 use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::shown_path;
 use crate::thumbs::{self, Thumbnail};
 use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::views::model::preview::StripPreview;
@@ -488,9 +488,8 @@ pub fn tile_mut(def: &mut TilesetDef, tile: u32) -> &mut TileData {
     def.tiles.entry(tile).or_default()
 }
 
-pub fn tile_size(row: &Value) -> Result<u32, String> {
-    u32::deserialize(&row["tile"])
-        .ok()
+pub fn tile_size(tileset: &TilesetDef) -> Result<u32, String> {
+    Some(tileset.tile)
         .filter(|tile| (1..=MAX_TILE_PX).contains(tile))
         .ok_or_else(|| format!("the tileset's tile is not 1 to {MAX_TILE_PX} px"))
 }
@@ -640,9 +639,12 @@ fn is_blank(data: &TileData) -> bool {
 
 fn unreadable(editor: &Editor, key: &str) -> String {
     if editor.row(key).is_none() {
-        format!("tileset/{key} is gone")
+        format!("{} is gone", shown_path(key))
     } else {
-        format!("tileset/{key} does not read as a tileset; its row on the left shows why")
+        format!(
+            "{} does not read as a tileset; its row on the left shows why",
+            shown_path(key)
+        )
     }
 }
 
@@ -652,7 +654,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mut picked = None;
     let mut import = None;
     ui.horizontal(|ui| {
-        ui.label(theme::mono(format!("tileset/{key}")).color(theme::CODE));
+        ui.label(theme::mono(shown_path(key)).color(theme::CODE));
         ui.add_space(8.0);
         for option in TilesetMode::VARIANTS {
             if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
@@ -668,7 +670,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         }
         if ui.available_width() > 120.0 {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.menu_button("Import", |ui| {
+                widgets::dropdown_menu(ui, "Import", |ui| {
                     if ui.button("Onto this tileset…").clicked() {
                         import = Some(Reimport::Tiles);
                         ui.close();

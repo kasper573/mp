@@ -77,7 +77,7 @@ pub enum InputAction {
 
 impl Fixture for InputAction {
     type Row = InputDef;
-    const FOLDER: &'static str = "input";
+    const FOLDER: Option<&'static str> = Some("input");
     const WHOLE_TABLE: bool = true;
 
     fn locks(self) -> Vec<FixtureLock> {

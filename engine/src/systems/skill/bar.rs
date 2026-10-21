@@ -768,7 +768,11 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
             painter.rect_filled(rect.shrink(1.0), 2.0, ink::wash(ink::CREAM, 0.55));
             glyph::hatch(painter, rect.shrink(1.0), ink::ink_wash(0.3));
             match blocked {
-                Glyph::Lock => glyph::padlock(painter, rect.center(), 11.0, ink::INK2),
+                Glyph::Lock => Mark::Lock.paint(
+                    painter,
+                    Rect::from_center_size(rect.center(), Vec2::splat(14.0)),
+                    ink::INK2,
+                ),
                 Glyph::Zero => {
                     painter.text(
                         rect.right_bottom() - Vec2::new(3.0, 1.0),
@@ -778,9 +782,8 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
                         ink::RUBRIC,
                     );
                 }
-                Glyph::Cross => glyph::paint(
+                Glyph::Cross => Mark::Cross.paint(
                     painter,
-                    Mark::Cross,
                     Rect::from_center_size(rect.center(), Vec2::splat(14.0)),
                     ink::RUBRIC,
                 ),

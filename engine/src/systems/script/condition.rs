@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 
 use super::{Condition, RiftQuery, RiftScripting};
-use crate::core::content::Content;
+use crate::core::content::{Content, ContentNames};
 use crate::core::script::{Compiler, Eval, Expr, FlowCx, ScriptFault, Value, ValueType};
 use crate::systems::text::{self, LineText, Span};
 
@@ -98,7 +98,7 @@ pub fn parts(condition: &Condition) -> Vec<&Condition> {
     }
 }
 
-pub fn describe(content: &Content, condition: &Condition) -> String {
+pub fn describe(content: &impl ContentNames, condition: &Condition) -> String {
     match condition {
         Expr::Not { of } => format!("not {}", describe(content, of)),
         Expr::All { of: parts } => parts
@@ -114,7 +114,7 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
         Expr::AtLeast { a, b } | Expr::More { a, b } => match (&**a, &**b) {
             (Expr::Query(RiftQuery::Level { .. }), Expr::Int(level)) => format!("Level {level}"),
             (Expr::Query(RiftQuery::Holding { item, .. }), Expr::Int(count)) => {
-                format!("{count} {}", item.get(content).name)
+                format!("{count} {}", content.name_of(*item))
             }
             (Expr::Query(RiftQuery::Stat { stat, .. }), Expr::Num(min)) => {
                 format!("{min} {}", stat.label())
@@ -123,7 +123,7 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
                 format!("{min} {}", stat.label())
             }
             (Expr::Query(RiftQuery::Memory { memory, .. }), Expr::Int(count)) => {
-                format!("{} {count}", memory.get(content).label)
+                format!("{} {count}", content.name_of(*memory))
             }
             (Expr::Query(RiftQuery::FreeSlots { .. }), Expr::Int(1)) => "1 free slot".to_owned(),
             (Expr::Query(RiftQuery::FreeSlots { .. }), Expr::Int(slots)) => {
@@ -146,37 +146,37 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
     }
 }
 
-fn describe_query(content: &Content, query: &RiftQuery) -> String {
+fn describe_query(content: &impl ContentNames, query: &RiftQuery) -> String {
     match query {
         RiftQuery::Level { .. } => "Level".to_owned(),
-        RiftQuery::IsClass { class, .. } => format!("a {}", class.get(content).name),
-        RiftQuery::SkillRank { skill, .. } => format!("{} rank", skill.get(content).name),
+        RiftQuery::IsClass { class, .. } => format!("a {}", content.name_of(*class)),
+        RiftQuery::SkillRank { skill, .. } => format!("{} rank", content.name_of(*skill)),
         RiftQuery::SkillStat { skill, stat, .. } => {
-            format!("{} {}", skill.get(content).name, stat.label())
+            format!("{} {}", content.name_of(*skill), stat.label())
         }
         RiftQuery::SpentSkillPoints { .. } => "skill points spent".to_owned(),
         RiftQuery::Stat { stat, .. } => stat.label().to_owned(),
-        RiftQuery::HasStatus { effect, .. } => effect.get(content).name.to_owned(),
+        RiftQuery::HasStatus { effect, .. } => content.name_of(*effect),
         RiftQuery::StatusCount { category, .. } => match category {
             Some(category) => format!("{}s", category.label().to_lowercase()),
             None => "statuses".to_owned(),
         },
         RiftQuery::StatusPower => "status power".to_owned(),
-        RiftQuery::Holding { item, .. } => item.get(content).name.to_owned(),
+        RiftQuery::Holding { item, .. } => content.name_of(*item),
         RiftQuery::FreeSlots { .. } => "free slots".to_owned(),
-        RiftQuery::Wearing { item, .. } => format!("{} worn", item.get(content).name),
-        RiftQuery::Memory { memory, .. } => memory.get(content).label.to_owned(),
-        RiftQuery::SetWithin { memory, .. } => format!("{} lately", memory.get(content).label),
-        RiftQuery::OnQuest { quest, .. } => format!("On {}", quest.get(content).title),
-        RiftQuery::QuestDone { quest, .. } => quest.get(content).title.to_owned(),
+        RiftQuery::Wearing { item, .. } => format!("{} worn", content.name_of(*item)),
+        RiftQuery::Memory { memory, .. } => content.name_of(*memory),
+        RiftQuery::SetWithin { memory, .. } => format!("{} lately", content.name_of(*memory)),
+        RiftQuery::OnQuest { quest, .. } => format!("On {}", content.name_of(*quest)),
+        RiftQuery::QuestDone { quest, .. } => content.name_of(*quest),
         RiftQuery::QuestCooling { quest, .. } => {
-            format!("{} done for today", quest.get(content).title)
+            format!("{} done for today", content.name_of(*quest))
         }
-        RiftQuery::TaskDone { quest, task, .. } => format!("{} · {task}", quest.get(content).title),
-        RiftQuery::QuestResetsIn { quest, .. } => format!("{} resets", quest.get(content).title),
+        RiftQuery::TaskDone { quest, task, .. } => format!("{} · {task}", content.name_of(*quest)),
+        RiftQuery::QuestResetsIn { quest, .. } => format!("{} resets", content.name_of(*quest)),
         RiftQuery::Inside { object, .. } => format!("Standing on {object}"),
-        RiftQuery::InArea { area, .. } => format!("In {}", area.get(content).name),
-        RiftQuery::KnowsArea { area, .. } => format!("Knows {}", area.get(content).name),
+        RiftQuery::InArea { area, .. } => format!("In {}", content.name_of(*area)),
+        RiftQuery::KnowsArea { area, .. } => format!("Knows {}", content.name_of(*area)),
         RiftQuery::Nearest { .. } => "nearest".to_owned(),
         RiftQuery::Count { .. } => "count".to_owned(),
         RiftQuery::Present { .. } => "present".to_owned(),
@@ -187,7 +187,7 @@ fn describe_query(content: &Content, query: &RiftQuery) -> String {
         RiftQuery::Target => "target".to_owned(),
         RiftQuery::Walking { .. } => "walking".to_owned(),
         RiftQuery::Hostile { .. } => "hostile".to_owned(),
-        RiftQuery::GroundItems { item, .. } => format!("{} on the ground", item.get(content).name),
+        RiftQuery::GroundItems { item, .. } => format!("{} on the ground", content.name_of(*item)),
         RiftQuery::SkillTargets => "the skill's targets".to_owned(),
         RiftQuery::SkillArea => "the skill's area".to_owned(),
         RiftQuery::AimedPoint => "the aimed point".to_owned(),

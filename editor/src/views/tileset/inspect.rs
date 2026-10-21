@@ -1,9 +1,7 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
-use engine::core::assets::AssetKind;
-use engine::systems::area::tileset::TileData;
-use serde_json::Value;
+use engine::systems::area::tileset::{TileData, TilesetDef};
 use strum::VariantArray;
 
 use super::sheet::TileBrush;
@@ -13,9 +11,9 @@ use super::{
     TileSheetDialog, TilesetMode, WalkBrush, change_tileset, tile_mut, walk_label,
 };
 use crate::app::Editor;
-use crate::forms::{FormChange, FormCx};
-use crate::picker;
+use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
@@ -54,44 +52,36 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         });
 }
 
-pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
-    let mut changed = FormChange::default();
-    widgets::kv(ui, "image", |ui| {
-        let mut file = value["image"].as_str().unwrap_or_default().to_owned();
-        if picker::asset_of(ui, cx, AssetKind::Image, &mut file, "/image") {
-            value["image"] = Value::String(file);
-            changed = FormChange::at("/image");
-        }
-    });
+pub fn row_body(ui: &mut Ui, cx: &mut FormCx, tileset: &TilesetDef) {
+    let image = tileset.image.as_str();
+    widgets::kv_text(ui, "image", shown_path(image));
     let ctx = ui.ctx().clone();
-    let tile = super::tile_size(value).map(|tile| {
-        let columns = value["image"]
-            .as_str()
-            .and_then(|image| cx.state.thumbnails.image(&ctx, cx.files, image))
-            .map(|thumb| thumb.size[0] as u32 / tile);
+    let tile = tileset.tile;
+    let columns = cx
+        .state
+        .thumbnails
+        .image(&ctx, cx.files, image)
+        .map(|thumb| thumb.size[0] as u32 / tile.max(1));
+    widgets::kv_text(
+        ui,
+        "tile",
         match columns {
             Some(columns) => format!("{tile} × {tile} px · {columns} columns, imported"),
             None => format!("{tile} × {tile} px, imported"),
-        }
-    });
-    widgets::kv_text(ui, "tile", tile.unwrap_or_else(|error| error));
-    let tiles = value["tiles"].as_object().map_or(0, |tiles| tiles.len());
-    widgets::kv_text(ui, "tiles", format!("{tiles} with data"));
-    if let Some(sets) = value["terrains"]
-        .as_object()
-        .filter(|sets| !sets.is_empty())
-    {
-        let names: Vec<&str> = sets.keys().map(String::as_str).collect();
+        },
+    );
+    widgets::kv_text(ui, "tiles", format!("{} with data", tileset.tiles.len()));
+    if !tileset.terrains.is_empty() {
+        let names: Vec<&str> = tileset.terrains.keys().map(String::as_str).collect();
         widgets::kv_text(ui, "terrains", names.join(" · "));
     }
-    changed
 }
 
 fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32) {
     let key = tileset.key.as_str();
     let cell = tileset.sheet.cell(tile);
     ui.label(
-        theme::mono(format!("tileset/{key} › tile {tile}"))
+        theme::mono(format!("{} › tile {tile}", shown_path(key)))
             .color(theme::CODE)
             .size(12.0),
     );
@@ -187,7 +177,7 @@ fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str) {
 fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let key = tileset.key.as_str();
     ui.label(
-        theme::mono(format!("tileset/{key} › terrains"))
+        theme::mono(format!("{} › terrains", shown_path(key)))
             .color(theme::CODE)
             .size(12.0),
     );
@@ -231,7 +221,7 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 widgets::kv_text(ui, "tiles", tile_text);
                 widgets::kv(ui, "mixes", |ui| {
                     if mixes.missing.is_empty() {
-                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                        glyph::show(ui, Mark::Check, 14.0, theme::OK);
                         ui.label(format!("all {} beyond its base", mixes.total));
                         return;
                     }

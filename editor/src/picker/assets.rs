@@ -1,10 +1,9 @@
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::core::assets::AssetKind;
 
-use super::{Candidate, Category, Dragged, Pick, PickSource};
+use super::{Candidate, Category, Dragged, Pick, PickLayout, PickSource};
 use crate::forms::FormCx;
-use crate::ui::theme;
+use crate::icons::{self, KindIcon};
+use crate::moves::file_name;
 
 /// Media files of one kind, wherever they sit outside a bundle.
 pub struct AssetSource {
@@ -73,32 +72,23 @@ impl PickSource for AssetSource {
         }
     }
 
-    fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32) {
-        match AssetKind::of(&pick.key) {
-            Some(AssetKind::Image) => {
-                let ctx = ui.ctx().clone();
-                if let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &pick.key) {
-                    let [w, h] = thumb.size;
-                    let scale = (size / h.max(1) as f32)
-                        .min(size / w.max(1) as f32)
-                        .min(1.0);
-                    ui.add(egui::Image::from_texture((
-                        thumb.texture.id(),
-                        egui::vec2(w as f32 * scale, h as f32 * scale),
-                    )));
-                }
-            }
-            Some(AssetKind::Audio) => {
-                glyph::show(ui, Mark::Note, 13.0, theme::MUTED);
-            }
-            Some(AssetKind::Font) => {
-                ui.label(theme::muted("A"));
-            }
-            None => {}
-        }
+    fn short(&self, pick: &Pick) -> String {
+        file_name(&pick.key).to_owned()
     }
 
-    fn footer(&self, _cx: &FormCx, pick: &Pick) -> String {
-        pick.key.clone()
+    fn icon(&self, pick: &Pick) -> KindIcon {
+        icons::of_media(&pick.key)
+    }
+
+    fn describe(&self, cx: &FormCx, pick: &Pick) -> String {
+        let uses = cx.usages.of_media(&pick.key).len();
+        format!("used by {uses}")
+    }
+
+    fn layout(&self) -> PickLayout {
+        match self.kind {
+            AssetKind::Image => PickLayout::Grid,
+            _ => PickLayout::List,
+        }
     }
 }

@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Forest",
         "shape": {
           "type": "rect",
           "x": -0.5,
@@ -47,8 +48,7 @@
             "file": "assets/audio/ambient/forest_air.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Forest"
+        ]
       }
     ]
   },
@@ -69,6 +69,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": 14.5,
@@ -83,8 +84,7 @@
             "file": "assets/audio/ambient/lapping_water.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Lapping water"
+        ]
       },
       {
         "type": "scenery",
@@ -3780,6 +3780,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": 11.5,
@@ -3794,11 +3795,11 @@
             "file": "assets/audio/ambient/lapping_water.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Lapping water"
+        ]
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 5.5,
@@ -3813,8 +3814,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",

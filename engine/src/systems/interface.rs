@@ -45,7 +45,7 @@ pub enum CursorShape {
 
 impl Fixture for CursorShape {
     type Row = CursorDef;
-    const FOLDER: &'static str = "interface";
+    const FOLDER: Option<&'static str> = Some("interface");
     const WHOLE_TABLE: bool = true;
 }
 
@@ -74,7 +74,7 @@ pub enum InterfaceIcon {
 
 impl Fixture for InterfaceIcon {
     type Row = InterfaceIconDef;
-    const FOLDER: &'static str = "interface";
+    const FOLDER: Option<&'static str> = Some("interface");
     const WHOLE_TABLE: bool = true;
 }
 
@@ -98,7 +98,7 @@ pub enum InterfaceSound {
 
 impl Fixture for InterfaceSound {
     type Row = SfxDef;
-    const FOLDER: &'static str = "interface";
+    const FOLDER: Option<&'static str> = Some("interface");
 }
 
 impl InterfaceSound {

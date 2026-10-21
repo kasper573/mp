@@ -2,8 +2,10 @@ use egui::{Pos2, Ui};
 use engine::core::content::table_of;
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
-use serde_json::Value;
+use engine::systems::area::AreaModule;
+use engine::systems::area::scene::SceneNode;
+use engine::systems::script::Variable;
+use std::collections::BTreeMap;
 
 use super::flags::RowFlags;
 use super::placement::{self, AreaPlacement, PartView};
@@ -11,11 +13,10 @@ use super::{
     AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
     blueprint, nodes, pick, pins, scene_tree, shapes,
 };
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor, SceneClip};
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;
 use crate::ui::widgets;
-use crate::value::RowValue;
 
 /// The modules of the scene of `bundle` the selection moves, in tree order: those selected and
 /// what selected folders hold.
@@ -167,7 +168,7 @@ impl SelectScope<'_> {
                 .modules
                 .iter()
                 .filter(|module| {
-                    super::is_selectable(&module.json)
+                    super::is_selectable(module.module())
                         && frame
                             .module_bounds(&module.pointer)
                             .is_some_and(|bounds| rect.contains_rect(&bounds))
@@ -220,7 +221,7 @@ impl SelectScope<'_> {
             (SelectScope::Area, Some(node)) => {
                 if frame
                     .module(&node)
-                    .is_some_and(|module| module.is_module(AreaModuleKind::Blueprint))
+                    .is_some_and(|module| matches!(module, AreaModule::Blueprint(_)))
                 {
                     placement::edit_in_place(editor, view_key, frame, &node);
                 }
@@ -459,11 +460,12 @@ fn finish_select_drag(
             };
             let w = (new_max.x - new_min.x).max(1.0);
             let h = (new_max.y - new_min.y).max(1.0);
+            let reader = frame.reader.clone();
             nodes::change_scene(editor, &frame.bundle, |scene| {
-                let module = scene.pointer_mut(&part)?;
+                let module = &mut nodes::module_node_mut(scene, &part)?.module;
                 shapes::shift(module, new_min.x - min.x, new_min.y - min.y);
                 shapes::resize(module, w, h);
-                Some(format!("Resize {}", shapes::label(module)))
+                Some(format!("Resize {}", shapes::label(module, reader.as_ref())))
             });
         }
         AreaDrag::Pin { file, pointer } => {
@@ -511,12 +513,16 @@ pub fn move_selection(editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) 
     if moved.is_empty() {
         return;
     }
+    let reader = frame.reader.clone();
     nodes::change_scene(editor, &frame.bundle, |scene| {
         for node in &moved {
-            shapes::shift(scene.pointer_mut(node)?, dx, dy);
+            shapes::shift(&mut nodes::module_node_mut(scene, node)?.module, dx, dy);
         }
         Some(match moved.as_slice() {
-            [one] => format!("Move {}", shapes::label(scene.pointer(one)?)),
+            [one] => format!(
+                "Move {}",
+                shapes::label(&nodes::module_node(scene, one)?.module, reader.as_ref())
+            ),
             many => format!("Move {} modules", many.len()),
         })
     });
@@ -528,23 +534,34 @@ pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
 }
 
 pub fn start_paste(editor: &mut Editor, view_key: &str) {
-    let Some(clip) = editor.clipboard.clone() else {
+    let Some(clip) = editor
+        .clipboard
+        .as_ref()
+        .and_then(Clipboard::scene)
+        .cloned()
+    else {
         editor.toast("Nothing copied");
+        return;
+    };
+    let bundle = editor.views.area.view(view_key).bundle.clone();
+    let Some((nodes, _)) = pasted(editor, &clip, &bundle) else {
         return;
     };
     let view = editor.views.area.view_mut(view_key);
     view.set_tool(AreaTool::Select);
-    view.paste = Some(PasteGhost {
-        modules: clip.modules,
-    });
+    view.paste = Some(PasteGhost { clip, nodes });
 }
 
 pub fn paste_in_place(editor: &mut Editor, frame: &AreaFrame) {
-    let Some(clip) = editor.clipboard.clone() else {
+    let Some(clip) = editor
+        .clipboard
+        .as_ref()
+        .and_then(Clipboard::scene)
+        .cloned()
+    else {
         return;
     };
-    let origin = clip.origin.unwrap_or(Pos::new(0.0, 0.0));
-    paste_at(editor, frame, clip.modules, origin);
+    paste_at(editor, frame, &clip, clip.origin);
 }
 
 pub(super) fn finish_paste(
@@ -555,16 +572,19 @@ pub(super) fn finish_paste(
     tile: Pos<Tiles>,
 ) {
     editor.views.area.view_mut(view_key).paste = None;
-    paste_at(editor, frame, ghost.modules, paste_anchor(tile));
+    paste_at(editor, frame, &ghost.clip, paste_anchor(tile));
 }
 
 pub(super) fn paste_anchor(tile: Pos<Tiles>) -> Pos<Tiles> {
     Pos::new(tile.x.round() - 0.5, tile.y.round() - 0.5)
 }
 
-pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, pasted: Vec<Value>, at: Pos<Tiles>) {
+pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, clip: &SceneClip, at: Pos<Tiles>) {
+    let Some((pasted, open)) = pasted(editor, clip, &frame.bundle) else {
+        return;
+    };
     let mut taken = frame.object_names();
-    let placed: Vec<Value> = pasted
+    let placed: Vec<SceneNode> = pasted
         .into_iter()
         .map(|mut node| {
             blueprint::shift_tree(&mut node, at.x, at.y);
@@ -573,12 +593,75 @@ pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, pasted: Vec<Value
         })
         .collect();
     let count = placed.len();
-    nodes::add(
+    if nodes::add(
         editor,
         &frame.bundle,
         placed,
         &format!("Paste {count} row{}", widgets::plural(count)),
-    );
+    ) && open > 0
+    {
+        toast_open(editor, open);
+    }
+}
+
+/// The nodes of `clip` as they paste into `bundle`, read among the files there are now, and how
+/// many holes of the blueprint they were copied from came along without a default. Pasted into
+/// another bundle, a hole keeps the value it was read with: its variable's default, or else a
+/// stand-in to fill in.
+pub(super) fn pasted(
+    editor: &mut Editor,
+    clip: &SceneClip,
+    bundle: &str,
+) -> Option<(Vec<SceneNode>, usize)> {
+    let reader = editor.reader()?;
+    let variables = nodes::bundle_of(editor, &clip.from)
+        .map(|from| from.blueprint().variables.clone())
+        .unwrap_or_default();
+    let mut read = match clip.nodes.read(&reader, &variables) {
+        Ok(read) => read,
+        Err(problems) => {
+            let said = problems
+                .first()
+                .map(|(pointer, problem)| format!("{pointer}: {problem}"))
+                .unwrap_or_default();
+            editor.toast(format!("What was copied doesn't read any more: {said}"));
+            return None;
+        }
+    };
+    let open = match clip.from == bundle {
+        true => 0,
+        false => settle_holes(&mut read, &variables),
+    };
+    Some((read, open))
+}
+
+pub(super) fn toast_open(editor: &mut Editor, open: usize) {
+    editor.toast(format!(
+        "{open} value{} the blueprint left open came along as a stand-in: fill {} in",
+        widgets::plural(open),
+        if open == 1 { "it" } else { "them" }
+    ));
+}
+
+/// Fixes every hole of `nodes` to the value it was read with; answers how many had no default.
+fn settle_holes(nodes: &mut [SceneNode], variables: &BTreeMap<String, Variable>) -> usize {
+    let mut open = 0;
+    for node in nodes {
+        match node {
+            SceneNode::Folder(folder) => open += settle_holes(&mut folder.children, variables),
+            SceneNode::Module(module) => {
+                open += module
+                    .holes
+                    .0
+                    .values()
+                    .filter(|name| variables.get(*name).is_none_or(|v| v.default.is_none()))
+                    .count();
+                module.holes.0.clear();
+            }
+            SceneNode::GroundLayer(_) => {}
+        }
+    }
+    open
 }
 
 pub fn duplicate_selection(editor: &mut Editor, frame: &AreaSnapshot) {
@@ -612,7 +695,7 @@ pub fn select_all(editor: &mut Editor, frame: &AreaFrame) {
             frame
                 .modules
                 .iter()
-                .filter(|module| super::is_selectable(&module.json))
+                .filter(|module| super::is_selectable(module.module()))
                 .filter(|module| skipped.passes(&frame.flags.row(&module.pointer)))
                 .map(|module| module.pointer.clone())
                 .collect(),

@@ -1,10 +1,8 @@
 use std::time::Duration;
 
 use driver::{DeployEdit, UiTarget, WaitBudget, arrived_in, in_world, resident_home};
-use engine::core::content::ContentFile;
 use engine::core::math::Offset;
 use engine::systems::npc::NpcDef;
-use serde_json::json;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -39,13 +37,15 @@ fn play(shoot: &mut Shoot) {
     );
     let changed = shoot.deploy(
         &[
-            DeployEdit::game(&|game| game["name"] = json!(EDITION)),
-            DeployEdit::file(NpcDef::TABLE, "mara", &|npc| {
-                npc["name"] = json!("Mara the Harbourmaster")
+            DeployEdit::game(|game| game.name = EDITION.to_owned()),
+            DeployEdit::file("mara", |npc: &mut NpcDef| {
+                npc.name = "Mara the Harbourmaster".to_owned()
             }),
-            DeployEdit::file(NpcDef::TABLE, "tobb", &|npc| npc["name"] = json!("Tobb, town crier")),
-            DeployEdit::file(NpcDef::TABLE, "grisha", &|npc| {
-                npc["name"] = json!("Grisha of the quay")
+            DeployEdit::file("tobb", |npc: &mut NpcDef| {
+                npc.name = "Tobb, town crier".to_owned()
+            }),
+            DeployEdit::file("grisha", |npc: &mut NpcDef| {
+                npc.name = "Grisha of the quay".to_owned()
             }),
         ],
         || {

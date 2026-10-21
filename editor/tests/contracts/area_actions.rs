@@ -2,17 +2,18 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use editor::app::Editor;
-use editor::project::{ContentEdit, Project, RowSelection};
+use editor::project::{Project, RowSelection};
 use editor::schema::SchemaShapes;
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
+use editor::views::area::nodes::SceneTree;
 use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, nodes, run_action};
 use engine::core::content::ContentFile;
 use engine::core::math::Rng;
 use engine::core::tiling::CellPos;
-use engine::systems::area::AreaDef;
-use engine::systems::area::scene::scene_file;
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{AreaDef, AreaModule};
 use serde_json::{Value, json};
 
 use crate::support::{area, game_folder};
@@ -33,11 +34,12 @@ fn editor_with_a_door(scratch: &tempfile::TempDir) -> Editor {
         EditorSettings::default(),
     );
     editor.project = Some(project);
-    let mut scene = nodes::scene_of(&editor, &area());
-    nodes::append(&mut scene, "", vec![barn_door()]);
-    let mut edit = ContentEdit::new("Add a door");
-    edit.write_json(scene_file(&area()), &scene);
-    editor.try_apply(edit).expect("the door is written");
+    let reader = editor.reader().expect("a reader");
+    let door: AreaModule = reader.from_json(&barn_door()).expect("a door");
+    assert!(nodes::change_scene(&mut editor, &area(), |scene| {
+        SceneTree::new(scene).append("", vec![SceneNode::Module(ModuleNode::new(door))]);
+        Some("Add a door".to_owned())
+    }));
     editor
 }
 
@@ -45,9 +47,10 @@ fn editor_with_a_door(scratch: &tempfile::TempDir) -> Editor {
 const DOOR: &str = "/1";
 
 fn modules(editor: &Editor) -> Vec<Value> {
+    let reader = editor.reader().expect("a reader");
     nodes::modules(&nodes::scene_of(editor, &area()))
-        .into_iter()
-        .map(|module| module.json)
+        .iter()
+        .map(|module| reader.to_json(module.module()).expect("a module"))
         .collect()
 }
 
@@ -95,12 +98,15 @@ fn a_snapshot_lists_the_modules_of_its_area() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
-    let listed: Vec<(&str, &Value)> = snapshot
+    let listed: Vec<(&str, Value)> = snapshot
         .modules
         .iter()
-        .map(|module| (module.pointer.as_str(), &module.json))
+        .map(|module| {
+            let json = snapshot.reader.to_json(module.module()).expect("a module");
+            (module.pointer.as_str(), json)
+        })
         .collect();
-    assert_eq!(listed, vec![(DOOR, &barn_door())]);
+    assert_eq!(listed, vec![(DOOR, barn_door())]);
     assert_eq!(snapshot.bundle, area());
     assert!(AreaSnapshot::for_bundle(&mut editor, "nowhere").is_none());
 }
@@ -110,7 +116,7 @@ fn switching_tools_ends_the_stroke_held_across_it() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
-    let draft = GridDraft::own(&snapshot.content, &snapshot.bundle).expect("the area's grids");
+    let draft = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
     let view = editor.views.area.ensure_view(&area());
     view.set_stroke(BrushStroke {
         draft,
@@ -165,7 +171,7 @@ fn show_area(
 
 fn hold_a_stroke(editor: &mut Editor) {
     let snapshot = AreaSnapshot::for_bundle(editor, &area()).expect("the area is open");
-    let draft = GridDraft::own(&snapshot.content, &snapshot.bundle).expect("the area's grids");
+    let draft = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
     view(editor).set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,
@@ -210,7 +216,7 @@ fn ctrl_g_over_the_scene_graph_groups_the_selection_into_a_new_folder() {
     show_area(&ctx, &mut editor, screen, ctrl_g);
 
     let scene = nodes::scene_of(&editor, &area());
-    assert_eq!(scene.as_array().map(Vec::len), Some(1));
-    assert_eq!(scene[0]["type"], "folder");
-    assert_eq!(scene[0]["children"].as_array().map(Vec::len), Some(2));
+    assert_eq!(scene.len(), 1);
+    assert!(nodes::is_folder(&scene[0]));
+    assert_eq!(nodes::children_of(&scene[0]).len(), 2);
 }

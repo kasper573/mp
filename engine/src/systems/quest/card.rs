@@ -266,7 +266,7 @@ pub(super) fn objective_row(
     };
     let (mark, color) = match standing {
         Standing::Open => (Mark::Flag, ink::INK),
-        Standing::Done => (Mark::Tick, ink::INK),
+        Standing::Done => (Mark::Check, ink::INK),
         Standing::Failed => (Mark::Cross, ink::INK3),
     };
     ui.horizontal(|ui| {

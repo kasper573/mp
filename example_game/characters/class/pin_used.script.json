@@ -22,7 +22,7 @@
     },
     "show": {
       "type": "vfx",
-      "vfx": "visual-effects/vfx/arrow_hit.vfx.json",
+      "vfx": "vfx/arrow_hit.vfx.json",
       "on": {
         "type": "skill_targets"
       },

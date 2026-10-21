@@ -120,8 +120,8 @@ impl Game {
         self
     }
 
-    /// The game's own settings, read from `fixtures/game.json`, at the content version this build
-    /// reads unless they name one.
+    /// The game's own settings, read from `fixtures/game.config.json`, at the content version this
+    /// build reads unless they name one.
     pub fn settings(mut self, settings: Value) -> Game {
         self.settings = Some(settings);
         self

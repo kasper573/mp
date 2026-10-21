@@ -1,5 +1,8 @@
+use design_tokens::glyph::Mark;
 use egui_dock::DockState;
-use engine::core::content::{ContentFile, Fixture, SETTINGS_FILE, fields_file, table_of};
+use engine::core::content::{
+    ContentFile, Fixture, NOTE_EXTENSION, SETTINGS_FILE, fields_file, table_of,
+};
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -8,6 +11,7 @@ use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
 
+use crate::icons::{self, KindIcon};
 use crate::project::files::content_holding;
 use crate::views::script::ScriptRow;
 
@@ -63,9 +67,25 @@ impl EditorTab {
         }
     }
 
+    /// The icon of what the tab shows.
+    pub fn icon(&self) -> KindIcon {
+        match self {
+            EditorTab::Game => Mark::Settings.into(),
+            EditorTab::Spreadsheet { .. } => icons::TABLE,
+            EditorTab::Rows { table, .. } => icons::of_table(table),
+            EditorTab::Asset { path } if path.ends_with(&format!(".{NOTE_EXTENSION}")) => {
+                icons::NOTE
+            }
+            EditorTab::Asset { path } => icons::of_media(path),
+            other => other
+                .row()
+                .map_or(icons::TABLE, |(table, _)| icons::of_table(&table)),
+        }
+    }
+
     pub fn row(&self) -> Option<(String, String)> {
         match self {
-            EditorTab::World => Some((WorldMapDef::TABLE.to_owned(), WorldMap::World.path())),
+            EditorTab::World => Some((WorldMapDef::TABLE.to_owned(), WorldMap::Game.path())),
             EditorTab::Row { table, key } => Some((table.clone(), key.clone())),
             EditorTab::Rows { .. } => None,
             EditorTab::Area { key } => Some((AreaDef::TABLE.to_owned(), key.clone())),
@@ -199,6 +219,11 @@ fn holds(path: &str, file: &str) -> bool {
 
 /// How a content file is named on its tab and in lists: its file name, without `.json`.
 pub fn file_title(path: &str) -> &str {
-    let file = path.rsplit('/').next().unwrap_or(path);
-    file.strip_suffix(".json").unwrap_or(file)
+    shown_path(path.rsplit('/').next().unwrap_or(path))
+}
+
+/// A path as the editor writes it for the user: a content file without the `.json` every one of
+/// them ends in, since its type already says what it is.
+pub fn shown_path(path: &str) -> &str {
+    path.strip_suffix(".json").unwrap_or(path)
 }

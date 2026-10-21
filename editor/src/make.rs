@@ -10,7 +10,7 @@ use engine::systems::registry;
 use include_dir::{Dir, include_dir};
 use serde_json::json;
 
-use crate::project::{FileBytes, json_bytes};
+use crate::project::{FileBytes, ProjectFiles, json_bytes};
 use crate::schema::{self, SchemaShapes};
 
 static DEFAULTS: Dir = include_dir!("$CARGO_MANIFEST_DIR/defaults");
@@ -23,12 +23,24 @@ pub struct MadeFile {
 
 /// A new content file of `table` named `name` in `folder`, holding the type's default fields and,
 /// for a bundle, the parts it can't load without, blank: a clip of short silence, an empty image.
-pub fn content_file(shapes: &SchemaShapes, table: &str, folder: &str, name: &str) -> MadeFile {
+pub fn content_file(
+    shapes: &SchemaShapes,
+    files: &ProjectFiles,
+    table: &str,
+    folder: &str,
+    name: &str,
+) -> MadeFile {
     let shape = registry().shape_of(table).unwrap_or(Shape::Json);
     let path = content_path(folder, name, table, shape);
     let fields = shapes
         .table(table)
-        .map(|table| schema::template(&table.shape, &table.shape))
+        .map(|table| {
+            let nearby = schema::Nearby {
+                files,
+                from: Some(&path),
+            };
+            schema::template(&table.shape, &table.shape, nearby)
+        })
         .unwrap_or_else(|| json!({}));
     let files = match shape {
         Shape::Json => vec![(path.clone(), json_bytes(&fields))],

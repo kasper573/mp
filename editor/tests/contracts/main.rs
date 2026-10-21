@@ -1,7 +1,11 @@
 mod area_actions;
+mod busts;
+mod content_integrity;
 mod content_tree;
 mod drafts;
+mod fit;
 mod fixtures;
+mod icons;
 mod import;
 mod keymap;
 mod new_game;
@@ -17,3 +21,5 @@ mod support;
 mod tabs;
 mod thumbnails;
 mod unused;
+mod watch;
+mod waveforms;

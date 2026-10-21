@@ -18,7 +18,27 @@ pub fn model_sprites(model: &str) -> String {
 
 /// The bust a model bundle keeps for `expression`.
 pub fn model_bust(model: &str, expression: &str) -> String {
-    format!("{model}/{}", MODEL_BUSTS.named(expression, "png"))
+    format!("{model}/{}", bust_part(expression))
+}
+
+/// Where in a model bundle its bust for `expression` is.
+pub fn bust_part(expression: &str) -> String {
+    MODEL_BUSTS.named(expression, "png")
+}
+
+/// The name of every bust a model bundle keeps, generic expressions and its own alike.
+pub fn model_bust_names(files: &ProjectFiles, model: &str) -> Vec<String> {
+    let PartSpec::Keyed { folder, exts } = MODEL_BUSTS else {
+        return Vec::new();
+    };
+    let prefix = format!("{model}/{folder}/");
+    files
+        .paths_under(&prefix)
+        .filter_map(|path| {
+            let (name, ext) = path.strip_prefix(&prefix)?.rsplit_once('.')?;
+            (exts.contains(&ext) && !name.contains('/')).then(|| name.to_owned())
+        })
+        .collect()
 }
 
 /// The WGSL source a shader bundle keeps.

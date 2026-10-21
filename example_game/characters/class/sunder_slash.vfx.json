@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/swoosh.vfx_shader",
+      "shader": "vfx/swoosh.vfx_shader",
       "params": {
         "angle": -50.0,
         "clip": 1.0,

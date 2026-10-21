@@ -1,10 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use engine::systems::area::grid::{self, PaletteRow};
-use engine::systems::area::tileset::MAX_TILE_PX;
+use engine::systems::area::grid::PaletteRow;
+use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TileFrame, TilesetDef};
 use image::{GenericImage, RgbaImage};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport};
 use crate::ui::widgets;
@@ -164,12 +163,12 @@ impl TilePlan {
 
 pub fn tile_plan(
     old: &RgbaImage,
-    row: &Value,
+    tileset: &TilesetDef,
     new: &RgbaImage,
     key: &str,
     palettes: &[(String, Vec<PaletteRow>)],
 ) -> Result<TilePlan, String> {
-    let tile = tile_size(row)?;
+    let tile = tile_size(tileset)?;
     let old_hashes = tile_hashes(old, tile);
     let new_hashes = tile_hashes(new, tile);
     let old_columns = old.width() / tile;
@@ -225,10 +224,7 @@ pub fn tile_plan(
         .filter(|(index, (_, blank))| !blank && !used.contains(&(*index as u32)))
         .count();
     let renumbered = matches.iter().filter(|(old, new)| old != new).count();
-    let data_tiles: Vec<u32> = row["tiles"]
-        .as_object()
-        .map(|tiles| tiles.keys().filter_map(|key| key.parse().ok()).collect())
-        .unwrap_or_default();
+    let data_tiles: Vec<u32> = tileset.tiles.keys().copied().collect();
     let mut walk = 0;
     let mut surfaces = 0;
     let mut animations = 0;
@@ -244,10 +240,12 @@ pub fn tile_plan(
         if !matches.contains_key(index) {
             continue;
         }
-        let data = &row["tiles"][index.to_string()];
-        walk += usize::from(data.get("walk").is_some());
-        surfaces += usize::from(data.get("surface").is_some());
-        animations += usize::from(data["animation"].as_array().is_some_and(|a| !a.is_empty()));
+        let Some(data) = tileset.tiles.get(index) else {
+            continue;
+        };
+        walk += usize::from(data.walk.is_some());
+        surfaces += usize::from(data.surface.is_some());
+        animations += usize::from(!data.animation.is_empty());
     }
     let mut gone_used: BTreeMap<u32, Vec<PaletteUse>> = BTreeMap::new();
     let mut rewrites = Vec::new();
@@ -312,57 +310,42 @@ pub fn tile_plan(
     })
 }
 
+/// `tileset` with its tiles' data moved where `plan` renumbers them, and the palettes among
+/// `palettes` that paint its tiles, renumbered the same way: only those that change.
 pub fn apply_tile_plan(
     plan: &TilePlan,
-    row: &Value,
+    tileset: &TilesetDef,
     key: &str,
     palettes: &[(String, Vec<PaletteRow>)],
-) -> Result<(Value, Vec<(String, String)>), String> {
+) -> Result<(TilesetDef, Vec<(String, Vec<PaletteRow>)>), String> {
     plan.ready()?;
-    let mut row = row.clone();
-    let mut tiles = serde_json::Map::new();
-    if let Some(old_tiles) = row["tiles"].as_object() {
-        let mut keyed: Vec<(u32, Value)> = old_tiles
+    let mut moved: BTreeMap<u32, TileData> = BTreeMap::new();
+    for (index, data) in &tileset.tiles {
+        let Some(target) = plan.target(*index) else {
+            continue;
+        };
+        let mut data = data.clone();
+        let frames: Vec<TileFrame> = data
+            .animation
             .iter()
-            .filter_map(|(index, data)| Some((index.parse::<u32>().ok()?, data.clone())))
+            .filter_map(|frame| {
+                Some(TileFrame {
+                    tile: plan.target(frame.tile)?,
+                    ms: frame.ms,
+                })
+            })
             .collect();
-        keyed.sort_by_key(|(index, _)| *index);
-        let mut moved: BTreeMap<u32, Value> = BTreeMap::new();
-        for (index, mut data) in keyed {
-            let Some(target) = plan.target(index) else {
-                continue;
-            };
-            if let Some(frames) = data.get_mut("animation").and_then(Value::as_array_mut) {
-                let mut kept = Vec::new();
-                for frame in frames.iter() {
-                    let old_tile = frame["tile"].as_u64().unwrap_or(0) as u32;
-                    if let Some(new_tile) = plan.target(old_tile) {
-                        let mut frame = frame.clone();
-                        frame["tile"] = json!(new_tile);
-                        kept.push(frame);
-                    }
-                }
-                if kept.len() < 2 {
-                    kept.clear();
-                }
-                *frames = kept;
-                if frames.is_empty() {
-                    data.as_object_mut().map(|data| data.remove("animation"));
-                }
-            }
-            if data.as_object().is_some_and(|data| !data.is_empty())
-                && moved.insert(target, data).is_some()
-            {
-                return Err(format!(
-                    "two painted tiles would both become tile {target}; pick distinct replacements"
-                ));
-            }
-        }
-        for (index, data) in moved {
-            tiles.insert(index.to_string(), data);
+        data.animation = if frames.len() < 2 { Vec::new() } else { frames };
+        if !is_blank(&data) && moved.insert(target, data).is_some() {
+            return Err(format!(
+                "two painted tiles would both become tile {target}; pick distinct replacements"
+            ));
         }
     }
-    row["tiles"] = Value::Object(tiles);
+    let renumbered = TilesetDef {
+        tiles: moved,
+        ..tileset.clone()
+    };
     let mut rewritten = Vec::new();
     for (area, rows) in palettes {
         let mut changed = false;
@@ -381,10 +364,17 @@ pub fn apply_tile_plan(
             })
             .collect();
         if changed {
-            rewritten.push((area.clone(), grid::write_palette(&moved)));
+            rewritten.push((area.clone(), moved));
         }
     }
-    Ok((row, rewritten))
+    Ok((renumbered, rewritten))
+}
+
+fn is_blank(data: &TileData) -> bool {
+    data.walk.is_none()
+        && data.surface.is_none()
+        && data.corners.is_empty()
+        && data.animation.is_empty()
 }
 
 #[derive(Clone, Debug)]
@@ -423,12 +413,12 @@ impl AnimPlan {
 
 pub fn anim_plan(
     tileset: &RgbaImage,
-    row: &Value,
+    def: &TilesetDef,
     export: &AnimationExport,
     kind_limits: bool,
     block: (u32, u32),
 ) -> Result<AnimPlan, String> {
-    let tile = tile_size(row)?;
+    let tile = tile_size(def)?;
     let strip = export.strips.first().ok_or("the export has no frames")?;
     if strip.frames.len() < 2 {
         return Err("an animation has at least two frames".to_owned());
@@ -565,10 +555,10 @@ pub fn anim_plan(
 pub fn apply_anim_plan(
     plan: &AnimPlan,
     tileset: &RgbaImage,
-    row: &Value,
+    def: &TilesetDef,
     export: &AnimationExport,
-) -> Result<(Option<Vec<u8>>, Value), String> {
-    let tile = tile_size(row)?;
+) -> Result<(Option<Vec<u8>>, TilesetDef), String> {
+    let tile = tile_size(def)?;
     let columns = (tileset.width() / tile).max(1);
     let old_count = columns * (tileset.height() / tile);
     let total = old_count + plan.new_images.len() as u32;
@@ -597,34 +587,27 @@ pub fn apply_anim_plan(
             .copy_from(new, (index % columns) * tile, (index / columns) * tile)
             .map_err(|error| error.to_string())?;
     }
-    let mut row = row.clone();
-    if !row["tiles"].is_object() {
-        row["tiles"] = json!({});
-    }
+    let mut def = def.clone();
     for cell in &plan.cells {
-        let frames: Vec<Value> = cell
+        let frames: Vec<TileFrame> = cell
             .frames
             .iter()
             .zip(&plan.lengths)
-            .map(|(frame, ms)| {
-                let tile = match frame {
+            .map(|(frame, ms)| TileFrame {
+                tile: match frame {
                     AnimFrameRef::Block => cell.tile,
                     AnimFrameRef::Existing(index) => *index,
                     AnimFrameRef::New(offset) => old_count + *offset as u32,
-                };
-                json!({ "tile": tile, "ms": ms })
+                },
+                ms: *ms,
             })
             .collect();
-        let entry = &mut row["tiles"][cell.tile.to_string()];
-        if !entry.is_object() {
-            *entry = json!({});
-        }
-        entry["animation"] = Value::Array(frames);
+        def.tiles.entry(cell.tile).or_default().animation = frames;
     }
     let png = if changed {
         Some(formats::encode_png(&image)?)
     } else {
         None
     };
-    Ok((png, row))
+    Ok((png, def))
 }

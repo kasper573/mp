@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -10,9 +11,10 @@ use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::registry;
 
 use super::browser::{self, BrowserAction, RowMenu};
-use super::tree::{self, TreeDrop, TreeRow, TreeSource, TreeState};
+use super::tree::{self, Narrowing, TreeDrop, TreeRow, TreeSource, TreeState};
 use super::{theme, widgets};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
+use crate::icons::{self, Preview};
 use crate::keymap::EditorKey;
 use crate::moves::{file_name, fixed_place};
 use crate::picker::Dragged;
@@ -20,6 +22,8 @@ use crate::project::Project;
 use crate::project::files::{FolderIndex, content_holding};
 use crate::rows;
 use crate::tabs::EditorTab;
+use crate::tabs::shown_path;
+use crate::thumbs::Thumbnails;
 use crate::user::{TreeView, UserFolder};
 
 /// The content panel's tree of the game folder, and what it was asked to do.
@@ -74,7 +78,7 @@ pub fn move_to_dialog(editor: &mut Editor, paths: Vec<String>) {
         .iter()
         .find_map(|path| fixed_place(path).map(|reason| (path, reason)))
     {
-        editor.toast(format!("{path} stays: {reason}"));
+        editor.toast(format!("{} stays: {reason}", shown_path(path)));
         return;
     }
     let options: Vec<String> = std::iter::once(String::new())
@@ -135,7 +139,7 @@ pub fn new_file(editor: &mut Editor, folder: &str, table: &str) {
 }
 
 /// The rows the tree lists inside `folder` ("" for the top) as it would show them now, with the
-/// search, the chips and the user's Show ▾ applied.
+/// search and the user's Show ▾ applied.
 pub fn listed(editor: &Editor, folder: &str) -> Vec<(String, TreeRow)> {
     let Some(project) = &editor.project else {
         return Vec::new();
@@ -169,11 +173,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         project,
         content_tree,
         settings,
+        form,
         ..
     } = editor;
     let project = project.as_ref().expect("a project");
     let view = settings.content_trees.entry(folder_key).or_default();
-    let source = GameFolder::new(project, content_tree, view);
+    let source =
+        GameFolder::new(project, content_tree, view).with_previews(ui.ctx(), &mut form.thumbnails);
     let first_hit = open_first.then(|| first_file(&source, "")).flatten();
     let mut open = view.open.clone();
     let (response, changed) = egui::ScrollArea::vertical()
@@ -293,7 +299,7 @@ fn act(editor: &mut Editor, action: TreeAction) {
         },
         TreeAction::ReplaceWith(path) => {
             let Some(source) = rfd::FileDialog::new()
-                .set_title(format!("Replace {path} with…"))
+                .set_title(format!("Replace {} with…", shown_path(&path)))
                 .pick_file()
             else {
                 return;
@@ -305,7 +311,7 @@ fn act(editor: &mut Editor, action: TreeAction) {
         TreeAction::MoveTo(paths) => move_to_dialog(editor, paths),
         TreeAction::Delete(paths) => rows::delete_dialog(editor, paths),
         TreeAction::Rename(path) => match fixed_place(&path) {
-            Some(reason) => editor.toast(format!("{path} stays: {reason}")),
+            Some(reason) => editor.toast(format!("{} stays: {reason}", shown_path(&path))),
             None => begin_rename(editor, &path),
         },
         TreeAction::ShowInFileManager(path) => {
@@ -361,7 +367,7 @@ fn media_act(editor: &mut Editor, path: &str, action: BrowserAction) {
         BrowserAction::CopyPath => editor.copy_text(path),
         BrowserAction::Rename => begin_rename(editor, path),
         BrowserAction::Duplicate => {
-            let label = format!("Duplicate {path}");
+            let label = format!("Duplicate {}", shown_path(path));
             match rows::copy_into(editor, &[path.to_owned()], parent_of(path), label) {
                 Ok(copies) => editor.content_tree.tree.select(copies),
                 Err(error) => editor.toast(error),
@@ -450,40 +456,62 @@ fn keys(editor: &mut Editor, ui: &mut Ui) {
     act(editor, action);
 }
 
-/// The search field, the unsaved and unused chips, and Show ▾. Answers whether Enter was pressed
-/// in the search.
+/// The search field and Show ▾. Answers whether Enter was pressed in the search.
 fn filters(editor: &mut Editor, ui: &mut Ui, folder_key: &str) -> bool {
-    let tree = &mut editor.content_tree;
-    let response = widgets::search_box(
-        ui,
-        &mut tree.search,
-        "Search files and paths",
-        Some(EditorKey::Search),
-    );
-    if std::mem::take(&mut tree.focus_search) {
-        response.request_focus();
-    }
-    let entered = response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i));
-    if response.has_focus() && ui.input(|i| EditorKey::Cancel.pressed(i)) {
-        tree.search.clear();
-    }
     let kinds = kinds(editor);
-    let view = editor
-        .settings
+    let Editor {
+        content_tree: tree,
+        settings,
+        ..
+    } = editor;
+    let view = settings
         .content_trees
         .entry(folder_key.to_owned())
         .or_default();
-    let tree = &mut editor.content_tree;
-    let mut changed = false;
-    ui.horizontal(|ui| {
-        if widgets::toggle_chip(ui, "unsaved", tree.only_unsaved).clicked() {
-            tree.only_unsaved = !tree.only_unsaved;
-        }
-        if widgets::toggle_chip(ui, "unused", tree.only_unused).clicked() {
-            tree.only_unused = !tree.only_unused;
-        }
-        changed = tree::show_menu(ui, view, &kinds);
-    });
+    let ContentTree {
+        search,
+        focus_search,
+        only_unsaved,
+        only_unused,
+        ..
+    } = tree;
+    let (entered, changed) = tree::filter_row(
+        ui,
+        |ui| {
+            let response = widgets::search_box(
+                ui,
+                search,
+                "Search files and paths",
+                Some(EditorKey::Search),
+            );
+            if std::mem::take(focus_search) {
+                response.request_focus();
+            }
+            if response.has_focus() && ui.input(|i| EditorKey::Cancel.pressed(i)) {
+                search.clear();
+            }
+            response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i))
+        },
+        |ui| {
+            tree::show_menu(
+                ui,
+                view,
+                &kinds,
+                &mut [
+                    Narrowing {
+                        label: "Only unsaved files",
+                        short: "unsaved",
+                        on: only_unsaved,
+                    },
+                    Narrowing {
+                        label: "Only unused files",
+                        short: "unused",
+                        on: only_unused,
+                    },
+                ],
+            )
+        },
+    );
     if changed {
         editor.save_settings();
     }
@@ -570,9 +598,37 @@ struct GameFolder<'a> {
     needle: String,
     copied: bool,
     last_new: Option<String>,
+    previews: Option<RefCell<Previews<'a>>>,
+}
+
+/// What the tree draws the pictures of its files from, decoding a few each frame.
+struct Previews<'a> {
+    ctx: egui::Context,
+    thumbnails: &'a mut Thumbnails,
+    budget: u32,
 }
 
 impl<'a> GameFolder<'a> {
+    /// Draws the pictures of files small enough to stand in for their icons.
+    fn with_previews(mut self, ctx: &egui::Context, thumbnails: &'a mut Thumbnails) -> Self {
+        self.previews = Some(RefCell::new(Previews {
+            ctx: ctx.clone(),
+            thumbnails,
+            budget: icons::DECODES_PER_FRAME,
+        }));
+        self
+    }
+
+    fn preview(&self, path: &str) -> Option<Preview> {
+        let mut previews = self.previews.as_ref()?.borrow_mut();
+        let Previews {
+            ctx,
+            thumbnails,
+            budget,
+        } = &mut *previews;
+        icons::preview(ctx, thumbnails, self.project, path, budget)
+    }
+
     fn new(project: &'a Project, tree: &ContentTree, view: &TreeView) -> GameFolder<'a> {
         let index = project.files.index();
         let mut missing: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -591,8 +647,8 @@ impl<'a> GameFolder<'a> {
             }
         }
         let mut unsaved = HashSet::new();
-        for entry in project.unsaved() {
-            let row = row_of(&entry);
+        for entry in project.unsaved().iter() {
+            let row = row_of(entry);
             above(&row, &mut |folder| {
                 unsaved.insert(folder.to_owned());
             });
@@ -629,6 +685,7 @@ impl<'a> GameFolder<'a> {
             needle: needle.clone(),
             copied: !tree.copied.is_empty(),
             last_new: tree.last_new.clone(),
+            previews: None,
         };
         if filtered {
             folder.shown = Some(folder.shown_rows(tree, view, &needle));
@@ -750,12 +807,8 @@ impl<'a> GameFolder<'a> {
             .collect();
         let mut picked = None;
         for table in &held {
-            let button = if self.last_new.as_deref() == Some(*table) {
-                widgets::shortcut_button(*table, EditorKey::NewAgain)
-            } else {
-                egui::Button::new(*table)
-            };
-            if ui.add(button).clicked() {
+            let again = (self.last_new.as_deref() == Some(*table)).then_some(EditorKey::NewAgain);
+            if widgets::kind_button(ui, icons::of_table(table), table, again).clicked() {
                 picked = Some(TreeAction::New {
                     folder: folder.to_owned(),
                     table: (*table).to_owned(),
@@ -766,13 +819,13 @@ impl<'a> GameFolder<'a> {
             picked = Some(TreeAction::OtherType(folder.to_owned()));
         }
         ui.separator();
-        if ui.button("New folder").clicked() {
+        if widgets::kind_button(ui, Mark::Folder.into(), "New folder", None).clicked() {
             picked = Some(TreeAction::NewFolder(folder.to_owned()));
         }
-        if ui.button("Import media…").clicked() {
+        if widgets::kind_button(ui, icons::IMAGE, "Import media…", None).clicked() {
             picked = Some(TreeAction::ImportMedia(folder.to_owned()));
         }
-        if ui.button("New note").clicked() {
+        if widgets::kind_button(ui, icons::NOTE, "New note", None).clicked() {
             picked = Some(TreeAction::NewNote(folder.to_owned()));
         }
         if picked.is_some() {
@@ -935,13 +988,12 @@ impl TreeSource for GameFolder<'_> {
             return row;
         }
         row.name = name;
+        row.icon = Some(icons::of_file(&self.index, id));
         if id == SETTINGS_FILE {
-            row.icon = Some(Mark::Gear);
             row.suffix = Some((" settings".to_owned(), theme::FAINT));
             row.spoken = Some("the game's settings".to_owned());
         } else if self.is_missing(id) {
             let table = table_of(id).unwrap_or_default();
-            row.icon = Some(Mark::Page);
             row.suffix = Some((format!(".{table}"), theme::FAINT));
             row.dim = true;
             row.problem = Some(format!(
@@ -950,23 +1002,18 @@ impl TreeSource for GameFolder<'_> {
             row.spoken = Some(format!("{}, missing {table}", row.name));
         } else if self.index.is_content(id) {
             let table = table_of(id).unwrap_or_default();
-            row.icon = Some(Mark::Page);
             row.suffix = Some((format!(".{table}"), theme::ACCENT));
             row.spoken = Some(format!("{}, {table}", row.name));
+            row.preview = self.preview(id);
         } else if self.index.media.contains(id) {
-            row.icon = Some(match AssetKind::of(id) {
-                Some(AssetKind::Image) => Mark::Grid,
-                Some(AssetKind::Audio) => Mark::Note,
-                _ => Mark::Page,
-            });
             row.suffix = Some((after_name.to_owned(), theme::FAINT));
             row.spoken = Some(format!("{file}, media"));
+            row.preview = self.preview(id);
         } else if self.index.notes.contains(id) {
-            row.icon = Some(Mark::Page);
             row.suffix = Some((after_name.to_owned(), theme::FAINT));
             row.spoken = Some(format!("{file}, note"));
         } else {
-            row.icon = Some(Mark::Warning);
+            row.icon = Some(Mark::Warning.into());
             row.name = file.to_owned();
         }
         if self.filtered && row.dim {

@@ -3,29 +3,27 @@ use std::collections::BTreeSet;
 use engine::core::content::{ContentFile, numbered, table_of, valid_name};
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::{SCENE_FILE, scene_file};
-use serde_json::Value;
+use engine::systems::area::scene::{GroundLayer, SCENE_FILE, SceneNode};
 
-use super::grid::{GridDraft, layer_file};
+use super::grid::GridDraft;
 use super::nodes;
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project};
 use crate::tabs::file_title;
 use crate::ui::widgets;
-use crate::value::RowValue;
 
 /// Adds a ground layer at the end of `folder` of `bundle`'s scene, named apart from every layer
 /// there, and selects it; answers its pointer.
 pub fn add(editor: &mut Editor, bundle: &str, folder: &str) -> Option<String> {
-    let scene = nodes::scene_of(editor, bundle);
-    let name = free_name("layer", &names(&scene));
+    let name = free_name("layer", &names(&nodes::scene_of(editor, bundle)));
     let mut made = Vec::new();
     nodes::change_scene(editor, bundle, |scene| {
-        made = nodes::append(
-            scene,
-            folder,
-            vec![serde_json::json!({ "type": "ground_layer", "name": name })],
-        );
+        let layer = SceneNode::GroundLayer(GroundLayer {
+            name: name.clone(),
+            hidden: false,
+            locked: false,
+        });
+        made = nodes::SceneTree::new(scene).append(folder, vec![layer]);
         Some(format!("Add ground layer {name}"))
     });
     let pointer = made.first()?.clone();
@@ -35,40 +33,31 @@ pub fn add(editor: &mut Editor, bundle: &str, folder: &str) -> Option<String> {
 
 /// Copies the layer at `pointer` right after it, its cells too, under a free name.
 pub fn duplicate(editor: &mut Editor, bundle: &str, pointer: &str) {
-    let mut scene = nodes::scene_of(editor, bundle);
-    let Some(name) = scene
-        .pointer(pointer)
-        .and_then(|node| node["name"].as_str())
-        .map(str::to_owned)
-    else {
-        return;
-    };
-    let fresh = free_name(&name, &names(&scene));
-    let made = nodes::duplicate(&mut scene, &[pointer.to_owned()], |node| {
-        let mut copy = node.clone();
-        copy["name"] = Value::String(fresh.clone());
-        copy
+    let mut made = Vec::new();
+    let applied = nodes::change_blueprint(editor, bundle, |blueprint| {
+        let scene = &mut blueprint.scene;
+        let name = nodes::layer_name(nodes::node(&scene.nodes, pointer)?)?.to_owned();
+        let fresh = free_name(&name, &names(&scene.nodes));
+        made = nodes::SceneTree::new(&mut scene.nodes).duplicate(&[pointer.to_owned()], |node| {
+            let mut copy = node.clone();
+            if let SceneNode::GroundLayer(layer) = &mut copy {
+                layer.name = fresh.clone();
+            }
+            copy
+        });
+        if let Some(cells) = scene.grids.layers.get(&name).cloned() {
+            scene.grids.layers.insert(fresh.clone(), cells);
+        }
+        Some(format!("Duplicate ground layer {name} as {fresh}"))
     });
-    let mut edit = ContentEdit::new(format!("Duplicate ground layer {name} as {fresh}"));
-    nodes::write_scene(&mut edit, bundle, &scene);
-    if let Some(bytes) = editor
-        .project
-        .as_ref()
-        .and_then(|project| project.files.get(&layer_file(bundle, &name)).cloned())
-    {
-        edit.write(layer_file(bundle, &fresh), bytes);
-    }
-    if editor.apply(edit) {
+    if applied {
         nodes::select(editor, bundle, made);
     }
 }
 
 /// Clears every forced walk cell of `bundle` in one step, handing each back to its tiles.
 pub fn clear_forced(editor: &mut Editor, bundle: &str) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
-        return;
-    };
-    let Some(mut draft) = GridDraft::own(&content, bundle) else {
+    let Some(mut draft) = GridDraft::own(editor, bundle) else {
         return;
     };
     let cells: Vec<_> = draft.cells().collect();
@@ -80,12 +69,13 @@ pub fn clear_forced(editor: &mut Editor, bundle: &str) {
         editor.toast("No walk cell is forced");
         return;
     }
-    let mut edit = ContentEdit::new(format!(
-        "Clear {cleared} forced walk cells in {}",
-        file_title(bundle)
-    ));
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    nodes::change_blueprint(editor, bundle, |blueprint| {
+        draft.apply_to(blueprint);
+        Some(format!(
+            "Clear {cleared} forced walk cells in {}",
+            file_title(bundle)
+        ))
+    });
 }
 
 /// Renames the layer `old` of `bundle` to `new`, and in every area and blueprint joined to it
@@ -110,25 +100,12 @@ pub fn rename(editor: &mut Editor, bundle: &str, old: &str, new: &str) -> Result
     }
     let mut edit = ContentEdit::new(format!("Rename ground layer {old} to {new}"));
     for other in &joined {
-        let mut scene = scene(project, other);
-        let mut renamed = false;
-        nodes::walk(&scene.clone(), &mut |pointer, node| {
-            if nodes::is_layer(node)
-                && node["name"] == old
-                && let Some(node) = scene.pointer_mut(pointer)
-            {
-                node["name"] = Value::String(new.to_owned());
-                renamed = true;
-            }
-        });
-        if !renamed {
+        let Some(read) = nodes::bundle_in(project, other) else {
             continue;
-        }
-        nodes::write_scene(&mut edit, other, &scene);
-        if let Some(bytes) = project.files.get(&layer_file(other, old)).cloned() {
-            edit.remove(layer_file(other, old));
-            edit.write(layer_file(other, new), bytes);
-        }
+        };
+        read.write(&mut edit, project, other, |blueprint| {
+            rename_in(blueprint, old, new)
+        })?;
     }
     let others: Vec<String> = joined
         .iter()
@@ -148,6 +125,18 @@ pub fn rename(editor: &mut Editor, bundle: &str, old: &str, new: &str) -> Result
     };
     editor.toast(said);
     Ok(())
+}
+
+/// Takes the layer named `name` out of `blueprint`'s scene: its node and its cells.
+pub fn delete_in(blueprint: &mut BlueprintDef, name: &str) {
+    let mut found = Vec::new();
+    nodes::walk(&blueprint.scene.nodes, &mut |pointer, node| {
+        if nodes::layer_name(node) == Some(name) {
+            found.push(pointer.to_owned());
+        }
+    });
+    nodes::SceneTree::new(&mut blueprint.scene.nodes).remove(&found);
+    blueprint.scene.grids.layers.remove(name);
 }
 
 /// How many bundles a rename of the layer `name` of `bundle` would reach besides it.
@@ -183,9 +172,15 @@ fn placed_by(project: &Project, bundle: &str) -> BTreeSet<String> {
     let mut seen = BTreeSet::new();
     let mut queue = vec![bundle.to_owned()];
     while let Some(at) = queue.pop() {
-        for module in nodes::modules(&scene(project, &at)) {
-            let blueprint = module.json.text("blueprint");
-            if module.json["type"] == "blueprint" && seen.insert(blueprint.to_owned()) {
+        let Some(read) = nodes::bundle_in(project, &at) else {
+            continue;
+        };
+        let reader = project.reader();
+        for module in nodes::modules(read.nodes()) {
+            if let engine::systems::area::AreaModule::Blueprint(placement) = module.module()
+                && let Some(blueprint) = reader.path_of(placement.blueprint)
+                && seen.insert(blueprint.to_owned())
+            {
                 queue.push(blueprint.to_owned());
             }
         }
@@ -211,23 +206,16 @@ fn placing(project: &Project, bundle: &str) -> BTreeSet<String> {
     seen
 }
 
-fn scene(project: &Project, bundle: &str) -> Value {
-    project
-        .files
-        .json_owned(&scene_file(bundle))
-        .filter(Value::is_array)
-        .unwrap_or_else(|| Value::Array(Vec::new()))
+fn scene(project: &Project, bundle: &str) -> Vec<SceneNode> {
+    nodes::bundle_in(project, bundle).map_or_else(Vec::new, |read| read.nodes().to_vec())
 }
 
 /// The names of the ground layers of `scene`, in tree order.
-pub fn names(scene: &Value) -> Vec<String> {
-    let mut found = Vec::new();
-    nodes::walk(scene, &mut |_, node| {
-        if nodes::is_layer(node) {
-            found.push(node["name"].as_str().unwrap_or_default().to_owned());
-        }
-    });
-    found
+pub fn names(scene: &[SceneNode]) -> Vec<String> {
+    engine::systems::area::scene::layers(scene)
+        .into_iter()
+        .map(|layer| layer.name.clone())
+        .collect()
 }
 
 /// `base`, or `base (1)`, `base (2)`, the next free number, among `taken`.
@@ -242,11 +230,6 @@ fn free_name(base: &str, taken: &[String]) -> String {
         .expect("a free number")
 }
 
-/// What deleting the layer named `name` of `bundle` takes: its node and its grid, as one step.
-pub fn delete_into(edit: &mut ContentEdit, bundle: &str, name: &str) {
-    edit.remove(layer_file(bundle, name));
-}
-
 /// How many cells a layer of `draft` holds.
 pub fn cell_count(draft: &GridDraft, name: &str) -> usize {
     draft.layer_index(name).map_or(0, |layer| {
@@ -256,4 +239,23 @@ pub fn cell_count(draft: &GridDraft, name: &str) -> usize {
 
 pub fn cells_said(count: usize) -> String {
     format!("{count} cell{}", widgets::plural(count))
+}
+
+fn rename_in(blueprint: &mut BlueprintDef, old: &str, new: &str) {
+    let mut found = Vec::new();
+    nodes::walk(&blueprint.scene.nodes, &mut |pointer, node| {
+        if nodes::layer_name(node) == Some(old) {
+            found.push(pointer.to_owned());
+        }
+    });
+    for pointer in found {
+        if let Some(SceneNode::GroundLayer(layer)) =
+            nodes::node_mut(&mut blueprint.scene.nodes, &pointer)
+        {
+            layer.name = new.to_owned();
+        }
+    }
+    if let Some(cells) = blueprint.scene.grids.layers.remove(old) {
+        blueprint.scene.grids.layers.insert(new.to_owned(), cells);
+    }
 }

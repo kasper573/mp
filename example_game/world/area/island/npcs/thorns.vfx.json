@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/slash.vfx_shader",
+      "shader": "vfx/slash.vfx_shader",
       "params": {
         "color": [
           120,
@@ -17,7 +17,7 @@
     },
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/tint.vfx_shader",
+      "shader": "vfx/tint.vfx_shader",
       "params": {
         "amount": 0.5,
         "color": [

@@ -9,6 +9,7 @@ use super::AreaSnapshot;
 use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 use crate::views::tileset::{SheetLayout, SheetRect, TilesetSheet};
@@ -129,7 +130,7 @@ fn more_popup<T: Clone>(
         return None;
     }
     let mut picked = None;
-    let response = widgets::chip(ui, &format!("+ {}", others.len()));
+    let response = widgets::dropdown_chip(ui, format!("+ {}", others.len()));
     egui::Popup::from_toggle_button_response(&response)
         .id(id)
         .width(280.0)
@@ -249,7 +250,7 @@ fn tile_sheet(
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
                     }
                     if let Some(surface) = data.surface {
-                        info.push_str(&format!(" · {}", surface.path(content)));
+                        info.push_str(&format!(" · {}", shown_path(surface.path(content))));
                     }
                     if !data.animation.is_empty() {
                         info.push_str(&format!(" · {} frames", data.animation.len()));

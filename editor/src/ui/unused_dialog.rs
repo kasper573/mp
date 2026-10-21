@@ -254,9 +254,9 @@ fn group_lines(
         let fold = ui
             .horizontal(|ui| {
                 let mark = if open {
-                    Mark::ChevronDown
+                    Mark::CaretDown
                 } else {
-                    Mark::ChevronRight
+                    Mark::CaretRight
                 };
                 glyph::show(ui, mark, 11.0, theme::FAINT);
                 ui.label(theme::mono(&group.label).color(theme::TEXT));

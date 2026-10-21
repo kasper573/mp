@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": -0.5,
@@ -41,8 +42,7 @@
             "file": "assets/audio/ambient/lapping_water.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Lapping water"
+        ]
       }
     ]
   },
@@ -52,6 +52,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 3.5,
@@ -66,8 +67,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.22
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",

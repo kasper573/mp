@@ -2,7 +2,6 @@ pub mod blueprint;
 pub mod brush;
 pub mod flags;
 pub mod grid;
-pub mod holes;
 pub mod inspect;
 pub mod layers;
 pub mod modules;
@@ -36,13 +35,13 @@ use std::sync::Arc;
 use bevy::prelude::World;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentFile, table_of};
+use engine::core::content::{Content, ContentFile, FolderReader, table_of};
 use engine::core::math::{Offset, Pos, Rect, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::{CellPos, GridDims, TilePos, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::{self, AreaDef, AreaId, AreaModuleKind, Picture, Pictured};
-use serde_json::Value;
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, Picture, Pictured};
 use strum::{AsRefStr, VariantArray};
 
 use self::flags::{SceneFlags, SceneLevel};
@@ -56,7 +55,6 @@ use crate::keymap::EditorKey;
 use crate::project::{AreaCameraState, Project, RowSelection};
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::{sidebar, theme, widgets};
-use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
 
@@ -325,9 +323,12 @@ pub enum ResizeCorner {
     BottomRight,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+/// What is being pasted, following the pointer until a click places it: the nodes as they read
+/// when the paste started, drawn as a ghost.
 pub struct PasteGhost {
-    pub modules: Vec<Value>,
+    pub clip: crate::app::SceneClip,
+    pub nodes: Vec<SceneNode>,
 }
 
 impl AreaViews {
@@ -448,6 +449,11 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) 
 
 fn show_canvas(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let Some(snapshot) = AreaSnapshot::for_view(editor, view_key) else {
+        let bundle = editor.views.area.view(view_key).bundle.clone();
+        if let Some(Err(errors)) = nodes::read_bundle(editor, &bundle) {
+            widgets::unreadable(ui, &bundle, &errors);
+            return;
+        }
         let loads = editor
             .project
             .as_ref()
@@ -543,12 +549,12 @@ pub fn armed(editor: &Editor, snapshot: &AreaSnapshot) -> Armed {
     let parts: Vec<&String> = selected_parts_of(editor, &snapshot.bundle);
     match parts.as_slice() {
         [part] if *part == WALK_ROW => Armed::Walk,
-        [part] => match snapshot.scene.pointer(part) {
-            Some(node) if nodes::is_layer(node) => Armed::Layer {
+        [part] => match nodes::node(snapshot.nodes(), part).and_then(nodes::layer_name) {
+            Some(name) => Armed::Layer {
                 pointer: (*part).clone(),
-                name: node["name"].as_str().unwrap_or_default().to_owned(),
+                name: name.to_owned(),
             },
-            _ => Armed::Nothing,
+            None => Armed::Nothing,
         },
         _ => Armed::Nothing,
     }
@@ -597,12 +603,9 @@ pub fn arm_a_layer(editor: &mut Editor, view_key: &str) {
     }
     let last = editor.views.area.view(view_key).last_layer.clone();
     let mut found: Vec<(String, String)> = Vec::new();
-    nodes::walk(&snapshot.scene, &mut |pointer, node| {
-        if nodes::is_layer(node) {
-            found.push((
-                pointer.to_owned(),
-                node["name"].as_str().unwrap_or_default().to_owned(),
-            ));
+    nodes::walk(snapshot.nodes(), &mut |pointer, node| {
+        if let Some(name) = nodes::layer_name(node) {
+            found.push((pointer.to_owned(), name.to_owned()));
         }
     });
     let pick = found
@@ -642,7 +645,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
             });
         let label = snapshot
             .scene_node(&place_id(&editor.views.area.view(view_key).in_place))
-            .and_then(|node| node["label"].as_str().map(str::to_owned))
+            .and_then(|node| node.label().map(str::to_owned))
             .unwrap_or_else(|| file_title(&place.blueprint).to_owned());
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Grid, 14.0, theme::WARN);
@@ -664,7 +667,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
     if let Some(only) = view.show_only.clone() {
         let name = snapshot
             .scene_node(&only)
-            .map(shapes::node_label)
+            .map(|node| shapes::node_label(node, snapshot.reader.as_ref()))
             .unwrap_or_default();
         let mut back = false;
         chip(&mut child, &mut |ui| {
@@ -893,8 +896,15 @@ fn locked_tip(editor: &Editor, view_key: &str, frame: &AreaFrame) {
     })
     .find(|id| frame.flags.row(id).locked == flags::Flag::Own)
     .filter(|id| *id != locked)
-    .and_then(|id| frame.scene_node(&id).map(shapes::node_label));
-    let what = frame.module(&locked).map(shapes::label).unwrap_or_default();
+    .and_then(|id| {
+        frame
+            .scene_node(&id)
+            .map(|node| shapes::node_label(node, frame.reader.as_ref()))
+    });
+    let what = frame
+        .module(&locked)
+        .map(|module| shapes::label(module, frame.reader.as_ref()))
+        .unwrap_or_default();
     let text = match by {
         Some(folder) => format!("{what} is locked by {folder}: a click selects what's under it"),
         None => format!("{what} is locked: a click selects what's under it"),
@@ -931,7 +941,9 @@ pub struct AreaSnapshot {
     pub bundle: String,
     pub pictured: Pictured,
     pub picture: Arc<Picture>,
-    pub scene: Arc<Value>,
+    /// The bundle as its files read now, its ids those of `reader`.
+    pub def: nodes::SceneBundle,
+    pub reader: Arc<FolderReader>,
     pub flags: Arc<SceneFlags>,
     pub modules: Arc<Vec<nodes::SceneModule>>,
     pub in_place: Vec<placement::AreaPlacement>,
@@ -950,7 +962,8 @@ struct SnapshotCache {
 struct SnapshotParts {
     pictured: Pictured,
     picture: Arc<Picture>,
-    scene: Arc<Value>,
+    def: nodes::SceneBundle,
+    reader: Arc<FolderReader>,
     flags: Arc<SceneFlags>,
     modules: Arc<Vec<nodes::SceneModule>>,
     in_place: Vec<placement::AreaPlacement>,
@@ -1031,7 +1044,8 @@ impl AreaSnapshot {
             bundle,
             pictured: parts.pictured,
             picture: parts.picture,
-            scene: parts.scene,
+            def: parts.def,
+            reader: parts.reader,
             flags: parts.flags,
             modules: parts.modules,
             in_place: parts.in_place,
@@ -1059,22 +1073,31 @@ impl AreaSnapshot {
         area::walk::in_map(self.size().grid(), tile)
     }
 
+    /// The bundle's own scene, as its files read now.
+    pub fn nodes(&self) -> &[SceneNode] {
+        self.def.nodes()
+    }
+
     /// The node of the scene a tree row stands for, through the placements edited in place.
-    pub fn scene_node(&self, id: &str) -> Option<&Value> {
+    pub fn scene_node(&self, id: &str) -> Option<&SceneNode> {
         let mut levels = id.split("/in/");
         let top = levels.next()?;
-        let mut node = self.scene.pointer(top)?;
+        let mut node = nodes::node(self.nodes(), top)?;
         for (pointer, place) in levels.zip(self.in_place.iter()) {
-            node = place.scene.pointer(&format!("/{pointer}"))?;
+            node = nodes::node(&place.def.scene.nodes, &format!("/{pointer}"))?;
         }
         Some(node)
     }
 
-    pub fn module(&self, pointer: &str) -> Option<&Value> {
+    pub fn module_node(&self, pointer: &str) -> Option<&ModuleNode> {
         self.modules
             .iter()
             .find(|module| module.pointer == pointer)
-            .map(|module| &module.json)
+            .map(|module| &module.node)
+    }
+
+    pub fn module(&self, pointer: &str) -> Option<&AreaModule> {
+        self.module_node(pointer).map(|node| &node.module)
     }
 
     pub fn module_bounds(&self, pointer: &str) -> Option<Rect<Tiles>> {
@@ -1093,7 +1116,7 @@ impl AreaSnapshot {
     pub fn hit(&self, tile: Pos<Tiles>) -> Option<String> {
         let mut best: Option<(&str, f32)> = None;
         for module in self.modules.iter() {
-            if !is_selectable(&module.json) || !self.pickable(&module.pointer) {
+            if !is_selectable(module.module()) || !self.pickable(&module.pointer) {
                 continue;
             }
             let Some(bounds) = self.module_bounds(&module.pointer) else {
@@ -1141,13 +1164,13 @@ impl AreaSnapshot {
             .iter()
             .min()
             .and_then(|folder| self.scene_node(folder))
-            .map(shapes::node_label)?;
+            .map(|node| shapes::node_label(node, self.reader.as_ref()))?;
         let bounds = self
             .modules
             .iter()
             .filter(|module| {
                 self.pickable(&module.pointer)
-                    && is_selectable(&module.json)
+                    && is_selectable(module.module())
                     && folders
                         .iter()
                         .any(|folder| module.pointer.starts_with(&format!("{folder}/")))
@@ -1163,8 +1186,10 @@ impl AreaSnapshot {
         let own = self
             .modules
             .iter()
-            .filter(|module| module.json.is_module(AreaModuleKind::Object))
-            .filter_map(|module| module.json["name"].as_str().map(str::to_owned));
+            .filter_map(|module| match module.module() {
+                AreaModule::Object(object) => object.name.clone(),
+                _ => None,
+            });
         own.chain(stamp::object_names(&self.picture.placed))
             .collect()
     }
@@ -1188,11 +1213,10 @@ impl AreaSnapshot {
                 let Some((index, _)) = cells.find(|(_, placed)| *placed == cell) else {
                     return false;
                 };
-                grid::GridDraft::own(&self.content, placement.blueprint.path(&self.content))
-                    .and_then(|draft| {
-                        let painted = draft.layer_index(layer)?;
-                        draft.ground[painted].cells.get(index).copied().flatten()
-                    })
+                let draft = grid::GridDraft::of(placement.blueprint.path(&self.content), def);
+                draft
+                    .layer_index(layer)
+                    .and_then(|painted| draft.ground[painted].cells.get(index).copied().flatten())
                     .is_some()
             })
             .map(|placement| placement.origin.clone())
@@ -1202,7 +1226,7 @@ impl AreaSnapshot {
     pub fn locked_hit(&self, tile: Pos<Tiles>) -> Option<String> {
         self.modules
             .iter()
-            .filter(|module| is_selectable(&module.json))
+            .filter(|module| is_selectable(module.module()))
             .filter(|module| {
                 !self.flags.hidden(&module.pointer) && self.flags.locked(&module.pointer)
             })
@@ -1215,9 +1239,11 @@ impl AreaSnapshot {
     /// The names of the bundle's own ground layers left out of the editor's picture.
     pub fn hidden_ground(&self) -> Vec<String> {
         let mut hidden = Vec::new();
-        nodes::walk(&self.scene, &mut |pointer, node| {
-            if nodes::is_layer(node) && self.flags.hidden(pointer) {
-                hidden.push(node["name"].as_str().unwrap_or_default().to_owned());
+        nodes::walk(self.nodes(), &mut |pointer, node| {
+            if let Some(name) = nodes::layer_name(node)
+                && self.flags.hidden(pointer)
+            {
+                hidden.push(name.to_owned());
             }
         });
         hidden.sort();
@@ -1237,17 +1263,17 @@ fn snapshot_parts(
         BlueprintDef::TABLE => Pictured::Blueprint(content.by_path::<BlueprintDef>(bundle)?),
         _ => return None,
     };
-    let scene = nodes::scene_of(editor, bundle);
-    let in_place =
-        placement::resolve_in_place(editor, content, &scene, in_place).unwrap_or_default();
+    let def = nodes::bundle_of(editor, bundle)?;
+    let reader = editor.reader()?;
+    let in_place = placement::resolve_in_place(editor, def.nodes(), in_place).unwrap_or_default();
     let mut levels = vec![SceneLevel {
         under: String::new(),
-        scene: &scene,
+        scene: def.nodes(),
     }];
     for (depth, place) in in_place.iter().enumerate() {
         levels.push(SceneLevel {
             under: place_id_of(&in_place[..=depth]),
-            scene: &place.scene,
+            scene: &place.def.scene.nodes,
         });
     }
     let flags = SceneFlags::of(&levels, show_only);
@@ -1258,12 +1284,13 @@ fn snapshot_parts(
         area::Kept::All
     };
     let picture = Arc::new(area::picture(content, pictured, kept)?);
-    let placement_bounds = placement::placement_bounds(content, &picture.placed);
+    let placement_bounds = placement::placement_bounds(&picture.placed);
     Some(SnapshotParts {
         pictured,
         picture,
-        modules: Arc::new(nodes::modules(&scene)),
-        scene: Arc::new(scene),
+        modules: Arc::new(nodes::modules(def.nodes())),
+        def,
+        reader,
         flags: Arc::new(flags),
         in_place,
         placement_bounds: Arc::new(placement_bounds),
@@ -1304,8 +1331,8 @@ impl AreaFrame<'_> {
     }
 }
 
-fn is_selectable(module: &Value) -> bool {
-    !(module.is_module(AreaModuleKind::Population) && module["roams"].is_null())
+fn is_selectable(module: &AreaModule) -> bool {
+    !matches!(module, AreaModule::Population(population) if population.roams.is_none())
 }
 
 pub fn selected_parts(editor: &Editor, bundle: &str) -> HashSet<String> {
@@ -1379,7 +1406,7 @@ pub fn drop_gone(editor: &mut Editor) -> Option<String> {
     editor
         .selection
         .parts
-        .retain(|part| part == WALK_ROW || scene.pointer(part).is_some());
+        .retain(|part| part == WALK_ROW || nodes::node(&scene, part).is_some());
     let gone = before - editor.selection.parts.len();
     let what = match (gone, editor.selection.parts.is_empty()) {
         (0, _) => return None,

@@ -2,18 +2,22 @@ use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
 
+use super::check::RowCheck;
 use super::files::{CONFIG_FILE, valid_name};
 use super::id::{ContentScope, with_content};
 use super::load::{ContentFolder, FileWriter, parse_json, reference_errors, shape_error};
 use super::locate::JsonIndex;
 use super::report::{ContentProblem, ErrorPlace, LoadError};
 use super::table::ContentFile;
+use crate::core::assets::FileSize;
 
 /// A type whose files are bundles: a folder of its `config.json` and the parts it declares, read and
 /// written with its fields. A part is never named from outside the bundle, so the bundle moves,
 /// renames and copies as one.
 pub trait Bundle: ContentFile {
     const PARTS: &'static [PartSpec];
+    /// The parts `write_parts` writes: one it leaves unwritten is no part of the bundle any more.
+    const WRITTEN: &'static [PartSpec] = &[];
 
     fn read_parts(&mut self, parts: &mut Parts);
 
@@ -101,6 +105,26 @@ impl<'a> Parts<'a> {
     /// The path from the game folder of the part at `part` in the bundle.
     pub fn path(&self, part: &str) -> String {
         format!("{}/{part}", self.bundle)
+    }
+
+    /// The size in pixels of the image at `part`, when it decodes.
+    pub fn image_size(&self, part: &str) -> Option<(u32, u32)> {
+        let path = self.path(part);
+        let bytes = self.folder.read(&path).ok()?;
+        super::media::image_size(&path, &bytes)
+    }
+
+    /// How much the file at `part` weighs.
+    pub fn weight(&self, part: &str) -> Option<FileSize> {
+        let bytes = self.folder.read(&self.path(part)).ok()?;
+        Some(FileSize(bytes.len()))
+    }
+
+    /// The problems `check` found in the bundle's config, each at its place there.
+    pub fn config_errors(&mut self, check: RowCheck) {
+        for error in check.into_errors() {
+            self.json_error(CONFIG_FILE, &error.pointer, error.problem);
+        }
     }
 
     pub fn has(&self, part: &str) -> bool {

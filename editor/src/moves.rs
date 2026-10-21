@@ -50,16 +50,16 @@ pub struct PlannedMove {
 pub fn fixed_place(path: &str) -> Option<&'static str> {
     let registry = registry();
     if path == FIXTURES_DIR {
-        return Some("the engine finds its fixtures and the game's settings in this folder");
+        return Some("the engine reads its fixtures and the game's settings from this folder");
     }
     if registry.is_fixture(path) {
-        return Some("the engine finds this file at this path");
+        return Some("it is a fixture, a file the engine itself reads at this path");
     }
     let inside = format!("{path}/");
     registry
         .fixture_paths()
         .any(|fixture| fixture.starts_with(&inside))
-        .then_some("this folder holds fixtures the engine finds by their path")
+        .then_some("it holds fixtures, files the engine itself reads at their paths")
 }
 
 /// The path a file or folder named `file` gets in `folder`: `file` itself when no neighbour has

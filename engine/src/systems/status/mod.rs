@@ -15,7 +15,9 @@ use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet, RowCheck};
+use crate::core::content::{
+    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, RowCheck,
+};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
 use crate::systems::script::{RunnerKind, ScriptModule, ScriptedRow};
@@ -236,6 +238,12 @@ impl ContentFile for StatusEffectDef {
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
         check.text("/description", &self.description, 0, 200);
+    }
+}
+
+impl NamedContent for StatusEffectDef {
+    fn shown_name(&self) -> &str {
+        &self.name
     }
 }
 

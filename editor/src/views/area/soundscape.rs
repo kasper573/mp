@@ -1,122 +1,82 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui, Vec2};
-use engine::core::assets::AssetKind;
-use engine::core::audio;
-use serde_json::Value;
+use engine::core::assets::{AssetKind, AudioRef};
+use engine::core::audio::{self, mix::AudioCategory};
+use engine::systems::area::{SoundChannel, SoundscapeDef};
 
+use crate::audio::WaveState;
 use crate::forms::{self, FormCx};
 use crate::picker;
 use crate::ui::{theme, widgets};
 
+/// The channels of `soundscape`, each edited as the game reads it, and how loud each plays at the
+/// default mix.
 pub(super) fn soundscape_extras(
     ui: &mut Ui,
     cx: &mut FormCx,
-    module: &mut Value,
+    soundscape: &mut SoundscapeDef,
     path: &str,
 ) -> bool {
     let mut changed = false;
     widgets::section(ui, "Channels");
-    if !module["channels"].is_array() {
-        module["channels"] = Value::Array(Vec::new());
-    }
-    let count = module["channels"].as_array().map_or(0, Vec::len);
     let mut remove = None;
-    for index in 0..count {
+    for (index, channel) in soundscape.channels.iter_mut().enumerate() {
         let channel_path = format!("{path}/channels/{index}");
-        let channel = &mut module["channels"][index];
-        let number = channel["channel"].as_u64().unwrap_or(0);
-        widgets::kv(ui, &format!("channel {number}"), |ui| {
-            let mut file = channel["file"].as_str().unwrap_or_default().to_owned();
-            if picker::asset_of(
-                ui,
-                cx,
-                AssetKind::Audio,
-                &mut file,
-                &format!("{channel_path}/file"),
-            ) {
-                channel["file"] = Value::String(file);
-                changed = true;
-            }
-        });
-        widgets::kv(ui, "volume", |ui| {
-            ui.scope(|ui| {
-                ui.set_max_width(96.0);
-                let mut volume = channel.get("volume").cloned().unwrap_or(Value::from(1.0));
-                if forms::value(
-                    ui,
-                    cx,
-                    &serde_json::json!({ "type": "number", "minimum": 0.0, "maximum": 1.0 }),
-                    &mut volume,
-                    &format!("{channel_path}/volume"),
-                )
-                .is_some()
+        ui.horizontal(|ui| {
+            ui.label(theme::strong(format!("channel {}", channel.channel)).monospace());
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
+                    .on_hover_text("Remove the channel")
+                    .clicked()
                 {
-                    channel["volume"] = volume;
-                    changed = true;
+                    remove = Some(index);
                 }
             });
-            ui.scope(|ui| {
-                ui.set_max_width(72.0);
-                let mut renumber = Value::from(number);
-                if forms::value(
-                    ui,
-                    cx,
-                    &serde_json::json!({ "type": "integer", "minimum": 1, "x-unit": "ch" }),
-                    &mut renumber,
-                    &format!("{channel_path}/channel"),
-                )
-                .is_some()
-                {
-                    channel["channel"] = renumber;
-                    changed = true;
-                }
-            });
-            if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
-                .on_hover_text("Remove the channel")
-                .clicked()
-            {
-                remove = Some(index);
-            }
         });
+        changed |= forms::of_type(ui, cx, channel, &channel_path).is_some();
     }
     if let Some(index) = remove {
-        module["channels"]
-            .as_array_mut()
-            .expect("channels")
-            .remove(index);
+        soundscape.channels.remove(index);
         changed = true;
     }
-    if ui.button("+ channel").clicked() {
-        let next = module["channels"].as_array().map_or(1, |list| {
-            list.iter()
-                .filter_map(|c| c["channel"].as_u64())
+    widgets::kv(ui, "+ channel", |ui| {
+        let mut file = String::new();
+        let new_path = format!("{path}/channels/{}", soundscape.channels.len());
+        if picker::asset_of(ui, cx, AssetKind::Audio, &mut file, &new_path) && !file.is_empty() {
+            let next = soundscape
+                .channels
+                .iter()
+                .map(|channel| channel.channel)
                 .max()
                 .unwrap_or(0)
-                + 1
-        });
-        module["channels"]
-            .as_array_mut()
-            .expect("channels")
-            .push(serde_json::json!({ "channel": next, "file": "" }));
-        changed = true;
-    }
-    let channels = module["channels"].as_array().cloned().unwrap_or_default();
-    if channels.is_empty() {
+                + 1;
+            soundscape.channels.push(SoundChannel {
+                channel: next,
+                file: AudioRef::new(file),
+                volume: 1.0,
+                pan: 0.0,
+                category: AudioCategory::Ambience,
+            });
+            changed = true;
+        }
+    });
+    if soundscape.channels.is_empty() {
         return changed;
     }
     widgets::section(ui, "At the default mix");
-    for channel in &channels {
-        let Some(file) = channel["file"].as_str() else {
-            continue;
-        };
-        let number = channel["channel"].as_u64().unwrap_or(0);
-        let volume = channel["volume"].as_f64().unwrap_or(1.0);
-        let loudness = cx
-            .state
-            .audio
-            .wave(cx.files, file)
-            .and_then(|wave| wave.loudness);
+    for channel in &soundscape.channels {
+        let file = channel.file.as_str();
+        let number = channel.channel;
+        let state = cx.state.audio.state(ui.ctx(), cx.files, file);
         ui.label(theme::mono(format!("{number} · {file}")).size(12.5));
+        let loudness = match state {
+            WaveState::Measuring => {
+                widgets::hint(ui, "measuring…");
+                continue;
+            }
+            WaveState::Ready(wave) => wave.loudness,
+            WaveState::Unreadable => None,
+        };
         let Some(loudness) = loudness else {
             widgets::hint(ui, "not measured: the file does not decode");
             continue;
@@ -125,7 +85,7 @@ pub(super) fn soundscape_extras(
             widgets::hint(ui, "not measured: the file does not decode");
             continue;
         };
-        let effective = integrated + f64::from(audio::decibels(volume as f32).0);
+        let effective = integrated + f64::from(audio::decibels(channel.volume).0);
         let band = if number == 1 {
             MUSIC_BAND
         } else {

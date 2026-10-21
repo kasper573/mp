@@ -1,12 +1,17 @@
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentFile, table_of};
+use std::collections::BTreeMap;
+
+use engine::core::content::{Content, ContentFile, FolderReader, table_of};
 use engine::core::math::Rng;
 use engine::core::script::VariableType;
+use engine::field;
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::scene_file;
-use engine::systems::area::{self, AreaDef, AreaModuleKind};
+use engine::systems::area::object::ObjectDef;
+use engine::systems::area::scene::{self, SceneNode, scene_file};
+use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SoundscapeDef};
+use engine::systems::script::{VarValue, Variable};
 use serde_json::Value;
 
 use super::placement::{self, placement_extras};
@@ -16,14 +21,13 @@ use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
 use super::{AreaTool, AreaViewState, brush, grid, nodes, scene_tree, stamp, terrain};
 use crate::app::Editor;
-use crate::forms::{self, FormCx};
+use crate::forms::{self, FieldHole, FormCx, FormHoles, HoleRequest};
 use crate::keymap::EditorKey;
-use crate::project::{ContentEdit, RowSelection};
+use crate::project::{ContentEdit, IdPaths, RowSelection};
 use crate::tabs::file_title;
 use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
-use crate::value::RowValue;
-use crate::{picker, schema};
+use crate::{picker, rows, schema};
 
 /// The view's inspector: a paste or a pick under way, the selected nodes, the blueprint parts
 /// edited in place, or else the card of the tool in hand.
@@ -58,7 +62,7 @@ pub fn sidebar(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         .into_iter()
         .cloned()
         .collect();
-    let node = |part: &String| snapshot.scene.pointer(part);
+    let node = |part: &String| nodes::node(snapshot.nodes(), part);
     match parts.as_slice() {
         [walk] if walk == super::WALK_ROW => {
             walk_card(editor, ui, view_key, &snapshot);
@@ -95,19 +99,16 @@ fn tool(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super::Area
 /// A ground layer's card: its name, where it draws among the others, what it holds, and its eye
 /// and padlock.
 fn layer_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, pointer: &str) {
-    let Some(node) = snapshot.scene.pointer(pointer).cloned() else {
+    let Some(name) = nodes::node(snapshot.nodes(), pointer)
+        .and_then(nodes::layer_name)
+        .map(str::to_owned)
+    else {
         return;
     };
-    let name = node["name"].as_str().unwrap_or_default().to_owned();
-    let mut order: Vec<String> = Vec::new();
-    nodes::walk(&snapshot.scene, &mut |_, node| {
-        if nodes::is_layer(node) {
-            order.push(node["name"].as_str().unwrap_or_default().to_owned());
-        }
-    });
+    let order = super::layers::names(snapshot.nodes());
     let at = order.iter().position(|layer| *layer == name).unwrap_or(0);
     let (under, over) = (&order[..at], &order[at + 1..]);
-    let painted = grid::GridDraft::own(&snapshot.content, &snapshot.bundle)
+    let painted = grid::GridDraft::own(editor, &snapshot.bundle)
         .and_then(|draft| {
             let layer = draft.layer_index(&name)?;
             Some(draft.ground[layer].cells.iter().flatten().count())
@@ -149,16 +150,14 @@ fn layer_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, 
 
 /// A folder's card: what it holds by kind, its eye and padlock, and what can be made of it.
 fn folder_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, pointer: &str) {
-    let Some(node) = snapshot.scene.pointer(pointer).cloned() else {
+    let Some(node) = nodes::node(snapshot.nodes(), pointer).cloned() else {
         return;
     };
-    let label = node["label"].as_str().unwrap_or_default().to_owned();
-    let mut counts: std::collections::BTreeMap<String, usize> = Default::default();
-    nodes::walk(&node["children"], &mut |_, child| {
+    let label = node.label().unwrap_or_default().to_owned();
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    nodes::walk(nodes::children_of(&node), &mut |_, child| {
         if !nodes::is_folder(child) {
-            *counts
-                .entry(child["type"].as_str().unwrap_or("module").to_owned())
-                .or_default() += 1;
+            *counts.entry(nodes::kind_tag(child)).or_default() += 1;
         }
     });
     let flags = snapshot.flags.row(pointer);
@@ -220,8 +219,8 @@ fn folder_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot,
         Some(FolderAction::Ungroup) => scene_tree::ungroup(editor, &bundle, &[pointer.to_owned()]),
         Some(FolderAction::SelectInside) => {
             let mut inside = Vec::new();
-            nodes::walk(&node["children"], &mut |at, child| {
-                if nodes::is_module(child) {
+            nodes::walk(nodes::children_of(&node), &mut |at, child| {
+                if matches!(child, SceneNode::Module(_)) {
                     inside.push(format!("{pointer}/children{at}"));
                 }
             });
@@ -415,7 +414,7 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
         let view = editor.views.area.view(view_key);
         view.terrain.tileset.clone().zip(view.terrain.set.clone())
     };
-    let layer = grid::GridDraft::own(content, &snapshot.bundle)
+    let layer = grid::GridDraft::own(editor, &snapshot.bundle)
         .and_then(|draft| brush::target_layer(editor, snapshot, &draft));
     if let (Some((tileset, set)), Some(layer)) = (picked, layer) {
         ui.add_space(6.0);
@@ -445,7 +444,7 @@ fn repaint_layer(
     else {
         return;
     };
-    let Some(mut draft) = grid::GridDraft::own(content, key) else {
+    let Some(mut draft) = grid::GridDraft::own(editor, key) else {
         return;
     };
     let mut rng = Rng::new(editor.frame);
@@ -456,9 +455,10 @@ fn repaint_layer(
         ));
         return;
     }
-    let mut edit = ContentEdit::new(format!("Repaint {changed} cells with {set} in {key}"));
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    draft.commit(
+        editor,
+        format!("Repaint {changed} cells with {set} in {key}"),
+    );
     if kept > 0 {
         editor.toast(format!("{kept} cells kept: no tile for their mix"));
     }
@@ -593,14 +593,22 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             );
             return;
         };
+        let Some(reader) = editor.reader() else {
+            return;
+        };
         let footprint = {
             let values = stamp::stamp_values(editor, Some(&stamp));
-            let size = stamp::stamp_footprint(editor, content, &stamp, &values);
+            let size = stamp::stamp_footprint(editor, content, &reader, &stamp, &values);
             (
                 size.width.round().max(1.0) as u32,
                 size.height.round().max(1.0) as u32,
             )
         };
+        let variables = editor
+            .read::<BlueprintDef>(&stamp)
+            .and_then(Result::ok)
+            .map(|def| def.variables.clone())
+            .unwrap_or_default();
         let settings = editor.settings.stamps.entry(stamp.clone()).or_default();
         widgets::kv(ui, "flip", |ui| {
             if flip_chip(ui, "X", EditorKey::FlipHorizontal, settings.flip_x) {
@@ -649,14 +657,10 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             ui.label(theme::muted("whole tiles").size(12.5));
             widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
         });
-        let variables = content
-            .by_path::<BlueprintDef>(&stamp)
-            .map(|id| id.get(content).variables.clone())
-            .unwrap_or_default();
         if variables.is_empty() {
             widgets::kv_text(ui, "values", "none: no variables");
         } else {
-            let mut values = Value::Object(settings.values.clone().into_iter().collect());
+            let mut values = settings.values.clone();
             let mut values_changed = false;
             {
                 let Editor {
@@ -673,8 +677,9 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 for (name, variable) in &variables {
                     widgets::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
-                            placement::variable_default(content, variable)
-                                .unwrap_or_else(|| placement::variable_template(variable))
+                            placement::variable_default(&reader, variable).unwrap_or_else(|| {
+                                placement::variable_template(variable, cx.nearby())
+                            })
                         });
                         if variable.ty == VariableType::Name {
                             ui.label(theme::muted("named per copy").size(12.5));
@@ -688,7 +693,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                             &format!("/stamp/{stamp}/{name}"),
                         );
                         if edited || (values.get(name).is_none() && variable.default.is_none()) {
-                            values[name] = value;
+                            values.insert(name.clone(), value);
                             values_changed = true;
                         }
                     });
@@ -696,10 +701,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             }
             if values_changed {
                 let settings = editor.settings.stamps.entry(stamp.clone()).or_default();
-                settings.values = values
-                    .as_object()
-                    .map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default();
+                settings.values = values;
                 save = true;
             }
         }
@@ -713,18 +715,20 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
     let Some(bundle) = selection.keys.first().cloned() else {
         return;
     };
-    let mut scene = nodes::scene_of(editor, &bundle);
+    let Some(read) = nodes::bundle_of(editor, &bundle) else {
+        return;
+    };
+    let mut blueprint = read.blueprint().clone();
     let selected: Vec<String> = selection
         .parts
         .iter()
-        .filter(|part| scene.pointer(part).is_some_and(nodes::is_module))
+        .filter(|part| nodes::module_node(&blueprint.scene.nodes, part).is_some())
         .cloned()
         .collect();
     if selected.is_empty() {
         return;
     }
     let shapes = editor.shapes.clone();
-    let shape = &shapes.scene_module;
     let table = table_of(&bundle).unwrap_or(AreaDef::TABLE).to_owned();
     let mut changed = false;
     let mut actions = Vec::new();
@@ -735,18 +739,27 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
         let Editor {
             project,
             form,
-            shapes,
+            shapes: editor_shapes,
             views,
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
-            .editing(&table, Some(&bundle))
-            .errors_of(&scene_file(&bundle));
+        let reader = project.reader();
+        let mut cx = FormCx::new(
+            project,
+            &shapes.scene_module,
+            editor_shapes,
+            form,
+            &mut actions,
+        )
+        .editing(&table, Some(&bundle))
+        .errors_of(&scene_file(&bundle));
         if let [node] = selected.as_slice() {
             let view = views.area.views.get_mut(&super::view_key(&bundle));
-            label = super::shapes::label(scene.pointer(node).unwrap_or(&Value::Null));
-            changed = module_inspector(ui, &mut cx, view, &bundle, &mut scene, node, &mut out);
+            label = nodes::module_node(&blueprint.scene.nodes, node)
+                .map(|module| super::shapes::label(&module.module, reader.as_ref()))
+                .unwrap_or_default();
+            changed = module_inspector(ui, &mut cx, view, &bundle, &mut blueprint, node, &mut out);
         } else {
             label = format!("{} modules", selected.len());
             ui.label(
@@ -758,12 +771,14 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
                 .monospace()
                 .size(13.0),
             );
-            ui.label(theme::muted(spans(&scene, &selected)).size(12.5));
+            ui.label(
+                theme::muted(spans(&blueprint.scene.nodes, &selected, reader.as_ref())).size(12.5),
+            );
             ui.add_space(4.0);
             widgets::card_frame(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 widgets::card_header(ui, &format!("{} modules", selected.len()), "", |ui| {
-                    if ui.button("Copy as JSON").clicked() {
+                    if ui.button("Copy").clicked() {
                         out.actions.push(super::AreaAction::Copy);
                         ui.close();
                     }
@@ -780,7 +795,8 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
                     }
                 });
                 ui.add_space(4.0);
-                changed |= placement::shared_values(ui, &mut cx, &mut scene, &selected);
+                changed |=
+                    placement::shared_values(ui, &mut cx, &mut blueprint.scene.nodes, &selected);
             });
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -804,10 +820,14 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
             );
         }
     }
-    if changed {
+    if changed && let Some(project) = editor.project.as_ref() {
         let mut edit = ContentEdit::new(format!("Edit {label}"));
-        nodes::write_scene(&mut edit, &bundle, &scene);
-        editor.apply(edit);
+        match read.write(&mut edit, project, &bundle, |own| *own = blueprint) {
+            Ok(()) => {
+                editor.apply(edit);
+            }
+            Err(error) => editor.toast(error),
+        }
     }
     for action in actions {
         row_form::act(editor, action, &table, &bundle);
@@ -830,38 +850,48 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
     }
 }
 
+/// The card of the module at `node` of `blueprint`, the area's or blueprint's at `bundle`: its
+/// fields as the game reads them, a blueprint's holes among them, and what its kind adds.
 fn module_inspector(
     ui: &mut Ui,
     cx: &mut FormCx,
     view: Option<&mut AreaViewState>,
     bundle: &str,
-    scene: &mut Value,
+    blueprint: &mut BlueprintDef,
     node: &str,
     out: &mut Followups,
 ) -> bool {
-    let variants = cx.shapes.scene_variants();
     let path = node.to_owned();
-    let Some(module) = scene.pointer(node) else {
+    let reader = cx.project.reader();
+    let Some(module) = nodes::module_node(&blueprint.scene.nodes, node) else {
         return false;
     };
-    let kind = module["type"].as_str().unwrap_or("module").to_owned();
-    let module_kind = module.module_kind();
-    let shown_kind = kind.replace('_', " ");
+    let kind = module.module.kind();
+    let shown_kind = kind.tag().replace('_', " ");
     let crumbs: Vec<String> = std::iter::once(file_title(bundle).to_owned())
-        .chain(folders_above(scene, node))
+        .chain(folders_above(&blueprint.scene.nodes, node, reader.as_ref()))
         .chain(std::iter::once(shown_kind.clone()))
         .collect();
     ui.label(theme::muted(crumbs.join(" › ")).monospace().size(13.0));
-    let Some(module) = scene.pointer_mut(node) else {
+    ui.add_space(4.0);
+    let holes_here = table_of(bundle) == Some(BlueprintDef::TABLE);
+    if holes_here {
+        cx.holes = Some(form_holes(
+            &reader,
+            &blueprint.variables,
+            &module.module,
+            &module.holes,
+            &path,
+        ));
+    }
+    let Some(module) = nodes::module_node_mut(&mut blueprint.scene.nodes, node) else {
         return false;
     };
-    ui.add_space(4.0);
     let mut changed = false;
-    let content = cx.content.clone();
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         widgets::card_header(ui, &shown_kind, "", |ui| {
-            if ui.button("Copy as JSON").clicked() {
+            if ui.button("Copy").clicked() {
                 out.actions.push(super::AreaAction::Copy);
                 ui.close();
             }
@@ -879,30 +909,12 @@ fn module_inspector(
             }
         });
         ui.add_space(4.0);
-        match schema::variant_of(&variants, module) {
-            Some(variant) => {
-                changed |= forms::object_without(
-                    ui,
-                    cx,
-                    variant.schema,
-                    module,
-                    &path,
-                    hidden_fields(module_kind),
-                )
-                .is_some();
-            }
-            None => {
-                changed |= forms::raw_json(ui, cx, module, &path).is_some();
-            }
-        }
-        match module_kind {
-            Some(AreaModuleKind::Scenery) => changed |= scenery_rows(ui, module, &path),
-            Some(AreaModuleKind::Population) => {
+        changed |= module_fields(ui, cx, &mut module.module, &path);
+        match &mut module.module {
+            AreaModule::Scenery(scenery) => changed |= scenery_rows(ui, scenery, &path),
+            AreaModule::Population(_) => {
                 if let Some(view) = view {
-                    let preview = view
-                        .population_previews
-                        .entry(module.to_string())
-                        .or_default();
+                    let preview = view.population_previews.entry(path.clone()).or_default();
                     widgets::kv(ui, "preview", |ui| {
                         let mut shown = !preview.hidden;
                         if ui.checkbox(&mut shown, "").changed() {
@@ -917,39 +929,45 @@ fn module_inspector(
             _ => {}
         }
     });
-    match module_kind {
-        Some(AreaModuleKind::Scenery) => scenery_extras(ui, cx, module, out, node),
-        Some(AreaModuleKind::Blueprint) => {
-            if let Some(blueprint) = module["blueprint"].as_str().map(str::to_owned)
-                && content
-                    .as_ref()
-                    .and_then(|c| {
-                        c.by_path::<BlueprintDef>(&blueprint)
-                            .map(|id| !id.get(c).variables.is_empty())
-                    })
-                    .unwrap_or(false)
+    match &mut module.module {
+        AreaModule::Scenery(scenery) => scenery_extras(ui, cx, scenery, out, node),
+        AreaModule::Blueprint(placement) => {
+            let placed = reader
+                .path_of(placement.blueprint)
+                .map(str::to_owned)
+                .and_then(|path| Some((cx.project.read::<BlueprintDef>(&path).ok()?, path)));
+            if let Some((def, placed)) = placed
+                && !def.variables.is_empty()
             {
-                widgets::section(ui, &format!("Values · {}", file_title(&blueprint)));
+                widgets::section(ui, &format!("Values · {}", file_title(&placed)));
                 widgets::card_frame(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     widgets::card_title(ui, "values");
                     ui.add_space(4.0);
-                    changed |= placement::placement_card(ui, cx, content.as_ref(), module, &path);
+                    changed |= placement::placement_card(ui, cx, placement, &def, &path);
                 });
             }
-            placement_extras(ui, cx, module, out, node);
+            placement_extras(ui, cx, placement, out, node);
         }
-        Some(AreaModuleKind::Population | AreaModuleKind::Resident) => from_npc(ui, cx, module),
-        Some(AreaModuleKind::Object) => {
+        AreaModule::Population(population) => {
+            if let Some(npc) = reader.path_of(population.npc) {
+                from_npc(ui, cx, npc);
+            }
+        }
+        AreaModule::Resident(resident) => {
+            if let Some(npc) = reader.path_of(resident.npc) {
+                from_npc(ui, cx, npc);
+            }
+        }
+        AreaModule::Object(object) => {
             ui.add_space(4.0);
-            changed |= crate::ui::row_form::scripts::script_cards(
-                ui, cx, "area", module, "scripts", &path,
-            )
-            .is_some();
-            object_extras(ui, module, out, node);
+            changed |= object_scripts(ui, cx, &reader, object, &path);
+            object_extras(ui, object, reader.as_ref(), out, node);
         }
-        Some(AreaModuleKind::Soundscape) => changed |= soundscape_extras(ui, cx, module, &path),
-        Some(AreaModuleKind::Script) if table_of(bundle) == Some(BlueprintDef::TABLE) => {
+        AreaModule::Soundscape(soundscape) => {
+            changed |= soundscape_extras(ui, cx, soundscape, &path)
+        }
+        AreaModule::Script(_) if holes_here => {
             widgets::hint(
                 ui,
                 "In a blueprint, this script runs once for each placement.",
@@ -957,7 +975,180 @@ fn module_inspector(
         }
         _ => {}
     }
+    if let Some(holes) = cx.holes.take() {
+        for request in holes.requests {
+            changed |= apply_hole(&reader, blueprint, node, &path, request);
+        }
+    }
     changed
+}
+
+/// The fields of `module` as the game reads them, without those its kind's own parts of the card
+/// edit.
+fn module_fields(ui: &mut Ui, cx: &mut FormCx, module: &mut AreaModule, path: &str) -> bool {
+    match module {
+        AreaModule::Object(object) => {
+            forms::of_type_without(ui, cx, object, path, &[field!(ObjectDef, scripts)])
+        }
+        AreaModule::SafeZone(zone) => forms::of_type(ui, cx, zone, path),
+        AreaModule::Soundscape(soundscape) => {
+            forms::of_type_without(ui, cx, soundscape, path, &[field!(SoundscapeDef, channels)])
+        }
+        AreaModule::Scenery(scenery) => forms::of_type_without(
+            ui,
+            cx,
+            scenery,
+            path,
+            &[
+                field!(Scenery, tiles),
+                field!(Scenery, sort),
+                field!(Scenery, blocks),
+            ],
+        ),
+        AreaModule::Blueprint(placement) => forms::of_type_without(
+            ui,
+            cx,
+            placement,
+            path,
+            &[field!(engine::systems::area::Placement, values)],
+        ),
+        AreaModule::Population(population) => forms::of_type(ui, cx, population, path),
+        AreaModule::Resident(resident) => forms::of_type(ui, cx, resident, path),
+        AreaModule::Script(script) => forms::of_type(ui, cx, script, path),
+    }
+    .is_some()
+}
+
+/// The scripts of `object`, each as a card.
+fn object_scripts(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    reader: &FolderReader,
+    object: &mut ObjectDef,
+    path: &str,
+) -> bool {
+    let Ok(mut json) = reader.to_json(&*object) else {
+        return false;
+    };
+    let scripts = field!(ObjectDef, scripts).trim_start_matches('/');
+    let changed =
+        crate::ui::row_form::scripts::script_cards(ui, cx, "area", &mut json, scripts, path)
+            .is_some();
+    match changed.then(|| reader.from_json::<ObjectDef>(&json)) {
+        Some(Ok(read)) => {
+            *object = read;
+            true
+        }
+        Some(Err(error)) => {
+            cx.state.errors.insert(path.to_owned(), error);
+            false
+        }
+        None => false,
+    }
+}
+
+/// The holes of a blueprint's module as its form shows them: each filled by its variable, and
+/// every other field a variable of its type could fill.
+fn form_holes(
+    reader: &FolderReader,
+    variables: &BTreeMap<String, Variable>,
+    module: &AreaModule,
+    holes: &scene::Holes,
+    path: &str,
+) -> FormHoles {
+    let mut fields: std::collections::HashMap<String, FieldHole> = Default::default();
+    if let Ok(json) = reader.to_json(module) {
+        for field in schema::holeable_fields(schema::of_type::<AreaModule>(), &json) {
+            fields.insert(
+                format!("{path}{}", field.pointer),
+                FieldHole::Open(field.kind),
+            );
+        }
+    }
+    for (pointer, name) in &holes.0 {
+        fields.insert(format!("{path}{pointer}"), FieldHole::Filled(name.clone()));
+    }
+    FormHoles {
+        fields,
+        variables: variables
+            .iter()
+            .map(|(name, variable)| (name.clone(), variable.ty))
+            .collect(),
+        requests: Vec::new(),
+    }
+}
+
+/// Makes a field of the module at `node` of `blueprint` a hole, fills it from another variable, or
+/// fixes it to a value again, as `request` asks.
+fn apply_hole(
+    reader: &FolderReader,
+    blueprint: &mut BlueprintDef,
+    node: &str,
+    path: &str,
+    request: HoleRequest,
+) -> bool {
+    let relative = |field: &str| field.strip_prefix(path).unwrap_or(field).to_owned();
+    let Some(module) = nodes::module_node_mut(&mut blueprint.scene.nodes, node) else {
+        return false;
+    };
+    match request {
+        HoleRequest::Make { field, kind } => {
+            let pointer = relative(&field);
+            let Ok(json) = reader.to_json(&module.module) else {
+                return false;
+            };
+            let table = schema::holeable_fields(schema::of_type::<AreaModule>(), &json)
+                .into_iter()
+                .find(|holeable| holeable.pointer == pointer)
+                .and_then(|holeable| holeable.table);
+            let default = json
+                .pointer(&pointer)
+                .and_then(|value| reader.from_json::<VarValue>(value).ok())
+                .map(|value| match (kind, value) {
+                    (VariableType::Number, VarValue::Integer(whole)) => {
+                        VarValue::Number(whole as f64)
+                    }
+                    (_, value) => value,
+                });
+            let base = pointer.rsplit('/').next().unwrap_or("value");
+            let name = rows::free_name(base, &blueprint.variables.keys().cloned().collect());
+            module.holes.0.insert(pointer, name.clone());
+            blueprint.variables.insert(
+                name,
+                Variable {
+                    ty: kind,
+                    table,
+                    default,
+                },
+            );
+            true
+        }
+        HoleRequest::Use { field, name } => {
+            module.holes.0.insert(relative(&field), name);
+            true
+        }
+        HoleRequest::Fix { field, name } => {
+            let pointer = relative(&field);
+            module.holes.0.remove(&pointer);
+            if let Some(default) = blueprint
+                .variables
+                .get(&name)
+                .and_then(|variable| variable.default.as_ref())
+                .and_then(|default| reader.to_json(default).ok())
+                && let Ok(mut json) = reader.to_json(&module.module)
+                && let Some(at) = json.pointer_mut(&pointer)
+            {
+                *at = default;
+                if let Ok(fixed) = reader.from_json(&json) {
+                    module.module = fixed;
+                }
+            }
+            if !scene::holes(&blueprint.scene.nodes).contains(&name) {
+                blueprint.variables.remove(&name);
+            }
+            true
+        }
+    }
 }
 
 #[derive(Default)]
@@ -965,18 +1156,14 @@ pub(super) struct Followups {
     pub actions: Vec<super::AreaAction>,
 }
 
-pub(super) fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static str] {
-    match kind {
-        Some(AreaModuleKind::Scenery) => &["type", "tiles", "sort", "blocks"],
-        Some(AreaModuleKind::Blueprint) => &["type", "values"],
-        Some(AreaModuleKind::Object) => &["type", "scripts"],
-        Some(AreaModuleKind::Soundscape) => &["type", "channels"],
-        _ => &["type"],
-    }
-}
-
-fn object_extras(ui: &mut Ui, module: &Value, out: &mut Followups, node: &str) {
-    let destinations = placement::warp_destinations(module);
+fn object_extras(
+    ui: &mut Ui,
+    object: &ObjectDef,
+    paths: &impl IdPaths,
+    out: &mut Followups,
+    node: &str,
+) {
+    let destinations = placement::warp_destinations(object, paths);
     if destinations.is_empty() {
         return;
     }
@@ -1036,28 +1223,29 @@ fn brush_size_field(ui: &mut Ui, brush: &mut BrushSettings, square: bool) -> boo
 }
 
 /// The labels of the folders above the node at `pointer`, outermost first.
-fn folders_above(scene: &Value, pointer: &str) -> Vec<String> {
+fn folders_above(scene: &[SceneNode], pointer: &str, paths: &impl IdPaths) -> Vec<String> {
     let mut labels: Vec<String> = std::iter::successors(nodes::place_of(pointer), |(folder, _)| {
         nodes::place_of(folder)
     })
     .map(|(folder, _)| folder)
     .take_while(|folder| !folder.is_empty())
-    .filter_map(|folder| scene.pointer(folder).map(super::shapes::node_label))
+    .filter_map(|folder| {
+        nodes::node(scene, folder).map(|node| super::shapes::node_label(node, paths))
+    })
     .collect();
     labels.reverse();
     labels
 }
 
 /// Which folders the modules at `pointers` sit in, said in a line.
-fn spans(scene: &Value, pointers: &[String]) -> String {
+fn spans(scene: &[SceneNode], pointers: &[String], paths: &impl IdPaths) -> String {
     let mut folders: Vec<String> = Vec::new();
     for pointer in pointers {
         let folder = nodes::place_of(pointer).map_or("", |(folder, _)| folder);
         let label = match folder {
             "" => "the top level".to_owned(),
-            folder => scene
-                .pointer(folder)
-                .map(super::shapes::node_label)
+            folder => nodes::node(scene, folder)
+                .map(|node| super::shapes::node_label(node, paths))
                 .unwrap_or_default(),
         };
         if !folders.contains(&label) {

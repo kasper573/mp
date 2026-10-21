@@ -7,8 +7,7 @@ use engine::core::math::{Pos, Rect};
 use engine::core::render::TILE;
 use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::{self, AreaModuleKind, Pictured};
-use serde_json::Value;
+use engine::systems::area::{self, AreaModule, AreaModuleKind, Pictured};
 
 use super::population::{self, NpcSprite};
 use super::{AreaFrame, AreaTool, nodes, scenery, selected_parts, shapes};
@@ -16,7 +15,6 @@ use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
-use crate::value::RowValue;
 use crate::views::navigation::Viewport;
 
 const LABEL_GAP: f32 = 2.0;
@@ -154,32 +152,29 @@ pub(super) fn overlay_modules(
         if frame.flags.hidden(&node.pointer) {
             continue;
         }
-        let module = &node.json;
+        let module = node.module();
         let Some(bounds) = frame.module_bounds(&node.pointer) else {
             continue;
         };
         if !visible.intersects(&bounds) {
             continue;
         }
-        let Some(kind) = module.module_kind() else {
-            continue;
-        };
-        if kind == AreaModuleKind::Population && module["roams"].is_null() {
-            continue;
-        }
+        let kind = module.kind();
         let is_selected = selected.contains(&node.pointer);
         let is_hovered = hovered.as_ref() == Some(&node.pointer);
-        if kind == AreaModuleKind::Blueprint
+        let label = shapes::label(module, frame.reader.as_ref());
+        if let AreaModule::Blueprint(placement) = module
             && frame
-                .content
-                .by_path::<BlueprintDef>(module.text("blueprint"))
+                .reader
+                .path_of(placement.blueprint)
+                .and_then(|path| frame.content.by_path::<BlueprintDef>(path))
                 .is_none()
         {
             let rect = canvas.rect(bounds);
             widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::DANGER), 5.0, 3.0);
             frame.labels.chip(
                 rect.min + Vec2::new(0.0, -4.0),
-                format!("{} doesn't load", shapes::label(module)),
+                format!("{label} doesn't load"),
                 theme::DANGER,
             );
             continue;
@@ -229,11 +224,9 @@ pub(super) fn overlay_modules(
             || is_hovered
             || (kind == AreaModuleKind::Population && canvas.scale() >= 2.0)
         {
-            frame.labels.chip(
-                rect.min + Vec2::new(0.0, -4.0),
-                shapes::label(module),
-                color,
-            );
+            frame
+                .labels
+                .chip(rect.min + Vec2::new(0.0, -4.0), label, color);
         }
         if parts.contains(&node.pointer) && shapes::has_size(module) {
             for corner in [
@@ -263,12 +256,10 @@ pub(super) fn overlay_selected_scenery(
     let Some(node) = scenery::selected_scenery(editor, frame) else {
         return;
     };
-    let Some(module) = frame.module(&node) else {
+    let Some(AreaModule::Scenery(scenery)) = frame.module(&node) else {
         return;
     };
-    let Some(rect) = shapes::scenery_rect(module) else {
-        return;
-    };
+    let rect = scenery.bounds();
     let canvas = frame.canvas;
     let grids = area.grids.clone();
     let size = area.size.grid();
@@ -284,26 +275,18 @@ pub(super) fn overlay_selected_scenery(
             );
         }
     }
-    let at = shapes::pos_of(&module["at"]).unwrap_or(rect.min());
-    for block in module["blocks"].as_array().into_iter().flatten() {
-        if let (Some(dx), Some(dy)) = (block[0].as_i64(), block[1].as_i64()) {
-            let cell = CellPos::new(
-                at.x.round() as i32 + dx as i32,
-                at.y.round() as i32 + dy as i32,
-            );
-            patterns::hatch(
-                painter,
-                canvas.rect(cell.bounds()),
-                Color32::from_rgba_unmultiplied(220, 120, 60, 140),
-                canvas.scale(),
-            );
-        }
+    let at = scenery.at;
+    for [dx, dy] in &scenery.blocks {
+        let cell = CellPos::new(at.x.round() as i32 + dx, at.y.round() as i32 + dy);
+        patterns::hatch(
+            painter,
+            canvas.rect(cell.bounds()),
+            Color32::from_rgba_unmultiplied(220, 120, 60, 140),
+            canvas.scale(),
+        );
     }
     let height = rect.size.height;
-    let sort = module["sort"]
-        .as_f64()
-        .map(|s| s as f32)
-        .unwrap_or(height - 1.0);
+    let sort = scenery.sort.unwrap_or(height - 1.0);
     let line_y = rect.min().y + sort;
     let a = canvas.to_screen(Pos::new(rect.min().x, line_y));
     let b = canvas.to_screen(Pos::new(rect.max().x, line_y));
@@ -339,15 +322,20 @@ pub(super) fn overlay_selected_scenery(
         let new_sort = snapped.clamp(0.0, height);
         if (new_sort - sort).abs() > f32::EPSILON {
             nodes::change_scene(editor, &frame.bundle, |scene| {
-                scene.pointer_mut(&node)?["sort"] = Value::from(new_sort as f64);
+                let AreaModule::Scenery(scenery) =
+                    &mut nodes::module_node_mut(scene, &node)?.module
+                else {
+                    return None;
+                };
+                scenery.sort = Some(new_sort);
                 Some("Move the sort line of the scenery".to_owned())
             });
         }
     }
     editor.status.left.push(format!(
         "scenery · {} · {} tiles",
-        module.text("tileset"),
-        scenery::tile_count(module)
+        frame.reader.path_of(scenery.tileset).unwrap_or_default(),
+        scenery::tile_count(scenery)
     ));
     editor.status.left.push(format!(
         "drag the sort line · {} snaps to 1/16",
@@ -362,16 +350,11 @@ pub(super) fn overlay_soundscape_reach(
 ) {
     let canvas = frame.canvas;
     for part in selected_parts(editor, &frame.bundle) {
-        let Some(module) = frame.module(&part) else {
+        let Some(module @ AreaModule::Soundscape(soundscape)) = frame.module(&part) else {
             continue;
         };
-        if !module.is_module(AreaModuleKind::Soundscape) {
-            continue;
-        }
-        let Some(bounds) = shapes::bounds(module, None) else {
-            continue;
-        };
-        let reach = module["emit"].as_f64().unwrap_or(0.0) as f32 + EDGE_FALLOFF.0;
+        let bounds = soundscape.shape.bounds();
+        let reach = soundscape.emit + EDGE_FALLOFF.0;
         let outer = bounds.inflate(reach, reach);
         let rect = canvas.rect(outer);
         let color = Color32::from_rgba_unmultiplied(170, 110, 255, 120);
@@ -406,31 +389,30 @@ pub(super) fn overlay_populations(
     let live: HashSet<String> = frame
         .modules
         .iter()
-        .filter(|module| module.json.is_module(AreaModuleKind::Population))
-        .map(|module| module.json.to_string())
+        .filter(|module| matches!(module.module(), AreaModule::Population(_)))
+        .map(|module| module.pointer.clone())
         .collect();
     let view = editor.views.area.view_mut(view_key);
     view.population_previews.retain(|key, _| live.contains(key));
     let previews = view.population_previews.clone();
     for node in frame.modules.iter() {
-        let module = &node.json;
-        if !module.is_module(AreaModuleKind::Population) || frame.flags.hidden(&node.pointer) {
+        let AreaModule::Population(population) = node.module() else {
+            continue;
+        };
+        if frame.flags.hidden(&node.pointer) {
             continue;
         }
-        let preview = previews
-            .get(&module.to_string())
-            .copied()
-            .unwrap_or_default();
+        let preview = previews.get(&node.pointer).copied().unwrap_or_default();
         if preview.hidden {
             continue;
         }
-        let Some(npc) = module["npc"].as_str() else {
+        let Some(npc) = frame.reader.path_of(population.npc) else {
             continue;
         };
         let Some(sprite) = population::npc_sprite(editor, &ctx, &frame.content, npc) else {
             continue;
         };
-        for at in population::population_places(area, module, preview.seed) {
+        for at in population::population_places(area, population, preview.seed) {
             draw_sprite(painter, canvas, at, &sprite, 200);
         }
     }

@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use design_tokens::glyph::Mark;
 use egui::{Align, Context, Layout, RichText, Ui};
 use engine::core::content::{SETTINGS_FILE, version};
 
@@ -9,6 +10,7 @@ use crate::app::{CloseThen, Editor, ModalDialog, NewGameDialog, NewGameSource, c
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::project::journal::RecoveryJournal;
+use crate::tabs::shown_path;
 use crate::templates;
 use crate::ui::{self, dialogs};
 
@@ -108,7 +110,7 @@ fn recent_list(editor: &mut Editor, ui: &mut Ui) {
                             ui.label(theme::strong(name));
                             ui.label(theme::muted(path).monospace().size(12.5));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.menu_button(theme::faint("…"), |ui| {
+                                ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                                     folder_menu(ui, folder, &mut picks);
                                 });
                                 ui.label(theme::faint(ago).monospace().size(12.0));
@@ -201,7 +203,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
                         for file in &data.files {
                             ui.horizontal(|ui| {
                                 let name = content_of(&file.path)
-                                    .map(|(table, key)| format!("{table}/{key}"))
+                                    .map(|(_, key)| shown_path(key).to_owned())
                                     .unwrap_or_else(|| file.path.clone());
                                 ui.add_sized(
                                     egui::vec2(220.0, 18.0),

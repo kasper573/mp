@@ -5,7 +5,6 @@ use engine::systems::area::{self, Pictured};
 use super::{AreaFrame, AreaTool, Armed, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::scene_graph;
 use crate::tabs::file_title;
 use crate::ui::{theme, widgets};
 
@@ -45,10 +44,10 @@ pub(super) fn status_bar(
         );
     }
     if let Some(said) = frame.flags.said() {
-        let name = editor
-            .row_value(&frame.bundle)
-            .and_then(|row| row["name"].as_str().map(str::to_owned))
-            .unwrap_or_else(|| file_title(&frame.bundle).to_owned());
+        let name = match &frame.def {
+            super::nodes::SceneBundle::Area(area) => area.name.clone(),
+            super::nodes::SceneBundle::Blueprint(_) => file_title(&frame.bundle).to_owned(),
+        };
         left.push(format!("{said} in {name}"));
     }
     if let Some(tile) = frame.pointer_tile {
@@ -167,6 +166,6 @@ fn part_count(frame: &AreaFrame, blueprint: &str) -> usize {
         .content
         .by_path::<area::blueprint::BlueprintDef>(blueprint)
         .map_or(0, |id| {
-            scene_graph::scene_modules(&id.get(&frame.content).scene.nodes).len()
+            super::nodes::modules(&id.get(&frame.content).scene.nodes).len()
         })
 }

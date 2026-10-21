@@ -228,11 +228,7 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
         ui.horizontal(|ui| {
             if kept {
                 ui.label(theme::faint("·")).on_hover_text(forms::KEPT_TIP);
-            } else if ui
-                .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                .on_hover_text("Remove")
-                .clicked()
-            {
+            } else if widgets::remove_button(ui, "Remove").clicked() {
                 remove = Some(index);
             }
             let mut picked = kind.clone();

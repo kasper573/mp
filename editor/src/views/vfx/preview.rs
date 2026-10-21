@@ -100,7 +100,7 @@ pub fn preview(
     ui.horizontal_wrapped(|ui| {
         for &kind in VfxTargetKind::VARIANTS {
             let on = VfxTargetKind::from(&views.target) == kind;
-            if widgets::mode_chip(ui, kind.into(), on).clicked() && !on {
+            if widgets::mode_chip(ui, <&str>::from(kind), on).clicked() && !on {
                 views.target = VfxTarget::fresh(kind, &models);
             }
         }

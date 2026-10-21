@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use engine::core::content::{Content, ContentScope, with_content};
+use engine::core::script::Fill;
 use engine::core::script::node::MAX_CALL_DEPTH;
 use engine::core::script::{EffectDef, EventDef, NodeKind, REFUSED, RunnerKindDef};
 use engine::systems::actor::model::Expression;
-use engine::systems::area::blueprint::hole_name;
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{
     EventKind, Node, RiftEffectKind, RiftQuery, RiftQueryKind, RunnerKind,
@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::keymap::EditorKey;
-use crate::project::ProjectFiles;
 use crate::schema::{self, SchemaVariant};
+use crate::tabs::shown_path;
 use crate::ui::widgets;
 use crate::value::RowValue;
 use crate::{condition, rows, spans};
@@ -240,7 +240,7 @@ impl NodeCatalogue {
                     .into_iter()
                     .filter(|(name, _)| *name != "type")
                     .partition(|(_, field)| leads_out(field));
-                let node = parse(fresh(root, variant));
+                let node = parse(fresh(root, variant, schema::Nearby::nowhere()));
                 NodeEntry {
                     kind: variant.tag.clone(),
                     system: schema::system_of(variant.schema)
@@ -277,7 +277,11 @@ impl NodeCatalogue {
         let events = event_variants(root)
             .into_iter()
             .map(|variant| {
-                let owners = match parse(template_event(root, &variant.tag)) {
+                let owners = match parse(template_event(
+                    root,
+                    &variant.tag,
+                    schema::Nearby::nowhere(),
+                )) {
                     Some(Node::On { event, .. }) => event.owners().to_vec(),
                     _ => Vec::new(),
                 };
@@ -525,20 +529,21 @@ pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
     rows::free_name(base, &nodes.keys().cloned().collect())
 }
 
-pub fn template(root: &Value, kind: &str) -> Option<Value> {
+pub fn template(root: &Value, kind: &str, nearby: schema::Nearby) -> Option<Value> {
     fresh(
         root,
         variants(root).iter().find(|variant| variant.tag == kind)?,
+        nearby,
     )
 }
 
 /// A node as the editor first places it: the schema's least, with a start a writer can see work.
-fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
+fn fresh(root: &Value, variant: &SchemaVariant, nearby: schema::Nearby) -> Option<Value> {
     let kind: NodeKind = variant.tag.parse().unwrap_or(NodeKind::Effect);
     if kind == NodeKind::On {
-        return template_event(root, EventKind::Started.name());
+        return template_event(root, EventKind::Started.name(), nearby);
     }
-    let mut value = schema::variant_template(root, variant);
+    let mut value = schema::variant_template(root, variant, nearby);
     match kind {
         NodeKind::Dialogue => {
             value["lines"] = serde_json::json!([LineSpeaker::Narrator.blank_line()]);
@@ -561,47 +566,11 @@ fn fresh(root: &Value, variant: &SchemaVariant) -> Option<Value> {
     Some(value)
 }
 
-/// Fills each empty reference in a new node with the first file of its type.
-pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &ProjectFiles) {
-    let schema = schema::resolve(root, schema);
-    if let Some(table) = schema::table_of(schema) {
-        if value.as_str().is_some_and(str::is_empty)
-            && let Some(key) = files.index().paths_of(table).min()
-        {
-            *value = Value::from(key);
-        }
-        return;
-    }
-    match schema::kind(root, schema) {
-        schema::SchemaKind::Object => {
-            for (name, field) in schema::properties(schema) {
-                if let Some(inner) = value.get_mut(name) {
-                    fill_references(root, field, inner, files);
-                }
-            }
-        }
-        schema::SchemaKind::Choice(alternatives) => {
-            if let Some(alternative) = alternatives
-                .iter()
-                .find(|alternative| schema::fits(root, alternative, value))
-            {
-                fill_references(root, alternative, value, files);
-            }
-        }
-        schema::SchemaKind::Union(variants) => {
-            if let Some(variant) = schema::variant_of(&variants, value) {
-                fill_references(root, variant.schema, value, files);
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn template_event(root: &Value, event: &str) -> Option<Value> {
+pub fn template_event(root: &Value, event: &str, nearby: schema::Nearby) -> Option<Value> {
     let variant = event_variants(root)
         .into_iter()
         .find(|variant| variant.tag == event)?;
-    let mut node = schema::variant_template(root, &variant);
+    let mut node = schema::variant_template(root, &variant, nearby);
     node["type"] = Value::from(NodeKind::On.name());
     match event.parse() {
         Ok(EventKind::Interacted) => {
@@ -714,8 +683,8 @@ fn value_text(value: &Value) -> String {
         Value::String(text) => text.clone(),
         Value::Number(number) => number.to_string(),
         Value::Bool(flag) => flag.to_string(),
-        Value::Object(_) if hole_name(value).is_some() => {
-            format!("◇{}", hole_name(value).unwrap_or(""))
+        Value::Object(_) if var_name(value).is_some() => {
+            format!("◇{}", var_name(value).unwrap_or_default())
         }
         Value::Array(items) => items.iter().map(value_text).collect::<Vec<_>>().join(", "),
         other => place_text(other).unwrap_or_else(|| condition::summary(other)),
@@ -863,7 +832,8 @@ impl NodeReads {
     pub fn text(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
         if !self.memories.is_empty() {
-            parts.push(format!("the subject's memory {}", self.memories.join(", ")));
+            let memories: Vec<&str> = self.memories.iter().map(|m| shown_path(m)).collect();
+            parts.push(format!("the subject's memory {}", memories.join(", ")));
         }
         parts.extend(self.items.iter().cloned());
         parts.extend(self.places.iter().cloned());
@@ -877,25 +847,28 @@ impl NodeReads {
                 self.memories.push(memory.path(content).to_owned());
             }
             RiftQuery::Holding { item, .. } => {
-                self.items.push(format!("holding {}", item.path(content)));
+                self.items
+                    .push(format!("holding {}", shown_path(item.path(content))));
             }
             RiftQuery::Wearing { item, .. } => {
-                self.items.push(format!("wearing {}", item.path(content)));
+                self.items
+                    .push(format!("wearing {}", shown_path(item.path(content))));
             }
             RiftQuery::Inside { object, .. } => self.places.push(format!("inside {object}")),
             RiftQuery::InArea { area, .. } => {
-                self.places.push(format!("in area/{}", area.path(content)));
+                self.places
+                    .push(format!("in {}", shown_path(area.path(content))));
             }
             RiftQuery::KnowsArea { area, .. } => {
                 self.places
-                    .push(format!("knows area/{}", area.path(content)));
+                    .push(format!("knows {}", shown_path(area.path(content))));
             }
             RiftQuery::OnQuest { quest, .. }
             | RiftQuery::QuestDone { quest, .. }
             | RiftQuery::QuestCooling { quest, .. }
             | RiftQuery::TaskDone { quest, .. }
             | RiftQuery::QuestResetsIn { quest, .. } => {
-                self.other.push(format!("quest/{}", quest.path(content)));
+                self.other.push(shown_path(quest.path(content)).to_owned());
             }
             RiftQuery::Level { .. } => self.other.push("the level".to_owned()),
             _ => {}
@@ -1064,7 +1037,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                     .map(actor_word)
                     .unwrap_or_else(|| "the subject".to_owned());
                 let mut line = vec![strong(who), muted(" to ")];
-                match (hole_name(&node["to"]), place_text(&node["to"])) {
+                match (var_name(&node["to"]), place_text(&node["to"])) {
                     (Some(name), _) => line.push(var(format!("◇ {name}"))),
                     (None, Some(place)) => line.push(strong(place)),
                     (None, None) => line.extend(expression_pieces(&node["to"])),
@@ -1203,9 +1176,9 @@ fn field_pieces(field: &str, table: Option<&str>, value: &Value) -> Vec<SummaryP
         out
     };
     match (table, value) {
-        (Some(table), Value::String(key)) => vec![muted(format!("{table}/")), strong(key)],
-        _ if hole_name(value).is_some() => {
-            let hole = var(format!("◇ {}", hole_name(value).unwrap_or("")));
+        (Some(_), Value::String(key)) => vec![strong(shown_path(key))],
+        _ if var_name(value).is_some() => {
+            let hole = var(format!("◇ {}", var_name(value).unwrap_or_default()));
             if field == "who" {
                 vec![hole]
             } else {
@@ -1259,7 +1232,7 @@ fn actor_word(text: &str) -> String {
 }
 
 pub fn expression_pieces(value: &Value) -> Vec<SummaryPiece> {
-    if let Some(name) = hole_name(value) {
+    if let Some(name) = var_name(value) {
         return vec![var(format!("◇ {name}"))];
     }
     let summary = condition::summary(value);
@@ -1286,4 +1259,27 @@ pub fn expression_pieces(value: &Value) -> Vec<SummaryPiece> {
         }
     }
     out
+}
+
+/// The variable a value of a script is filled from, when it is filled from one.
+pub fn var_name(value: &Value) -> Option<String> {
+    match Fill::<Value>::deserialize(value) {
+        Ok(Fill::Var { var }) => Some(var),
+        _ => None,
+    }
+}
+
+/// The variables the values within `value` are filled from.
+pub fn vars_in(value: &Value, names: &mut Vec<String>) {
+    if let Some(name) = var_name(value) {
+        if !names.contains(&name) {
+            names.push(name);
+        }
+        return;
+    }
+    match value {
+        Value::Object(map) => map.values().for_each(|inner| vars_in(inner, names)),
+        Value::Array(items) => items.iter().for_each(|inner| vars_in(inner, names)),
+        _ => {}
+    }
 }

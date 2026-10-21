@@ -1,38 +1,77 @@
+use crate::tabs::file_title;
+use engine::core::content::ContentFile;
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
-use serde_json::Value;
+use engine::core::tiling::{CellPos, Tiles};
+use engine::systems::area::AreaModuleKind;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::ScriptDef;
 
-use super::{AreaFrame, nodes, shapes};
+use super::{AreaFrame, modules, nodes, shapes};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::schema;
-use crate::value::RowValue;
 use crate::views::sound;
 
-/// Asks which row of `table` the new `module` names in its `field`, then adds it to `bundle`'s
-/// insertion folder.
-pub fn pick_then_add(editor: &mut Editor, bundle: &str, module: Value, table: &str, field: &str) {
+/// The type of file a module of `kind` names, picked when one is added: whose npc, which blueprint.
+pub fn named_table(kind: AreaModuleKind) -> Option<&'static str> {
+    match kind {
+        AreaModuleKind::Population | AreaModuleKind::Resident => Some(NpcDef::TABLE),
+        AreaModuleKind::Blueprint => Some(BlueprintDef::TABLE),
+        AreaModuleKind::Script => Some(ScriptDef::TABLE),
+        AreaModuleKind::Scenery => Some(TilesetDef::TABLE),
+        AreaModuleKind::Object | AreaModuleKind::SafeZone | AreaModuleKind::Soundscape => None,
+    }
+}
+
+/// Asks which file a new module of `kind` names, then adds it at `at`, or area-wide without one, to
+/// `bundle`'s insertion folder.
+pub fn pick_then_add(editor: &mut Editor, bundle: &str, kind: AreaModuleKind, at: Option<CellPos>) {
+    let Some(table) = named_table(kind) else {
+        return;
+    };
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
-        title: format!(
-            "Pick a {table} for the new {}",
-            schema::title(module.kind_or("module"))
-        ),
+        title: format!("Pick a {table} for the new {}", schema::title(kind.tag())),
         table: table.to_owned(),
         search: String::new(),
         picked: None,
         options: Vec::new(),
         then: PickRowThen::AddModule {
             area: bundle.to_owned(),
-            module,
-            field: field.to_owned(),
+            kind,
+            at,
         },
     }));
 }
 
-/// Adds `module` to `area` with the picked row's path in its `field`.
-pub fn add_picked(editor: &mut Editor, area: &str, mut module: Value, field: &str, picked: &str) {
-    module[field] = Value::String(picked.to_owned());
-    let label = format!("Add {} to {area}", shapes::label(&module));
-    nodes::add(editor, area, vec![module], &label);
+/// Adds a module of `kind` at `at`, or area-wide without one, to `area`, naming the file at
+/// `picked`.
+pub fn add_picked(
+    editor: &mut Editor,
+    area: &str,
+    kind: AreaModuleKind,
+    at: Option<CellPos>,
+    picked: &str,
+) {
+    let Some(reader) = editor.reader() else {
+        return;
+    };
+    let Some(module) = modules::module_template(&reader, kind, at, Some(picked)) else {
+        editor.toast(format!("{picked} can't be named by a {}", kind.tag()));
+        return;
+    };
+    let label = format!(
+        "Add {} to {}",
+        shapes::label(&module, reader.as_ref()),
+        file_title(area)
+    );
+    nodes::add(
+        editor,
+        area,
+        vec![SceneNode::Module(ModuleNode::new(module))],
+        &label,
+    );
 }
 
 pub fn listen(editor: &mut Editor, frame: &AreaFrame, tile: Pos<Tiles>) {

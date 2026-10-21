@@ -10,12 +10,12 @@ use crate::core::math::Pos;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
 #[strum(serialize_all = "snake_case")]
 pub enum WorldMap {
-    World,
+    Game,
 }
 
 impl Fixture for WorldMap {
     type Row = WorldMapDef;
-    const FOLDER: &'static str = "area";
+    const FOLDER: Option<&'static str> = None;
     const WHOLE_TABLE: bool = true;
 }
 

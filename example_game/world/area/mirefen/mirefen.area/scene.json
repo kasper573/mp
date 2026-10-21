@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Lagoon",
         "shape": {
           "type": "rect",
           "x": -0.5,
@@ -47,8 +48,7 @@
             "file": "assets/audio/ambient/forest_air.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Lagoon"
+        ]
       }
     ]
   },
@@ -2229,6 +2229,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Lake",
         "shape": {
           "type": "rect",
           "x": 33.5,
@@ -2243,11 +2244,11 @@
             "file": "assets/audio/ambient/lake.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Lake"
+        ]
       },
       {
         "type": "soundscape",
+        "label": "Lapping water",
         "shape": {
           "type": "rect",
           "x": 42.5,
@@ -2262,11 +2263,11 @@
             "file": "assets/audio/ambient/lapping_water.flac",
             "volume": 0.32
           }
-        ],
-        "label": "Lapping water"
+        ]
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 42.5,
@@ -2281,8 +2282,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",
@@ -3419,6 +3419,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Jungle",
         "shape": {
           "type": "rect",
           "x": 1.5,
@@ -3433,8 +3434,7 @@
             "file": "assets/audio/ambient/jungle.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Jungle"
+        ]
       },
       {
         "type": "blueprint",
@@ -4966,6 +4966,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Jungle",
         "shape": {
           "type": "rect",
           "x": 65.5,
@@ -4980,8 +4981,7 @@
             "file": "assets/audio/ambient/jungle.flac",
             "volume": 0.32
           }
-        ],
-        "label": "Jungle"
+        ]
       },
       {
         "type": "scenery",

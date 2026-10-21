@@ -10,6 +10,7 @@ use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::RowSelection;
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{condition, picker, schema};
@@ -45,7 +46,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                 .id_salt(("class-node", &key, &node))
                 .show(ui, |ui| {
                     ui.label(
-                        theme::mono(format!("{}/{key} › node {node}", ClassDef::TABLE))
+                        theme::mono(format!("{} › node {node}", shown_path(&key)))
                             .color(theme::CODE)
                             .size(12.0),
                     );
@@ -231,7 +232,7 @@ fn requirements(
         changed = FormChange::at(&path);
     }
     ui.add_space(4.0);
-    ui.menu_button("+ add requirement", |ui| {
+    widgets::dropdown_menu(ui, "+ add requirement", |ui| {
         let kinds = [
             (
                 "skill",

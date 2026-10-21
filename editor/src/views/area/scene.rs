@@ -14,11 +14,11 @@ use engine::core::content::Content;
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::render::{TILE, ToScreen};
 use engine::core::tiling::{TileSize, Tiles};
-use engine::systems::area::scene::SceneNode;
-use engine::systems::area::{self, AreaGrids, AreaModule, Flip, Picture, Scenery};
+use engine::systems::area::blueprint::Placement;
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{self, AreaGrids, AreaModule, Picture, Scenery};
 use engine::systems::screen::area::TileSheets;
 
-use super::stamp;
 use crate::project::{ProjectFiles, hash};
 
 pub struct AreaSceneRequest {
@@ -380,13 +380,9 @@ pub fn scenery_extent(sceneries: &[Scenery]) -> Option<Rect<Tiles>> {
         .reduce(|a, b| a.union(&b))
 }
 
-pub fn parts_scenery(
-    content: &Content,
-    blueprint: &str,
-    at: Pos<Tiles>,
-    values: &serde_json::Value,
-) -> Vec<Scenery> {
-    let placement = SceneNode::Module(stamp::placement_json(blueprint, at, Flip::None, values));
+/// The scenery a placement brings, its ids those of `content`.
+pub fn parts_scenery(content: &Content, placement: &Placement) -> Vec<Scenery> {
+    let placement = SceneNode::Module(ModuleNode::new(AreaModule::Blueprint(placement.clone())));
     let mut errors = Vec::new();
     let flattening = area::blueprint::flatten(content, &[placement], &mut errors);
     flattening

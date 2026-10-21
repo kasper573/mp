@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 6.5,
@@ -41,8 +42,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.22
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",
@@ -259,6 +259,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 17.5,
@@ -273,8 +274,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",

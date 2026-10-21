@@ -14,6 +14,7 @@ use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::schema;
+use crate::tabs::shown_path;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MapLens {
@@ -25,7 +26,7 @@ pub enum MapLens {
 impl MapLens {
     pub fn chip(&self) -> String {
         match self {
-            MapLens::Row { table, key } => format!("{table}: {key}"),
+            MapLens::Row { key, .. } => shown_path(key).to_owned(),
             MapLens::Module(kind) => format!("module: {}", kind.tag()),
             MapLens::Text(text) => format!("text: {text}"),
         }
@@ -33,7 +34,7 @@ impl MapLens {
 
     pub fn crumb(&self) -> String {
         match self {
-            MapLens::Row { table, key } => format!("{table}/{key}"),
+            MapLens::Row { key, .. } => shown_path(key).to_owned(),
             MapLens::Module(kind) => format!("module/{}", kind.tag()),
             MapLens::Text(text) => format!("text/{text}"),
         }

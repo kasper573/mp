@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
+use engine::systems::actor::model::SheetFrame;
 use engine::systems::area::tileset::{MAX_TILE_FRAME_MS, MAX_TILE_FRAMES, TileFrame};
 use strum::{IntoStaticStr, VariantArray};
 
@@ -11,8 +12,9 @@ use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
+use crate::tabs::shown_path;
 use crate::ui::{patterns, theme, widgets};
-use crate::views::model::{StripFrame, preview};
+use crate::views::model::{self, preview};
 
 const PREVIEW_W: f32 = 224.0;
 
@@ -141,15 +143,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             painter.rect_filled(dot, 1.0, Color32::WHITE);
         }
         if odd.contains(&tile) {
-            let badge = cell.center();
-            painter.circle_filled(badge, (cell.width() * 0.22).max(6.0), theme::WARN);
-            painter.text(
-                badge,
-                egui::Align2::CENTER_CENTER,
-                "!",
-                egui::FontId::proportional((cell.width() * 0.3).max(9.0)),
-                Color32::BLACK,
-            );
+            glyph::alert(&painter, cell.center(), (cell.width() * 0.22).max(7.0));
         }
     });
     sheet::select(editor, ui, tileset, &canvas);
@@ -200,7 +194,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         return;
     };
     ui.label(
-        theme::mono(format!("tileset/{key} › {} tiles", selection.count()))
+        theme::mono(format!("{} › {} tiles", shown_path(key), selection.count()))
             .color(theme::CODE)
             .size(12.0),
     );
@@ -231,7 +225,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 }
             }
             if common.frames.len() < MAX_TILE_FRAMES
-                && widgets::chip(ui, "+")
+                && widgets::chip(ui, Mark::Plus.text(12.0))
                     .on_hover_text("another frame, one step further")
                     .clicked()
             {
@@ -453,7 +447,7 @@ fn offset_text(offset: i64, unit: OffsetUnit, columns: i64) -> String {
     }
 }
 
-fn reference_frames(common: Option<&CommonAnimation>) -> Vec<StripFrame> {
+fn reference_frames(common: Option<&CommonAnimation>) -> Vec<SheetFrame> {
     let Some(common) = common else {
         return Vec::new();
     };
@@ -461,11 +455,7 @@ fn reference_frames(common: Option<&CommonAnimation>) -> Vec<StripFrame> {
     common
         .frames
         .iter()
-        .map(|frame| StripFrame {
-            frame: frame.on(anchor).tile,
-            ms: frame.ms,
-            ..StripFrame::default()
-        })
+        .map(|frame| model::plain_frame(frame.on(anchor).tile, frame.ms))
         .collect()
 }
 

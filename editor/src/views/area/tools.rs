@@ -1,8 +1,7 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::AreaModuleKind;
-use serde_json::Value;
+use engine::systems::area::{AreaModule, AreaModuleKind};
 use strum::VariantArray;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
@@ -15,10 +14,10 @@ use super::{
     AreaDrag, AreaFrame, AreaTool, Armed, MAX_ZOOM, MIN_ZOOM, blueprint, grid, nodes, placement,
     shapes, stamp,
 };
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor};
 use crate::keymap::EditorKey;
+use crate::tabs::file_title;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 use crate::views::navigation::{self, Viewport};
 
 pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
@@ -281,25 +280,22 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     {
         let at = paste_anchor(tile);
         let mut whole: Option<Rect<Tiles>> = None;
-        for module in nodes::modules(&Value::Array(ghost.modules.clone())) {
-            let module = &module.json;
-            let mut placed = module.clone();
+        let ghosts = nodes::modules(&ghost.nodes);
+        for module in &ghosts {
+            let mut placed = module.module().clone();
             shapes::shift(&mut placed, at.x, at.y);
             if let Some(bounds) = shapes::bounds(&placed, None) {
-                let color = super::overlays::module_color(module.module_kind());
+                let kind = placed.kind();
+                let color = super::overlays::module_color(Some(kind));
                 let rect = canvas.rect(bounds);
                 widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
                 if matches!(
-                    module.module_kind(),
-                    Some(
-                        AreaModuleKind::Population
-                            | AreaModuleKind::Resident
-                            | AreaModuleKind::Object
-                    )
+                    kind,
+                    AreaModuleKind::Population | AreaModuleKind::Resident | AreaModuleKind::Object
                 ) {
                     frame.labels.chip(
                         rect.min + Vec2::new(0.0, -4.0),
-                        shapes::label(module),
+                        shapes::label(&placed, frame.reader.as_ref()),
                         color,
                     );
                 }
@@ -316,17 +312,13 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                 6.0,
             );
         }
-        let from = editor
-            .clipboard
-            .as_ref()
-            .map(|clip| format!(" from area/{}", clip.from))
-            .unwrap_or_default();
         frame.labels.chip(
             canvas.to_screen(tile) + Vec2::new(16.0, 8.0),
             format!(
-                "{} module{}{from}",
-                ghost.modules.len(),
-                crate::ui::widgets::plural(ghost.modules.len())
+                "{} module{} from {}",
+                ghosts.len(),
+                crate::ui::widgets::plural(ghosts.len()),
+                file_title(&ghost.clip.from)
             ),
             Color32::WHITE,
         );
@@ -400,17 +392,14 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         }
         AreaTool::Module if view.placing.is_some() => {
             let kind = view.placing.expect("a kind being placed");
-            if let Some(module) = super::modules::module_template(editor, kind, cell) {
-                let color = super::overlays::module_color(Some(kind));
-                let bounds = shapes::bounds(&module, None).unwrap_or(cell.bounds());
-                let rect = canvas.rect(bounds);
-                widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
-                frame.labels.chip(
-                    rect.min + Vec2::new(0.0, -4.0),
-                    format!("new {}", kind.tag().replace('_', " ")),
-                    color,
-                );
-            }
+            let color = super::overlays::module_color(Some(kind));
+            let rect = canvas.rect(super::modules::template_bounds(kind, cell));
+            widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+            frame.labels.chip(
+                rect.min + Vec2::new(0.0, -4.0),
+                format!("new {}", kind.tag().replace('_', " ")),
+                color,
+            );
         }
         AreaTool::Fill | AreaTool::Eyedropper | AreaTool::Module => {
             painter.rect_stroke(
@@ -493,7 +482,10 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
                 if !flipped.is_empty() {
                     nodes::change_scene(editor, &frame.bundle, |scene| {
                         for node in &flipped {
-                            shapes::flip_field(scene.pointer_mut(node)?, horizontal);
+                            shapes::flip_field(
+                                &mut nodes::module_node_mut(scene, node)?.module,
+                                horizontal,
+                            );
                         }
                         Some(format!("Flip {} modules", flipped.len()))
                     });
@@ -514,7 +506,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         && let [node] = selected_nodes(editor, frame).as_slice()
         && frame
             .module(node)
-            .is_some_and(|module| module.is_module(AreaModuleKind::Blueprint))
+            .is_some_and(|module| matches!(module, AreaModule::Blueprint(_)))
     {
         placement::edit_in_place(editor, view_key, frame, node);
     }
@@ -533,9 +525,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     });
     if copied || pressed(EditorKey::Copy) {
         copy_selection(editor, frame);
-        if let Some(clip) = &editor.clipboard {
-            ui.ctx()
-                .copy_text(serde_json::to_string_pretty(&clip.modules).unwrap_or_default());
+        if let Some(clip) = editor.clipboard.as_ref().and_then(Clipboard::scene) {
+            ui.ctx().copy_text(clip.nodes.text());
         }
     }
     if pressed(EditorKey::PasteInPlace) {
@@ -593,7 +584,7 @@ fn under_placement_tip(frame: &AreaFrame, placement: &str, armed: &Armed) {
     };
     let label = frame
         .module(placement)
-        .map(shapes::label)
+        .map(|module| shapes::label(module, frame.reader.as_ref()))
         .unwrap_or_default();
     if let Some(bounds) = frame.module_bounds(placement) {
         widgets::dashed_rect(

@@ -7,16 +7,18 @@ pub mod assets;
 pub mod rows;
 
 pub use self::assets::AssetSource;
-pub use self::rows::{PictureFrame, RowSource, picture_of};
+pub use self::rows::RowSource;
 
-use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
-use egui::{Align, Color32, Layout, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Color32, Layout, Rect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::core::assets::AssetKind;
+use engine::core::content::{ContentFile, ContentId};
 
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
+use crate::icons::{self, KindIcon};
 use crate::keymap::EditorKey;
+use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
 
 /// What a picker field holds: a key within a category (a row's key within its table, a file's
@@ -51,7 +53,7 @@ pub enum Dragged {
 impl Dragged {
     pub fn label(&self) -> String {
         match self {
-            Dragged::Row { table, key } => format!("{table}/{key}"),
+            Dragged::Row { key, .. } => shown_path(key).to_owned(),
             Dragged::Asset(path) => path.to_owned(),
         }
     }
@@ -87,13 +89,17 @@ pub trait PickSource {
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate>;
     /// The pick a dragged thing becomes on this field, or why the field refuses it.
     fn accepts(&self, cx: &FormCx, dragged: &Dragged) -> Result<Pick, String>;
-    /// The muted prefix and the text a pick is shown as.
+    /// The muted folder and the file a pick is shown as.
     fn shown(&self, pick: &Pick) -> (String, String);
-    fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32);
-    fn footer(&self, cx: &FormCx, pick: &Pick) -> String;
-    /// Lays the candidates out as a grid of pictures instead of a list.
-    fn grid(&self) -> bool {
-        false
+    /// The pick's name alone, as a grid labels it.
+    fn short(&self, pick: &Pick) -> String;
+    /// What stands for a pick that has no picture.
+    fn icon(&self, pick: &Pick) -> KindIcon;
+    /// What is said about a pick under the list beyond its name: its picture, its uses.
+    fn describe(&self, cx: &FormCx, pick: &Pick) -> String;
+    /// How the candidates are laid out until the user picks another layout.
+    fn layout(&self) -> PickLayout {
+        PickLayout::List
     }
     /// The action behind the arrow button beside a held pick.
     fn opens(&self, _pick: &Pick) -> Option<FormAction> {
@@ -105,6 +111,14 @@ pub trait PickSource {
     }
 }
 
+/// How a popover lays its candidates out: pictures with their names, or a line each with its
+/// whole path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PickLayout {
+    Grid,
+    List,
+}
+
 pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &str) -> bool {
     let mut pick = Pick::new(table, key.as_str());
     let changed = field(ui, cx, &RowSource::table(table, path), &mut pick, path);
@@ -112,6 +126,49 @@ pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &s
         *key = pick.key;
     }
     changed
+}
+
+/// A field picking the file of `Row` that `id` names, among the files as they stand now.
+pub fn content<Row: ContentFile>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    id: &mut ContentId<Row>,
+    path: &str,
+) -> bool {
+    let mut held = Some(*id);
+    let picked = maybe_content(ui, cx, &mut held, path);
+    match held {
+        Some(new) if picked => {
+            *id = new;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// A field picking the file of `Row` that `id` names, or none.
+pub fn maybe_content<Row: ContentFile>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    id: &mut Option<ContentId<Row>>,
+    path: &str,
+) -> bool {
+    let reader = cx.project.reader();
+    let mut key = id
+        .and_then(|id| reader.path_of(id))
+        .unwrap_or_default()
+        .to_owned();
+    if !row(ui, cx, Row::TABLE, &mut key, path) {
+        return false;
+    }
+    let picked = (!key.is_empty())
+        .then(|| reader.id_of::<Row>(&key))
+        .flatten();
+    if picked.is_none() && !key.is_empty() {
+        return false;
+    }
+    *id = picked;
+    true
 }
 
 /// A field over several tables at once; the pick names which table its key came from.
@@ -160,7 +217,7 @@ pub fn field(
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         if !pick.is_empty()
             && let Some(action) = source.opens(pick)
-            && controls::button(ui, "→")
+            && glyph::button(ui, Mark::Arrow, 22.0, theme::MUTED, "Open")
                 .on_hover_text(format!("Open {}", source.shown(pick).1))
                 .clicked()
         {
@@ -220,6 +277,9 @@ pub fn field(
     changed
 }
 
+/// The narrowest a pick's folder is shown, cut short; any narrower and only its name shows.
+const MIN_PREFIX: f32 = 24.0;
+
 fn chip(ui: &mut Ui, cx: &mut FormCx, source: &dyn PickSource, pick: &Pick) -> egui::Response {
     let empty = pick.is_empty();
     egui::Frame::new()
@@ -229,17 +289,37 @@ fn chip(ui: &mut Ui, cx: &mut FormCx, source: &dyn PickSource, pick: &Pick) -> e
         .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                if empty {
-                    ui.label(theme::muted(format!("pick {}…", source.placeholder())));
-                    return;
-                }
-                source.thumbnail(ui, cx, pick, 18.0);
-                let (prefix, text) = source.shown(pick);
-                ui.label(theme::muted(prefix).monospace().size(13.0));
-                ui.add(
-                    egui::Label::new(theme::mono(text).size(13.0).color(theme::CODE)).truncate(),
-                );
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.label(Mark::CaretDown.text(11.0).color(theme::MUTED));
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    if empty {
+                        ui.label(theme::muted(format!("pick {}…", source.placeholder())));
+                        return;
+                    }
+                    let (rect, _) = ui.allocate_exact_size(Vec2::splat(18.0), Sense::hover());
+                    let mut unlimited = u32::MAX;
+                    face(ui, cx, source, pick, rect, &mut unlimited);
+                    let (prefix, text) = source.shown(pick);
+                    let name =
+                        egui::WidgetText::from(theme::mono(text).size(13.0).color(theme::CODE))
+                            .into_galley(
+                                ui,
+                                Some(egui::TextWrapMode::Truncate),
+                                ui.available_width(),
+                                egui::TextStyle::Monospace,
+                            );
+                    let room = ui.available_width() - name.size().x - ui.spacing().item_spacing.x;
+                    if !prefix.is_empty() && room > MIN_PREFIX {
+                        ui.scope(|ui| {
+                            ui.set_max_width(room);
+                            ui.add(
+                                egui::Label::new(theme::muted(prefix).monospace().size(13.0))
+                                    .truncate(),
+                            );
+                        });
+                    }
+                    ui.add(egui::Label::new(name));
+                });
             });
         })
         .response
@@ -271,19 +351,23 @@ fn popover(
                 EditorKey::Move.name(),
                 EditorKey::Confirm.name(),
                 EditorKey::Cancel.name(),
-                pick.key
+                source.short(pick)
             )
         },
     ];
     let search_id = id.with("search");
     let category_id = id.with("category");
+    let layout_id = egui::Id::new(("picker layout", source.placeholder()));
     let mut search = draft_of(ui, search_id).unwrap_or_default();
     let mut category = draft_of(ui, category_id);
+    let mut layout = ui
+        .ctx()
+        .data(|d| d.get_temp::<PickLayout>(layout_id))
+        .unwrap_or_else(|| source.layout());
     let needle = search.to_lowercase();
     let categories = source.categories(cx);
     let all = source.candidates(cx);
     let total = all.len();
-    let mut blocked_rule: Option<String> = None;
     let mut candidates: Vec<&Candidate> = all
         .iter()
         .filter(|candidate| {
@@ -306,45 +390,68 @@ fn popover(
             .then(a.pick.category.cmp(&b.pick.category))
             .then(a.pick.key.cmp(&b.pick.key))
     });
-    if all.iter().any(|candidate| candidate.blocked.is_some()) {
-        blocked_rule = Some(format!(
-            "{} pickable",
-            candidates
-                .iter()
-                .filter(|candidate| candidate.blocked.is_none())
-                .count()
-        ));
-    }
+    let counted = if all.iter().any(|candidate| candidate.blocked.is_some()) {
+        let pickable = candidates
+            .iter()
+            .filter(|candidate| candidate.blocked.is_none())
+            .count();
+        format!("{pickable} pickable")
+    } else {
+        format!("{} of {total}", candidates.len())
+    };
     let highlight_id = id.with("highlight");
     let mut highlight: usize = ui.ctx().data(|d| d.get_temp(highlight_id)).unwrap_or(0);
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(6, 3))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut search)
-                        .frame(egui::Frame::NONE)
-                        .hint_text(format!("filter · {}", source.placeholder()))
-                        .desired_width(ui.available_width() - 120.0),
-                );
-                widgets::default_focus(ui, &response);
-                if response.changed() {
-                    set_draft(ui, search_id, &search);
-                    highlight = 0;
-                }
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let counted = match &blocked_rule {
-                        Some(rule) => rule.clone(),
-                        None => format!("{} of {total}", candidates.len()),
-                    };
-                    ui.label(theme::muted(counted).monospace().size(11.5));
+    ui.horizontal(|ui| {
+        let layouts = [
+            (PickLayout::List, Mark::List, "List"),
+            (PickLayout::Grid, Mark::Grid, "Grid"),
+        ];
+        let buttons = layouts.len() as f32 * (LAYOUT_BUTTON + ui.spacing().item_spacing.x);
+        egui::Frame::new()
+            .fill(theme::INPUT)
+            .stroke(Stroke::new(1.0, theme::BORDER))
+            .corner_radius(4.0)
+            .inner_margin(egui::Margin::symmetric(6, 3))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width() - buttons - 12.0);
+                ui.horizontal(|ui| {
+                    glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
+                    let count = ui.painter().layout_no_wrap(
+                        counted.clone(),
+                        egui::FontId::monospace(11.5),
+                        theme::MUTED,
+                    );
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut search)
+                            .frame(egui::Frame::NONE)
+                            .hint_text(format!("filter · {}", source.placeholder()))
+                            .desired_width(ui.available_width() - count.size().x - 8.0),
+                    );
+                    widgets::default_focus(ui, &response);
+                    if response.changed() {
+                        set_draft(ui, search_id, &search);
+                        highlight = 0;
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(theme::muted(&counted).monospace().size(11.5));
+                    });
                 });
             });
-        });
+        for (choice, mark, label) in layouts {
+            let color = if layout == choice {
+                theme::ACCENT
+            } else {
+                theme::FAINT
+            };
+            if glyph::button(ui, mark, LAYOUT_BUTTON, color, label)
+                .on_hover_text(label)
+                .clicked()
+            {
+                layout = choice;
+                ui.ctx().data_mut(|d| d.insert_temp(layout_id, choice));
+            }
+        }
+    });
     if !categories.is_empty() {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -365,62 +472,75 @@ fn popover(
             }
         });
     }
-    let (up, down, enter, escape) = ui.input(|i| {
+    let columns = match layout {
+        PickLayout::Grid => GRID_COLUMNS,
+        PickLayout::List => 1,
+    };
+    let (up, down, left, right, enter, escape) = ui.input(|i| {
+        let arrow = EditorKey::Move.arrow(i);
         (
-            EditorKey::Move.arrow(i) == Some([0, -1]),
-            EditorKey::Move.arrow(i) == Some([0, 1]),
+            arrow == Some([0, -1]),
+            arrow == Some([0, 1]),
+            arrow == Some([-1, 0]),
+            arrow == Some([1, 0]),
             EditorKey::Confirm.pressed(i),
             EditorKey::Cancel.pressed(i),
         )
     });
-    let grid = source.grid();
-    let columns = if grid { 5 } else { 1 };
+    let last = candidates.len().saturating_sub(1);
     if down {
-        highlight = (highlight + columns).min(candidates.len().saturating_sub(1));
+        highlight = (highlight + columns).min(last);
     }
     if up {
         highlight = highlight.saturating_sub(columns);
     }
-    if grid {
-        let (left, right) = ui.input(|i| {
-            (
-                EditorKey::Move.arrow(i) == Some([-1, 0]),
-                EditorKey::Move.arrow(i) == Some([1, 0]),
-            )
-        });
+    if layout == PickLayout::Grid {
         if right {
-            highlight = (highlight + 1).min(candidates.len().saturating_sub(1));
+            highlight = (highlight + 1).min(last);
         }
         if left {
             highlight = highlight.saturating_sub(1);
         }
     }
     let mut picked: Option<Pick> = None;
+    let mut hovered: Option<usize> = None;
+    let mut budget = icons::DECODES_PER_FRAME;
     egui::ScrollArea::vertical()
         .max_height(300.0)
         .id_salt(id.with("list"))
         .show(ui, |ui| {
-            let members: Vec<(usize, &Candidate)> =
-                candidates.iter().copied().enumerate().collect();
-            {
-                let group = 0;
-                if grid {
-                    egui::Grid::new(id.with(("grid", group)))
-                        .num_columns(columns)
-                        .spacing([4.0, 4.0])
-                        .show(ui, |ui| {
-                            for (count, (index, candidate)) in members.iter().enumerate() {
-                                if tile(ui, cx, source, candidate, *index == highlight, pick) {
-                                    picked = Some(candidate.pick.clone());
-                                }
-                                if (count + 1) % columns == 0 {
-                                    ui.end_row();
-                                }
+            match layout {
+                PickLayout::Grid => {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = Vec2::splat(GRID_GAP);
+                        ui.set_max_width(GRID_COLUMNS as f32 * (TILE + GRID_GAP));
+                        for (index, candidate) in candidates.iter().enumerate() {
+                            let cell = Cell {
+                                lit: index == highlight,
+                                held: candidate.pick == *pick,
+                            };
+                            let response = tile(ui, cx, source, candidate, cell, &mut budget);
+                            if response.hovered() {
+                                hovered = Some(index);
                             }
-                        });
-                } else {
-                    for &(index, candidate) in &members {
-                        if line(ui, cx, source, candidate, index == highlight, pick) {
+                            if response.clicked() && candidate.blocked.is_none() {
+                                picked = Some(candidate.pick.clone());
+                            }
+                        }
+                    });
+                }
+                PickLayout::List => {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    for (index, candidate) in candidates.iter().enumerate() {
+                        let cell = Cell {
+                            lit: index == highlight,
+                            held: candidate.pick == *pick,
+                        };
+                        let response = line(ui, cx, source, candidate, cell, &mut budget);
+                        if response.hovered() {
+                            hovered = Some(index);
+                        }
+                        if response.clicked() && candidate.blocked.is_none() {
                             picked = Some(candidate.pick.clone());
                         }
                     }
@@ -437,13 +557,15 @@ fn popover(
         picked = Some(candidate.pick.clone());
     }
     ui.separator();
-    if !pick.is_empty() {
-        ui.label(theme::muted(source.footer(cx, pick)).monospace().size(11.5));
-    }
+    let described = hovered
+        .or((up || down || left || right).then_some(highlight))
+        .and_then(|index| candidates.get(index).copied())
+        .or_else(|| candidates.iter().copied().find(|c| c.pick == *pick));
+    describe(ui, cx, source, described, pick);
     for (label, action) in source.creates(cx) {
         let response = ui
             .horizontal(|ui| {
-                ui.label(theme::code("+"));
+                glyph::show(ui, Mark::Plus, 14.0, theme::CODE);
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 0.0;
                     ui.label(label);
@@ -472,62 +594,124 @@ fn popover(
     changed
 }
 
+const LAYOUT_BUTTON: f32 = 22.0;
+const GRID_COLUMNS: usize = 5;
+const GRID_GAP: f32 = 4.0;
+const TILE: f32 = 78.0;
+const TILE_PICTURE: f32 = 48.0;
+const LINE: f32 = 24.0;
+const LINE_ICON: f32 = 16.0;
+
+/// How a candidate stands among the rest: under the keyboard, and whether the field holds it.
+#[derive(Clone, Copy)]
+struct Cell {
+    lit: bool,
+    held: bool,
+}
+
+impl Cell {
+    fn fill(self, hovered: bool) -> Color32 {
+        if self.lit {
+            theme::ACCENT_SOFT
+        } else if hovered {
+            design_tokens::ink::gold_wash(0.2)
+        } else if self.held {
+            theme::RAISED
+        } else {
+            Color32::TRANSPARENT
+        }
+    }
+}
+
+/// The line under the candidates, about the one the pointer is on, else the one the keys moved
+/// to, else the one the field holds.
+fn describe(
+    ui: &mut Ui,
+    cx: &FormCx,
+    source: &dyn PickSource,
+    described: Option<&Candidate>,
+    held: &Pick,
+) {
+    let Some(candidate) = described else {
+        ui.label(theme::faint("point at one to read about it").size(11.5));
+        return;
+    };
+    ui.horizontal(|ui| {
+        ui.label(theme::mono(source.shown(&candidate.pick).1).size(12.5));
+        if !candidate.name.is_empty() {
+            ui.label(theme::muted(&candidate.name).size(12.0));
+        }
+        if candidate.pick == *held {
+            ui.label(theme::faint("· held").size(11.5));
+        }
+    });
+    let said = match &candidate.blocked {
+        Some(reason) => RichText::new(reason).color(theme::DANGER),
+        None => theme::muted(&candidate.hint),
+    };
+    ui.add(egui::Label::new(said.size(11.5)).wrap());
+    ui.add(
+        egui::Label::new(
+            theme::faint(source.describe(cx, &candidate.pick))
+                .monospace()
+                .size(11.5),
+        )
+        .wrap(),
+    );
+}
+
 fn line(
     ui: &mut Ui,
     cx: &mut FormCx,
     source: &dyn PickSource,
     candidate: &Candidate,
-    lit: bool,
-    held: &Pick,
-) -> bool {
-    let full = ui.available_rect_before_wrap();
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(full.width(), 36.0), Sense::click());
-    if lit {
-        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
-    } else if response.hovered() {
-        ui.painter()
-            .rect_filled(rect, 4.0, design_tokens::ink::gold_wash(0.2));
-    }
+    cell: Cell,
+    budget: &mut u32,
+) -> egui::Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(width, LINE), Sense::click());
+    ui.painter()
+        .rect_filled(rect, 3.0, cell.fill(response.hovered()));
+    let icon = Rect::from_center_size(
+        egui::pos2(rect.left() + 6.0 + LINE_ICON / 2.0, rect.center().y),
+        Vec2::splat(LINE_ICON),
+    );
+    face(ui, cx, source, &candidate.pick, icon, budget);
     let mut child = ui.new_child(
         egui::UiBuilder::new()
-            .max_rect(rect.shrink2(Vec2::new(6.0, 2.0)))
+            .max_rect(Rect::from_min_max(
+                egui::pos2(icon.right() + 6.0, rect.top()),
+                egui::pos2(rect.right() - 6.0, rect.bottom()),
+            ))
             .layout(Layout::left_to_right(Align::Center)),
     );
-    source.thumbnail(&mut child, cx, &candidate.pick, 24.0);
+    child.spacing_mut().item_spacing.x = 6.0;
     let (prefix, text) = source.shown(&candidate.pick);
-    child.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        let ink = if candidate.blocked.is_some() {
-            theme::FAINT
-        } else {
-            theme::TEXT
-        };
-        ui.horizontal(|ui| {
-            if !prefix.is_empty() {
-                ui.label(theme::muted(prefix).monospace().size(13.0));
-            }
-            ui.label(RichText::new(text).monospace().size(13.0).color(ink));
-            if !candidate.name.is_empty() && candidate.name != candidate.pick.key {
-                ui.label(theme::muted(&candidate.name).size(12.0));
-            }
-        });
-        let line = match &candidate.blocked {
-            Some(reason) => reason.clone(),
-            None => {
-                let mut line = candidate.hint.clone();
-                if candidate.pick == *held {
-                    line.push_str(if line.is_empty() {
-                        "this one"
-                    } else {
-                        " · this one"
-                    });
-                }
-                line
-            }
-        };
-        ui.label(theme::muted(line).size(11.5));
-    });
-    response.clicked() && candidate.blocked.is_none()
+    let ink = if candidate.blocked.is_some() {
+        theme::FAINT
+    } else {
+        theme::TEXT
+    };
+    let mut job = egui::text::LayoutJob::default();
+    let font = egui::FontId::monospace(12.5);
+    job.append(
+        &prefix,
+        0.0,
+        egui::TextFormat::simple(font.clone(), theme::MUTED),
+    );
+    job.append(&text, 0.0, egui::TextFormat::simple(font, ink));
+    child.add(egui::Label::new(job).truncate().selectable(false));
+    if !candidate.name.is_empty() && child.available_width() > 40.0 {
+        child.add(
+            egui::Label::new(theme::muted(&candidate.name).size(12.0))
+                .truncate()
+                .selectable(false),
+        );
+    }
+    match &candidate.blocked {
+        Some(reason) => response.on_hover_text(reason),
+        None => response,
+    }
 }
 
 fn tile(
@@ -535,44 +719,63 @@ fn tile(
     cx: &mut FormCx,
     source: &dyn PickSource,
     candidate: &Candidate,
-    lit: bool,
-    held: &Pick,
-) -> bool {
-    let response = egui::Frame::new()
-        .fill(if lit {
-            theme::ACCENT_SOFT
-        } else if candidate.pick == *held {
-            theme::RAISED
-        } else {
-            Color32::TRANSPARENT
-        })
-        .corner_radius(4.0)
-        .inner_margin(4.0)
-        .show(ui, |ui| {
-            ui.set_width(72.0);
-            ui.vertical_centered(|ui| {
-                ui.add_enabled_ui(candidate.blocked.is_none(), |ui| {
-                    source.thumbnail(ui, cx, &candidate.pick, 48.0);
-                    ui.label(
-                        RichText::new(&candidate.pick.key)
-                            .monospace()
-                            .size(11.0)
-                            .color(if candidate.blocked.is_some() {
-                                theme::FAINT
-                            } else {
-                                theme::TEXT
-                            }),
-                    );
-                });
-            });
-        })
-        .response
-        .interact(Sense::click());
-    let response = match &candidate.blocked {
+    cell: Cell,
+    budget: &mut u32,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(TILE, TILE), Sense::click());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 4.0, cell.fill(response.hovered()));
+    let picture = Rect::from_center_size(
+        egui::pos2(rect.center().x, rect.top() + 6.0 + TILE_PICTURE / 2.0),
+        Vec2::splat(TILE_PICTURE),
+    );
+    face(ui, cx, source, &candidate.pick, picture, budget);
+    let ink = if candidate.blocked.is_some() {
+        theme::FAINT
+    } else {
+        theme::TEXT
+    };
+    let mut job = egui::text::LayoutJob::simple_singleline(
+        source.short(&candidate.pick),
+        egui::FontId::monospace(11.0),
+        ink,
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width(rect.width() - 8.0);
+    let name = ui.painter().layout_job(job);
+    painter.galley(
+        egui::pos2(
+            rect.center().x - name.size().x / 2.0,
+            picture.bottom() + 4.0,
+        ),
+        name,
+        ink,
+    );
+    if candidate.blocked.is_some() {
+        painter.rect_filled(rect, 4.0, theme::PANEL.gamma_multiply(0.4));
+    }
+    match &candidate.blocked {
         Some(reason) => response.on_hover_text(reason),
         None => response,
-    };
-    response.clicked() && candidate.blocked.is_none()
+    }
+}
+
+/// What stands for a pick: its picture, or its kind's icon.
+fn face(
+    ui: &Ui,
+    cx: &mut FormCx,
+    source: &dyn PickSource,
+    pick: &Pick,
+    rect: Rect,
+    budget: &mut u32,
+) {
+    let picture = icons::picture(
+        ui.ctx(),
+        &mut cx.state.thumbnails,
+        cx.project,
+        &pick.key,
+        budget,
+    );
+    icons::paint_file(ui.painter(), rect, picture, source.icon(pick), theme::MUTED);
 }
 
 fn close(ui: &mut Ui, id: egui::Id) {

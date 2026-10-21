@@ -1,65 +1,50 @@
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::sync::{LazyLock, Mutex};
 
 use rayon::prelude::*;
 
-use super::load::Loading;
+use super::load::{FileHashes, Loading};
 use super::report::{ContentProblem, ErrorPlace};
+use crate::core::assets::AssetKind;
+use crate::core::audio;
 
 pub struct ImageSizes(pub HashMap<String, (u32, u32)>);
 
-type MediaCheck = Result<Option<(u32, u32)>, (&'static str, String, &'static str)>;
+/// What decoding a media file found: an image's size, nothing more for a sound or a font, or why
+/// it does not decode.
+type MediaCheck = Result<Option<(u32, u32)>, MediaProblem>;
 
+#[derive(Clone)]
+struct MediaProblem {
+    rule: &'static str,
+    found: String,
+    expected: &'static str,
+}
+
+/// Every media file is decoded whole, as the game decodes it, so a file damaged anywhere fails the
+/// load rather than showing nothing in play.
 pub fn check_media(loading: &mut Loading) {
     let mut paths: Vec<String> = loading.media().to_vec();
     paths.extend(loading.media_parts());
     let folder = loading.folder();
+    let hashes = loading.content().built::<FileHashes>().0.clone();
     let checked: Vec<(String, MediaCheck)> = paths
         .into_par_iter()
         .map(|path| {
-            let bytes = match folder.read(&path) {
-                Ok(bytes) => bytes,
-                Err(error) => {
-                    return (
-                        path,
-                        Err(("unreadable file", error.to_string(), "a readable file")),
-                    );
-                }
+            let read = || match folder.read(&path) {
+                Ok(bytes) => decode(&path, &bytes),
+                Err(error) => Err(MediaProblem {
+                    rule: "unreadable file",
+                    found: error.to_string(),
+                    expected: "a readable file",
+                }),
             };
-            let lower = path.to_ascii_lowercase();
-            let result = if lower.ends_with(".png") {
-                measure_png(&bytes)
-                    .map(Some)
-                    .map_err(|error| ("unreadable image", error, "a PNG that decodes"))
-            } else if lower.ends_with(".wav") {
-                (bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WAVE")
-                    .then_some(None)
-                    .ok_or((
-                        "unreadable sound",
-                        "no RIFF WAVE header".to_owned(),
-                        "a WAV file",
-                    ))
-            } else if lower.ends_with(".flac") {
-                (bytes.len() >= 4 && &bytes[..4] == b"fLaC")
-                    .then_some(None)
-                    .ok_or((
-                        "unreadable sound",
-                        "no FLAC header".to_owned(),
-                        "a FLAC file",
-                    ))
-            } else if lower.ends_with(".ttf") || lower.ends_with(".otf") {
-                (bytes.len() >= 4
-                    && matches!(&bytes[..4], [0, 1, 0, 0] | b"true" | b"OTTO" | b"ttcf"))
-                .then_some(None)
-                .ok_or((
-                    "unreadable font",
-                    "no TrueType or OpenType header".to_owned(),
-                    "a TrueType or OpenType font",
-                ))
-            } else {
-                Ok(None)
+            let check = match hashes.get(&path) {
+                Some(hashed) => remembered(&hashed.hash, read),
+                None => read(),
             };
-            (path, result)
+            (path, check)
         })
         .collect();
     let mut sizes = HashMap::new();
@@ -69,14 +54,74 @@ pub fn check_media(loading: &mut Loading) {
                 sizes.insert(path, size);
             }
             Ok(None) => {}
-            Err((rule, found, expected)) => loading.file_error(
+            Err(problem) => loading.file_error(
                 path,
                 ErrorPlace::WholeFile,
-                ContentProblem::new(rule, found, expected),
+                ContentProblem::new(problem.rule, problem.found, problem.expected),
             ),
         }
     }
     loading.built(ImageSizes(sizes));
+}
+
+/// Decoding the same bytes again finds the same, so each is decoded once per process however often
+/// a game is loaded, as the editor does on every edit.
+fn remembered(hash: &str, decode: impl FnOnce() -> MediaCheck) -> MediaCheck {
+    static DECODED: LazyLock<Mutex<HashMap<String, MediaCheck>>> = LazyLock::new(Mutex::default);
+    if let Some(known) = DECODED
+        .lock()
+        .ok()
+        .and_then(|known| known.get(hash).cloned())
+    {
+        return known;
+    }
+    let check = decode();
+    if let Ok(mut known) = DECODED.lock() {
+        known.insert(hash.to_owned(), check.clone());
+    }
+    check
+}
+
+/// The size in pixels of the image at `path` of `bytes`, when it decodes.
+pub(super) fn image_size(path: &str, bytes: &[u8]) -> Option<(u32, u32)> {
+    let hash = blake3::hash(bytes).to_hex();
+    remembered(hash.as_str(), || decode(path, bytes))
+        .ok()
+        .flatten()
+}
+
+/// Why the media file at `path` of `bytes` does not decode, when it does not.
+pub(super) fn problem_of(path: &str, bytes: &[u8]) -> Option<ContentProblem> {
+    let hash = blake3::hash(bytes).to_hex();
+    remembered(hash.as_str(), || decode(path, bytes))
+        .err()
+        .map(|problem| ContentProblem::new(problem.rule, problem.found, problem.expected))
+}
+
+fn decode(path: &str, bytes: &[u8]) -> MediaCheck {
+    match AssetKind::of(path) {
+        Some(AssetKind::Image) => decode_png(bytes).map(Some).map_err(|found| MediaProblem {
+            rule: "unreadable image",
+            found,
+            expected: "a PNG that decodes",
+        }),
+        Some(AssetKind::Audio) => audio::loader::decode(bytes.to_vec())
+            .and_then(audio::loader::DecodedAudio::into_sound)
+            .map(|_| None)
+            .map_err(|error| MediaProblem {
+                rule: "unreadable sound",
+                found: error.to_string(),
+                expected: "a WAV or FLAC file of one or two channels that decodes",
+            }),
+        Some(AssetKind::Font) => ttf_parser::Face::parse(bytes, 0)
+            .map(|_| None)
+            .map_err(|error| MediaProblem {
+                rule: "unreadable font",
+                found: error.to_string(),
+                expected: "a TrueType or OpenType font",
+            }),
+        None => Ok(None),
+    }
 }
 
 pub struct VisiblePixelColumns {
@@ -122,9 +167,16 @@ pub fn visible_columns(bytes: &[u8]) -> Result<Option<VisiblePixelColumns>, Stri
     }))
 }
 
-fn measure_png(bytes: &[u8]) -> Result<(u32, u32), String> {
-    let decoder = png::Decoder::new(Cursor::new(bytes));
-    let reader = decoder.read_info().map_err(|error| error.to_string())?;
-    let info = reader.info();
-    Ok((info.width, info.height))
+fn decode_png(bytes: &[u8]) -> Result<(u32, u32), String> {
+    let mut reader = png::Decoder::new(Cursor::new(bytes))
+        .read_info()
+        .map_err(|error| error.to_string())?;
+    let size = reader
+        .output_buffer_size()
+        .ok_or_else(|| "an image too large to decode".to_owned())?;
+    let mut pixels = vec![0; size];
+    let frame = reader
+        .next_frame(&mut pixels)
+        .map_err(|error| error.to_string())?;
+    Ok((frame.width, frame.height))
 }

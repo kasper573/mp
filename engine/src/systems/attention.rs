@@ -48,7 +48,7 @@ pub enum AttentionMark {
 
 impl Fixture for AttentionMark {
     type Row = AttentionDef;
-    const FOLDER: &'static str = "attention";
+    const FOLDER: Option<&'static str> = Some("attention");
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

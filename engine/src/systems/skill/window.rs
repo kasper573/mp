@@ -635,7 +635,7 @@ fn draw_node(
             Pos2::new(name.max.x + 3.0, name.center().y - 5.0),
             Vec2::splat(10.0),
         );
-        glyph::paint(painter, Mark::Padlock, mark, color);
+        Mark::Lock.paint(painter, mark, color);
     }
 }
 

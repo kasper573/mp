@@ -1,6 +1,11 @@
-use editor::import::model;
+use std::sync::Arc;
+
+use editor::import::{formats, model};
+use engine::core::content::FolderReader;
+use engine::systems::actor::ModelDef;
 use image::{Rgba, RgbaImage};
 use serde_json::{Value, json};
+use testkit::{Game, path};
 
 /// A frame of the walker's sheet, in pixels.
 pub const FRAME: (u32, u32) = (12, 16);
@@ -24,7 +29,22 @@ pub const BLANK_WITH_DATA: u32 = COLUMNS * ROWS - 1;
 /// A model row of every strip the importer knows, eight frames each laid out a strip a row:
 /// footsteps on the first and fifth frame of its walks and runs, and an attack landing, with a
 /// sound, on the sixth.
-pub fn walker_row() -> Value {
+/// The walker as the game reads it, in a game holding the sound it plays, and what reads that
+/// game.
+pub fn walker() -> (FolderReader, ModelDef) {
+    let sheet = formats::encode_png(&walker_sheet()).expect("a png");
+    let game = Game::new()
+        .sfx("slash03")
+        .row("model", "walker", walker_row())
+        .part("model", "walker", "sprites.png", sheet);
+    let reader = FolderReader::new(game.registry(), Arc::new(game.folder()));
+    let walker = reader
+        .read::<ModelDef>(&path("model", "walker"))
+        .unwrap_or_else(|errors| panic!("the walker reads: {errors:?}"));
+    (reader, walker)
+}
+
+fn walker_row() -> Value {
     let mut actions = serde_json::Map::new();
     for (row, name) in model::strip_names().iter().enumerate() {
         let (action, direction) = name.split_once('_').expect("action_direction");
@@ -37,7 +57,7 @@ pub fn walker_row() -> Value {
                         frame["ms"] = json!(ATTACK_MS[column as usize]);
                         if column == 5 {
                             frame["apex"] = json!(true);
-                            frame["sound"] = json!("slash03");
+                            frame["sound"] = json!(path("sfx", "slash03"));
                         }
                     }
                     _ => {}

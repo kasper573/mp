@@ -82,7 +82,7 @@ the game at the spawn location (compared against the reference image beside it i
 
 A game is a folder of folders, arranged however the game likes, in which each file says what it is
 by its name: `fire_priestess.npc.json` is an npc, and the folder `emberfall_shrine.area/` is an area
-whose scene and grids are its parts. The game's settings are `fixtures/game.json`, and the content
+whose scene and grids are its parts. The game's settings are `fixtures/game.config.json`, and the content
 the engine itself asks for has fixed places under `fixtures/`; everything else is found by its path,
 so folders only organize. [`example_game/`](example_game) is one. The server loads the folder at
 start and serves it; clients sync it and keep it on the device; the same binaries run any folder that

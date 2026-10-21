@@ -7,6 +7,7 @@ pub mod key;
 pub mod load;
 pub mod locate;
 pub mod media;
+pub mod reader;
 pub mod report;
 pub mod serial;
 pub mod store;
@@ -21,15 +22,19 @@ pub use files::{
     bundle_of, content_path, fields_file, name_of, numbered, parent_of, table_of, valid_name,
 };
 pub use fixture::Fixture;
-pub use id::{ContentId, ContentScope, with_content};
+pub use id::{ContentId, ContentScope, rescoped, with_content};
 pub use key::key_of;
 pub use load::{
     BesideFile, BesideName, ContentFolder, ContentRegistry, FileHashes, FileWriter,
     FilesystemFolder, FolderEntry, JsonPart, LoadStep, Loading, MemoryFolder, Reference, Settings,
-    load, pointer_of, valid_key, write,
+    check_files, load, pointer_of, valid_key, write,
 };
+pub use reader::{FolderReader, Unreadable, WrittenFiles};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport, MISSING_FILE};
-pub use table::{AnyTable, Content, ContentBuilder, ContentFile, ModuleRule, ModuleSet, Table};
+pub use table::{
+    AnyTable, Content, ContentBuilder, ContentFile, ContentNames, ModuleRule, ModuleSet,
+    NamedContent, Table,
+};
 pub use version::ContentVersion;
 
 /// Whether `file` is media by its extension, fetched and cached on its own rather than read with the

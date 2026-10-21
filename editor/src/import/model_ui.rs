@@ -5,10 +5,10 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
 use engine::core::content::files::NAME_RULE;
-use engine::core::content::{ContentFile, fields_file, valid_name};
+use engine::core::content::{ContentFile, FolderReader, valid_name};
 use engine::systems::actor::ModelDef;
+use engine::systems::actor::model::SheetFrame;
 use image::RgbaImage;
-use serde_json::Value;
 
 use super::formats::{self, AnimationExport, ExportFormat};
 use super::model::{
@@ -18,8 +18,9 @@ use super::records::{DueReimport, ImportRecord};
 use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
+use crate::tabs::shown_path;
 use crate::ui::{dialogs, theme, widgets};
-use crate::views::model::{FrameCue, StripFrame, frame_size};
+use crate::views::model::{self as model_view, FrameCue, frame_size};
 use crate::{rows, schema, thumbs};
 
 const FRAME_CARD: f32 = 48.0;
@@ -75,8 +76,12 @@ pub struct ModelReimport {
     pub old_frame: Option<(u32, u32)>,
 }
 
-fn sheet_of(editor: &Editor, model: &str) -> Option<RgbaImage> {
-    super::asset_image(editor, &crate::parts::model_sprites(model))
+fn sheet_of(editor: &Editor, model: &ModelDef) -> Option<RgbaImage> {
+    super::asset_image(editor, model.sprites.image.as_str())
+}
+
+fn model_of(editor: &Editor, key: &str) -> Option<Arc<ModelDef>> {
+    editor.read::<ModelDef>(key)?.ok()
 }
 
 fn asked_defaults(export: &AnimationExport) -> BTreeMap<String, String> {
@@ -100,13 +105,15 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
-    let row = editor.row_value(key);
+    let reader = editor.reader()?;
+    let row = model_of(editor, key);
     let record = editor.imports.record_for(ModelDef::TABLE, key).cloned();
-    let sheet = row.as_ref().and_then(|_| sheet_of(editor, key));
+    let sheet = row.as_ref().and_then(|row| sheet_of(editor, row));
     if let (Some(due), Some(record), Some(row)) = (again, &record, &row) {
         let mapping = model::recorded_mapping(record, &export);
         let plan = model::plan(
             Some(row),
+            &reader,
             sheet.as_ref(),
             &export,
             &mapping,
@@ -151,7 +158,8 @@ pub fn land(
         key.to_owned(),
         row.is_none(),
         export,
-        row,
+        row.as_deref(),
+        &reader,
         sheet,
         record,
     ))))
@@ -159,7 +167,8 @@ pub fn land(
 
 pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::ImportDialog> {
     let name = super::suggested_name(&export, ModelDef::TABLE);
-    let mut dialog = new_dialog(name, true, export, None, None, None);
+    let reader = editor.reader()?;
+    let mut dialog = new_dialog(name, true, export, None, &reader, None, None);
     dialog.folder = crate::ui::content_tree::current_folder(editor);
     Some(super::ImportDialog::Model(Box::new(dialog)))
 }
@@ -168,7 +177,8 @@ fn new_dialog(
     key: String,
     new_row: bool,
     export: AnimationExport,
-    row: Option<Value>,
+    row: Option<&ModelDef>,
+    reader: &FolderReader,
     sheet: Option<RgbaImage>,
     record: Option<ImportRecord>,
 ) -> ModelDialog {
@@ -204,7 +214,8 @@ fn new_dialog(
         error: None,
     };
     dialog.plan = model::plan(
-        row.as_ref(),
+        row,
+        reader,
         dialog.sheet.as_ref(),
         &dialog.export,
         &dialog.mapping,
@@ -215,8 +226,11 @@ fn new_dialog(
 }
 
 fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     let row = (!dialog.new_row)
-        .then(|| editor.row_value(&dialog.key))
+        .then(|| model_of(editor, &dialog.key))
         .flatten();
     let choices: BTreeMap<(String, usize, FrameCue), CuePlacement> = dialog
         .plan
@@ -241,7 +255,8 @@ fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
         })
         .collect();
     dialog.plan = model::plan(
-        row.as_ref(),
+        row.as_deref(),
+        &reader,
         dialog.sheet.as_ref(),
         &dialog.export,
         &dialog.mapping,
@@ -289,7 +304,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     let width = 1130.0;
     dialogs::card(ctx, "import-model", width, |ui| {
         ui.horizontal(|ui| {
-            glyph::show(ui, Mark::Page, 16.0, theme::MUTED);
+            glyph::show(ui, Mark::File, 16.0, theme::MUTED);
             ui.label(
                 theme::strong(if dialog.new_row {
                     "Import a model".to_owned()
@@ -489,7 +504,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label("");
                         ui.label("");
                         ui.horizontal(|ui| {
-                            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                            glyph::show(ui, Mark::Check, 14.0, theme::OK);
                             ui.label(theme::muted("by name"));
                         });
                         ui.end_row();
@@ -660,7 +675,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
             .map(MappingNote::text)
             .unwrap_or_default();
         ui.horizontal(|ui| {
-            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+            glyph::show(ui, Mark::Check, 14.0, theme::OK);
             ui.label(theme::muted(note));
         });
     }
@@ -843,7 +858,8 @@ pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDi
 }
 
 fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String> {
-    let (key, row) = if dialog.new_row {
+    let reader = editor.reader().ok_or("no folder is open")?;
+    let (key, base) = if dialog.new_row {
         let project = editor.project.as_ref().ok_or("no folder is open")?;
         let name = dialog.key.trim();
         if !valid_name(name) {
@@ -853,16 +869,23 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
             .shapes
             .table(ModelDef::TABLE)
             .ok_or("the model type has no shape")?;
-        (
-            rows::new_path(&project.files, &dialog.folder, ModelDef::TABLE, name),
-            Some(schema::template(&shape.shape, &shape.shape)),
-        )
+        let key = rows::new_path(&project.files, &dialog.folder, ModelDef::TABLE, name);
+        let nearby = schema::Nearby {
+            files: &project.files,
+            from: Some(&key),
+        };
+        let template = schema::template(&shape.shape, &shape.shape, nearby);
+        let base = reader
+            .from_json::<ModelDef>(&template)
+            .map_err(|error| format!("a new model does not read: {error}"))?;
+        (key, base)
     } else {
         let key = dialog.key.clone();
-        let row = editor.row_value(&key);
-        (key, row)
+        let base =
+            model_of(editor, &key).ok_or_else(|| format!("{} does not read", shown_path(&key)))?;
+        (key, (*base).clone())
     };
-    let built = model::build(&dialog.plan, &dialog.export, row.as_ref(), &key)?;
+    let built = model::build(&dialog.plan, &dialog.export, base, &reader, &key)?;
     let names = formats::export_name(&dialog.export.files);
     let label = if dialog.new_row {
         format!("Imported {names} as {key}")
@@ -885,7 +908,11 @@ fn write(
 ) -> Result<(), String> {
     let mut edit = ContentEdit::new(label);
     edit.write(built.image.to_owned(), Arc::from(built.png));
-    edit.write_json(fields_file(key), &built.row);
+    edit.write_content(
+        editor.project.as_ref().ok_or("no folder is open")?,
+        key,
+        &built.row,
+    )?;
     editor.try_apply(edit)?;
     editor.imports.remember(record);
     editor.views.model.reimports.remove(key);
@@ -910,8 +937,11 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     let Some(draft) = editor.views.model.reimports.get(key) else {
         return;
     };
-    let row = editor.row_value(key);
-    let built = match model::build(&draft.plan, &draft.export, row.as_ref(), key) {
+    let (Some(reader), Some(base)) = (editor.reader(), model_of(editor, key)) else {
+        editor.toast(format!("Not imported: {} does not read", shown_path(key)));
+        return;
+    };
+    let built = match model::build(&draft.plan, &draft.export, (*base).clone(), &reader, key) {
         Ok(built) => built,
         Err(error) => {
             editor.toast(format!("Not imported: {error}"));
@@ -936,6 +966,9 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
 
 pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     let Some(draft) = editor.views.model.reimports.get_mut(key) else {
         return;
     };
@@ -981,6 +1014,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
             let sheet = draft.sheet.clone();
             let frames = Frames {
+                reader: &reader,
                 export: &draft.export,
                 sheet: &sheet,
                 old_frame: draft.old_frame,
@@ -993,12 +1027,13 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
         });
     editor.status.left = vec![
-        format!("model/{key} · its exports changed"),
+        format!("{} · its exports changed", shown_path(&key)),
         "the game keeps the old frames until the import applies".to_owned(),
     ];
 }
 
 struct Frames<'a> {
+    reader: &'a FolderReader,
     export: &'a AnimationExport,
     sheet: &'a Option<RgbaImage>,
     old_frame: Option<(u32, u32)>,
@@ -1013,6 +1048,7 @@ fn strip_section(
     strip: &StripPlan,
 ) {
     let Frames {
+        reader,
         export,
         sheet,
         old_frame,
@@ -1069,7 +1105,7 @@ fn strip_section(
             let texture = textures.of(ctx, &hash, &image);
             draw_fit(&painter, card.shrink(2.0), &texture, old_frame);
         }
-        let cues = cue_labels(frame_data);
+        let cues = cue_labels(frame_data, reader);
         painter.text(
             egui::pos2(card.center().x, card.max.y + 10.0),
             egui::Align2::CENTER_CENTER,
@@ -1091,7 +1127,7 @@ fn strip_section(
         );
     }
     let source = strip.tag.as_ref().and_then(|tag| export.strip(tag));
-    let after = strip.after();
+    let after = strip.after(reader);
     for (index, frame_data) in after.iter().enumerate() {
         let card = card_at(1, index);
         let waiting = strip
@@ -1120,7 +1156,7 @@ fn strip_section(
                 3.0,
             );
         }
-        let cues = cue_labels(frame_data);
+        let cues = cue_labels(frame_data, reader);
         let text = match (cues.is_empty(), waiting) {
             (true, true) => format!("{} ?", index + 1),
             (true, false) => format!("{}", index + 1),
@@ -1163,9 +1199,8 @@ fn strip_section(
     }
 }
 
-fn cue_labels(frame: &StripFrame) -> String {
-    frame
-        .cues()
+fn cue_labels(frame: &SheetFrame, reader: &FolderReader) -> String {
+    model_view::cues_of(frame, reader)
         .iter()
         .map(FrameCue::label)
         .collect::<Vec<_>>()
@@ -1179,7 +1214,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     ui.label(
-        theme::mono(format!("model/{key} › import"))
+        theme::mono(format!("{} › import", shown_path(&key)))
             .color(theme::CODE)
             .size(12.0),
     );
@@ -1201,7 +1236,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         followed.push(format!("{} {} → {}", cue.cue.label(), cue.from + 1, to + 1));
                     } else if cue.to.is_some() {
                         ui.horizontal_wrapped(|ui| {
-                            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                            glyph::show(ui, Mark::Check, 14.0, theme::OK);
                             ui.label(theme::muted(format!(
                                 "{} on frame {} stays.",
                                 cue.cue.label(),
@@ -1212,7 +1247,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 }
                 if !followed.is_empty() {
                     ui.horizontal_wrapped(|ui| {
-                        glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                        glyph::show(ui, Mark::Check, 14.0, theme::OK);
                         ui.label(theme::muted(format!(
                             "{} follow{} their frame{}. Found by its pixels.",
                             followed.join(", "),

@@ -1,18 +1,16 @@
 use egui::{RichText, Vec2};
-use engine::core::content::{ContentFile, fields_file, table_of};
+use engine::core::content::{ContentFile, table_of};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::GridSize;
-use engine::systems::area::{self, AreaDef, AreaModuleKind};
-use serde_json::Value;
+use engine::systems::area::{self, AreaDef, AreaModule, MapSize};
+use engine::systems::script::Place;
 
 use super::grid::GridDraft;
 use super::{nodes, pins, shapes};
 use crate::app::Editor;
 use crate::forms;
-use crate::project::ContentEdit;
 use crate::tabs::file_title;
 use crate::ui::{dialogs, theme, widgets};
-use crate::value::RowValue;
 
 pub struct ResizeDialog {
     /// The area or blueprint bundle resized.
@@ -29,11 +27,7 @@ pub fn resize_dialog(
     mut dialog: ResizeDialog,
 ) -> Option<ResizeDialog> {
     let mut outcome = None;
-    let old = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .and_then(|c| GridDraft::own(&c, &dialog.bundle))
+    let old = GridDraft::own(editor, &dialog.bundle)
         .map(|draft| (draft.size.width, draft.size.height))
         .unwrap_or((dialog.width, dialog.height));
     let smallest = match table_of(&dialog.bundle) {
@@ -210,13 +204,8 @@ fn anchor_shift(anchor: i8, old: u32, new: u32) -> i32 {
 }
 
 pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), String> {
-    let content = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .ok_or("the folder does not load")?;
     let bundle = &dialog.bundle;
-    let draft = GridDraft::own(&content, bundle).ok_or("the bundle is gone")?;
+    let draft = GridDraft::own(editor, bundle).ok_or("the bundle is gone")?;
     let old = draft.size;
     let new = GridSize::new(dialog.width, dialog.height);
     let shift = (
@@ -224,37 +213,43 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
     let (resized, clipped) = draft.resized(new, shift);
-    let mut row = editor.row_value(bundle).ok_or("the bundle is gone")?;
-    let map = row
-        .pointer_mut(nodes::map_pointer(bundle))
-        .ok_or("the bundle has no map")?;
-    map["size"]["width"] = Value::from(dialog.width);
-    map["size"]["height"] = Value::from(dialog.height);
     let (dx, dy) = (shift.0 as f32, shift.1 as f32);
     let bounds = Rect::new(
         Pos::new(-0.5, -0.5),
         Size::new(dialog.width as f32, dialog.height as f32),
     );
-    let mut outside = Vec::new();
-    let mut scene = nodes::scene_of(editor, bundle);
     let in_area = table_of(bundle) == Some(AreaDef::TABLE);
-    for module in nodes::modules(&scene) {
-        let Some(module) = scene.pointer_mut(&module.pointer) else {
-            continue;
+    let reader = editor.reader().ok_or("no folder is open")?;
+    let mut outside = Vec::new();
+    let edit = nodes::blueprint_edit(editor, bundle, |blueprint| {
+        blueprint.map.size = MapSize {
+            width: dialog.width,
+            height: dialog.height,
         };
-        shapes::shift(module, dx, dy);
-        if let Some(b) = shapes::bounds(module, None)
-            && in_area
-            && !bounds.contains_rect(&b)
-        {
-            match module.module_kind() {
-                Some(AreaModuleKind::SafeZone)
-                | Some(AreaModuleKind::Soundscape)
-                | Some(AreaModuleKind::Population) => {}
-                _ => outside.push(shapes::label(module)),
+        for module in nodes::modules(&blueprint.scene.nodes) {
+            let node = nodes::module_node_mut(&mut blueprint.scene.nodes, &module.pointer)?;
+            let module = &mut node.module;
+            shapes::shift(module, dx, dy);
+            let keeps_out = matches!(
+                module,
+                AreaModule::SafeZone(_) | AreaModule::Soundscape(_) | AreaModule::Population(_)
+            );
+            if let Some(b) = shapes::bounds(module, None)
+                && in_area
+                && !keeps_out
+                && !bounds.contains_rect(&b)
+            {
+                outside.push(shapes::label(module, reader.as_ref()));
             }
         }
-    }
+        resized.apply_to(blueprint);
+        Some(format!(
+            "Resize {} to {} × {} ({clipped} cells clipped)",
+            file_title(bundle),
+            dialog.width,
+            dialog.height
+        ))
+    });
     if !outside.is_empty() {
         return Err(format!(
             "{} left outside the map: {}",
@@ -262,24 +257,18 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             outside.join(", ")
         ));
     }
-    let mut edit = ContentEdit::new(format!(
-        "Resize {} to {} × {} ({clipped} cells clipped)",
-        file_title(bundle),
-        dialog.width,
-        dialog.height
-    ));
-    edit.write_json(fields_file(bundle), &row);
-    nodes::write_scene(&mut edit, bundle, &scene);
-    resized.write_all_into(&mut edit);
+    let mut edit = edit.ok_or("the bundle doesn't read")?;
     if dx != 0.0 || dy != 0.0 {
-        let files = &editor.project.as_ref().ok_or("no folder")?.files;
+        let project = editor.project.as_ref().ok_or("no folder is open")?;
         for arrival in pins::arrivals(editor, bundle) {
-            edit.update_json(files, &arrival.file, |json| {
-                let place = json.pointer_mut(&arrival.pointer)?;
-                place["x"] = serde_json::json!(arrival.at.x + dx);
-                place["y"] = serde_json::json!(arrival.at.y + dy);
-                Some(())
-            });
+            edit.update_at(
+                project,
+                &arrival.file,
+                &arrival.pointer,
+                |place: &mut Place| {
+                    place.at = Pos::new(arrival.at.x + dx, arrival.at.y + dy);
+                },
+            )?;
         }
     }
     editor.try_apply(edit)

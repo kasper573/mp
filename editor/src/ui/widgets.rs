@@ -7,10 +7,13 @@ use design_tokens::face::{Face, TextRole};
 use design_tokens::glyph::{self, Mark};
 use design_tokens::ink;
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
+use engine::core::content::LoadError;
 use engine::core::time::{Seconds, UnixMillis};
 
 use super::theme;
+use crate::icons::KindIcon;
 use crate::keymap::EditorKey;
+use crate::tabs::shown_path;
 
 pub fn section_heading(text: &str) -> RichText {
     RichText::new(text)
@@ -18,21 +21,34 @@ pub fn section_heading(text: &str) -> RichText {
         .color(ink::RUBRIC)
 }
 
-pub fn chip(ui: &mut Ui, text: &str) -> Response {
+pub fn chip(ui: &mut Ui, text: impl Into<RichText>) -> Response {
     chip_colored(ui, text, theme::RAISED, theme::TEXT)
 }
 
-pub fn chip_colored(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Response {
-    egui::Frame::new()
-        .fill(fill)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(3.0)
-        .inner_margin(egui::Margin::symmetric(8, 2))
-        .show(ui, |ui| {
-            ui.label(RichText::new(text).size(12.5).color(ink));
-        })
-        .response
-        .interact(Sense::click())
+pub fn chip_colored(
+    ui: &mut Ui,
+    text: impl Into<RichText>,
+    fill: Color32,
+    ink: Color32,
+) -> Response {
+    chip_framed(ui, text.into(), fill, ink, false)
+}
+
+/// A chip that opens a list to choose from, its caret on the right.
+pub fn dropdown_chip(ui: &mut Ui, text: impl Into<RichText>) -> Response {
+    chip_framed(ui, text.into(), theme::RAISED, theme::TEXT, true)
+}
+
+/// A plain button that opens a menu, its caret on the right.
+pub fn dropdown_menu<R>(
+    ui: &mut Ui,
+    text: impl Into<RichText>,
+    contents: impl FnOnce(&mut Ui) -> R,
+) -> egui::InnerResponse<Option<R>> {
+    let button = egui::Button::new(text.into()).right_text(Mark::CaretDown.text(11.0));
+    let (response, inner) =
+        egui::containers::menu::MenuButton::from_button(button).ui(ui, contents);
+    egui::InnerResponse::new(inner.map(|inner| inner.inner), response)
 }
 
 pub fn card_frame(selected: bool) -> egui::Frame {
@@ -71,7 +87,7 @@ pub fn kv(ui: &mut Ui, key: &str, value: impl FnOnce(&mut Ui)) {
 pub fn verdict(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
         let (mark, color) = if ok {
-            (Mark::Tick, theme::OK)
+            (Mark::Check, theme::OK)
         } else {
             (Mark::Warning, theme::WARN)
         };
@@ -168,6 +184,47 @@ pub fn shortcut_button<'a>(label: impl Into<egui::WidgetText>, key: EditorKey) -
     egui::Button::new(label).shortcut_text(key.name())
 }
 
+/// A menu button reading `label` after a kind's icon, with its shortcut when it has one.
+pub fn kind_button(
+    ui: &mut Ui,
+    kind: KindIcon,
+    label: &str,
+    shortcut: Option<EditorKey>,
+) -> Response {
+    let id = ui.id().with(("kind button", label));
+    let mut button = egui::Button::new((egui::Atom::custom(id, Vec2::splat(KIND_ICON)), label));
+    if let Some(key) = shortcut {
+        button = button.shortcut_text(key.name());
+    }
+    let laid = button.atom_ui(ui);
+    paint_kind(ui, kind, id, laid)
+}
+
+/// A line of a list to pick from, reading `label` after a kind's icon.
+pub fn kind_option(ui: &mut Ui, kind: KindIcon, label: &str, selected: bool) -> Response {
+    let id = ui.id().with(("kind option", label));
+    let button = egui::Button::selectable(
+        selected,
+        (egui::Atom::custom(id, Vec2::splat(KIND_ICON)), label),
+    );
+    let laid = button.atom_ui(ui);
+    paint_kind(ui, kind, id, laid)
+}
+
+const KIND_ICON: f32 = 14.0;
+
+fn paint_kind(ui: &Ui, kind: KindIcon, id: egui::Id, laid: egui::AtomLayoutResponse) -> Response {
+    if let Some(rect) = laid.rect(id) {
+        let color = if ui.is_enabled() {
+            theme::MUTED
+        } else {
+            theme::FAINT
+        };
+        kind.paint(ui.painter(), rect, color);
+    }
+    laid.response
+}
+
 pub fn key_chip(ui: &mut Ui, key: EditorKey) -> Response {
     key_hint(ui, &key.name())
 }
@@ -240,7 +297,7 @@ pub fn card_header(
     card_header_with(
         ui,
         |ui| {
-            ui.label(theme::strong(title).monospace());
+            ui.add(egui::Label::new(theme::strong(title).monospace()).truncate());
         },
         subtitle,
         menu,
@@ -255,9 +312,7 @@ pub fn card_header_with(
     menu: impl FnOnce(&mut Ui),
 ) -> Response {
     card_heading(ui, title, subtitle, |ui| {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.menu_button(theme::faint("…"), menu);
-        });
+        ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), menu);
     })
 }
 
@@ -265,7 +320,7 @@ pub fn card_title(ui: &mut Ui, title: &str) -> Response {
     card_heading(
         ui,
         |ui| {
-            ui.label(theme::strong(title).monospace());
+            ui.add(egui::Label::new(theme::strong(title).monospace()).truncate());
         },
         "",
         |_| {},
@@ -281,6 +336,27 @@ pub fn code_block(ui: &mut Ui, text: &str) {
         .show(ui, |ui| {
             ui.add(egui::Label::new(RichText::new(text).monospace().size(12.5)).selectable(true));
         });
+}
+
+/// Why the content file at `path` can't be shown: the errors that keep the game from reading it,
+/// each where it is in the file.
+pub fn unreadable(ui: &mut Ui, path: &str, errors: &[LoadError]) {
+    ui.horizontal(|ui| {
+        glyph::alert(ui.painter(), ui.cursor().min + Vec2::new(8.0, 9.0), 7.0);
+        ui.add_space(20.0);
+        ui.label(RichText::new(format!("{} doesn't read", shown_path(path))).strong());
+    });
+    for error in errors {
+        ui.label(
+            RichText::new(format!(
+                "{} · {}",
+                shown_path(&error.at.location(&error.file)),
+                error.problem
+            ))
+            .color(theme::MUTED)
+            .size(12.5),
+        );
+    }
 }
 
 pub fn hint(ui: &mut Ui, text: &str) {
@@ -302,7 +378,7 @@ pub fn search_box(
         .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
+                glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
                 let width = ui.available_width()
                     - key.as_ref().map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
                 let response = ui.add(
@@ -330,13 +406,31 @@ pub fn submenu<R>(
     let (response, inner) =
         egui::containers::menu::SubMenuButton::from_button(button).ui(ui, content);
     let at = response.rect.right_center() - Vec2::new(10.0, 0.0);
-    glyph::paint(
+    Mark::CaretRight.paint(
         ui.painter(),
-        Mark::ChevronRight,
         Rect::from_center_size(at, Vec2::splat(9.0)),
         theme::MUTED,
     );
     inner.map(|inner| inner.inner)
+}
+
+fn chip_framed(ui: &mut Ui, text: RichText, fill: Color32, ink: Color32, caret: bool) -> Response {
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(Stroke::new(1.0, theme::BORDER))
+        .corner_radius(3.0)
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                ui.label(text.size(12.5).color(ink));
+                if caret {
+                    ui.label(Mark::CaretDown.text(10.0).color(ink));
+                }
+            });
+        })
+        .response
+        .interact(Sense::click())
 }
 
 pub fn plural<N: PartialEq + From<u8>>(count: N) -> &'static str {
@@ -352,7 +446,12 @@ pub fn toggle_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
     chip_colored(ui, text, fill, ink)
 }
 
-pub fn mode_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
+/// A small cross that removes what it sits beside, saying `what` it does on hover.
+pub fn remove_button(ui: &mut Ui, what: &str) -> Response {
+    glyph::button(ui, Mark::Cross, 16.0, theme::FAINT, what).on_hover_text(what)
+}
+
+pub fn mode_chip(ui: &mut Ui, text: impl Into<RichText>, on: bool) -> Response {
     let (fill, ink) = if on {
         (ink::LIGHT, ink::RUBRIC)
     } else {
@@ -502,6 +601,7 @@ pub fn ago(elapsed: Seconds) -> String {
     }
 }
 
+/// A card's heading: `trailing` and the subtitle at its right, the title in the room they leave.
 fn card_heading(
     ui: &mut Ui,
     title: impl FnOnce(&mut Ui),
@@ -511,11 +611,13 @@ fn card_heading(
     let response = ui
         .horizontal(|ui| {
             ui.set_min_height(ui.spacing().interact_size.y);
-            title(ui);
-            if !subtitle.is_empty() {
-                ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
-            }
-            trailing(ui);
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                trailing(ui);
+                if !subtitle.is_empty() {
+                    ui.label(TextRole::Band.widget_text(subtitle, theme::MUTED));
+                }
+                ui.with_layout(Layout::left_to_right(Align::Center), title);
+            });
         })
         .response;
     response.interact(Sense::click())

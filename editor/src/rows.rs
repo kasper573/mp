@@ -7,7 +7,7 @@ use engine::core::content::{
     ContentFile, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
 };
 use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::{SCENE_FILE, module_json};
+use engine::systems::area::scene::SCENE_FILE;
 use engine::systems::registry;
 use serde_json::Value;
 
@@ -16,11 +16,13 @@ use crate::make;
 use crate::moves::{self, PathMove, fixed_place, free_path, free_path_among};
 use crate::project::files::{FolderIndex, content_holding, folder_entry};
 use crate::project::{ContentEdit, FileBytes, Project, ProjectFiles};
+use crate::scene_graph;
 use crate::schema::{self, SchemaShapes};
+use crate::tabs::shown_path;
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
-use crate::views::area::placement;
+use crate::views::area::{self as area, placement};
 
 /// What deleted files leave behind: the uses of one kind of a deleted file, and what becomes of
 /// them.
@@ -127,9 +129,9 @@ pub fn new_path(files: &ProjectFiles, folder: &str, table: &str, name: &str) -> 
 /// taken, holding the type's default content, and opens it. Gives its path.
 pub fn new_file(editor: &mut Editor, folder: &str, table: &str) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let made = make::content_file(&editor.shapes, table, folder, table);
+    let made = make::content_file(&editor.shapes, &project.files, table, folder, table);
     let path = free_path(&project.files, folder, moves::file_name(&made.path), &[]);
-    let mut edit = ContentEdit::new(format!("New {path}"));
+    let mut edit = ContentEdit::new(format!("New {}", shown_path(&path)));
     write_moved(&mut edit, &made.files, &made.path, &path);
     editor.try_apply(edit)?;
     editor.open_row(table, &path);
@@ -146,9 +148,9 @@ pub fn new_file_into(
 ) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let folder = parent_of(content_holding(file).unwrap_or(file)).to_owned();
-    let made = make::content_file(&editor.shapes, table, &folder, table);
+    let made = make::content_file(&editor.shapes, &project.files, table, &folder, table);
     let path = free_path(&project.files, &folder, moves::file_name(&made.path), &[]);
-    let mut edit = ContentEdit::new(format!("New {path}"));
+    let mut edit = ContentEdit::new(format!("New {}", shown_path(&path)));
     write_moved(&mut edit, &made.files, &made.path, &path);
     edit.update_json(&project.files, file, |target| {
         *target.pointer_mut(pointer)? = Value::String(path.clone());
@@ -190,7 +192,7 @@ pub fn duplicate(editor: &mut Editor, path: &str) -> Result<String, String> {
         editor,
         &[path.to_owned()],
         parent_of(path),
-        format!("Duplicate {path}"),
+        format!("Duplicate {}", shown_path(path)),
     )?;
     let copy = copies.into_iter().next().ok_or("nothing was copied")?;
     if let Some(table) = table_of(&copy).filter(|_| content_holding(&copy).is_some()) {
@@ -213,7 +215,10 @@ pub fn copy_into(
     let mut copies: Vec<String> = Vec::new();
     for path in paths {
         if folder == path || folder.starts_with(&format!("{path}/")) {
-            return Err(format!("{path} can't be copied inside itself"));
+            return Err(format!(
+                "{} can't be copied inside itself",
+                shown_path(path)
+            ));
         }
         let copy = free_path_among(&project.files, folder, moves::file_name(path), &[], &copies);
         let held = if project.files.index().folders.contains(path) {
@@ -272,10 +277,13 @@ pub fn replace_media(
     let name = import_name(source);
     let extension = |file: &str| file.rsplit_once('.').map(|(_, ext)| ext.to_lowercase());
     if extension(&name) != extension(path) {
-        return Err(format!("{name} isn't the same kind of file as {path}"));
+        return Err(format!(
+            "{name} isn't the same kind of file as {}",
+            shown_path(path)
+        ));
     }
     let bytes = std::fs::read(source).map_err(|error| format!("{name}: {error}"))?;
-    let mut edit = ContentEdit::new(format!("Replace {path} with {name}"));
+    let mut edit = ContentEdit::new(format!("Replace {} with {name}", shown_path(path)));
     edit.write(path.to_owned(), FileBytes::from(bytes));
     editor.try_apply(edit)
 }
@@ -283,13 +291,15 @@ pub fn replace_media(
 /// Writes the default content of the fixture at `path`, which the engine looks for there.
 pub fn make_fixture(editor: &mut Editor, path: &str) -> Result<(), String> {
     let table = table_of(path).ok_or("no type in its name")?;
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
     let made = make::content_file(
         &editor.shapes,
+        &project.files,
         table,
         parent_of(path),
         engine::core::content::name_of(path),
     );
-    let mut edit = ContentEdit::new(format!("Make {path}"));
+    let mut edit = ContentEdit::new(format!("Make {}", shown_path(path)));
     for (file, bytes) in made.files {
         edit.write(file, bytes);
     }
@@ -320,7 +330,7 @@ pub fn rename(editor: &mut Editor, path: &str, name: &str) -> Result<String, Str
     moves::apply(
         editor,
         &[PathMove::new(path, &to)],
-        format!("Rename {path} to {name}"),
+        format!("Rename {} to {name}", shown_path(path)),
     )?;
     Ok(to)
 }
@@ -334,7 +344,7 @@ pub fn move_into(editor: &mut Editor, paths: &[String], folder: &str) -> Result<
             continue;
         }
         if folder == path || folder.starts_with(&format!("{path}/")) {
-            return Err(format!("{path} can't go inside itself"));
+            return Err(format!("{} can't go inside itself", shown_path(path)));
         }
         let arriving: Vec<String> = steps.iter().map(|step| step.to.clone()).collect();
         let to = free_path_among(
@@ -382,7 +392,7 @@ pub fn delete_dialog(editor: &mut Editor, paths: Vec<String>) {
             Some(reason) => {
                 editor
                     .output
-                    .say("editor", format!("{path} stays: {reason}"));
+                    .say("editor", format!("{} stays: {reason}", shown_path(path)));
                 false
             }
             None => true,
@@ -590,11 +600,12 @@ fn kind_of(project: &Project, file: &str, pointer: &str) -> UsageKind {
         .flatten();
     let entry = match slot {
         None => None,
-        Some((parent, index)) if parent.ends_with("/modules") || is_scene(file) => {
+        Some(_) if is_scene(file) => Some(Entry::Module),
+        Some((parent, index)) if parent.ends_with("/modules") => {
             let any_number = project
                 .files
                 .json(file)
-                .and_then(|row| row.pointer(&parent)?.get(index).map(module_json))
+                .and_then(|row| row.pointer(&parent)?.get(index).cloned())
                 .and_then(|module| registry().module_rule(&table, &module))
                 == Some(ModuleRule::AnyNumber);
             any_number.then_some(Entry::Module)
@@ -997,7 +1008,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
                     moves::rewrite(&mut value, usage, &project.usages, &file, to)
                 }
                 UsageDecision::Remove => remove_entry(&mut value, &usage.pointer),
-                UsageDecision::Unpack => unpack_entry(project, &mut value, &usage.pointer),
+                UsageDecision::Unpack => unpack_entry(project, &file, &mut value, &usage.pointer),
                 UsageDecision::Undecided => {}
             }
         }
@@ -1031,11 +1042,24 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     Ok(())
 }
 
-fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
-    let Some(content) = project.content.clone() else {
+/// Puts in place of the placement a usage at `pointer` of the scene file `file` names what it
+/// places, as nodes of that scene.
+fn unpack_entry(project: &Project, file: &str, value: &mut Value, pointer: &str) {
+    let Some(bundle) = file.strip_suffix(&format!("/{SCENE_FILE}")) else {
         return;
     };
-    let Some((parent, index)) = list_slot(pointer) else {
+    let node = scene_graph::node_pointer(pointer);
+    let Some((parent, index)) = list_slot(&node) else {
+        return;
+    };
+    let reader = project.reader();
+    let unpacked = area::nodes::bundle_in(project, bundle).and_then(|read| {
+        let placement = area::nodes::placement_of(area::nodes::node(read.nodes(), &node)?)?;
+        let place = placement::AreaPlacement::of(project, &node, placement)?;
+        let nodes = placement::unpacked(&reader, &place)?;
+        area::nodes::CopiedNodes::of(&reader, &nodes)
+    });
+    let Some(parts) = unpacked.and_then(|copied| copied.into_json().as_array().cloned()) else {
         return;
     };
     let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut) else {
@@ -1044,9 +1068,6 @@ fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
     if index >= list.len() {
         return;
     }
-    let Some(parts) = placement::unpacked(&content, &list[index]) else {
-        return;
-    };
     list.remove(index);
     for (offset, part) in parts.into_iter().enumerate() {
         list.insert(index + offset, part);

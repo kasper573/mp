@@ -113,6 +113,8 @@ pub struct EditorSettings {
     pub scene_trees: BTreeMap<String, TreeView>,
     /// Whether the area and blueprint boxes above a scene graph are folded to one line.
     pub boxes_folded: bool,
+    /// Whether the meter of frames drawn a second shows.
+    pub frame_rate: bool,
 }
 
 /// How a tree is shown: the folders open, by path, and the kinds of rows left out.

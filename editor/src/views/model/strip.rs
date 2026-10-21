@@ -1,13 +1,15 @@
+use design_tokens::controls;
+use design_tokens::glyph::Mark;
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use engine::core::audio::playback::SfxDef;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
-use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES};
-use serde_json::Value;
+use engine::systems::actor::ModelDef;
+use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES, SheetFrame};
 use strum::VariantArray;
 
 use super::{
-    FrameCueKind, ModelPage, ModelStrip, StripFrame, action_timing, play_rule, starts_at, strip_of,
-    total_ms,
+    FrameCueKind, ModelPage, ModelStrip, action_timing, play_rule, starts_at, strip_of, total_ms,
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
@@ -50,14 +52,17 @@ pub enum StripConfirm {
 
 pub struct DraggedFrame(pub u32);
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let strip = editor.views.model.view(key).strip;
     let frames = strip_of(row, strip);
     header(editor, ui, key, row, strip);
     keys(editor, ui, key, &frames, &sheet);
-    let frames = strip_of(&editor.row_value(key).unwrap_or(row.clone()), strip);
+    let frames = match editor.read::<ModelDef>(key) {
+        Some(Ok(model)) => strip_of(&model, strip),
+        _ => frames,
+    };
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
         let view = editor.views.model.view_mut(key);
@@ -115,10 +120,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .clicked()
                     && let Some(lengths) = recorded
                 {
-                    let reverted: Vec<StripFrame> = frames
+                    let reverted: Vec<SheetFrame> = frames
                         .iter()
                         .zip(lengths)
-                        .map(|(frame, ms)| StripFrame {
+                        .map(|(frame, ms)| SheetFrame {
                             ms,
                             ..frame.clone()
                         })
@@ -168,7 +173,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .push("stored as ms per frame".to_owned());
 }
 
-pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: ModelStrip) {
+pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef, strip: ModelStrip) {
     let timing = action_timing(row, strip.action);
     let mut pick = None;
     ui.horizontal(|ui| {
@@ -200,7 +205,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let page = editor.views.model.view(key).page;
             if page == ModelPage::Cues {
-                if widgets::primary(ui, "▶ Play with sound").clicked() {
+                if controls::marked_primary(ui, Mark::Play, "Play with sound").clicked() {
                     let view = editor.views.model.view_mut(key);
                     view.preview.muted = false;
                     super::preview::restart(&mut view.preview);
@@ -249,7 +254,7 @@ pub fn timeline(
     ui: &mut Ui,
     key: &str,
     sheet: &super::ModelSheet,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     was: Option<u32>,
 ) -> TimelineLayout {
@@ -367,7 +372,7 @@ fn interact(
     key: &str,
     response: &egui::Response,
     layout: &TimelineLayout,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
 ) {
     let (extend, toggle) = ui.input(|i| {
@@ -487,7 +492,7 @@ fn interact(
 pub fn insert_frame(
     editor: &mut Editor,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     at: usize,
     sheet_frame: u32,
@@ -500,16 +505,7 @@ pub fn insert_frame(
     let ms = frames
         .get(at.saturating_sub(1))
         .map_or(100, |frame| frame.ms);
-    added.insert(
-        at.min(frames.len()),
-        StripFrame {
-            frame: sheet_frame,
-            ms,
-            apex: false,
-            step: false,
-            sound: None,
-        },
-    );
+    added.insert(at.min(frames.len()), super::plain_frame(sheet_frame, ms));
     if super::write_strip(
         editor,
         key,
@@ -530,7 +526,7 @@ pub fn lanes(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     layout: &TimelineLayout,
     strip: ModelStrip,
     with_waves: bool,
@@ -543,6 +539,9 @@ pub fn lanes(
         vec![FrameCueKind::Apex, FrameCueKind::Sound]
     };
     let selected_cue = editor.views.model.view(key).cue;
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     let lane_w = layout.width;
     let mut set = None;
     let mut select = None;
@@ -602,10 +601,10 @@ pub fn lanes(
                     );
                 }
                 FrameCueKind::Sound => {
-                    if let Some(sound) = &frame.sound {
+                    if let Some(sound) = frame.sound.and_then(|sound| reader.path_of(sound)) {
                         any = true;
                         if with_waves {
-                            let wave = super::sounds::wave_of_sfx(editor, sound);
+                            let wave = super::sounds::wave_of_sfx(editor, ui.ctx(), sound);
                             if let Some(wave) = wave {
                                 let w = wave.ms as f32 * layout.px_per_ms;
                                 let wave_rect = ERect::from_min_size(
@@ -621,7 +620,7 @@ pub fn lanes(
                             }
                         }
                         let galley = painter.layout_no_wrap(
-                            sound.to_string(),
+                            crate::tabs::shown_path(sound).to_owned(),
                             egui::FontId::monospace(11.0),
                             theme::TEXT,
                         );
@@ -672,7 +671,7 @@ pub fn lanes(
             && let Some(index) = layout.frame_at(pos.x)
         {
             let frame = &frames[index];
-            if frame.has(kind) {
+            if super::has_cue(frame, kind) {
                 select = Some((index, kind));
             } else {
                 set = Some((index, kind));
@@ -698,7 +697,7 @@ pub fn lanes(
 pub fn set_cue(
     editor: &mut Editor,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     index: usize,
     kind: FrameCueKind,
@@ -724,7 +723,17 @@ pub fn set_cue(
                 editor.toast("No sound rows to pick from");
                 return;
             };
-            cued[index].sound = Some(sound.clone());
+            let Some(id) = editor
+                .reader()
+                .and_then(|reader| reader.id_of::<SfxDef>(&sound))
+            else {
+                editor.toast(format!(
+                    "{} is no sound any more",
+                    crate::tabs::shown_path(&sound)
+                ));
+                return;
+            };
+            cued[index].sound = Some(id);
             format!(
                 "Sound {sound} on frame {} of {} of {key}",
                 index + 1,
@@ -746,7 +755,7 @@ pub fn set_cue(
     };
     if super::write_strip(editor, key, strip, &cued, ContentEdit::new(label)) {
         let view = editor.views.model.view_mut(key);
-        let present = cued[index].has(kind);
+        let present = super::has_cue(&cued[index], kind);
         view.cue = present.then_some((index, kind));
         view.frames = vec![index];
         if present {
@@ -786,7 +795,7 @@ pub fn frame_card(
     painter: &egui::Painter,
     rect: ERect,
     sheet: &super::ModelSheet,
-    frame: &StripFrame,
+    frame: &SheetFrame,
     index: usize,
     selected: bool,
 ) {
@@ -812,11 +821,15 @@ pub fn frame_card(
     );
 }
 
-fn rides(ui: &mut Ui, frames: &[StripFrame]) {
+fn rides(ui: &mut Ui, frames: &[SheetFrame]) {
     let cued: Vec<(usize, u32)> = frames
         .iter()
         .enumerate()
-        .filter(|(_, frame)| !frame.cues().is_empty())
+        .filter(|(_, frame)| {
+            FrameCueKind::VARIANTS
+                .iter()
+                .any(|&kind| super::has_cue(frame, kind))
+        })
         .map(|(index, _)| (index, super::starts_at(frames, index)))
         .collect();
     ui.add_space(4.0);
@@ -889,7 +902,7 @@ pub fn keys(
     editor: &mut Editor,
     ui: &Ui,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     sheet: &super::ModelSheet,
 ) {
     if !super::keyboard_free(ui) {
@@ -1030,12 +1043,19 @@ pub fn keys(
         }
         let mut sorted = selected.clone();
         sorted.sort_unstable();
+        let Some(reader) = editor.reader() else {
+            return;
+        };
         let cues: Vec<String> = sorted
             .iter()
             .filter_map(|index| frames.get(*index))
-            .flat_map(|frame| frame.cues().into_iter().map(|cue| cue.label()))
+            .flat_map(|frame| {
+                super::cues_of(frame, &reader)
+                    .into_iter()
+                    .map(|cue| cue.label())
+            })
             .collect();
-        let kept: Vec<StripFrame> = frames
+        let kept: Vec<SheetFrame> = frames
             .iter()
             .enumerate()
             .filter(|(index, _)| !sorted.contains(index))
@@ -1135,7 +1155,7 @@ pub fn confirm(
     editor: &mut Editor,
     ctx: &egui::Context,
     key: &str,
-    row: &Value,
+    row: &ModelDef,
     strip: ModelStrip,
 ) {
     let Some(what) = editor.views.model.view(key).confirm else {
@@ -1192,24 +1212,23 @@ pub fn confirm(
         if other.len() != source.len() {
             continue;
         }
-        let merged: Vec<StripFrame> = other
+        let merged: Vec<SheetFrame> = other
             .iter()
             .zip(&source)
             .map(|(frame, from)| match what {
-                StripConfirm::Timing => StripFrame {
+                StripConfirm::Timing => SheetFrame {
                     ms: from.ms,
                     ..frame.clone()
                 },
-                StripConfirm::Cues => StripFrame {
+                StripConfirm::Cues => SheetFrame {
                     apex: from.apex,
                     step: from.step,
-                    sound: from.sound.clone(),
+                    sound: from.sound,
                     ..frame.clone()
                 },
             })
             .collect();
-        changed["sprites"]["actions"][strip.action.as_ref()][direction.as_ref()] =
-            super::frames_json(&merged);
+        super::set_strip(&mut changed, others_of(direction), merged);
     }
     let label = match what {
         StripConfirm::Timing => format!(
@@ -1221,5 +1240,5 @@ pub fn confirm(
             strip.name()
         ),
     };
-    super::write_row(editor, key, &changed, ContentEdit::new(label));
+    editor.write_content_as(ContentEdit::new(label), key, &changed);
 }

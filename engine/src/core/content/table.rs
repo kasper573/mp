@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use bevy_ecs::prelude::Resource;
 use bevy_platform::collections::HashMap;
@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::files::{GameFiles, Shape};
-use super::id::ContentId;
+use super::id::{ContentId, ScopePaths};
 
 /// A type of content file: what its files hold, named `<name>.<TABLE>.json`, or kept as bundles
 /// `<name>.<TABLE>/` when the type implements `Bundle`.
@@ -27,6 +27,22 @@ pub trait ContentFile: DeserializeOwned + Serialize + JsonSchema + Send + Sync +
     /// Reads, in the scope the file was just parsed in, what it holds as plain JSON for another
     /// file to read later, so the files named there count as this file's references.
     fn read_held(&self) {}
+}
+
+/// A type of content file that carries the name a player reads it by.
+pub trait NamedContent: ContentFile {
+    fn shown_name(&self) -> &str;
+}
+
+/// Where a description of content finds the names of the files it names.
+pub trait ContentNames {
+    fn name_of<Row: NamedContent>(&self, id: ContentId<Row>) -> String;
+}
+
+impl ContentNames for Content {
+    fn name_of<Row: NamedContent>(&self, id: ContentId<Row>) -> String {
+        id.get(self).shown_name().to_owned()
+    }
 }
 
 pub trait ModuleSet: ContentFile {
@@ -153,6 +169,8 @@ type Built = HashMap<TypeId, Arc<dyn Any + Send + Sync>, NoOpHash>;
 struct Loaded {
     tables: Tables,
     built: Built,
+    /// Every table's paths, gathered once for every scope that resolves against this content.
+    scope: OnceLock<Arc<ScopePaths>>,
 }
 
 /// Every table of one content folder plus what the loader built from them (areas, models, compiled
@@ -217,6 +235,19 @@ impl Content {
             .map(|table| table.as_ref())
     }
 
+    pub(super) fn scope_paths(&self) -> Arc<ScopePaths> {
+        self.0
+            .scope
+            .get_or_init(|| {
+                Arc::new(
+                    self.tables()
+                        .map(|(id, table)| (id, (table.name(), table.paths().to_vec())))
+                        .collect(),
+                )
+            })
+            .clone()
+    }
+
     pub(super) fn tables(&self) -> impl Iterator<Item = (TypeId, &dyn AnyTable)> {
         self.0
             .tables
@@ -245,6 +276,7 @@ impl ContentBuilder {
         Content(Arc::new(Loaded {
             tables: self.tables.clone(),
             built: self.built.clone(),
+            scope: OnceLock::new(),
         }))
     }
 }

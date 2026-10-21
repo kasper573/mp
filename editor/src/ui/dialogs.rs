@@ -15,9 +15,11 @@ use super::{content_tree, theme, unused_dialog, widgets};
 use crate::app::{
     CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, PickRowThen,
 };
+use crate::icons;
 use crate::keymap::{EditorKey, KeyScope};
 use crate::project::{ContentEdit, files};
 use crate::rows::{self, UsageDecision};
+use crate::tabs::shown_path;
 use crate::templates::{self, GameTemplate};
 use crate::ui::{self, start};
 use crate::views::area::{pick, placement, resize};
@@ -368,7 +370,12 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
                     .filter(|key| !editor.shapes.is_fixture(table, key))
                     .collect();
                 if !own.is_empty() {
-                    parts.push(format!("{}/{}", table, own.join(", ")));
+                    parts.push(
+                        own.iter()
+                            .map(|key| shown_path(key))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    );
                 }
             }
             ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
@@ -767,20 +774,36 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                                 (key, Some(_)) => crate::forms::seen_from(editing, key).1,
                                 (key, None) => key.to_owned(),
                             };
+                            let shown = shown_path(&shown);
+                            let kind = match &dialog.then {
+                                PickRowThen::NewFile { .. } => icons::of_table(key),
+                                PickRowThen::MoveInto { .. } | PickRowThen::MoveNodes { .. } => {
+                                    Mark::Folder.into()
+                                }
+                                PickRowThen::AddModule { .. }
+                                | PickRowThen::ReplaceBlueprint { .. } => {
+                                    icons::of_table(&dialog.table)
+                                }
+                            };
                             let refused = editing
                                 .filter(|_| dialog.table == BlueprintDef::TABLE)
                                 .zip(editor.project.as_ref())
                                 .and_then(|(into, project)| {
-                                    placement::holds_itself(&project.files, into, key)
+                                    placement::holds_itself(project, into, key)
                                 });
                             if let Some(reason) = refused {
-                                ui.add_enabled(
-                                    false,
-                                    egui::Button::selectable(false, format!("{shown} · {reason}")),
-                                );
+                                ui.add_enabled_ui(false, |ui| {
+                                    widgets::kind_option(
+                                        ui,
+                                        kind,
+                                        &format!("{shown} · {reason}"),
+                                        false,
+                                    )
+                                });
                                 continue;
                             }
-                            let response = ui.selectable_label(picked, shown).on_hover_text(key);
+                            let response = widgets::kind_option(ui, kind, shown, picked)
+                                .on_hover_text(shown_path(key));
                             if response.clicked() {
                                 dialog.picked = Some(key.clone());
                             }
@@ -821,11 +844,9 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                                 editor.toast(error);
                             }
                         }
-                        PickRowThen::AddModule {
-                            area,
-                            module,
-                            field,
-                        } => pick::add_picked(editor, &area, module, &field, &picked),
+                        PickRowThen::AddModule { area, kind, at } => {
+                            pick::add_picked(editor, &area, kind, at, &picked)
+                        }
                         PickRowThen::ReplaceBlueprint { area, node } => {
                             placement::replace_with(editor, &area, &node, &picked)
                         }
@@ -842,14 +863,15 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
 fn confirmed(editor: &mut Editor, action: ConfirmAction) {
     match action {
         ConfirmAction::ReplaceModule {
-            table,
+            table: _,
             key,
             index,
             module,
         } => {
             if let Some(mut value) = editor.row_value(&key) {
                 value["modules"][index] = module;
-                let mut edit = ContentEdit::new(format!("Replace module {index} of {table}/{key}"));
+                let mut edit =
+                    ContentEdit::new(format!("Replace module {index} of {}", shown_path(&key)));
                 edit.write_json(fields_file(&key), &value);
                 editor.apply(edit);
             }

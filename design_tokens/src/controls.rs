@@ -23,31 +23,50 @@ pub const PILL_HEIGHT: f32 = 20.0;
 const BEAD: f32 = 6.0;
 
 pub fn button(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), None, Look::Outline)
+    button_look(ui, text.into(), Marked::Not, Look::Outline)
 }
 
 pub fn primary(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), None, Look::Primary)
+    button_look(ui, text.into(), Marked::Not, Look::Primary)
 }
 
 pub fn danger(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), None, Look::Danger)
+    button_look(ui, text.into(), Marked::Not, Look::Danger)
 }
 
 pub fn faded(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), None, Look::Faded)
+    button_look(ui, text.into(), Marked::Not, Look::Faded)
 }
 
 pub fn marked(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), Some(mark), Look::Outline)
+    button_look(ui, text.into(), Marked::Before(mark), Look::Outline)
 }
 
 pub fn marked_primary(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), Some(mark), Look::Primary)
+    button_look(ui, text.into(), Marked::Before(mark), Look::Primary)
 }
 
 pub fn marked_danger(ui: &mut Ui, mark: Mark, text: impl Into<WidgetText>) -> Response {
-    button_look(ui, text.into(), Some(mark), Look::Danger)
+    button_look(ui, text.into(), Marked::Before(mark), Look::Danger)
+}
+
+/// A button that opens a menu or a list to choose from, its caret on the right.
+pub fn dropdown(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
+    button_look(
+        ui,
+        text.into(),
+        Marked::After(Mark::CaretDown),
+        Look::Outline,
+    )
+}
+
+pub fn dropdown_primary(ui: &mut Ui, text: impl Into<WidgetText>) -> Response {
+    button_look(
+        ui,
+        text.into(),
+        Marked::After(Mark::CaretDown),
+        Look::Primary,
+    )
 }
 
 pub fn slider(ui: &mut Ui, value: &mut f32, range: RangeInclusive<f32>) -> Response {
@@ -109,12 +128,7 @@ pub fn combo(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
             crate::popup_style as fn(&mut egui::Style),
         ))
         .icon(|ui, rect, visuals, _open| {
-            glyph::paint(
-                ui.painter(),
-                Mark::ChevronDown,
-                rect,
-                visuals.fg_stroke.color,
-            );
+            Mark::CaretDown.paint(ui.painter(), rect, visuals.fg_stroke.color);
         })
 }
 
@@ -393,6 +407,12 @@ pub fn primed_ring(painter: &Painter, rect: Rect, time: f64) {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum Marked {
+    Not,
+    Before(Mark),
+    After(Mark),
+}
+
 enum Look {
     Outline,
     Primary,
@@ -406,7 +426,7 @@ enum Interaction {
     Pressed,
 }
 
-fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) -> Response {
+fn button_look(ui: &mut Ui, text: WidgetText, marked: Marked, look: Look) -> Response {
     let mut job = Arc::unwrap_or_clone(text.into_layout_job(
         ui.style(),
         TextRole::Button.font_id().into(),
@@ -419,7 +439,10 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
     }
     job.wrap.max_width = f32::INFINITY;
     let galley = ui.painter().layout_job(job);
-    let mark_room = if mark.is_some() { 20.0 } else { 0.0 };
+    let mark_room = match marked {
+        Marked::Not => 0.0,
+        Marked::Before(_) | Marked::After(_) => 20.0,
+    };
     let size = Vec2::new(
         galley.size().x + mark_room + BUTTON_PADDING.x * 2.0,
         CONTROL_HEIGHT,
@@ -477,13 +500,22 @@ fn button_look(ui: &mut Ui, text: WidgetText, mark: Option<Mark>, look: Look) ->
         StrokeKind::Inside,
     );
     let mut text_at = rect.center() - galley.size() / 2.0;
-    if let Some(mark) = mark {
-        text_at.x += mark_room / 2.0;
-        let mark_rect = Rect::from_center_size(
-            Pos2::new(text_at.x - mark_room / 2.0 - 4.0, rect.center().y),
-            Vec2::splat(13.0),
-        );
-        glyph::paint(painter, mark, mark_rect, text_color);
+    let mark_at = |x: f32| Rect::from_center_size(Pos2::new(x, rect.center().y), Vec2::splat(13.0));
+    match marked {
+        Marked::Not => {}
+        Marked::Before(mark) => {
+            text_at.x += mark_room / 2.0;
+            mark.paint(
+                painter,
+                mark_at(text_at.x - mark_room / 2.0 - 4.0),
+                text_color,
+            );
+        }
+        Marked::After(mark) => {
+            text_at.x -= mark_room / 2.0;
+            let x = text_at.x + galley.size().x + mark_room / 2.0 + 4.0;
+            mark.paint(painter, mark_at(x), text_color);
+        }
     }
     painter.galley(text_at, galley, text_color);
     if response.has_focus() {

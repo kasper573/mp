@@ -9,7 +9,7 @@ use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::prelude::*;
 use bevy::shader::Shader;
 use bevy_egui::EguiUserTextures;
-use engine::core::content::{Content, ContentFile, fields_file};
+use engine::core::content::{Content, fields_file};
 use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
@@ -430,8 +430,8 @@ impl Stage {
         let row = files
             .json(&fields_file(key))
             .ok_or_else(|| format!("no shader row {key}"))?;
-        let def: VfxShaderDef = serde_json::from_value((*row).clone())
-            .map_err(|_| format!("{}/{key} does not parse", VfxShaderDef::TABLE))?;
+        let def: VfxShaderDef =
+            serde_json::from_value((*row).clone()).map_err(|_| format!("{key} does not parse"))?;
         let source = drafts
             .get(key)
             .cloned()

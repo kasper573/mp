@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Stone hum",
         "shape": {
           "type": "rect",
           "x": 4.5,
@@ -41,8 +42,7 @@
             "file": "assets/audio/ambient/stone_hum.flac",
             "volume": 0.22
           }
-        ],
-        "label": "Stone hum"
+        ]
       },
       {
         "type": "scenery",

@@ -1,15 +1,18 @@
 use egui::{Sense, Ui};
-use engine::core::content::{ContentFile, fields_file};
-use engine::systems::area::{AreaDef, AreaModuleKind, BlueprintDef};
+use engine::core::content::ContentFile;
+use engine::core::script::node::Node;
+use engine::systems::area::AreaModule;
+use engine::systems::area::scene::SCENE_FILE;
 use engine::systems::player::snapshot::CharacterSnapshot;
-use engine::systems::script::{Fill, RiftEffectKind, ScriptDef};
-use serde::Deserialize;
-use serde_json::Value;
+use engine::systems::quest::QuestDef;
+use engine::systems::script::{RiftEffect, ScriptDef};
 
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::project::files::content_of;
 use crate::scene_graph;
-use crate::value::RowValue;
+use crate::tabs::shown_path;
+use crate::views::area::nodes;
 
 pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &str) {
     let (givers, turn_ins) = quest_parties(editor, quest);
@@ -36,9 +39,9 @@ pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &s
                         &party.table
                     },
                 );
-                let row = format!("{}/{}", party.table, party.key);
+                let row = shown_path(&party.key);
                 if ui
-                    .add(egui::Label::new(theme::mono(&row).size(13.0)).sense(Sense::click()))
+                    .add(egui::Label::new(theme::mono(row).size(13.0)).sense(Sense::click()))
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .clicked()
                 {
@@ -70,75 +73,65 @@ struct Party {
     node: String,
 }
 
+/// Every row whose scripts offer the quest at `quest`, and every one whose scripts take it back:
+/// the scripts with a node doing so, run by whatever names them.
 fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Party>) {
     let mut givers = Vec::new();
     let mut turn_ins = Vec::new();
     let Some(project) = editor.project.as_ref() else {
         return (givers, turn_ins);
     };
-    let files = &project.files;
-    let mut scan = |table: &str, key: &str, object: Option<&str>, module: &Value| {
-        let (script_label, nodes) = match module.module_kind() {
-            Some(AreaModuleKind::Script) => {
-                let name = module.text("script").to_owned();
-                (
-                    format!("script/{name}"),
-                    files
-                        .json(&fields_file(&name))
-                        .map(|row| row["nodes"].clone())
-                        .unwrap_or(Value::Null),
-                )
-            }
-            _ => return,
-        };
-        for (name, node) in nodes.as_object().into_iter().flatten() {
-            let named = match Fill::<String>::deserialize(&node["quest"]) {
-                Ok(Fill::Const(quest)) => Some(quest),
-                Ok(Fill::Var { var }) => module["values"][&var].as_str().map(str::to_owned),
-                Err(_) => None,
-            };
-            if named.as_deref() != Some(quest) {
-                continue;
-            }
-            let entry = Party {
-                table: table.to_owned(),
-                key: key.to_owned(),
-                object: object.map(str::to_owned),
-                script: script_label.clone(),
-                node: name.clone(),
-            };
-            match node.kind().parse() {
-                Ok(RiftEffectKind::OfferQuest | RiftEffectKind::AcceptQuest) => givers.push(entry),
-                Ok(RiftEffectKind::TurnIn) => turn_ins.push(entry),
-                _ => {}
-            }
-        }
+    let reader = project.reader();
+    let Some(quest) = reader.id_of::<QuestDef>(quest) else {
+        return (givers, turn_ins);
     };
-    let index = files.index();
-    for (table, keys) in &index.content {
-        let table = table.as_str();
-        if table == ScriptDef::TABLE || table == CharacterSnapshot::TABLE {
+    for script_path in reader.paths_of::<ScriptDef>() {
+        let Ok(script) = project.read::<ScriptDef>(script_path) else {
             continue;
-        }
-        for key in keys {
-            if table == AreaDef::TABLE || table == BlueprintDef::TABLE {
-                for (_, module) in scene_graph::modules_of(files, key) {
-                    scan(table, key, None, &module);
-                    let object = module["name"]
-                        .as_str()
-                        .or(module["title"].as_str())
-                        .unwrap_or("object");
-                    for script in module["scripts"].as_array().into_iter().flatten() {
-                        scan(table, key, Some(object), script);
-                    }
-                }
-                continue;
-            }
-            let Some(row) = files.json(&fields_file(key)) else {
-                continue;
+        };
+        for (name, node) in &script.nodes {
+            let gives = match node {
+                Node::Effect(RiftEffect::OfferQuest(offer)) if offer.quest == quest => true,
+                Node::Effect(RiftEffect::AcceptQuest(accept)) if accept.quest == quest => true,
+                Node::Effect(RiftEffect::TurnIn(turn_in)) if turn_in.quest == quest => false,
+                _ => continue,
             };
-            for module in row["modules"].as_array().into_iter().flatten() {
-                scan(table, key, None, module);
+            for usage in project.usages.of_content(script_path) {
+                let Some((table, key)) = content_of(&usage.file) else {
+                    continue;
+                };
+                if table == ScriptDef::TABLE || table == CharacterSnapshot::TABLE {
+                    continue;
+                }
+                let object = usage
+                    .file
+                    .strip_suffix(&format!("/{SCENE_FILE}"))
+                    .and_then(|bundle| nodes::bundle_in(project, bundle))
+                    .and_then(|bundle| {
+                        let node = scene_graph::node_pointer(&usage.pointer);
+                        match &nodes::module_node(bundle.nodes(), &node)?.module {
+                            AreaModule::Object(object) => Some(
+                                object
+                                    .name
+                                    .clone()
+                                    .or(object.title.clone())
+                                    .unwrap_or_else(|| "object".to_owned()),
+                            ),
+                            _ => None,
+                        }
+                    });
+                let party = Party {
+                    table: table.to_owned(),
+                    key: key.to_owned(),
+                    object,
+                    script: shown_path(script_path).to_owned(),
+                    node: name.clone(),
+                };
+                if gives {
+                    givers.push(party);
+                } else {
+                    turn_ins.push(party);
+                }
             }
         }
     }

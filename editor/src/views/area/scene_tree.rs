@@ -2,16 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use egui::Ui;
 use engine::core::content::{ContentFile, ErrorPlace, table_of};
-use engine::systems::area::blueprint::BlueprintDef;
-use engine::systems::area::scene::{MAX_FOLDER_DEPTH, scene_file};
-use engine::systems::area::{AreaModuleKind, Pictured};
-use serde_json::Value;
+use engine::systems::area::blueprint::{BlueprintDef, Placement};
+use engine::systems::area::scene::{MAX_FOLDER_DEPTH, SceneNode, scene_file};
+use engine::systems::area::{AreaModule, AreaModuleKind, Pictured};
 
 use super::flags::Flag;
 use super::modules::ADD_MENU;
-use super::nodes::{self, Landing, Remap};
+use super::nodes::{self, Landing, NodeFlag, Remap};
 use super::{AreaSnapshot, shapes};
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor, SceneClip};
 use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 use crate::project::{ContentEdit, Project, RowSelection};
@@ -20,7 +19,6 @@ use crate::tabs::file_title;
 pub use crate::ui::tree::Toggle;
 use crate::ui::tree::{self, DropAt, RowToggles, ToggleState, TreeDrop, TreeRow, TreeSource};
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 
 /// What the scene graph's menus and keys ask for.
 #[derive(Clone, Debug)]
@@ -168,18 +166,14 @@ impl<'a> SceneSource<'a> {
                 let Some(node) = self.snapshot.scene_node(&child) else {
                     continue;
                 };
-                let kind = node["type"].as_str().unwrap_or_default();
+                let kind = nodes::kind_tag(node);
+                let label = self.label_of(&child).to_lowercase();
                 let passes = !nodes::is_folder(node)
                     && !view.hidden_kinds.contains(kind)
-                    && (self.needle.is_empty()
-                        || shapes::node_label(node)
-                            .to_lowercase()
-                            .contains(&self.needle));
+                    && (self.needle.is_empty() || label.contains(&self.needle));
                 let folder_matches = nodes::is_folder(node)
                     && !self.needle.is_empty()
-                    && shapes::node_label(node)
-                        .to_lowercase()
-                        .contains(&self.needle);
+                    && label.contains(&self.needle);
                 if passes || folder_matches {
                     hits.insert(child.clone());
                     shown.insert(child.clone());
@@ -219,23 +213,16 @@ impl<'a> SceneSource<'a> {
     }
 
     fn all_children(&self, id: &str) -> Vec<String> {
-        let (list, prefix) = if id.is_empty() {
-            (self.snapshot.scene.as_ref(), String::new())
-        } else if let Some(depth) = self.in_place.iter().position(|place| place == id) {
-            (&self.snapshot.in_place[depth].scene, format!("{id}/in"))
-        } else {
-            match self.snapshot.scene_node(id) {
-                Some(node) if nodes::is_folder(node) => {
-                    (&node["children"], format!("{id}/children"))
-                }
-                _ => return Vec::new(),
-            }
-        };
-        let count = list.as_array().map_or(0, Vec::len);
+        let count = rows_in(self.snapshot, id).len();
         let waiting = self
             .placing
             .as_ref()
             .is_some_and(|(folder, _)| folder == id);
+        let prefix = match id {
+            "" => String::new(),
+            id if self.in_place.iter().any(|place| place == id) => format!("{id}/in"),
+            id => format!("{id}/children"),
+        };
         (0..count + usize::from(waiting))
             .map(|index| format!("{prefix}/{index}"))
             .collect()
@@ -267,7 +254,8 @@ impl<'a> SceneSource<'a> {
     fn is_placement(&self, id: &str) -> bool {
         self.snapshot
             .scene_node(id)
-            .is_some_and(|node| node.is_module(AreaModuleKind::Blueprint))
+            .and_then(nodes::placement_of)
+            .is_some()
     }
 
     /// Whether the row sits outside the placement edited in place, so it acts locked.
@@ -278,15 +266,17 @@ impl<'a> SceneSource<'a> {
     }
 
     /// What a placement's row says on hover: what it places, how often, and the ways into it.
-    fn placement_tip(&self, id: &str, node: &Value) -> String {
-        let blueprint = node.text("blueprint");
-        let scene = match Self::level(id) {
-            0 => self.snapshot.scene.as_ref(),
-            depth => &self.snapshot.in_place[depth - 1].scene,
-        };
-        let count = nodes::modules(scene)
+    fn placement_tip(&self, id: &str, placement: &Placement) -> String {
+        let blueprint = self
+            .snapshot
+            .reader
+            .path_of(placement.blueprint)
+            .unwrap_or_default();
+        let count = nodes::modules(scene_at(self.snapshot, Self::level(id)))
             .iter()
-            .filter(|module| module.json.text("blueprint") == blueprint)
+            .filter(|module| {
+                matches!(module.module(), AreaModule::Blueprint(other) if other.blueprint == placement.blueprint)
+            })
             .count();
         let times = match count {
             1 => "once".to_owned(),
@@ -304,7 +294,7 @@ impl<'a> SceneSource<'a> {
             return 0;
         };
         let mut count = 0;
-        nodes::walk(&node["children"], &mut |_, child| {
+        nodes::walk(nodes::children_of(node), &mut |_, child| {
             count += usize::from(!nodes::is_folder(child));
         });
         count
@@ -313,7 +303,7 @@ impl<'a> SceneSource<'a> {
     fn label_of(&self, id: &str) -> String {
         self.snapshot
             .scene_node(id)
-            .map(shapes::node_label)
+            .map(|node| shapes::node_label(node, self.snapshot.reader.as_ref()))
             .unwrap_or_default()
     }
 
@@ -324,7 +314,7 @@ impl<'a> SceneSource<'a> {
         }
     }
 
-    fn module_menu(&self, ui: &mut Ui, id: &str, node: &Value) -> Option<SceneAction> {
+    fn module_menu(&self, ui: &mut Ui, id: &str, node: &SceneNode) -> Option<SceneAction> {
         let one = || vec![id.to_owned()];
         let mut picked = None;
         let mut item = |ui: &mut Ui, text: &str, key: Option<EditorKey>, action: SceneAction| {
@@ -337,7 +327,7 @@ impl<'a> SceneSource<'a> {
                 ui.close();
             }
         };
-        let placement = node.is_module(AreaModuleKind::Blueprint);
+        let placement = nodes::placement_of(node).is_some();
         let opened = self.in_place.iter().any(|place| place == id);
         if opened {
             item(
@@ -425,8 +415,13 @@ impl<'a> SceneSource<'a> {
                 SceneAction::MakeBlueprint(one()),
             );
             ui.separator();
-            let scenery = node.is_module(AreaModuleKind::Scenery);
-            let door = !super::placement::warp_destinations(node).is_empty();
+            let module = match node {
+                SceneNode::Module(module) => Some(&module.module),
+                _ => None,
+            };
+            let scenery = matches!(module, Some(AreaModule::Scenery(_)));
+            let door = matches!(module, Some(AreaModule::Object(object))
+                if !super::placement::warp_destinations(object, self.snapshot.reader.as_ref()).is_empty());
             if ui
                 .add_enabled(scenery, egui::Button::new("Split into tiles"))
                 .clicked()
@@ -550,7 +545,7 @@ impl<'a> SceneSource<'a> {
         picked
     }
 
-    fn layer_menu(&self, ui: &mut Ui, id: &str, node: &Value) -> Option<SceneAction> {
+    fn layer_menu(&self, ui: &mut Ui, id: &str, node: &SceneNode) -> Option<SceneAction> {
         let one = || vec![id.to_owned()];
         let mut picked = None;
         let mut item = |ui: &mut Ui, text: &str, key: Option<EditorKey>, action: SceneAction| {
@@ -604,7 +599,7 @@ impl<'a> SceneSource<'a> {
         );
         let cells = self
             .cells
-            .get(node["name"].as_str().unwrap_or_default())
+            .get(nodes::layer_name(node).unwrap_or_default())
             .copied()
             .unwrap_or(0);
         item(
@@ -775,8 +770,8 @@ impl TreeSource for SceneSource<'_> {
             Flag::Own => ToggleState::Own,
             Flag::Inherited => ToggleState::Inherited,
         };
-        let name = shapes::node_label(node);
-        let kind = node["type"].as_str().unwrap_or("module").to_owned();
+        let name = self.label_of(id);
+        let kind = nodes::kind_tag(node);
         let folder = self.is_folder(id);
         let mut row = TreeRow {
             folder,
@@ -801,18 +796,18 @@ impl TreeSource for SceneSource<'_> {
             row.detail = count.to_string();
             row.spoken = Some(format!("{name}, folder, {count} inside"));
         } else if nodes::is_layer(node) {
-            row.badge = Some((theme::badge_letter(&kind), theme::badge_color(&kind)));
+            row.badge = Some((theme::badge_letter(kind), theme::badge_color(kind)));
             if Self::level(id) == 0 {
                 let cells = self.cells.get(&name).copied().unwrap_or(0);
                 row.detail = format!("{cells} cell{}", widgets::plural(cells));
             }
             row.spoken = Some(format!("{name}, ground layer"));
-        } else {
-            row.badge = Some((theme::badge_letter(&kind), theme::badge_color(&kind)));
-            row.detail = shapes::node_detail(node);
+        } else if let SceneNode::Module(module) = node {
+            row.badge = Some((theme::badge_letter(kind), theme::badge_color(kind)));
+            row.detail = shapes::node_detail(&module.module, self.snapshot.reader.as_ref());
             row.spoken = Some(format!("{name}, {}", kind.replace('_', " ")));
-            if node.is_module(AreaModuleKind::Blueprint) {
-                row.tip = Some(self.placement_tip(id, node));
+            if let AreaModule::Blueprint(placement) = &module.module {
+                row.tip = Some(self.placement_tip(id, placement));
             }
         }
         if folder && !nodes::is_folder(node) {
@@ -940,7 +935,8 @@ pub fn add_menu(ui: &mut Ui, folder: &str, snapshot: &AreaSnapshot) -> Option<Sc
         ui.close();
     }
     ui.label(theme::faint("GROUND").size(11.0));
-    if super::modules::module_menu_row(ui, "ground_layer", "cells painted under every module") {
+    if super::modules::module_menu_row(ui, nodes::GROUND_LAYER, "cells painted under every module")
+    {
         picked = Some(SceneAction::NewLayer(folder.to_owned()));
         ui.close();
     }
@@ -1070,9 +1066,10 @@ fn problems(project: &Project, snapshot: &AreaSnapshot) -> HashMap<String, Strin
             broken_bundles.entry(bundle).or_insert(text);
         }
     }
-    nodes::walk(&snapshot.scene, &mut |pointer, node| {
-        if node.is_module(AreaModuleKind::Blueprint)
-            && let Some(text) = broken_bundles.get(node.text("blueprint"))
+    nodes::walk(snapshot.nodes(), &mut |pointer, node| {
+        if let Some(placement) = nodes::placement_of(node)
+            && let Some(blueprint) = snapshot.reader.path_of(placement.blueprint)
+            && let Some(text) = broken_bundles.get(blueprint)
         {
             found
                 .entry(pointer.to_owned())
@@ -1116,18 +1113,16 @@ fn owning_bundle(file: &str) -> Option<String> {
 /// Turns `toggle` over on the rows `ids` of `bundle`'s scene as one step: on for all unless all
 /// have it on already.
 pub fn toggle(editor: &mut Editor, bundle: &str, ids: &[String], toggle: Toggle) {
-    let field = match toggle {
-        Toggle::Hide => "hidden",
-        Toggle::Lock => "locked",
-    };
+    let flag = flag_of(toggle);
     let pointers: Vec<String> = ids.iter().map(|id| local(id).to_owned()).collect();
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     nodes::change_scene(editor, bundle, |scene| {
-        let all_on = pointers.iter().all(|pointer| {
-            scene
-                .pointer(pointer)
-                .is_some_and(|node| node[field] == true)
-        });
-        nodes::set_flag(scene, &pointers, field, !all_on);
+        let all_on = pointers
+            .iter()
+            .all(|pointer| nodes::node(scene, pointer).is_some_and(|node| flag.of(node)));
+        nodes::SceneTree::new(scene).set_flag(&pointers, flag, !all_on);
         let verb = match (toggle, all_on) {
             (Toggle::Hide, false) => "Hide",
             (Toggle::Hide, true) => "Show",
@@ -1135,7 +1130,7 @@ pub fn toggle(editor: &mut Editor, bundle: &str, ids: &[String], toggle: Toggle)
             (Toggle::Lock, true) => "Unlock",
         };
         let what = match pointers.as_slice() {
-            [one] => shapes::node_label(scene.pointer(one)?),
+            [one] => shapes::node_label(nodes::node(scene, one)?, reader.as_ref()),
             many => format!("{} rows", many.len()),
         };
         Some(format!("{verb} {what}"))
@@ -1144,13 +1139,13 @@ pub fn toggle(editor: &mut Editor, bundle: &str, ids: &[String], toggle: Toggle)
 
 /// Clears `toggle` on every node of `bundle`'s scene as one step.
 pub fn clear_all(editor: &mut Editor, bundle: &str, toggle: Toggle) {
-    let (field, verb) = match toggle {
-        Toggle::Hide => ("hidden", "Show"),
-        Toggle::Lock => ("locked", "Unlock"),
+    let verb = match toggle {
+        Toggle::Hide => "Show",
+        Toggle::Lock => "Unlock",
     };
     let mut cleared = 0;
     nodes::change_scene(editor, bundle, |scene| {
-        cleared = nodes::clear_flag(scene, field);
+        cleared = nodes::SceneTree::new(scene).clear_flag(flag_of(toggle));
         (cleared > 0).then(|| format!("{verb} everything in {}", file_title(bundle)))
     });
     if cleared == 0 {
@@ -1180,11 +1175,10 @@ pub fn group(
     let mut remap = Remap::new();
     let mut step = String::new();
     nodes::change_scene(editor, &bundle, |scene| {
-        let (folder, moved) =
-            nodes::restructure(scene, |scene| nodes::group(scene, &pointers, NEW_FOLDER));
+        let (folder, moved) = nodes::restructure(scene, |tree| tree.group(&pointers, NEW_FOLDER));
         remap = moved;
         let folder = folder?;
-        let label = scene.pointer(&folder)?["label"].as_str()?.to_owned();
+        let label = nodes::node(scene, &folder)?.label()?.to_owned();
         made = Some(folder);
         step = group_step(pointers.len(), &label);
         Some(step.clone())
@@ -1219,7 +1213,7 @@ pub fn rename_grouped(
     let Some(mut edit) = nodes::scene_edit(editor, &bundle, |scene| {
         let (folder, index) = nodes::place_of(&pointer)?;
         let siblings = nodes::children_mut(scene, folder)?;
-        let others: Vec<Value> = siblings
+        let others: Vec<SceneNode> = siblings
             .iter()
             .enumerate()
             .filter(|(at, _)| *at != index)
@@ -1227,8 +1221,8 @@ pub fn rename_grouped(
             .collect();
         let label = nodes::free_label(typed, &others);
         let node = siblings.get_mut(index)?;
-        let count = node["children"].as_array().map_or(0, Vec::len);
-        node["label"] = Value::String(label.clone());
+        let count = nodes::children_of(node).len();
+        nodes::set_label(node, label.clone());
         Some(group_step(count, &label))
     }) else {
         return;
@@ -1244,17 +1238,20 @@ pub fn rename_grouped(
 pub fn ungroup(editor: &mut Editor, bundle: &str, ids: &[String]) {
     let pointers: Vec<String> = ids.iter().map(|id| local(id).to_owned()).collect();
     let mut remap = Remap::new();
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     nodes::change_scene(editor, bundle, |scene| {
         let labels: Vec<String> = pointers
             .iter()
-            .filter_map(|pointer| scene.pointer(pointer))
+            .filter_map(|pointer| nodes::node(scene, pointer))
             .filter(|node| nodes::is_folder(node))
-            .map(shapes::node_label)
+            .map(|node| shapes::node_label(node, reader.as_ref()))
             .collect();
         if labels.is_empty() {
             return None;
         }
-        let ((), moved) = nodes::restructure(scene, |scene| nodes::ungroup(scene, &pointers));
+        let ((), moved) = nodes::restructure(scene, |tree| tree.ungroup(&pointers));
         remap = moved;
         Some(format!("Ungroup {}", labels.join(", ")))
     });
@@ -1297,23 +1294,23 @@ pub fn move_rows(
         DropAt::Before(id) => Landing::Before(local(id).to_owned()),
         DropAt::After(id) => Landing::After(local(id).to_owned()),
     };
+    let reader = snapshot.reader.clone();
     let into_label = match folder {
         "" => "the top level".to_owned(),
         folder => snapshot
             .scene_node(folder)
-            .map(shapes::node_label)
+            .map(|node| shapes::node_label(node, reader.as_ref()))
             .unwrap_or_default(),
     };
     let mut remap = Remap::new();
     let mut landed = Vec::new();
     let applied = nodes::change_scene(editor, &bundle, |scene| {
         let what = match pointers.as_slice() {
-            [one] => shapes::node_label(scene.pointer(one)?),
+            [one] => shapes::node_label(nodes::node(scene, one)?, reader.as_ref()),
             many => format!("{} rows", many.len()),
         };
-        let (moved, map) = nodes::restructure(scene, |scene| {
-            nodes::move_nodes(scene, &pointers, &into, &landing)
-        });
+        let (moved, map) =
+            nodes::restructure(scene, |tree| tree.move_nodes(&pointers, &into, &landing));
         landed = moved?;
         remap = map;
         Some(format!("Move {what} into {into_label}"))
@@ -1399,38 +1396,14 @@ pub fn add(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str, kind: Are
                 "" => "the top level".to_owned(),
                 _ => snapshot
                     .scene_node(folder)
-                    .map(shapes::node_label)
+                    .map(|node| shapes::node_label(node, snapshot.reader.as_ref()))
                     .unwrap_or_default(),
             },
             EditorKey::Cancel.name()
         ));
         return;
     }
-    let Some(module) =
-        super::modules::module_template(editor, kind, engine::core::tiling::CellPos::new(0, 0))
-    else {
-        return;
-    };
-    let mut module = module;
-    if kind == AreaModuleKind::Population {
-        module["roams"] = Value::Null;
-        if let Some(object) = module.as_object_mut() {
-            object.shift_remove("roams");
-        }
-    }
-    let reference = match kind {
-        AreaModuleKind::Script => Some("script"),
-        AreaModuleKind::Population => Some("npc"),
-        _ => None,
-    };
-    if let Some(table) = reference
-        && module[table].as_str().unwrap_or_default().is_empty()
-    {
-        super::pick::pick_then_add(editor, &bundle, module, table, table);
-        return;
-    }
-    let label = format!("Add {} to {}", shapes::label(&module), file_title(&bundle));
-    nodes::add(editor, &bundle, vec![module], &label);
+    super::pick::pick_then_add(editor, &bundle, kind, None);
 }
 
 fn folder_is_place(snapshot: &AreaSnapshot, id: &str) -> bool {
@@ -1482,22 +1455,39 @@ pub fn prefix_of(snapshot: &AreaSnapshot, bundle: &str) -> String {
 
 /// The rows directly inside the row `parent`, "" for the top, whatever narrows the tree.
 pub fn rows_in(snapshot: &AreaSnapshot, parent: &str) -> Vec<String> {
-    let (list, prefix) = if parent.is_empty() {
-        (snapshot.scene.as_ref(), String::new())
+    let (list, prefix): (&[SceneNode], String) = if parent.is_empty() {
+        (snapshot.nodes(), String::new())
     } else if is_place_row(snapshot, parent) {
         let depth = SceneSource::level(parent);
-        (&snapshot.in_place[depth].scene, format!("{parent}/in"))
+        (
+            &snapshot.in_place[depth].def.scene.nodes,
+            format!("{parent}/in"),
+        )
     } else {
         match snapshot.scene_node(parent) {
-            Some(node) if nodes::is_folder(node) => {
-                (&node["children"], format!("{parent}/children"))
-            }
+            Some(SceneNode::Folder(folder)) => (&folder.children, format!("{parent}/children")),
             _ => return Vec::new(),
         }
     };
-    (0..list.as_array().map_or(0, Vec::len))
+    (0..list.len())
         .map(|index| format!("{prefix}/{index}"))
         .collect()
+}
+
+/// The scene whose nodes are the rows at `level`: the bundle's own, then the blueprint of each
+/// placement edited in place.
+fn scene_at(snapshot: &AreaSnapshot, level: usize) -> &[SceneNode] {
+    match level {
+        0 => snapshot.nodes(),
+        depth => &snapshot.in_place[depth - 1].def.scene.nodes,
+    }
+}
+
+fn flag_of(toggle: Toggle) -> NodeFlag {
+    match toggle {
+        Toggle::Hide => NodeFlag::Hidden,
+        Toggle::Lock => NodeFlag::Locked,
+    }
 }
 
 /// Every row of the tree, depth first in order.
@@ -1544,37 +1534,48 @@ pub fn copy_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String]) {
     };
     let bundle = bundle_of_row(snapshot, first);
     let scene = nodes::scene_of(editor, &bundle);
-    let copied: Vec<Value> = topmost(ids)
+    let copied: Vec<SceneNode> = topmost(ids)
         .iter()
-        .filter_map(|pointer| scene.pointer(pointer).cloned())
+        .filter_map(|pointer| nodes::node(&scene, pointer).cloned())
         .filter(|node| !nodes::is_layer(node))
         .collect();
     if copied.is_empty() {
         editor.toast("Ground layers copy with Duplicate");
         return;
     }
-    let origin = super::blueprint::covered(&snapshot.content, &copied)
+    let reader = snapshot.reader.clone();
+    let origin = super::blueprint::covered(&snapshot.content, &reader, &copied)
         .map(|bounds| bounds.min())
         .unwrap_or(engine::core::math::Pos::new(0.0, 0.0));
-    let modules: Vec<Value> = copied
+    let shifted: Vec<SceneNode> = copied
         .into_iter()
         .map(|mut node| {
             super::blueprint::shift_tree(&mut node, -origin.x, -origin.y);
             node
         })
         .collect();
-    let count = modules.len();
-    editor.clipboard = Some(crate::app::Clipboard {
+    let count = shifted.len();
+    let Some(nodes) = nodes::CopiedNodes::of(&reader, &shifted) else {
+        editor.toast("What's selected doesn't copy");
+        return;
+    };
+    editor.clipboard = Some(Clipboard::Scene(SceneClip {
         from: bundle,
-        modules,
-        origin: Some(origin),
-    });
+        nodes,
+        count,
+        origin,
+    }));
     editor.toast(format!("Copied {count} row{}", widgets::plural(count)));
 }
 
 /// Pastes what was copied into the folder row `folder`, where it was copied from.
 pub fn paste_rows(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str) {
-    let Some(clip) = editor.clipboard.clone() else {
+    let Some(clip) = editor
+        .clipboard
+        .as_ref()
+        .and_then(Clipboard::scene)
+        .cloned()
+    else {
         editor.toast("Nothing copied");
         return;
     };
@@ -1595,13 +1596,11 @@ pub fn paste_rows(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str) {
     } else {
         bundle_of_row(snapshot, &into)
     };
-    let origin = clip
-        .origin
-        .unwrap_or(engine::core::math::Pos::new(0.0, 0.0));
-    let mut nodes_in = clip.modules.clone();
-    let open = fill_copied_holes(snapshot, &clip.from, &bundle, &mut nodes_in);
+    let Some((mut nodes_in, open)) = super::select::pasted(editor, &clip, &bundle) else {
+        return;
+    };
     for node in &mut nodes_in {
-        super::blueprint::shift_tree(node, origin.x, origin.y);
+        super::blueprint::shift_tree(node, clip.origin.x, clip.origin.y);
     }
     let parts = match folder_pointer(snapshot, &folder).as_str() {
         "" => Vec::new(),
@@ -1616,35 +1615,8 @@ pub fn paste_rows(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str) {
         &format!("Paste {count} row{}", widgets::plural(count)),
     ) && open > 0
     {
-        editor.toast(format!(
-            "{open} value{} the blueprint left open came along empty: fill {} in",
-            widgets::plural(open),
-            if open == 1 { "it" } else { "them" }
-        ));
+        super::select::toast_open(editor, open);
     }
-}
-
-/// Fills the holes of nodes copied out of a blueprint into another bundle with their defaults;
-/// answers how many have none and stay open.
-fn fill_copied_holes(snapshot: &AreaSnapshot, from: &str, to: &str, copied: &mut [Value]) -> usize {
-    if from == to || table_of(from) != Some(BlueprintDef::TABLE) {
-        return 0;
-    }
-    let Some(id) = snapshot.content.by_path::<BlueprintDef>(from) else {
-        return 0;
-    };
-    let variables = &id.get(&snapshot.content).variables;
-    let mut open = 0;
-    for node in copied {
-        super::holes::fill_holes(
-            &snapshot.content,
-            node,
-            &Value::Object(Default::default()),
-            variables,
-        );
-        open += super::holes::holes_in(node, "").len();
-    }
-    open
 }
 
 /// Copies each of the rows `ids` right after itself, a module a tile down and right of its
@@ -1657,24 +1629,29 @@ pub fn duplicate_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[Strin
     let pointers = topmost(ids);
     let scene = nodes::scene_of(editor, &bundle);
     if let [one] = pointers.as_slice()
-        && scene.pointer(one).is_some_and(nodes::is_layer)
+        && nodes::node(&scene, one).is_some_and(nodes::is_layer)
     {
         super::layers::duplicate(editor, &bundle, one);
         return;
     }
+    let reader = snapshot.reader.clone();
     let mut taken: HashSet<String> = snapshot.object_names();
     let mut made = Vec::new();
     let applied = nodes::change_scene(editor, &bundle, |scene| {
-        made = nodes::duplicate(scene, &pointers, |node| {
+        let label = match pointers.as_slice() {
+            [one] => format!(
+                "Duplicate {}",
+                shapes::node_label(nodes::node(scene, one)?, reader.as_ref())
+            ),
+            many => format!("Duplicate {} rows", many.len()),
+        };
+        made = nodes::SceneTree::new(scene).duplicate(&pointers, |node| {
             let mut node = node.clone();
             super::blueprint::shift_tree(&mut node, 1.0, 1.0);
             rename_objects(&mut node, &mut taken);
             node
         });
-        Some(match pointers.as_slice() {
-            [one] => format!("Duplicate {}", shapes::node_label(scene.pointer(one)?)),
-            many => format!("Duplicate {} rows", many.len()),
-        })
+        Some(label)
     });
     if applied {
         let folder = made
@@ -1684,9 +1661,8 @@ pub fn duplicate_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[Strin
             .unwrap_or_default();
         let into = match folder.as_str() {
             "" => "the top level".to_owned(),
-            folder => nodes::scene_of(editor, &bundle)
-                .pointer(folder)
-                .map(shapes::node_label)
+            folder => nodes::node(&nodes::scene_of(editor, &bundle), folder)
+                .map(|node| shapes::node_label(node, reader.as_ref()))
                 .unwrap_or_default(),
         };
         nodes::select(editor, &bundle, made);
@@ -1695,19 +1671,23 @@ pub fn duplicate_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[Strin
 }
 
 /// Gives every object inside `node` a name no other object of the bundle has.
-pub(super) fn rename_objects(node: &mut Value, taken: &mut HashSet<String>) {
-    if nodes::is_folder(node) {
-        for child in node["children"].as_array_mut().into_iter().flatten() {
-            rename_objects(child, taken);
+pub(super) fn rename_objects(node: &mut SceneNode, taken: &mut HashSet<String>) {
+    match node {
+        SceneNode::Folder(folder) => {
+            for child in &mut folder.children {
+                rename_objects(child, taken);
+            }
         }
-        return;
-    }
-    if let Some(name) = node["name"].as_str().map(str::to_owned)
-        && node.is_module(AreaModuleKind::Object)
-    {
-        let fresh = crate::rows::free_name(&name, taken);
-        taken.insert(fresh.clone());
-        node["name"] = Value::String(fresh);
+        SceneNode::Module(module) => {
+            if let AreaModule::Object(object) = &mut module.module
+                && let Some(name) = &mut object.name
+            {
+                let fresh = crate::rows::free_name(name, taken);
+                taken.insert(fresh.clone());
+                *name = fresh;
+            }
+        }
+        SceneNode::GroundLayer(_) => {}
     }
 }
 
@@ -1719,22 +1699,21 @@ pub fn delete_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String])
     };
     let bundle = bundle_of_row(snapshot, first);
     let pointers = topmost(ids);
-    let mut layer_files = Vec::new();
-    let Some(mut edit) = nodes::scene_edit(editor, &bundle, |scene| {
+    let reader = snapshot.reader.clone();
+    let Some(edit) = nodes::blueprint_edit(editor, &bundle, |blueprint| {
+        let scene = &blueprint.scene.nodes;
         let mut modules = 0;
         let mut folders = Vec::new();
         let mut layers = Vec::new();
         for pointer in &pointers {
-            let node = scene.pointer(pointer)?;
-            nodes::walk(&Value::Array(vec![node.clone()]), &mut |_, inner| {
-                if nodes::is_layer(inner) {
-                    layers.push(inner["name"].as_str().unwrap_or_default().to_owned());
-                } else if nodes::is_module(inner) {
-                    modules += 1;
-                }
+            let node = nodes::node(scene, pointer)?;
+            nodes::walk(std::slice::from_ref(node), &mut |_, inner| match inner {
+                SceneNode::GroundLayer(layer) => layers.push(layer.name.clone()),
+                SceneNode::Module(_) => modules += 1,
+                SceneNode::Folder(_) => {}
             });
             if nodes::is_folder(node) {
-                folders.push(shapes::node_label(node));
+                folders.push(shapes::node_label(node, reader.as_ref()));
             }
         }
         let label = match (pointers.as_slice(), folders.as_slice(), layers.as_slice()) {
@@ -1743,29 +1722,34 @@ pub fn delete_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String])
                 widgets::plural(modules)
             ),
             ([_], [], [layer]) => {
-                let cells = super::layers::cells_said(snapshot_cells(snapshot, &bundle, layer));
-                format!("Delete layer {layer} and its {cells}")
+                let cells = blueprint
+                    .scene
+                    .grids
+                    .layers
+                    .get(layer)
+                    .map_or(0, |cells| cells.iter().flatten().count());
+                format!(
+                    "Delete layer {layer} and its {}",
+                    super::layers::cells_said(cells)
+                )
             }
-            ([one], [], []) => format!("Delete {}", shapes::node_label(scene.pointer(one)?)),
+            ([one], [], []) => format!(
+                "Delete {}",
+                shapes::node_label(nodes::node(scene, one)?, reader.as_ref())
+            ),
             (many, _, _) => format!("Delete {} rows", many.len()),
         };
-        layer_files = layers;
-        nodes::remove(scene, &pointers);
+        nodes::SceneTree::new(&mut blueprint.scene.nodes).remove(&pointers);
+        for layer in &layers {
+            blueprint.scene.grids.layers.remove(layer);
+        }
         Some(label)
     }) else {
         return;
     };
-    for layer in &layer_files {
-        super::layers::delete_into(&mut edit, &bundle, layer);
-    }
     if editor.apply(edit) {
         editor.selection.parts.clear();
     }
-}
-
-fn snapshot_cells(snapshot: &AreaSnapshot, bundle: &str, layer: &str) -> usize {
-    super::grid::GridDraft::own(&snapshot.content, bundle)
-        .map_or(0, |draft| super::layers::cell_count(&draft, layer))
 }
 
 /// Moves each of the rows `ids` one place up or down among its siblings, as one step.
@@ -1781,12 +1765,13 @@ pub fn reorder_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String]
         .map(|id| local(id).to_owned())
         .collect();
     let mut remap = Remap::new();
+    let reader = snapshot.reader.clone();
     let applied = nodes::change_scene(editor, &bundle, |scene| {
         let what = match pointers.as_slice() {
-            [one] => shapes::node_label(scene.pointer(one)?),
+            [one] => shapes::node_label(nodes::node(scene, one)?, reader.as_ref()),
             many => format!("{} rows", many.len()),
         };
-        let ((), moved) = nodes::restructure(scene, |scene| nodes::reorder(scene, &pointers, step));
+        let ((), moved) = nodes::restructure(scene, |tree| tree.reorder(&pointers, step));
         if moved.iter().all(|(was, now)| was == now) {
             return None;
         }
@@ -1823,19 +1808,11 @@ pub fn new_folder(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str) ->
     let mut made = Vec::new();
     nodes::change_scene(editor, &bundle, |scene| {
         let siblings = match into.as_str() {
-            "" => scene.as_array().cloned().unwrap_or_default(),
-            into => scene
-                .pointer(&format!("{into}/children"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default(),
+            "" => scene.clone(),
+            into => nodes::children_of(nodes::node(scene, into)?).to_vec(),
         };
         let label = nodes::free_label(NEW_FOLDER, &siblings);
-        made = nodes::append(
-            scene,
-            &into,
-            vec![serde_json::json!({ "type": "folder", "label": label })],
-        );
+        made = nodes::SceneTree::new(scene).append(&into, vec![nodes::folder(label.clone())]);
         Some(format!("New folder {label}"))
     });
     let pointer = made.first()?.clone();
@@ -1850,14 +1827,14 @@ pub fn rename(editor: &mut Editor, snapshot: &AreaSnapshot, id: &str, typed: &st
     let Some(node) = snapshot.scene_node(id).cloned() else {
         return;
     };
-    if typed.is_empty() || shapes::node_label(&node) == typed {
+    let reader = snapshot.reader.clone();
+    if typed.is_empty() || shapes::node_label(&node, reader.as_ref()) == typed {
         return;
     }
     let level = SceneSource::level(id);
     let bundle = bundle_at(snapshot, level);
-    if nodes::is_layer(&node) {
-        let old = node["name"].as_str().unwrap_or_default().to_owned();
-        if let Err(error) = super::layers::rename(editor, &bundle, &old, typed) {
+    if let Some(old) = nodes::layer_name(&node) {
+        if let Err(error) = super::layers::rename(editor, &bundle, old, typed) {
             editor.toast(error);
         }
         return;
@@ -1869,8 +1846,8 @@ pub fn rename(editor: &mut Editor, snapshot: &AreaSnapshot, id: &str, typed: &st
         let siblings = nodes::children_mut(scene, folder)?;
         let taken = siblings.iter().enumerate().any(|(at, sibling)| {
             at != index
-                && sibling["label"]
-                    .as_str()
+                && sibling
+                    .label()
                     .is_some_and(|label| label.eq_ignore_ascii_case(typed))
         });
         if taken {
@@ -1880,8 +1857,8 @@ pub fn rename(editor: &mut Editor, snapshot: &AreaSnapshot, id: &str, typed: &st
             return None;
         }
         let node = siblings.get_mut(index)?;
-        let was = shapes::node_label(node);
-        node["label"] = Value::String(typed.to_owned());
+        let was = shapes::node_label(node, reader.as_ref());
+        nodes::set_label(node, typed.to_owned());
         Some(format!("Rename {was} to {typed}"))
     });
     if let Some(refused) = refused {
@@ -1892,13 +1869,8 @@ pub fn rename(editor: &mut Editor, snapshot: &AreaSnapshot, id: &str, typed: &st
 /// Every folder row of the scene at `level` a row could move into, by its labels from the top, the
 /// top itself first.
 pub fn folders_of(snapshot: &AreaSnapshot, level: usize) -> Vec<(String, String)> {
-    let (scene, prefix) = match level {
-        0 => (snapshot.scene.as_ref(), String::new()),
-        depth => (
-            &snapshot.in_place[depth - 1].scene,
-            level_prefix(snapshot, depth),
-        ),
-    };
+    let scene = scene_at(snapshot, level);
+    let prefix = level_prefix(snapshot, level);
     let mut out = vec![(
         "(top level)".to_owned(),
         match level {
@@ -1911,7 +1883,7 @@ pub fn folders_of(snapshot: &AreaSnapshot, level: usize) -> Vec<(String, String)
         if nodes::is_folder(node) {
             let (parent, _) = nodes::place_of(pointer).unwrap_or(("", 0));
             let above = labels.get(parent).cloned();
-            let label = shapes::node_label(node);
+            let label = shapes::node_label(node, snapshot.reader.as_ref());
             let path = match above {
                 Some(above) => format!("{above} › {label}"),
                 None => label,

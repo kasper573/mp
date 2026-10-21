@@ -12,6 +12,7 @@ use serde_json::Value;
 use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::shown_path;
 use crate::ui::levels::{self, LevelCards};
 use crate::ui::{self, row_form, sidebar, theme, widgets};
 
@@ -130,7 +131,7 @@ pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
 }
 
 pub fn write(editor: &mut Editor, key: &str, label: &str, value: &Value) {
-    let mut edit = ContentEdit::new(format!("{label} · {}/{key}", ClassDef::TABLE));
+    let mut edit = ContentEdit::new(format!("{label} · {}", shown_path(key)));
     edit.write_json(fields_file(key), value);
     editor.apply(edit);
 }

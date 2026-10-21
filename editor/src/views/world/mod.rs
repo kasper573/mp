@@ -162,7 +162,7 @@ impl OpenWorldMap {
         let project = editor.project.as_ref()?;
         let content = project.content.clone()?;
         let atlas = editor.views.world.atlas(project, &content);
-        let layout = laid_out(&atlas, WorldMap::World.get(&content));
+        let layout = laid_out(&atlas, WorldMap::Game.get(&content));
         Some(OpenWorldMap {
             content,
             atlas,
@@ -277,7 +277,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         let selection = if editor.selection.table == WorldMapDef::TABLE {
             editor.selection.clone()
         } else {
-            RowSelection::row(WorldMapDef::TABLE, &WorldMap::World.path())
+            RowSelection::row(WorldMapDef::TABLE, &WorldMap::Game.path())
         };
         inspect::inspect_parts(editor, ui, &selection);
     });
@@ -300,7 +300,7 @@ pub fn selected(editor: &Editor) -> Vec<MapPart> {
 pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
     editor.select(RowSelection::parts(
         WorldMapDef::TABLE,
-        &WorldMap::World.path(),
+        &WorldMap::Game.path(),
         parts.iter().map(MapPart::to_string).collect(),
     ));
 }
@@ -312,7 +312,7 @@ pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, co
     let Some(area) = content.by_path::<AreaDef>(original) else {
         return;
     };
-    let Some(card) = WorldMap::World.get(&content).cards.get(&area) else {
+    let Some(card) = WorldMap::Game.get(&content).cards.get(&area) else {
         return;
     };
     let size = area::load(&content, area).size;
@@ -332,7 +332,7 @@ pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, co
 }
 
 fn layout_file() -> String {
-    fields_file(&WorldMap::World.path())
+    fields_file(&WorldMap::Game.path())
 }
 
 fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {

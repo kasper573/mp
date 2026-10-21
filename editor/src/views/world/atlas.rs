@@ -20,6 +20,7 @@ use strum::VariantArray;
 
 use crate::project::ProjectFiles;
 use crate::tabs::file_title;
+use crate::tabs::shown_path;
 use crate::usages::ContentUsages;
 
 pub struct WorldAtlas {
@@ -487,7 +488,7 @@ impl WorldAtlas {
             area: id,
             kind: RunnerKind::Area,
             name: key.to_owned(),
-            label: format!("area/{key}"),
+            label: shown_path(key).to_owned(),
             at: None,
             reaches: Vec::new(),
             opens: OpenTarget::Area {
@@ -567,7 +568,7 @@ impl WorldAtlas {
                 area: id,
                 kind: RunnerKind::Npc,
                 name: npc.get(content).name.clone(),
-                label: format!("npc/{npc_key}"),
+                label: shown_path(npc_key).to_owned(),
                 at,
                 reaches: Vec::new(),
                 opens: OpenTarget::Row {

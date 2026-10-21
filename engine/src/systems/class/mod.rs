@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{Content, ContentFile, ContentId, Loading, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, Loading, NamedContent, RowCheck};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::notification;
@@ -103,6 +103,12 @@ impl ContentFile for ClassDef {
         if let Some(backdrop) = &self.backdrop {
             backdrop.check(check);
         }
+    }
+}
+
+impl NamedContent for ClassDef {
+    fn shown_name(&self) -> &str {
+        &self.name
     }
 }
 

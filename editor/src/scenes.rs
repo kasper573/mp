@@ -11,12 +11,12 @@ use engine::systems::script::ScriptDef;
 use serde::Deserialize;
 use strum::VariantNames;
 
-use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
+use crate::app::{BottomTab, Clipboard, Editor, ModalDialog, SceneClip};
 use crate::import::ImportStep;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::views::area::resize::ResizeDialog;
-use crate::views::area::{self as area_view, blueprint, shapes};
+use crate::views::area::{self as area_view, blueprint};
 use crate::views::character::CharacterSection;
 use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
@@ -315,21 +315,24 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
             }
         }
         SceneStep::Clipboard { key, node } => {
-            let Some(module_value) = area_view::nodes::scene_of(editor, key)
-                .pointer(node)
-                .cloned()
-            else {
+            let (Some(reader), Some(mut copied)) = (
+                editor.reader(),
+                area_view::nodes::node(&area_view::nodes::scene_of(editor, key), node).cloned(),
+            ) else {
                 return;
             };
-            let origin = blueprint::selection_origin(std::slice::from_ref(&module_value))
-                .unwrap_or_default();
-            let mut relative = module_value;
-            shapes::shift(&mut relative, -origin.x, -origin.y);
-            editor.clipboard = Some(Clipboard {
+            let origin =
+                blueprint::selection_origin(std::slice::from_ref(&copied)).unwrap_or_default();
+            blueprint::shift_tree(&mut copied, -origin.x, -origin.y);
+            let Some(nodes) = area_view::nodes::CopiedNodes::of(&reader, &[copied]) else {
+                return;
+            };
+            editor.clipboard = Some(Clipboard::Scene(SceneClip {
                 from: key.clone(),
-                modules: vec![relative],
-                origin: Some(origin),
-            });
+                nodes,
+                count: 1,
+                origin,
+            }));
         }
         SceneStep::Script(key) => {
             editor.select(RowSelection::row(ScriptDef::TABLE, key));
@@ -496,15 +499,15 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
             view.page = ModelPage::Busts;
             if let Some(face) = face {
                 view.face = Some(face.clone());
-                if let Some(row) = editor.row_value(&key)
-                    && let Some(found) = busts::faces(&row)
+                if let Some(Ok(model)) = editor.read::<ModelDef>(&key)
+                    && let Some(found) = busts::faces(&model)
                         .into_iter()
                         .find(|found| found.name == *face)
                 {
                     editor.select(RowSelection {
                         table: ModelDef::TABLE.to_owned(),
                         keys: vec![key.clone()],
-                        parts: vec![found.pointer],
+                        parts: vec![found.part()],
                     });
                 }
             }

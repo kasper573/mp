@@ -6,6 +6,7 @@ use super::{theme, widgets};
 use crate::app::Editor;
 use crate::project::files::content_holding;
 use crate::tabs::file_title;
+use crate::tabs::shown_path;
 
 pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, key: &str, titled: bool) {
     let Some(project) = &editor.project else {
@@ -152,7 +153,7 @@ pub fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
     let mut open = None;
     for (file, pointer) in &usages {
         ui.horizontal(|ui| {
-            if ui.link(theme::mono(file)).clicked() {
+            if ui.link(theme::mono(shown_path(file))).clicked() {
                 open = Some(file.clone());
             }
             ui.label(theme::muted(pointer).monospace().size(12.0));

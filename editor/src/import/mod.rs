@@ -32,6 +32,7 @@ use crate::project::ContentEdit;
 use crate::rows;
 use crate::scenes::StripName;
 use crate::tabs::EditorTab;
+use crate::tabs::shown_path;
 use crate::ui::{active_tab, dialogs, theme};
 use crate::views::model::{ModelPage, strip_of, write_strip};
 
@@ -241,7 +242,7 @@ fn scripted(editor: &mut Editor) {
             let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
-            let Some(row) = editor.row_value(&key) else {
+            let Some(Ok(row)) = editor.read::<ModelDef>(&key) else {
                 return;
             };
             let Some(strip) = strip.strip() else {
@@ -297,11 +298,11 @@ pub fn start_animation(editor: &mut Editor, key: &str) {
 
 fn pick_files(editor: &mut Editor, target: ImportTarget) {
     let title = match &target {
-        ImportTarget::Model(key) => format!("Import onto model/{key}"),
+        ImportTarget::Model(key) => format!("Import onto {}", shown_path(key)),
         ImportTarget::NewModel => "Import a model".to_owned(),
-        ImportTarget::Tileset(key) => format!("Import onto tileset/{key}"),
+        ImportTarget::Tileset(key) => format!("Import onto {}", shown_path(key)),
         ImportTarget::NewTileset => "Import a tileset".to_owned(),
-        ImportTarget::Animation(key) => format!("Import an animation onto tileset/{key}"),
+        ImportTarget::Animation(key) => format!("Import an animation onto {}", shown_path(key)),
     };
     let mut picker = rfd::FileDialog::new()
         .set_title(&title)
@@ -417,7 +418,7 @@ fn suggested_name(export: &AnimationExport, table: &str) -> String {
 fn check_line(ui: &mut Ui, ok: bool, text: String) {
     ui.horizontal_wrapped(|ui| {
         if ok {
-            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+            glyph::show(ui, Mark::Check, 14.0, theme::OK);
         } else {
             glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
         }

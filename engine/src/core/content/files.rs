@@ -8,7 +8,15 @@ use super::load::{ContentFolder, FolderEntry};
 use super::report::{ContentProblem, ErrorPlace, LoadError, MISSING_FILE};
 
 /// The game's own settings: the one content file kept at a path the engine names outright.
-pub const SETTINGS_FILE: &str = "fixtures/game.json";
+pub const SETTINGS_FILE: &str = "fixtures/game.config.json";
+
+/// The folder fixtures declared under `folder` sit in: `fixtures/<folder>`, or `fixtures/` itself.
+pub fn fixture_dir(folder: Option<&str>) -> String {
+    match folder {
+        Some(folder) => format!("{FIXTURES_DIR}/{folder}"),
+        None => FIXTURES_DIR.to_owned(),
+    }
+}
 
 /// Where the engine looks for the settings and for every fixture, each under the folder of the
 /// system that declares it.
@@ -128,6 +136,9 @@ pub fn classify(
     if path == SETTINGS_FILE {
         return Ok(Some(GameFile::Settings));
     }
+    if Some(name) == SETTINGS_FILE.rsplit('/').next() {
+        return Err(misplaced_settings(name));
+    }
     let Some(rest) = rest else {
         return Err(unknown_file(name));
     };
@@ -154,14 +165,15 @@ pub fn classify(
     }
 }
 
+fn misplaced_settings(name: &str) -> ContentProblem {
+    ContentProblem::new(
+        "unknown file",
+        format!("file {name}"),
+        format!("the game's settings at {SETTINGS_FILE}"),
+    )
+}
+
 fn unknown_file(name: &str) -> ContentProblem {
-    if name == "game.json" {
-        return ContentProblem::new(
-            "unknown file",
-            format!("file {name}"),
-            format!("the game's settings at {SETTINGS_FILE}"),
-        );
-    }
     ContentProblem::new(
         "unknown file",
         format!("file {name}"),

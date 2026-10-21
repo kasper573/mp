@@ -1,5 +1,9 @@
 use std::path::{Path, PathBuf};
 
+use engine::core::math::Pos;
+use engine::systems::area::AreaModule;
+use engine::systems::area::object::{ObjectDef, ObjectShape};
+use engine::systems::area::scene::{ModuleNode, SceneFolder, SceneNode};
 use serde_json::json;
 use testkit::{Game, Map};
 
@@ -31,4 +35,44 @@ pub fn game_name(folder: &Path) -> String {
         .expect("the settings");
     let game: serde_json::Value = serde_json::from_str(&text).expect("json");
     game["name"].as_str().expect("a name").to_owned()
+}
+
+/// An object named `name` at a point of the map.
+pub fn object(name: &str) -> SceneNode {
+    SceneNode::Module(ModuleNode::new(AreaModule::Object(ObjectDef {
+        name: Some(name.to_owned()),
+        title: None,
+        shape: ObjectShape::Point(Pos::new(1.5, 1.5)),
+        look: None,
+        shown: None,
+        scripts: Vec::new(),
+    })))
+}
+
+/// A folder labelled `label` holding `children`.
+pub fn folder(label: &str, children: Vec<SceneNode>) -> SceneNode {
+    SceneNode::Folder(SceneFolder {
+        label: label.to_owned(),
+        hidden: false,
+        locked: false,
+        children,
+    })
+}
+
+/// What names each node of `nodes`, depth first: an object's name, a folder's label, a layer's
+/// name.
+pub fn names(nodes: &[SceneNode]) -> Vec<String> {
+    let mut found = Vec::new();
+    editor::views::area::nodes::walk(nodes, &mut |_, node| {
+        let name = match node {
+            SceneNode::Module(ModuleNode {
+                module: AreaModule::Object(object),
+                ..
+            }) => object.name.clone(),
+            SceneNode::GroundLayer(layer) => Some(layer.name.clone()),
+            node => node.label().map(str::to_owned),
+        };
+        found.push(name.unwrap_or_default());
+    });
+    found
 }

@@ -27,6 +27,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Harbour",
         "shape": {
           "type": "rect",
           "x": -0.5,
@@ -47,8 +48,7 @@
             "file": "assets/audio/ambient/stone_hum.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Harbour"
+        ]
       }
     ]
   },
@@ -2155,6 +2155,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Timbers",
         "shape": {
           "type": "rect",
           "x": 37.5,
@@ -2169,8 +2170,7 @@
             "file": "assets/audio/ambient/timbers.flac",
             "volume": 0.3
           }
-        ],
-        "label": "Timbers"
+        ]
       },
       {
         "type": "scenery",
@@ -3449,6 +3449,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 20.5,
@@ -3463,8 +3464,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",
@@ -6194,6 +6194,7 @@
     "children": [
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 53.5,
@@ -6208,8 +6209,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.29
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",
@@ -6471,6 +6471,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 61.5,
@@ -6485,8 +6486,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.32
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "scenery",

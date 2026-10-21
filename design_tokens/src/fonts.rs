@@ -4,9 +4,10 @@ use egui::{FontData, FontDefinitions, FontTweak};
 use strum::VariantArray;
 
 use crate::face::Face;
+use crate::glyph::Weight;
 
-/// The five families, every face its own and none falling back on another: a glyph a face lacks
-/// is not drawn as text at all.
+/// The families, every face and icon weight its own and none falling back on another: a glyph a
+/// face lacks is not drawn as text at all.
 pub(crate) fn definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::empty();
     for &face in Face::VARIANTS {
@@ -17,6 +18,15 @@ pub(crate) fn definitions() -> FontDefinitions {
         fonts
             .families
             .insert(face.family(), vec![face.key().to_owned()]);
+    }
+    for &weight in Weight::VARIANTS {
+        fonts.font_data.insert(
+            weight.key().to_owned(),
+            Arc::new(FontData::from_static(weight.font())),
+        );
+        fonts
+            .families
+            .insert(weight.family(), vec![weight.key().to_owned()]);
     }
     fonts
 }

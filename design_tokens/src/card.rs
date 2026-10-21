@@ -358,7 +358,7 @@ pub fn requirement(ui: &mut Ui, met: bool, text: &str) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 5.0;
         let (mark, color) = if met {
-            (Mark::Tick, ink::VERDIGRIS)
+            (Mark::Check, ink::VERDIGRIS)
         } else {
             (Mark::Cross, ink::RUBRIC)
         };

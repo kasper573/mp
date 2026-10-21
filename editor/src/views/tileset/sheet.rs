@@ -1,11 +1,11 @@
-use crate::views::area::nodes;
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use engine::core::content::{CONFIG_FILE, Content, ContentFile, parent_of};
+use engine::core::content::{Content, ContentFile, parent_of};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
+use engine::systems::area::scene::{ModuleNode, Scene, SceneGrids, SceneNode};
 use engine::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
-use engine::systems::area::{AreaModule, Scenery, SceneryTile};
+use engine::systems::area::{AreaModule, MapSize, Scenery, SceneryTile, Tilemap};
 use strum::VariantArray;
 
 use super::{
@@ -19,7 +19,7 @@ use crate::tabs::file_title;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
 use crate::views::model::sounds;
-use crate::{forms, rows, value};
+use crate::{forms, rows};
 
 const WALKABLE: Color32 = Color32::from_rgb(110, 200, 110);
 const BLOCKS: Color32 = Color32::from_rgb(230, 90, 90);
@@ -367,10 +367,14 @@ fn make_blueprint(
         return Err(problem);
     }
     let path = rows::new_path(&project.files, folder, BlueprintDef::TABLE, name);
-    let id = tileset
-        .content
-        .by_path::<TilesetDef>(&tileset.key)
-        .ok_or("the tileset is not loaded yet")?;
+    let reader = project.reader();
+    let id = reader
+        .id_of::<TilesetDef>(&tileset.key)
+        .ok_or("the tileset doesn't read")?;
+    let tile = project
+        .read::<TilesetDef>(&tileset.key)
+        .map_err(|_| "the tileset doesn't read")?
+        .tile;
     let tiles = selection
         .rows(tileset.sheet.columns())
         .into_iter()
@@ -393,18 +397,27 @@ fn make_blueprint(
         flip: Flip::None,
         blocks: Vec::new(),
     });
-    let part = value::untyped(&tileset.content, &part).ok_or("the scenery part does not write")?;
-    let tile = id.get(&tileset.content).tile;
-    let config = serde_json::json!({
-        "map": { "size": { "width": selection.w, "height": selection.h }, "tile": tile }
-    });
+    let map = Tilemap {
+        size: MapSize {
+            width: selection.w,
+            height: selection.h,
+        },
+        tile,
+    };
+    let made = BlueprintDef {
+        variables: Default::default(),
+        scene: Scene {
+            nodes: vec![SceneNode::Module(ModuleNode::new(part))],
+            grids: SceneGrids::empty(&map),
+        },
+        map,
+    };
     let mut edit = ContentEdit::new(format!(
         "Make blueprint {name} from {} tiles of {}",
         selection.count(),
         file_title(&tileset.key)
     ));
-    edit.write_json(format!("{path}/{CONFIG_FILE}"), &config);
-    nodes::write_scene(&mut edit, &path, &serde_json::json!([part]));
+    edit.write_content(project, &path, &made)?;
     editor.try_apply(edit)?;
     editor.toast(format!("{} is ready to stamp", file_title(&path)));
     editor.select(RowSelection::row(BlueprintDef::TABLE, &path));

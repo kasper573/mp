@@ -11,6 +11,8 @@ use crate::project::ProjectFiles;
 #[derive(Default)]
 pub struct Thumbnails {
     entries: HashMap<String, Entry>,
+    /// Each picture's size in pixels as its header says, by path, with the hash it was read at.
+    dimensions: HashMap<String, (String, Option<[u32; 2]>)>,
 }
 
 enum Entry {
@@ -60,6 +62,24 @@ impl Thumbnails {
         self.image_within(ctx, files, path, &mut unlimited)
     }
 
+    /// The size in pixels of the picture at `path`, read from its header without decoding it.
+    pub fn dimensions(&mut self, files: &ProjectFiles, path: &str) -> Option<[u32; 2]> {
+        let hash = files.hash_of(path)?;
+        if let Some((known, dimensions)) = self.dimensions.get(path)
+            && known == hash
+        {
+            return *dimensions;
+        }
+        let dimensions = image::ImageReader::new(std::io::Cursor::new(&files.get(path)?[..]))
+            .with_guessed_format()
+            .ok()
+            .and_then(|reader| reader.into_dimensions().ok())
+            .map(|(width, height)| [width, height]);
+        self.dimensions
+            .insert(path.to_owned(), (hash.to_owned(), dimensions));
+        dimensions
+    }
+
     pub fn image_within(
         &mut self,
         ctx: &egui::Context,
@@ -69,6 +89,23 @@ impl Thumbnails {
     ) -> Option<Thumbnail> {
         let file = path.to_owned();
         self.load(ctx, files, file.clone(), file, budget, |image| image)
+    }
+
+    /// The `frame`th cell, each `size` pixels, of the sheet at `path`, cut down to the pixels it
+    /// draws, so what it shows fills the room it is given.
+    pub fn trimmed_cell(
+        &mut self,
+        ctx: &egui::Context,
+        files: &ProjectFiles,
+        path: &str,
+        size: (u32, u32),
+        frame: u32,
+        budget: &mut u32,
+    ) -> Option<Thumbnail> {
+        let key = format!("cell:{path}:{}x{}:{frame}", size.0, size.1);
+        self.load(ctx, files, key, path.to_owned(), budget, |image| {
+            trimmed(&cell(&image, size, frame))
+        })
     }
 
     pub fn icon(
@@ -124,23 +161,6 @@ impl Thumbnails {
     }
 }
 
-pub struct SpriteFrame {
-    pub uv: egui::Rect,
-    pub size: egui::Vec2,
-}
-
-pub fn sprite_frame(size: (u32, u32), frame: u32, thumb: &Thumbnail) -> SpriteFrame {
-    let (w, h) = (size.0 as f32, size.1 as f32);
-    let frame = frame as f32;
-    let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
-    let x = (frame % columns) * w;
-    let y = (frame / columns).floor() * h;
-    SpriteFrame {
-        uv: uv(thumb.size, x, y, w, h),
-        size: egui::vec2(w, h),
-    }
-}
-
 pub fn uv(size: [usize; 2], x: f32, y: f32, w: f32, h: f32) -> egui::Rect {
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     egui::Rect::from_min_max(
@@ -179,6 +199,37 @@ fn decode(bytes: &[u8]) -> Option<RgbaImage> {
 fn to_color_image(image: RgbaImage) -> ColorImage {
     let size = [image.width() as usize, image.height() as usize];
     ColorImage::from_rgba_unmultiplied(size, image.as_raw())
+}
+
+/// The `frame`th cell of a sheet of `size` cells, laid out row by row.
+fn cell(image: &RgbaImage, (width, height): (u32, u32), frame: u32) -> RgbaImage {
+    let columns = (image.width() / width.max(1)).max(1);
+    let x = (frame % columns) * width;
+    let y = (frame / columns) * height;
+    image::imageops::crop_imm(image, x, y, width, height).to_image()
+}
+
+/// The picture without the transparent margins around what it draws; a picture that draws
+/// nothing stays whole.
+fn trimmed(image: &RgbaImage) -> RgbaImage {
+    let drawn = image
+        .enumerate_pixels()
+        .filter(|(_, _, pixel)| pixel[3] > 0);
+    let bounds = drawn.fold(None, |bounds: Option<(u32, u32, u32, u32)>, (x, y, _)| {
+        Some(match bounds {
+            None => (x, y, x, y),
+            Some((left, top, right, bottom)) => {
+                (left.min(x), top.min(y), right.max(x), bottom.max(y))
+            }
+        })
+    });
+    match bounds {
+        Some((left, top, right, bottom)) => {
+            image::imageops::crop_imm(image, left, top, right - left + 1, bottom - top + 1)
+                .to_image()
+        }
+        None => image.clone(),
+    }
 }
 
 fn shrink(image: RgbaImage, longest: u32) -> RgbaImage {

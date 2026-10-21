@@ -40,12 +40,12 @@ fn a_file_that_is_no_content_media_or_note_is_refused() {
 
 #[test]
 fn the_settings_anywhere_but_their_place_are_refused_saying_where_they_belong() {
-    let report = refused(game().file("game.json", "{}"));
+    let report = refused(game().file("game.config.json", "{}"));
 
     let error = report
         .errors
         .iter()
-        .find(|error| error.file == "game.json")
+        .find(|error| error.file == "game.config.json")
         .unwrap_or_else(|| panic!("{report}"));
     assert_eq!(error.problem.rule, "unknown file");
     assert!(error.problem.expected.contains(SETTINGS_FILE), "{report}");
@@ -164,4 +164,74 @@ fn only<'a>(report: &'a LoadReport, file: &str) -> (&'a str, Option<String>) {
         .collect();
     assert_eq!(errors.len(), 1, "{report}");
     (errors[0].problem.rule, errors[0].problem.nearest.clone())
+}
+
+#[test]
+fn a_folder_held_in_memory_lists_what_each_folder_holds_directly() {
+    use engine::core::content::{ContentFolder, MemoryFolder};
+    let folder = MemoryFolder {
+        name: "game".to_owned(),
+        files: ["a-b", "a.b", "a/x", "a/y/z", "a/y0", "a0", "b/c/d"]
+            .into_iter()
+            .map(|path| (path.to_owned(), std::sync::Arc::from(&b""[..])))
+            .collect(),
+    };
+    let listed = |dir: &str| -> std::collections::BTreeSet<(String, bool)> {
+        folder
+            .entries(dir)
+            .into_iter()
+            .map(|entry| (entry.name, entry.dir))
+            .collect()
+    };
+    let named = |entries: &[(&str, bool)]| -> std::collections::BTreeSet<(String, bool)> {
+        entries
+            .iter()
+            .map(|(name, dir)| ((*name).to_owned(), *dir))
+            .collect()
+    };
+
+    assert_eq!(
+        listed(""),
+        named(&[
+            ("a", true),
+            ("a-b", false),
+            ("a.b", false),
+            ("a0", false),
+            ("b", true)
+        ])
+    );
+    assert_eq!(
+        listed("a"),
+        named(&[("x", false), ("y", true), ("y0", false)])
+    );
+    assert_eq!(listed("a/y"), named(&[("z", false)]));
+    assert_eq!(listed("b"), named(&[("c", true)]));
+    assert!(listed("c").is_empty());
+}
+
+#[test]
+fn checking_any_files_of_a_game_that_loads_finds_nothing() {
+    let orcs = || {
+        game()
+            .npc("orc", 10.0, json!([]))
+            .busts("orc")
+            .sfx("hit")
+            .file("icons/cap.png", png(8, 8))
+            .file("notes/orcs.md", "Orcs live here.")
+    };
+    orcs().load();
+    let game = orcs();
+    let registry = game.registry();
+    let folder = std::sync::Arc::new(game.folder());
+    let files: Vec<String> = folder.files.keys().cloned().collect();
+    let errors = engine::core::content::check_files(registry, folder.clone(), &files);
+    assert!(errors.is_empty(), "the whole folder at once: {errors:?}");
+    for file in &files {
+        let errors = engine::core::content::check_files(
+            registry,
+            folder.clone(),
+            std::slice::from_ref(file),
+        );
+        assert!(errors.is_empty(), "{file}: {errors:?}");
+    }
 }

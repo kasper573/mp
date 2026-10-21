@@ -1,10 +1,14 @@
+use std::sync::OnceLock;
+
 use jsonc_parser::ast::Value;
 use jsonc_parser::common::Ranged;
 use jsonc_parser::{CollectOptions, ParseOptions, parse_to_ast};
 
-/// Where each value and key of a JSON file sits, by JSON pointer.
+/// Where each value and key of a JSON file sits, by JSON pointer. A file is only indexed once a
+/// place in it is asked for, which only a problem in it does.
 pub struct JsonIndex {
-    values: Vec<IndexedValue>,
+    text: String,
+    values: OnceLock<Vec<IndexedValue>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,21 +21,18 @@ pub struct IndexedValue {
 }
 
 impl JsonIndex {
-    // Text that isn't JSON indexes nothing: its parse error carries a place of its own.
     pub fn of(text: &str) -> JsonIndex {
-        let mut index = JsonIndex { values: Vec::new() };
-        let parsed = parse_to_ast(text, &CollectOptions::default(), &strict_json());
-        if let Some(value) = parsed.ok().and_then(|parsed| parsed.value) {
-            index.visit(&value, String::new(), &Lines::of(text));
+        JsonIndex {
+            text: text.to_owned(),
+            values: OnceLock::new(),
         }
-        index
     }
 
     pub fn position(&self, pointer: &str) -> Option<(usize, usize)> {
         let mut wanted = pointer.to_owned();
         loop {
             if let Some(value) = self
-                .values
+                .values()
                 .iter()
                 .find(|value| !value.key && value.pointer == wanted)
             {
@@ -43,47 +44,59 @@ impl JsonIndex {
     }
 
     pub fn strings(&self) -> impl Iterator<Item = &IndexedValue> {
-        self.values
+        self.values()
             .iter()
             .filter(|value| !value.key && value.string.is_some())
     }
 
-    fn visit(&mut self, value: &Value, pointer: String, lines: &Lines) {
-        let (line, column) = lines.place(value.start());
-        let string = match value {
-            Value::StringLit(literal) => Some(literal.value.to_string()),
-            _ => None,
-        };
-        self.values.push(IndexedValue {
-            pointer: pointer.clone(),
-            line,
-            column,
-            string,
-            key: false,
-        });
-        match value {
-            Value::Object(object) => {
-                for property in &object.properties {
-                    let name = property.name.as_str();
-                    let inner = format!("{pointer}/{}", escape(name));
-                    let (line, column) = lines.place(property.name.start());
-                    self.values.push(IndexedValue {
-                        pointer: inner.clone(),
-                        line,
-                        column,
-                        string: Some(name.to_owned()),
-                        key: true,
-                    });
-                    self.visit(&property.value, inner, lines);
-                }
+    // Text that isn't JSON indexes nothing: its parse error carries a place of its own.
+    fn values(&self) -> &[IndexedValue] {
+        self.values.get_or_init(|| {
+            let mut values = Vec::new();
+            let parsed = parse_to_ast(&self.text, &CollectOptions::default(), &strict_json());
+            if let Some(value) = parsed.ok().and_then(|parsed| parsed.value) {
+                visit(&mut values, &value, String::new(), &Lines::of(&self.text));
             }
-            Value::Array(array) => {
-                for (index, element) in array.elements.iter().enumerate() {
-                    self.visit(element, format!("{pointer}/{index}"), lines);
-                }
+            values
+        })
+    }
+}
+
+fn visit(values: &mut Vec<IndexedValue>, value: &Value, pointer: String, lines: &Lines) {
+    let (line, column) = lines.place(value.start());
+    let string = match value {
+        Value::StringLit(literal) => Some(literal.value.to_string()),
+        _ => None,
+    };
+    values.push(IndexedValue {
+        pointer: pointer.clone(),
+        line,
+        column,
+        string,
+        key: false,
+    });
+    match value {
+        Value::Object(object) => {
+            for property in &object.properties {
+                let name = property.name.as_str();
+                let inner = format!("{pointer}/{}", escape(name));
+                let (line, column) = lines.place(property.name.start());
+                values.push(IndexedValue {
+                    pointer: inner.clone(),
+                    line,
+                    column,
+                    string: Some(name.to_owned()),
+                    key: true,
+                });
+                visit(values, &property.value, inner, lines);
             }
-            _ => {}
         }
+        Value::Array(array) => {
+            for (index, element) in array.elements.iter().enumerate() {
+                visit(values, element, format!("{pointer}/{index}"), lines);
+            }
+        }
+        _ => {}
     }
 }
 

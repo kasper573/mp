@@ -2,12 +2,16 @@ use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
 use engine::core::content::{Content, SETTINGS_FILE};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::area::{self, AreaId, ObjectShape};
+use engine::systems::area::scene::SCENE_FILE;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModule, ObjectShape};
+use engine::systems::script::Place;
 
-use super::AreaFrame;
+use super::{AreaFrame, nodes};
 use crate::app::{Editor, PlacePick};
+use crate::project::ContentEdit;
 use crate::project::files::content_of;
-use crate::project::{ContentEdit, ProjectFiles};
+use crate::scene_graph;
+use crate::tabs::shown_path;
 
 pub const INITIAL_SPAWN: &str = "/initial_spawn";
 
@@ -34,20 +38,14 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
         let Some(parent) = usage.pointer.strip_suffix("/area") else {
             continue;
         };
-        let Some(json) = project.files.json(&usage.file) else {
-            continue;
-        };
-        let Some(place) = json.pointer(parent) else {
-            continue;
-        };
-        let (Some(x), Some(y)) = (place["x"].as_f64(), place["y"].as_f64()) else {
+        let Some(place) = project.value_at::<Place>(&usage.file, parent) else {
             continue;
         };
         let initial_spawn = usage.file == SETTINGS_FILE && parent == INITIAL_SPAWN;
         out.push(ArrivalPin {
             file: usage.file.clone(),
             pointer: parent.to_owned(),
-            at: Pos::new(x as f32, y as f32),
+            at: place.at,
             initial_spawn,
         });
     }
@@ -62,51 +60,48 @@ pub fn warp_objects(content: &Content, area_id: AreaId) -> Vec<ObjectShape> {
 }
 
 impl ArrivalPin {
+    /// Whose file the arrival is in, and the object leading to it when a scene's object does.
     pub fn names(&self, editor: &Editor) -> (String, Option<String>) {
         let owner = content_of(&self.file)
             .map(|(_, key)| key.to_owned())
             .unwrap_or_else(|| self.file.clone());
-        let spot = editor
-            .project
-            .as_ref()
-            .and_then(|project| project.files.json(&self.file))
-            .and_then(|json| {
-                let segments: Vec<&str> = self.pointer.split('/').skip(1).collect();
-                if segments.first() == Some(&"modules") && segments.len() >= 2 {
-                    json.pointer(&format!("/modules/{}", segments[1]))?["name"]
-                        .as_str()
-                        .map(str::to_owned)
-                } else {
-                    None
+        let spot = self
+            .file
+            .strip_suffix(&format!("/{SCENE_FILE}"))
+            .and_then(|bundle| nodes::bundle_of(editor, bundle))
+            .and_then(|bundle| {
+                let node = scene_graph::node_pointer(&self.pointer);
+                match &nodes::module_node(bundle.nodes(), &node)?.module {
+                    AreaModule::Object(object) => object.name.clone(),
+                    _ => None,
                 }
             });
         (owner, spot)
     }
 }
 
+/// Puts the place `at` in `area_key` where the place being picked goes, and ends the pick.
 pub fn commit_pick(editor: &mut Editor, area_key: &str, at: Pos<Tiles>) {
     let Some(PlacePick { file, pointer, .. }) = editor.pick.clone() else {
         return;
     };
-    let Some(mut target) = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.files.json_owned(&file))
-    else {
-        editor.pick = None;
+    let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(slot) = target.pointer_mut(&pointer) else {
-        editor.toast(format!("{pointer} is gone from {file}"));
-        editor.pick = None;
+    let Some(area) = project.reader().id_of::<AreaDef>(area_key) else {
         return;
     };
-    *slot = place_json(area_key, at);
     let mut edit = ContentEdit::new(format!(
         "Pick place {area_key} {}, {} for {file}",
         at.x, at.y
     ));
-    edit.write_json(file.clone(), &target);
+    if let Err(error) = edit.update_at(project, &file, &pointer, |place: &mut Option<Place>| {
+        *place = Some(Place { area, at });
+    }) {
+        editor.toast(error);
+        editor.pick = None;
+        return;
+    }
     if editor.apply(edit) {
         editor.pick = None;
         editor.toast(format!("Picked {area_key} {}, {}", at.x, at.y));
@@ -170,66 +165,52 @@ pub fn pin_at(editor: &Editor, frame: &AreaFrame, pointer: Pos2) -> Option<PinHi
 pub fn open_pin(editor: &mut Editor, pin: PinHit) {
     match pin {
         PinHit::InitialSpawn => {
-            editor.toast("The game's spawn: set in game.json; drag the pin to move it")
+            editor.toast("The game's spawn: set in game.config.json; drag the pin to move it")
         }
         PinHit::Place { file, pointer } => {
             if let Some((table, key)) = content_of(&file) {
                 let (table, key) = (table.to_owned(), key.to_owned());
                 editor.open_row(&table, &key);
-                editor.toast(format!("{table}/{key} {pointer}"));
+                editor.toast(format!("{} {pointer}", shown_path(&key)));
             }
         }
     }
 }
 
 pub fn move_pin(editor: &mut Editor, frame: &AreaFrame, file: &str, pointer: &str, at: Pos<Tiles>) {
-    let Some(mut json) = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.files.json_owned(file))
-    else {
+    let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(place) = json.pointer_mut(pointer) else {
-        return;
-    };
-    place["x"] = serde_json::json!(at.x);
-    place["y"] = serde_json::json!(at.y);
     let mut edit = ContentEdit::new(format!(
         "Move arrival in {} to {}, {}",
         frame.bundle, at.x, at.y
     ));
-    edit.write_json(file.to_owned(), &json);
+    if let Err(error) = edit.update_at(project, file, pointer, |place: &mut Place| place.at = at) {
+        editor.toast(error);
+        return;
+    }
     editor.apply(edit);
 }
 
-pub fn set_spawn(editor: &mut Editor, area: &str, at: Pos<Tiles>) {
-    let Some(mut game) = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.files.json_owned(SETTINGS_FILE))
-    else {
+pub fn set_spawn(editor: &mut Editor, area_key: &str, at: Pos<Tiles>) {
+    let Some(project) = editor.project.as_ref() else {
         return;
     };
-    game["initial_spawn"] = place_json(area, at);
+    let (Ok(settings), Some(area)) = (
+        project.settings(),
+        project.reader().id_of::<AreaDef>(area_key),
+    ) else {
+        return;
+    };
+    let mut settings = (*settings).clone();
+    settings.initial_spawn = Place { area, at };
     let mut edit = ContentEdit::new(format!(
-        "Set the initial spawn to {area} {}, {}",
+        "Set the initial spawn to {area_key} {}, {}",
         at.x, at.y
     ));
-    edit.write_json(SETTINGS_FILE, &game);
+    if let Err(error) = edit.write_settings(project, &settings) {
+        editor.toast(error);
+        return;
+    }
     editor.apply(edit);
-}
-
-pub fn initial_spawn_place(files: &ProjectFiles) -> Option<(String, Pos<Tiles>)> {
-    let game = files.json(SETTINGS_FILE)?;
-    let area = game["initial_spawn"]["area"].as_str()?.to_owned();
-    let at = Pos::new(
-        game["initial_spawn"]["x"].as_f64()? as f32,
-        game["initial_spawn"]["y"].as_f64()? as f32,
-    );
-    Some((area, at))
-}
-
-fn place_json(area: &str, at: Pos<Tiles>) -> serde_json::Value {
-    serde_json::json!({ "area": area, "x": at.x, "y": at.y })
 }

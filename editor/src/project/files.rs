@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::ops::Bound;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use engine::core::content::files::{self, GameFile};
@@ -15,6 +16,54 @@ pub type FileBytes = Arc<[u8]>;
 pub struct ProjectFiles {
     map: BTreeMap<String, Stored>,
     index: OnceLock<Arc<FolderIndex>>,
+    revision: u64,
+}
+
+/// The hash of every file and kept folder as it stands on disk, as the editor last read or wrote
+/// it.
+#[derive(Clone, Default)]
+pub struct DiskHashes {
+    map: BTreeMap<String, String>,
+    revision: u64,
+}
+
+impl DiskHashes {
+    pub fn get(&self, path: &str) -> Option<&str> {
+        self.map.get(path).map(String::as_str)
+    }
+
+    pub fn paths(&self) -> impl Iterator<Item = &String> {
+        self.map.keys()
+    }
+
+    /// Every path that starts with `prefix`.
+    pub fn under<'a>(&'a self, prefix: &'a str) -> impl Iterator<Item = &'a String> {
+        self.map
+            .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
+            .map(|(path, _)| path)
+            .take_while(move |path| path.starts_with(prefix))
+    }
+
+    pub fn insert(&mut self, path: String, hash: String) {
+        self.revision = next_revision();
+        self.map.insert(path, hash);
+    }
+
+    pub fn remove(&mut self, path: &str) {
+        self.revision = next_revision();
+        self.map.remove(path);
+    }
+
+    /// Which change the hashes are at, as [`ProjectFiles::revision`] is for the files.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+}
+
+/// A revision no files or hashes have had before, so no two different states share one.
+fn next_revision() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 /// What the files of the game folder are, as the loader sorts them by name and place.
@@ -99,7 +148,7 @@ impl ProjectFiles {
     }
 
     pub fn insert(&mut self, path: String, bytes: FileBytes) {
-        self.index = OnceLock::new();
+        self.changed();
         let hash = hash(&bytes);
         self.map.insert(
             path,
@@ -112,8 +161,19 @@ impl ProjectFiles {
     }
 
     pub fn remove(&mut self, path: &str) {
-        self.index = OnceLock::new();
+        self.changed();
         self.map.remove(path);
+    }
+
+    /// Which change the files are at: files at the same revision hold the same, whichever copy
+    /// they are, so what is worked out from them keeps while it stays.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    fn changed(&mut self) {
+        self.index = OnceLock::new();
+        self.revision = next_revision();
     }
 
     pub fn index(&self) -> Arc<FolderIndex> {
@@ -143,11 +203,16 @@ impl ProjectFiles {
             .map(|(path, stored)| (path, &stored.bytes))
     }
 
-    pub fn hashes(&self) -> BTreeMap<String, String> {
-        self.map
-            .iter()
-            .map(|(path, stored)| (path.clone(), stored.hash.clone()))
-            .collect()
+    /// The hash of every file, as the files stand now.
+    pub fn hashes(&self) -> DiskHashes {
+        DiskHashes {
+            map: self
+                .map
+                .iter()
+                .map(|(path, stored)| (path.clone(), stored.hash.clone()))
+                .collect(),
+            revision: next_revision(),
+        }
     }
 
     pub fn text(&self, path: &str) -> Option<String> {

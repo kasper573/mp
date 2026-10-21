@@ -30,13 +30,15 @@ use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{module_lines, script_module_body, script_summary, speaker_of, summary_of};
 use super::{breadcrumb, theme, widgets};
 use crate::app::{
-    Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, TextComparison,
+    Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, ModuleClip, PlacePick,
+    TextComparison,
 };
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_file_into;
+use crate::tabs::shown_path;
 use crate::ui::browser::{self, RowMenu};
 use crate::value::RowValue;
 use crate::views::{class, model, skill, tileset, vfx};
@@ -122,7 +124,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         .is_some();
     let second_column = has_modules || table == InputDef::TABLE;
     if fixture {
-        editor.status.left.push(format!("{table}/{key}"));
+        editor.status.left.push(shown_path(key).to_owned());
         editor
             .status
             .left
@@ -130,6 +132,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
     }
     let mut actions = Vec::new();
     let mut changed = FormChange::default();
+    let mut typed: Option<TypedWrite> = None;
     let mut module_ops: Vec<ModuleOp> = Vec::new();
     let mut status: Option<String> = None;
     {
@@ -148,7 +151,9 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.set_width(LEFT_COLUMN);
-                        changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
+                        changed |= row_card(
+                            ui, &mut cx, table, key, fixture, root, &mut value, &mut typed,
+                        );
                     });
                     ui.add_space(16.0);
                     ui.vertical(|ui| {
@@ -172,7 +177,9 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 if wide {
                     ui.set_max_width(SINGLE_COLUMN);
                 }
-                changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
+                changed |= row_card(
+                    ui, &mut cx, table, key, fixture, root, &mut value, &mut typed,
+                );
                 if table == InputDef::TABLE {
                     ui.add_space(10.0);
                     changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
@@ -193,31 +200,33 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         });
     }
     if let Some(status) = status {
-        editor.status.left.push(format!("{table}/{key}"));
+        editor.status.left.push(shown_path(key).to_owned());
         editor.status.left.push(status);
     }
     if !editor.form.status.is_empty() {
-        editor
-            .status
-            .left
-            .push(format!("{table}/{key} › {}", editor.form.status.remove(0)));
+        editor.status.left.push(format!(
+            "{} › {}",
+            shown_path(key),
+            editor.form.status.remove(0)
+        ));
         editor.status.left.append(&mut editor.form.status);
     }
     for op in module_ops {
         match op {
             ModuleOp::Copy(index) => {
                 let module = value["modules"][index].clone();
-                editor.clipboard = Some(Clipboard {
+                editor.clipboard = Some(Clipboard::Modules(ModuleClip {
                     from: key.to_owned(),
                     modules: vec![module],
-                    origin: None,
-                });
+                }));
                 editor.toast("Module copied");
             }
             ModuleOp::Paste => paste_modules(editor, table, key, &mut value, &mut changed),
         }
     }
-    if changed.is_some() {
+    if let Some(write) = typed {
+        write(editor);
+    } else if changed.is_some() {
         let what = changed.0.clone().unwrap_or_default();
         let label = format!(
             "Edit {table}/{key}{}",
@@ -236,6 +245,10 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
     }
 }
 
+/// A change a row's own body made to the file as its type, written once the form is drawn.
+type TypedWrite = Box<dyn FnOnce(&mut Editor) -> bool>;
+
+#[allow(clippy::too_many_arguments)]
 fn row_card(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -244,6 +257,7 @@ fn row_card(
     fixture: bool,
     schema: &Value,
     value: &mut Value,
+    typed: &mut Option<TypedWrite>,
 ) -> FormChange {
     let mut changed = FormChange::default();
     widgets::card_frame(false).show(ui, |ui| {
@@ -271,11 +285,21 @@ fn row_card(
         ui.add_space(4.0);
         forms::error_line(ui, cx, "");
         if table == ModelDef::TABLE {
-            changed = model::inspect::row_body(ui, cx, value);
+            if let Ok(model) = cx.project.read::<ModelDef>(key) {
+                let mut model = (*model).clone();
+                if let Some(what) = model::inspect::row_body(ui, &mut model).0 {
+                    let (label, key) = (format!("Edit {} {what}", shown_path(key)), key.to_owned());
+                    *typed = Some(Box::new(move |editor| {
+                        editor.write_content(&label, &key, &model)
+                    }));
+                }
+            }
             return;
         }
         if table == TilesetDef::TABLE {
-            changed = tileset::inspect::row_body(ui, cx, value);
+            if let Ok(tileset) = cx.project.read::<TilesetDef>(key) {
+                tileset::inspect::row_body(ui, cx, &tileset);
+            }
             return;
         }
         let hidden: &[&str] = match table {
@@ -335,7 +359,7 @@ fn modules_column(
         "Modules"
     };
     widgets::section_with(ui, &format!("{heading} · {shown}"), |ui| {
-        let button = controls::primary(ui, "+ Add module");
+        let button = controls::dropdown_primary(ui, "+ Add module");
         let popup = egui::Popup::from_toggle_button_response(&button)
             .id(ui.id().with("add-module"))
             .width(330.0);
@@ -400,7 +424,7 @@ fn modules_column(
                 .unwrap_or(1);
             format!("condition · {blocks} block{}", widgets::plural(blocks))
         } else {
-            summary_of(cx.root, module)
+            summary_of(cx, module)
         };
         let folded_key = format!("{table}{path}");
         let folded = match (
@@ -417,7 +441,7 @@ fn modules_column(
             let header = ui
                 .horizontal(|ui| {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.menu_button(theme::faint("…"), |ui| {
+                        ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
                             if ui.button("Copy").clicked() {
                                 ops.push(ModuleOp::Copy(index));
                                 ui.close();
@@ -437,9 +461,9 @@ fn modules_column(
                         glyph::show(
                             ui,
                             if folded {
-                                Mark::ChevronRight
+                                Mark::CaretRight
                             } else {
-                                Mark::ChevronDown
+                                Mark::CaretDown
                             },
                             11.0,
                             theme::FAINT,
@@ -578,7 +602,7 @@ pub(super) fn add_module_popup(
                     continue;
                 }
                 offered += 1;
-                let template = schema::variant_template(cx.root, variant);
+                let template = schema::variant_template(cx.root, variant, cx.nearby());
                 let at_most_one =
                     registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne);
                 let blocked = !registry.takes_module(table, list, &template);
@@ -715,7 +739,7 @@ fn paste_modules(
     value: &mut Value,
     changed: &mut FormChange,
 ) {
-    let Some(clip) = editor.clipboard.clone() else {
+    let Some(Clipboard::Modules(clip)) = editor.clipboard.clone() else {
         editor.toast("Nothing copied");
         return;
     };
@@ -736,7 +760,7 @@ fn paste_modules(
         match (rule, existing) {
             (ModuleRule::AtMostOne, Some(index)) => {
                 editor.dialogs.push(ModalDialog::Confirm(ConfirmDialog {
-                    title: format!("{table}/{key} already has {tag}"),
+                    title: format!("{} already has {tag}", shown_path(key)),
                     body: format!(
                         "A {table} has at most one {tag} module. Replace it with {from}'s?"
                     ),

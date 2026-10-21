@@ -1,8 +1,11 @@
-use engine::core::content::ContentId;
+use std::sync::Arc;
+
+use engine::core::content::{ContentFolder, ContentId, FolderReader};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
+use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
-use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SceneryTile, walk};
+use engine::systems::area::{self, AreaDef, AreaModule, SceneNode, Scenery, SceneryTile, walk};
 use serde_json::{Value, json};
 use testkit::{Game, path, png};
 
@@ -287,6 +290,128 @@ fn a_placed_blueprint_naming_an_unknown_file_is_reported_once_at_the_blueprint()
         .map(|error| error.file.as_str())
         .collect();
     assert_eq!(unknown, ["bad.blueprint/scene.json"], "{report}");
+}
+
+#[test]
+fn a_placement_fills_each_hole_with_the_value_it_gives() {
+    let content = placing(
+        game().blueprint(
+            "rock",
+            (1, 1),
+            json!({ "x": { "type": "number" } }),
+            json!([holed_rock()]),
+        ),
+        json!([with_values(
+            placement("Rock", "rock", 2.0, 2.0, "none"),
+            json!({ "x": 3.0 })
+        )]),
+    )
+    .load();
+
+    let placed = area::placed(&content, start(&content));
+    let at: Vec<Pos<Tiles>> = placed
+        .iter()
+        .map(|part| scenery_at(&part.module).0)
+        .collect();
+    assert_eq!(at, [Pos::new(5.0, 2.0)]);
+}
+
+#[test]
+fn a_hole_left_without_a_value_takes_its_variables_default() {
+    let content = placing(
+        game().blueprint(
+            "rock",
+            (1, 1),
+            json!({ "x": { "type": "number", "default": 1.0 } }),
+            json!([holed_rock()]),
+        ),
+        json!([placement("Rock", "rock", 2.0, 2.0, "none")]),
+    )
+    .load();
+
+    let placed = area::placed(&content, start(&content));
+    let at: Vec<Pos<Tiles>> = placed
+        .iter()
+        .map(|part| scenery_at(&part.module).0)
+        .collect();
+    assert_eq!(at, [Pos::new(3.0, 2.0)]);
+}
+
+#[test]
+fn a_hole_naming_no_variable_of_its_blueprint_is_reported_at_the_hole() {
+    let report = game()
+        .blueprint(
+            "rock",
+            (1, 1),
+            json!({ "y": { "type": "number" } }),
+            json!([holed_rock()]),
+        )
+        .try_load()
+        .err()
+        .expect("refused");
+
+    let unknown: Vec<(&str, &str)> = report
+        .errors
+        .iter()
+        .filter(|error| error.problem.rule == "unknown variable")
+        .map(|error| (error.file.as_str(), pointer(&error.at)))
+        .collect();
+    assert_eq!(
+        unknown,
+        [("rock.blueprint/scene.json", "/0/at/x/var")],
+        "{report}"
+    );
+}
+
+#[test]
+fn a_blueprint_writes_its_holes_back_where_it_read_them() {
+    let game = game().blueprint(
+        "rock",
+        (1, 1),
+        json!({ "x": { "type": "number" }, "set": { "type": "row", "table": "tileset" } }),
+        json!([{
+            "type": "scenery",
+            "at": { "x": { "var": "x" }, "y": 0.0 },
+            "tileset": { "var": "set" },
+            "tiles": [[0]],
+            "label": "Rock",
+        }]),
+    );
+    let folder = Arc::new(game.folder());
+    let reader = FolderReader::new(game.registry(), folder.clone());
+    let rock = path("blueprint", "rock");
+    let blueprint: BlueprintDef = reader.read(&rock).expect("reads");
+
+    let holes: Vec<(&str, &str)> = match &blueprint.scene.nodes[..] {
+        [SceneNode::Module(node)] => node
+            .holes
+            .0
+            .iter()
+            .map(|(at, name)| (at.as_str(), name.as_str()))
+            .collect(),
+        _ => panic!("one module node"),
+    };
+    assert_eq!(holes, [("/at/x", "x"), ("/tileset", "set")]);
+    let scene = format!("{rock}/scene.json");
+    let written = reader.write(&rock, &blueprint).expect("writes").files;
+    let read: Value =
+        serde_json::from_slice(&folder.read(&scene).expect("the scene")).expect("json");
+    let wrote: Value = serde_json::from_slice(&written[&scene]).expect("json");
+    assert_eq!(wrote, read);
+}
+
+fn holed_rock() -> Value {
+    json!({
+        "type": "scenery",
+        "at": { "x": { "var": "x" }, "y": 0.0 },
+        "tileset": path("tileset", "start_ground"),
+        "tiles": [[0]],
+    })
+}
+
+fn with_values(mut placement: Value, values: Value) -> Value {
+    placement["values"] = values;
+    placement
 }
 
 fn tree() -> Value {

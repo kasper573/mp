@@ -3,7 +3,7 @@
   "layers": [
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/motes.vfx_shader",
+      "shader": "vfx/motes.vfx_shader",
       "params": {
         "color": [
           255,

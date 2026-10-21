@@ -35,6 +35,7 @@
       },
       {
         "type": "soundscape",
+        "label": "Campfire",
         "shape": {
           "type": "rect",
           "x": 14.5,
@@ -49,8 +50,7 @@
             "file": "assets/audio/ambient/campfire.flac",
             "volume": 0.32
           }
-        ],
-        "label": "Campfire"
+        ]
       },
       {
         "type": "blueprint",

@@ -514,7 +514,7 @@ pub fn registry() -> &'static ContentRegistry {
     &REGISTRY
 }
 
-/// Every table a game is made of, and the settings its `game.json` holds: a folder of only some of
+/// Every table a game is made of, and the settings its `game.config.json` holds: a folder of only some of
 /// a game's rows, set up to be played, loads through this.
 pub fn settled_tables() -> ContentRegistry {
     use crate::core::content::LoadStep;

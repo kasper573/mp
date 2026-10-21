@@ -9,6 +9,7 @@ authors = ["kasper573"]
 [dependencies]
 ab_glyph = "0.2"
 egui.workspace = true
+egui-phosphor = { version = "0.14", default-features = false, features = ["regular", "fill"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 strum = { workspace = true, features = ["derive"] }
 

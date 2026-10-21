@@ -17,7 +17,7 @@ use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentFile, ContentId, ContentProblem, Fixture, Loading, ModuleRule, ModuleSet,
-    RowCheck,
+    NamedContent, RowCheck,
 };
 use crate::core::math::{Percent, Rng};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
@@ -66,6 +66,12 @@ pub struct QuestDef {
 
 impl ContentFile for QuestDef {
     const TABLE: &'static str = "quest";
+}
+
+impl NamedContent for QuestDef {
+    fn shown_name(&self) -> &str {
+        &self.title
+    }
 }
 
 impl ModuleSet for QuestDef {

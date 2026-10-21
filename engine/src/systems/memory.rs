@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentFile, ContentId};
+use crate::core::content::{Content, ContentFile, ContentId, NamedContent};
 use crate::core::script::{
     Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
 };
@@ -23,6 +23,12 @@ pub struct MemoryDef {
 
 impl ContentFile for MemoryDef {
     const TABLE: &'static str = "memory";
+}
+
+impl NamedContent for MemoryDef {
+    fn shown_name(&self) -> &str {
+        &self.label
+    }
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]

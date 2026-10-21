@@ -14,7 +14,7 @@
     },
     {
       "type": "shader",
-      "shader": "visual-effects/vfx_shader/warp.vfx_shader",
+      "shader": "vfx/warp.vfx_shader",
       "params": {
         "amplitude": 0.06,
         "frequency": 20.0

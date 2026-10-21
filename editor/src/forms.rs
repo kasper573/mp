@@ -5,14 +5,20 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{Content, ContentFile, LoadReport, fields_file, parent_of};
+use engine::core::content::{
+    Content, ContentFile, LoadReport, fields_file, parent_of, with_content,
+};
 use engine::core::script::VariableType;
 use engine::systems::area::AreaDef;
+use schemars::JsonSchema;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::keymap::EditorKey;
 use crate::project::{Project, ProjectFiles};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
+use crate::tabs::shown_path;
 use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
@@ -23,6 +29,7 @@ use crate::{audio, condition, drafts, picker, spans, thumbs, value};
 pub const KEPT_TIP: &str = "Kept: the engine reads this from every game, so it stays as it is";
 
 pub struct FormCx<'a> {
+    pub project: &'a Project,
     pub root: &'a Value,
     pub content: Option<Content>,
     pub catalogue: &'a NodeCatalogue,
@@ -51,6 +58,7 @@ impl<'a> FormCx<'a> {
         actions: &'a mut Vec<FormAction>,
     ) -> FormCx<'a> {
         FormCx {
+            project,
             root,
             content: project.content.clone(),
             catalogue: &project.catalogue,
@@ -96,6 +104,14 @@ impl<'a> FormCx<'a> {
             })
             .unwrap_or_default();
         self
+    }
+
+    /// Where a fresh value of this form is written.
+    pub fn nearby(&self) -> schema::Nearby<'_> {
+        schema::Nearby {
+            files: self.files,
+            from: self.row_key.as_deref(),
+        }
     }
 
     /// How `path` reads from the file this form edits: how many folders up from it their paths
@@ -192,6 +208,58 @@ pub fn label_column(ui: &mut Ui) -> Ui {
             .max_rect(rect)
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     )
+}
+
+/// The form of `typed`, drawn from the schema of its type as the game reads it: a part of a file
+/// edited as its type, with no field of it named here.
+pub fn of_type<T: JsonSchema + Serialize + DeserializeOwned + 'static>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    typed: &mut T,
+    path: &str,
+) -> FormChange {
+    of_type_without(ui, cx, typed, path, &[])
+}
+
+/// The form of `typed` as `of_type` draws it, without the fields at `hidden`, pointers into the
+/// value that another part of the view edits.
+pub fn of_type_without<T: JsonSchema + Serialize + DeserializeOwned + 'static>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    typed: &mut T,
+    path: &str,
+    hidden: &[&str],
+) -> FormChange {
+    let reader = cx.project.reader();
+    let in_scope = || reader.scope().clone();
+    let Ok(mut json) = with_content(in_scope(), || value::json(typed)).0 else {
+        widgets::hint(ui, "does not write as the game reads it");
+        return FormChange::default();
+    };
+    let shape = schema::of_type::<T>();
+    let root = std::mem::replace(&mut cx.root, shape);
+    let hidden: Vec<&str> = hidden
+        .iter()
+        .map(|pointer| pointer.trim_start_matches('/'))
+        .collect();
+    let changed = match hidden.is_empty() {
+        true => value(ui, cx, shape, &mut json, path),
+        false => object_without(ui, cx, shape, &mut json, path, &hidden),
+    };
+    cx.root = root;
+    if !changed.is_some() {
+        return changed;
+    }
+    match with_content(in_scope(), || serde_json::from_value::<T>(json)).0 {
+        Ok(read) => {
+            *typed = read;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(path.to_owned(), error.to_string());
+            FormChange::default()
+        }
+    }
 }
 
 pub fn value(
@@ -505,11 +573,7 @@ pub fn object_without(
         }
         if nested {
             let unset = widgets::section_with(ui, name, |ui| {
-                optional
-                    && ui
-                        .small_button("×")
-                        .on_hover_text(format!("Unset {name}"))
-                        .clicked()
+                optional && widgets::remove_button(ui, &format!("Unset {name}")).clicked()
             });
             if unset {
                 value.as_object_mut().expect("object").remove(name);
@@ -535,7 +599,7 @@ pub fn object_without(
                         .on_hover_text(format!("Set {name}"))
                         .clicked()
                     {
-                        let fresh = schema::template(cx.root, field);
+                        let fresh = schema::template(cx.root, field, cx.nearby());
                         value
                             .as_object_mut()
                             .expect("object")
@@ -650,7 +714,10 @@ fn params_map(ui: &mut Ui, cx: &mut FormCx, at: ParamsMapField, parent: &mut Val
                 ))
                 .clicked()
             {
-                entries.insert(spec.name.clone(), schema::template(cx.root, value_schema));
+                entries.insert(
+                    spec.name.clone(),
+                    schema::template(cx.root, value_schema, cx.nearby()),
+                );
                 changed = FormChange::at(&entry_path);
             }
         });
@@ -670,7 +737,10 @@ fn params_map(ui: &mut Ui, cx: &mut FormCx, at: ParamsMapField, parent: &mut Val
                 entries.remove(&key);
                 changed = FormChange::at(path);
             }
-            ui.label(theme::warn(format!("{key} · not a parameter of {table}/{owner}")).size(12.5));
+            ui.label(
+                theme::warn(format!("{key} · not a parameter of {}", shown_path(&owner)))
+                    .size(12.5),
+            );
         });
         error_line(ui, cx, &format!("{path}/{key}"));
     }
@@ -740,7 +810,7 @@ fn variant_picker(
         && let Some(tag) = &picked
         && let Some(variant) = variants.iter().find(|variant| variant.tag == *tag)
     {
-        let mut fresh = schema::variant_template(cx.root, variant);
+        let mut fresh = schema::variant_template(cx.root, variant, cx.nearby());
         if let (Some(fresh), Some(old)) = (fresh.as_object_mut(), value.as_object()) {
             for (name, old_value) in old {
                 if name != &field && fresh.contains_key(name) {
@@ -891,7 +961,7 @@ fn choice(
                 .iter()
                 .find(|alternative| describe(alternative) != "Var")
         {
-            *value = schema::template(cx.root, first);
+            *value = schema::template(cx.root, first, cx.nearby());
             changed = FormChange::at(path);
         }
         return changed;
@@ -912,7 +982,7 @@ fn choice(
     if picked != current
         && let Some(at) = picked
     {
-        *value = schema::template(cx.root, alternatives[at]);
+        *value = schema::template(cx.root, alternatives[at], cx.nearby());
         changed = FormChange::at(path);
     }
     if let Some(at) = picked {
@@ -1052,8 +1122,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                 let response = if kept {
                     ui.label(theme::faint("·")).on_hover_text(KEPT_TIP)
                 } else {
-                    ui.add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                        .on_hover_text("Remove")
+                    widgets::remove_button(ui, "Remove")
                 };
                 if response.clicked() && !kept {
                     remove = Some(index);
@@ -1098,7 +1167,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                 } else if field.get("x-blank").is_some() {
                                     Value::Null
                                 } else {
-                                    schema::template(cx.root, field)
+                                    schema::template(cx.root, field, cx.nearby())
                                 };
                                 ui.allocate_ui_with_layout(
                                     egui::vec2(
@@ -1154,11 +1223,12 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                 SchemaKind::Union(variants) if allowed.is_some() => {
                     within(variants, allowed.as_deref())
                         .first()
-                        .map(|variant| schema::variant_template(cx.root, variant))
+                        .map(|variant| schema::variant_template(cx.root, variant, cx.nearby()))
                 }
                 _ => None,
             };
-            let mut fresh = first_allowed.unwrap_or_else(|| schema::template(cx.root, items));
+            let mut fresh =
+                first_allowed.unwrap_or_else(|| schema::template(cx.root, items, cx.nearby()));
             name_newcomer(&mut fresh, list, &singular);
             list.push(fresh);
             changed = FormChange::at(path);
@@ -1196,7 +1266,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
         for (key, item) in entries.iter_mut() {
             let item_path = format!("{path}/{key}");
             ui.horizontal(|ui| {
-                if ui.small_button("×").clicked() {
+                if widgets::remove_button(ui, "Remove").clicked() {
                     remove = Some(key.clone());
                 }
                 let id = ui.id().with(&item_path).with("key");
@@ -1235,7 +1305,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
             let add = ui.small_button("+ add").clicked()
                 || (response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i)));
             if add && !draft.is_empty() && !entries.contains_key(&draft) {
-                entries.insert(draft, schema::template(cx.root, values));
+                entries.insert(draft, schema::template(cx.root, values, cx.nearby()));
                 drafts::clear_draft(ui, id);
                 changed = FormChange::at(path);
             }
@@ -1540,22 +1610,11 @@ fn asset(
 }
 
 fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
-    let mut faces: Vec<String> = busts::generic().map(str::to_owned).collect();
-    if let Some(speaker) = &cx.speaker
-        && let Some(npc) = cx.files.json(&fields_file(speaker))
-        && let Some(model) = npc["model"].as_str()
-        && let Some(model) = cx.files.json(&fields_file(model))
-    {
-        for module in model["modules"].as_array().into_iter().flatten() {
-            if module["type"] == "bust" {
-                for own in module["own"].as_array().into_iter().flatten() {
-                    if let Some(name) = own["name"].as_str() {
-                        faces.push(name.to_owned());
-                    }
-                }
-            }
-        }
-    }
+    let model = cx
+        .speaker
+        .as_deref()
+        .and_then(|speaker| busts::model_of_npc(cx.project, speaker));
+    let faces = busts::face_names(model.as_deref());
     enum_combo(ui, &faces, value, path)
 }
 
@@ -1567,7 +1626,7 @@ fn place(
     path: &str,
 ) -> FormChange {
     if !value.is_object() {
-        *value = schema::template(cx.root, schema);
+        *value = schema::template(cx.root, schema, cx.nearby());
     }
     let mut changed = FormChange::default();
     let mut area = value["area"].as_str().unwrap_or_default().to_owned();
