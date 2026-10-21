@@ -24,28 +24,7 @@ const BESIDE_PIER: Pos<Tiles> = Pos::new(8.0, 6.0);
 const ON_PIER: Pos<Tiles> = Pos::new(10.0, 6.0);
 
 #[test]
-fn stepping_onto_the_pier_narrates_the_gulls_once() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
-    let start = position(&sim.world, player).expect("position");
-
-    movement::relocate(&mut sim.world, player, ON_PIER);
-    sim.run(0.5);
-    assert_eq!(sim.told(1), vec![sim.spoken("gulls")]);
-    assert!(!commands_locked(&sim.world, player));
-
-    sim.later(30.0);
-    sim.forget_notified();
-    movement::relocate(&mut sim.world, player, start);
-    sim.run(0.5);
-    movement::relocate(&mut sim.world, player, ON_PIER);
-    sim.run(0.5);
-    assert_eq!(sim.told(1), Vec::new());
-    assert!(remembered(&sim, player, "heard_gulls"));
-}
-
-#[test]
-fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
+fn stepping_onto_the_pier_narrates_the_gulls_once_even_during_a_conversation() {
     let mut sim = island(&game());
     let player = sim.join(1);
     let talker = sim.npc("talker");
@@ -70,13 +49,17 @@ fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
 }
 
 #[test]
-fn every_notification_is_recorded_when_it_is_raised() {
+fn history_keeps_every_notice_and_refusal_raised_and_never_a_pop() {
     let mut sim = island(&game());
     let player = sim.join(1);
+    sim.run(0.5);
     let gulls = sim.spoken("gulls");
-    notification::notify(&mut sim.world, player, gulls.clone());
     let refused = refusal(&sim);
-    notification::record(&mut sim.world, player, &refused);
+
+    notification::notify(&mut sim.world, player, gulls);
+    notification::notify(&mut sim.world, player, refused);
+    notification::pop(&mut sim.world, player, "Ouch", None, VfxParams::default());
+    sim.tick();
 
     let records = recorded(&sim, player);
     assert!(records.contains(&(
@@ -86,7 +69,8 @@ fn every_notification_is_recorded_when_it_is_raised() {
         1
     )));
     assert!(records.contains(&(HistoryTopic::Error, None, "Needs 10 Gold".to_owned(), 1)));
-    assert_eq!(sim.told(1), vec![gulls]);
+    assert!(!records.iter().any(|(_, _, text, _)| text == "Ouch"));
+    assert_eq!(pops(&mut sim, 1).len(), 1);
 }
 
 #[test]
@@ -130,23 +114,18 @@ fn a_character_speaks_to_players_on_its_errand_from_its_own_body() {
             .iter()
             .any(|notification| matches!(notification.kind, NotificationKind::Speech { .. }))
     );
-}
 
-#[test]
-fn speech_names_no_body_when_the_speaker_is_someone_else() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
+    sim.forget_notified();
     let talker = sim.npc("talker");
-
     let challenge = sim.spoken("challenge");
     notification::notify_from(&mut sim.world, player, Some(talker), challenge);
-
     assert_eq!(
         sim.notified(1)
             .into_iter()
             .map(|sent| sent.actor)
             .collect::<Vec<_>>(),
-        vec![None]
+        vec![None],
+        "a line someone else speaks names no body"
     );
 }
 
@@ -256,7 +235,7 @@ fn a_flood_goes_out_in_a_burst_and_then_at_the_refill_rate() {
 }
 
 #[test]
-fn errors_and_feed_lines_answer_every_action() {
+fn every_refusal_answers_its_action_however_many_come() {
     let mut sim = island(&game());
     let player = sim.join(1);
     let refused = refusal(&sim);
@@ -318,20 +297,6 @@ fn healing_a_level_and_a_status_each_pop_with_their_own_look() {
         (Some(player), "Guarded".to_owned(), shader("status_pop")),
     ];
     assert_eq!(pops(&mut sim, 1), looks);
-}
-
-#[test]
-fn a_pop_is_never_kept_in_history() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
-    sim.run(0.5);
-    let before = recorded(&sim, player);
-
-    notification::pop(&mut sim.world, player, "Ouch", None, VfxParams::default());
-    sim.tick();
-
-    assert_eq!(pops(&mut sim, 1).len(), 1);
-    assert_eq!(recorded(&sim, player), before);
 }
 
 /// An island with a pier the gulls haunt, a forest across the water that greets newcomers, and a

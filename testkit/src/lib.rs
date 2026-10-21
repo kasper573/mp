@@ -13,4 +13,4 @@ mod talk;
 pub use art::{png, wav};
 pub use game::{Declared, Game, Map, TILE, path, stats};
 pub use sim::{Sim, drawn_seed};
-pub use talk::{labels, locked};
+pub use talk::{labels, lines, locked};

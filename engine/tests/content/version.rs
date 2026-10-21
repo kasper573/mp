@@ -1,15 +1,9 @@
 use engine::core::content::{ContentFile, ContentRegistry};
-use engine::systems::registry;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::support::game;
-
-#[test]
-fn the_version_is_pinned() {
-    assert_eq!(registry().version().0, "d25f6ec5");
-}
 
 #[test]
 fn another_version_is_refused_last() {

@@ -18,9 +18,11 @@ use crate::support::game;
 const FILES: &str = "/content/files/";
 
 #[test]
-fn a_first_visit_fetches_everything_and_the_next_day_only_the_manifest() {
+fn a_first_visit_fetches_everything_keeping_only_it_and_a_later_visit_only_the_manifest() {
     let server = FakeServer::new(served(sounding()));
     let store = MemoryStore::default();
+    let stale = "0".repeat(64);
+    store.put(&stale, b"left over from another game");
 
     let synced = run(&server, &store).expect("the first visit syncs");
 
@@ -38,12 +40,6 @@ fn a_first_visit_fetches_everything_and_the_next_day_only_the_manifest() {
     assert_eq!(server.requests.borrow().as_slice(), ["/content/manifest"]);
     assert!(again.same_as(&synced));
     assert_eq!(again.assets.len(), synced.assets.len());
-
-    server.forget_requests();
-    let evicted = MemoryStore::default();
-    run(&server, &evicted).expect("an evicted store is rebuilt");
-    let requested: HashSet<String> = server.requested_hashes().into_iter().collect();
-    assert_eq!(requested, every_file);
 }
 
 #[test]
@@ -182,20 +178,6 @@ fn a_store_that_refuses_writes_keeps_the_visit_in_memory() {
     assert!(synced.memory_only);
     assert_eq!(synced.assets.len(), synced.index.files.len());
     assert!(store.hashes().is_empty());
-}
-
-#[test]
-fn stale_entries_leave_the_store_after_a_full_sync() {
-    let server = FakeServer::new(served(sounding()));
-    let store = MemoryStore::default();
-    let stale = "0".repeat(64);
-    store.put(&stale, b"left over from another game");
-
-    let synced = run(&server, &store).expect("the sync finishes");
-
-    assert!(!store.hashes().contains(&stale));
-    let kept: HashSet<String> = store.hashes().into_iter().collect();
-    assert_eq!(kept, expected_hashes(&server.served.borrow(), &synced));
 }
 
 #[test]

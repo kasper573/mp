@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use engine::core::content::Content;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
@@ -9,7 +10,7 @@ use engine::systems::area::AreaDef;
 use engine::systems::class::NodeKey;
 use engine::systems::combat::{self, Attitude};
 use engine::systems::equipment::{self, EquipmentSlot, UnequipRequest};
-use engine::systems::item::{self, Inventory, ItemDef, UseItemRequest};
+use engine::systems::item::{self, Inventory, ItemDef, ItemStack, UseItemRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::skill::{
@@ -76,7 +77,7 @@ fn a_cleanse_takes_only_the_category_it_names() {
 }
 
 #[test]
-fn a_status_on_an_interval_strikes_every_period_while_it_holds() {
+fn a_status_on_an_interval_strikes_or_heals_every_period_while_it_holds() {
     let (mut sim, player) = clinic();
     let full = stat::current_health(&sim.world, player);
     let poisoned = sim.id::<StatusEffectDef>("poisoned");
@@ -95,6 +96,23 @@ fn a_status_on_an_interval_strikes_every_period_while_it_holds() {
     let bitten = stat::current_health(&sim.world, player);
     sim.later(2.0);
     assert_eq!(stat::current_health(&sim.world, player), bitten);
+
+    let at = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
+    let dummy = dummy(&mut sim, at);
+    stat::apply_damage(&mut sim.world, dummy, 20.0);
+    let hurt = stat::current_health(&sim.world, dummy);
+    let sanctified = sim.id::<StatusEffectDef>("sanctified");
+    status::apply(&mut sim.world, dummy, sanctified, 3.0, Some(Seconds(9.0)));
+    sim.run(0.5);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt);
+    sim.later(2.0);
+    assert_eq!(
+        stat::current_health(&sim.world, dummy),
+        hurt + 3.0,
+        "a status of positive power heals each period"
+    );
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 6.0);
 }
 
 #[test]
@@ -135,10 +153,12 @@ fn a_carried_charm_boosts_only_while_it_is_carried() {
     );
 
     let wing = sim.id::<ItemDef>("wing");
+    let content = sim.world.resource::<Content>().clone();
     sim.world
         .get_mut::<Inventory>(player)
         .expect("bag")
-        .set_count(wing, 0);
+        .exchange(&content, &[ItemStack::new(wing, 1)], &[])
+        .expect("the wing is handed over");
     sim.run(0.5);
     assert_eq!(
         stat::effective(&sim.world, player, StatKind::MovementSpeed),
@@ -211,57 +231,34 @@ fn a_status_plays_its_vfx_coming_staying_and_going() {
 }
 
 #[test]
-fn an_interval_status_can_heal_as_well_as_harm() {
-    let (mut sim, player) = clinic();
-    let at = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
-    let dummy = dummy(&mut sim, at);
-    stat::apply_damage(&mut sim.world, dummy, 20.0);
-    let hurt = stat::current_health(&sim.world, dummy);
-    let sanctified = sim.id::<StatusEffectDef>("sanctified");
-
-    status::apply(&mut sim.world, dummy, sanctified, 3.0, Some(Seconds(9.0)));
-    sim.run(0.5);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt);
-    sim.later(2.0);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 3.0);
-    sim.later(2.0);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 6.0);
-}
-
-#[test]
 fn an_area_skill_leaves_its_status_on_everyone_it_hit() {
     let (mut sim, player) = clinic();
     knows_fireball(&mut sim, player);
     let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
     let near = dummy(&mut sim, aimed);
     let far = dummy(&mut sim, aimed + Offset::new(1.0, 0.0));
-    sim.run(0.5);
-    let burning = sim.id::<StatusEffectDef>("burning");
-
-    cast_fireball(&mut sim, aimed);
-    assert!(sim.run_until(10.0, |world| {
-        status::has(world, near, burning) && status::has(world, far, burning)
-    }));
-    sim.run(0.5);
-    assert!(playing(&mut sim, "embers", near));
-    assert!(playing(&mut sim, "embers", far));
-}
-
-#[test]
-fn an_area_skill_leaves_its_status_on_a_monster_running_its_own_script() {
-    let (mut sim, player) = clinic();
-    knows_fireball(&mut sim, player);
-    let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
     let area = sim.id::<AreaDef>("clinic");
     let roamer = sim.id::<NpcDef>("roamer");
-    let monster = npc::spawn(&mut sim.world, roamer, aimed, area, Pack(7));
+    let scripted = npc::spawn(
+        &mut sim.world,
+        roamer,
+        aimed + Offset::new(0.0, 1.0),
+        area,
+        Pack(7),
+    );
     sim.run(0.5);
     let burning = sim.id::<StatusEffectDef>("burning");
 
     cast_fireball(&mut sim, aimed);
-    assert!(sim.run_until(10.0, |world| status::has(world, monster, burning)));
+    let hit = [near, far, scripted];
+    assert!(sim.run_until(10.0, |world| {
+        hit.iter()
+            .all(|target| status::has(world, *target, burning))
+    }));
     sim.run(0.5);
-    assert!(playing(&mut sim, "embers", monster));
+    for target in hit {
+        assert!(playing(&mut sim, "embers", target));
+    }
 }
 
 fn clinic() -> (Sim, Entity) {

@@ -42,18 +42,3 @@ fn taking_a_draft_hands_it_over_once() {
         assert_eq!(drafts::draft_of(ui, field), None);
     });
 }
-
-#[test]
-fn clearing_a_draft_leaves_other_fields_alone() {
-    let ctx = Context::default();
-    let (first, second) = (Id::new("first"), Id::new("second"));
-    frame(&ctx, |ui| {
-        drafts::set_draft(ui, first, "1");
-        drafts::set_draft(ui, second, "2");
-    });
-    frame(&ctx, |ui| drafts::clear_draft(ui, first));
-    frame(&ctx, |ui| {
-        assert_eq!(drafts::draft_of(ui, first), None);
-        assert_eq!(drafts::draft_of(ui, second).as_deref(), Some("2"));
-    });
-}

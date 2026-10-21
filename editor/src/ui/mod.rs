@@ -100,7 +100,8 @@ pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
         })
 }
 
-fn shortcuts(editor: &mut Editor, ctx: &Context) {
+/// Acts on the editor's own keys pressed this frame, unless typing into a field takes them.
+pub fn shortcuts(editor: &mut Editor, ctx: &Context) {
     if ctx.text_edit_focused() {
         return;
     }

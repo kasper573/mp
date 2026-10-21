@@ -27,6 +27,11 @@ fn sprites_sharing_a_row_keep_one_order_as_they_change() {
         "two sprites on one row drew at one depth"
     );
 
+    let depths = |app: &App| [depth(app, first), depth(app, second)];
+    let once = depths(&app);
+    app.update();
+    assert_eq!(depths(&app), once, "ordering again changes nothing");
+
     app.world_mut().entity_mut(first).insert(Reshuffled);
     app.update();
     assert_eq!(drawn_order(&app, first, second), before);
@@ -39,27 +44,6 @@ fn a_deeper_row_draws_in_front() {
     let in_front = app.world_mut().spawn(on_row(ROW + 0.25)).id();
     app.update();
     assert_eq!(drawn_order(&app, in_front, behind), Ordering::Greater);
-}
-
-#[test]
-fn a_sprite_draws_in_front_of_scenery_on_its_row() {
-    let mut app = rows();
-    let sprite = app.world_mut().spawn(on_row(ROW)).id();
-    app.update();
-    assert!(depth(&app, sprite) > ROW);
-}
-
-#[test]
-fn ordering_again_changes_nothing() {
-    let mut app = rows();
-    let sprites: Vec<Entity> = (0..3)
-        .map(|_| app.world_mut().spawn(on_row(ROW)).id())
-        .collect();
-    app.update();
-    let once: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
-    app.update();
-    let twice: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
-    assert_eq!(once, twice);
 }
 
 #[test]

@@ -46,13 +46,8 @@ fn an_update_that_finds_no_place_writes_nothing() {
     });
     assert!(applied.is_none());
     assert!(edit.changes.is_empty());
-}
 
-#[test]
-fn an_edit_that_removed_the_file_cannot_update_it() {
-    let files = files_with(json!({ "doors": [] }));
     let mut edit = ContentEdit::new("remove, then edit");
     edit.remove(FILE);
-    let applied = edit.update_json(&files, FILE, |_| Some(()));
-    assert!(applied.is_none());
+    assert!(edit.update_json(&files, FILE, |_| Some(())).is_none());
 }

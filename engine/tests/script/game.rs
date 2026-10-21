@@ -21,7 +21,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use testkit::{Game, Map, Sim, path};
 
-use crate::{behaviour, compile, flow};
+use crate::{compile, flow};
 
 /// The rows every script under test names, loaded once a process.
 pub fn content() -> &'static Content {
@@ -131,14 +131,17 @@ pub fn game() -> Game {
         .npc("chief", 30.0, fighter("protects"))
         .npc("bat", 30.0, json!([{ "type": "script", "script": "flees.script.json" }]))
         .npc("stroller", 30.0, json!([{ "type": "script", "script": "strolls.script.json" }]))
+        .npc("brawler", 30.0, fighter("brawls"))
         .edit("npc", "fighter", striking)
         .edit("npc", "hunter", striking)
         .edit("npc", "guard", striking)
         .edit("npc", "chief", striking)
         .edit("npc", "bat", striking)
+        .edit("npc", "brawler", striking)
         .row("script", "hunts", fights_nearest("characters"))
         .row("script", "defends", fights_nearest("attackers"))
         .row("script", "protects", fights_nearest("pack_attackers"))
+        .row("script", "brawls", fights_nearest("npcs"))
         .row(
             "script",
             "flees",
@@ -256,7 +259,7 @@ pub fn game() -> Game {
         .vfx("healed")
         .shader("heal_pop")
         .vfx("defeated");
-    [flow::scripts(), behaviour::scripts(), compile::scripts()]
+    [flow::scripts(), compile::scripts()]
         .into_iter()
         .flatten()
         .fold(game, |game, (key, row)| game.row("script", key, row))

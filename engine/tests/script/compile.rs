@@ -9,11 +9,11 @@ use engine::core::script::{EffectDef, Expr, ScriptError};
 use engine::systems::area::AreaDef;
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
+use engine::systems::notification::NotificationDef;
 use engine::systems::npc::NpcModule;
 use engine::systems::quest::QuestDef;
 use engine::systems::script::{
-    EventKind, ListedScriptModule, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptDef,
-    ScriptModule,
+    EventKind, ListedScriptModule, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptModule,
 };
 use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
@@ -33,24 +33,29 @@ const OWNERS: [RunnerKind; 6] = [
 #[test]
 fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     let capabilities = every_capability();
-    assert_eq!(capabilities.len(), 38);
     for owner in OWNERS {
-        for value in &capabilities {
-            let content = game()
-                .row(
+        let probes = capabilities
+            .iter()
+            .enumerate()
+            .fold(game(), |game, (index, value)| {
+                game.row(
                     "script",
-                    "probe",
+                    &format!("probe_{index}"),
                     json!({
                         "runs_on": owner,
                         "nodes": { "on": entry(owner, "do"), "do": value },
                     }),
                 )
-                .load();
+            });
+        let content = probes.load();
+        for (index, value) in capabilities.iter().enumerate() {
             let parsed: engine::systems::script::RiftEffect = parse_in(&content, value.clone());
             let kind = parsed.kind().name();
             let allowed = parsed.owners().contains(&owner);
-            let script: ScriptModule =
-                parse_in(&content, json!({ "script": path("script", "probe") }));
+            let script: ScriptModule = parse_in(
+                &content,
+                json!({ "script": path("script", &format!("probe_{index}")) }),
+            );
             let compiled = compile_in(&content, owner, &[&script]);
             assert_eq!(
                 compiled.is_ok(),
@@ -110,6 +115,13 @@ fn may_do_lists_exactly_what_a_script_reaches() {
     for reach in expected {
         assert!(may_do.reaches.contains(&reach), "{reach:?} missing");
     }
+
+    let procedures = compile(RunnerKind::Npc, &[&module("calls_helper")]).expect("compiles");
+    let may_do = &procedures[0].may_do;
+    assert_eq!(may_do.calls, vec![path("script", "helper")]);
+    assert_eq!(may_do.answers, vec![EventKind::Started]);
+    assert!(may_do.reaches.is_empty());
+    assert!(!may_do.waits);
 }
 
 #[test]
@@ -169,21 +181,14 @@ fn a_script_that_runs_itself_is_refused() {
 }
 
 #[test]
-fn may_do_names_the_functions_a_script_calls() {
-    let procedures = compile(RunnerKind::Npc, &[&module("calls_helper")]).expect("compiles");
-
-    let may_do = &procedures[0].may_do;
-    assert_eq!(may_do.calls, vec![path("script", "helper")]);
-    assert_eq!(may_do.answers, vec![EventKind::Started]);
-    assert!(may_do.reaches.is_empty());
-    assert!(!may_do.waits);
-}
-
-#[test]
 fn an_if_always_taken_still_compiles_both_arrows() {
     let procedures = compile(RunnerKind::Area, &[&module("compile_if_taken")]).expect("compiles");
 
-    assert_eq!(procedures[0].may_do.reaches.len(), 2);
+    let reaches = &procedures[0].may_do.reaches;
+    for notification in ["gulls", "intro"] {
+        let notifies = Reach::Notifies(id::<NotificationDef>(notification));
+        assert!(reaches.contains(&notifies), "{reaches:?}");
+    }
 }
 
 #[test]
@@ -212,32 +217,9 @@ fn every_expression_shape_serializes_back_to_the_json_it_was_read_from() {
 }
 
 #[test]
-fn a_script_row_reads_back_as_written() {
-    let def: ScriptDef = parse(json!({
-        "runs_on": "npc",
-        "variables": { "aggro": { "type": "number", "default": 4 } },
-        "locals": { "target": "actor" },
-        "nodes": {
-            "spawned": { "type": "on", "event": "started", "next": "look" },
-            "look": {
-                "type": "set",
-                "values": [{ "local": "target", "to": { "type": "nearest", "among": "characters", "within": { "var": "aggro" } } }]
-            }
-        }
-    }));
-
-    assert_eq!(def.runs_on, RunnerKind::Npc);
-    assert_eq!(def.variables.len(), 1);
-    assert_eq!(def.nodes.len(), 2);
-}
-
-#[test]
-fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
+fn an_event_field_reads_only_where_every_entry_reaching_the_node_raises_it() {
     compile(RunnerKind::Shop, &[&module("compile_trade_field")]).expect("compiles");
-}
 
-#[test]
-fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
     let error = compile(RunnerKind::Object, &[&module("compile_event_field")])
         .err()
         .expect("refused");

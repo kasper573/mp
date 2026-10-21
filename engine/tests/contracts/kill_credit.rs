@@ -2,7 +2,7 @@ use bevy_ecs::message::MessageCursor;
 use bevy_ecs::prelude::*;
 use engine::core::time::Seconds;
 use engine::systems::area::AreaDef;
-use engine::systems::combat::{self, Died};
+use engine::systems::combat;
 use engine::systems::movement::position;
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::rewards::{self, KillCredited};
@@ -11,44 +11,26 @@ use serde_json::json;
 use testkit::{Game, Map, Sim};
 
 #[test]
-fn a_reserved_kill_credits_the_reserving_player_once() {
+fn a_kill_credits_the_player_who_reserved_it_once_and_an_unreserved_one_nobody() {
     let (mut sim, player) = field();
     let victim = brute(&mut sim, player);
     item::reserve(&mut sim.world, victim, player, Seconds(0.0));
     kill(&mut sim, victim, player);
 
-    let credits = credits(&mut sim, 3);
+    let credited = credits(&mut sim, 3);
 
     assert_eq!(
-        credits,
+        credited,
         vec![KillCredited {
             npc: sim.id::<NpcDef>("brute"),
             victim,
             credited: player,
         }]
     );
-}
 
-#[test]
-fn an_unreserved_kill_credits_nobody() {
-    let (mut sim, player) = field();
-    let victim = brute(&mut sim, player);
-    combat::inflict(&mut sim.world, victim, None, 1_000_000.0);
-
+    let unreserved = brute(&mut sim, player);
+    combat::inflict(&mut sim.world, unreserved, None, 1_000_000.0);
     assert!(credits(&mut sim, 3).is_empty());
-}
-
-#[test]
-fn deaths_stay_observable_to_every_reader() {
-    let (mut sim, player) = field();
-    let victim = brute(&mut sim, player);
-    item::reserve(&mut sim.world, victim, player, Seconds(0.0));
-    let mut died = MessageCursor::<Died>::default();
-    kill(&mut sim, victim, player);
-    sim.tick();
-    sim.tick();
-
-    assert!(sim.read(&mut died).iter().any(|died| died.entity == victim));
 }
 
 fn field() -> (Sim, Entity) {

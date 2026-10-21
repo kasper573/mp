@@ -34,25 +34,13 @@ fn read_back<T: serde::de::DeserializeOwned>(prefix: &str, config: &impl serde::
 }
 
 #[test]
-fn server_config_reads_back_from_its_env() {
-    let config = server_config(Some(7));
-    assert_eq!(
-        read_back::<ServerConfig>(SERVER_ENV_PREFIX, &config),
-        config
-    );
-}
-
-#[test]
-fn server_config_without_a_seed_reads_back_from_its_env() {
-    let config = server_config(None);
-    assert_eq!(
-        read_back::<ServerConfig>(SERVER_ENV_PREFIX, &config),
-        config
-    );
-}
-
-#[test]
-fn client_config_reads_back_from_its_env() {
+fn a_binarys_config_reads_back_from_the_env_written_for_it() {
+    for config in [server_config(Some(7)), server_config(None)] {
+        assert_eq!(
+            read_back::<ServerConfig>(SERVER_ENV_PREFIX, &config),
+            config
+        );
+    }
     let config = ClientConfig {
         game_server_url: "http://127.0.0.1:4000".to_owned(),
         game_server_ws_url: "ws://127.0.0.1:4001".to_owned(),
@@ -89,10 +77,20 @@ fn settings_file(folder: &Path, config: &ClientConfig) {
 }
 
 #[test]
-fn a_binary_takes_its_settings_from_the_file_beside_it() {
+fn a_binary_takes_its_settings_from_the_file_beside_it_or_its_environment_alone() {
     let folder = tempfile::tempdir().expect("a folder");
     settings_file(folder.path(), &client_config());
     let settings = LaunchSettings::read(folder.path(), []);
+    assert_eq!(
+        settings.get::<ClientConfig>(CLIENT_ENV_PREFIX),
+        client_config()
+    );
+
+    let without_a_file = tempfile::tempdir().expect("a folder");
+    let settings = LaunchSettings::read(
+        without_a_file.path(),
+        env_of(CLIENT_ENV_PREFIX, &client_config()),
+    );
     assert_eq!(
         settings.get::<ClientConfig>(CLIENT_ENV_PREFIX),
         client_config()
@@ -113,16 +111,6 @@ fn the_environment_overrides_the_settings_file() {
             auth: AuthMode::Fake,
             ..client_config()
         }
-    );
-}
-
-#[test]
-fn a_binary_without_a_settings_file_takes_its_environment_alone() {
-    let folder = tempfile::tempdir().expect("a folder");
-    let settings = LaunchSettings::read(folder.path(), env_of(CLIENT_ENV_PREFIX, &client_config()));
-    assert_eq!(
-        settings.get::<ClientConfig>(CLIENT_ENV_PREFIX),
-        client_config()
     );
 }
 

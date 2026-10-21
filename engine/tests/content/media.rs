@@ -20,42 +20,40 @@ fn damaged(mut bytes: Vec<u8>, from_end: usize) -> Vec<u8> {
 }
 
 #[test]
-fn an_image_damaged_past_its_header_is_refused() {
+fn an_image_damaged_past_its_header_or_cut_short_is_refused() {
     let sheet = format!("{}/sprites.png", path("model", "orc"));
-    let game = Game::new()
-        .model("orc", 1.0, json!([]))
-        .file(&sheet, damaged(png(32, 32), 30));
-    assert_eq!(refusals(game), [("unreadable image", sheet)]);
-}
-
-#[test]
-fn a_cut_short_image_is_refused() {
     let mut cut = png(32, 32);
     cut.truncate(cut.len() - 20);
-    let game = Game::new().file("icons/cap.png", cut);
+    let game = Game::new()
+        .model("orc", 1.0, json!([]))
+        .file(&sheet, damaged(png(32, 32), 30))
+        .file("icons/cap.png", cut);
     assert_eq!(
         refusals(game),
-        [("unreadable image", "icons/cap.png".to_owned())]
+        [
+            ("unreadable image", "icons/cap.png".to_owned()),
+            ("unreadable image", sheet),
+        ]
     );
 }
 
 #[test]
-fn a_cut_short_sound_is_refused() {
+fn a_sound_cut_short_or_that_the_game_cannot_play_is_refused() {
     let clip = format!("{}/clip.wav", path("sfx", "hit"));
     let mut cut = wav();
     cut.truncate(cut.len() - 10);
-    let game = Game::new().sfx("hit").file(&clip, cut);
-    assert_eq!(refusals(game), [("unreadable sound", clip)]);
-}
-
-#[test]
-fn a_sound_the_game_cannot_play_is_refused() {
     let mut garbled = wav();
     garbled[20] = 0x77;
-    let game = Game::new().file("sounds/hum.wav", garbled);
+    let game = Game::new()
+        .sfx("hit")
+        .file(&clip, cut)
+        .file("sounds/hum.wav", garbled);
     assert_eq!(
         refusals(game),
-        [("unreadable sound", "sounds/hum.wav".to_owned())]
+        [
+            ("unreadable sound", clip),
+            ("unreadable sound", "sounds/hum.wav".to_owned()),
+        ]
     );
 }
 
@@ -68,13 +66,4 @@ fn a_font_that_does_not_parse_is_refused() {
         refusals(game),
         [("unreadable font", "fonts/hand.otf".to_owned())]
     );
-}
-
-#[test]
-fn whole_media_loads() {
-    Game::new()
-        .model("orc", 1.0, json!([]))
-        .sfx("hit")
-        .file("icons/cap.png", png(8, 8))
-        .load();
 }

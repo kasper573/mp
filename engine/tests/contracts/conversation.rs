@@ -14,7 +14,7 @@ use engine::systems::script::{self, EventKind, RiftInstances};
 use engine::systems::stat::{self, Immortal, StatKind};
 use engine::systems::{combat, npc};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, lines};
 
 #[test]
 fn a_conversation_reaches_the_client_as_the_world_holds_it() {
@@ -37,7 +37,7 @@ fn talking_walks_into_reach_opens_the_greeting_and_locks_commands() {
 
     let opened = sim.talk(1, "keeper");
 
-    assert_eq!(opened.node, "hello");
+    assert_eq!(lines(&opened), vec!["Welcome in.".to_owned()]);
     assert_eq!(opened.with, Some(keeper));
     // A step under way when the greeting opens still ends on its tile.
     assert!(sim.run_until(1.0, |world| !moving(world, player)));
@@ -82,7 +82,7 @@ fn a_pick_answers_its_step_once() {
 
     assert_eq!(sim.count(player, "gold"), 20);
     let now = sim.conversation(1).expect("still talking");
-    assert_eq!(now.node, "round");
+    assert_eq!(lines(&now), vec!["Cheers!".to_owned()]);
     assert_eq!(favour(&sim, player), Recalled::Int(1));
 
     sim.send(conn, round);
@@ -109,20 +109,28 @@ fn a_choice_that_costs_too_much_changes_nothing() {
     sim.tick();
 
     let now = sim.conversation(1).expect("still talking");
-    assert_eq!(now.node, "hello");
+    assert_eq!(lines(&now), vec!["Welcome in.".to_owned()]);
     assert_eq!(now.refused.map(|refused| refused.choice), Some(index));
     assert_eq!(sim.errors(1), vec!["Needs 10 more Gold".to_owned()]);
     assert_eq!(favour(&sim, player), Recalled::Int(0));
 }
 
 #[test]
-fn walking_out_of_reach_ends_the_conversation() {
+fn walking_out_of_reach_or_losing_the_speaker_ends_the_conversation() {
     let mut sim = inn();
     let player = sim.join(1);
     sim.talk(1, "keeper");
     let at = position(&sim.world, player).expect("position");
 
     movement::relocate(&mut sim.world, player, at + Offset::new(0.0, 7.0));
+    sim.tick();
+
+    assert!(sim.conversation(1).is_none());
+    assert!(!commands_locked(&sim.world, player));
+
+    sim.talk(1, "keeper");
+    let keeper = sim.npc("keeper");
+    npc::despawn(&mut sim.world, keeper);
     sim.tick();
 
     assert!(sim.conversation(1).is_none());
@@ -167,7 +175,7 @@ fn a_conversation_an_npc_starts_replaces_the_one_in_progress() {
     let opened = sim.conversation(1).expect("talking");
     assert_eq!(opened.with, Some(crier));
     assert_ne!(opened.with, Some(keeper));
-    assert_eq!(opened.node, "hello");
+    assert_eq!(lines(&opened), vec!["The crier tips his hat.".to_owned()]);
 }
 
 #[test]
@@ -175,7 +183,7 @@ fn news_called_out_waits_until_you_are_free() {
     let mut sim = inn();
     let player = sim.join(1);
     let opened = sim.talk(1, "crier");
-    assert_eq!(opened.node, "hello");
+    assert_eq!(lines(&opened), vec!["The crier tips his hat.".to_owned()]);
 
     sim.run(1.0);
     assert_eq!(sim.conversation(1).map(|now| now.step), Some(opened.step));
@@ -187,7 +195,7 @@ fn news_called_out_waits_until_you_are_free() {
             .is_some_and(|now| now.step != opened.step)
     }));
     let news = sim.conversation(1).expect("the crier's news");
-    assert_eq!(news.node, "news");
+    assert_eq!(lines(&news), vec!["Hear ye!".to_owned()]);
 
     sim.send(conn, ConversationRequest::Leave { step: news.step });
     sim.run(2.0);

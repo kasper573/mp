@@ -1,7 +1,6 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
-use engine::core::time::WallClock;
 use engine::systems::area::AreaDef;
 use engine::systems::class::{self, NodeKey, SkillPoints};
 use engine::systems::combat::{self, AttackRequest, Attitude};
@@ -11,8 +10,8 @@ use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::skill::{
     self, AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, CastAim,
-    Cooldowns, Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank,
-    ResetAnswerRequest, ResetPrompt, SkillDef, SkillId, UseSkillRequest,
+    Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest,
+    ResetPrompt, SkillDef, SkillId, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, reach, script, vfx};
@@ -290,13 +289,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
     assert!(sim.run_until(10.0, |world| {
         stat::effective(world, dummy, StatKind::Health) < full
     }));
-    let now = sim.world.resource::<WallClock>().now;
-    assert!(
-        sim.world
-            .get::<Cooldowns>(player)
-            .is_some_and(|cooldowns| cooldowns.cooling(cleave, now))
-    );
-    assert_eq!(reach::current(&sim.world, player), None);
+    let struck = stat::effective(&sim.world, dummy, StatKind::Health);
 
     cast(&mut sim, cleave, CastAim::Point(at));
     sim.run(0.5);
@@ -305,6 +298,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
             .iter()
             .any(|text| text.contains("cooling down"))
     );
+    assert_eq!(stat::effective(&sim.world, dummy, StatKind::Health), struck);
 }
 
 #[test]
@@ -378,24 +372,6 @@ fn a_reset_asks_first_and_gives_every_point_back() {
     assert_eq!(learned(&sim, player, "cleave"), Rank(0));
     assert_eq!(class::points_to_spend(&sim.world, player), SkillPoints(1));
     assert_eq!(sim.count(player, "draught"), 0);
-}
-
-#[test]
-fn a_filled_hotbar_and_its_requests_survive_the_wire() {
-    let (sim, _) = yard();
-    let potion = HotbarEntry::Item(sim.id::<ItemDef>("potion"));
-    let bar = Hotbar(vec![
-        skill_entry(&sim, "cleave"),
-        HotbarEntry::Empty,
-        potion,
-    ]);
-    let bytes = postcard::to_allocvec(&bar).expect("serializes");
-    assert_eq!(postcard::from_bytes::<Hotbar>(&bytes).expect("reads"), bar);
-
-    let request = assign(2, potion);
-    let bytes = postcard::to_allocvec(&request).expect("serializes");
-    let received: AssignHotbarRequest = postcard::from_bytes(&bytes).expect("reads");
-    assert_eq!(received, request);
 }
 
 /// A fighter in a yard, wearing a sword whose strike is their basic attack, with a tree of

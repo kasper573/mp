@@ -1,10 +1,6 @@
-use std::sync::Arc;
-
 use editor::app::Editor;
-use editor::project::{Project, RowSelection};
-use editor::schema::SchemaShapes;
+use editor::project::RowSelection;
 use editor::ui::row_form;
-use editor::user::{EditorSettings, UserFolder};
 use editor::views::script::inspect;
 use editor::views::script::{ScriptDoc, ScriptRow};
 use serde_json::json;
@@ -53,21 +49,7 @@ fn open(scratch: &tempfile::TempDir) -> Editor {
             },
         }),
     );
-    let folder = scratch.path().join("game");
-    game.write_to(&folder);
-    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
-    project.settle();
-    assert!(
-        project.loads(),
-        "{:?}",
-        project.report.as_ref().map(ToString::to_string)
-    );
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    editor.project = Some(project);
-    editor
+    support::open(game, scratch)
 }
 
 /// How wide `body` lays itself out when it is given [`WIDTH`], once remembered sizes settle.
@@ -96,33 +78,20 @@ fn laid_out_width(editor: &mut Editor, body: impl Fn(&mut Editor, &mut egui::Ui)
 }
 
 #[test]
-fn a_dialogue_node_inspector_fits_the_width_it_is_given() {
+fn a_node_inspector_fits_the_width_it_is_given() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(&scratch);
-    let at = ScriptRow {
-        key: path("script", "greeting"),
-    };
-    let width = laid_out_width(&mut editor, |editor, ui| {
-        let doc = ScriptDoc::load(editor, &at).expect("the script");
-        let selection = RowSelection::parts("script", &at.key, vec!["node:cold".to_owned()]);
-        inspect::show(editor, ui, &doc, &selection);
-    });
-    assert!(width <= WIDTH, "{width}");
-}
-
-#[test]
-fn a_condition_node_inspector_fits_the_width_it_is_given() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = open(&scratch);
-    let at = ScriptRow {
-        key: path("script", "watch"),
-    };
-    let width = laid_out_width(&mut editor, |editor, ui| {
-        let doc = ScriptDoc::load(editor, &at).expect("the script");
-        let selection = RowSelection::parts("script", &at.key, vec!["node:found".to_owned()]);
-        inspect::show(editor, ui, &doc, &selection);
-    });
-    assert!(width <= WIDTH, "{width}");
+    for (script, node) in [("greeting", "cold"), ("watch", "found")] {
+        let at = ScriptRow {
+            key: path("script", script),
+        };
+        let width = laid_out_width(&mut editor, |editor, ui| {
+            let doc = ScriptDoc::load(editor, &at).expect("the script");
+            let selection = RowSelection::parts("script", &at.key, vec![format!("node:{node}")]);
+            inspect::show(editor, ui, &doc, &selection);
+        });
+        assert!(width <= WIDTH, "{node}: {width}");
+    }
 }
 
 #[test]

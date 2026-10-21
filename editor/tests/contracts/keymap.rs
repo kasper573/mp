@@ -32,8 +32,9 @@ fn every_key_is_named_and_listed_in_the_sheet_once() {
         .iter()
         .flat_map(|scope| scope.keys())
         .collect();
-    assert_eq!(listed, EditorKey::VARIANTS.to_vec());
+    assert_eq!(listed.len(), EditorKey::VARIANTS.len());
     for key in EditorKey::VARIANTS {
+        assert!(listed.contains(key), "{key:?} is not on the sheet");
         assert!(!key.name().is_empty(), "{key:?} has no name");
         assert!(!key.about().is_empty(), "{key:?} says nothing");
     }

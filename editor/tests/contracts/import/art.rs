@@ -26,9 +26,6 @@ pub const PAVED: u32 = 450;
 /// A transparent tile that carries data all the same.
 pub const BLANK_WITH_DATA: u32 = COLUMNS * ROWS - 1;
 
-/// A model row of every strip the importer knows, eight frames each laid out a strip a row:
-/// footsteps on the first and fifth frame of its walks and runs, and an attack landing, with a
-/// sound, on the sixth.
 /// The walker as the game reads it, in a game holding the sound it plays, and what reads that
 /// game.
 pub fn walker() -> (FolderReader, ModelDef) {
@@ -44,6 +41,9 @@ pub fn walker() -> (FolderReader, ModelDef) {
     (reader, walker)
 }
 
+/// A model row of every strip the importer knows, eight frames each laid out a strip a row:
+/// footsteps on the first and fifth frame of its walks and runs, and an attack landing, with a
+/// sound, on the sixth.
 fn walker_row() -> Value {
     let mut actions = serde_json::Map::new();
     for (row, name) in model::strip_names().iter().enumerate() {

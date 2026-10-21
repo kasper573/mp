@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use engine::core::audio::playback::{SfxDef, SfxRoleDef};
-use engine::core::content::{ContentFolder, FolderReader, write};
+use engine::core::content::{FolderReader, write};
 use engine::systems::GameSettings;
 use engine::systems::actor::model::{GenericExpression, ModelDef, ModelModule};
 use engine::systems::area::AreaDef;
@@ -61,7 +61,12 @@ fn a_file_naming_a_path_no_file_has_does_not_read() {
         .read::<SfxDef>(&path("sfx", "hit"))
         .err()
         .expect("refused");
-    assert!(!errors.is_empty());
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.problem.rule == "missing file"),
+        "{errors:?}"
+    );
 }
 
 #[test]
@@ -81,16 +86,13 @@ fn a_file_read_in_another_scope_names_the_ids_of_its_paths() {
         other.path_of(sfx.role),
         Some(path("sfx_role", "sounds").as_str())
     );
-}
 
-#[test]
-fn a_file_the_other_scope_does_not_hold_does_not_read_in_it() {
-    let held = game().sfx("hit");
-    let other = reader(&game().sfx("miss"));
+    let without_it = reader(&game().sfx("miss"));
     assert!(
         reader(&held)
-            .read_in::<SfxDef>(&path("sfx", "hit"), other.scope())
-            .is_err()
+            .read_in::<SfxDef>(&path("sfx", "hit"), without_it.scope())
+            .is_err(),
+        "a file the other scope does not hold does not read in it"
     );
 }
 
@@ -122,29 +124,15 @@ fn a_file_writes_back_exactly_as_writing_the_whole_game_does() {
 
     let area = path("area", "start");
     let start: AreaDef = reader.read(&area).expect("reads");
-    same_as_whole(reader.write(&area, &start).expect("writes").files);
+    let files = reader.write(&area, &start).expect("writes").files;
+    assert!(files.contains_key(&format!("{area}/scene.json")));
+    assert!(files.contains_key(&format!("{area}/layers/ground.csv")));
+    same_as_whole(files);
     let hero = path("model", "hero");
     let model: ModelDef = reader.read(&hero).expect("reads");
     same_as_whole(reader.write(&hero, &model).expect("writes").files);
     let settings: GameSettings = reader.settings().expect("reads");
     same_as_whole(reader.write_settings(&settings).expect("writes"));
-}
-
-#[test]
-fn an_area_writes_its_scene_and_grids_beside_its_fields() {
-    let game = game();
-    let reader = reader(&game);
-    let area = path("area", "start");
-    let start: AreaDef = reader.read(&area).expect("reads");
-
-    let files = reader.write(&area, &start).expect("writes").files;
-
-    let folder = game.folder();
-    for file in files.keys() {
-        assert!(folder.read(file).is_ok(), "{file} is a file the area keeps");
-    }
-    assert!(files.contains_key(&format!("{area}/scene.json")));
-    assert!(files.contains_key(&format!("{area}/layers/ground.csv")));
 }
 
 #[test]
@@ -216,6 +204,10 @@ fn a_file_naming_a_path_that_moved_away_reads_and_names_where_it_went() {
     });
     let hit = path("sfx", "hit");
     assert!(reader(&game).read::<SfxDef>(&hit).is_err());
+    assert!(
+        reader(&game).rewritten(&hit, &BTreeMap::new()).is_err(),
+        "without the move it names, the file is not rewritten"
+    );
 
     let written = reader(&game)
         .rewritten(&hit, &renames(&[(gone, &sounds)]))
@@ -239,15 +231,4 @@ fn a_rename_reaches_the_games_settings() {
     let settings = text(&written, engine::core::content::SETTINGS_FILE);
     assert!(settings.contains(&format!("\"{harbour}\"")), "{settings}");
     assert!(!settings.contains(&format!("\"{start}\"")), "{settings}");
-}
-
-#[test]
-fn a_file_that_does_not_read_is_not_rewritten() {
-    let game = game().sfx("hit").edit("sfx", "hit", |sfx| {
-        sfx["role"] = json!("nowhere/gone.sfx_role.json");
-    });
-
-    let refused = reader(&game).rewritten(&path("sfx", "hit"), &BTreeMap::new());
-
-    assert!(refused.is_err());
 }

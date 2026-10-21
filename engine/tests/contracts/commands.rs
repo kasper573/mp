@@ -8,33 +8,11 @@ use serde_json::json;
 use testkit::{Game, Map, Sim};
 
 #[test]
-fn a_command_lock_refuses_use_drop_and_unequip_until_it_lifts() {
-    let (mut sim, player) = camp();
-    prepare(&mut sim, player);
-
-    sim.world.entity_mut(player).insert(CommandLock);
-    attempt_each(&mut sim);
-    assert_eq!(belongings(&sim, player), PREPARED);
-
-    sim.world.entity_mut(player).remove::<CommandLock>();
-    attempt_each(&mut sim);
-    assert_eq!(belongings(&sim, player), EACH_DONE);
-}
-
-#[test]
-fn an_arrival_hold_refuses_use_drop_and_unequip_until_it_lifts() {
-    let (mut sim, player) = camp();
-    prepare(&mut sim, player);
-
-    sim.world.entity_mut(player).insert(ArrivalHold {
+fn a_command_lock_or_an_arrival_hold_refuses_use_drop_and_unequip_until_it_lifts() {
+    refused_while_held_and_done_once_lifted(CommandLock);
+    refused_while_held_and_done_once_lifted(ArrivalHold {
         until: Seconds(1000.0),
     });
-    attempt_each(&mut sim);
-    assert_eq!(belongings(&sim, player), PREPARED);
-
-    sim.world.entity_mut(player).remove::<ArrivalHold>();
-    attempt_each(&mut sim);
-    assert_eq!(belongings(&sim, player), EACH_DONE);
 }
 
 fn camp() -> (Sim, Entity) {
@@ -137,4 +115,17 @@ fn belongings(sim: &Sim, player: Entity) -> Belongings {
             .get::<Equipment>(player)
             .is_some_and(|equipment| equipment.slots.contains_key(&EquipmentSlot::Head)),
     }
+}
+
+fn refused_while_held_and_done_once_lifted<Hold: Component>(hold: Hold) {
+    let (mut sim, player) = camp();
+    prepare(&mut sim, player);
+
+    sim.world.entity_mut(player).insert(hold);
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), PREPARED);
+
+    sim.world.entity_mut(player).remove::<Hold>();
+    attempt_each(&mut sim);
+    assert_eq!(belongings(&sim, player), EACH_DONE);
 }

@@ -1,32 +1,31 @@
 use std::sync::Arc;
 
-use editor::app::Editor;
-use editor::project::Project;
-use editor::schema::SchemaShapes;
-use editor::user::{EditorSettings, UserFolder};
-use editor::views::script::{self, ScriptDoc, ScriptRef, ScriptRow};
+use editor::app::{BottomTab, Editor};
+use editor::tabs::EditorTab;
+use editor::views::script::{self, ScriptDoc, ScriptRow};
 use engine::core::script::{Node, VariableType};
 use engine::systems::script::ScriptDef;
 use serde_json::json;
 use testkit::path;
 
-use crate::support;
+use crate::support::{self, Drawn, Frames, click, key};
 
 const SCREEN: egui::Vec2 = egui::vec2(1600.0, 1000.0);
 
 #[test]
 fn deleting_several_selected_nodes_deletes_every_one_of_them() {
     let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = open(&scratch);
+    let mut editor = open(support::game(), &scratch);
     let at = talk();
-    let mut frames = Frames::new();
+    let mut frames = ScriptFrames::new();
     frames.run(&mut editor, &at, Vec::new());
-    let doc = ScriptDoc::load(&editor, &at).expect("the script");
-    let gone = ["ask".to_owned(), "answer".to_owned()];
-    script::select_nodes(&mut editor, &doc, &gone);
+    select(&mut editor, &at, &["ask", "answer"]);
 
-    editor.views.script.keys.delete = true;
-    frames.run(&mut editor, &at, Vec::new());
+    frames.run(
+        &mut editor,
+        &at,
+        key(egui::Key::Delete, egui::Modifiers::NONE),
+    );
 
     let names: Vec<String> = read(&editor).nodes.keys().cloned().collect();
     assert_eq!(names, ["start"]);
@@ -35,145 +34,128 @@ fn deleting_several_selected_nodes_deletes_every_one_of_them() {
 #[test]
 fn duplicating_several_selected_nodes_copies_every_one_of_them() {
     let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = open(&scratch);
+    let mut editor = open(support::game(), &scratch);
     let at = talk();
-    let mut frames = Frames::new();
+    let mut frames = ScriptFrames::new();
     frames.run(&mut editor, &at, Vec::new());
-    let doc = ScriptDoc::load(&editor, &at).expect("the script");
-    script::select_nodes(&mut editor, &doc, &["ask".to_owned(), "answer".to_owned()]);
+    select(&mut editor, &at, &["ask", "answer"]);
 
-    editor.views.script.keys.duplicate = true;
-    frames.run(&mut editor, &at, Vec::new());
+    frames.run(
+        &mut editor,
+        &at,
+        key(egui::Key::D, egui::Modifiers::COMMAND),
+    );
 
-    assert_eq!(read(&editor).nodes.len(), 5);
+    let script = read(&editor);
+    let saying = |said: &str| {
+        script
+            .nodes
+            .values()
+            .filter(|node| matches!(node, Node::Dialogue(dialogue) if dialogue.lines.iter().any(|line| editor::spans::plain(&line.text) == said)))
+            .count()
+    };
+    assert_eq!((saying("Well?"), saying("Fine.")), (2, 2));
 }
 
 #[test]
-fn entering_a_line_keeps_what_was_typed_into_it_and_adds_one_after() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = open(&scratch);
-    let at = talk();
-    let mut frames = Frames::new();
-    let line = line_on_card(&mut editor, &at, &mut frames);
-
-    let end = egui::pos2(line.right() - 1.0, line.center().y);
-    for events in [
-        vec![egui::Event::PointerMoved(end)],
-        vec![click(end, true)],
-        vec![click(end, false)],
-        vec![key(egui::Key::End, true), key(egui::Key::End, false)],
-        vec![egui::Event::Text(" Speak up.".to_owned())],
-        vec![key(egui::Key::Enter, true), key(egui::Key::Enter, false)],
+fn enter_on_a_line_keeps_what_was_typed_into_it_and_adds_one_after() {
+    for (caret, typed, lines) in [
+        (egui::Key::End, " Speak up.", ["Well? Speak up.", ""]),
+        (egui::Key::Home, "", ["Well?", ""]),
     ] {
-        frames.run(&mut editor, &at, events);
-    }
+        let scratch = tempfile::tempdir().expect("scratch");
+        let mut editor = open(support::game(), &scratch);
+        let at = talk();
+        let mut frames = ScriptFrames::new();
+        frames.run(&mut editor, &at, Vec::new());
+        select(&mut editor, &at, &["ask"]);
+        let line = frames
+            .run(&mut editor, &at, Vec::new())
+            .0
+            .into_iter()
+            .filter(|(text, _)| text == "Well?")
+            .map(|(_, rect)| rect)
+            .min_by(|a, b| a.left().total_cmp(&b.left()))
+            .expect("the line is drawn on its card");
 
-    assert_eq!(ask_lines(&editor), ["Well? Speak up.", ""]);
+        for events in click(line.center())
+            .into_iter()
+            .chain([key(caret, egui::Modifiers::NONE)])
+            .chain((!typed.is_empty()).then(|| vec![egui::Event::Text(typed.to_owned())]))
+            .chain([key(egui::Key::Enter, egui::Modifiers::NONE)])
+        {
+            frames.run(&mut editor, &at, events);
+        }
+
+        let Some(Node::Dialogue(ask)) = read(&editor).nodes.get("ask").cloned() else {
+            panic!("ask is a dialogue");
+        };
+        let shown: Vec<String> = ask
+            .lines
+            .iter()
+            .map(|line| editor::spans::plain(&line.text))
+            .collect();
+        assert_eq!(shown, lines, "{caret:?}");
+    }
 }
 
 #[test]
-fn entering_inside_a_line_keeps_it_whole_and_adds_one_after() {
+fn a_script_lists_every_module_running_it_with_the_values_it_gives() {
     let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = open(&scratch);
-    let at = talk();
-    let mut frames = Frames::new();
-    let line = line_on_card(&mut editor, &at, &mut frames);
-
-    let start = egui::pos2(line.left() + 1.0, line.center().y);
-    for events in [
-        vec![egui::Event::PointerMoved(start)],
-        vec![click(start, true)],
-        vec![click(start, false)],
-        vec![key(egui::Key::Home, true), key(egui::Key::Home, false)],
-        vec![key(egui::Key::Enter, true), key(egui::Key::Enter, false)],
-    ] {
-        frames.run(&mut editor, &at, events);
-    }
-
-    assert_eq!(ask_lines(&editor), ["Well?", ""]);
-}
-
-#[test]
-fn every_module_naming_a_script_is_read_where_it_names_it() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let say = json!({ "type": "dialogue", "lines": [{ "by": { "type": "narrator" }, "text": ["Ding."] }], "choices": [{ "label": ["Bye."] }] });
+    let counted = |runs_on: &str, on: serde_json::Value| {
+        json!({
+            "runs_on": runs_on,
+            "variables": { "times": { "type": "integer", "default": 1 } },
+            "nodes": {
+                "on": on,
+                "check": {
+                    "type": "if",
+                    "test": { "type": "at_least", "a": { "var": "times" }, "b": 4 },
+                    "yes": "rest",
+                    "no": "rest",
+                },
+                "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
+            },
+        })
+    };
     let game = support::game()
-        .script(
+        .row(
+            "script",
             "chime",
-            "area",
-            json!({ "found": { "type": "on", "event": "discovered", "next": "say" }, "say": say }),
+            counted("area", json!({ "type": "on", "event": "discovered", "next": "check" })),
         )
-        .script(
+        .row(
+            "script",
             "door",
-            "object",
-            json!({ "entered": { "type": "on", "event": "entered", "by": "characters", "next": "say" }, "say": say }),
-        )
-        .npc(
-            "keeper",
-            10.0,
-            json!([{ "type": "script", "script": path("script", "talk") }]),
+            counted(
+                "object",
+                json!({ "type": "on", "event": "entered", "by": "characters", "next": "check" }),
+            ),
         )
         .edit_scene("area", support::AREA, |scene| {
             let scene = scene.as_array_mut().expect("a scene");
-            scene.push(json!({ "type": "script", "label": "Bells", "script": path("script", "chime") }));
+            scene.push(json!({ "type": "script", "label": "Bells", "script": path("script", "chime"), "values": { "times": 5 } }));
             scene.push(json!({
                 "type": "object",
                 "name": "door",
                 "shape": { "type": "rect", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0 },
-                "scripts": [{ "script": path("script", "door") }],
+                "scripts": [{ "script": path("script", "door"), "values": { "times": 2 } }],
             }));
         });
-    let editor = open_game(game, &scratch);
-    let project = editor.project.as_ref().expect("a project");
-    assert!(
-        project.loads(),
-        "{:?}",
-        project.report.as_ref().map(ToString::to_string)
-    );
-    let reader = project.reader();
+    let mut editor = open(game, &scratch);
 
-    for script in ["talk", "chime", "door"] {
-        let key = path("script", script);
-        let named = project.usages.files_naming(&key);
-        assert!(!named.is_empty(), "something names {key}");
-        for (file, pointers) in named {
-            for pointer in pointers {
-                let module = ScriptRef::parse(&pointer)
-                    .module
-                    .and_then(|at| at.module_in(project, &file))
-                    .unwrap_or_else(|| panic!("{file} {pointer} holds a script module"));
-                assert_eq!(reader.path_of(module.script), Some(key.as_str()));
-            }
-        }
+    for (script, given) in [("chime", "times 5"), ("door", "times 2")] {
+        let at = ScriptRow::new(path("script", script));
+        let mut frames = Frames::new(SCREEN);
+        let drawn = frames.run(Vec::new(), |ui| {
+            script::bottom(&mut editor, ui, &at, BottomTab::UsedBy)
+        });
+        assert!(drawn.any(|text| text == given), "{script}: {drawn:?}");
     }
 }
 
-/// Where the first line of `ask` is drawn on its card, once `ask` is selected.
-fn line_on_card(editor: &mut Editor, at: &ScriptRow, frames: &mut Frames) -> egui::Rect {
-    frames.run(editor, at, Vec::new());
-    let doc = ScriptDoc::load(editor, at).expect("the script");
-    script::select_nodes(editor, &doc, &["ask".to_owned()]);
-    let texts = frames.run(editor, at, Vec::new());
-    texts
-        .iter()
-        .filter(|(text, _)| text == "Well?")
-        .map(|(_, rect)| *rect)
-        .min_by(|a, b| a.left().total_cmp(&b.left()))
-        .unwrap_or_else(|| panic!("the line is drawn on its card: {texts:?}"))
-}
-
-fn ask_lines(editor: &Editor) -> Vec<String> {
-    let Some(Node::Dialogue(ask)) = read(editor).nodes.get("ask").cloned() else {
-        panic!("ask is a dialogue");
-    };
-    ask.lines
-        .iter()
-        .map(|line| editor::spans::plain(&line.text))
-        .collect()
-}
-
 #[test]
-fn a_condition_inside_a_query_is_edited_as_a_condition() {
+fn a_condition_inside_a_query_is_shown_as_a_condition_within_the_screen() {
     let scratch = tempfile::tempdir().expect("scratch");
     let game = support::game().row(
         "script",
@@ -193,28 +175,22 @@ fn a_condition_inside_a_query_is_edited_as_a_condition() {
             },
         }),
     );
-    let mut editor = open_game(game, &scratch);
+    let mut editor = open(game, &scratch);
     let at = ScriptRow::new(path("script", "watch"));
-    let mut frames = Frames::new();
+    let mut frames = ScriptFrames::new();
     frames.run(&mut editor, &at, Vec::new());
-    let doc = ScriptDoc::load(&editor, &at).expect("the script");
-    script::select_nodes(&mut editor, &doc, &["found".to_owned()]);
+    select(&mut editor, &at, &["found"]);
 
-    let texts = frames.run(&mut editor, &at, Vec::new());
+    let drawn = frames.run(&mut editor, &at, Vec::new());
 
-    let target = texts
-        .iter()
-        .find(|(text, _)| text == "target")
-        .map(|(_, rect)| *rect)
-        .unwrap_or_else(|| panic!("the local's name is drawn: {texts:?}"));
+    let target = drawn
+        .rect("target")
+        .unwrap_or_else(|| panic!("the local's name is drawn: {drawn:?}"));
     assert!(
         target.right() <= SCREEN.x,
         "the local's name fits on screen: {target:?}"
     );
-    assert!(
-        !texts.iter().any(|(text, _)| text.contains("\"type\"")),
-        "{texts:?}"
-    );
+    assert!(!drawn.any(|text| text.contains("\"type\"")), "{drawn:?}");
 }
 
 #[test]
@@ -232,28 +208,15 @@ fn a_variable_given_another_type_drops_the_default_it_had_as_the_old_one() {
             },
         }),
     );
-    let mut editor = open_game(game, &scratch);
+    let mut editor = open(game, &scratch);
     let at = ScriptRow::new(path("script", "tally"));
-    let mut frames = Frames::new();
+    let mut frames = ScriptFrames::new();
     frames.run(&mut editor, &at, Vec::new());
-    let texts = frames.run(&mut editor, &at, Vec::new());
-    let kind = drawn_at(&texts, "Integer");
-    for events in [
-        vec![egui::Event::PointerMoved(kind)],
-        vec![click(kind, true)],
-        vec![click(kind, false)],
-    ] {
-        frames.run(&mut editor, &at, events);
-    }
-    let texts = frames.run(&mut editor, &at, Vec::new());
-    let text = drawn_at(&texts, "Text");
-
-    for events in [
-        vec![egui::Event::PointerMoved(text)],
-        vec![click(text, true)],
-        vec![click(text, false)],
-    ] {
-        frames.run(&mut editor, &at, events);
+    for chip in ["Integer", "Text"] {
+        let at_chip = frames.run(&mut editor, &at, Vec::new()).at(chip);
+        for events in click(at_chip) {
+            frames.run(&mut editor, &at, events);
+        }
     }
 
     let script = editor
@@ -265,26 +228,18 @@ fn a_variable_given_another_type_drops_the_default_it_had_as_the_old_one() {
     assert!(count.default.is_none());
 }
 
-/// Where `text` is drawn among `texts`, the last of them when it is drawn more than once.
-fn drawn_at(texts: &[(String, egui::Rect)], text: &str) -> egui::Pos2 {
-    texts
-        .iter()
-        .rev()
-        .find(|(drawn, _)| drawn == text)
-        .map(|(_, rect)| rect.center())
-        .unwrap_or_else(|| panic!("{text} is drawn: {texts:?}"))
-}
-
 fn talk() -> ScriptRow {
     ScriptRow::new(path("script", "talk"))
 }
 
-fn open(scratch: &tempfile::TempDir) -> Editor {
-    open_game(support::game(), scratch)
+fn select(editor: &mut Editor, at: &ScriptRow, nodes: &[&str]) {
+    let doc = ScriptDoc::load(editor, at).expect("the script");
+    let nodes: Vec<String> = nodes.iter().map(|node| (*node).to_owned()).collect();
+    script::select_nodes(editor, &doc, &nodes);
 }
 
 /// `game` with the `talk` script, open in the editor.
-fn open_game(game: testkit::Game, scratch: &tempfile::TempDir) -> Editor {
+fn open(game: testkit::Game, scratch: &tempfile::TempDir) -> Editor {
     let line = |text: &str| json!({ "by": { "type": "narrator" }, "text": [text] });
     let game = game.script(
         "talk",
@@ -295,16 +250,7 @@ fn open_game(game: testkit::Game, scratch: &tempfile::TempDir) -> Editor {
             "answer": { "type": "dialogue", "lines": [line("Fine.")], "choices": [{ "label": ["Bye."] }] },
         }),
     );
-    let folder = scratch.path().join("game");
-    game.write_to(&folder);
-    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
-    project.settle();
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    editor.project = Some(project);
-    editor
+    support::open(game, scratch)
 }
 
 fn read(editor: &Editor) -> Arc<ScriptDef> {
@@ -314,66 +260,25 @@ fn read(editor: &Editor) -> Arc<ScriptDef> {
         .expect("the script reads")
 }
 
-/// The script view drawn frame after frame in one context, as the editor draws it.
-struct Frames {
-    ctx: egui::Context,
-}
+/// The script view drawn as the editor draws it in its tab, taking the editor's keys.
+struct ScriptFrames(Frames);
 
-impl Frames {
-    fn new() -> Frames {
-        let ctx = egui::Context::default();
-        editor::ui::theme::apply(&ctx);
-        Frames { ctx }
+impl ScriptFrames {
+    fn new() -> ScriptFrames {
+        ScriptFrames(Frames::new(SCREEN))
     }
 
-    /// Draws a frame of `events` and one more to settle, giving the texts the last one drew and
-    /// where.
-    fn run(
-        &mut self,
-        editor: &mut Editor,
-        at: &ScriptRow,
-        events: Vec<egui::Event>,
-    ) -> Vec<(String, egui::Rect)> {
-        let mut texts = Vec::new();
+    /// Draws a frame of `events` and one more to settle, giving what the last one drew.
+    fn run(&mut self, editor: &mut Editor, at: &ScriptRow, events: Vec<egui::Event>) -> Drawn {
+        editor.open_tab(EditorTab::Script(at.clone()));
+        editor.place_tabs();
+        let mut drawn = Drawn::default();
         for events in [events, Vec::new()] {
-            let input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, SCREEN)),
-                events,
-                ..Default::default()
-            };
-            let mut output = self.ctx.run_ui(input, |ui| script::show(editor, ui, at));
-            output.textures_delta.clear();
-            texts = output
-                .shapes
-                .iter()
-                .filter_map(|clipped| match &clipped.shape {
-                    egui::Shape::Text(text) => Some((
-                        text.galley.text().to_owned(),
-                        text.galley.rect.translate(text.pos.to_vec2()),
-                    )),
-                    _ => None,
-                })
-                .collect();
+            drawn = self.0.run(events, |ui| {
+                editor::ui::shortcuts(editor, ui.ctx());
+                script::show(editor, ui, at);
+            });
         }
-        texts
-    }
-}
-
-fn click(pos: egui::Pos2, pressed: bool) -> egui::Event {
-    egui::Event::PointerButton {
-        pos,
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: egui::Modifiers::NONE,
-    }
-}
-
-fn key(key: egui::Key, pressed: bool) -> egui::Event {
-    egui::Event::Key {
-        key,
-        physical_key: None,
-        pressed,
-        repeat: false,
-        modifiers: egui::Modifiers::NONE,
+        drawn
     }
 }

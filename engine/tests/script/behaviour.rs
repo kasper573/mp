@@ -3,15 +3,14 @@ use engine::core::math::{Offset, Pos};
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::combat::{AttackRequest, Attitude};
 use engine::systems::movement::{self, position};
-use engine::systems::npc::{Home, body};
-use engine::systems::script::{EventKind, Owner, RiftInstances, RunnerKind};
+use engine::systems::npc::body;
 use engine::systems::stat::{self, StatKind};
-use serde_json::{Value, json};
 use testkit::Sim;
 
-use crate::game::{compiled, field, health, module, spawn};
+use crate::game::{field, health, spawn};
 
 const FAR: Pos<Tiles> = Pos::new(28.0, 28.0);
+const STROLLER_HOME: Pos<Tiles> = Pos::new(26.0, 4.0);
 
 #[test]
 fn an_aggressive_monster_picks_a_character_in_its_aggro_range_and_drops_one_beyond_it() {
@@ -72,11 +71,7 @@ fn a_pacifist_monster_never_fights_back() {
 fn idle_stroll_keeps_its_leash() {
     let (mut sim, _) = field();
     let stroller = sim.npc("stroller");
-    let home = sim
-        .world
-        .get::<Home>(stroller)
-        .expect("a resident's home")
-        .0;
+    let home = STROLLER_HOME;
     let leash = Tiles(3.0);
 
     let mut farthest = Tiles(0.0);
@@ -98,8 +93,8 @@ fn idle_stroll_keeps_its_leash() {
 #[test]
 fn two_npcs_targeting_each_other_fight() {
     let (mut sim, player) = field();
-    let first = brawling_npc(&mut sim, player, Offset::new(2.0, 0.0), 1);
-    let second = brawling_npc(&mut sim, player, Offset::new(0.0, 2.0), 2);
+    let first = spawn(&mut sim, "brawler", player, Offset::new(2.0, 0.0), 1);
+    let second = spawn(&mut sim, "brawler", player, Offset::new(0.0, 2.0), 2);
     sim.tick();
     let full = [health(&sim, first), health(&sim, second)];
 
@@ -126,54 +121,4 @@ fn attack(sim: &mut Sim, target: Entity) {
 
 fn targets(sim: &mut Sim, npc: Entity, player: Entity, within: f32) -> bool {
     sim.run_until(within, |world| body::target(world, npc) == Some(player))
-}
-
-/// A fighter that fights the nearest other character it finds, whatever its pack.
-fn brawling_npc(sim: &mut Sim, near: Entity, offset: Offset<Tiles>, pack: u32) -> Entity {
-    let npc = spawn(sim, "fighter", near, offset, pack);
-    let owner = Owner::Entity(RunnerKind::Npc, npc);
-    let mut instances = sim.world.resource_mut::<RiftInstances>();
-    instances.remove_owner(owner);
-    instances.spawn_owner(owner, compiled("test/brawler", &[&module("brawl")]));
-    instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
-    npc
-}
-
-pub fn scripts() -> Vec<(&'static str, Value)> {
-    vec![(
-        "brawl",
-        json!({
-            "runs_on": "npc",
-            "locals": { "target": "actor" },
-            "nodes": {
-                "spawned": { "type": "on", "event": "started", "next": "hostile" },
-                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
-                "look": {
-                    "type": "set",
-                    "values": [{
-                        "local": "target",
-                        "to": { "type": "nearest", "among": "npcs", "within": 10.0 }
-                    }],
-                    "next": "found"
-                },
-                "found": {
-                    "type": "if",
-                    "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
-                    "yes": "fight",
-                    "no": "roam"
-                },
-                "fight": {
-                    "type": "attack",
-                    "target": { "type": "local", "local": "target" },
-                    "within": 10.0,
-                    "priority": 5,
-                    "defeated": "look",
-                    "lost": "look",
-                    "interrupted": "look"
-                },
-                "roam": { "type": "wander", "priority": 1, "next": "tick" },
-                "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
-            },
-        }),
-    )]
 }

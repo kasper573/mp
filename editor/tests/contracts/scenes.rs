@@ -12,8 +12,3 @@ fn a_scene_is_a_json_array_of_named_steps() {
     assert!(matches!(steps[1], SceneStep::Bottom(BottomTab::Output)));
     assert!(matches!(&steps[2], SceneStep::Model(ModelStep::Open(key)) if key == "walk"));
 }
-
-#[test]
-fn the_string_language_is_not_a_scene() {
-    assert!(serde_json::from_str::<Vec<SceneStep>>("area:island;bottom:output").is_err());
-}

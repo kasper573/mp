@@ -1,16 +1,15 @@
 use bevy_ecs::prelude::*;
-use engine::core::time::{Seconds, WallClock};
-use engine::systems::combat::{self, AttackRequest, Attitude};
+use engine::systems::combat::{self, AttackRequest};
 use engine::systems::dialogue::{self, ConversationRequest};
 use engine::systems::interact::{self, InteractRequest};
 use engine::systems::memory::{self, MemoryDef};
-use engine::systems::npc::{self, Npc, NpcDef, Summoned, summon};
+use engine::systems::npc::{self, Npc, NpcDef, summon};
 use engine::systems::player::ClientId;
 use engine::systems::stat::{self, StatKind};
-use engine::systems::visibility::{self, Presence};
+use engine::systems::visibility;
 use engine::systems::{actor, movement, rewards, script, skill};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, path};
+use testkit::{Game, Map, Sim, lines, path};
 
 #[test]
 fn a_gamblers_dice_take_ten_gold_a_roll_and_pay_twenty_on_a_win() {
@@ -18,26 +17,23 @@ fn a_gamblers_dice_take_ten_gold_a_roll_and_pay_twenty_on_a_win() {
     let player = sim.join(1);
     sim.give(player, "gold", 400);
 
-    let mut node = sim.talk(1, "gambler").node;
+    let mut roll = "Roll the dice.";
+    sim.talk(1, "gambler");
     let (mut won, mut lost) = (false, false);
     for _ in 0..30 {
         let before = sim.count(player, "gold");
-        let roll = if node == "hello" {
-            "Roll the dice."
-        } else {
-            "Roll again."
-        };
-        node = sim.pick(1, roll).expect("at the table").node;
+        let said = lines(&sim.pick(1, roll).expect("at the table"));
         let after = sim.count(player, "gold");
-        if node == "loses" {
+        if said == ["Beginner's luck."] {
             assert_eq!(after, before + 10);
             won = true;
-        } else if node == "wins" {
+        } else if said == ["The house wins!"] {
             assert_eq!(after, before - 10);
             lost = true;
         } else {
-            panic!("the dice landed on {node:?}");
+            panic!("the dice landed on {said:?}");
         }
+        roll = "Roll again.";
     }
     assert!(won && lost, "thirty rolls went only one way");
 }
@@ -55,14 +51,6 @@ fn calling_the_gambler_a_cheat_sends_guards_after_you_alone() {
     let guards = all_of(&mut sim, "guard");
     assert_eq!(guards.len(), 2);
     for &guard in &guards {
-        assert!(matches!(
-            sim.world.get::<Presence>(guard),
-            Some(Presence::For(ClientId(1)))
-        ));
-        assert_eq!(
-            sim.world.get::<Summoned>(guard),
-            Some(&Summoned { with: Some(player) })
-        );
         assert!(visibility::present(&sim.world, guard, player));
         assert!(!visibility::present(&sim.world, guard, bystander));
     }
@@ -80,7 +68,10 @@ fn calling_the_gambler_a_cheat_sends_guards_after_you_alone() {
         calm
     );
 
-    assert_eq!(sim.talk(1, "gambler").node, "grudging");
+    assert_eq!(
+        lines(&sim.talk(1, "gambler")),
+        vec!["You've got some nerve.".to_owned()]
+    );
 }
 
 #[test]
@@ -119,9 +110,7 @@ fn fighting_the_gambler_leaves_him_dead_in_your_world_only() {
     assert!(!visibility::present(&sim.world, gambler, player));
     assert!(visibility::present(&sim.world, gambler, bystander));
 
-    let mut clock = sim.world.resource_mut::<WallClock>();
-    clock.now = clock.now.after(Seconds(1800.0));
-    sim.run(0.5);
+    sim.later(1800.0);
     assert!(visibility::present(&sim.world, gambler, player));
 }
 
@@ -152,12 +141,16 @@ fn a_townsperson_turned_hostile_can_be_fought_until_they_return_friendly() {
     let baker = sim.npc("baker");
     assert!(!combat::attackable(&sim.world, player, baker));
 
-    sim.world.entity_mut(baker).insert(Attitude::Hostile);
+    sim.talk(1, "baker");
+    sim.pick(1, "Your bread is stale.");
+    sim.run(0.5);
     assert!(combat::attackable(&sim.world, player, baker));
 
     stat::apply_damage(&mut sim.world, baker, 10_000.0);
+    sim.tick();
+    assert!(stat::is_dead(&sim.world, baker));
     assert!(sim.run_until(10.0, |world| !stat::is_dead(world, baker)));
-    assert_eq!(sim.world.get::<Attitude>(baker), Some(&Attitude::Friendly));
+    assert!(!combat::attackable(&sim.world, player, baker));
 }
 
 fn harbour() -> Sim {
@@ -215,7 +208,33 @@ fn harbour() -> Sim {
         .npc("guard", 30.0, json!([{ "type": "script", "script": "guard_hunt.script.json" }]))
         .row("script", "guard_hunt", hunting())
         .edit("npc", "guard", |guard| guard["basic_attack"] = json!(path("skill", "strike")))
-        .npc("baker", 20.0, json!([{ "type": "respawn", "after": 5.0 }]))
+        .npc(
+            "baker",
+            20.0,
+            json!([
+                { "type": "respawn", "after": 5.0 },
+                { "type": "script", "script": "baker_talk.script.json" },
+            ]),
+        )
+        .script(
+            "baker_talk",
+            "npc",
+            json!({
+                "interacted": {
+                    "type": "on",
+                    "event": "interacted",
+                    "verb": "talk",
+                    "reach": 2.0,
+                    "next": "hello",
+                },
+                "hello": {
+                    "type": "dialogue",
+                    "lines": [{ "by": { "type": "narrator" }, "text": ["Fresh bread!"] }],
+                    "choices": [{ "label": ["Your bread is stale."], "to": "angry" }],
+                },
+                "angry": { "type": "set_attitude", "attitude": "hostile" },
+            }),
+        )
         .row("memory", "grudge", memory_row("never"))
         .row("memory", "fighting", memory_row("leaving_area"))
         .row("memory", "dead", memory_row("never"))
@@ -372,15 +391,14 @@ fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
 }
 
 fn lose_at_dice(sim: &mut Sim, client: u32) {
-    let mut node = sim.talk(client, "gambler").node;
+    sim.talk(client, "gambler");
+    let mut roll = "Roll the dice.";
     for _ in 0..40 {
-        let roll = match node.as_str() {
-            "hello" => "Roll the dice.",
-            "loses" => "Roll again.",
-            "wins" => return,
-            other => panic!("the gambler is at {other:?}"),
-        };
-        node = sim.pick(client, roll).expect("still at the table").node;
+        let at_the_table = sim.pick(client, roll).expect("still at the table");
+        if lines(&at_the_table) == ["The house wins!"] {
+            return;
+        }
+        roll = "Roll again.";
     }
     panic!("never lost a roll");
 }

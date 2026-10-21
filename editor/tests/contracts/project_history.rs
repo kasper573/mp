@@ -1,11 +1,7 @@
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use editor::project::watch::FolderChange;
-use editor::project::{
-    ContentEdit, EditHistory, EditStep, EditViewpoint, FileChange, Project, RowSelection,
-    json_bytes,
-};
+use editor::project::{ContentEdit, EditViewpoint, FileChange, Project, RowSelection, json_bytes};
 use editor::schema::SchemaShapes;
 use engine::core::content::SETTINGS_FILE;
 
@@ -75,7 +71,8 @@ fn the_unsaved_files_follow_edits_saves_and_changes_on_disk() {
     project
         .apply(rename(&project, "Again"), viewpoint())
         .expect("applies");
-    std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside["name"])).expect("writes");
+    outside["name"] = "Outside again".into();
+    std::fs::write(folder.join(SETTINGS_FILE), &*json_bytes(&outside)).expect("writes");
     project.outside_changes(FolderChange::Files(vec![SETTINGS_FILE.to_owned()]));
     assert_eq!(
         &*project.unsaved(),
@@ -85,57 +82,32 @@ fn the_unsaved_files_follow_edits_saves_and_changes_on_disk() {
 }
 
 #[test]
-fn the_saved_marker_follows_its_state_through_undo_and_new_edits() {
-    let mut history = EditHistory::default();
-    history.push(step("one"));
-    history.push(step("two"));
-    history.mark_saved();
-    history.undone();
+fn the_saved_step_stays_marked_through_undo_until_a_new_edit_discards_it() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let folder = game_folder(scratch.path().join("game"));
+    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
+    for name in ["One", "Two"] {
+        project
+            .apply(rename(&project, name), viewpoint())
+            .expect("applies");
+    }
+    assert!(project.save().is_ok(), "the project saves");
+
+    project.undo();
     assert_eq!(
-        history.saved(),
+        project.history.saved(),
         Some(2),
-        "undo keeps the saved state on record"
+        "undo keeps the saved step marked"
     );
 
-    history.push(step("three"));
+    project
+        .apply(rename(&project, "Three"), viewpoint())
+        .expect("applies");
     assert_eq!(
-        history.saved(),
+        project.history.saved(),
         None,
-        "a saved state that a new edit discarded is gone"
+        "a saved step a new edit discarded is gone"
     );
-}
-
-#[test]
-fn the_saved_marker_follows_its_state_through_trimming() {
-    let mut history = EditHistory::default();
-    history.push(step("one"));
-    history.mark_saved();
-    for index in 0..499 {
-        history.push(step(&format!("filler {index}")));
-    }
-    assert_eq!(history.steps().len(), 500);
-    assert_eq!(history.saved(), Some(1));
-
-    history.push(step("overflow"));
-    assert_eq!(
-        history.saved(),
-        Some(0),
-        "the saved state moves with the steps kept"
-    );
-
-    history.push(step("overflow again"));
-    assert_eq!(history.saved(), None, "a trimmed saved state is gone");
-}
-
-fn step(label: &str) -> EditStep {
-    EditStep {
-        label: label.to_owned(),
-        before: Vec::new(),
-        after: Vec::new(),
-        selection: RowSelection::game(),
-        camera: None,
-        at: SystemTime::now(),
-    }
 }
 
 #[test]

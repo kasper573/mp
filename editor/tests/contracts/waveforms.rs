@@ -18,7 +18,7 @@ fn measured(cache: &mut WaveformCache, files: &ProjectFiles, path: &str) -> Wave
 }
 
 #[test]
-fn a_sound_is_measured_once_per_version_of_its_file() {
+fn a_sound_reads_as_its_current_bytes_and_one_that_is_not_there_is_unreadable() {
     let mut files = ProjectFiles::default();
     files.insert("hit.wav".to_owned(), FileBytes::from(testkit::wav()));
     let mut cache = WaveformCache::default();
@@ -33,17 +33,8 @@ fn a_sound_is_measured_once_per_version_of_its_file() {
         measured(&mut cache, &files, "hit.wav"),
         WaveState::Unreadable
     ));
-}
-
-#[test]
-fn a_missing_sound_is_unreadable_at_once() {
-    let mut cache = WaveformCache::default();
     assert!(matches!(
-        cache.state(
-            &egui::Context::default(),
-            &ProjectFiles::default(),
-            "gone.wav"
-        ),
+        measured(&mut cache, &files, "gone.wav"),
         WaveState::Unreadable
     ));
 }

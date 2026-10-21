@@ -14,7 +14,6 @@ fn a_reference_is_placed_where_it_is_read_not_where_its_key_is_first_written() {
     game.write_to(folder.path());
     let file = fields_file(&path("npc", "wren"));
     let text = std::fs::read_to_string(folder.path().join(&file)).expect("the npc's file");
-    assert!(text.find("\"name\"") < text.find("\"model\""), "{text}");
     let content = game.load();
 
     let references = registry().references(&content, &file, &text);

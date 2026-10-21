@@ -16,22 +16,15 @@ fn token_of(span: Value) -> String {
 }
 
 #[test]
-fn typing_inside_a_styled_span_keeps_its_style() {
+fn typing_inside_a_styled_span_or_where_it_ends_keeps_its_style() {
     let line = line_of(json!(["The ", { "text": "red", "ink": "danger" }, " key"]));
-    let typed = json(spans::retype(&line, "The red key", "The reed key"));
     assert_eq!(
-        typed,
+        json(spans::retype(&line, "The red key", "The reed key")),
         Some(json!(["The ", { "text": "reed", "ink": "danger" }, " key"]))
     );
-}
-
-#[test]
-fn typing_where_two_spans_meet_continues_the_first() {
-    let line = line_of(json!([{ "text": "red", "ink": "danger" }, " key"]));
-    let typed = json(spans::retype(&line, "red key", "reds key"));
     assert_eq!(
-        typed,
-        Some(json!([{ "text": "reds", "ink": "danger" }, " key"]))
+        json(spans::retype(&line, "The red key", "The reds key")),
+        Some(json!(["The ", { "text": "reds", "ink": "danger" }, " key"]))
     );
 }
 
@@ -58,11 +51,24 @@ fn a_value_is_deleted_whole_or_not_at_all() {
 }
 
 #[test]
-fn text_typed_beside_a_value_keeps_the_value_whole() {
+fn text_typed_beside_or_between_values_keeps_each_value_whole() {
     let line = line_of(json!(["You have ", { "value": 3 }]));
     let shown = spans::plain(&line);
-    let typed = json(spans::retype(&line, &shown, &format!("{shown} coins")));
-    assert_eq!(typed, Some(json!(["You have ", { "value": 3 }, " coins"])));
+    assert_eq!(
+        json(spans::retype(&line, &shown, &format!("{shown} coins"))),
+        Some(json!(["You have ", { "value": 3 }, " coins"]))
+    );
+
+    let line = line_of(json!([{ "value": 1 }, { "value": 2 }]));
+    let shown = spans::plain(&line);
+    let between = token_of(json!({ "value": 1 })).chars().count();
+    let mut typed: Vec<char> = shown.chars().collect();
+    typed.insert(between, '+');
+    let typed: String = typed.into_iter().collect();
+    assert_eq!(
+        json(spans::retype(&line, &shown, &typed)),
+        Some(json!([{ "value": 1 }, "+", { "value": 2 }]))
+    );
 }
 
 #[test]
@@ -98,19 +104,5 @@ fn a_value_replaces_the_selection() {
     assert_eq!(
         json(spans::with_value(&line, (2, 5))),
         Some(json!(["a ", { "value": 0 }, " key"]))
-    );
-}
-
-#[test]
-fn text_typed_between_two_values_lands_between_them() {
-    let line = line_of(json!([{ "value": 1 }, { "value": 2 }]));
-    let shown = spans::plain(&line);
-    let between = token_of(json!({ "value": 1 })).chars().count();
-    let mut typed: Vec<char> = shown.chars().collect();
-    typed.insert(between, '+');
-    let typed: String = typed.into_iter().collect();
-    assert_eq!(
-        json(spans::retype(&line, &shown, &typed)),
-        Some(json!([{ "value": 1 }, "+", { "value": 2 }]))
     );
 }

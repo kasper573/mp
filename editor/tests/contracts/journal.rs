@@ -13,71 +13,64 @@ use crate::support;
 
 #[test]
 fn a_journal_the_folder_refuses_is_kept_aside_and_said_where() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let (mut editor, folder) = editor_on_camp(&scratch);
-    let refused = journaled(
-        &fields_file(&path("npc", "orc")),
-        None,
-        json!({ "name": "Orc", "not_a_field": true }),
-    );
-    write_journal(&editor, &folder, vec![refused]);
-
-    let data = RecoveryJournal::recover(&editor.user, &folder).expect("a journal");
-    editor.open_now(&folder, data.files);
-
-    assert!(editor.project.is_some());
-    let said = said(&editor);
-    let aside = said
-        .iter()
-        .find_map(|line| {
-            line.split_once("it is kept at ")
-                .map(|(_, at)| at.to_owned())
-        })
-        .unwrap_or_else(|| panic!("says where the journal is kept: {said:?}"));
-    let kept: RecoveryJournalData =
-        serde_json::from_str(&std::fs::read_to_string(aside).expect("the journal is kept"))
-            .expect("a journal");
-    assert_eq!(kept.files.len(), 1);
-    assert!(RecoveryJournal::recover(&editor.user, &folder).is_none());
-}
-
-#[test]
-fn a_journal_that_breaks_a_file_it_never_wrote_is_kept_aside_too() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let folder = scratch.path().join("game");
     let crier = path("npc", "crier");
-    support::game()
-        .babble("crier")
-        .npc(
-            "crier",
-            8.0,
-            json!([{ "type": "voice", "babble": path("babble", "crier") }]),
-        )
-        .row(
-            "notification",
-            "call",
-            json!({ "kind": { "type": "speech", "speaker": crier }, "text": ["Hear ye!"] }),
-        )
-        .write_to(&folder);
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    let npc = fields_file(&crier);
-    let mut fields: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(folder.join(&npc)).expect("the npc")).expect("json");
-    fields["modules"] = json!([]);
-    write_journal(&editor, &folder, vec![journaled(&npc, None, fields)]);
+    let game = || {
+        support::game()
+            .npc("orc", 10.0, json!([]))
+            .babble("crier")
+            .npc(
+                "crier",
+                8.0,
+                json!([{ "type": "voice", "babble": path("babble", "crier") }]),
+            )
+            .row(
+                "notification",
+                "call",
+                json!({ "kind": { "type": "speech", "speaker": crier }, "text": ["Hear ye!"] }),
+            )
+    };
+    let unknown_field = |_: &Path| {
+        let orc = fields_file(&path("npc", "orc"));
+        journaled(&orc, None, json!({ "name": "Orc", "not_a_field": true }))
+    };
+    let breaks_another_file = |folder: &Path| {
+        let npc = fields_file(&crier);
+        let mut fields: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(folder.join(&npc)).expect("the npc"))
+                .expect("json");
+        fields["modules"] = json!([]);
+        journaled(&npc, None, fields)
+    };
+    let cases: [&dyn Fn(&Path) -> RecoveryJournalFile; 2] = [&unknown_field, &breaks_another_file];
 
-    let data = RecoveryJournal::recover(&editor.user, &folder).expect("a journal");
-    editor.open_now(&folder, data.files);
+    for journal in cases {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let folder = scratch.path().join("game");
+        game().write_to(&folder);
+        let mut editor = Editor::new(
+            UserFolder::at(scratch.path().join("user")),
+            EditorSettings::default(),
+        );
+        write_journal(&editor, &folder, vec![journal(&folder)]);
 
-    let said = said(&editor);
-    assert!(
-        said.iter().any(|line| line.contains("it is kept at ")),
-        "{said:?}"
-    );
-    assert!(editor.project.as_ref().expect("a project").loads());
+        let data = RecoveryJournal::recover(&editor.user, &folder).expect("a journal");
+        editor.open_now(&folder, data.files);
+
+        assert!(editor.project.as_ref().expect("a project").loads());
+        let said = said(&editor);
+        let aside = said
+            .iter()
+            .find_map(|line| {
+                line.split_once("it is kept at ")
+                    .map(|(_, at)| at.to_owned())
+            })
+            .unwrap_or_else(|| panic!("says where the journal is kept: {said:?}"));
+        let kept: RecoveryJournalData =
+            serde_json::from_str(&std::fs::read_to_string(aside).expect("the journal is kept"))
+                .expect("a journal");
+        assert_eq!(kept.files.len(), 1);
+        assert!(RecoveryJournal::recover(&editor.user, &folder).is_none());
+    }
 }
 
 #[test]

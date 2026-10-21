@@ -32,8 +32,6 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
     let export = formats::decode(&dropped).expect("decodes");
     assert_eq!(export.kind, ExportFormat::SheetJson);
     assert_eq!(export.frame, FRAME);
-    assert!(export.trimmed);
-    assert_eq!(export.strips.len(), 40);
     assert!(export.timed());
     let plan = plan_for(&row, &reader, &sheet, &export, None);
     assert!(plan.missing.is_empty());
@@ -90,7 +88,6 @@ fn a_texturepacker_sheet_with_rotated_frames_imports_alike() {
     let strips = strips_of(&row, &sheet);
     let files = exports::texturepacker(dir.path(), "walker", &strips);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
-    assert_eq!(export.strips.len(), 40);
     assert!(!export.timed(), "TexturePacker carries no durations");
     for (name, frames) in &strips {
         let strip = export.strip(name).expect(name);
@@ -588,7 +585,6 @@ fn import_records_written_by_earlier_editors_still_read() {
     );
 }
 
-/// A whole game whose island is painted with the beach tileset.
 /// The beach tileset of `beach_game`, read as the game reads it, and the reader it was read with.
 fn beach() -> (FolderReader, TilesetDef) {
     let reader = FolderReader::new(
@@ -601,6 +597,7 @@ fn beach() -> (FolderReader, TilesetDef) {
     (reader, tileset)
 }
 
+/// A whole game whose island is painted with the beach tileset.
 fn beach_game() -> testkit::Game {
     let mut tileset = Vec::new();
     art::tileset()

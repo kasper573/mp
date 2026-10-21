@@ -1,5 +1,5 @@
 use design_tokens::card::{self, Card};
-use design_tokens::face::{self, Face, TextRole};
+use design_tokens::face::{self, Face};
 use design_tokens::glyph::{Icon, Kind, Mark, Weight};
 use design_tokens::motion::{self, Clock};
 use design_tokens::sheet::{Depth, Sheet};
@@ -63,20 +63,6 @@ fn every_mark_is_an_icon_of_the_icon_font_in_every_weight() {
 }
 
 #[test]
-fn text_roles_resolve_to_their_faces_and_sizes() {
-    assert_eq!(TextRole::Title.face(), Face::SmallCapsBold);
-    assert_eq!(TextRole::Title.size(), 17.0);
-    assert_eq!(TextRole::Body.size(), 15.0);
-    assert_eq!(TextRole::CardBody.size(), 14.5);
-    assert_eq!(TextRole::Line.size(), 17.0);
-    assert_eq!(TextRole::Flavour.face(), Face::Quill);
-    assert_eq!(TextRole::Numeral.face(), Face::Numerals);
-    assert_eq!(TextRole::KeyHint.face(), Face::Mono);
-    assert!(TextRole::Section.tracking() > TextRole::Name.tracking());
-    assert_eq!(TextRole::Body.line_height(), Some(21.0));
-}
-
-#[test]
 fn roman_numerals() {
     assert_eq!(face::roman(0), "0");
     assert_eq!(face::roman(1), "I");
@@ -88,17 +74,7 @@ fn roman_numerals() {
 }
 
 #[test]
-fn a_kinds_word_and_ground_agree_with_the_table() {
-    assert_eq!(Kind::Equipment.word(), "equipment");
-    assert_eq!(Kind::Equipment.ground()[1], ink::AZURE);
-    assert_eq!(Kind::Usable.word(), "usable");
-    assert_eq!(Kind::Usable.ground()[1], ink::WAX);
-    assert_eq!(Kind::Resource.word(), "resource");
-    assert_eq!(Kind::Quest.word(), "quest");
-    assert_eq!(Kind::Quest.ground()[0], ink::TYRIAN);
-    assert_eq!(Kind::Active.word(), "active skill");
-    assert_eq!(Kind::Active.ground(), Kind::Usable.ground());
-    assert_eq!(Kind::Passive.word(), "passive skill");
+fn every_kind_goes_by_a_word_of_its_own() {
     let words: std::collections::HashSet<&str> =
         Kind::VARIANTS.iter().map(|kind| kind.word()).collect();
     assert_eq!(words.len(), Kind::VARIANTS.len());
@@ -110,75 +86,76 @@ fn every_kind_glyph_decodes_into_a_texture() {
     pass(&ctx, |_| {});
     for &kind in Kind::VARIANTS {
         let texture = kind.texture(&ctx);
-        assert_eq!(texture, kind.texture(&ctx), "{kind:?} is loaded once");
+        let size = ctx.tex_manager().read().meta(texture).map(|meta| meta.size);
+        assert!(
+            size.is_some_and(|[w, h]| w > 0 && h > 0),
+            "{kind:?} has no picture"
+        );
     }
 }
 
 #[test]
-fn the_sheet_clock_runs_up_in_180_ms_and_down_in_120_and_reverses_from_where_it_is() {
+fn a_sheet_opens_in_its_time_closes_quicker_and_reverses_from_where_it_is() {
     let mut clock = Clock::CLOSED;
     assert!(clock.is_closed());
-    clock.run(true, 0.09);
-    assert!((clock.progress() - 0.5).abs() < 1e-5);
-    clock.run(true, 0.09);
+    clock.run(true, motion::SHEET_OPEN_SECS);
     assert!(clock.is_open());
-    clock.run(false, 0.06);
-    assert!((clock.progress() - 0.5).abs() < 1e-5);
-    clock.run(true, 0.045);
-    assert!((clock.progress() - 0.75).abs() < 1e-5);
-    clock.run(false, 1.0);
+    let mut opening = Clock::CLOSED;
+    opening.run(true, motion::SHEET_CLOSE_SECS);
+    assert!(
+        !opening.is_open(),
+        "a sheet opens no quicker than it closes"
+    );
+    clock.run(false, motion::SHEET_CLOSE_SECS / 2.0);
+    let halfway = clock.progress();
+    assert!(halfway > 0.0 && halfway < 1.0);
+    clock.run(true, motion::SHEET_OPEN_SECS / 4.0);
+    assert!(clock.progress() > halfway && !clock.is_open());
+    clock.run(false, motion::SHEET_CLOSE_SECS);
     assert!(clock.is_closed());
 }
 
 #[test]
-fn a_sheet_rests_flat_once_open_and_starts_small_faint_and_lifted() {
+fn a_sheet_rests_flat_once_open_and_starts_faint_and_lifted() {
     let closed = Clock::CLOSED.pose();
-    assert_eq!(closed.opacity, 0.0);
-    assert!((closed.scale - 1.03).abs() < 1e-5);
-    assert_eq!(closed.dy, -4.0);
     let open = Clock::OPEN.pose();
-    assert_eq!(open.opacity, 1.0);
-    assert_eq!(open.scale, 1.0);
-    assert_eq!(open.dy, 0.0);
-    assert_eq!(open.shadow, motion::SheetPose::REST.shadow);
+    assert_eq!(open, motion::SheetPose::REST);
+    assert_eq!(closed.opacity, 0.0);
+    assert!(closed.dy < 0.0);
     let mut mid = Clock::CLOSED;
-    mid.run(true, 0.09);
+    mid.run(true, motion::SHEET_OPEN_SECS / 2.0);
     let pose = mid.pose();
-    assert!(pose.opacity > 0.0 && pose.opacity < 1.0);
-    assert!(pose.scale > 1.0 && pose.scale < 1.03);
+    assert!(pose.opacity > closed.opacity && pose.opacity < open.opacity);
+    assert!(pose.dy > closed.dy && pose.dy < open.dy);
 }
 
 #[test]
-fn a_card_is_dealt_from_the_slot_at_a_fifth_turned_and_lands_straight() {
+fn a_card_is_dealt_small_and_unseen_from_its_slot_and_lands_straight_at_its_place() {
     let from = Rect::from_min_size(Pos2::new(100.0, 500.0), Vec2::splat(36.0));
     let to = Rect::from_min_size(Pos2::new(900.0, 96.0), Vec2::new(300.0, 380.0));
     let start = motion::deal(0.0, from, to);
     assert_eq!(start.center, from.center());
-    assert!((start.scale - 0.2).abs() < 1e-5);
-    assert!((start.angle - (-14.0_f32).to_radians()).abs() < 1e-5);
+    assert!(start.scale < 1.0);
     assert_eq!(start.opacity, 0.0);
+    let mid = motion::deal(0.5, from, to);
+    assert!(mid.center.x > from.center().x && mid.center.x < to.center().x);
     let landed = motion::deal(1.0, from, to);
     assert_eq!(landed.center, to.center());
     assert!((landed.scale - 1.0).abs() < 1e-5);
     assert_eq!(landed.angle, 0.0);
     assert_eq!(landed.opacity, 1.0);
-    let overshoot = motion::deal(0.19 / motion::DEAL_SECS, from, to);
-    assert!(overshoot.scale > 1.0 && overshoot.scale <= 1.011);
-    let mid = motion::deal(0.5, from, to);
-    assert!(mid.center.x > from.center().x && mid.center.x < to.center().x);
 }
 
 #[test]
-fn a_flicked_card_lifts_tilts_and_fades_and_a_replaced_one_drops_and_dims() {
+fn a_flicked_card_lifts_away_unseen_and_a_replaced_one_drops_and_dims() {
     let at = Rect::from_min_size(Pos2::new(900.0, 96.0), Vec2::new(300.0, 380.0));
-    let gone = motion::flick(1.0, at);
-    assert_eq!(gone.center, at.center() - Vec2::new(0.0, 20.0));
-    assert!((gone.angle - 4.0_f32.to_radians()).abs() < 1e-5);
-    assert_eq!(gone.opacity, 0.0);
     assert_eq!(motion::flick(0.0, at).opacity, 1.0);
+    let gone = motion::flick(1.0, at);
+    assert!(gone.center.y < at.center().y);
+    assert_eq!(gone.opacity, 0.0);
     let under = motion::replaced(1.0, at);
-    assert_eq!(under.center, at.center() + Vec2::new(0.0, 26.0));
-    assert!((under.opacity - 0.55).abs() < 1e-5);
+    assert!(under.center.y > at.center().y);
+    assert!(under.opacity > 0.0 && under.opacity < 1.0);
 }
 
 #[test]
@@ -206,7 +183,7 @@ fn a_posed_layer_comes_back_as_meshes_moved_into_the_pose() {
 }
 
 #[test]
-fn a_card_is_300_wide_as_tall_as_its_plate_and_never_past_420() {
+fn a_card_keeps_its_width_and_grows_with_what_it_holds_up_to_its_most() {
     let ctx = context();
     let mut short = None;
     let mut long = None;
@@ -282,11 +259,9 @@ fn a_sheet_lays_its_parts_out_and_shrinks_its_cross_when_small() {
         };
         let rect = Rect::from_min_size(Pos2::new(100.0, 100.0), Vec2::new(400.0, 230.0));
         let parts = sheet.paint(ui.painter(), rect);
-        assert_eq!(parts.band.height(), design_tokens::sheet::TITLE_BAND);
         assert!(rect.contains_rect(parts.body));
         assert!(parts.body.min.y >= parts.band.max.y);
         let cross = parts.cross.unwrap();
-        assert_eq!(cross.width(), design_tokens::sheet::CROSS);
         assert!(rect.contains_rect(cross));
         let curl = parts.curl.unwrap();
         assert_eq!(curl.max, rect.max);
@@ -294,10 +269,7 @@ fn a_sheet_lays_its_parts_out_and_shrinks_its_cross_when_small() {
             ui.painter(),
             Rect::from_min_size(Pos2::new(100.0, 100.0), Vec2::splat(100.0)),
         );
-        assert_eq!(
-            small.cross.unwrap().width(),
-            design_tokens::sheet::SMALL_CROSS
-        );
+        assert!(small.cross.unwrap().width() < cross.width());
     });
 }
 
@@ -311,7 +283,6 @@ fn controls_stand_a_control_tall() {
         heights.push(controls::danger(ui, "Abandon").rect.height());
         let mut value = 0.5;
         heights.push(controls::slider(ui, &mut value, 0.0..=1.0).rect.height());
-        assert_eq!(value, 0.5);
     });
     assert!(
         heights

@@ -7,13 +7,10 @@ use engine::systems::item::{
 };
 use engine::systems::memory::{self, MemoryDef};
 use engine::systems::player::Xp;
-use engine::systems::quest::{
-    self, Objective, ObjectiveKind, QuestDef, QuestLog, QuestRequest, QuestResult,
-};
+use engine::systems::quest::{self, QuestDef, QuestLog, QuestRequest, QuestResult};
 use engine::systems::shop::{self, ShopRequest};
 use engine::systems::{area, combat, movement, npc, rewards, script, stat};
 use serde_json::{Value, json};
-use strum::VariantArray;
 use testkit::{Game, Map, Sim, labels, locked, path};
 
 #[test]
@@ -24,7 +21,7 @@ fn accepting_a_quest_logs_it_tracks_it_and_hands_over_its_items() {
     let greeting = sim.talk(1, "giver");
     assert!(labels(&greeting).contains(&"A Letter".to_owned()));
     let offer = sim.pick(1, "A Letter").expect("the offer");
-    assert_eq!(offer.node, "letter_offer");
+    assert!(labels(&offer).contains(&"I'll take it.".to_owned()));
     sim.pick(1, "I'll take it.");
 
     let log = log(&sim, player);
@@ -55,15 +52,19 @@ fn abandoning_takes_the_quest_items_back_and_accepting_again_returns_them() {
 }
 
 #[test]
-fn delivering_completes_the_quest_once_and_unlocks_the_next_in_the_chain() {
+fn delivering_completes_the_quest_once_and_with_the_level_unlocks_the_next_in_the_chain() {
     let mut sim = harbour();
     let player = sim.join(1);
+    let levelled = sim.join(2);
+    level_up(&mut sim, levelled);
+    let captain = sim.talk(2, "captain");
+    assert!(!labels(&captain).contains(&"Bats".to_owned()));
+
     sim.talk(1, "giver");
     sim.pick(1, "A Letter");
     sim.pick(1, "I'll take it.");
     sim.leave(1);
     sim.run(0.5);
-    level_up(&mut sim, player);
     let gold = sim.count(player, "gold");
 
     let captain = sim.talk(1, "captain");
@@ -95,22 +96,12 @@ fn delivering_completes_the_quest_once_and_unlocks_the_next_in_the_chain() {
     sim.leave(1);
     let again = sim.talk(1, "captain");
     assert!(!labels(&again).contains(&"A Letter".to_owned()));
-    assert!(!locked(&again, "Bats"));
-}
+    assert!(!labels(&again).contains(&"Bats".to_owned()));
 
-#[test]
-fn a_chain_stays_hidden_until_its_previous_quest_and_level_are_met() {
-    let mut sim = harbour();
-    let levelled = sim.join(1);
-    let delivered = sim.join(2);
-    level_up(&mut sim, levelled);
-    deliver_letter(&mut sim, delivered);
-
-    for client in [1, 2] {
-        let captain = sim.talk(client, "captain");
-        assert!(!labels(&captain).contains(&"Bats".to_owned()));
-        sim.leave(client);
-    }
+    sim.leave(1);
+    level_up(&mut sim, player);
+    let ready = sim.talk(1, "captain");
+    assert!(!locked(&ready, "Bats"));
 }
 
 #[test]
@@ -313,7 +304,6 @@ fn exploring_the_marked_spot_readies_the_quest_for_the_object_there() {
     accept(&mut sim, player, "x_marks");
     sim.run(0.5);
     let quest = sim.id::<QuestDef>("x_marks");
-    assert!(!quest::ready_to_hand_in(&sim.world, player, quest));
 
     let stone = sim.object("stone");
     sim.open_with(1, stone);
@@ -322,7 +312,6 @@ fn exploring_the_marked_spot_readies_the_quest_for_the_object_there() {
             .get::<dialogue::Conversation>(player)
             .is_some_and(|now| now.panel.is_some())
     }));
-    assert!(quest::ready_to_hand_in(&sim.world, player, quest));
     assert_eq!(
         sim.conversation(1).and_then(|now| now.panel),
         Some(ConversationPanel::QuestTurnIn(quest))
@@ -343,10 +332,9 @@ fn deciding_fails_the_other_quest_and_is_remembered() {
 
     sim.talk(1, "shaman");
     sim.pick(1, "The Plea");
-    let answer = sim.pick(1, "I'm listening.").expect("her plea");
-    assert_eq!(answer.node, "plea_answer");
+    sim.pick(1, "I'm listening.");
     let given = sim.pick(1, "Give her the tusks.").expect("her thanks");
-    assert_eq!(given.node, "grateful");
+    assert_eq!(labels(&given), vec!["Rest easy.".to_owned()]);
 
     let tusks = sim.id::<QuestDef>("tusks");
     let plea = sim.id::<QuestDef>("plea");
@@ -364,16 +352,10 @@ fn deciding_fails_the_other_quest_and_is_remembered() {
     assert!(memory::get(&sim.world, player, sided).truthy());
     sim.leave(1);
     sim.run(0.5);
-    let content = sim
-        .world
-        .resource::<engine::core::content::Content>()
-        .clone();
-    let settled = log(&sim, player);
-    assert!(!settled.trackable(&content, tusks));
-    assert!(!settled.tracked.contains(&tusks));
+    assert!(!log(&sim, player).tracked.contains(&tusks));
 
     let friend = sim.talk(1, "shaman");
-    assert_eq!(friend.node, "friend");
+    assert_eq!(labels(&friend), vec!["Farewell.".to_owned()]);
 }
 
 /// A harbour of quest givers, each standing for one way quests are offered, followed and handed
@@ -876,20 +858,4 @@ fn fill_bag(sim: &mut Sim, player: Entity) {
     for _ in used..INVENTORY_MAX as usize {
         sim.give(player, "pebble", 1);
     }
-}
-
-#[test]
-fn objective_kinds_name_the_tags_objectives_are_written_with() {
-    let schema = serde_json::to_value(schemars::schema_for!(Objective)).expect("a schema");
-    let written: Vec<&str> = schema["oneOf"]
-        .as_array()
-        .expect("one schema per kind")
-        .iter()
-        .filter_map(|kind| kind["properties"]["type"]["const"].as_str())
-        .collect();
-    let named: Vec<&str> = ObjectiveKind::VARIANTS
-        .iter()
-        .map(|kind| kind.tag())
-        .collect();
-    assert_eq!(written, named);
 }

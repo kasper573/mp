@@ -168,9 +168,9 @@ fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
 }
 
 #[test]
-fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
+fn an_instance_arrives_as_the_server_sent_it_whatever_its_parameters_and_site() {
     let (sim, _) = arena();
-    let sent = VfxInstance {
+    let on_screen = VfxInstance {
         vfx: sim.id("damage_taken"),
         site: VfxSite::Screen,
         params: VfxParams(vec![
@@ -181,15 +181,7 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),
     };
-    let bytes = postcard::to_allocvec(&sent).expect("serializes");
-    let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
-    assert_eq!(received, sent);
-}
-
-#[test]
-fn an_instance_on_an_area_survives_the_wire() {
-    let (sim, _) = arena();
-    let sent = VfxInstance {
+    let on_an_area = VfxInstance {
         vfx: sim.id("swoosh"),
         site: VfxSite::Area(Footprint {
             at: Pos::new(3.0, 4.0),
@@ -200,13 +192,13 @@ fn an_instance_on_an_area_survives_the_wire() {
             },
         }),
         params: VfxParams::default(),
-        heading: Radians(0.25),
-        started: UnixMillis(1_000),
-        until: UnixMillis(2_500),
+        ..on_screen.clone()
     };
-    let bytes = postcard::to_allocvec(&sent).expect("serializes");
-    let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
-    assert_eq!(received, sent);
+    for sent in [on_screen, on_an_area] {
+        let bytes = postcard::to_allocvec(&sent).expect("serializes");
+        let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
+        assert_eq!(received, sent);
+    }
 }
 
 fn arena() -> (Sim, Entity) {

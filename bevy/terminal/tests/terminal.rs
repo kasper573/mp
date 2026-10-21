@@ -70,12 +70,13 @@ fn line(text: &str, tone: LineTone) -> TerminalLine {
 }
 
 #[test]
-fn chat_line_is_said_trimmed_and_not_replied_to() {
+fn chat_line_is_said_trimmed_and_not_replied_to_and_a_blank_one_is_not_said() {
     let mut app = server(&[]);
     let world = app.world_mut();
     let conn = connect(world);
 
     send(world, conn, "  hello there  ");
+    send(world, conn, "   ");
 
     assert_eq!(
         said(world),
@@ -84,18 +85,6 @@ fn chat_line_is_said_trimmed_and_not_replied_to() {
             text: "hello there".to_owned()
         }]
     );
-    assert!(replies(world).is_empty());
-}
-
-#[test]
-fn blank_line_is_ignored() {
-    let mut app = server(&[]);
-    let world = app.world_mut();
-    let conn = connect(world);
-
-    send(world, conn, "   ");
-
-    assert!(said(world).is_empty());
     assert!(replies(world).is_empty());
 }
 
@@ -139,33 +128,23 @@ fn registered_command_runs_with_its_arguments() {
 }
 
 #[test]
-fn failing_command_replies_as_failure() {
+fn a_failing_or_unknown_command_replies_as_failure() {
     let mut app = server(&[SHOUT]);
     let world = app.world_mut();
     let conn = connect(world);
 
     send(world, conn, "/shout");
-
-    assert_eq!(
-        replies(world),
-        vec![(conn, line("nothing to shout", LineTone::Failed))]
-    );
-}
-
-#[test]
-fn unknown_command_replies_as_failure() {
-    let mut app = server(&[]);
-    let world = app.world_mut();
-    let conn = connect(world);
-
     send(world, conn, "/nope");
 
     assert!(said(world).is_empty());
     assert_eq!(
         replies(world),
-        vec![(
-            conn,
-            line("Unknown command /nope — try /commands", LineTone::Failed)
-        )]
+        vec![
+            (conn, line("nothing to shout", LineTone::Failed)),
+            (
+                conn,
+                line("Unknown command /nope — try /commands", LineTone::Failed)
+            ),
+        ]
     );
 }

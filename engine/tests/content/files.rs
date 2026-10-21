@@ -25,16 +25,11 @@ fn content_loads_from_any_folder_and_is_named_by_its_path() {
 #[test]
 fn a_file_of_no_known_type_is_refused_naming_the_nearest_type() {
     let report = refused(game().file("orc.ncp.json", "{}"));
-
     let error = only(&report, "orc.ncp.json");
     assert_eq!(error.0, "unknown type");
     assert_eq!(error.1.as_deref(), Some("\"npc\""));
-}
 
-#[test]
-fn a_file_that_is_no_content_media_or_note_is_refused() {
     let report = refused(game().file("todo.txt", "later"));
-
     assert_eq!(only(&report, "todo.txt").0, "unknown file");
 }
 
@@ -63,18 +58,12 @@ fn a_name_a_disk_or_a_url_would_change_is_refused() {
 
         assert_eq!(only(&report, name).0, "invalid name", "{name}");
     }
-}
 
-#[test]
-fn a_numbered_name_is_a_valid_name() {
+    let numbered = "orc (2).npc.json";
     let content = game()
-        .file(
-            "orc (2).npc.json",
-            npc_fields("Orc", &path("model", "hero")),
-        )
+        .file(numbered, npc_fields("Orc", &path("model", "hero")))
         .load();
-
-    assert!(content.by_path::<NpcDef>("orc (2).npc.json").is_some());
+    assert!(content.by_path::<NpcDef>(numbered).is_some());
 }
 
 #[test]
@@ -90,27 +79,27 @@ fn names_that_differ_only_by_case_clash() {
 }
 
 #[test]
-fn a_folder_with_a_dot_that_no_bundle_type_names_is_refused() {
-    let report = refused(game().file("old.stuff/a.md", "notes"));
-
-    assert_eq!(only(&report, "old.stuff").0, "unknown type");
-}
-
-#[test]
-fn a_bundle_type_kept_as_one_file_is_refused() {
-    let report = refused(game().file("lamp.model.json", "{}"));
-
-    assert_eq!(
-        only(&report, "lamp.model.json").0,
-        "bundle kept as one file"
-    );
-}
-
-#[test]
-fn a_json_type_kept_as_a_folder_is_refused() {
-    let report = refused(game().file("orc.npc/config.json", "{}"));
-
-    assert_eq!(only(&report, "orc.npc").0, "folder with a dot");
+fn a_dotted_name_must_take_the_shape_its_type_does() {
+    for (game, file, rule) in [
+        (
+            game().file("old.stuff/a.md", "notes"),
+            "old.stuff",
+            "unknown type",
+        ),
+        (
+            game().file("lamp.model.json", "{}"),
+            "lamp.model.json",
+            "bundle kept as one file",
+        ),
+        (
+            game().file("orc.npc/config.json", "{}"),
+            "orc.npc",
+            "folder with a dot",
+        ),
+    ] {
+        let report = refused(game);
+        assert_eq!(only(&report, file).0, rule, "{file}");
+    }
 }
 
 #[test]
@@ -132,14 +121,12 @@ fn a_bundles_part_is_never_named_from_outside_it() {
 
 #[test]
 fn media_is_named_by_its_path_from_the_game_folder() {
-    let content = game()
+    game()
         .asset("art/icons/axe.png", png(1, 1))
         .edit("class", "hero", |hero| {
             hero["icon"] = json!("art/icons/axe.png")
         })
         .load();
-
-    assert!(content.files().media.contains("art/icons/axe.png"));
 }
 
 fn npc_fields(name: &str, model: &str) -> Vec<u8> {

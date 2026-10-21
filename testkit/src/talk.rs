@@ -76,6 +76,14 @@ impl Sim {
     }
 }
 
+pub fn lines(conversation: &Conversation) -> Vec<String> {
+    conversation
+        .lines
+        .iter()
+        .map(|line| line.text.plain_words())
+        .collect()
+}
+
 pub fn labels(conversation: &Conversation) -> Vec<String> {
     conversation
         .choices

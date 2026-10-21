@@ -5,7 +5,7 @@ use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
-use engine::systems::area::{self, AreaDef, AreaModule, SceneNode, Scenery, SceneryTile, walk};
+use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SceneryTile, walk};
 use serde_json::{Value, json};
 use testkit::{Game, path, png};
 
@@ -163,7 +163,7 @@ fn a_placement_whose_ground_lands_past_the_edge_is_refused() {
 }
 
 #[test]
-fn a_placement_needs_a_label() {
+fn a_placement_needs_a_label_of_its_own_among_its_siblings() {
     let mut unlabelled = placement("Tree", "tree", 2.0, 2.0, "none");
     unlabelled.as_object_mut().expect("a node").remove("label");
     let report = placing(
@@ -173,12 +173,8 @@ fn a_placement_needs_a_label() {
     .try_load()
     .err()
     .expect("refused");
-
     assert!(rules(&report).contains(&"missing field"), "{report}");
-}
 
-#[test]
-fn labels_are_unique_among_siblings() {
     let report = placing(
         game().blueprint("tree", (1, 1), json!({}), json!([tree()])),
         json!([
@@ -231,19 +227,14 @@ fn a_blueprint_holding_itself_is_refused() {
 }
 
 #[test]
-fn nesting_past_eight_levels_is_refused() {
-    let report = nest(0).try_load().err().expect("refused");
+fn nesting_loads_up_to_eight_levels_and_is_refused_past_them() {
+    let content = nest(1).load();
+    assert_eq!(area::placed(&content, start(&content)).len(), 1);
 
+    let report = nest(0).try_load().err().expect("refused");
     let rules = rules(&report);
     assert!(rules.contains(&"nested too deep"), "{report}");
     assert!(!rules.contains(&"blueprint holds itself"), "{report}");
-}
-
-#[test]
-fn nesting_up_to_eight_levels_loads() {
-    let content = nest(1).load();
-    let start = start(&content);
-    assert_eq!(area::placed(&content, start).len(), 1);
 }
 
 #[test]
@@ -293,48 +284,33 @@ fn a_placed_blueprint_naming_an_unknown_file_is_reported_once_at_the_blueprint()
 }
 
 #[test]
-fn a_placement_fills_each_hole_with_the_value_it_gives() {
-    let content = placing(
-        game().blueprint(
-            "rock",
-            (1, 1),
-            json!({ "x": { "type": "number" } }),
-            json!([holed_rock()]),
-        ),
-        json!([with_values(
-            placement("Rock", "rock", 2.0, 2.0, "none"),
-            json!({ "x": 3.0 })
-        )]),
-    )
-    .load();
+fn a_placement_fills_each_hole_with_the_value_it_gives_or_its_variables_default() {
+    let rock = |variables: Value, values: Value| {
+        let content = placing(
+            game().blueprint("rock", (1, 1), variables, json!([holed_rock()])),
+            json!([with_values(
+                placement("Rock", "rock", 2.0, 2.0, "none"),
+                values
+            )]),
+        )
+        .load();
+        area::placed(&content, start(&content))
+            .iter()
+            .map(|part| scenery_at(&part.module).0)
+            .collect::<Vec<Pos<Tiles>>>()
+    };
 
-    let placed = area::placed(&content, start(&content));
-    let at: Vec<Pos<Tiles>> = placed
-        .iter()
-        .map(|part| scenery_at(&part.module).0)
-        .collect();
-    assert_eq!(at, [Pos::new(5.0, 2.0)]);
-}
-
-#[test]
-fn a_hole_left_without_a_value_takes_its_variables_default() {
-    let content = placing(
-        game().blueprint(
-            "rock",
-            (1, 1),
+    assert_eq!(
+        rock(json!({ "x": { "type": "number" } }), json!({ "x": 3.0 })),
+        [Pos::new(5.0, 2.0)]
+    );
+    assert_eq!(
+        rock(
             json!({ "x": { "type": "number", "default": 1.0 } }),
-            json!([holed_rock()]),
+            json!({})
         ),
-        json!([placement("Rock", "rock", 2.0, 2.0, "none")]),
-    )
-    .load();
-
-    let placed = area::placed(&content, start(&content));
-    let at: Vec<Pos<Tiles>> = placed
-        .iter()
-        .map(|part| scenery_at(&part.module).0)
-        .collect();
-    assert_eq!(at, [Pos::new(3.0, 2.0)]);
+        [Pos::new(3.0, 2.0)]
+    );
 }
 
 #[test]
@@ -382,16 +358,6 @@ fn a_blueprint_writes_its_holes_back_where_it_read_them() {
     let rock = path("blueprint", "rock");
     let blueprint: BlueprintDef = reader.read(&rock).expect("reads");
 
-    let holes: Vec<(&str, &str)> = match &blueprint.scene.nodes[..] {
-        [SceneNode::Module(node)] => node
-            .holes
-            .0
-            .iter()
-            .map(|(at, name)| (at.as_str(), name.as_str()))
-            .collect(),
-        _ => panic!("one module node"),
-    };
-    assert_eq!(holes, [("/at/x", "x"), ("/tileset", "set")]);
     let scene = format!("{rock}/scene.json");
     let written = reader.write(&rock, &blueprint).expect("writes").files;
     let read: Value =

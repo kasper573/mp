@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
 use editor::app::Editor;
-use editor::project::Project;
-use editor::schema::SchemaShapes;
-use editor::user::{EditorSettings, UserFolder};
 use editor::views::model::busts::{self, BustFace};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::GenericExpression;
@@ -18,16 +13,7 @@ fn open(scratch: &tempfile::TempDir) -> Editor {
         .model("orc", 1.0, json!([]))
         .busts("orc")
         .part("model", "orc", "busts/smug.png", png(4, 4));
-    let folder = scratch.path().join("game");
-    game.write_to(&folder);
-    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
-    project.settle();
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    editor.project = Some(project);
-    editor
+    support::open(game, scratch)
 }
 
 fn faces(editor: &Editor) -> Vec<BustFace> {
@@ -36,16 +22,6 @@ fn faces(editor: &Editor) -> Vec<BustFace> {
         .expect("a project")
         .expect("the model reads");
     busts::faces(&model)
-}
-
-fn settled_loads(editor: &mut Editor) {
-    let project = editor.project.as_mut().expect("a project");
-    project.settle();
-    assert!(
-        project.loads(),
-        "{:?}",
-        project.report.as_ref().map(ToString::to_string)
-    );
 }
 
 #[test]
@@ -85,7 +61,7 @@ fn renaming_an_own_face_moves_its_picture_and_the_game_still_loads() {
         "sly"
     ));
 
-    settled_loads(&mut editor);
+    support::settled(&mut editor);
     let names: Vec<String> = faces(&editor).into_iter().map(|face| face.name).collect();
     assert!(names.contains(&"sly".to_owned()), "{names:?}");
     assert!(!names.contains(&"smug".to_owned()), "{names:?}");
@@ -128,7 +104,7 @@ fn removing_an_own_face_removes_its_picture_and_a_generic_face_stays() {
     assert!(busts::remove(&mut editor, &model, smug, "happy"));
     assert!(!busts::remove(&mut editor, &model, happy, "sad"));
 
-    settled_loads(&mut editor);
+    support::settled(&mut editor);
     assert_eq!(faces(&editor).len(), GenericExpression::VARIANTS.len());
 }
 
@@ -149,15 +125,7 @@ fn renaming_a_face_leaves_the_lines_of_speakers_wearing_another_model_alone() {
             "said": { "type": "dialogue", "lines": [line("grunt"), line("lady")], "choices": [{ "label": ["Bye."] }] },
         }),
     );
-    let folder = scratch.path().join("game");
-    game.write_to(&folder);
-    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
-    project.settle();
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    editor.project = Some(project);
+    let mut editor = support::open(game, &scratch);
     let grunt = path("model", "grunt");
     let model = editor
         .read::<ModelDef>(&grunt)
@@ -170,7 +138,7 @@ fn renaming_a_face_leaves_the_lines_of_speakers_wearing_another_model_alone() {
 
     assert!(busts::rename(&mut editor, &grunt, &smug, "sly"));
 
-    settled_loads(&mut editor);
+    support::settled(&mut editor);
     let faces_of = |model: &str| -> Vec<String> {
         busts::lines(&editor, &path("model", model))
             .into_iter()

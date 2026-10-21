@@ -4,8 +4,6 @@ use testkit::{Game, Map, path};
 
 use crate::support::game;
 
-const PINNED: &str = include_str!("load_errors.txt");
-
 #[test]
 fn every_rule_names_its_file_line_pointer_and_nearest_value() {
     let report = game()
@@ -45,16 +43,80 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
         .err()
         .expect("refused");
 
-    let text = report.to_string();
-    let body = text
-        .split_once("\nresult   ")
-        .map(|(_, body)| body)
-        .expect("a result line");
+    let json = |line: usize, column: usize, pointer: &str| ErrorPlace::Json {
+        line,
+        column,
+        pointer: pointer.to_owned(),
+    };
+    let named: Vec<(&str, ErrorPlace, &str, Option<&str>)> = report
+        .errors
+        .iter()
+        .map(|error| {
+            (
+                error.file.as_str(),
+                error.at.clone(),
+                error.problem.rule,
+                error.problem.nearest.as_deref(),
+            )
+        })
+        .collect();
     assert_eq!(
-        body.trim_end(),
-        PINNED.trim_end(),
-        "the report text\n{text}"
+        named,
+        [
+            (
+                SETTINGS_FILE,
+                json(3, 20, "/initial_spawn"),
+                "not walkable",
+                Some("9, 7")
+            ),
+            (
+                SETTINGS_FILE,
+                json(8, 13, "/player"),
+                "missing file",
+                Some("\"hero.player.json\""),
+            ),
+            (
+                "apprentice.class.json",
+                json(1, 11, "/name"),
+                "wrong type",
+                None
+            ),
+            (
+                "cove.area/layers/ground.csv",
+                ErrorPlace::Csv { row: 2, column: 3 },
+                "palette out of range",
+                None,
+            ),
+            (
+                "hero.class.json",
+                json(3, 11, "/icon"),
+                "missing file",
+                Some("\"icons/hero.png\""),
+            ),
+            (
+                "lost.test_character.json",
+                json(4, 18, "/known_areas"),
+                "start not known",
+                None,
+            ),
+            (
+                "lost.test_character.json",
+                json(7, 12, "/start"),
+                "not walkable",
+                Some("9, 7"),
+            ),
+            ("splash.sfx", ErrorPlace::WholeFile, "missing file", None),
+        ],
+        "{report}"
     );
+    let text = report.to_string();
+    for at in [
+        "fixtures/game.config.json:8:13  /player",
+        "cove.area/layers/ground.csv:2:3  row 2, column 3",
+        "nearest   \"icons/hero.png\"",
+    ] {
+        assert!(text.contains(at), "the report says {at}:\n{text}");
+    }
 }
 
 #[test]

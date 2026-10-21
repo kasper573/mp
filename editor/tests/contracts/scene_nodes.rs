@@ -1,15 +1,12 @@
-use std::sync::Arc;
-
 use editor::app::Editor;
-use editor::project::{Project, RowSelection};
+use editor::project::RowSelection;
 use editor::schema::{self, SchemaShapes};
-use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::nodes::SceneTree;
 use editor::views::area::{AreaAction, AreaSnapshot, nodes, placement, run_action};
 use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
-use engine::systems::area::blueprint::{BlueprintDef, Placement};
+use engine::systems::area::blueprint::{self, BlueprintDef, Placement};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaModule, AreaModuleKind};
 use serde_json::json;
@@ -100,17 +97,19 @@ fn new_nodes_land_in_the_selected_folder_or_beside_the_selected_node() {
 }
 
 #[test]
-fn a_change_remaps_only_the_nodes_the_scene_held_before_it() {
+fn a_change_follows_each_node_the_scene_held_to_where_it_now_sits() {
     let mut scene = vec![object("a"), folder("f", vec![object("b")])];
     let mut tree = SceneTree::new(&mut scene);
-    tree.append("", vec![object("c")]);
-    tree.duplicate(&["/1".to_owned()], Clone::clone);
+    tree.duplicate(&["/0".to_owned()], Clone::clone);
     let remap = tree.remap();
 
-    let mut before: Vec<&str> = remap.keys().map(String::as_str).collect();
-    before.sort();
-    assert_eq!(before, ["/0", "/1", "/1/children/0"]);
-    assert_eq!(nodes::remapped(&remap, "/7"), None);
+    assert_eq!(nodes::remapped(&remap, "/0").as_deref(), Some("/0"));
+    assert_eq!(nodes::remapped(&remap, "/1").as_deref(), Some("/2"));
+    assert_eq!(
+        nodes::remapped(&remap, "/1/children/0").as_deref(),
+        Some("/2/children/0")
+    );
+    assert_eq!(nodes::remapped(&remap, "/5"), None);
 }
 
 #[test]
@@ -134,14 +133,13 @@ fn a_new_placement_takes_its_blueprints_name_numbered_past_its_siblings() {
     let label = |pointer: &str| nodes::node(&scene, pointer).and_then(SceneNode::label);
     assert_eq!(label("/1/children/2"), Some("pew (2)"));
     assert_eq!(label("/1/children/3"), Some("pew (3)"));
-    settled(&mut editor);
 }
 
 #[test]
 fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(chapel(), &scratch);
-    let before = shown(settled(&mut editor));
+    let before = shown(support::content(&mut editor));
 
     nodes::select(&mut editor, &area(), vec!["/1".to_owned()]);
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
@@ -154,7 +152,7 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
     assert_eq!(scene[1].label(), Some("Pews"));
     assert_eq!(reader.path_of(placed.blueprint), Some(made.as_str()));
     assert_eq!(editor.selection.parts, ["/1"]);
-    let content = settled(&mut editor);
+    let content = support::content(&mut editor);
     let blueprint = content
         .by_path::<BlueprintDef>(&made)
         .expect("the new blueprint loads");
@@ -166,7 +164,7 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
     assert_eq!(shown(content), before);
 
     editor.undo();
-    let content = settled(&mut editor);
+    let content = support::content(&mut editor);
     assert!(content.by_path::<BlueprintDef>(&made).is_none());
     assert!(nodes::is_folder(&nodes::scene_of(&editor, &area())[1]));
 }
@@ -175,7 +173,7 @@ fn making_a_blueprint_of_a_folder_leaves_one_placement_and_the_area_as_it_was() 
 fn unpacking_a_placement_leaves_a_folder_of_what_it_placed_and_the_area_as_it_was() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(chapel(), &scratch);
-    let before = shown(settled(&mut editor));
+    let before = shown(support::content(&mut editor));
 
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     run_action(
@@ -195,14 +193,13 @@ fn unpacking_a_placement_leaves_a_folder_of_what_it_placed_and_the_area_as_it_wa
             ..
         })]
     ));
-    assert_eq!(shown(settled(&mut editor)), before);
+    assert_eq!(shown(support::content(&mut editor)), before);
 }
 
 #[test]
 fn a_placement_covers_on_the_map_what_it_places() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(chapel(), &scratch);
-    settled(&mut editor);
 
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
 
@@ -219,8 +216,7 @@ fn a_placement_covers_on_the_map_what_it_places() {
 #[test]
 fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
-    let mut editor = open(signposted(), &scratch);
-    settled(&mut editor);
+    let editor = open(signposted(), &scratch);
     let reader = editor.reader().expect("a reader");
     let signpost = editor
         .read::<BlueprintDef>(&path("blueprint", "signpost"))
@@ -235,7 +231,6 @@ fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content()
 fn a_blueprint_made_of_modules_with_holes_takes_their_variables_and_its_placement_fills_them() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = open(signposted(), &scratch);
-    settled(&mut editor);
     let signpost = path("blueprint", "signpost");
     let scene = nodes::scene_of(&editor, &signpost);
     let door = (0..scene.len())
@@ -246,7 +241,7 @@ fn a_blueprint_made_of_modules_with_holes_takes_their_variables_and_its_placemen
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &signpost).expect("the signpost is open");
     run_action(&mut editor, &snapshot, AreaAction::MakeBlueprint);
 
-    let content = settled(&mut editor);
+    let content = support::content(&mut editor);
     let made = content
         .by_path::<BlueprintDef>(&path("blueprint", "door"))
         .expect("the new blueprint loads");
@@ -257,7 +252,7 @@ fn a_blueprint_made_of_modules_with_holes_takes_their_variables_and_its_placemen
     };
     assert!(matches!(placed.module, AreaModule::Blueprint(_)));
     assert_eq!(
-        placed.holes.0.values().collect::<Vec<_>>(),
+        blueprint::variables_of(&placed.holes).collect::<Vec<_>>(),
         ["spot"],
         "the placement fills the new blueprint's variable from the signpost's"
     );
@@ -329,31 +324,9 @@ fn shown(content: &Content) -> Vec<String> {
 }
 
 fn open(game: Game, scratch: &tempfile::TempDir) -> Editor {
-    let folder = scratch.path().join("game");
-    game.write_to(&folder);
-    let project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
-    let mut editor = Editor::new(
-        UserFolder::at(scratch.path().join("user")),
-        EditorSettings::default(),
-    );
-    editor.project = Some(project);
+    let mut editor = support::open(game, scratch);
     editor.selection = RowSelection::row(AreaDef::TABLE, &area());
     editor
-}
-
-fn settled(editor: &mut Editor) -> &Content {
-    let project = editor.project.as_mut().expect("a project");
-    project.settle();
-    project.content.as_ref().unwrap_or_else(|| {
-        panic!(
-            "{}",
-            project
-                .report
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default()
-        )
-    })
 }
 
 #[test]

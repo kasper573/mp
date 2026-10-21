@@ -19,20 +19,14 @@ fn a_line_is_inked_inside_a_clear_ring_of_its_padding() {
 }
 
 #[test]
-fn a_longer_line_is_wider_and_as_tall() {
-    let pad = 4;
-    let short = raster(Face::BookBold, 24.0, "7", pad);
-    let long = raster(Face::BookBold, 24.0, "777", pad);
-
-    assert!(long.width - 2 * pad > (short.width - 2 * pad) * 2);
+fn a_line_is_as_wide_as_what_it_says_and_as_tall_as_its_face_sets_it_at_that_size() {
+    let short = raster(Face::BookBold, 24.0, "7", 0);
+    let long = raster(Face::BookBold, 24.0, "777", 0);
+    assert!(long.width > short.width * 2);
     assert_eq!(long.height, short.height);
-}
 
-#[test]
-fn a_line_is_as_tall_as_its_face_sets_it_at_that_size() {
     let small = raster(Face::SmallCapsBold, 20.0, "Guarded", 0);
     let large = raster(Face::SmallCapsBold, 40.0, "Guarded", 0);
-
     assert!(small.height as f32 >= 20.0);
     assert!(large.height.abs_diff(small.height * 2) <= 2);
 }

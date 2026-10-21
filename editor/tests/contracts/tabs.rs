@@ -13,31 +13,20 @@ use engine::systems::area::AreaDef;
 use crate::support::{area, game_folder};
 
 #[test]
-fn each_preview_takes_the_place_of_the_one_before() {
-    let scratch = tempfile::tempdir().expect("a scratch folder");
-    let mut editor = editor(&scratch);
-
-    for key in ["a", "b", "c"] {
-        preview(&mut editor, item(key));
-    }
-
-    assert_eq!(tabs(&editor), vec![item("c")]);
-}
-
-#[test]
-fn a_kept_tab_is_never_taken_by_a_preview() {
+fn each_preview_takes_the_place_of_the_one_before_but_never_a_kept_tab() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor(&scratch);
 
     keep(&mut editor, item("a"));
-    preview(&mut editor, item("b"));
-    preview(&mut editor, item("c"));
+    for key in ["b", "c", "d"] {
+        preview(&mut editor, item(key));
+    }
 
-    assert_eq!(tabs(&editor), vec![item("a"), item("c")]);
+    assert_eq!(tabs(&editor), vec![item("a"), item("d")]);
 }
 
 #[test]
-fn keeping_the_preview_keeps_it_where_it_is() {
+fn keeping_the_preview_keeps_it_where_it_is_even_once_closed_and_opened_again() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor(&scratch);
 
@@ -45,8 +34,16 @@ fn keeping_the_preview_keeps_it_where_it_is() {
     preview(&mut editor, item("b"));
     keep(&mut editor, item("b"));
     preview(&mut editor, item("c"));
-
     assert_eq!(tabs(&editor), vec![item("a"), item("b"), item("c")]);
+
+    let path = editor.dock.find_tab(&item("c")).expect("the preview");
+    editor.dock.remove_tab(path);
+    keep(&mut editor, item("c"));
+    preview(&mut editor, item("d"));
+    assert_eq!(
+        tabs(&editor),
+        vec![item("a"), item("b"), item("c"), item("d")]
+    );
 }
 
 #[test]
@@ -61,20 +58,6 @@ fn previewing_an_open_tab_shows_it_and_spares_the_preview() {
     preview(&mut editor, item("c"));
 
     assert_eq!(tabs(&editor), vec![item("a"), item("c")]);
-}
-
-#[test]
-fn a_closed_preview_opened_again_to_keep_stays() {
-    let scratch = tempfile::tempdir().expect("a scratch folder");
-    let mut editor = editor(&scratch);
-
-    preview(&mut editor, item("a"));
-    let path = editor.dock.find_tab(&item("a")).expect("the preview");
-    editor.dock.remove_tab(path);
-    keep(&mut editor, item("a"));
-    preview(&mut editor, item("b"));
-
-    assert_eq!(tabs(&editor), vec![item("a"), item("b")]);
 }
 
 #[test]
