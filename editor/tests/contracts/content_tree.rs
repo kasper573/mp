@@ -335,6 +335,52 @@ fn deleting_files_removes_exactly_the_entries_that_named_them_wherever_they_sit(
 }
 
 #[test]
+fn deleting_refuses_to_take_entries_from_a_file_changed_on_disk_since_it_was_read() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = camp().npc("villager", 5.0, json!([])).edit_scene("area", support::AREA, |scene| {
+        scene.as_array_mut().expect("a scene").push(
+            json!({ "type": "resident", "npc": path("npc", "villager"), "at": { "x": 3.0, "y": 3.0 } }),
+        );
+    });
+    let mut editor = support::open(game, &scratch);
+    let root = editor.project.as_ref().expect("a project").root.clone();
+    let scene_file = format!("{}/scene.json", area());
+    let mut scene: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join(&scene_file)).expect("the scene"))
+            .expect("a scene");
+    scene.as_array_mut().expect("a scene").insert(
+        0,
+        json!({ "type": "resident", "npc": path("npc", "ghost"), "at": { "x": 1.0, "y": 1.0 } }),
+    );
+    let changed = serde_json::to_vec_pretty(&scene).expect("written");
+    std::fs::write(root.join(&scene_file), &changed).expect("changed by hand");
+    let project = editor.project.as_mut().expect("a project");
+    project.outside_changes(FolderChange::Files(vec![scene_file.clone()]));
+    assert!(!project.loads());
+
+    rows::delete_dialog(&mut editor, vec![path("npc", "villager")]);
+    let Some(ModalDialog::Delete(mut dialog)) = editor.dialogs.pop() else {
+        panic!("a delete dialog");
+    };
+    for group in &mut dialog.groups {
+        group.decision = UsageDecision::Remove;
+    }
+    let refused = rows::delete(&mut editor, &dialog);
+
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|reason| reason.contains("changed")),
+        "{refused:?}"
+    );
+    let files = support::files(&mut editor);
+    assert_eq!(
+        files.text(&scene_file).as_deref(),
+        std::str::from_utf8(&changed).ok()
+    );
+}
+
+#[test]
 fn deleting_a_file_refuses_to_point_what_named_it_where_the_game_would_refuse_it() {
     let scratch = tempfile::tempdir().expect("scratch");
     let crier = path("npc", "crier");

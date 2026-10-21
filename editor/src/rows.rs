@@ -1001,6 +1001,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     let mut repointed: Vec<&str> = Vec::new();
     for (file, entries) in by_file {
         let mut taken: Vec<TakenSlot> = Vec::new();
+        let mut taken_from: Vec<&ContentUsage> = Vec::new();
         for (usage, group) in entries {
             match &group.decision {
                 UsageDecision::Repoint(to) => {
@@ -1013,11 +1014,17 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
                     );
                     repointed.push(&usage.file);
                 }
-                UsageDecision::Remove => taken.extend(TakenSlot::of(&usage.pointer, false)),
-                UsageDecision::Unpack => taken.extend(TakenSlot::of(
-                    &scene_graph::node_pointer(&usage.pointer),
-                    true,
-                )),
+                UsageDecision::Remove => {
+                    taken.extend(TakenSlot::of(&usage.pointer, false));
+                    taken_from.push(usage);
+                }
+                UsageDecision::Unpack => {
+                    taken.extend(TakenSlot::of(
+                        &scene_graph::node_pointer(&usage.pointer),
+                        true,
+                    ));
+                    taken_from.push(usage);
+                }
                 UsageDecision::Undecided => {}
             }
         }
@@ -1027,6 +1034,17 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         let Some(mut value) = project.files.json_owned(&file) else {
             continue;
         };
+        let still_named = |usage: &&ContentUsage| {
+            usage
+                .named_in(&value)
+                .is_some_and(|named| dialog.gone.contains(&named))
+        };
+        if !taken_from.iter().all(still_named) {
+            return Err(format!(
+                "{} changed since what it names was read; delete again once the folder loads",
+                shown_path(&file)
+            ));
+        }
         taken.sort_by(|a, b| b.steps.cmp(&a.steps).then(a.unpack.cmp(&b.unpack)));
         taken.dedup_by(|later, first| later.steps == first.steps);
         for slot in taken {

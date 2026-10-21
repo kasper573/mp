@@ -169,7 +169,8 @@ pub fn repoint(editor: &mut Editor, moved: &[MovedOutside]) -> Result<usize, Str
     Ok(count)
 }
 
-/// The open folder with every pending load taken in, so its usages name what the files name now.
+/// The open folder with every pending load taken in, so its usages name what the files name now
+/// unless that load failed.
 pub fn settled(editor: &mut Editor) -> Result<&Project, String> {
     let project = editor.project.as_mut().ok_or("no folder is open")?;
     project.settle();

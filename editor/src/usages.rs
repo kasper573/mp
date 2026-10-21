@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use engine::core::content::id::LeafKind;
+use engine::core::content::locate::unescape;
 use engine::core::content::{Content, Reference};
 use engine::systems::registry;
 use rayon::prelude::*;
+use serde_json::Value;
 
 use crate::project::ProjectFiles;
 
@@ -11,7 +13,24 @@ use crate::project::ProjectFiles;
 pub struct ContentUsage {
     pub file: String,
     pub pointer: String,
+    pub key: bool,
     pub known: bool,
+}
+
+impl ContentUsage {
+    /// The path its file names here as `file` holds it now, which differs from the path it was
+    /// found naming once the file changed since.
+    pub fn named_in(&self, file: &Value) -> Option<String> {
+        if !self.key {
+            return file.pointer(&self.pointer)?.as_str().map(str::to_owned);
+        }
+        let (map, key) = self.pointer.rsplit_once('/')?;
+        let key = unescape(key);
+        file.pointer(map)?
+            .as_object()?
+            .contains_key(&key)
+            .then_some(key)
+    }
 }
 
 #[derive(Default)]
@@ -39,6 +58,7 @@ impl ContentUsages {
                 let usage = ContentUsage {
                     file: file.clone(),
                     pointer: reference.pointer.clone(),
+                    key: reference.key,
                     known: reference.known,
                 };
                 let named = match reference.kind {
