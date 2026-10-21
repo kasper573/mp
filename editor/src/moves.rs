@@ -332,6 +332,7 @@ pub fn follow(editor: &mut Editor, moves: &[PathMove]) {
         }
     }
     editor.imports.moved(&moved);
+    editor.views.area.moved(&moved);
     if let Some(project) = &editor.project {
         let folder = UserFolder::folder_key(&project.root);
         if let Some(view) = editor.settings.content_trees.get_mut(&folder) {

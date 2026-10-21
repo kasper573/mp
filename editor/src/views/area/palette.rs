@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::{Content, name_of};
+use engine::core::content::{FolderReader, name_of};
 use engine::systems::area::tileset::TilesetDef;
 use strum::VariantArray;
 
@@ -21,19 +22,21 @@ pub enum PaletteLens {
     Terrains,
 }
 
-pub fn show(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: &Content,
-    area: &AreaSnapshot,
-) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, area: &AreaSnapshot) {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
     let tile_px = area.area().tile;
-    let tilesets: Vec<(String, &TilesetDef)> = content
-        .table::<TilesetDef>()
+    let reader = project.reader();
+    let read: Vec<(String, Arc<TilesetDef>)> = reader
+        .paths_of::<TilesetDef>()
         .iter()
+        .filter_map(|path| Some((path.clone(), project.read::<TilesetDef>(path).ok()?)))
         .filter(|(_, def)| def.tile == tile_px)
-        .map(|(id, def)| (id.path(content).to_owned(), def))
+        .collect();
+    let tilesets: Vec<(String, &TilesetDef)> = read
+        .iter()
+        .map(|(path, def)| (path.clone(), def.as_ref()))
         .collect();
     let used = area.picture.ground.tilesets();
     let view = editor.views.area.view(view_key);
@@ -64,7 +67,7 @@ pub fn show(
     editor.views.area.view_mut(view_key).palette_lens = picked;
     ui.add_space(6.0);
     match lens {
-        PaletteLens::Tiles => tile_sheet(editor, ui, view_key, content, &tilesets),
+        PaletteLens::Tiles => tile_sheet(editor, ui, view_key, &reader, &tilesets),
         PaletteLens::Terrains => terrain_sheet(editor, ui, view_key, &tilesets),
     }
 }
@@ -90,11 +93,15 @@ fn tileset_chips(
         .map(|k| (k.clone(), k.clone()))
         .collect();
     others.sort();
-    if view.pick.tileset.is_none() {
-        view.pick.tileset = own
-            .first()
-            .map(|k| (*k).clone())
-            .or_else(|| others.first().map(|(k, _)| k.clone()));
+    let listed = |key: &String| tilesets.iter().any(|(listed, _)| listed == key);
+    if !view.pick.tileset.as_ref().is_some_and(listed) {
+        view.pick = TilePick {
+            tileset: own
+                .first()
+                .map(|k| (*k).clone())
+                .or_else(|| others.first().map(|(k, _)| k.clone())),
+            ..TilePick::default()
+        };
     }
     let current = view.pick.tileset.clone();
     let mut picked: Option<String> = None;
@@ -157,7 +164,7 @@ fn tile_sheet(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: &Content,
+    reader: &FolderReader,
     tilesets: &[(String, &TilesetDef)],
 ) {
     let Some(tileset_key) = editor.views.area.view(view_key).pick.tileset.clone() else {
@@ -249,8 +256,9 @@ fn tile_sheet(
                     if let Some(walk) = data.walk {
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
                     }
-                    if let Some(surface) = data.surface {
-                        info.push_str(&format!(" · {}", shown_path(surface.path(content))));
+                    if let Some(surface) = data.surface.and_then(|surface| reader.path_of(surface))
+                    {
+                        info.push_str(&format!(" · {}", shown_path(surface)));
                     }
                     if !data.animation.is_empty() {
                         info.push_str(&format!(" · {} frames", data.animation.len()));
@@ -295,7 +303,11 @@ fn terrain_chips(
 ) {
     let sets = terrain_sets(tilesets, used);
     let view = editor.views.area.view_mut(view_key);
-    if view.terrain.set.is_none()
+    let listed = |tileset: &Option<String>, set: &Option<String>| {
+        sets.iter()
+            .any(|(t, s)| tileset.as_ref() == Some(t) && set.as_ref() == Some(s))
+    };
+    if !listed(&view.terrain.tileset, &view.terrain.set)
         && let Some((tileset, set)) = sets.first()
     {
         view.terrain = TerrainPick {

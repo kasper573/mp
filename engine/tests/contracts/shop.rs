@@ -11,7 +11,7 @@ use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::{self, Speaker};
 use engine::systems::shop::{self, SaleQuote, SaleVerdict, ShopDef, ShopRequest, ShopView};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, path};
+use testkit::{Game, Map, Sim, path, said};
 
 #[test]
 fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
@@ -208,8 +208,6 @@ fn a_map_object_can_keep_a_shop() {
 }
 
 fn market() -> Sim {
-    let stacked =
-        || json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] });
     let content = Game::new()
         .area(
             "market",
@@ -239,13 +237,13 @@ fn market() -> Sim {
         .asset("objects/box.png", testkit::png(1, 1))
         .hero("market", 7.0, 7.0)
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 100_000 }] }))
-        .item("potion", stacked())
-        .item("tonic", stacked())
-        .item("wing", stacked())
-        .item("bone", stacked())
-        .item("token", stacked())
-        .item("tusk", stacked())
-        .item("steak", stacked())
+        .resource("potion", 1000)
+        .resource("tonic", 1000)
+        .resource("wing", 1000)
+        .resource("bone", 1000)
+        .resource("token", 1000)
+        .resource("tusk", 1000)
+        .resource("steak", 1000)
         .npc("merchant", 40.0, json!([{ "type": "script", "script": "merchant_talk.script.json" }]))
         .script(
             "merchant_talk",
@@ -363,14 +361,6 @@ fn keeper(ask: &str, browsing: &str, shop: &str) -> Value {
     });
     nodes[browsing] = said("Take your time.", "shop");
     nodes
-}
-
-fn said(text: &str, next: &str) -> Value {
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "next": next,
-    })
 }
 
 fn browse(sim: &mut Sim, client: u32, keeper: &str) -> ShopView {

@@ -14,7 +14,7 @@ use engine::systems::player::{
 use engine::systems::script::{self, Place};
 use engine::systems::{npc, stat};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, labels, lines, locked};
+use testkit::{Game, Map, Sim, dialogue, labels, lines, locked};
 
 const ROAD: Pos<Tiles> = Pos::new(13.0, 6.0);
 
@@ -220,8 +220,6 @@ fn the_warden_has_a_word_only_for_friends_of_the_clan() {
 }
 
 fn harbour() -> Sim {
-    let stacked =
-        || json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] });
     let content = Game::new()
         .area(
             "harbour",
@@ -252,17 +250,13 @@ fn harbour() -> Sim {
             hero["levels"] = json!([{ "xp": 0 }, { "xp": 100 }, { "xp": 200 }])
         })
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }))
-        .item("pass", stacked())
-        .item("fish", stacked())
+        .resource("pass", 1000)
+        .resource("fish", 1000)
         .npc("warden", 40.0, json!([{ "type": "script", "script": "warden_talk.script.json" }]))
         .script("warden_talk", "npc", warden())
         .npc("ferryman", 40.0, json!([{ "type": "script", "script": "ferryman_talk.script.json" }]))
         .script("ferryman_talk", "npc", ferryman())
-        .row(
-            "memory",
-            "sided",
-            json!({ "label": "Sided with the clan", "type": "boolean", "resets": "never" }),
-        )
+        .memory("sided", "never")
         .row(
             "notification",
             "sails",
@@ -306,13 +300,6 @@ fn harbour() -> Sim {
 }
 
 fn warden() -> Value {
-    let said = |text: &str, choices: Value| {
-        json!({
-            "type": "dialogue",
-            "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-            "choices": choices,
-        })
-    };
     let seasoned = json!({ "type": "at_least", "a": { "type": "level" }, "b": 3 });
     json!({
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
@@ -324,12 +311,12 @@ fn warden() -> Value {
                 "next": "no_pass",
             },
             "no_pass": { "type": "if", "test": { "type": "not", "of": holding_pass() }, "yes": "halt" },
-            "halt": said("Halt! Nobody takes the road without a pass.", json!([
+            "halt": dialogue("Halt! Nobody takes the road without a pass.", json!([
                 { "label": ["I have a pass."], "requires": holding_pass(), "reveal": ["needs"], "to": "lets_you_pass" },
                 { "label": ["I'm ready for the road."], "requires": seasoned, "reveal": ["locked", "needs"], "to": "earn_pass" },
                 { "label": ["I'll turn back."] },
             ])),
-            "hello": said("The road is closed.", json!([
+            "hello": dialogue("The road is closed.", json!([
                 { "label": ["I'm ready for the road."], "requires": seasoned, "reveal": ["locked", "needs"], "to": "earn_pass" },
                 { "label": ["Would a fish change your mind?"], "reveal": ["costs"], "to": "fish_for_pass" },
                 {
@@ -347,9 +334,9 @@ fn warden() -> Value {
                 "done": "fish",
             },
             "clan_pass": { "type": "items", "give": [{ "item": "pass.item.json" }], "done": "uneasy" },
-            "lets_you_pass": said("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
-            "fish": said("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
-            "uneasy": said("Then go.", json!([{ "label": ["Thank you."] }])),
+            "lets_you_pass": dialogue("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
+            "fish": dialogue("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
+            "uneasy": dialogue("Then go.", json!([{ "label": ["Thank you."] }])),
     })
 }
 

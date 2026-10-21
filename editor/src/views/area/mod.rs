@@ -376,6 +376,22 @@ impl AreaViews {
     pub fn view_mut(&mut self, key: &str) -> &mut AreaViewState {
         self.views.get_mut(key).expect("an open area view")
     }
+
+    /// Points what the views have picked, stamp and draw behind at where `moved` took it.
+    pub fn moved(&mut self, moved: &dyn Fn(&str) -> Option<String>) {
+        for view in self.views.values_mut() {
+            for picked in [
+                &mut view.pick.tileset,
+                &mut view.terrain.tileset,
+                &mut view.stamp,
+                &mut view.backdrop,
+            ] {
+                if let Some(to) = picked.as_deref().and_then(moved) {
+                    *picked = Some(to);
+                }
+            }
+        }
+    }
 }
 
 pub fn sync(editor: &mut Editor, world: &mut World) {
@@ -439,7 +455,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) 
     match tab {
         BottomTab::Palette => {
             if let Some(snapshot) = AreaSnapshot::for_view(editor, view_key) {
-                palette::show(editor, ui, view_key, &content, &snapshot);
+                palette::show(editor, ui, view_key, &snapshot);
             }
         }
         BottomTab::Blueprints => stamp::stamp_panel(editor, ui, view_key, &content, &bundle),

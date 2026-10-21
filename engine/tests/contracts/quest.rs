@@ -11,7 +11,7 @@ use engine::systems::quest::{self, QuestDef, QuestLog, QuestRequest, QuestResult
 use engine::systems::shop::{self, ShopRequest};
 use engine::systems::{area, combat, movement, npc, rewards, script, stat};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, labels, locked, path};
+use testkit::{Game, Map, Sim, dialogue, labels, locked, path, said};
 
 #[test]
 fn accepting_a_quest_logs_it_tracks_it_and_hands_over_its_items() {
@@ -361,7 +361,6 @@ fn deciding_fails_the_other_quest_and_is_remembered() {
 /// A harbour of quest givers, each standing for one way quests are offered, followed and handed
 /// in, with what they ask for at hand.
 fn harbour() -> Sim {
-    let stacked = |max: u32| json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": max }] });
     let quest_item =
         |kind: &str| json!({ "kind": { "type": kind }, "modules": [{ "type": "quest_item" }] });
     let content = Game::new()
@@ -405,11 +404,11 @@ fn harbour() -> Sim {
                 { "xp": 200 },
             ])
         })
-        .item("gold", stacked(100_000))
-        .item("bone", stacked(50))
-        .item("token", stacked(1000))
-        .item("tusk", stacked(50))
-        .item("steak", stacked(50))
+        .resource("gold", 100_000)
+        .resource("bone", 50)
+        .resource("token", 1000)
+        .resource("tusk", 50)
+        .resource("steak", 50)
         .item("pebble", json!({ "kind": { "type": "resource" } }))
         .item("shield", json!({ "kind": { "type": "equipment", "slot": "offhand" } }))
         .item("helm", json!({ "kind": { "type": "equipment", "slot": "head" } }))
@@ -625,8 +624,8 @@ fn harbour() -> Sim {
                 ]),
             ),
         )
-        .row("memory", "sided", json!({ "label": "sided", "type": "boolean", "resets": "never" }))
-        .row("memory", "spurned", json!({ "label": "spurned", "type": "boolean", "resets": "never" }))
+        .memory("sided", "never")
+        .memory("spurned", "never")
         .vfx("damage_taken")
         .shader("damage_pop")
         .vfx("defeated")
@@ -774,22 +773,6 @@ fn bats_open() -> Value {
         { "type": "at_least", "a": { "type": "level" }, "b": 3 },
         quest_done("letter"),
     ] })
-}
-
-fn dialogue(text: &str, choices: Value) -> Value {
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "choices": choices,
-    })
-}
-
-fn said(text: &str, next: &str) -> Value {
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "next": next,
-    })
 }
 
 fn on_quest(quest: &str) -> Value {

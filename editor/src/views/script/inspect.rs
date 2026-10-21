@@ -1239,8 +1239,11 @@ fn speaker_rows(
             .as_deref()
             .and_then(|npc| reader.id_of::<NpcDef>(npc))
             .or_else(|| {
-                let first = reader.paths_of::<NpcDef>().first()?;
-                reader.id_of::<NpcDef>(first)
+                let nearest = reader
+                    .paths_of::<NpcDef>()
+                    .iter()
+                    .min_by_key(|npc| cx.seen_from_here(npc).0)?;
+                reader.id_of::<NpcDef>(nearest)
             });
         let by = match picked {
             SpeakerKind::Npc => npc.map(Speaker::Npc),

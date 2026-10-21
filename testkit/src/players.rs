@@ -6,6 +6,7 @@ use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::AreaDef;
 use engine::systems::area::transition::{self, Crossing};
+use engine::systems::memory::{self, MemoryDef};
 use engine::systems::player::snapshot::JoinAs;
 use engine::systems::player::{
     self, AreaDrawn, ClientId, JoinRequest, PlayedBy, Players, SpawnPolicy, SpawnRules,
@@ -85,6 +86,11 @@ impl Sim {
 
     pub fn player(&self, client: u32) -> Entity {
         self.world.resource::<Players>().0[&ClientId(client)]
+    }
+
+    /// Whether `player` remembers the boolean memory under `key`.
+    pub fn remembers(&self, player: Entity, key: &str) -> bool {
+        memory::get(&self.world, player, self.id::<MemoryDef>(key)).truthy()
     }
 
     pub fn conn(&mut self, client: u32) -> Entity {

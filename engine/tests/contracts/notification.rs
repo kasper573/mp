@@ -8,7 +8,6 @@ use engine::systems::combat::{self, Attitude};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::history::{History, HistoryTopic};
 use engine::systems::interact::{self, InteractRequest};
-use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, position};
 use engine::systems::notification::{self, Notification, NotificationKind, NotificationSent};
 use engine::systems::npc::{self, NpcDef, Pack};
@@ -44,7 +43,7 @@ fn stepping_onto_the_pier_narrates_the_gulls_once_even_during_a_conversation() {
     movement::relocate(&mut sim.world, player, ON_PIER);
     sim.run(0.5);
     assert_eq!(sim.told(1), Vec::new());
-    assert!(remembered(&sim, player, "heard_gulls"));
+    assert!(sim.remembers(player, "heard_gulls"));
     assert!(sim.conversation(1).is_some());
 }
 
@@ -428,8 +427,8 @@ fn game() -> Content {
         )
         .row("notification", "island_intro", intro_row("The island"))
         .row("notification", "forest_intro", intro_row("The forest"))
-        .row("memory", "heard_gulls", json!({ "label": "heard", "type": "boolean", "resets": "never" }))
-        .row("memory", "taunted", json!({ "label": "taunted", "type": "boolean", "resets": "never" }))
+        .memory("heard_gulls", "never")
+        .memory("taunted", "never")
         .sfx("gull_cries")
         .sfx("drums")
         .sfx("ui_refuse")
@@ -511,10 +510,6 @@ fn travel(from: &mut Sim, player: Entity, to: &mut Sim) -> Entity {
     let arrived = from.cross(player, to, Pos::new(3.0, 3.0));
     to.run(0.5);
     arrived
-}
-
-fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
-    memory::get(&sim.world, player, sim.id::<MemoryDef>(key)).truthy()
 }
 
 fn refusal(sim: &Sim) -> Notification {

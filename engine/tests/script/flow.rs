@@ -1,14 +1,13 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
 use engine::systems::dialogue::Conversation;
-use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement;
 use engine::systems::notification::Notification;
 use engine::systems::npc::body::{self, Act, Priority};
 use engine::systems::script::{EventKind, Owner, RiftInstances};
 use engine::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
-use testkit::{Sim, labels, lines, path};
+use testkit::{Sim, dialogue, labels, lines, path};
 
 use crate::game::{field, health, module, scripted_npc, spawn};
 
@@ -81,13 +80,13 @@ fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
         stat::effective(world, player, StatKind::Health) < hurt
     }));
     assert_eq!(body::target(&sim.world, npc), Some(player));
-    assert!(!remembered(&sim, player, "bribed"));
+    assert!(!sim.remembers(player, "bribed"));
 
     body::order(&mut sim.world, npc, Act::Stop, Priority(5), None);
     sim.tick();
-    assert!(remembered(&sim, player, "bribed"));
+    assert!(sim.remembers(player, "bribed"));
     assert_eq!(body::target(&sim.world, npc), None);
-    assert!(!remembered(&sim, player, "sided"));
+    assert!(!sim.remembers(player, "sided"));
 }
 
 #[test]
@@ -101,7 +100,7 @@ fn an_attack_loses_a_target_that_leaves_its_range() {
     movement::relocate(&mut sim.world, player, Pos::new(28.0, 28.0));
     assert!(sim.run_until(5.0, |world| body::target(world, npc).is_none()));
     sim.tick();
-    assert!(remembered(&sim, player, "sided"));
+    assert!(sim.remembers(player, "sided"));
 }
 
 #[test]
@@ -113,9 +112,9 @@ fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
     raise(&mut sim, owner, EventKind::Interacted, player);
     sim.tick();
 
-    assert!(remembered(&sim, player, "bribed"));
-    assert!(!remembered(&sim, player, "sided"));
-    assert!(!remembered(&sim, player, "looted"));
+    assert!(sim.remembers(player, "bribed"));
+    assert!(!sim.remembers(player, "sided"));
+    assert!(!sim.remembers(player, "looted"));
     assert_eq!(sim.count(player, "gold"), 0);
     let errors = sim.errors(1);
     assert_eq!(errors.len(), 1);
@@ -150,21 +149,6 @@ fn a_choice_label_fills_its_values_like_a_line_does() {
     assert_eq!(labels(&conversation), vec!["Pay Gold".to_owned()]);
 }
 
-fn say(text: &str, choices: Vec<(&str, Option<&str>)>) -> Value {
-    let choices: Vec<Value> = choices
-        .into_iter()
-        .map(|(label, to)| match to {
-            Some(to) => json!({ "label": [label], "to": to }),
-            None => json!({ "label": [label] }),
-        })
-        .collect();
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "choices": choices,
-    })
-}
-
 fn interacted(next: &str) -> Value {
     json!({ "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next })
 }
@@ -188,10 +172,6 @@ fn told<'a>(sim: &mut Sim, lines: &[&'a Notification]) -> Vec<&'a Notification> 
         .into_iter()
         .filter_map(|told| lines.iter().copied().find(|line| line.text == told.text))
         .collect()
-}
-
-fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
-    memory::get(&sim.world, player, sim.id::<MemoryDef>(key)).truthy()
 }
 
 #[test]
@@ -221,15 +201,15 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
             npc(json!({
                 "interacted": interacted("wait"),
                 "wait": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "hello" },
-                "hello": say("Pay up.", vec![("Pay.", Some("pay"))]),
+                "hello": dialogue("Pay up.", json!([{ "label": ["Pay."], "to": "pay" }])),
                 "pay": {
                     "type": "items",
                     "take": [{ "item": "gold.item.json", "count": 5 }],
                     "done": "paid",
                     "refused": "broke"
                 },
-                "paid": say("Thanks.", vec![("Bye.", None)]),
-                "broke": say("No coin?", vec![("Bye.", None)]),
+                "paid": dialogue("Thanks.", json!([{ "label": ["Bye."] }])),
+                "broke": dialogue("No coin?", json!([{ "label": ["Bye."] }])),
             })),
         ),
         (
@@ -320,7 +300,7 @@ pub fn scripts() -> Vec<(&'static str, Value)> {
             npc(json!({
                 "interacted": interacted("roll"),
                 "roll": { "type": "random", "weights": [1, 1], "outputs": ["hello", "bye"] },
-                "hello": say("Hi.", vec![("Bye.", None)]),
+                "hello": dialogue("Hi.", json!([{ "label": ["Bye."] }])),
                 "bye": { "type": "wait", "seconds": 1, "at_most": 5.0 },
             })),
         ),

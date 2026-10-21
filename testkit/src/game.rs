@@ -202,6 +202,24 @@ impl Game {
         )
     }
 
+    /// A memory of whether something happened, labelled with its name and forgotten as `resets`
+    /// says (`never`, `daily` or `leaving_area`).
+    pub fn memory(self, name: &str, resets: &str) -> Game {
+        self.row(
+            "memory",
+            name,
+            json!({ "label": name, "type": "boolean", "resets": resets }),
+        )
+    }
+
+    /// A resource item that stacks up to `max` in a bag slot.
+    pub fn resource(self, name: &str, max: u32) -> Game {
+        self.item(
+            name,
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": max }] }),
+        )
+    }
+
     /// An item of `fields`, named after its file, with an icon and a quiet sound for every way it
     /// changes hands.
     pub fn item(self, name: &str, fields: Value) -> Game {

@@ -3,13 +3,13 @@ use engine::systems::combat::{self, AttackRequest};
 use engine::systems::dialogue::{self, ConversationRequest};
 use engine::systems::interact::{self, InteractRequest};
 use engine::systems::memory::{self, MemoryDef};
-use engine::systems::npc::{self, Npc, NpcDef, summon};
+use engine::systems::npc::{self, NpcDef, summon};
 use engine::systems::player::ClientId;
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility;
 use engine::systems::{actor, movement, rewards, script, skill};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, lines, path};
+use testkit::{Game, Map, Sim, dialogue, hunting, lines, path};
 
 #[test]
 fn a_gamblers_dice_take_ten_gold_a_roll_and_pay_twenty_on_a_win() {
@@ -48,13 +48,13 @@ fn calling_the_gambler_a_cheat_sends_guards_after_you_alone() {
     lose_at_dice(&mut sim, 1);
     assert!(sim.pick(1, "You're cheating.").is_none());
 
-    let guards = all_of(&mut sim, "guard");
+    let guards = sim.npcs("guard");
     assert_eq!(guards.len(), 2);
     for &guard in &guards {
         assert!(visibility::present(&sim.world, guard, player));
         assert!(!visibility::present(&sim.world, guard, bystander));
     }
-    assert!(remembered(&sim, player, "grudge"));
+    assert!(sim.remembers(player, "grudge"));
 
     let full = stat::effective(&sim.world, player, StatKind::Health);
     let calm = stat::effective(&sim.world, bystander, StatKind::Health);
@@ -90,7 +90,7 @@ fn fighting_the_gambler_leaves_him_dead_in_your_world_only() {
 
     sim.talk(1, "gambler");
     assert!(sim.pick(1, "Then let's settle this.").is_none());
-    let copies = all_of(&mut sim, "gambler_hostile");
+    let copies = sim.npcs("gambler_hostile");
     assert_eq!(copies.len(), 1);
     let copy = copies[0];
     assert!(!visibility::present(&sim.world, gambler, player));
@@ -105,8 +105,8 @@ fn fighting_the_gambler_leaves_him_dead_in_your_world_only() {
         "the copy never fell"
     );
     sim.run(0.5);
-    assert!(remembered(&sim, player, "dead"));
-    assert!(!remembered(&sim, player, "fighting"));
+    assert!(sim.remembers(player, "dead"));
+    assert!(!sim.remembers(player, "fighting"));
     assert!(!visibility::present(&sim.world, gambler, player));
     assert!(visibility::present(&sim.world, gambler, bystander));
 
@@ -127,11 +127,11 @@ fn summons_leave_with_their_owner() {
         Some(ClientId(1)),
         Some(player),
     );
-    assert_eq!(all_of(&mut sim, "guard").len(), 2);
+    assert_eq!(sim.npcs("guard").len(), 2);
 
     sim.world.despawn(player);
     sim.tick();
-    assert!(all_of(&mut sim, "guard").is_empty());
+    assert!(sim.npcs("guard").is_empty());
 }
 
 #[test]
@@ -194,7 +194,7 @@ fn harbour() -> Sim {
                 { "type": "script", "script": "gambler_hostile_defeat.script.json" },
             ]),
         )
-        .row("script", "gambler_hostile_hunt", hunting())
+        .row("script", "gambler_hostile_hunt", hunting(10.0))
         .script(
             "gambler_hostile_defeat",
             "npc",
@@ -206,7 +206,7 @@ fn harbour() -> Sim {
         )
         .edit("npc", "gambler_hostile", |copy| copy["basic_attack"] = json!(path("skill", "strike")))
         .npc("guard", 30.0, json!([{ "type": "script", "script": "guard_hunt.script.json" }]))
-        .row("script", "guard_hunt", hunting())
+        .row("script", "guard_hunt", hunting(10.0))
         .edit("npc", "guard", |guard| guard["basic_attack"] = json!(path("skill", "strike")))
         .npc(
             "baker",
@@ -235,9 +235,9 @@ fn harbour() -> Sim {
                 "angry": { "type": "set_attitude", "attitude": "hostile" },
             }),
         )
-        .row("memory", "grudge", memory_row("never"))
-        .row("memory", "fighting", memory_row("leaving_area"))
-        .row("memory", "dead", memory_row("never"))
+        .memory("grudge", "never")
+        .memory("fighting", "leaving_area")
+        .memory("dead", "never")
         .vfx("damage_taken")
         .shader("damage_pop")
         .vfx("defeated")
@@ -276,13 +276,6 @@ fn harbour() -> Sim {
 }
 
 fn gambling() -> Value {
-    let said = |text: &str, choices: Value| {
-        json!({
-            "type": "dialogue",
-            "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-            "choices": choices,
-        })
-    };
     json!({
             "interacted": {
                 "type": "on",
@@ -297,18 +290,18 @@ fn gambling() -> Value {
                 "yes": "grudging",
                 "no": "hello",
             },
-            "hello": said("Ten gold a roll.", json!([
+            "hello": dialogue("Ten gold a roll.", json!([
                 { "label": ["Roll the dice."], "to": "stake" },
                 { "label": ["Not today."] },
             ])),
             "stake": { "type": "items", "take": [{ "item": "gold.item.json", "count": 10 }], "done": "roll" },
             "roll": { "type": "random", "weights": [45, 55], "outputs": ["payout", "wins"] },
             "payout": { "type": "items", "give": [{ "item": "gold.item.json", "count": 20 }], "done": "loses" },
-            "loses": said("Beginner's luck.", json!([
+            "loses": dialogue("Beginner's luck.", json!([
                 { "label": ["Roll again."], "to": "stake" },
                 { "label": ["Quit."] },
             ])),
-            "wins": said("The house wins!", json!([
+            "wins": dialogue("The house wins!", json!([
                 { "label": ["Roll again."], "to": "stake" },
                 { "label": ["You're cheating."], "to": "remember_grudge" },
                 { "label": ["Leave."] },
@@ -321,7 +314,7 @@ fn gambling() -> Value {
                 "near": "owner",
                 "shown": "subject",
             },
-            "grudging": said("You've got some nerve.", json!([
+            "grudging": dialogue("You've got some nerve.", json!([
                 { "label": ["Then let's settle this."], "to": "remember_fight" },
                 { "label": ["I'm leaving."] },
             ])),
@@ -334,60 +327,6 @@ fn gambling() -> Value {
                 "shown": "subject",
             },
     })
-}
-
-fn hunting() -> Value {
-    json!({
-        "runs_on": "npc",
-        "locals": { "target": "actor" },
-        "nodes": {
-            "spawned": { "type": "on", "event": "started", "next": "hostile" },
-            "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
-            "look": {
-                "type": "set",
-                "values": [{
-                    "local": "target",
-                    "to": { "type": "nearest", "among": "characters", "within": 10.0 },
-                }],
-                "next": "found",
-            },
-            "found": {
-                "type": "if",
-                "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
-                "yes": "fight",
-                "no": "tick",
-            },
-            "fight": {
-                "type": "attack",
-                "target": { "type": "local", "local": "target" },
-                "within": 10.0,
-                "priority": 5,
-                "defeated": "look",
-                "lost": "look",
-                "interrupted": "look",
-            },
-            "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
-        },
-    })
-}
-
-fn memory_row(resets: &str) -> Value {
-    json!({ "label": "remembered", "type": "boolean", "resets": resets })
-}
-
-fn all_of(sim: &mut Sim, key: &str) -> Vec<Entity> {
-    let def = sim.id::<NpcDef>(key);
-    sim.world
-        .query::<(Entity, &Npc)>()
-        .iter(&sim.world)
-        .filter(|(_, npc)| npc.def == def)
-        .map(|(entity, _)| entity)
-        .collect()
-}
-
-fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
-    let id = sim.id::<MemoryDef>(key);
-    memory::get(&sim.world, player, id).truthy()
 }
 
 fn lose_at_dice(sim: &mut Sim, client: u32) {

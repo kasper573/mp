@@ -209,11 +209,7 @@ fn returning_to(area: &str) -> Sim {
             }),
         )
         .mark("merchant")
-        .row(
-            "memory",
-            "taunted",
-            json!({ "label": "Taunted", "type": "boolean", "resets": "never" }),
-        )
+        .memory("taunted", "never")
         .load();
     let mut sim = Sim::new(content);
     sim.serve(area);

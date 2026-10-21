@@ -1,4 +1,4 @@
-use editor::app::{Editor, ModalDialog};
+use editor::app::{BottomTab, Editor, ModalDialog};
 use editor::moves;
 use editor::project::MovedOutside;
 use editor::project::watch::FolderChange;
@@ -6,7 +6,7 @@ use editor::rows::{self, UsageDecision};
 use editor::ui::content_tree;
 use editor::ui::tree::TreeRow;
 use editor::user::{TreeView, UserFolder};
-use editor::views::area::pins;
+use editor::views::area::{self as area_view, pins};
 use engine::core::content::Fixture;
 use engine::core::content::{FIXTURES_DIR, parent_of, table_of};
 use engine::systems::area::AreaDef;
@@ -551,4 +551,31 @@ fn an_arrival_into_an_area_is_called_by_the_file_and_object_leading_there_not_th
         .collect();
 
     assert_eq!(names, [("hall".to_owned(), Some("door".to_owned()))]);
+}
+
+#[test]
+fn a_moved_tileset_paints_from_its_new_place_while_the_folder_reloads() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+    let wood = path("tileset", "wood");
+    editor.views.area.ensure_view(&area()).pick.tileset = Some(wood.clone());
+    let view = area_view::view_key(&area());
+    let mut frames = Frames::new(egui::vec2(1200.0, 400.0));
+    let mut palette = |editor: &mut Editor| {
+        frames.run(Vec::new(), |ui| {
+            area_view::bottom(editor, ui, &view, BottomTab::Palette)
+        })
+    };
+    let moved = format!("icons/{wood}");
+    assert!(palette(&mut editor).any(|text| text == wood));
+
+    rows::move_into(&mut editor, std::slice::from_ref(&wood), "icons").expect("moved");
+    let reloading = palette(&mut editor);
+    support::settled(&mut editor);
+    let reloaded = palette(&mut editor);
+
+    for drawn in [reloading, reloaded] {
+        assert!(drawn.any(|text| text == moved));
+        assert!(!drawn.any(|text| text.contains("missing")));
+    }
 }

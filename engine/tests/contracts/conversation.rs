@@ -268,16 +268,8 @@ fn inn() -> Sim {
             "favour",
             json!({ "label": "Rounds bought", "type": "integer", "resets": "never" }),
         )
-        .row(
-            "memory",
-            "met",
-            json!({ "label": "Met the crier", "type": "boolean", "resets": "never" }),
-        )
-        .row(
-            "memory",
-            "news_today",
-            json!({ "label": "Heard the news today", "type": "boolean", "resets": "daily" }),
-        )
+        .memory("met", "never")
+        .memory("news_today", "daily")
         .mark("news")
         .mark("talking")
         .sfx("ui_refuse")

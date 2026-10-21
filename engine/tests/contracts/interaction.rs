@@ -4,7 +4,7 @@ use engine::systems::interact::{self, InteractRequest};
 use engine::systems::player::commands_locked;
 use engine::systems::{area, movement, script};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, lines, path};
+use testkit::{Game, Map, Sim, dialogue, lines, path};
 
 const DAY: u64 = 24 * 3_600_000;
 
@@ -121,11 +121,7 @@ fn beach() -> Sim {
             "gold",
             json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }),
         )
-        .row(
-            "memory",
-            "chest_looted",
-            json!({ "label": "Emptied the chest today", "type": "boolean", "resets": "daily" }),
-        )
+        .memory("chest_looted", "daily")
         .asset("objects/look.png", testkit::png(1, 1))
         .load();
     let mut sim = Sim::new(content);
@@ -157,9 +153,5 @@ fn object(name: &str, x: f32, y: f32, script: &str) -> Value {
 }
 
 fn said(text: &str) -> Value {
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "choices": [{ "label": ["Step back."] }],
-    })
+    dialogue(text, json!([{ "label": ["Step back."] }]))
 }

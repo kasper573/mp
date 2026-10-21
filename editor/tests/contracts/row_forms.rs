@@ -5,6 +5,7 @@ use editor::ui::row_form;
 use editor::views::spreadsheet;
 use engine::core::content::Fixture;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::systems::memory::{MemoryDef, Resets};
 use engine::systems::npc::NpcDef;
 use serde_json::json;
 use testkit::{Game, path};
@@ -14,10 +15,9 @@ use crate::support::{self, Drawn, Frames, click, key};
 #[test]
 fn a_multi_row_form_of_a_type_without_modules_says_nothing_of_modules() {
     let scratch = tempfile::tempdir().expect("scratch");
-    let memory = |label: &str| json!({ "label": label, "type": "boolean", "resets": "never" });
     let game = support::game()
-        .row("memory", "taunted", memory("Taunted"))
-        .row("memory", "bribed", memory("Bribed"));
+        .memory("taunted", "never")
+        .memory("bribed", "never");
     let mut editor = support::open(game, &scratch);
     let keys = [path("memory", "taunted"), path("memory", "bribed")];
 
@@ -106,6 +106,35 @@ fn the_spreadsheet_shows_an_edit_on_the_next_frame() {
 
     let drawn = frames.run(Vec::new(), |ui| spreadsheet::show(&mut editor, ui, "npc"));
     assert!(drawn.rect("Grey wolf").is_some(), "{drawn:?}");
+}
+
+#[test]
+fn pasting_into_the_spreadsheet_writes_each_cell_its_column_reads_and_skips_the_rest() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = support::game()
+        .memory("bribed", "never")
+        .memory("taunted", "never");
+    let mut editor = support::open(game, &scratch);
+    let (bribed, taunted) = (path("memory", "bribed"), path("memory", "taunted"));
+    let mut frames = Frames::new(egui::vec2(1200.0, 900.0));
+    frames.run(Vec::new(), |ui| {
+        spreadsheet::show(&mut editor, ui, "memory")
+    });
+    editor.views.spreadsheet.state_mut("memory").selected =
+        Some((bribed.clone(), "resets".to_owned()));
+
+    let paste = vec![egui::Event::Paste("daily\nsometimes".to_owned())];
+    frames.run(paste, |ui| spreadsheet::show(&mut editor, ui, "memory"));
+
+    let resets = |editor: &mut Editor, memory: &str| {
+        editor
+            .read::<MemoryDef>(memory)
+            .expect("a project")
+            .expect("the memory reads")
+            .resets
+    };
+    assert_eq!(resets(&mut editor, &bribed), Resets::Daily);
+    assert_eq!(resets(&mut editor, &taunted), Resets::Never);
 }
 
 #[test]

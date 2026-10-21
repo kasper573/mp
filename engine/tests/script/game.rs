@@ -184,9 +184,9 @@ pub fn game() -> Game {
                 "look": { "type": "notify", "notification": "gulls.notification.json" },
             }),
         )
-        .row("memory", "bribed", remembered("Bribed"))
-        .row("memory", "sided", remembered("Sided"))
-        .row("memory", "looted", remembered("Looted"))
+        .memory("bribed", "never")
+        .memory("sided", "never")
+        .memory("looted", "never")
         .row(
             "status_effect",
             "guarded",
@@ -302,10 +302,6 @@ fn fights_nearest(among: &str) -> Value {
 
 fn striking(npc: &mut Value) {
     npc["basic_attack"] = json!("strike.skill.json");
-}
-
-fn remembered(label: &str) -> Value {
-    json!({ "label": label, "type": "boolean", "resets": "never" })
 }
 
 fn narration(text: &str) -> Value {

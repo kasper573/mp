@@ -1419,6 +1419,11 @@ fn parse_as(root: &Value, schema: &Value, text: &str) -> Option<Value> {
             _ => None,
         },
         SchemaKind::Null => text.is_empty().then_some(Value::Null),
+        SchemaKind::Enum(values) => values
+            .iter()
+            .any(|value| value == text)
+            .then(|| Value::String(text.to_owned())),
+        SchemaKind::Const(value) => (value.as_str() == Some(text)).then(|| value.clone()),
         SchemaKind::Choice(alternatives) => {
             let empty_is_null = text.is_empty()
                 && alternatives.iter().any(|alternative| {

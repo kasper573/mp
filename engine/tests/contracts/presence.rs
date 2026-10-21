@@ -15,7 +15,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility;
 use engine::systems::{actor, reach, skill};
 use serde_json::json;
-use testkit::{Declared, Game, Map, Sim, path};
+use testkit::{Declared, Game, Map, Sim, hunting, path};
 
 #[test]
 fn a_monster_summoned_for_one_player_fights_only_that_player() {
@@ -133,45 +133,9 @@ fn arena() -> Sim {
             25.0,
             json!([{ "type": "script", "script": "hunter_hunt.script.json" }]),
         )
-        .row("script", "hunter_hunt", json!({
-                "runs_on": "npc",
-                "locals": { "target": "actor" },
-                "nodes": {
-                    "spawned": { "type": "on", "event": "started", "next": "hostile" },
-                    "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
-                    "look": {
-                        "type": "set",
-                        "values": [{
-                            "local": "target",
-                            "to": { "type": "nearest", "among": "characters", "within": 8.0 },
-                        }],
-                        "next": "found",
-                    },
-                    "found": {
-                        "type": "if",
-                        "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
-                        "yes": "fight",
-                        "no": "tick",
-                    },
-                    "fight": {
-                        "type": "attack",
-                        "target": { "type": "local", "local": "target" },
-                        "within": 8.0,
-                        "priority": 5,
-                        "defeated": "look",
-                        "lost": "look",
-                        "interrupted": "look",
-                    },
-                    "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
-                },
-            }),
-        )
+        .row("script", "hunter_hunt", hunting(8.0))
         .edit("npc", "hunter", |hunter| hunter["basic_attack"] = json!(path("skill", "strike")))
-        .row(
-            "memory",
-            "slain",
-            json!({ "label": "Slew the brute", "type": "boolean", "resets": "never" }),
-        )
+        .memory("slain", "never")
         .vfx("damage_taken")
         .shader("damage_pop")
         .vfx("defeated")
