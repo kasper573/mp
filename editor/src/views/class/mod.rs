@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
-use crate::project::RowSelection;
+use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::shown_path;
 use crate::ui::levels::{self, Level};
 use crate::ui::{self, row_form, sidebar, theme, widgets};
@@ -124,8 +124,12 @@ pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
     }
 }
 
-pub fn write(editor: &mut Editor, key: &str, label: &str, class: &ClassDef) {
-    editor.write_content(&format!("{label} · {}", shown_path(key)), key, class);
+pub fn edit(key: &str, label: &str) -> ContentEdit {
+    ContentEdit::new(format!("{label} · {}", shown_path(key)))
+}
+
+pub fn write(editor: &mut Editor, key: &str, edit: ContentEdit, class: &ClassDef) {
+    editor.write_content_as(edit, key, class);
 }
 
 pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {

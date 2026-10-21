@@ -403,20 +403,11 @@ fn modules_column(
         let path = format!("{}/{index}", modules_pointer());
         let tag = TypeTag::of_json(module).unwrap_or_default();
         let is_script = tag == ScriptModule::TAG;
-        let summary = if is_script {
-            cx.project
-                .reader()
-                .from_json::<ListedScriptModule>(module)
-                .map_or_else(
-                    |error| error,
-                    |ListedScriptModule::Script(typed)| script_summary(cx.project, &typed),
-                )
-        } else if table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some() {
-            objectives += 1;
-            format!("objective {objectives}")
-        } else {
-            summary_of(cx, module)
-        };
+        let objective =
+            (table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some()).then(|| {
+                objectives += 1;
+                objectives
+            });
         let folded_key = format!("{table}{path}");
         let folded = match (
             cx.state.folded.contains(&folded_key),
@@ -427,74 +418,89 @@ fn modules_column(
             (false, false) => is_script && selected != Some(index),
         };
         let is_selected = selected == Some(index);
-        widgets::card_frame(is_selected).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            let header = ui
-                .horizontal(|ui| {
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
-                            if ui.button("Copy").clicked() {
-                                ops.push(ModuleOp::Copy(index));
-                                ui.close();
-                            }
-                            if ui
-                                .add_enabled(!singles[index], egui::Button::new("Duplicate"))
-                                .on_disabled_hover_text(format!(
-                                    "A row holds at most one {} module",
-                                    tag.replace('_', " ")
-                                ))
-                                .clicked()
-                            {
-                                duplicate = Some(index);
-                                ui.close();
-                            }
-                            ui.separator();
-                            swap = widgets::move_entries(ui, index, count).or(swap);
-                            ui.separator();
-                            if ui.button("Remove").clicked() {
-                                remove = Some(index);
-                                ui.close();
-                            }
+        widgets::in_view(ui, ui.id().with(&folded_key), |ui| {
+            let summary = if is_script {
+                cx.project
+                    .reader()
+                    .from_json::<ListedScriptModule>(module)
+                    .map_or_else(
+                        |error| error,
+                        |ListedScriptModule::Script(typed)| script_summary(cx.project, &typed),
+                    )
+            } else if let Some(objective) = objective {
+                format!("objective {objective}")
+            } else {
+                summary_of(cx, module)
+            };
+            widgets::card_frame(is_selected).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                let header = ui
+                    .horizontal(|ui| {
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
+                                if ui.button("Copy").clicked() {
+                                    ops.push(ModuleOp::Copy(index));
+                                    ui.close();
+                                }
+                                if ui
+                                    .add_enabled(!singles[index], egui::Button::new("Duplicate"))
+                                    .on_disabled_hover_text(format!(
+                                        "A row holds at most one {} module",
+                                        tag.replace('_', " ")
+                                    ))
+                                    .clicked()
+                                {
+                                    duplicate = Some(index);
+                                    ui.close();
+                                }
+                                ui.separator();
+                                swap = widgets::move_entries(ui, index, count).or(swap);
+                                ui.separator();
+                                if ui.button("Remove").clicked() {
+                                    remove = Some(index);
+                                    ui.close();
+                                }
+                            });
+                            glyph::show(
+                                ui,
+                                if folded {
+                                    Mark::CaretRight
+                                } else {
+                                    Mark::CaretDown
+                                },
+                                11.0,
+                                theme::FAINT,
+                            );
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                ui.label(theme::strong(&tag).monospace());
+                                if folded || !is_script {
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(summary.to_uppercase())
+                                                .size(11.0)
+                                                .color(theme::MUTED),
+                                        )
+                                        .truncate(),
+                                    );
+                                }
+                            });
                         });
-                        glyph::show(
-                            ui,
-                            if folded {
-                                Mark::CaretRight
-                            } else {
-                                Mark::CaretDown
-                            },
-                            11.0,
-                            theme::FAINT,
-                        );
-                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.label(theme::strong(&tag).monospace());
-                            if folded || !is_script {
-                                ui.add(
-                                    egui::Label::new(
-                                        RichText::new(summary.to_uppercase())
-                                            .size(11.0)
-                                            .color(theme::MUTED),
-                                    )
-                                    .truncate(),
-                                );
-                            }
-                        });
-                    });
-                })
-                .response
-                .interact(Sense::click());
-            if header.clicked() {
-                if folded {
-                    cx.state.folded.remove(&folded_key);
-                    cx.state.unfolded.insert(folded_key.clone());
-                } else {
-                    cx.state.unfolded.remove(&folded_key);
-                    cx.state.folded.insert(folded_key.clone());
+                    })
+                    .response
+                    .interact(Sense::click());
+                if header.clicked() {
+                    if folded {
+                        cx.state.folded.remove(&folded_key);
+                        cx.state.unfolded.insert(folded_key.clone());
+                    } else {
+                        cx.state.unfolded.remove(&folded_key);
+                        cx.state.folded.insert(folded_key.clone());
+                    }
                 }
-            }
-            if !folded {
-                changed |= card_body(ui, cx, table, &variants, module, &path);
-            }
+                if !folded {
+                    changed |= card_body(ui, cx, table, &variants, module, &path);
+                }
+            });
         });
         ui.add_space(2.0);
     }

@@ -32,6 +32,7 @@ use strum::{AsRefStr, VariantArray};
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
+use crate::project::ContentEdit;
 use crate::tabs::{EditorTab, file_title, shown_path};
 use crate::ui::browser::BrowserAction;
 use crate::ui::{row_form, theme, widgets};
@@ -144,7 +145,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let characters = reader.paths_of::<CharacterSnapshot>().to_vec();
     let mut switch: Option<String> = None;
     let mut changed = FormChange::default();
-    let mut label = format!("Edit {}", shown_path(key));
+    let mut label = String::new();
     let mut actions = Vec::new();
     let mut pick: Option<PlacePick> = None;
     ui.horizontal_top(|ui| {
@@ -333,8 +334,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
         editor.pick = Some(request);
     }
-    if changed.is_some() {
-        editor.write_content(&label, key, &character);
+    if let Some(what) = changed.0 {
+        if label.is_empty() {
+            label = format!("Edit {} {}", shown_path(key), what.trim_start_matches('/'));
+        }
+        // A drag edits a field every frame; those frames are one step to undo.
+        editor.write_content_as(ContentEdit::new(label).merging(), key, &character);
     }
     for action in actions {
         row_form::act(editor, action, CharacterSnapshot::TABLE, key);
@@ -418,20 +423,23 @@ fn bag(
     card(ui, "Bag", |ui| {
         for (index, stack) in character.bag.iter_mut().enumerate() {
             let path = format!("{}/{index}", field!(CharacterSnapshot, bag));
-            let cap = sheet
-                .read(cx, stack.item)
-                .map_or(1, |item| item.stack_max());
             ui.horizontal(|ui| {
                 if widgets::remove_button(ui, "Remove").clicked() {
                     remove = Some(index);
                 }
+                let mut picked = false;
                 ui.scope(|ui| {
                     ui.set_width(200.0);
                     let item = format!("{path}{}", field!(ItemStack, item));
-                    if picker::content(ui, cx, &mut stack.item, &item) {
-                        changed = FormChange::at(&path);
-                    }
+                    picked = picker::content(ui, cx, &mut stack.item, &item);
                 });
+                let cap = sheet
+                    .read(cx, stack.item)
+                    .map_or(1, |item| item.stack_max());
+                if picked {
+                    stack.count = stack.count.clamp(1, cap);
+                    changed = FormChange::at(&path);
+                }
                 let mut draft = stack.count;
                 let response = forms::boxed_input(ui, Some(&format!("/{cap}")), |ui| {
                     ui.add(egui::DragValue::new(&mut draft).speed(0.2).range(1..=cap))

@@ -176,6 +176,32 @@ pub const FOLDER: &str = "folder";
 pub const GROUND_LAYER: &str = "ground_layer";
 
 /// Every module node of `nodes` in tree order, through its folders.
+/// A bundle's own modules in tree order, each also found at once by its pointer.
+pub struct SceneModules {
+    listed: Vec<SceneModule>,
+    at: HashMap<String, usize>,
+}
+
+impl SceneModules {
+    pub fn of(nodes: &[SceneNode]) -> SceneModules {
+        let listed = modules(nodes);
+        let at = listed
+            .iter()
+            .enumerate()
+            .map(|(index, module)| (module.pointer.clone(), index))
+            .collect();
+        SceneModules { listed, at }
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, SceneModule> {
+        self.listed.iter()
+    }
+
+    pub fn get(&self, pointer: &str) -> Option<&SceneModule> {
+        self.at.get(pointer).map(|index| &self.listed[*index])
+    }
+}
+
 pub fn modules(nodes: &[SceneNode]) -> Vec<SceneModule> {
     let mut found = Vec::new();
     walk(nodes, &mut |pointer, node| {

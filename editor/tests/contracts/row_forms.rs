@@ -6,6 +6,7 @@ use editor::views::spreadsheet;
 use engine::core::content::Fixture;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::memory::{MemoryDef, Resets};
+use engine::systems::notification::{NotificationDef, NotificationDefKind};
 use engine::systems::npc::NpcDef;
 use serde_json::json;
 use testkit::{Game, path};
@@ -175,6 +176,50 @@ fn a_whole_number_field_refuses_a_fraction_instead_of_rounding_it() {
     assert!(
         drawn.any(|text| text.contains("a whole number")),
         "{drawn:?}"
+    );
+}
+
+#[test]
+fn the_keys_walk_a_picker_list_past_what_it_shows_and_pick_what_they_reach() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let voice = json!([{ "type": "voice", "babble": path("babble", "crier") }]);
+    let mut game = support::game().babble("crier");
+    for index in 0..30 {
+        game = game.npc(&format!("npc_{index:02}"), 10.0, voice.clone());
+    }
+    let game = game.row(
+        "notification",
+        "shout",
+        json!({ "kind": { "type": "speech", "speaker": path("npc", "npc_00") }, "text": [] }),
+    );
+    let mut editor = support::open(game, &scratch);
+    let mut form = RowFrames::new("notification", &path("notification", "shout"));
+    form.run(&mut editor, Vec::new());
+    let chip = form.run(&mut editor, Vec::new()).at("npc_00.npc");
+    for events in click(chip) {
+        form.run(&mut editor, events);
+    }
+
+    let mut drawn = Drawn::default();
+    for events in std::iter::repeat_n(key(egui::Key::ArrowDown, egui::Modifiers::NONE), 20)
+        .chain([Vec::new(), Vec::new()])
+    {
+        drawn = form.run(&mut editor, events);
+    }
+    form.run(&mut editor, key(egui::Key::Enter, egui::Modifiers::NONE));
+
+    assert!(drawn.rect("npc_20.npc").is_some(), "{drawn:?}");
+    let shout = editor
+        .read::<NotificationDef>(&path("notification", "shout"))
+        .expect("a project")
+        .expect("the notification reads");
+    let NotificationDefKind::Speech { speaker } = &shout.kind else {
+        panic!("a speech");
+    };
+    let reader = editor.reader().expect("a project");
+    assert_eq!(
+        reader.path_of(*speaker),
+        Some(path("npc", "npc_20").as_str())
     );
 }
 

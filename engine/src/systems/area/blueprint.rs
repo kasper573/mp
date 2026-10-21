@@ -116,7 +116,7 @@ pub(super) fn read_module(
 ) -> Result<(AreaModule, Holes), (String, ContentProblem)> {
     let misread = |error: ParseError| (error.pointer.clone(), shape_problem(&error));
     let mut found = BTreeMap::new();
-    find_holes(&json, "", &mut found);
+    find_holes(&json, &mut String::new(), &mut found);
     if found.is_empty() {
         let module = parse_value::<AreaModule>(&json).map_err(misread)?;
         return Ok((module, Holes::default()));
@@ -220,20 +220,31 @@ pub fn variables_of(holes: &Holes) -> impl Iterator<Item = &str> {
     holes.0.values().map(String::as_str)
 }
 
-fn find_holes(json: &Value, pointer: &str, found: &mut BTreeMap<String, String>) {
-    if let Ok(mark) = HoleMark::deserialize(json) {
-        found.insert(pointer.to_owned(), mark.var);
-        return;
-    }
+fn find_holes(json: &Value, pointer: &mut String, found: &mut BTreeMap<String, String>) {
+    let at = pointer.len();
     match json {
         Value::Object(map) => {
+            // A mark is written as an object of its one field; trying every value as one would build
+            // an error for each value it refuses, at a cost to every scene read.
+            if map.len() == 1
+                && let Ok(mark) = HoleMark::deserialize(json)
+            {
+                found.insert(pointer.clone(), mark.var);
+                return;
+            }
             for (key, value) in map {
-                find_holes(value, &format!("{pointer}/{}", escape(key)), found);
+                pointer.push('/');
+                pointer.push_str(&escape(key));
+                find_holes(value, pointer, found);
+                pointer.truncate(at);
             }
         }
         Value::Array(items) => {
             for (index, item) in items.iter().enumerate() {
-                find_holes(item, &format!("{pointer}/{index}"), found);
+                pointer.push('/');
+                pointer.push_str(&index.to_string());
+                find_holes(item, pointer, found);
+                pointer.truncate(at);
             }
         }
         _ => {}

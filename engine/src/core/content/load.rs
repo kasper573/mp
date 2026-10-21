@@ -25,7 +25,8 @@ use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::serial::TypeTag;
 use super::table::{
-    Content, ContentBuilder, ContentFile, MODULES, ModuleRule, ModuleSet, NamedContent, Table,
+    Content, ContentBuilder, ContentFile, MODULES, ModuleRule, ModuleSet, NamedContent, ReadRow,
+    Table,
 };
 use super::version::ContentVersion;
 
@@ -695,7 +696,7 @@ pub fn load(
     let (listing, errors) = super::files::list(folder.as_ref(), &registry.file_types());
     let mut loading = Loading {
         folder: folder.clone(),
-        listing,
+        listing: Arc::new(listing),
         builder: ContentBuilder::default(),
         snapshot: None,
         errors,
@@ -732,16 +733,13 @@ pub fn load(
     }
 }
 
-/// The problems the files at `files` have on their own, as a load reports them: what their names
-/// say, the shape and references of the content each belongs to, that content's parts and the
-/// rules of its type, and whether their media decodes. Only what the rest of the game says of them
-/// is left to a whole load, so whatever writes content can ask before it writes.
-pub fn check_files(
+pub(super) fn check_files(
     registry: &ContentRegistry,
     folder: Arc<dyn ContentFolder>,
+    listing: Arc<Listing>,
+    listing_errors: &[LoadError],
     files: &[String],
-) -> Vec<LoadError> {
-    let (listing, errors) = super::files::list(folder.as_ref(), &registry.file_types());
+) -> CheckedFiles {
     let touches = |file: &str| {
         files.iter().any(|touched| {
             touched == file
@@ -764,14 +762,20 @@ pub fn check_files(
         listing,
         builder: ContentBuilder::default(),
         snapshot: None,
-        errors: errors
-            .into_iter()
+        errors: listing_errors
+            .iter()
             .filter(|error| touches(&error.file))
+            .cloned()
             .collect(),
         indexes: HashMap::new(),
         failed: HashSet::new(),
     };
     loading.parse(registry, Some(&contents));
+    let misread: HashSet<String> = loading
+        .failed
+        .iter()
+        .map(|(_, path)| path.clone())
+        .collect();
     loading.check_rows(registry);
     for file in media {
         if let Ok(bytes) = loading.read(&file)
@@ -780,7 +784,24 @@ pub fn check_files(
             loading.file_error(file, ErrorPlace::WholeFile, problem);
         }
     }
-    loading.errors
+    loading.snapshot = None;
+    let read = loading
+        .builder
+        .into_rows()
+        .into_iter()
+        .filter(|read| !misread.contains(&read.path))
+        .collect();
+    CheckedFiles {
+        errors: loading.errors,
+        read,
+    }
+}
+
+/// What checking files finds: every problem they have on their own, and every content file among
+/// them that read whole, as `FolderReader::read` reads it.
+pub struct CheckedFiles {
+    pub errors: Vec<LoadError>,
+    pub read: Vec<ReadRow>,
 }
 
 /// The content `file` is, or is a part of, when the listing holds it: a content file, a bundle or
@@ -806,7 +827,7 @@ fn content_of(listing: &Listing, file: &str) -> Option<String> {
 
 pub struct Loading {
     folder: Arc<dyn ContentFolder>,
-    listing: Listing,
+    listing: Arc<Listing>,
     builder: ContentBuilder,
     snapshot: Option<Content>,
     errors: Vec<LoadError>,
@@ -1715,18 +1736,28 @@ fn no_modules(table: &str) -> String {
     format!("{} {table} files hold no modules", article(table))
 }
 
+// Tracking the path of every value read makes each read about half as slow again, so a read is
+// tracked only when made again to find where it failed.
 pub fn parse_value<T: DeserializeOwned>(value: &serde_json::Value) -> Result<T, ParseError> {
-    Ok(serde_path_to_error::deserialize(value)?)
+    let met = super::id::leaves_met();
+    T::deserialize(value).or_else(|_| {
+        super::id::forget_leaves_after(met);
+        Ok(serde_path_to_error::deserialize(value)?)
+    })
 }
 
 pub fn parse_json<T: DeserializeOwned>(text: &str) -> Result<T, ParseError> {
-    let mut deserializer = serde_json::Deserializer::from_str(text);
-    let value: T = serde_path_to_error::deserialize(&mut deserializer)?;
-    deserializer.end().map_err(|inner| ParseError {
-        pointer: String::new(),
-        inner,
-    })?;
-    Ok(value)
+    let met = super::id::leaves_met();
+    serde_json::from_str(text).or_else(|_| {
+        super::id::forget_leaves_after(met);
+        let mut deserializer = serde_json::Deserializer::from_str(text);
+        let value: T = serde_path_to_error::deserialize(&mut deserializer)?;
+        deserializer.end().map_err(|inner| ParseError {
+            pointer: String::new(),
+            inner,
+        })?;
+        Ok(value)
+    })
 }
 
 pub(super) trait SettingsLoader: Send + Sync {

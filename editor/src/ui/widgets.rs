@@ -55,6 +55,30 @@ pub fn dropdown_menu<R>(
     egui::InnerResponse::new(inner.map(|inner| inner.inner), response)
 }
 
+/// Draws `add` while it is in view. Out of view it only takes the room it took when last drawn at
+/// this width, as what a long form holds below the fold would otherwise cost every frame. While a
+/// widget holds focus or a popup is open everything is drawn, since they close once their widget
+/// goes undrawn.
+pub fn in_view<R>(ui: &mut Ui, id: egui::Id, add: impl FnOnce(&mut Ui) -> R) -> Option<R> {
+    let width = ui.available_width();
+    let busy = ui.memory(|memory| memory.focused().is_some()) || egui::Popup::is_any_open(ui.ctx());
+    let held = ui.data(|data| data.get_temp::<(f32, Vec2)>(id));
+    if let Some((drawn_at, size)) = held
+        && drawn_at == width
+        && !busy
+        && !ui
+            .clip_rect()
+            .intersects(Rect::from_min_size(ui.cursor().min, size))
+    {
+        ui.allocate_space(size);
+        return None;
+    }
+    let drawn = ui.scope(add);
+    let size = drawn.response.rect.size();
+    ui.data_mut(|data| data.insert_temp(id, (width, size)));
+    Some(drawn.inner)
+}
+
 pub fn card_frame(selected: bool) -> egui::Frame {
     egui::Frame::new()
         .fill(if selected {

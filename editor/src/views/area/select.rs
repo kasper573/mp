@@ -170,7 +170,7 @@ impl SelectScope<'_> {
                 .filter(|module| {
                     super::is_selectable(module.module())
                         && frame
-                            .module_bounds(&module.pointer)
+                            .bounds_of(module)
                             .is_some_and(|bounds| rect.contains_rect(&bounds))
                 })
                 .filter(|module| skipped.passes(&frame.flags.row(&module.pointer)))

@@ -290,9 +290,33 @@ pub fn solve(
 struct Graph {
     sizes: Vec<Vec2>,
     pinned: Vec<bool>,
-    hints: HashMap<(usize, usize), Vec2>,
+    hints: Pairs<Vec2>,
     components: Vec<Vec<usize>>,
-    hops: Vec<BTreeMap<(usize, usize), u32>>,
+    hops: Pairs<Option<u32>>,
+}
+
+/// A value for every ordered pair of cards, looked up in place: the solver asks for one per pair on
+/// every step.
+struct Pairs<T> {
+    cards: usize,
+    values: Vec<T>,
+}
+
+impl<T: Copy> Pairs<T> {
+    fn new(cards: usize, value: T) -> Pairs<T> {
+        Pairs {
+            cards,
+            values: vec![value; cards * cards],
+        }
+    }
+
+    fn get(&self, a: usize, b: usize) -> T {
+        self.values[a * self.cards + b]
+    }
+
+    fn set(&mut self, a: usize, b: usize, value: T) {
+        self.values[a * self.cards + b] = value;
+    }
 }
 
 impl Graph {
@@ -309,7 +333,7 @@ impl Graph {
             .map(|(i, area)| (*area, i))
             .collect();
         let mut links: BTreeSet<(usize, usize)> = BTreeSet::new();
-        let mut hints: HashMap<(usize, usize), Vec2> = HashMap::new();
+        let mut hints = Pairs::new(areas.len(), Vec2::ZERO);
         for warp in &map.atlas.warps {
             let (Some(&a), Some(&b)) = (index.get(&warp.from), index.get(&warp.to)) else {
                 continue;
@@ -327,7 +351,7 @@ impl Graph {
                 } else {
                     Vec2::new(0.0, rel.y.signum())
                 };
-                *hints.entry((a, b)).or_insert(Vec2::ZERO) += side;
+                hints.set(a, b, hints.get(a, b) + side);
             }
         }
         if keep_regions {
@@ -348,6 +372,13 @@ impl Graph {
             adjacency[b].push(a);
         }
         let components = components(&adjacency);
+        let mut hops = Pairs::new(areas.len(), None);
+        for component in &components {
+            for ((a, b), d) in hop_distances(&adjacency, component) {
+                hops.set(a, b, Some(d));
+                hops.set(b, a, Some(d));
+            }
+        }
         Graph {
             sizes: areas
                 .iter()
@@ -355,10 +386,7 @@ impl Graph {
                 .collect(),
             pinned: areas.iter().map(|area| layout.cards[area].pinned).collect(),
             hints,
-            hops: components
-                .iter()
-                .map(|component| hop_distances(&adjacency, component))
-                .collect(),
+            hops,
             components,
         }
     }
@@ -370,12 +398,13 @@ impl Graph {
     }
 
     fn relax(&self, positions: &mut [Vec2]) {
-        for (component, hops) in self.components.iter().zip(&self.hops) {
+        let mut springs = Vec::new();
+        for component in &self.components {
             let start = centroid(component, positions);
             for _ in 0..ITERATIONS {
                 let before = positions.to_vec();
                 for &i in component.iter().filter(|&&i| !self.pinned[i]) {
-                    let springs = self.springs(i, positions[i], component, hops, positions);
+                    self.springs(i, positions[i], component, positions, &mut springs);
                     if let Some(to) = centre(&springs) {
                         positions[i] = to;
                     }
@@ -412,12 +441,12 @@ impl Graph {
         i: usize,
         at: Vec2,
         component: &[usize],
-        hops: &BTreeMap<(usize, usize), u32>,
         positions: &[Vec2],
-    ) -> Vec<Spring> {
-        let mut springs = Vec::new();
+        springs: &mut Vec<Spring>,
+    ) {
+        springs.clear();
         for &j in component.iter().filter(|&&j| j != i) {
-            let Some(&d) = hops.get(&(i.min(j), i.max(j))) else {
+            let Some(d) = self.hops.get(i, j) else {
                 continue;
             };
             let d = d as f32;
@@ -428,8 +457,7 @@ impl Graph {
                 weight,
                 rest: self.beside(i, j, d, direction, positions),
             });
-            let pull = self.hints.get(&(j, i)).copied().unwrap_or_default()
-                - self.hints.get(&(i, j)).copied().unwrap_or_default();
+            let pull = self.hints.get(j, i) - self.hints.get(i, j);
             if d == 1.0 && pull != Vec2::ZERO {
                 springs.push(Spring {
                     weight: weight * HINT,
@@ -437,7 +465,6 @@ impl Graph {
                 });
             }
         }
-        springs
     }
 
     fn beside(&self, i: usize, j: usize, hops: f32, direction: Vec2, positions: &[Vec2]) -> Vec2 {

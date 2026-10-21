@@ -25,15 +25,15 @@ pub use fixture::Fixture;
 pub use id::{ContentId, ContentScope, rescoped, with_content};
 pub use key::key_of;
 pub use load::{
-    BesideFile, BesideName, ContentFolder, ContentRegistry, FileHashes, FileWriter,
+    BesideFile, BesideName, CheckedFiles, ContentFolder, ContentRegistry, FileHashes, FileWriter,
     FilesystemFolder, FolderEntry, JsonPart, LoadStep, Loading, MemoryFolder, Reference, Settings,
-    check_files, load, pointer_of, valid_key, write,
+    load, pointer_of, valid_key, write,
 };
 pub use reader::{FolderReader, Unreadable, WrittenFiles};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport, MISSING_FILE};
 pub use table::{
     AnyTable, Content, ContentBuilder, ContentFile, ContentNames, MODULES, ModuleRule, ModuleSet,
-    NamedContent, Table,
+    NamedContent, ReadRow, Table,
 };
 pub use version::ContentVersion;
 

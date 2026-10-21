@@ -442,6 +442,21 @@ pub fn in_scope<T>(f: impl FnOnce(&ContentScope) -> T) -> Option<T> {
     SCOPE.with(|slot| slot.borrow().as_ref().map(f))
 }
 
+/// How many references the scope being read in has met so far.
+pub(super) fn leaves_met() -> usize {
+    SCOPE.with(|slot| slot.borrow().as_ref().map_or(0, |scope| scope.leaves.len()))
+}
+
+/// Forgets the references the scope being read in met after its first `count`, as when what met
+/// them is read again.
+pub(super) fn forget_leaves_after(count: usize) {
+    SCOPE.with(|slot| {
+        if let Some(scope) = slot.borrow_mut().as_mut() {
+            scope.leaves.truncate(count);
+        }
+    });
+}
+
 /// Runs `f` in a copy of the scope being read in, and keeps the references it met that `keep`
 /// lets through, as if the scope had met them itself.
 pub fn read_aside<T>(f: impl FnOnce() -> T, keep: impl Fn(&Leaf) -> bool) -> T {

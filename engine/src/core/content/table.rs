@@ -148,6 +148,16 @@ pub trait AnyTable: Any + Send + Sync {
     /// The raw id of the file at `path`, for code that names a table only by its name.
     fn raw_of(&self, path: &str) -> Option<u32>;
     fn as_any(&self) -> &dyn Any;
+    /// Every row the table holds, by its path and with its type, when nothing else holds the
+    /// table.
+    fn into_rows(self: Arc<Self>) -> Vec<ReadRow>;
+}
+
+/// A content file read whole, as `FolderReader::read` reads it: its path, its type and its row.
+pub struct ReadRow {
+    pub path: String,
+    pub row_type: TypeId,
+    pub row: Arc<dyn Any + Send + Sync>,
 }
 
 impl<Row: ContentFile> AnyTable for Table<Row> {
@@ -165,6 +175,24 @@ impl<Row: ContentFile> AnyTable for Table<Row> {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn into_rows(self: Arc<Self>) -> Vec<ReadRow> {
+        let Ok(table) = Arc::try_unwrap(self) else {
+            return Vec::new();
+        };
+        table
+            .paths
+            .into_iter()
+            .zip(table.rows)
+            .filter_map(|(path, row)| {
+                Some(ReadRow {
+                    path,
+                    row_type: TypeId::of::<Row>(),
+                    row: Arc::new(row?),
+                })
+            })
+            .collect()
     }
 }
 
@@ -275,6 +303,14 @@ impl ContentBuilder {
 
     pub fn built<T: Any + Send + Sync>(&mut self, value: T) {
         self.built.insert(TypeId::of::<T>(), Arc::new(value));
+    }
+
+    /// Every row of every table, as `AnyTable::into_rows` gives them.
+    pub fn into_rows(self) -> Vec<ReadRow> {
+        self.tables
+            .into_values()
+            .flat_map(AnyTable::into_rows)
+            .collect()
     }
 
     pub fn build(&self) -> Content {

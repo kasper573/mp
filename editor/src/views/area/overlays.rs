@@ -5,7 +5,7 @@ use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 use engine::core::audio::soundscape::EDGE_FALLOFF;
 use engine::core::math::{Pos, Rect};
 use engine::core::render::TILE;
-use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
+use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, TileRect, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaModule, AreaModuleKind, Pictured};
 
@@ -77,38 +77,88 @@ pub(super) fn overlay_grid(
 
 pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &area::Area) {
     let canvas = frame.canvas;
-    let visible = canvas.visible();
     let size = area.size.grid();
-    let grids = area.grids.clone();
+    cell_runs(
+        canvas,
+        size,
+        |cell| !area.grid.walkable(cell.center()),
+        |run| {
+            patterns::hatch(
+                painter,
+                canvas.rect(run),
+                theme::alpha(theme::BLOCKED, 110),
+                canvas.scale(),
+            )
+        },
+    );
+    cell_runs(
+        canvas,
+        size,
+        |cell| area.grid.walkable(cell.center()) && !area.wild_grid.walkable(cell.center()),
+        |run| {
+            painter.rect_filled(
+                canvas.rect(run),
+                0.0,
+                Color32::from_rgba_unmultiplied(80, 120, 220, 40),
+            );
+        },
+    );
+    if canvas.scale() < 8.0 {
+        return;
+    }
+    let visible = canvas.visible();
     for cell in size.cells() {
         let bounds = cell.bounds();
-        if !visible.intersects(&bounds) {
-            continue;
-        }
         let Some(index) = cell.index(size) else {
             continue;
         };
+        let Some(walk) = area.grids.walk[index] else {
+            continue;
+        };
+        if !visible.intersects(&bounds) {
+            continue;
+        }
         let rect = canvas.rect(bounds);
-        if !area.grid.walkable(cell.center()) {
-            patterns::hatch(
-                painter,
-                rect,
-                theme::alpha(theme::BLOCKED, 110),
-                canvas.scale(),
-            );
-        } else if !area.wild_grid.walkable(cell.center()) {
-            painter.rect_filled(rect, 0.0, Color32::from_rgba_unmultiplied(80, 120, 220, 40));
+        let mark = ERect::from_min_size(rect.min, Vec2::splat((canvas.scale() * 0.25).max(2.0)));
+        let color = if walk {
+            Color32::from_rgb(90, 200, 120)
+        } else {
+            Color32::from_rgb(220, 90, 90)
+        };
+        painter.rect_filled(mark, 0.0, color);
+    }
+}
+
+/// Hands `draw` the cells in view that `picked` takes, each row's neighbours joined into one run,
+/// as a large map holds thousands of them.
+pub(super) fn cell_runs(
+    canvas: Viewport<Tiles>,
+    size: GridSize,
+    picked: impl Fn(CellPos) -> bool,
+    mut draw: impl FnMut(Rect<Tiles>),
+) {
+    let visible = canvas.visible();
+    let mut run: Option<Rect<Tiles>> = None;
+    for cell in size.cells() {
+        let bounds = cell.bounds();
+        let taken = visible.intersects(&bounds) && picked(cell);
+        if let Some(open) = run
+            && taken
+            && open.max_y() == bounds.max_y()
+            && open.max_x() == bounds.min_x()
+        {
+            run = Some(open.union(&bounds));
+            continue;
         }
-        if grids.walk[index].is_some() && canvas.scale() >= 8.0 {
-            let mark =
-                ERect::from_min_size(rect.min, Vec2::splat((canvas.scale() * 0.25).max(2.0)));
-            let color = if grids.walk[index] == Some(true) {
-                Color32::from_rgb(90, 200, 120)
-            } else {
-                Color32::from_rgb(220, 90, 90)
-            };
-            painter.rect_filled(mark, 0.0, color);
+        if let Some(done) = run.take() {
+            draw(done);
         }
+        if taken {
+            run = Some(bounds);
+        }
+    }
+    if let Some(done) = run {
+        draw(done);
     }
 }
 
@@ -153,7 +203,7 @@ pub(super) fn overlay_modules(
             continue;
         }
         let module = node.module();
-        let Some(bounds) = frame.module_bounds(&node.pointer) else {
+        let Some(bounds) = frame.bounds_of(node) else {
             continue;
         };
         if !visible.intersects(&bounds) {

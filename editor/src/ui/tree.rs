@@ -1,6 +1,7 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::BTreeSet;
 use std::ops::Range;
+use std::rc::Rc;
 
 use design_tokens::controls;
 use design_tokens::glyph::Mark;
@@ -26,6 +27,7 @@ pub trait TreeSource {
     fn children(&self, id: &str) -> Vec<String>;
     /// The folder holding `id`, "" at the top.
     fn parent(&self, id: &str) -> String;
+    fn is_folder(&self, id: &str) -> bool;
     fn row(&self, id: &str) -> TreeRow;
     /// The menu on `ids`, or on empty space when there are none; the action picked.
     fn menu(&self, ui: &mut Ui, ids: &[String]) -> Option<Self::Action>;
@@ -244,7 +246,7 @@ pub fn show<S: TreeSource>(
         if reveal.as_deref() == Some(line.id.as_str()) {
             revealed_at = Some(index);
         }
-        if line.row.folder {
+        if line.folder {
             folders.push((line.id.clone(), line.open));
         }
         index += 1;
@@ -281,6 +283,7 @@ pub fn show<S: TreeSource>(
                 .show_state(ui, view, |builder| {
                     builder.node(NodeBuilder::dir(String::new()).flatten(true));
                     let rows = RowsCx {
+                        row: &|id| source.row(id),
                         drawn: &drawn,
                         renaming: &renaming_cell,
                         renamed: &renamed,
@@ -434,9 +437,11 @@ const TOGGLE: f32 = 17.0;
 const TOGGLE_GLYPH: f32 = 14.0;
 const SHOW_MENU_WIDTH: f32 = 220.0;
 
+/// A row's place in the tree. What it reads is asked of the source only once it is drawn, as a
+/// tree may hold far more rows than fit on screen.
 struct Line {
     id: String,
-    row: TreeRow,
+    folder: bool,
     open: bool,
     children: Vec<Line>,
 }
@@ -446,8 +451,8 @@ fn lines_of<S: TreeSource>(source: &S, folder: &str, is_open: &dyn Fn(&str) -> b
         .children(folder)
         .into_iter()
         .map(|id| {
-            let row = source.row(&id);
-            let open = row.folder && is_open(&id);
+            let folder = source.is_folder(&id);
+            let open = folder && is_open(&id);
             let children = if open {
                 lines_of(source, &id, is_open)
             } else {
@@ -455,7 +460,7 @@ fn lines_of<S: TreeSource>(source: &S, folder: &str, is_open: &dyn Fn(&str) -> b
             };
             Line {
                 id,
-                row,
+                folder,
                 open,
                 children,
             }
@@ -496,6 +501,7 @@ enum RenameEnd {
 }
 
 struct RowsCx<'a> {
+    row: &'a dyn Fn(&str) -> TreeRow,
     drawn: &'a RefCell<Vec<DrawnRow>>,
     renaming: &'a RefCell<Option<Renaming>>,
     renamed: &'a RefCell<Option<RenameEnd>>,
@@ -507,20 +513,10 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
     for line in lines {
         let Line {
             id,
-            row,
+            folder,
             open,
             children,
         } = line;
-        let folder = row.folder;
-        let icon = match (folder, open) {
-            (true, true) => Some(KindIcon::from(Mark::FolderOpen)),
-            (true, false) => Some(KindIcon::from(Mark::Folder)),
-            (false, _) => row.icon,
-        };
-        let preview = row.preview;
-        let badge = row.badge.clone().filter(|_| !folder);
-        let dim = row.dim;
-        let label_id = id.clone();
         let mut node = if folder {
             NodeBuilder::dir(id.clone())
                 .default_open(open)
@@ -528,6 +524,11 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
         } else {
             NodeBuilder::leaf(id.clone())
         };
+        let label = Rc::new(LazyRow {
+            id,
+            row: OnceCell::new(),
+        });
+        let icon = label.clone();
         node = node
             .closer(|ui: &mut Ui, closer: CloserState| {
                 let mark = if closer.is_open {
@@ -547,37 +548,64 @@ fn build(builder: &mut TreeViewBuilder<'_, String>, lines: Vec<Line>, cx: &RowsC
                 );
             })
             .label_ui(move |ui: &mut Ui| {
-                row_label(ui, cx, &label_id, &row, open);
+                row_label(ui, cx, &label.id, label.get(cx), open);
+            })
+            .icon(move |ui: &mut Ui| {
+                row_icon(ui, icon.get(cx), open);
             });
-        if let Some((letter, color)) = badge {
-            node = node.icon(move |ui: &mut Ui| {
-                let rect = Rect::from_center_size(ui.max_rect().center(), Vec2::splat(14.0));
-                let color = if dim {
-                    color.gamma_multiply(0.5)
-                } else {
-                    color
-                };
-                ui.painter().rect_filled(rect, 3.0, color);
-                ui.painter().text(
-                    rect.center(),
-                    Align2::CENTER_CENTER,
-                    &letter,
-                    FontId::monospace(10.0),
-                    design_tokens::ink::CREAM,
-                );
-            });
-        } else if let Some(icon) = icon {
-            node = node.icon(move |ui: &mut Ui| {
-                let tone = if dim { IconTone::Dim } else { IconTone::Normal };
-                let rect = Rect::from_center_size(ui.max_rect().center(), Vec2::splat(ICON));
-                icons::paint_file(ui.painter(), rect, preview, icon, tone);
-            });
-        }
         builder.node(node);
         if folder {
             build(builder, children, cx);
             builder.close_dir();
         }
+    }
+}
+
+/// A row's look, asked of the source the first time the row is drawn.
+struct LazyRow {
+    id: String,
+    row: OnceCell<TreeRow>,
+}
+
+impl LazyRow {
+    fn get(&self, cx: &RowsCx) -> &TreeRow {
+        self.row.get_or_init(|| (cx.row)(&self.id))
+    }
+}
+
+fn row_icon(ui: &mut Ui, row: &TreeRow, open: bool) {
+    let center = ui.max_rect().center();
+    let badge = row.badge.as_ref().filter(|_| !row.folder);
+    if let Some((letter, color)) = badge {
+        let rect = Rect::from_center_size(center, Vec2::splat(14.0));
+        let color = if row.dim {
+            color.gamma_multiply(0.5)
+        } else {
+            *color
+        };
+        ui.painter().rect_filled(rect, 3.0, color);
+        ui.painter().text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            letter,
+            FontId::monospace(10.0),
+            design_tokens::ink::CREAM,
+        );
+        return;
+    }
+    let icon = match (row.folder, open) {
+        (true, true) => Some(KindIcon::from(Mark::FolderOpen)),
+        (true, false) => Some(KindIcon::from(Mark::Folder)),
+        (false, _) => row.icon,
+    };
+    if let Some(icon) = icon {
+        let tone = if row.dim {
+            IconTone::Dim
+        } else {
+            IconTone::Normal
+        };
+        let rect = Rect::from_center_size(center, Vec2::splat(ICON));
+        icons::paint_file(ui.painter(), rect, row.preview, icon, tone);
     }
 }
 

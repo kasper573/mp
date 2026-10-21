@@ -1,4 +1,4 @@
-use engine::core::content::{LoadReport, SETTINGS_FILE};
+use engine::core::content::{FolderReader, LoadReport, SETTINGS_FILE};
 use engine::systems::npc::NpcDef;
 use serde_json::json;
 use testkit::{Game, path, png};
@@ -209,16 +209,13 @@ fn checking_any_files_of_a_game_that_loads_finds_nothing() {
     orcs().load();
     let game = orcs();
     let registry = game.registry();
-    let folder = std::sync::Arc::new(game.folder());
+    let folder = game.folder();
     let files: Vec<String> = folder.files.keys().cloned().collect();
-    let errors = engine::core::content::check_files(registry, folder.clone(), &files);
+    let reader = FolderReader::new(registry, std::sync::Arc::new(folder));
+    let errors = reader.check(&files).errors;
     assert!(errors.is_empty(), "the whole folder at once: {errors:?}");
     for file in &files {
-        let errors = engine::core::content::check_files(
-            registry,
-            folder.clone(),
-            std::slice::from_ref(file),
-        );
+        let errors = reader.check(std::slice::from_ref(file)).errors;
         assert!(errors.is_empty(), "{file}: {errors:?}");
     }
 }

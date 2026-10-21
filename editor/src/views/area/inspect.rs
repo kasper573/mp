@@ -342,10 +342,13 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
                         if ui
                             .selectable_label(
                                 picked,
-                                theme::mono(format!(
-                                    "{} · {} · {} of {}",
-                                    set.set, set.tileset, set.have, set.total
-                                )),
+                                theme::mono({
+                                    let mixes = set.coverage(content);
+                                    format!(
+                                        "{} · {} · {} of {}",
+                                        set.set, set.tileset, mixes.have, mixes.total
+                                    )
+                                }),
                             )
                             .clicked()
                         {
@@ -382,7 +385,7 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
     }
     widgets::section(ui, "Terrains of these tilesets");
     let used = snapshot.picture.ground.tilesets();
-    let mut own: Vec<&terrain::TerrainSetCoverage> = sets
+    let mut own: Vec<&terrain::TerrainSet> = sets
         .iter()
         .filter(|set| used.contains(&set.tileset))
         .collect();
@@ -397,8 +400,9 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
             ui.label(theme::mono(&set.set).size(13.0));
             ui.label(theme::muted(set.terrains.join(" · ")).size(12.5));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let mixes = set.coverage(content);
                 ui.label(
-                    theme::muted(format!("{} of {}", set.have, set.total))
+                    theme::muted(format!("{} of {}", mixes.have, mixes.total))
                         .monospace()
                         .size(12.0),
                 );

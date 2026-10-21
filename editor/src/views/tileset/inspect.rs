@@ -237,8 +237,12 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 if missing_shown && !mixes.missing.is_empty() {
                     ui.horizontal_wrapped(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
-                        for code in &mixes.missing {
-                            ui.label(theme::mono(code).size(11.5).color(theme::MUTED));
+                        for mix in &mixes.missing {
+                            ui.label(
+                                theme::mono(terrain::mix_code(*mix))
+                                    .size(11.5)
+                                    .color(theme::MUTED),
+                            );
                         }
                     });
                 }

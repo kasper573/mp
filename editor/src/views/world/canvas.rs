@@ -300,13 +300,16 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
     }
     let px_per_tile = card.art.width() / info.size.width.max(1.0);
     let scene_key = format!("world:{key}");
+    let rendered = card.art.size() * drawing.ppp;
+    let rendered = rendered * rendered_scale(rendered);
+    let width = rendered.x.round().clamp(1.0, 4096.0) as u32;
     editor.views.area.requests.push(scene::AreaSceneRequest {
         key: scene_key.clone(),
         spec: scene::AreaSceneSpec::area(key),
-        width: (card.art.width() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
-        height: (card.art.height() * drawing.ppp).round().clamp(1.0, 4096.0) as u32,
+        width,
+        height: rendered.y.round().clamp(1.0, 4096.0) as u32,
         center: Pos::new(info.size.width / 2.0, info.size.height / 2.0),
-        zoom: px_per_tile / TILE.0 * drawing.ppp,
+        zoom: width as f32 / (info.size.width.max(1.0) * TILE.0),
         generation: atlas.generation,
         live: false,
     });
@@ -1324,4 +1327,12 @@ fn tile_facts(map: &OpenWorldMap, hit: &MapTileHit) -> String {
             |(door, tiles)| format!("door {door} {} tiles away", tiles.round()),
         );
     format!("{walkable} · {safe} · {nearest_npc} · {nearest_door}")
+}
+
+/// How much larger than its `pixels` on screen a card's art renders: up to the next step of a
+/// ladder of √2 steps, so zooming renders the cards again only as it crosses a step, and the
+/// picture scales between steps.
+fn rendered_scale(pixels: Vec2) -> f32 {
+    let longest = pixels.max_elem().max(1.0);
+    2f32.powf((longest.log2() * 2.0).ceil() / 2.0) / longest
 }

@@ -2,12 +2,14 @@ use std::collections::HashSet;
 
 use egui::{Color32, Stroke as EStroke, Vec2};
 use engine::core::math::{Pos, Rect, Rng, Size};
-use engine::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
+use engine::core::tiling::{Cell, CellPos, TilePos, TileSize};
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::{self, Flip};
 use engine::systems::script::Place;
 
-use super::{AreaFrame, AreaSnapshot, AreaTool, Armed, grid, nodes, pins, select, terrain};
+use super::{
+    AreaFrame, AreaSnapshot, AreaTool, Armed, grid, nodes, overlays, pins, select, terrain,
+};
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
 use crate::thumbs;
@@ -409,23 +411,21 @@ pub(super) fn pick_place(
         return;
     };
     let warps = pins::warp_objects(&frame.content, area_id);
-    let visible = canvas.visible();
-    for cell in area.size.grid().cells() {
-        let bounds = cell.bounds();
-        if !visible.intersects(&bounds) {
-            continue;
-        }
-        let valid =
-            area.grid.walkable(cell.center()) && !warps.iter().any(|shape| shape.covers_cell(cell));
-        if !valid {
+    overlays::cell_runs(
+        canvas,
+        area.size.grid(),
+        |cell| {
+            !area.grid.walkable(cell.center()) || warps.iter().any(|shape| shape.covers_cell(cell))
+        },
+        |run| {
             patterns::hatch(
                 painter,
-                canvas.rect(bounds),
+                canvas.rect(run),
                 theme::alpha(theme::BLOCKED, 90),
                 canvas.scale(),
-            );
-        }
-    }
+            )
+        },
+    );
     pins::draw_arrivals(editor, painter, frame);
     let text = format!(
         "Pick a place for {} {} · click a cell, {} click any point · {} cancels",

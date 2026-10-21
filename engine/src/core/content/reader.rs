@@ -6,8 +6,8 @@ use std::sync::Arc;
 use super::files::{Listing, list, table_of};
 use super::id::{ContentId, ContentScope, with_content};
 use super::load::{
-    ContentFolder, ContentRegistry, FileWriter, Settings, TableLoader, listing_scope, parse_file,
-    parse_settings, parse_value,
+    CheckedFiles, ContentFolder, ContentRegistry, FileWriter, Settings, TableLoader, check_files,
+    listing_scope, parse_file, parse_settings, parse_value,
 };
 use super::report::{ContentProblem, ErrorPlace, LoadError, MISSING_FILE};
 use super::table::ContentFile;
@@ -19,7 +19,13 @@ use serde::de::DeserializeOwned;
 pub struct FolderReader {
     registry: &'static ContentRegistry,
     folder: Arc<dyn ContentFolder>,
-    listing: Listing,
+    listed: Arc<Listed>,
+}
+
+/// What the folder's paths say it holds: worked out once for every reader of the same paths.
+struct Listed {
+    listing: Arc<Listing>,
+    errors: Vec<LoadError>,
     scope: ContentScope,
 }
 
@@ -36,20 +42,48 @@ pub type Unreadable = Vec<LoadError>;
 
 impl FolderReader {
     pub fn new(registry: &'static ContentRegistry, folder: Arc<dyn ContentFolder>) -> FolderReader {
-        let (listing, _) = list(folder.as_ref(), &registry.file_types());
+        let (listing, errors) = list(folder.as_ref(), &registry.file_types());
         let scope = listing_scope(registry, &listing);
         FolderReader {
             registry,
             folder,
-            listing,
-            scope,
+            listed: Arc::new(Listed {
+                listing: Arc::new(listing),
+                errors,
+                scope,
+            }),
         }
+    }
+
+    /// What reads `folder`, which holds the very paths this reader's folder holds with other bytes,
+    /// without listing it again: listing a whole folder costs far more than an edit to a file's
+    /// fields does.
+    pub fn rereading(&self, folder: Arc<dyn ContentFolder>) -> FolderReader {
+        FolderReader {
+            registry: self.registry,
+            folder,
+            listed: self.listed.clone(),
+        }
+    }
+
+    /// The problems the files at `files` have on their own, as a load reports them: what their
+    /// names say, the shape and references of the content each belongs to, that content's parts
+    /// and the rules of its type, and whether their media decodes. Only what the rest of the game
+    /// says of them is left to a whole load, so whatever writes content can ask before it writes.
+    pub fn check(&self, files: &[String]) -> CheckedFiles {
+        check_files(
+            self.registry,
+            self.folder.clone(),
+            self.listed.listing.clone(),
+            &self.listed.errors,
+            files,
+        )
     }
 
     /// The content file at `path`, its fields and the parts of its bundle, when it reads whole:
     /// parsed, with every reference naming a file the folder holds.
     pub fn read<Row: ContentFile>(&self, path: &str) -> Result<Row, Unreadable> {
-        self.read_in(path, &self.scope)
+        self.read_in(path, &self.listed.scope)
     }
 
     /// The content file at `path` read as `read` reads it, its references resolved among the
@@ -63,14 +97,14 @@ impl FolderReader {
         let Some(loader) = self.registry.loader_of::<Row>() else {
             return Err(vec![unknown_type(path, Row::TABLE)]);
         };
-        if self.scope.id_of::<Row>(path).is_none() || scope.id_of::<Row>(path).is_none() {
+        if self.listed.scope.id_of::<Row>(path).is_none() || scope.id_of::<Row>(path).is_none() {
             return Err(vec![missing(path, Row::TABLE)]);
         }
         let parsed = parse_file(
             self.registry,
             loader,
             &self.folder,
-            &self.listing,
+            &self.listed.listing,
             scope,
             path,
         );
@@ -85,7 +119,7 @@ impl FolderReader {
 
     /// `value` as JSON, its ids written as the paths they stand for among the folder's.
     pub fn to_json<T: serde::Serialize>(&self, value: &T) -> Result<serde_json::Value, String> {
-        with_content(self.scope.clone(), || super::serial::json_of(value))
+        with_content(self.listed.scope.clone(), || super::serial::json_of(value))
             .0
             .map_err(|error| error.to_string())
     }
@@ -112,7 +146,7 @@ impl FolderReader {
 
     /// The game's settings, when they read whole.
     pub fn settings<G: Settings>(&self) -> Result<G, Unreadable> {
-        let parsed = parse_settings(self.registry, self.folder.as_ref(), &self.scope);
+        let parsed = parse_settings(self.registry, self.folder.as_ref(), &self.listed.scope);
         whole(parsed.row, parsed.errors, super::SETTINGS_FILE)
     }
 
@@ -139,12 +173,12 @@ impl FolderReader {
         let loader = table_of(path)
             .and_then(|table| self.registry.loader_named(table))
             .ok_or_else(|| format!("{path} is no content file this game registers"))?;
-        let scope = self.scope.renaming(renames);
+        let scope = self.listed.scope.renaming(renames);
         let parsed = parse_file(
             self.registry,
             loader,
             &self.folder,
-            &self.listing,
+            &self.listed.listing,
             &scope,
             path,
         );
@@ -167,7 +201,7 @@ impl FolderReader {
             .registry
             .settings_loader()
             .ok_or("no settings in this game's registry")?;
-        let scope = self.scope.renaming(renames);
+        let scope = self.listed.scope.renaming(renames);
         let parsed = parse_settings(self.registry, self.folder.as_ref(), &scope);
         let settings = read_whole(parsed.row, parsed.errors, super::SETTINGS_FILE)
             .map_err(|errors| told(&errors))?;
@@ -191,7 +225,7 @@ impl FolderReader {
     /// What `read` makes of JSON with its references resolved among the folder's paths, refused
     /// when one names no file the folder holds.
     fn within<T>(&self, read: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-        let (read, scope) = with_content(self.scope.clone(), read);
+        let (read, scope) = with_content(self.listed.scope.clone(), read);
         let read = read?;
         match scope.leaves().iter().find_map(|leaf| leaf.reported()) {
             Some(problem) => Err(problem.to_string()),
@@ -201,26 +235,26 @@ impl FolderReader {
 
     /// The paths every reference read here resolves among.
     pub fn scope(&self) -> &ContentScope {
-        &self.scope
+        &self.listed.scope
     }
 
     pub fn path_of<Row: ContentFile>(&self, id: ContentId<Row>) -> Option<&str> {
-        self.scope.path_of(id)
+        self.listed.scope.path_of(id)
     }
 
     pub fn id_of<Row: ContentFile>(&self, path: &str) -> Option<ContentId<Row>> {
-        self.scope.id_of(path)
+        self.listed.scope.id_of(path)
     }
 
     pub fn paths_of<Row: ContentFile>(&self) -> &[String] {
-        self.scope.paths_of::<Row>()
+        self.listed.scope.paths_of::<Row>()
     }
 
     fn write_with(
         &self,
         write: impl FnOnce(&mut FileWriter) -> io::Result<()>,
     ) -> io::Result<BTreeMap<String, Vec<u8>>> {
-        write_in(&self.scope, write)
+        write_in(&self.listed.scope, write)
     }
 
     /// The parts the folder holds for the content file at `path` that `files` no longer writes.
@@ -231,7 +265,8 @@ impl FolderReader {
         files: &BTreeMap<String, Vec<u8>>,
     ) -> Vec<String> {
         let written = loader.written_parts();
-        self.listing
+        self.listed
+            .listing
             .parts
             .get(path)
             .into_iter()

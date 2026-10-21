@@ -31,6 +31,7 @@ pub use resize::ResizeDialog;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use bevy::prelude::World;
 use design_tokens::glyph::{self, Mark};
@@ -435,30 +436,25 @@ fn show_bundle(editor: &mut Editor, ui: &mut Ui, bundle: &str) {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) {
-    let Some(content) = editor
+    if editor
         .project
         .as_ref()
-        .and_then(|project| project.content.clone())
-    else {
+        .is_none_or(|project| project.content.is_none())
+    {
         ui.label(theme::muted("The folder does not load."));
         return;
-    };
-    let Some(bundle) = editor
-        .views
-        .area
-        .views
-        .get(view_key)
-        .map(|view| view.bundle.clone())
-    else {
-        return;
-    };
+    }
     match tab {
         BottomTab::Palette => {
             if let Some(snapshot) = AreaSnapshot::for_view(editor, view_key) {
                 palette::show(editor, ui, view_key, &snapshot);
             }
         }
-        BottomTab::Blueprints => stamp::stamp_panel(editor, ui, view_key, &content, &bundle),
+        BottomTab::Blueprints => {
+            if let Some(snapshot) = AreaSnapshot::for_view(editor, view_key) {
+                stamp::stamp_panel(editor, ui, view_key, &snapshot);
+            }
+        }
         _ => {}
     }
 }
@@ -953,6 +949,9 @@ fn backdrop_shift(snapshot: &AreaSnapshot, area: &str) -> Option<Offset<Tiles>> 
 /// What a view shows of its bundle: the scene as the editor holds it, the picture it makes with
 /// what is hidden left out, and the placements being edited in place.
 pub struct AreaSnapshot {
+    /// Made anew only when what the snapshot holds is, so what is found from it may be kept
+    /// until this changes.
+    pub made: u64,
     pub content: Content,
     pub bundle: String,
     pub pictured: Pictured,
@@ -961,9 +960,19 @@ pub struct AreaSnapshot {
     pub def: nodes::SceneBundle,
     pub reader: Arc<FolderReader>,
     pub flags: Arc<SceneFlags>,
-    pub modules: Arc<Vec<nodes::SceneModule>>,
+    pub modules: Arc<nodes::SceneModules>,
     pub in_place: Vec<placement::AreaPlacement>,
     pub placement_bounds: Arc<HashMap<String, Rect<Tiles>>>,
+    targets: Arc<[MapTarget]>,
+}
+
+/// A module of the bundle, where the pointer finds it on the map: hovering asks of every one on
+/// every frame.
+struct MapTarget {
+    pointer: String,
+    bounds: Rect<Tiles>,
+    shown: bool,
+    locked: bool,
 }
 
 #[derive(Clone)]
@@ -977,14 +986,16 @@ struct SnapshotCache {
 
 #[derive(Clone)]
 struct SnapshotParts {
+    made: u64,
     pictured: Pictured,
     picture: Arc<Picture>,
     def: nodes::SceneBundle,
     reader: Arc<FolderReader>,
     flags: Arc<SceneFlags>,
-    modules: Arc<Vec<nodes::SceneModule>>,
+    modules: Arc<nodes::SceneModules>,
     in_place: Vec<placement::AreaPlacement>,
     placement_bounds: Arc<HashMap<String, Rect<Tiles>>>,
+    targets: Arc<[MapTarget]>,
 }
 
 pub struct AreaFrame<'a> {
@@ -1069,6 +1080,7 @@ impl AreaSnapshot {
 
     fn from_parts(content: Content, bundle: String, parts: SnapshotParts) -> Self {
         Self {
+            made: parts.made,
             content,
             bundle,
             pictured: parts.pictured,
@@ -1079,6 +1091,7 @@ impl AreaSnapshot {
             modules: parts.modules,
             in_place: parts.in_place,
             placement_bounds: parts.placement_bounds,
+            targets: parts.targets,
         }
     }
 
@@ -1119,10 +1132,7 @@ impl AreaSnapshot {
     }
 
     pub fn module_node(&self, pointer: &str) -> Option<&ModuleNode> {
-        self.modules
-            .iter()
-            .find(|module| module.pointer == pointer)
-            .map(|module| &module.node)
+        self.modules.get(pointer).map(|module| &module.node)
     }
 
     pub fn module(&self, pointer: &str) -> Option<&AreaModule> {
@@ -1130,9 +1140,14 @@ impl AreaSnapshot {
     }
 
     pub fn module_bounds(&self, pointer: &str) -> Option<Rect<Tiles>> {
+        self.bounds_of(self.modules.get(pointer)?)
+    }
+
+    /// Where `module`, one of the bundle's own, takes room on the map.
+    pub fn bounds_of(&self, module: &nodes::SceneModule) -> Option<Rect<Tiles>> {
         shapes::bounds(
-            self.module(pointer)?,
-            self.placement_bounds.get(pointer).copied(),
+            module.module(),
+            self.placement_bounds.get(&module.pointer).copied(),
         )
     }
 
@@ -1143,22 +1158,20 @@ impl AreaSnapshot {
     }
 
     pub fn hit(&self, tile: Pos<Tiles>) -> Option<String> {
-        let mut best: Option<(&str, f32)> = None;
-        for module in self.modules.iter() {
-            if !is_selectable(module.module()) || !self.pickable(&module.pointer) {
-                continue;
-            }
-            let Some(bounds) = self.module_bounds(&module.pointer) else {
-                continue;
-            };
-            if bounds.contains(tile) {
-                let size = bounds.area();
-                if best.is_none_or(|(_, area)| size < area) {
-                    best = Some((&module.pointer, size));
-                }
+        if !self.in_place.is_empty() {
+            return None;
+        }
+        let mut best: Option<&MapTarget> = None;
+        for target in self.targets.iter() {
+            if target.shown
+                && !target.locked
+                && target.bounds.contains(tile)
+                && best.is_none_or(|best| target.bounds.area() < best.bounds.area())
+            {
+                best = Some(target);
             }
         }
-        best.map(|(pointer, _)| pointer.to_owned())
+        best.map(|target| target.pointer.clone())
     }
 
     /// The modules the selection `parts` takes on the map: those selected, and every visible,
@@ -1204,7 +1217,7 @@ impl AreaSnapshot {
                         .iter()
                         .any(|folder| module.pointer.starts_with(&format!("{folder}/")))
             })
-            .filter_map(|module| self.module_bounds(&module.pointer))
+            .filter_map(|module| self.bounds_of(module))
             .reduce(|a, b| a.union(&b))?;
         Some((bounds, label))
     }
@@ -1253,16 +1266,11 @@ impl AreaSnapshot {
 
     /// The locked module under `tile` a click passes through, for the tip that says what locks it.
     pub fn locked_hit(&self, tile: Pos<Tiles>) -> Option<String> {
-        self.modules
+        self.targets
             .iter()
-            .filter(|module| is_selectable(module.module()))
-            .filter(|module| {
-                !self.flags.hidden(&module.pointer) && self.flags.locked(&module.pointer)
-            })
-            .filter_map(|module| Some((module, self.module_bounds(&module.pointer)?)))
-            .filter(|(_, bounds)| bounds.contains(tile))
-            .min_by(|a, b| a.1.area().total_cmp(&b.1.area()))
-            .map(|(module, _)| module.pointer.clone())
+            .filter(|target| target.shown && target.locked && target.bounds.contains(tile))
+            .min_by(|a, b| a.bounds.area().total_cmp(&b.bounds.area()))
+            .map(|target| target.pointer.clone())
     }
 
     /// The names of the bundle's own ground layers left out of the editor's picture.
@@ -1323,15 +1331,34 @@ fn snapshot_parts(
             (picture, placement_bounds)
         }
     };
+    let modules = nodes::SceneModules::of(def.nodes());
+    let targets = modules
+        .iter()
+        .filter(|module| is_selectable(module.module()))
+        .filter_map(|module| {
+            Some(MapTarget {
+                bounds: shapes::bounds(
+                    module.module(),
+                    placement_bounds.get(&module.pointer).copied(),
+                )?,
+                shown: !flags.hidden(&module.pointer),
+                locked: flags.locked(&module.pointer),
+                pointer: module.pointer.clone(),
+            })
+        })
+        .collect();
+    static MADE: AtomicU64 = AtomicU64::new(0);
     Some(SnapshotParts {
+        made: MADE.fetch_add(1, Ordering::Relaxed),
         pictured,
         picture,
-        modules: Arc::new(nodes::modules(def.nodes())),
+        modules: Arc::new(modules),
         def,
         reader,
         flags: Arc::new(flags),
         in_place,
         placement_bounds,
+        targets,
     })
 }
 

@@ -12,7 +12,7 @@ use engine::systems::class::{
 use engine::systems::skill::{Rank, SkillDef};
 use strum::VariantArray;
 
-use super::{node_of, select_node, write};
+use super::{edit, node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::Project;
@@ -135,7 +135,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         );
     }
     if let Some(label) = changed {
-        write(editor, key, label, &class);
+        write(editor, key, edit(key, label), &class);
     }
 }
 

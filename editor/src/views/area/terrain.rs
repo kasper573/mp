@@ -139,30 +139,33 @@ pub fn repaint(
     (changed, kept)
 }
 
-pub struct TerrainSetCoverage {
+pub struct TerrainSet {
     pub tileset: String,
     pub set: String,
     pub terrains: Vec<String>,
-    pub have: usize,
-    pub total: usize,
 }
 
-pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSetCoverage> {
+impl TerrainSet {
+    /// How many of the set's mixes have a tile.
+    pub fn coverage(&self, content: &Content) -> MixCompleteness {
+        content
+            .by_path::<TilesetDef>(&self.tileset)
+            .map(|id| MixCompleteness::of(id.get(content), &self.set))
+            .unwrap_or_default()
+    }
+}
+
+pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSet> {
     content
         .table::<TilesetDef>()
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
         .flat_map(|(id, def)| {
             let tileset = id.path(content).to_owned();
-            def.terrains.iter().map(move |(set, terrains)| {
-                let mixes = MixCompleteness::of(def, set);
-                TerrainSetCoverage {
-                    tileset: tileset.clone(),
-                    set: set.clone(),
-                    terrains: terrains.clone(),
-                    have: mixes.have,
-                    total: mixes.total,
-                }
+            def.terrains.iter().map(move |(set, terrains)| TerrainSet {
+                tileset: tileset.clone(),
+                set: set.clone(),
+                terrains: terrains.clone(),
             })
         })
         .collect()

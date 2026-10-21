@@ -97,10 +97,12 @@ impl TileCorner {
     }
 }
 
+#[derive(Default)]
 pub struct MixCompleteness {
     pub have: usize,
     pub total: usize,
-    pub missing: Vec<String>,
+    /// The codes of the mixes without a tile.
+    pub missing: Vec<[usize; 4]>,
 }
 
 impl MixCompleteness {
@@ -110,10 +112,10 @@ impl MixCompleteness {
         let mut have = 0;
         let mut missing = Vec::new();
         for mix in all_mixes(terrains.len()).skip(1) {
-            if by_mix.contains_key(&mix_names(mix, terrains)) {
+            if by_mix.contains_key(&mix) {
                 have += 1;
             } else {
-                missing.push(mix_code(mix));
+                missing.push(mix);
             }
         }
         MixCompleteness {
@@ -403,28 +405,50 @@ pub fn mixes(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         )));
     });
     ui.add_space(4.0);
-    let per_row = ((ui.available_width() - 16.0) / 58.0).floor().max(1.0) as usize;
-    egui::ScrollArea::vertical()
-        .id_salt(("mixes", &tileset.key))
-        .show(ui, |ui| {
-            egui::Grid::new(("mixes-grid", &tileset.key))
-                .spacing(Vec2::new(8.0, 6.0))
-                .show(ui, |ui| {
-                    for (index, mix) in all_mixes(terrains.len()).enumerate() {
-                        let tiles = by_mix.get(&mix_names(mix, terrains));
-                        ui.vertical(|ui| {
-                            let (rect, _) =
-                                ui.allocate_exact_size(Vec2::splat(44.0), Sense::hover());
-                            mix_cell(ui.painter_at(rect), rect, mix, tiles, tileset);
-                            ui.label(theme::faint(mix_code(mix)).size(10.5).monospace());
+    let per_row = ((ui.available_width() - 16.0) / (MIX_CELL.x + MIX_GAP.x))
+        .floor()
+        .max(1.0) as usize;
+    let mixes: Vec<[usize; 4]> = all_mixes(terrains.len()).collect();
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing = MIX_GAP;
+        egui::ScrollArea::vertical()
+            .id_salt(("mixes", &tileset.key))
+            .show_rows(
+                ui,
+                MIX_CELL.y,
+                mixes.len().div_ceil(per_row),
+                |ui, shown| {
+                    for row in shown {
+                        ui.horizontal(|ui| {
+                            for mix in mixes.iter().skip(row * per_row).take(per_row) {
+                                let (cell, _) = ui.allocate_exact_size(MIX_CELL, Sense::hover());
+                                let picture =
+                                    ERect::from_min_size(cell.min, Vec2::splat(MIX_PICTURE));
+                                mix_cell(
+                                    ui.painter_at(picture),
+                                    picture,
+                                    *mix,
+                                    by_mix.get(mix),
+                                    tileset,
+                                );
+                                ui.painter().text(
+                                    Pos2::new(cell.left(), picture.bottom() + 3.0),
+                                    egui::Align2::LEFT_TOP,
+                                    mix_code(*mix),
+                                    egui::FontId::monospace(10.5),
+                                    theme::FAINT,
+                                );
+                            }
                         });
-                        if (index + 1) % per_row == 0 {
-                            ui.end_row();
-                        }
                     }
-                });
-        });
+                },
+            );
+    });
 }
+
+const MIX_PICTURE: f32 = 44.0;
+const MIX_CELL: Vec2 = Vec2::new(50.0, MIX_PICTURE + 17.0);
+const MIX_GAP: Vec2 = Vec2::new(8.0, 6.0);
 
 pub fn new_set_dialog(
     editor: &mut Editor,
@@ -659,24 +683,35 @@ fn all_mixes(terrains: usize) -> impl Iterator<Item = [usize; 4]> {
     })
 }
 
-fn mix_names(mix: [usize; 4], terrains: &[String]) -> [String; 4] {
-    std::array::from_fn(|corner| terrains[mix[corner]].clone())
-}
-
 fn number_of(terrain: usize) -> String {
     (terrain + 1).to_string()
 }
 
-fn mix_code(mix: [usize; 4]) -> String {
+pub(super) fn mix_code(mix: [usize; 4]) -> String {
     mix.iter().map(|index| number_of(*index)).collect()
 }
 
-fn tiles_by_mix<'a>(def: &'a TilesetDef, set: &str) -> BTreeMap<&'a [String; 4], Vec<u32>> {
-    let mut by_mix: BTreeMap<&[String; 4], Vec<u32>> = BTreeMap::new();
+/// The tiles of each mix of the set's terrains, a mix naming each corner's terrain by its place
+/// in the set.
+fn tiles_by_mix(def: &TilesetDef, set: &str) -> BTreeMap<[usize; 4], Vec<u32>> {
+    let terrains = def.terrains.get(set).map_or(&[][..], Vec::as_slice);
+    let mut by_mix: BTreeMap<[usize; 4], Vec<u32>> = BTreeMap::new();
     for (tile, data) in &def.tiles {
-        if let Some(corners) = data.corners.get(set) {
-            by_mix.entry(corners).or_default().push(*tile);
+        if let Some(mix) = data
+            .corners
+            .get(set)
+            .and_then(|corners| mix_of(corners, terrains))
+        {
+            by_mix.entry(mix).or_default().push(*tile);
         }
     }
     by_mix
+}
+
+fn mix_of(corners: &[String; 4], terrains: &[String]) -> Option<[usize; 4]> {
+    let mut mix = [0; 4];
+    for (slot, name) in mix.iter_mut().zip(corners) {
+        *slot = terrains.iter().position(|terrain| terrain == name)?;
+    }
+    Some(mix)
 }

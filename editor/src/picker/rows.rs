@@ -1,4 +1,6 @@
-use engine::core::content::{ContentFile, fields_file, name_of, parent_of};
+use std::collections::{BTreeMap, HashMap};
+
+use engine::core::content::{Content, ContentFile, fields_file, name_of, parent_of};
 use engine::field;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -8,7 +10,7 @@ use engine::systems::attention::AttentionDef;
 use engine::systems::class::{ClassDef, SkillNode};
 use engine::systems::interface::{CursorDef, InterfaceIconDef};
 use engine::systems::item::ItemDef;
-use engine::systems::npc::{self, NpcDef};
+use engine::systems::npc::{self, NpcDef, NpcId};
 use engine::systems::quest::QuestDef;
 use engine::systems::registry;
 use engine::systems::script::{RiftScripts, RunnerKind, ScriptDef};
@@ -103,6 +105,12 @@ impl PickSource for RowSource {
     }
 
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate> {
+        let places = self
+            .tables
+            .iter()
+            .any(|table| table == NpcDef::TABLE)
+            .then(|| npc_places(cx))
+            .flatten();
         let mut listed = Vec::new();
         for table in &self.tables {
             for key in cx.files.paths_of(table) {
@@ -117,7 +125,7 @@ impl PickSource for RowSource {
                     pick: Pick::new(table.as_str(), key),
                     category,
                     name: display_name(cx, table, key),
-                    hint: match pick_hint(cx, table, key) {
+                    hint: match pick_hint(cx, places.as_ref(), table, key) {
                         Some(detail) => format!("{} · {detail}", shown_path(&from_here)),
                         None => shown_path(&from_here).to_owned(),
                     },
@@ -255,36 +263,48 @@ fn script_runner(cx: &FormCx, key: &str) -> String {
 
 /// What sets the file `key` of `table` apart in the picker, beside its path, for the types that
 /// say more about a file than how often it's used.
-fn pick_hint(cx: &FormCx, table: &str, key: &str) -> Option<String> {
+fn pick_hint(cx: &FormCx, places: Option<&NpcPlaces>, table: &str, key: &str) -> Option<String> {
     match table {
         NpcDef::TABLE => {
-            let content = cx.content.clone()?;
-            let id = content.by_path::<NpcDef>(key)?;
-            let mut places: Vec<String> = Vec::new();
-            for area in content.ids::<AreaDef>() {
-                let count: u32 = area::placed(&content, area)
-                    .iter()
-                    .map(|placed| match &placed.module {
-                        AreaModule::Resident(resident) if resident.npc == id => 1,
-                        AreaModule::Population(population) if population.npc == id => {
-                            population.count
-                        }
-                        _ => 0,
-                    })
-                    .sum();
-                if count > 0 {
-                    places.push(format!("{} × {count}", shown_path(area.path(&content))));
-                }
-            }
-            Some(if places.is_empty() {
-                "placed nowhere".to_owned()
-            } else {
-                places.join(" · ")
+            let places = places?;
+            let id = places.content.by_path::<NpcDef>(key)?;
+            Some(match places.of.get(&id) {
+                Some(places) => places.join(" · "),
+                None => "placed nowhere".to_owned(),
             })
         }
         ScriptDef::TABLE => Some(script_runner(cx, key)).filter(|runner| !runner.is_empty()),
         _ => None,
     }
+}
+
+/// Where each npc stands in the world: every area that places it, and how many.
+struct NpcPlaces {
+    content: Content,
+    of: HashMap<NpcId, Vec<String>>,
+}
+
+fn npc_places(cx: &FormCx) -> Option<NpcPlaces> {
+    let content = cx.content.clone()?;
+    let mut of: HashMap<NpcId, Vec<String>> = HashMap::new();
+    for area in content.ids::<AreaDef>() {
+        let mut counts: BTreeMap<NpcId, u32> = BTreeMap::new();
+        for placed in area::placed(&content, area) {
+            match &placed.module {
+                AreaModule::Resident(resident) => *counts.entry(resident.npc).or_default() += 1,
+                AreaModule::Population(population) => {
+                    *counts.entry(population.npc).or_default() += population.count
+                }
+                _ => {}
+            }
+        }
+        for (npc, count) in counts.into_iter().filter(|(_, count)| *count > 0) {
+            of.entry(npc)
+                .or_default()
+                .push(format!("{} × {count}", shown_path(area.path(&content))));
+        }
+    }
+    Some(NpcPlaces { content, of })
 }
 
 fn display_name(cx: &FormCx, table: &str, key: &str) -> String {

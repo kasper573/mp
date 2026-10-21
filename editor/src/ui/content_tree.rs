@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use design_tokens::glyph::Mark;
 use egui::{Color32, Ui};
@@ -41,6 +41,30 @@ pub struct ContentTree {
     pub copied: Vec<String>,
     /// The file of the tab last revealed, so a tab is revealed once each time it becomes active.
     revealed: Option<String>,
+    /// What the tree lists, kept until what it was found from changes: walking every file each
+    /// frame costs more than drawing the tree.
+    listing: Arc<Mutex<Option<Listing>>>,
+}
+
+struct Listing {
+    from: ListedFrom,
+    /// While anything narrows the tree: every row shown, and folders above them.
+    shown: Option<Arc<HashSet<String>>>,
+    /// The rows of each folder listed so far, in order.
+    children: HashMap<String, Vec<String>>,
+}
+
+/// Everything what the tree lists depends on.
+#[derive(PartialEq)]
+struct ListedFrom {
+    files: u64,
+    generation: u64,
+    unsaved: Arc<[String]>,
+    needle: String,
+    only_unsaved: bool,
+    only_unused: bool,
+    hidden_kinds: BTreeSet<String>,
+    hide_empty_folders: bool,
 }
 
 /// The folder new things land in: the folder selected in the tree, or the one holding what is
@@ -598,8 +622,8 @@ struct GameFolder<'a> {
     missing: BTreeMap<String, BTreeSet<String>>,
     unsaved: HashSet<String>,
     problems: HashMap<String, String>,
-    /// While anything narrows the tree: every row shown, and folders above them.
-    shown: Option<HashSet<String>>,
+    listing: Arc<Mutex<Option<Listing>>>,
+    shown: Option<Arc<HashSet<String>>>,
     narrowed: bool,
     filtered: bool,
     /// What the search looks for, lowercased.
@@ -654,8 +678,9 @@ impl<'a> GameFolder<'a> {
                 child = parent;
             }
         }
+        let unsaved_paths = project.unsaved();
         let mut unsaved = HashSet::new();
-        for entry in project.unsaved().iter() {
+        for entry in unsaved_paths.iter() {
             let row = row_of(entry);
             above(&row, &mut |folder| {
                 unsaved.insert(folder.to_owned());
@@ -687,6 +712,7 @@ impl<'a> GameFolder<'a> {
             missing,
             unsaved,
             problems,
+            listing: tree.listing.clone(),
             shown: None,
             narrowed,
             filtered,
@@ -695,15 +721,48 @@ impl<'a> GameFolder<'a> {
             last_new: tree.last_new.clone(),
             previews: None,
         };
-        if filtered {
-            folder.shown = Some(folder.shown_rows(tree, view, &needle));
-        }
+        let from = ListedFrom {
+            files: project.files.revision(),
+            generation: project.generation,
+            unsaved: unsaved_paths,
+            needle: needle.clone(),
+            only_unsaved: tree.only_unsaved,
+            only_unused: tree.only_unused,
+            hidden_kinds: view.hidden_kinds.clone(),
+            hide_empty_folders: view.hide_empty_folders,
+        };
+        folder.shown = {
+            let mut listing = tree.listing.lock().unwrap_or_else(PoisonError::into_inner);
+            let listing = match &mut *listing {
+                Some(listing) if listing.from == from => listing,
+                stale => stale.insert(Listing {
+                    from,
+                    shown: filtered.then(|| Arc::new(folder.find_shown(tree, view, &needle))),
+                    children: HashMap::new(),
+                }),
+            };
+            listing.shown.clone()
+        };
         folder
+    }
+
+    fn find_children(&self, id: &str) -> Vec<String> {
+        let mut children: Vec<String> = self
+            .index
+            .children_of(id)
+            .map(str::to_owned)
+            .chain(self.missing.get(id).into_iter().flatten().cloned())
+            .filter(|path| self.shown.as_ref().is_none_or(|shown| shown.contains(path)))
+            .collect::<BTreeSet<String>>()
+            .into_iter()
+            .collect();
+        children.sort_by_cached_key(|path| (!self.is_folder(path), file_name(path).to_lowercase()));
+        children
     }
 
     /// The rows left once the tree is narrowed and its kinds chosen: what passes, the folders
     /// above it, and every other folder unless it is hidden for showing nothing.
-    fn shown_rows(&self, tree: &ContentTree, view: &TreeView, needle: &str) -> HashSet<String> {
+    fn find_shown(&self, tree: &ContentTree, view: &TreeView, needle: &str) -> HashSet<String> {
         let unused = &self.project.unused;
         let mut shown = HashSet::new();
         let mut leaves: Vec<&str> = Vec::new();
@@ -731,11 +790,6 @@ impl<'a> GameFolder<'a> {
             shown.extend(self.index.folders.iter().cloned());
         }
         shown
-    }
-
-    fn is_folder(&self, path: &str) -> bool {
-        self.index.folders.contains(path)
-            || (self.missing.contains_key(path) && !self.index.is_content(path))
     }
 
     fn is_missing(&self, path: &str) -> bool {
@@ -959,21 +1013,25 @@ impl TreeSource for GameFolder<'_> {
     type Action = TreeAction;
 
     fn children(&self, id: &str) -> Vec<String> {
-        let mut children: Vec<String> = self
-            .index
-            .children_of(id)
-            .map(str::to_owned)
-            .chain(self.missing.get(id).into_iter().flatten().cloned())
-            .filter(|path| self.shown.as_ref().is_none_or(|shown| shown.contains(path)))
-            .collect::<BTreeSet<String>>()
-            .into_iter()
-            .collect();
-        children.sort_by_cached_key(|path| (!self.is_folder(path), file_name(path).to_lowercase()));
+        let mut listing = self.listing.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(listing) = &mut *listing else {
+            return self.find_children(id);
+        };
+        if let Some(children) = listing.children.get(id) {
+            return children.clone();
+        }
+        let children = self.find_children(id);
+        listing.children.insert(id.to_owned(), children.clone());
         children
     }
 
     fn parent(&self, id: &str) -> String {
         parent_of(id).to_owned()
+    }
+
+    fn is_folder(&self, id: &str) -> bool {
+        self.index.folders.contains(id)
+            || (self.missing.contains_key(id) && !self.index.is_content(id))
     }
 
     fn row(&self, id: &str) -> TreeRow {

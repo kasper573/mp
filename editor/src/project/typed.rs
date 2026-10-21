@@ -2,14 +2,17 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use engine::core::content::{Content, ContentFile, ContentId, FolderReader, Unreadable};
+use engine::core::content::{
+    Content, ContentFile, ContentId, FolderReader, ReadRow, SETTINGS_FILE, Unreadable,
+};
 use engine::systems::{self, GameSettings};
 
 use super::files::ProjectFiles;
 
-/// The project's files read as the types the game reads them as, each read once per revision of
-/// the files and only when asked for: everything the editor knows of a file's fields comes from
-/// its type, so a field the game no longer has is one the editor can no longer name.
+/// The project's files read as the types the game reads them as, each read only when asked for and
+/// again only once its files change or the folder's paths do: everything the editor knows of a
+/// file's fields comes from its type, so a field the game no longer has is one the editor can no
+/// longer name.
 #[derive(Default)]
 pub(super) struct TypedFiles {
     at: Mutex<Option<Typed>>,
@@ -17,11 +20,26 @@ pub(super) struct TypedFiles {
 
 struct Typed {
     revision: u64,
+    paths_revision: u64,
     reader: Arc<FolderReader>,
-    read: HashMap<(TypeId, String), Read>,
+    read: HashMap<(TypeId, String), Kept>,
 }
 
 type Read = Result<Arc<dyn Any + Send + Sync>, Arc<Unreadable>>;
+
+/// A read, and the hash of every file it was read from.
+struct Kept {
+    read: Read,
+    from: Vec<(String, String)>,
+}
+
+impl Kept {
+    fn holds(&self, files: &ProjectFiles) -> bool {
+        self.from
+            .iter()
+            .all(|(file, hash)| files.hash_of(file) == Some(hash.as_str()))
+    }
+}
 
 impl TypedFiles {
     pub(super) fn reader(&self, files: &ProjectFiles, name: &str) -> Arc<FolderReader> {
@@ -42,7 +60,12 @@ impl TypedFiles {
         files: &ProjectFiles,
         name: &str,
     ) -> Result<Arc<GameSettings>, Arc<Unreadable>> {
-        self.read_as(files, name, "", FolderReader::settings::<GameSettings>)
+        self.read_as(
+            files,
+            name,
+            SETTINGS_FILE,
+            FolderReader::settings::<GameSettings>,
+        )
     }
 
     fn read_as<T: Any + Send + Sync>(
@@ -58,12 +81,29 @@ impl TypedFiles {
             typed
                 .read
                 .entry(key)
-                .or_insert_with(|| match read(&reader) {
-                    Ok(row) => Ok(Arc::new(row)),
-                    Err(errors) => Err(Arc::new(errors)),
+                .or_insert_with(|| Kept {
+                    read: match read(&reader) {
+                        Ok(row) => Ok(Arc::new(row)),
+                        Err(errors) => Err(Arc::new(errors)),
+                    },
+                    from: hashes_of(files, path),
                 })
+                .read
                 .clone()
                 .map(|row| row.downcast::<T>().expect("read as its own type"))
+        })
+    }
+
+    /// Keeps `rows`, read whole from `files` by a check, as the reads of their files.
+    pub(super) fn keep(&self, files: &ProjectFiles, name: &str, rows: Vec<ReadRow>) {
+        self.with(files, name, |typed| {
+            for row in rows {
+                let from = hashes_of(files, &row.path);
+                typed.read.entry((row.row_type, row.path)).or_insert(Kept {
+                    read: Ok(row.row),
+                    from,
+                });
+            }
         })
     }
 
@@ -72,16 +112,27 @@ impl TypedFiles {
             .at
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let typed = match at.as_mut() {
-            Some(typed) if typed.revision == files.revision() => typed,
-            _ => at.insert(Typed {
-                revision: files.revision(),
-                reader: Arc::new(FolderReader::new(
-                    systems::registry(),
-                    Arc::new(files.folder(name)),
-                )),
-                read: HashMap::new(),
-            }),
+        let typed = match at.take() {
+            Some(typed) if typed.revision == files.revision() => at.insert(typed),
+            last => {
+                let folder = Arc::new(files.folder(name));
+                let (reader, mut read) = match last {
+                    Some(last) if last.paths_revision == files.paths_revision() => {
+                        (last.reader.rereading(folder), last.read)
+                    }
+                    _ => (
+                        FolderReader::new(systems::registry(), folder),
+                        HashMap::new(),
+                    ),
+                };
+                read.retain(|_, kept| kept.holds(files));
+                at.insert(Typed {
+                    revision: files.revision(),
+                    paths_revision: files.paths_revision(),
+                    reader: Arc::new(reader),
+                    read,
+                })
+            }
         };
         f(typed)
     }
@@ -107,4 +158,13 @@ impl IdPaths for Content {
             .get(id.index())
             .map(String::as_str)
     }
+}
+
+/// The hash of every file the content at `path` is read from.
+fn hashes_of(files: &ProjectFiles, path: &str) -> Vec<(String, String)> {
+    files
+        .files_of(path)
+        .into_iter()
+        .filter_map(|file| Some((file.clone(), files.hash_of(&file)?.to_owned())))
+        .collect()
 }

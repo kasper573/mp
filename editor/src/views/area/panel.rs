@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
@@ -15,14 +16,14 @@ use strum::VariantArray;
 
 use super::grid::GridDraft;
 use super::nodes::SceneBundle;
-use super::scene_tree::{self, SceneAction, SceneSource, Toggle};
+use super::scene_tree::{self, SceneAction, SceneNarrowing, SceneSource, Toggle};
 use super::{AreaSnapshot, WALK_ROW, layers, nodes, placement, resize, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::tree::{self, DropAt, TreeState};
+use crate::ui::tree::{self, DropAt, TreeSource, TreeState};
 use crate::ui::widgets::{self, KindMark};
 use crate::ui::{breadcrumb, content_tree, row_form, theme};
 use crate::views;
@@ -41,6 +42,8 @@ pub struct ScenePanel {
     /// How many cells each ground layer holds, by name, as of the project's generation `counted`.
     cells: HashMap<String, usize>,
     counted: Option<u64>,
+    /// What the filter and Show last left of the scene.
+    narrowed: Option<Arc<scene_tree::Narrowed>>,
     /// What another part of the view asked of the scene graph, done on its next frame.
     pub queued: Option<SceneAction>,
     /// A folder just made by grouping, with its step, so naming it joins that step.
@@ -616,8 +619,11 @@ fn scene_graph(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &Area
         project,
         snapshot,
         selection,
-        &panel.filter,
-        shown_kinds,
+        SceneNarrowing {
+            filter: &panel.filter,
+            view: shown_kinds,
+            kept: &mut panel.narrowed,
+        },
         &panel.cells,
         clipboard.is_some() || !panel.cut.is_empty(),
     );
@@ -1033,7 +1039,7 @@ fn show_on_map(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, id:
             .modules
             .iter()
             .filter(|module| module.pointer.starts_with(&format!("{pointer}/")))
-            .filter_map(|module| snapshot.module_bounds(&module.pointer))
+            .filter_map(|module| snapshot.bounds_of(module))
             .reduce(|a, b| a.union(&b))
     } else {
         snapshot.module_bounds(scene_tree::local(id))

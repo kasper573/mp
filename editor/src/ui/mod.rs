@@ -548,13 +548,9 @@ impl TabViewer for Viewer<'_> {
     fn title(&mut self, tab: &mut EditorTab) -> egui::WidgetText {
         let title = tab.title();
         let project = self.editor.project.as_ref();
-        let unsaved = project.zip(tab.row()).is_some_and(|(project, (_, key))| {
-            project
-                .files
-                .files_of(&key)
-                .iter()
-                .any(|file| project.is_unsaved(file))
-        });
+        let unsaved = project
+            .zip(tab.row())
+            .is_some_and(|(project, (_, key))| project.holds_unsaved(&key));
         let mut job = LayoutJob::default();
         let italics = self.editor.preview.as_ref() == Some(tab);
         let format = TextFormat {

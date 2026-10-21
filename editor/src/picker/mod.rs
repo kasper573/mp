@@ -9,6 +9,8 @@ pub mod rows;
 pub use self::assets::AssetSource;
 pub use self::rows::RowSource;
 
+use std::sync::Arc;
+
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Color32, Layout, Rect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::core::assets::AssetKind;
@@ -60,12 +62,14 @@ impl Dragged {
 }
 
 /// A chip in the popover that narrows the list to one category.
+#[derive(Clone)]
 pub struct Category {
     pub id: String,
     pub label: String,
 }
 
 /// One thing a source offers.
+#[derive(Clone)]
 pub struct Candidate {
     pub pick: Pick,
     /// The category chip that keeps this candidate listed.
@@ -365,8 +369,9 @@ fn popover(
         .data(|d| d.get_temp::<PickLayout>(layout_id))
         .unwrap_or_else(|| source.layout());
     let needle = search.to_lowercase();
-    let categories = source.categories(cx);
-    let all = source.candidates(cx);
+    let found = found(ui, cx, source, id);
+    let categories = &found.categories;
+    let all = &found.candidates;
     let total = all.len();
     let mut candidates: Vec<&Candidate> = all
         .iter()
@@ -455,7 +460,7 @@ fn popover(
     if !categories.is_empty() {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
-            for listed in &categories {
+            for listed in categories.iter() {
                 let on = category.as_deref() == Some(listed.id.as_str());
                 let count = all
                     .iter()
@@ -505,21 +510,35 @@ fn popover(
     let mut picked: Option<Pick> = None;
     let mut hovered: Option<usize> = None;
     let mut budget = icons::DECODES_PER_FRAME;
-    egui::ScrollArea::vertical()
-        .max_height(300.0)
-        .id_salt(id.with("list"))
-        .show(ui, |ui| {
-            match layout {
-                PickLayout::Grid => {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = Vec2::splat(GRID_GAP);
-                        ui.set_max_width(GRID_COLUMNS as f32 * (TILE + GRID_GAP));
-                        for (index, candidate) in candidates.iter().enumerate() {
+    let moved = up || down || left || right;
+    let (row_height, gap) = match layout {
+        PickLayout::Grid => (TILE, GRID_GAP),
+        PickLayout::List => (LINE, 0.0),
+    };
+    let rows = candidates.len().div_ceil(columns);
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing = Vec2::splat(gap);
+        egui::ScrollArea::vertical()
+            .max_height(300.0)
+            .id_salt(id.with("list"))
+            .show_rows(ui, row_height, rows, |ui, shown| {
+                let top = ui.cursor().top();
+                for row in shown.clone() {
+                    ui.horizontal(|ui| {
+                        let in_row = candidates.iter().enumerate().skip(row * columns);
+                        for (index, &candidate) in in_row.take(columns) {
                             let cell = Cell {
                                 lit: index == highlight,
                                 held: candidate.pick == *pick,
                             };
-                            let response = tile(ui, cx, source, candidate, cell, &mut budget);
+                            let response = match layout {
+                                PickLayout::Grid => {
+                                    tile(ui, cx, source, candidate, cell, &mut budget)
+                                }
+                                PickLayout::List => {
+                                    line(ui, cx, source, candidate, cell, &mut budget)
+                                }
+                            };
                             if response.hovered() {
                                 hovered = Some(index);
                             }
@@ -529,27 +548,17 @@ fn popover(
                         }
                     });
                 }
-                PickLayout::List => {
-                    ui.spacing_mut().item_spacing.y = 0.0;
-                    for (index, candidate) in candidates.iter().enumerate() {
-                        let cell = Cell {
-                            lit: index == highlight,
-                            held: candidate.pick == *pick,
-                        };
-                        let response = line(ui, cx, source, candidate, cell, &mut budget);
-                        if response.hovered() {
-                            hovered = Some(index);
-                        }
-                        if response.clicked() && candidate.blocked.is_none() {
-                            picked = Some(candidate.pick.clone());
-                        }
-                    }
+                if moved {
+                    let row = highlight / columns;
+                    let y = top + (row as f32 - shown.start as f32) * (row_height + gap);
+                    let rect = Rect::from_x_y_ranges(ui.max_rect().x_range(), y..=y + row_height);
+                    ui.scroll_to_rect(rect, None);
                 }
-            }
-            if candidates.is_empty() {
-                ui.label(theme::muted("nothing matches"));
-            }
-        });
+                if candidates.is_empty() {
+                    ui.label(theme::muted("nothing matches"));
+                }
+            });
+    });
     if enter
         && let Some(candidate) = candidates.get(highlight)
         && candidate.blocked.is_none()
@@ -779,7 +788,36 @@ fn face(
     icons::paint_file(ui.painter(), rect, picture, icon, IconTone::Normal);
 }
 
+/// What an open popover lists, found again only once the files or what they load into change:
+/// finding it reads every file of the kinds it lists.
+#[derive(Clone)]
+struct Found {
+    from: (u64, u64),
+    categories: Arc<[Category]>,
+    candidates: Arc<[Candidate]>,
+}
+
+fn found(ui: &Ui, cx: &FormCx, source: &dyn PickSource, id: egui::Id) -> Found {
+    let key = id.with("found");
+    let from = (cx.project.files.revision(), cx.project.generation);
+    if let Some(found) = ui
+        .ctx()
+        .data(|d| d.get_temp::<Found>(key))
+        .filter(|found| found.from == from)
+    {
+        return found;
+    }
+    let found = Found {
+        from,
+        categories: source.categories(cx).into(),
+        candidates: source.candidates(cx).into(),
+    };
+    ui.ctx().data_mut(|d| d.insert_temp(key, found.clone()));
+    found
+}
+
 fn close(ui: &mut Ui, id: egui::Id) {
+    ui.ctx().data_mut(|d| d.remove::<Found>(id.with("found")));
     clear_draft(ui, id.with("search"));
     clear_draft(ui, id.with("category"));
     ui.ctx()

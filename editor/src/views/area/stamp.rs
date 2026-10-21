@@ -10,7 +10,7 @@ use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaModule, Flip};
 use engine::systems::script::VarValue;
 
-use super::{AreaFrame, modules, nodes, select, shapes};
+use super::{AreaFrame, AreaSnapshot, modules, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::ui::theme;
@@ -31,24 +31,17 @@ pub fn placement_node(
     })))
 }
 
-pub fn stamp_panel(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: &Content,
-    bundle: &str,
-) {
-    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    if let Some(reader) = editor.reader() {
-        for module in nodes::modules(&nodes::scene_of(editor, bundle)) {
-            if let AreaModule::Blueprint(placement) = module.module()
-                && let Some(path) = reader.path_of(placement.blueprint)
-            {
-                *counts.entry(path.to_owned()).or_default() += 1;
-            }
+pub fn stamp_panel(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnapshot) {
+    let content = &snapshot.content;
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for module in snapshot.modules.iter() {
+        if let AreaModule::Blueprint(placement) = module.module()
+            && let Some(path) = snapshot.reader.path_of(placement.blueprint)
+        {
+            *counts.entry(path).or_default() += 1;
         }
     }
-    let area_key = bundle.to_owned();
+    let area_key = snapshot.bundle.clone();
     let needle = {
         let view = editor.views.area.view_mut(view_key);
         ui.add_space(4.0);
@@ -80,7 +73,7 @@ pub fn stamp_panel(
         .iter()
         .filter(|path| needle.is_empty() || path.to_lowercase().contains(&needle))
         .map(|path| {
-            let count = counts.get(path).copied().unwrap_or(0);
+            let count = counts.get(path.as_str()).copied().unwrap_or(0);
             (folders_apart(&area_key, path), path.clone(), count)
         })
         .collect();

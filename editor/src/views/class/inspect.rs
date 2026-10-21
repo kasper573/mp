@@ -10,7 +10,7 @@ use engine::systems::class::{AccessRequirement, ClassDef, NodeKey, SkillNode, Sk
 use engine::systems::skill::{Rank, SkillDef};
 
 use super::tree::{self, CarriedNode, NodeSkill};
-use super::{node_of, select_node, write};
+use super::{edit, node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::RowSelection;
@@ -75,11 +75,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let mut class = (*read).clone();
     if removed {
         tree::remove_node(&mut class.tree, &node);
-        write(editor, &key, "Remove node", &class);
+        write(editor, &key, edit(&key, "Remove node"), &class);
         select_node(editor, &key, None);
     } else if changed.is_some() {
         class.tree.0.insert(node, held);
-        write(editor, &key, "Edit node", &class);
+        write(editor, &key, edit(&key, "Edit node").merging(), &class);
     }
 }
 

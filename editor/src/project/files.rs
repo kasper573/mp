@@ -17,6 +17,7 @@ pub struct ProjectFiles {
     map: BTreeMap<String, Stored>,
     index: OnceLock<Arc<FolderIndex>>,
     revision: u64,
+    paths_revision: u64,
 }
 
 /// The hash of every file and kept folder as it stands on disk, as the editor last read or wrote
@@ -148,21 +149,23 @@ impl ProjectFiles {
     }
 
     pub fn insert(&mut self, path: String, bytes: FileBytes) {
-        self.changed();
+        self.revision = next_revision();
         let hash = hash(&bytes);
-        self.map.insert(
-            path,
-            Stored {
-                bytes,
-                hash,
-                json: OnceLock::new(),
-            },
-        );
+        let stored = Stored {
+            bytes,
+            hash,
+            json: OnceLock::new(),
+        };
+        if self.map.insert(path, stored).is_none() {
+            self.paths_changed();
+        }
     }
 
     pub fn remove(&mut self, path: &str) {
-        self.changed();
-        self.map.remove(path);
+        self.revision = next_revision();
+        if self.map.remove(path).is_some() {
+            self.paths_changed();
+        }
     }
 
     /// Which change the files are at: files at the same revision hold the same, whichever copy
@@ -171,9 +174,15 @@ impl ProjectFiles {
         self.revision
     }
 
-    fn changed(&mut self) {
+    /// Which paths the files are at: files at the same paths revision hold the same paths,
+    /// whatever bytes they hold, so what is worked out from the paths alone keeps while it stays.
+    pub fn paths_revision(&self) -> u64 {
+        self.paths_revision
+    }
+
+    fn paths_changed(&mut self) {
         self.index = OnceLock::new();
-        self.revision = next_revision();
+        self.paths_revision = next_revision();
     }
 
     pub fn index(&self) -> Arc<FolderIndex> {

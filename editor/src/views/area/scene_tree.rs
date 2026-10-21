@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 
 use egui::Ui;
 use engine::core::content::{ContentFile, ErrorPlace, table_of};
@@ -80,10 +81,7 @@ pub struct SceneSource<'a> {
     snapshot: &'a AreaSnapshot,
     /// The rows of the placements edited in place, outermost first.
     in_place: Vec<String>,
-    /// While anything narrows the tree: the rows shown, and the folders above them.
-    shown: Option<HashSet<String>>,
-    /// The rows that pass the filter and Show, among those shown.
-    hits: HashSet<String>,
+    narrowed: Option<Arc<Narrowed>>,
     needle: String,
     holding: HashSet<String>,
     problems: HashMap<String, String>,
@@ -96,24 +94,50 @@ pub struct SceneSource<'a> {
     can_paste: bool,
 }
 
+/// What the filter and Show leave of a scene, kept while neither nor the scene changes: finding
+/// it walks every row.
+pub struct Narrowed {
+    from: NarrowedFrom,
+    /// The rows shown, and the folders above them.
+    shown: HashSet<String>,
+    /// The rows that pass the filter and Show, among those shown.
+    hits: HashSet<String>,
+    counted: (usize, usize),
+}
+
+#[derive(PartialEq)]
+struct NarrowedFrom {
+    made: u64,
+    needle: String,
+    hidden_kinds: BTreeSet<String>,
+    hide_empty_folders: bool,
+}
+
+/// What narrows the scene's rows: the filter typed, what Show hides, and what they left of the
+/// scene last.
+pub struct SceneNarrowing<'b> {
+    pub filter: &'b str,
+    pub view: &'b crate::user::TreeView,
+    pub kept: &'b mut Option<Arc<Narrowed>>,
+}
+
 impl<'a> SceneSource<'a> {
     pub fn new(
         project: &Project,
         snapshot: &'a AreaSnapshot,
         selection: &RowSelection,
-        filter: &str,
-        view: &crate::user::TreeView,
+        narrowing: SceneNarrowing,
         cells: &'a HashMap<String, usize>,
         can_paste: bool,
     ) -> SceneSource<'a> {
+        let SceneNarrowing { filter, view, kept } = narrowing;
         let in_place: Vec<String> = (1..=snapshot.in_place.len())
             .map(|depth| place_ids(&snapshot.in_place[..depth]))
             .collect();
         let mut source = SceneSource {
             snapshot,
             in_place,
-            shown: None,
-            hits: HashSet::new(),
+            narrowed: None,
             needle: filter.trim().to_lowercase(),
             holding: HashSet::new(),
             problems: problems(project, snapshot),
@@ -132,19 +156,30 @@ impl<'a> SceneSource<'a> {
             }
         }
         if !source.needle.is_empty() || !view.hidden_kinds.is_empty() || view.hide_empty_folders {
-            source.narrow(view);
+            let from = NarrowedFrom {
+                made: snapshot.made,
+                needle: source.needle.clone(),
+                hidden_kinds: view.hidden_kinds.clone(),
+                hide_empty_folders: view.hide_empty_folders,
+            };
+            let narrowed = match kept.take() {
+                Some(kept) if kept.from == from => kept,
+                _ => Arc::new(source.narrow(from, view)),
+            };
+            *kept = Some(narrowed.clone());
+            source.narrowed = Some(narrowed);
         }
         source
     }
 
-    fn narrow(&mut self, view: &crate::user::TreeView) {
+    fn narrow(&self, from: NarrowedFrom, view: &crate::user::TreeView) -> Narrowed {
         let mut shown = HashSet::new();
         let mut hits = HashSet::new();
         let mut stack = vec![String::new()];
         while let Some(id) = stack.pop() {
             for child in self.all_children(&id) {
                 if self.is_folder(&child) {
-                    if !view.hide_empty_folders {
+                    if self.needle.is_empty() && !view.hide_empty_folders {
                         shown.insert(child.clone());
                     }
                     stack.push(child.clone());
@@ -171,19 +206,16 @@ impl<'a> SceneSource<'a> {
                 }
             }
         }
-        if !self.needle.is_empty() {
-            shown.retain(|id| {
-                hits.contains(id) || hits.iter().any(|hit| hit.starts_with(&format!("{id}/")))
-            });
+        let leaves = hits.iter().filter(|id| !self.is_folder(id)).count();
+        Narrowed {
+            from,
+            shown,
+            hits,
+            counted: (leaves, self.count_rows()),
         }
-        self.shown = Some(shown);
-        self.hits = hits;
     }
 
-    /// How many rows pass the filter and Show, and how many there are.
-    pub fn hit_count(&self) -> Option<(usize, usize)> {
-        self.shown.as_ref()?;
-        let leaf = |id: &String| !self.is_folder(id);
+    fn count_rows(&self) -> usize {
         let mut total = 0;
         let mut stack = vec![String::new()];
         while let Some(id) = stack.pop() {
@@ -195,7 +227,12 @@ impl<'a> SceneSource<'a> {
                 }
             }
         }
-        Some((self.hits.iter().filter(|id| leaf(id)).count(), total))
+        total
+    }
+
+    /// How many rows pass the filter and Show, and how many there are.
+    pub fn hit_count(&self) -> Option<(usize, usize)> {
+        self.narrowed.as_ref().map(|narrowed| narrowed.counted)
     }
 
     fn all_children(&self, id: &str) -> Vec<String> {
@@ -232,11 +269,6 @@ impl<'a> SceneSource<'a> {
         })
     }
 
-    pub fn is_folder(&self, id: &str) -> bool {
-        self.in_place.iter().any(|place| place == id)
-            || self.snapshot.scene_node(id).is_some_and(nodes::is_folder)
-    }
-
     fn is_placement(&self, id: &str) -> bool {
         self.snapshot
             .scene_node(id)
@@ -258,12 +290,15 @@ impl<'a> SceneSource<'a> {
             .reader
             .path_of(placement.blueprint)
             .unwrap_or_default();
-        let count = nodes::modules(scene_at(self.snapshot, Self::level(id)))
-            .iter()
-            .filter(|module| {
-                matches!(module.module(), AreaModule::Blueprint(other) if other.blueprint == placement.blueprint)
-            })
-            .count();
+        let mut count = 0;
+        nodes::walk(scene_at(self.snapshot, Self::level(id)), &mut |_, node| {
+            if let SceneNode::Module(module) = node
+                && let AreaModule::Blueprint(other) = &module.module
+                && other.blueprint == placement.blueprint
+            {
+                count += 1;
+            }
+        });
         let times = match count {
             1 => "once".to_owned(),
             2 => "twice".to_owned(),
@@ -733,10 +768,10 @@ impl TreeSource for SceneSource<'_> {
 
     fn children(&self, id: &str) -> Vec<String> {
         let all = self.all_children(id);
-        match &self.shown {
-            Some(shown) => all
+        match &self.narrowed {
+            Some(narrowed) => all
                 .into_iter()
-                .filter(|child| shown.contains(child))
+                .filter(|child| narrowed.shown.contains(child))
                 .collect(),
             None => all,
         }
@@ -744,6 +779,11 @@ impl TreeSource for SceneSource<'_> {
 
     fn parent(&self, id: &str) -> String {
         parent_id(id)
+    }
+
+    fn is_folder(&self, id: &str) -> bool {
+        self.in_place.iter().any(|place| place == id)
+            || self.snapshot.scene_node(id).is_some_and(nodes::is_folder)
     }
 
     fn row(&self, id: &str) -> TreeRow {
@@ -769,7 +809,10 @@ impl TreeSource for SceneSource<'_> {
             }),
             dim: flags.hidden.on()
                 || self.outside(id)
-                || (self.shown.is_some() && !self.hits.contains(id)),
+                || self
+                    .narrowed
+                    .as_ref()
+                    .is_some_and(|narrowed| !narrowed.hits.contains(id)),
             problem: self.problems.get(id).cloned(),
             holds_selected: self.holding.contains(id),
             lit: self.lit.as_deref() == Some(id),
@@ -887,7 +930,7 @@ impl TreeSource for SceneSource<'_> {
     }
 
     fn narrowed(&self) -> bool {
-        self.shown.is_some()
+        self.narrowed.is_some()
     }
 
     fn carried(&self, _: &[String]) -> Option<Dragged> {

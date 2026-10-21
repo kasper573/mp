@@ -18,8 +18,9 @@ use std::time::{Duration, Instant, SystemTime};
 
 use engine::core::content::ErrorPlace::WholeFile;
 use engine::core::content::{
-    Content, ContentFile, ContentId, ContentNames, ContentProblem, FolderReader, LoadError,
-    LoadReport, MISSING_FILE, NamedContent, SETTINGS_FILE, Unreadable, check_files, table_of,
+    CheckedFiles, Content, ContentFile, ContentId, ContentNames, ContentProblem, FolderReader,
+    LoadError, LoadReport, MISSING_FILE, NamedContent, ReadRow, SETTINGS_FILE, Unreadable,
+    table_of,
 };
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -292,6 +293,7 @@ pub struct Project {
     loading: Option<Loading>,
     stale: bool,
     unverified: Option<Unverified>,
+    checked: Option<Checked>,
     refused: Option<RefusedEdit>,
 }
 
@@ -306,10 +308,22 @@ struct Loading {
 
 /// An applied edit its load has yet to vouch for, with the edits that continue it: the files and
 /// history from before it, to go back to when the load finds problems they brought.
+/// The edits made since the folder last loaded, vouched for together by the next load so the
+/// editor never waits on one: the first edit's label, how many came after it, and the files and
+/// history from before them.
 struct Unverified {
     label: String,
+    later: usize,
     files: ProjectFiles,
     history: EditHistory,
+}
+
+/// The problems the files an edit touched have as it left them, which the next edit to the same
+/// files starts from.
+struct Checked {
+    revision: u64,
+    touched: Vec<String>,
+    errors: Vec<LoadError>,
 }
 
 /// An edit taken back because the folder didn't load after it.
@@ -368,6 +382,7 @@ impl Project {
             catalogue,
             typed: typed::TypedFiles::default(),
             unverified: None,
+            checked: None,
             refused: None,
         };
         project.reload();
@@ -404,8 +419,17 @@ impl Project {
 
     /// What reads the files as they would stand after `edit`: how an edit names a file it makes.
     pub fn reader_after(&self, edit: &ContentEdit) -> FolderReader {
-        let next = self.files.with(&edit.changes);
-        FolderReader::new(systems::registry(), Arc::new(next.folder(&self.name())))
+        self.reader_of(&self.files.with(&edit.changes))
+    }
+
+    /// What reads `files`, the project's files as an edit would leave them.
+    fn reader_of(&self, files: &ProjectFiles) -> FolderReader {
+        let folder = Arc::new(files.folder(&self.name()));
+        if files.paths_revision() == self.files.paths_revision() {
+            self.reader().rereading(folder)
+        } else {
+            FolderReader::new(systems::registry(), folder)
+        }
     }
 
     fn name(&self) -> String {
@@ -513,7 +537,11 @@ impl Project {
                     self.files = before.files;
                     self.history = before.history;
                     self.refused = Some(RefusedEdit {
-                        label: before.label,
+                        label: match before.later {
+                            0 => before.label,
+                            1 => format!("{} and the edit after it", before.label),
+                            later => format!("{} and the {later} edits after it", before.label),
+                        },
                         refusal: EditRefusal::of_errors(&report.errors),
                     });
                     self.begin_load();
@@ -531,8 +559,8 @@ impl Project {
         self.refused.take()
     }
 
-    /// Waits for the load to vouch for the last edit, so what comes next builds on files that
-    /// load.
+    /// Waits for the load to vouch for the edits made since the last, so what is written or taken
+    /// from disk is files that load.
     fn settle_unverified(&mut self) {
         if self.unverified.is_some() {
             self.settle();
@@ -571,17 +599,15 @@ impl Project {
             return Ok(());
         }
         let continues = edit.merge || edit.amends.is_some();
-        if !continues {
-            self.settle_unverified();
-        }
         if changes.iter().any(|change| change.bytes.is_none()) {
             self.settle();
         }
         let next = self.files.with(&changes);
-        let introduced = self.introduced_errors(&next, &changes);
+        let (introduced, checked, read) = self.introduced_errors(&next, &changes);
         if !introduced.is_empty() {
             return Err(Box::new(EditRefusal::of_errors(&introduced)));
         }
+        self.checked = Some(checked);
         let before: Vec<FileChange> = changes
             .iter()
             .map(|change| FileChange {
@@ -591,10 +617,12 @@ impl Project {
             .collect();
         let loads = self.loads();
         match &mut self.unverified {
-            Some(unverified) => unverified.label = edit.label.clone(),
+            Some(unverified) if !continues => unverified.later += 1,
+            Some(_) => {}
             None if loads => {
                 self.unverified = Some(Unverified {
                     label: edit.label.clone(),
+                    later: 0,
                     files: self.files.clone(),
                     history: self.history.clone(),
                 });
@@ -602,6 +630,7 @@ impl Project {
             None => {}
         }
         self.adopt(next);
+        self.typed.keep(&self.files, &self.name(), read);
         let amended = edit.amends.as_deref().is_some_and(|step| {
             self.history
                 .amend_last(step, &edit.label, changes.clone(), &before)
@@ -625,7 +654,6 @@ impl Project {
     }
 
     pub fn undo(&mut self) -> Option<AppliedStep> {
-        self.settle_unverified();
         let step = self.history.undo_step()?;
         let (applied, changes) = (AppliedStep::of(step), step.before.clone());
         self.restore(&changes);
@@ -634,7 +662,6 @@ impl Project {
     }
 
     pub fn redo(&mut self) -> Option<AppliedStep> {
-        self.settle_unverified();
         let step = self.history.redo_step()?;
         let (applied, changes) = (AppliedStep::of(step), step.after.clone());
         self.restore(&changes);
@@ -695,8 +722,13 @@ impl Project {
     /// The problems `changes` bring into the files they touch, and into the files naming what they
     /// remove, that those files did not have before: what refuses an edit, so the editor never
     /// writes content the game would refuse. What names a removed file is known only from the
-    /// usages of a settled load.
-    fn introduced_errors(&self, next: &ProjectFiles, changes: &[FileChange]) -> Vec<LoadError> {
+    /// usages of a settled load. Also every problem the touched files have after `changes`, and
+    /// the content among them that reads whole after them.
+    fn introduced_errors(
+        &self,
+        next: &ProjectFiles,
+        changes: &[FileChange],
+    ) -> (Vec<LoadError>, Checked, Vec<ReadRow>) {
         let mut touched: BTreeSet<String> = changes.iter().map(|c| c.file.clone()).collect();
         for removed in changes.iter().filter(|change| change.bytes.is_none()) {
             let naming = match content_holding(&removed.file) {
@@ -706,24 +738,35 @@ impl Project {
             touched.extend(naming.iter().map(|usage| usage.file.clone()));
         }
         let touched: Vec<String> = touched.into_iter().collect();
-        let name = self.root.display().to_string();
-        let check = |files: &ProjectFiles| {
-            check_files(systems::registry(), Arc::new(files.folder(&name)), &touched)
-        };
         // Files that loaded whole and haven't changed since have no errors an edit may keep.
         let clean = self.loads() && !self.loading();
-        let known: HashSet<(String, &str, String)> = if clean {
-            HashSet::new()
-        } else {
-            check(&self.files)
+        let known: HashSet<(String, &str, String)> = match &self.checked {
+            _ if clean => HashSet::new(),
+            Some(checked)
+                if checked.revision == self.files.revision() && checked.touched == touched =>
+            {
+                checked.errors.iter().map(error_key).collect()
+            }
+            _ => self
+                .reader()
+                .check(&touched)
+                .errors
                 .iter()
-                .map(|error| error_key(error))
-                .collect()
+                .map(error_key)
+                .collect(),
         };
-        check(next)
-            .into_iter()
+        let CheckedFiles { errors, read } = self.reader_of(next).check(&touched);
+        let introduced = errors
+            .iter()
             .filter(|error| !known.contains(&error_key(error)))
-            .collect()
+            .cloned()
+            .collect();
+        let checked = Checked {
+            revision: next.revision(),
+            touched,
+            errors,
+        };
+        (introduced, checked, read)
     }
 
     fn adopt(&mut self, next: ProjectFiles) {
@@ -782,6 +825,19 @@ impl Project {
             paths: unsaved.clone(),
         });
         unsaved
+    }
+
+    /// Whether the file at `path`, or any part of the bundle there, differs from disk.
+    pub fn holds_unsaved(&self, path: &str) -> bool {
+        let unsaved = self.unsaved();
+        let parts = files::folder_entry(path);
+        let first_part = unsaved.partition_point(|file| *file < parts);
+        unsaved
+            .binary_search_by(|file| file.as_str().cmp(path))
+            .is_ok()
+            || unsaved
+                .get(first_part)
+                .is_some_and(|file| file.starts_with(&parts))
     }
 
     pub fn is_unsaved(&self, path: &str) -> bool {

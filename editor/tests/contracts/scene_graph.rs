@@ -6,7 +6,7 @@ use editor::ui::tree::{DropAt, Toggle, TreeDrop, TreeSource};
 use editor::user::TreeView;
 use editor::views::area::flags::{SceneFlags, SceneLevel};
 use editor::views::area::nodes::{self, Landing, NodeFlag, SceneTree};
-use editor::views::area::scene_tree::{self, SceneSource};
+use editor::views::area::scene_tree::{self, SceneNarrowing, SceneSource};
 use editor::views::area::{AreaSnapshot, drop_gone, layers, placement};
 use engine::core::content::{ContentFile, write};
 use engine::systems::area::AreaDef;
@@ -312,8 +312,11 @@ fn rows_never_drop_onto_a_placement_or_into_themselves() {
         project,
         &snapshot,
         &editor.selection,
-        "",
-        &TreeView::default(),
+        SceneNarrowing {
+            filter: "",
+            view: &TreeView::default(),
+            kept: &mut None,
+        },
         &cells,
         false,
     );
