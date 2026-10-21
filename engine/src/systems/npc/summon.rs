@@ -83,9 +83,7 @@ impl EffectDef<RiftScripting> for SetAttitude {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let attitude = self.attitude;
         Ok(Box::new(move |world, _, cx| {
@@ -109,9 +107,7 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
             return Err(ScriptFault::new(
@@ -155,9 +151,7 @@ impl EffectDef<RiftScripting> for Despawn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

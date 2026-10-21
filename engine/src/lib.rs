@@ -11,5 +11,19 @@ macro_rules! field {
     }};
 }
 
+/// An effect's outputs, each named and held in a field of the effect: `outputs` and
+/// `outputs_mut` of `EffectDef`.
+#[macro_export]
+macro_rules! outputs {
+    ($($name:expr => $field:ident),+ $(,)?) => {
+        fn outputs(&self) -> Vec<(&'static str, &$crate::core::script::Arrow)> {
+            vec![$(($name, &self.$field)),+]
+        }
+        fn outputs_mut(&mut self) -> Vec<(&'static str, &mut $crate::core::script::Arrow)> {
+            vec![$(($name, &mut self.$field)),+]
+        }
+    };
+}
+
 pub mod core;
 pub mod systems;

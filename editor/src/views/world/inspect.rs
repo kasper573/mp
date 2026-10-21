@@ -252,7 +252,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             for (row, bump) in rows.iter().zip(&bumps) {
                 ui.horizontal(|ui| {
                     let ink = if *bump { theme::WARN } else { theme::TEXT };
-                    ui.label(theme::mono(shown_path(&row.key)).size(12.5).color(ink));
+                    ui.label(theme::mono(shown_path(row.key)).size(12.5).color(ink));
                     if *bump {
                         ui.label(Mark::Raise.text(12.0).color(ink));
                     }

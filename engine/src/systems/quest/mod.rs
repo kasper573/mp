@@ -81,6 +81,10 @@ impl ModuleSet for QuestDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<QuestModule> {
+        &mut self.modules
+    }
+
     fn rule(module: &QuestModule) -> ModuleRule {
         match module {
             QuestModule::Objective(_) | QuestModule::Drop(_) | QuestModule::Script(_) => {

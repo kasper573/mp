@@ -4,7 +4,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::Ui;
 use engine::core::audio::playback::SfxDef;
 use engine::core::babble::BabbleDef;
-use engine::core::content::{Content, ContentFile};
+use engine::core::content::{Content, ContentFile, MODULES};
 use engine::core::gui::ImageSource;
 use engine::core::math::{Direction, Rgba};
 use engine::core::time::Seconds;
@@ -14,7 +14,7 @@ use engine::systems::actor::model::ModelDef;
 use engine::systems::actor::plate::PlateLabel;
 use engine::systems::item::card::CardLook;
 use engine::systems::item::{self, ItemDef};
-use engine::systems::npc::NpcDef;
+use engine::systems::npc::{NpcDef, NpcModule};
 use engine::systems::player::PlayerDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::quest::card::{Moment, QuestCardLook};
@@ -22,7 +22,6 @@ use engine::systems::quest::{self, Parties, QuestDef};
 use engine::systems::script::{Reach, RiftScripts};
 use engine::systems::skill::SkillDef;
 use engine::systems::status::StatusEffectDef;
-use serde_json::Value;
 use strum::VariantArray;
 
 use super::quests::quest_parties_sections;
@@ -30,7 +29,6 @@ use super::{theme, widgets};
 use crate::app::Editor;
 use crate::stage::{self, Posed, PosedActor, Scenario, Scene};
 use crate::thumbs::ProjectImages;
-use crate::value::{self, RowValue};
 use crate::views::character;
 use crate::views::script::panel;
 use crate::views::sound::BabbleRequest;
@@ -90,9 +88,6 @@ pub fn preview_place(table: &str) -> Option<PreviewPlace> {
 /// The row as the game shows it, beside its form: the actor, item or quest card it stands for, a
 /// status effect on an actor, a skill cast over and over.
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
-    let Some(value) = editor.row_value(key) else {
-        return;
-    };
     match table {
         StatusEffectDef::TABLE => return show_status(editor, ui, key),
         SkillDef::TABLE => return show_skill(editor, ui, key),
@@ -107,7 +102,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
         direction: state.direction,
         playing: state.playing,
     };
-    draw_preview(editor, ui, table, key, &value, &pose);
+    draw_preview(editor, ui, table, key, &pose);
     if table == QuestDef::TABLE {
         quest_parties_sections(editor, ui, key);
     }
@@ -252,14 +247,7 @@ fn show_babble(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
 }
 
-pub(super) fn draw_preview(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    table: &str,
-    key: &str,
-    value: &Value,
-    pose: &Pose,
-) {
+fn draw_preview(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, pose: &Pose) {
     let ctx = ui.ctx().clone();
     let Some(content) = editor.loaded() else {
         return;
@@ -283,35 +271,18 @@ pub(super) fn draw_preview(
     if table == ItemDef::TABLE {
         posed.items.extend(content.by_path::<ItemDef>(key));
     } else {
-        let model_key = match table {
-            ModelDef::TABLE => key.to_owned(),
-            CharacterSnapshot::TABLE => content
-                .built::<GameSettings>()
-                .player
-                .get(&content)
-                .model
-                .path(&content)
-                .to_owned(),
-            _ => value["model"].as_str().unwrap_or_default().to_owned(),
+        let Some(look) = actor_look(editor, &content, table, key) else {
+            return;
         };
-        let Some(model) = content.by_path::<ModelDef>(&model_key) else {
+        let Some(model) = content.by_path::<ModelDef>(&look.model) else {
             ui.label(theme::muted("pick a model to see it"));
             return;
         };
-        let tint = value["modules"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|m| m["type"] == "tint")
-            .map_or(Rgba::WHITE, |m| {
-                Rgba(u32::from_be_bytes(value::rgba(&m["rgba"])))
-            });
-        let plate = plate_of(&content, table, key, value);
         posed.actors.push(PosedActor {
             action: pose.action,
             dir: pose.direction,
-            tint,
-            plate,
+            tint: look.tint,
+            plate: look.plate,
             held: (!pose.playing).then_some(Seconds(0.0)),
             ..PosedActor::standing(model, center)
         });
@@ -325,22 +296,51 @@ pub(super) fn draw_preview(
     );
 }
 
-/// The plate the row's actor wears in game: an npc's name and role once it has a nameplate, a
-/// test character's name as a player.
-fn plate_of(content: &Content, table: &str, key: &str, value: &Value) -> Option<PlateLabel> {
+/// How the row's actor stands on the stage: the model it wears, its tint, and the plate it wears
+/// in game, an npc's name and role once it has a nameplate, a test character's name as a player.
+struct ActorLook {
+    model: String,
+    tint: Rgba,
+    plate: Option<PlateLabel>,
+}
+
+fn actor_look(editor: &Editor, content: &Content, table: &str, key: &str) -> Option<ActorLook> {
+    let project = editor.project.as_ref()?;
+    let reader = project.reader();
     match table {
+        ModelDef::TABLE => Some(ActorLook {
+            model: key.to_owned(),
+            tint: Rgba::WHITE,
+            plate: None,
+        }),
         NpcDef::TABLE => {
-            let role = value["modules"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .find(|module| module["type"] == "nameplate")
-                .and_then(|module| module["role"].as_str())?;
-            let name = value["name"].as_str().unwrap_or(key);
-            let hostile = attitude(content, table, key, value) == Some(true);
-            Some(PlateLabel::npc(name, role, hostile))
+            let npc = project.read::<NpcDef>(key).ok()?;
+            let hostile = attitude(content, key, &npc) == Some(true);
+            Some(ActorLook {
+                model: reader.path_of(npc.model)?.to_owned(),
+                tint: npc.tint(),
+                plate: npc
+                    .nameplate()
+                    .map(|role| PlateLabel::npc(&npc.name, role, hostile)),
+            })
         }
-        CharacterSnapshot::TABLE => Some(PlateLabel::player(value["name"].as_str().unwrap_or(key))),
+        PlayerDef::TABLE => {
+            let player = project.read::<PlayerDef>(key).ok()?;
+            Some(ActorLook {
+                model: reader.path_of(player.model)?.to_owned(),
+                tint: player.tint(),
+                plate: None,
+            })
+        }
+        CharacterSnapshot::TABLE => {
+            let snapshot = project.read::<CharacterSnapshot>(key).ok()?;
+            let player = content.built::<GameSettings>().player.get(content);
+            Some(ActorLook {
+                model: player.model.path(content).to_owned(),
+                tint: player.tint(),
+                plate: Some(PlateLabel::player(&snapshot.name)),
+            })
+        }
         _ => None,
     }
 }
@@ -385,23 +385,18 @@ fn item_card(ui: &mut Ui, images: &mut ProjectImages, content: &Content, key: &s
     });
 }
 
-fn attitude(content: &Content, table: &str, key: &str, value: &Value) -> Option<bool> {
+fn attitude(content: &Content, key: &str, npc: &NpcDef) -> Option<bool> {
     if !content.has_built::<RiftScripts>() {
         return None;
     }
     let scripts = content.built::<RiftScripts>();
     let mut friendly = false;
-    for (index, module) in value["modules"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .enumerate()
-    {
-        if !module.is_script_module() {
+    for (index, module) in npc.modules.iter().enumerate() {
+        if !matches!(module, NpcModule::Script(_)) {
             continue;
         }
-        let Some(bound) = panel::owner_row(content, table, key, &format!("/modules/{index}"))
-        else {
+        let pointer = format!("/{MODULES}/{index}");
+        let Some(bound) = panel::owner_row(content, NpcDef::TABLE, key, &pointer) else {
             continue;
         };
         for reach in scripts.may_do(bound.row).reaches {

@@ -10,12 +10,9 @@ pub use preview::VfxViews;
 use std::sync::Arc;
 
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
-use engine::core::content::{
-    Content, ContentFile, ContentScope, ErrorPlace, fields_file, with_content,
-};
+use engine::core::content::{ContentFile, ContentScope, ErrorPlace, fields_file, rescoped};
 use engine::core::time::Seconds;
 use engine::core::vfx::{ParamFill, VfxDef, VfxLayer, VfxShaderDef, shader_file};
-use serde_json::Value;
 
 use self::preview::preview;
 use crate::app::Editor;
@@ -29,28 +26,32 @@ const HEADING_HEIGHT: f32 = 24.0;
 const MIN_TITLE_WIDTH: f32 = 60.0;
 
 pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(key) else {
-        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
+    let Some(project) = &editor.project else {
         return;
     };
-    let (layers, inside) = editor.loaded().map_or((Vec::new(), None), |content| {
-        let layers = layers_of(&content, &row);
-        let inside = row["on_actors_inside"].as_str().map(|inner| {
-            if inner == key {
-                layers.clone()
-            } else {
-                content
-                    .by_path::<VfxDef>(inner)
-                    .map_or_else(Vec::new, |id| id.get(&content).layers.clone())
-            }
-        });
-        (layers, inside)
-    });
-    let specs = editor
-        .project
-        .as_ref()
-        .map(|project| params_of(&project.files, VfxDef::TABLE, key))
-        .unwrap_or_default();
+    if !project.files.contains(&fields_file(key)) {
+        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
+        return;
+    }
+    let vfx = project.read::<VfxDef>(key).ok();
+    let specs = params_of(project, VfxDef::TABLE, key);
+    let reader = project.reader();
+    let (layers, inside) = match (editor.loaded(), vfx) {
+        (Some(content), Some(vfx)) => {
+            let loaded = ContentScope::of(&content);
+            let layers = rescoped(&vfx.layers, reader.scope(), &loaded).unwrap_or_default();
+            let inside = vfx
+                .on_actors_inside
+                .map(|inner| match reader.path_of(inner) {
+                    Some(inner) if inner == key => layers.clone(),
+                    inner => inner
+                        .and_then(|inner| content.by_path::<VfxDef>(inner))
+                        .map_or_else(Vec::new, |id| id.get(&content).layers.clone()),
+                });
+            (layers, inside)
+        }
+        _ => (Vec::new(), None),
+    };
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(FORM_WIDTH);
@@ -214,17 +215,4 @@ fn code_pane(
             ui.add(egui::Label::new(status).truncate());
         },
     );
-}
-
-/// The row's layers that parse, each against the content that last loaded, so a row being worked
-/// on still previews the layers that are whole.
-fn layers_of(content: &Content, row: &Value) -> Vec<VfxLayer> {
-    let layers = row["layers"].as_array().cloned().unwrap_or_default();
-    with_content(ContentScope::of(content), || {
-        layers
-            .into_iter()
-            .filter_map(|layer| serde_json::from_value(layer).ok())
-            .collect()
-    })
-    .0
 }

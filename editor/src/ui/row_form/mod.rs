@@ -6,15 +6,13 @@ pub mod scripts;
 pub mod settings;
 pub mod usages;
 
-use std::collections::BTreeMap;
-
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentFile, ModuleRule, fields_file};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{ContentFile, MODULES, ModuleRule, fields_file};
 use engine::core::vfx::VfxShaderDef;
 use engine::systems::actor::ModelDef;
-use engine::systems::area::AreaDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::class::ClassDef;
 use engine::systems::input::map::InputDef;
@@ -40,7 +38,6 @@ use crate::project::{ContentEdit, RowSelection};
 use crate::rows::new_file_into;
 use crate::tabs::shown_path;
 use crate::ui::browser::{self, RowMenu};
-use crate::value::RowValue;
 use crate::views::{class, model, skill, tileset, vfx};
 use crate::{schema, stage};
 
@@ -114,14 +111,20 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         .selection
         .parts
         .first()
-        .and_then(|part| part.strip_prefix("/modules/"))
-        .and_then(|index| index.parse().ok());
+        .and_then(|part| part.strip_prefix(&modules_pointer()))
+        .and_then(|index| index.strip_prefix('/')?.parse().ok());
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(table);
-    let has_modules = root
-        .get("properties")
-        .and_then(|p| p.get("modules"))
-        .is_some();
+    let has_modules = registry().holds_modules(table);
+    let Some(reader) = editor.reader() else {
+        return;
+    };
+    let mut modules = if has_modules {
+        reader.modules_in(table, &value)
+    } else {
+        Ok(Vec::new())
+    };
+    let mut modules_changed = FormChange::default();
     let second_column = has_modules || table == InputDef::TABLE;
     if fixture {
         editor.status.left.push(shown_path(key).to_owned());
@@ -159,13 +162,13 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
                         if table == InputDef::TABLE {
-                            changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
+                            changed |= bindings_section(ui, &mut cx, key, &mut value);
                         } else {
-                            changed |= modules_column(
+                            modules_changed |= modules_column(
                                 ui,
                                 &mut cx,
                                 table,
-                                &mut value,
+                                &mut modules,
                                 &mut module_ops,
                                 selected_module,
                                 &mut status,
@@ -182,15 +185,15 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 );
                 if table == InputDef::TABLE {
                     ui.add_space(10.0);
-                    changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
+                    changed |= bindings_section(ui, &mut cx, key, &mut value);
                 }
                 if has_modules {
                     ui.add_space(10.0);
-                    changed |= modules_column(
+                    modules_changed |= modules_column(
                         ui,
                         &mut cx,
                         table,
-                        &mut value,
+                        &mut modules,
                         &mut module_ops,
                         selected_module,
                         &mut status,
@@ -211,17 +214,27 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         ));
         editor.status.left.append(&mut editor.form.status);
     }
-    for op in module_ops {
-        match op {
-            ModuleOp::Copy(index) => {
-                let module = value["modules"][index].clone();
-                editor.clipboard = Some(Clipboard::Modules(ModuleClip {
-                    from: key.to_owned(),
-                    modules: vec![module],
-                }));
-                editor.toast("Module copied");
+    if let Ok(modules) = &mut modules {
+        for op in module_ops {
+            match op {
+                ModuleOp::Copy(index) => {
+                    editor.clipboard = Some(Clipboard::Modules(ModuleClip {
+                        from: key.to_owned(),
+                        modules: vec![modules[index].clone()],
+                    }));
+                    editor.toast("Module copied");
+                }
+                ModuleOp::Paste => paste_modules(editor, table, key, modules, &mut modules_changed),
             }
-            ModuleOp::Paste => paste_modules(editor, table, key, &mut value, &mut changed),
+        }
+    }
+    if let (Ok(modules), true) = (&modules, modules_changed.is_some()) {
+        match reader.with_modules_in(table, &value, modules) {
+            Ok(with) => {
+                value = with;
+                changed |= modules_changed;
+            }
+            Err(error) => editor.toast(error),
         }
     }
     if let Some(write) = typed {
@@ -332,52 +345,33 @@ fn modules_column(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    value: &mut Value,
+    modules: &mut Result<Vec<Value>, String>,
     ops: &mut Vec<ModuleOp>,
     selected: Option<usize>,
     status: &mut Option<String>,
 ) -> FormChange {
+    let modules = match modules {
+        Ok(modules) => modules,
+        Err(error) => {
+            widgets::section(ui, "Modules");
+            widgets::hint(ui, &format!("The modules show once the row reads: {error}"));
+            return FormChange::default();
+        }
+    };
     let variants = cx.shapes.module_variants(table);
-    if !value["modules"].is_array() {
-        value["modules"] = Value::Array(Vec::new());
-    }
     let mut changed = FormChange::default();
-    let scripts_only = table == AreaDef::TABLE;
-    let count = value["modules"].as_array().map_or(0, Vec::len);
-    let shown = if scripts_only {
-        value["modules"].as_array().map_or(0, |list| {
-            list.iter()
-                .filter(|module| module.is_script_module())
-                .count()
-        })
-    } else {
-        count
-    };
-    let heading = if scripts_only {
-        "Area scripts"
-    } else {
-        "Modules"
-    };
-    widgets::section_with(ui, &format!("{heading} · {shown}"), |ui| {
+    let count = modules.len();
+    widgets::section_with(ui, &format!("Modules · {count}"), |ui| {
         let button = controls::dropdown_primary(ui, "+ Add module");
         let popup = egui::Popup::from_toggle_button_response(&button)
             .id(ui.id().with("add-module"))
             .width(330.0);
         popup.show(|ui| {
-            if let Some(template) = add_module_popup(
-                ui,
-                cx,
-                table,
-                &variants,
-                value["modules"].as_array().expect("modules"),
-                scripts_only,
-                status,
-            ) {
-                let list = value["modules"].as_array_mut().expect("modules");
-                list.push(template);
-                let path = format!("{table}/modules/{}", list.len() - 1);
+            if let Some(template) = add_module_popup(ui, cx, table, &variants, modules, status) {
+                modules.push(template);
+                let path = format!("{table}{}/{}", modules_pointer(), modules.len() - 1);
                 cx.state.folded.remove(&path);
-                changed = FormChange::at("/modules");
+                changed = FormChange::at(&modules_pointer());
                 ui.close();
             }
         });
@@ -389,7 +383,7 @@ fn modules_column(
             ops.push(ModuleOp::Paste);
         }
     });
-    let free = free_singles(cx, table, &variants, value);
+    let free = free_singles(cx, table, &variants, modules);
     if !free.is_empty() {
         ui.horizontal(|ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -397,32 +391,22 @@ fn modules_column(
             });
         });
     }
-    if scripts_only {
-        module_counts(ui, value);
-    }
     let mut remove = None;
     let mut swap = None;
     let mut duplicate = None;
     let mut objectives = 0;
-    for index in 0..count {
-        let path = format!("/modules/{index}");
-        let module = &mut value["modules"][index];
-        let tag = module.kind_or("module").to_owned();
-        let is_script = module.is_script_module();
-        if scripts_only && !is_script {
-            continue;
-        }
+    for (index, module) in modules.iter_mut().enumerate() {
+        let path = format!("{}/{index}", modules_pointer());
+        let tag = TypeTag::of_json(module).unwrap_or_default();
+        let is_script = tag == ScriptModule::TAG;
         let summary = if is_script {
-            script_summary(module)
+            cx.project
+                .reader()
+                .from_json::<ScriptModule>(module)
+                .map_or_else(|error| error, |typed| script_summary(cx.project, &typed))
         } else if table == QuestDef::TABLE && ObjectiveKind::of(&tag).is_some() {
             objectives += 1;
             format!("objective {objectives}")
-        } else if let Some(condition) = module.get("condition") {
-            let blocks = ["all", "any"]
-                .iter()
-                .find_map(|op| condition[op].as_array().map(Vec::len))
-                .unwrap_or(1);
-            format!("condition · {blocks} block{}", widgets::plural(blocks))
         } else {
             summary_of(cx, module)
         };
@@ -500,21 +484,25 @@ fn modules_column(
         });
         ui.add_space(2.0);
     }
-    let list = value["modules"].as_array_mut().expect("modules");
     if let Some(index) = remove {
-        list.remove(index);
-        changed = FormChange::at("/modules");
+        modules.remove(index);
+        changed = FormChange::at(&modules_pointer());
     }
     if let Some((a, b)) = swap {
-        list.swap(a, b);
-        changed = FormChange::at("/modules");
+        modules.swap(a, b);
+        changed = FormChange::at(&modules_pointer());
     }
     if let Some(index) = duplicate {
-        let copy = list[index].clone();
-        list.insert(index + 1, copy);
-        changed = FormChange::at("/modules");
+        let copy = modules[index].clone();
+        modules.insert(index + 1, copy);
+        changed = FormChange::at(&modules_pointer());
     }
     changed
+}
+
+/// Where a row's modules are, as a pointer into its file.
+pub(super) fn modules_pointer() -> String {
+    format!("/{MODULES}")
 }
 
 pub(super) fn card_body(
@@ -529,13 +517,12 @@ pub(super) fn card_body(
     let mut changed = FormChange::default();
     match schema::variant_of(variants, module) {
         Some(variant) if variant.tag == ScriptModule::TAG => {
-            changed |= script_module_body(ui, cx, table, variant.schema, module, path);
+            changed |= forms::as_type::<ScriptModule>(ui, cx, module, path, |ui, cx, typed| {
+                script_module_body(ui, cx, table, typed, path)
+            });
         }
         Some(variant) => {
-            let fieldless = variant.schema["properties"]
-                .as_object()
-                .is_none_or(|fields| fields.keys().all(|name| name == "type"));
-            if fieldless {
+            if schema::is_fieldless(variant.schema) {
                 widgets::hint(ui, &fieldless_note(variant.schema));
             } else {
                 changed |= forms::object_without(ui, cx, variant.schema, module, path, &[]);
@@ -546,39 +533,12 @@ pub(super) fn card_body(
     changed
 }
 
-fn module_counts(ui: &mut Ui, value: &Value) {
-    let mut counts: BTreeMap<String, usize> = Default::default();
-    for module in value["modules"].as_array().into_iter().flatten() {
-        if module.is_script_module() {
-            continue;
-        }
-        let kind = module.kind_or("module");
-        *counts.entry(kind.to_owned()).or_default() += 1;
-    }
-    let text: Vec<String> = counts
-        .iter()
-        .map(|(kind, count)| format!("{count} {}", kind.replace('_', " ")))
-        .collect();
-    widgets::hint(
-        ui,
-        &format!(
-            "Placed modules edit in the area view: {}.",
-            if text.is_empty() {
-                "none yet".to_owned()
-            } else {
-                text.join(", ")
-            }
-        ),
-    );
-}
-
 pub(super) fn add_module_popup(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
     variants: &[schema::SchemaVariant],
     list: &[Value],
-    scripts_only: bool,
     status: &mut Option<String>,
 ) -> Option<Value> {
     let registry = registry();
@@ -598,9 +558,6 @@ pub(super) fn add_module_popup(
         .show(ui, |ui| {
             for variant in variants {
                 let is_script = variant.tag == ScriptModule::TAG;
-                if scripts_only && !is_script {
-                    continue;
-                }
                 offered += 1;
                 let template = schema::variant_template(cx.root, variant, cx.nearby());
                 let at_most_one =
@@ -614,8 +571,7 @@ pub(super) fn add_module_popup(
                 {
                     continue;
                 }
-                let description = variant.schema["description"]
-                    .as_str()
+                let description = schema::description(variant.schema)
                     .map(str::to_owned)
                     .unwrap_or_else(|| {
                         if is_script {
@@ -736,7 +692,7 @@ fn paste_modules(
     editor: &mut Editor,
     table: &str,
     key: &str,
-    value: &mut Value,
+    list: &mut Vec<Value>,
     changed: &mut FormChange,
 ) {
     let Some(Clipboard::Modules(clip)) = editor.clipboard.clone() else {
@@ -748,15 +704,14 @@ fn paste_modules(
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(table);
     for module in &clip.modules {
-        let tag = module.kind_or("module").to_owned();
+        let tag = TypeTag::of_json(module).unwrap_or_default();
         let Some(rule) = registry.module_rule(table, module) else {
             editor.toast(format!("a {table} row takes no {tag} module"));
             continue;
         };
-        let list = value["modules"].as_array_mut().expect("modules");
         let existing = list
             .iter()
-            .position(|known| known["type"] == module["type"]);
+            .position(|known| TypeTag::of_json(known).as_ref() == Some(&tag));
         match (rule, existing) {
             (ModuleRule::AtMostOne, Some(index)) => {
                 editor.dialogs.push(ModalDialog::Confirm(ConfirmDialog {
@@ -781,7 +736,7 @@ fn paste_modules(
             }
             _ => {
                 list.push(module.clone());
-                *changed = FormChange::at("/modules");
+                *changed = FormChange::at(&modules_pointer());
             }
         }
     }

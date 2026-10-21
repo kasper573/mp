@@ -185,13 +185,7 @@ pub fn picture_of(project: &Project, path: &str) -> Option<Picture> {
             frame: PictureFrame::Whole,
         })
     };
-    let worn = |model| {
-        sprite(
-            &*project
-                .read::<ModelDef>(project.reader().path_of(model)?)
-                .ok()?,
-        )
-    };
+    let worn = |model| sprite(&*project.read_id::<ModelDef>(model)?);
     match table_of(path)? {
         ModelDef::TABLE => sprite(&*project.read::<ModelDef>(path).ok()?),
         NpcDef::TABLE => worn(project.read::<NpcDef>(path).ok()?.model),

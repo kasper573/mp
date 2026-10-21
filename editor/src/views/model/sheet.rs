@@ -38,7 +38,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
             let line = first.frame / sheet.columns.max(1);
             widgets::chip(
                 ui,
-                &format!("row {} · {}", line + 1, strips_starting_in_row(first.frame)),
+                format!("row {} · {}", line + 1, strips_starting_in_row(first.frame)),
             );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

@@ -23,7 +23,6 @@ use engine::core::content::{
 };
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
-use engine::systems::script::ScriptDef;
 use engine::systems::{self, GameSettings};
 
 use self::files::content_holding;
@@ -290,9 +289,7 @@ pub struct Project {
     pub files: ProjectFiles,
     /// The hash of every file as it stands on disk.
     disk: DiskHashes,
-    /// The unsaved files, as last worked out, and the revisions of the files and disk hashes they
-    /// were worked out from.
-    unsaved: Mutex<Option<((u64, u64), Arc<[String]>)>>,
+    unsaved: Mutex<Option<UnsavedFiles>>,
     pub content: Option<Content>,
     pub report: Option<LoadReport>,
     pub history: EditHistory,
@@ -346,7 +343,7 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
-        let catalogue = NodeCatalogue::build(shapes.shape_of(ScriptDef::TABLE));
+        let catalogue = NodeCatalogue::build();
         let mut project = Project {
             root: root.to_path_buf(),
             loading: None,
@@ -377,6 +374,11 @@ impl Project {
     /// keep it from reading.
     pub fn read<Row: ContentFile>(&self, path: &str) -> Result<Arc<Row>, Arc<Unreadable>> {
         self.typed.read(&self.files, &self.name(), path)
+    }
+
+    /// The content file `id` names among the files as they stand now, when it reads.
+    pub fn read_id<Row: ContentFile>(&self, id: ContentId<Row>) -> Option<Arc<Row>> {
+        self.read(self.reader().path_of(id)?).ok()
     }
 
     /// The game's settings as the game reads them, as the files stand now.
@@ -683,10 +685,10 @@ impl Project {
     pub fn unsaved(&self) -> Arc<[String]> {
         let mut known = self.unsaved.lock().unwrap_or_else(PoisonError::into_inner);
         let revision = (self.files.revision(), self.disk.revision());
-        if let Some((at, unsaved)) = &*known
-            && *at == revision
+        if let Some(known) = &*known
+            && known.revision == revision
         {
-            return unsaved.clone();
+            return known.paths.clone();
         }
         let unsaved: Arc<[String]> = self
             .files
@@ -697,7 +699,10 @@ impl Project {
             .collect::<BTreeSet<String>>()
             .into_iter()
             .collect();
-        *known = Some((revision, unsaved.clone()));
+        *known = Some(UnsavedFiles {
+            revision,
+            paths: unsaved.clone(),
+        });
         unsaved
     }
 
@@ -930,4 +935,11 @@ fn error_key(error: &LoadError) -> (String, &'static str, String) {
         error.problem.rule,
         error.at.pointer().to_owned(),
     )
+}
+
+/// The unsaved files, as last worked out, and the revisions of the files and disk hashes they
+/// were worked out from.
+struct UnsavedFiles {
+    revision: (u64, u64),
+    paths: Arc<[String]>,
 }

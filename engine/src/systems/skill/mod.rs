@@ -207,6 +207,10 @@ impl ModuleSet for SkillDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<SkillModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &SkillModule) -> ModuleRule {
         ModuleRule::AnyNumber
     }

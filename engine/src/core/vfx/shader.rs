@@ -63,8 +63,20 @@ pub struct ShaderParam {
     pub max: Option<f32>,
 }
 
-#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    VariantArray,
+    IntoStaticStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ParamKind {
     Number,
     Bool,

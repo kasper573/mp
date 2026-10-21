@@ -119,6 +119,43 @@ impl<V: Vocabulary> Expr<V> {
         self.into()
     }
 
+    /// The comparison or arithmetic of `kind` between `a` and `b`, when `kind` is one.
+    pub fn binary(kind: ExprKind, a: Box<Expr<V>>, b: Box<Expr<V>>) -> Option<Expr<V>> {
+        Some(match kind {
+            ExprKind::Equal => Expr::Equal { a, b },
+            ExprKind::NotEqual => Expr::NotEqual { a, b },
+            ExprKind::Less => Expr::Less { a, b },
+            ExprKind::AtMost => Expr::AtMost { a, b },
+            ExprKind::More => Expr::More { a, b },
+            ExprKind::AtLeast => Expr::AtLeast { a, b },
+            ExprKind::Add => Expr::Add { a, b },
+            ExprKind::Subtract => Expr::Subtract { a, b },
+            ExprKind::Multiply => Expr::Multiply { a, b },
+            ExprKind::Divide => Expr::Divide { a, b },
+            ExprKind::Min => Expr::Min { a, b },
+            ExprKind::Max => Expr::Max { a, b },
+            _ => return None,
+        })
+    }
+
+    pub fn operands_mut(&mut self) -> Option<[&mut Box<Self>; 2]> {
+        match self {
+            Expr::Equal { a, b }
+            | Expr::NotEqual { a, b }
+            | Expr::Less { a, b }
+            | Expr::AtMost { a, b }
+            | Expr::More { a, b }
+            | Expr::AtLeast { a, b }
+            | Expr::Add { a, b }
+            | Expr::Subtract { a, b }
+            | Expr::Multiply { a, b }
+            | Expr::Divide { a, b }
+            | Expr::Min { a, b }
+            | Expr::Max { a, b } => Some([a, b]),
+            _ => None,
+        }
+    }
+
     pub fn children(&self) -> Vec<&Expr<V>> {
         match self {
             Expr::All { of } | Expr::Any { of } | Expr::Join { of } => of.iter().collect(),

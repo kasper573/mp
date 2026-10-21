@@ -11,8 +11,11 @@ pub mod tileset;
 pub mod vfx;
 pub mod world;
 
+use std::sync::Arc;
+
 use bevy::prelude::*;
 use egui::Ui;
+use engine::core::content::ContentFile;
 use engine::core::tiling::TilePos;
 use engine::systems::area::AreaDef;
 use engine::systems::script::Place;
@@ -63,6 +66,17 @@ impl EditorViews {
 
     pub fn content_changed(&mut self) {
         self.area.content_changed();
+    }
+}
+
+/// The content file at `key` as the game reads it, or `None` once `ui` says why it doesn't read.
+pub fn read_shown<Row: ContentFile>(editor: &Editor, ui: &mut Ui, key: &str) -> Option<Arc<Row>> {
+    match editor.read::<Row>(key)? {
+        Ok(row) => Some(row),
+        Err(errors) => {
+            ui::widgets::unreadable(ui, key, &errors);
+            None
+        }
     }
 }
 

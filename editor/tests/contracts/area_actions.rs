@@ -171,7 +171,7 @@ fn show_area(
 
 fn hold_a_stroke(editor: &mut Editor) {
     let snapshot = AreaSnapshot::for_bundle(editor, &area()).expect("the area is open");
-    let draft = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
+    let draft = GridDraft::own(editor, &snapshot.bundle).expect("the area's grids");
     view(editor).set_stroke(BrushStroke {
         draft,
         kind: BrushStrokeKind::Paint,

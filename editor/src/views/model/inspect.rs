@@ -26,7 +26,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(part) = selection.parts.first().cloned() else {
         return;
     };
-    let Some(row) = super::read_model(editor, ui, &key) else {
+    let Some(row) = crate::views::read_shown::<ModelDef>(editor, ui, &key) else {
         return;
     };
     super::ensure_view(editor, &key);

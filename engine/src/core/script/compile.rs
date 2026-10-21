@@ -993,30 +993,10 @@ fn event_fields_by_node<V: Vocabulary>(
 }
 
 fn node_arrows<V: Vocabulary>(node: &Node<V>) -> Vec<&str> {
-    let arrows: Vec<&Arrow> = match node {
-        Node::On { next, .. }
-        | Node::Wait { next, .. }
-        | Node::Set { next, .. }
-        | Node::Run { next, .. } => vec![next],
-        Node::If { yes, no, .. } => vec![yes, no],
-        Node::Random { outputs, .. } => outputs.iter().collect(),
-        Node::Repeat { each, then, .. } => vec![each, then],
-        Node::Return { .. } => Vec::new(),
-        Node::Dialogue(dialogue) => dialogue
-            .choices
-            .iter()
-            .map(|choice| &choice.to)
-            .chain([&dialogue.next, &dialogue.left])
-            .collect(),
-        Node::Effect(effect) => {
-            return effect
-                .outputs()
-                .into_iter()
-                .filter_map(|(_, to)| to.to())
-                .collect();
-        }
-    };
-    arrows.into_iter().filter_map(Arrow::to).collect()
+    node.exits()
+        .into_iter()
+        .filter_map(|(_, arrow)| arrow.to())
+        .collect()
 }
 
 fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {

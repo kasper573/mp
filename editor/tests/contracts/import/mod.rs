@@ -8,6 +8,7 @@ use editor::import::formats::{self, ExportFormat, ExportStrip};
 use editor::import::model::{self, CuePlacement};
 use editor::import::records::{ImportMapping, ImportRecord};
 use editor::import::tileset;
+use editor::views::area::grid::BundlePalette;
 use editor::views::model::{ModelStrip, strip_of};
 use engine::core::content::FolderReader;
 use engine::core::math::Direction;
@@ -350,7 +351,10 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     image::GenericImage::copy_from(&mut wide, &old, 0, 0).unwrap();
     fill(&mut wide, old.width(), 0, 64, 16, [200, 90, 120, 255]);
     let island = art::island_palette();
-    let palettes = vec![(path("area", "island"), palette(&island))];
+    let palettes = vec![BundlePalette {
+        bundle: path("area", "island"),
+        rows: palette(&island),
+    }];
     let plan =
         tileset::tile_plan(&old, &row, &wide, &path("tileset", "beach"), &palettes).expect("plans");
     assert_eq!(
@@ -389,10 +393,11 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
             assert_eq!(after.ms, before.ms);
         }
     }
-    let (_, after) = rewritten
+    let after = &rewritten
         .iter()
-        .find(|(area, _)| *area == path("area", "island"))
-        .expect("island rewritten");
+        .find(|palette| palette.bundle == path("area", "island"))
+        .expect("island rewritten")
+        .rows;
     let before = palette(&island);
     assert_eq!(before.len(), after.len());
     for (old, new) in before.iter().zip(after) {
@@ -410,10 +415,10 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     for (file, bytes) in written.files {
         std::fs::write(game.join(file), bytes).unwrap();
     }
-    for (area, rows) in &rewritten {
+    for palette in &rewritten {
         std::fs::write(
-            game.join(format!("{area}/palette.csv")),
-            grid::write_palette(rows),
+            game.join(format!("{}/palette.csv", palette.bundle)),
+            grid::write_palette(&palette.rows),
         )
         .unwrap();
     }
@@ -440,14 +445,14 @@ fn a_gone_tile_still_painted_blocks_until_replaced() {
         [1, 2, 3, 255],
     );
     let beach = path("tileset", "beach");
-    let palettes = vec![(
-        path("area", "island"),
-        palette(&format!(
+    let palettes = vec![BundlePalette {
+        bundle: path("area", "island"),
+        rows: palette(&format!(
             "tileset,tile,flip\n{beach},{},\n{beach},{},\n",
             art::PAVED,
             art::PAVED + 1
         )),
-    )];
+    }];
     let mut plan = tileset::tile_plan(&old, &row, &changed, &beach, &palettes).expect("plans");
     assert_eq!(plan.gone, vec![art::PAVED]);
     assert!(plan.gone_used.contains_key(&art::PAVED));
@@ -455,7 +460,7 @@ fn a_gone_tile_still_painted_blocks_until_replaced() {
     plan.replacements.insert(art::PAVED, Some(art::PAVED + 1));
     assert_eq!(plan.ready(), Ok(()));
     let (_, rewritten) = tileset::apply_tile_plan(&plan, &row, &beach, &palettes).unwrap();
-    assert_eq!(rewritten[0].1[0].tile, art::PAVED + 1);
+    assert_eq!(rewritten[0].rows[0].tile, art::PAVED + 1);
 }
 
 #[test]

@@ -69,19 +69,34 @@ impl FolderReader {
     /// `json` read as a `T`, its references resolved among the folder's paths: the fields of a file
     /// about to be made, or a value kept apart from the files.
     pub fn from_json<T: DeserializeOwned>(&self, json: &serde_json::Value) -> Result<T, String> {
-        let (parsed, scope) = with_content(self.scope.clone(), || parse_value::<T>(json));
-        let row = parsed.map_err(|error| format!("at {}: {}", error.pointer, error.inner))?;
-        match scope.leaves().iter().find_map(|leaf| leaf.reported()) {
-            Some(problem) => Err(problem.to_string()),
-            None => Ok(row),
-        }
+        self.within(|| parse_value::<T>(json).map_err(|error| error.to_string()))
     }
 
     /// `value` as JSON, its ids written as the paths they stand for among the folder's.
     pub fn to_json<T: serde::Serialize>(&self, value: &T) -> Result<serde_json::Value, String> {
-        with_content(self.scope.clone(), || serde_json::to_value(value))
+        with_content(self.scope.clone(), || super::serial::json_of(value))
             .0
             .map_err(|error| error.to_string())
+    }
+
+    /// The modules of `row`, a file of `table` as JSON, each as its type writes it.
+    pub fn modules_in(
+        &self,
+        table: &str,
+        row: &serde_json::Value,
+    ) -> Result<Vec<serde_json::Value>, String> {
+        self.within(|| self.registry.modules_of_json(table, row))
+    }
+
+    /// `row`, a file of `table` as JSON, holding `modules` in place of its own: each read as its
+    /// type, so a module that doesn't read is refused.
+    pub fn with_modules_in(
+        &self,
+        table: &str,
+        row: &serde_json::Value,
+        modules: &[serde_json::Value],
+    ) -> Result<serde_json::Value, String> {
+        self.within(|| self.registry.with_modules_json(table, row, modules))
     }
 
     /// The game's settings, when they read whole.
@@ -121,6 +136,17 @@ impl FolderReader {
             .settings_loader()
             .ok_or_else(|| io::Error::other("no settings in this game's registry"))?;
         self.write_with(|writer| loader.write_value(settings, writer))
+    }
+
+    /// What `read` makes of JSON with its references resolved among the folder's paths, refused
+    /// when one names no file the folder holds.
+    fn within<T>(&self, read: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+        let (read, scope) = with_content(self.scope.clone(), read);
+        let read = read?;
+        match scope.leaves().iter().find_map(|leaf| leaf.reported()) {
+            Some(problem) => Err(problem.to_string()),
+            None => Ok(read),
+        }
     }
 
     /// The paths every reference read here resolves among.

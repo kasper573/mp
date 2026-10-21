@@ -146,9 +146,9 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let mut clicked_row: Option<usize> = None;
     let list_height = ui.max_rect().height() * 0.55;
     let hint = match &palette.open.link {
-        Some((from, field)) => format!(
+        Some((from, exit)) => format!(
             "add after {from} {}",
-            nodes::port_label(doc.nodes(), catalogue, from, field)
+            nodes::port_label(doc.nodes(), from, *exit)
         ),
         None => "type to search".to_owned(),
     };

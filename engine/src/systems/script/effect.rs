@@ -52,6 +52,9 @@ macro_rules! effects {
             fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
                 match self { $(RiftEffect::$variant(e) => e.outputs(),)* }
             }
+            fn outputs_mut(&mut self) -> Vec<(&'static str, &mut Arrow)> {
+                match self { $(RiftEffect::$variant(e) => e.outputs_mut(),)* }
+            }
             fn pauses(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.pauses(),)* }
             }
@@ -197,9 +200,7 @@ impl EffectDef<RiftScripting> for PlaySound {
     fn needs_subject(&self) -> bool {
         self.audience == Audience::Subject
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

@@ -2,19 +2,18 @@ use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentFile, fields_file};
-use engine::core::script::{MayDo, NodeKind};
+use engine::core::script::{Expr, MayDo};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::script::{
-    OwnerRow, Place, Reach, RiftScripting, RiftScripts, RunnerKind, ScriptDef,
+    Node, OwnerRow, Place, Reach, RiftEffect, RiftScripting, RiftScripts, RunnerKind, ScriptDef,
+    ScriptModule, VarValue,
 };
 use engine::systems::stat::StatKind;
-use serde_json::Value;
 
-use super::nodes::{self, NodeReads};
+use super::nodes::{self, NodeReads, NodeText};
 use super::{ScriptDoc, ScriptPanel, ScriptPath, ScriptRef, ScriptRow, run};
 use crate::app::Editor;
-use crate::condition;
 use crate::project::RowSelection;
 use crate::project::files::content_of;
 use crate::tabs::shown_path;
@@ -101,7 +100,7 @@ pub fn owner_row(
                     )
                 }
                 None => bound(
-                    shown_path(&key).to_owned(),
+                    shown_path(key).to_owned(),
                     OwnerRow {
                         kind: RunnerKind::Area,
                         row: area.raw(),
@@ -121,7 +120,7 @@ pub fn owner_row(
                 Some(bound(
                     format!(
                         "{} in {} {ordinal}",
-                        shown_path(&key),
+                        shown_path(key),
                         shown_path(area.path(content))
                     ),
                     OwnerRow {
@@ -294,8 +293,11 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     let speakers = unique(
         nodes
             .values()
-            .flat_map(|node| node["lines"].as_array().cloned().unwrap_or_default())
-            .map(|line| nodes::speaker_name(&line["by"])),
+            .flat_map(|node| match node {
+                Node::Dialogue(dialogue) => dialogue.lines.as_slice(),
+                _ => &[],
+            })
+            .map(|line| nodes::speaker_name(&doc.reader, line.by)),
     );
     let called_dialogue = may.dialogue.len().saturating_sub(dialogue_count);
     if dialogue_count > 0 || called_dialogue > 0 {
@@ -350,7 +352,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             .collect();
         rows.push(MayRow::present("runs", calls.join(" · ")));
     }
-    let reads = NodeReads::of(content, nodes).text();
+    let reads = NodeReads::of(&doc.reader, nodes).text();
     if !reads.is_empty() {
         rows.push(MayRow::present("reads", reads));
     }
@@ -368,11 +370,11 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .collect();
     rows.push(MayRow::maybe("warps", &warps, "nowhere", " · "));
     let takes = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Takes(item) => Some(stack_text(doc, "take", item.path(content))),
+        Reach::Takes(item) => Some(stack_text(doc, Hands::Take, item.path(content))),
         _ => None,
     }));
     let gives = unique(may.reaches.iter().filter_map(|r| match r {
-        Reach::Gives(item) => Some(stack_text(doc, "give", item.path(content))),
+        Reach::Gives(item) => Some(stack_text(doc, Hands::Give, item.path(content))),
         _ => None,
     }));
     if !takes.is_empty() || !gives.is_empty() {
@@ -503,8 +505,17 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let seconds: Vec<String> = nodes
         .values()
-        .filter(|node| nodes::kind_of(node) == NodeKind::Wait)
-        .filter_map(|node| node["seconds"].as_f64())
+        .filter_map(|node| match node {
+            Node::Wait {
+                seconds: Expr::Num(seconds),
+                ..
+            } => Some(*seconds),
+            Node::Wait {
+                seconds: Expr::Int(seconds),
+                ..
+            } => Some(*seconds as f64),
+            _ => None,
+        })
         .map(|s| format!("{} s", s))
         .collect();
     if !seconds.is_empty() {
@@ -528,12 +539,25 @@ fn place_coords(place: &Place) -> String {
     format!("{}, {}", place.at.x, place.at.y)
 }
 
-fn stack_text(doc: &ScriptDoc, field: &str, item: &str) -> String {
+/// Which way items change hands.
+#[derive(Clone, Copy)]
+enum Hands {
+    Take,
+    Give,
+}
+
+fn stack_text(doc: &ScriptDoc, hands: Hands, item: &str) -> String {
     for node in doc.nodes().values() {
-        for stack in node[field].as_array().into_iter().flatten() {
-            if stack["item"].as_str() == Some(item) {
-                let count = stack["count"].as_u64().unwrap_or(1);
-                return format!("{count} {}", shown_path(item));
+        let Node::Effect(RiftEffect::Items(items)) = node else {
+            continue;
+        };
+        let stacks = match hands {
+            Hands::Take => &items.take,
+            Hands::Give => &items.give,
+        };
+        for stack in stacks {
+            if doc.reader.path_of(stack.item) == Some(item) {
+                return format!("{} {}", stack.count, shown_path(item));
             }
         }
     }
@@ -653,28 +677,23 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         return;
     };
     let mut rows: Vec<NamedBy> = Vec::new();
+    let text = doc.text(project);
     for (file, pointers) in project.usages.files_naming(key) {
-        let row = project.files.json(&file);
         let Some((table, row_key)) = content_of(&file) else {
             continue;
         };
         for pointer in pointers {
             let at = ScriptRef::parse(&pointer);
-            let module_json = at
+            let module = at
                 .module
                 .as_ref()
-                .and_then(|module| row.as_ref()?.pointer(&module.pointer()).cloned());
+                .and_then(|module| project.value_at::<ScriptModule>(&file, &module.pointer()));
             let (name, what) = match at.node {
                 Some(node) => (node, "run node".to_owned()),
                 None => (
-                    module_json
-                        .as_ref()
-                        .and_then(|module| module["name"].as_str())
-                        .unwrap_or_default()
-                        .to_owned(),
-                    module_json
-                        .as_ref()
-                        .map(|module| summarise_values(&module["values"]))
+                    String::new(),
+                    module
+                        .map(|module| summarise_values(&text, &module.values))
                         .unwrap_or_default(),
                 ),
             };
@@ -777,20 +796,15 @@ pub fn used_by_count(editor: &Editor, script: &ScriptRow) -> usize {
         .map_or(0, |project| project.usages.of_content(&script.key).len())
 }
 
-fn summarise_values(values: &Value) -> String {
+fn summarise_values(
+    text: &NodeText,
+    values: &std::collections::BTreeMap<String, VarValue>,
+) -> String {
     values
-        .as_object()
-        .map(|map| {
-            map.iter()
-                .map(|(name, value)| {
-                    let shown =
-                        nodes::place_text(value).unwrap_or_else(|| condition::summary(value));
-                    format!("{name} {shown}")
-                })
-                .collect::<Vec<_>>()
-                .join(" · ")
-        })
-        .unwrap_or_default()
+        .iter()
+        .map(|(name, value)| format!("{name} {}", nodes::var_value_text(text, value)))
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
 fn stat_name(stat: StatKind) -> String {

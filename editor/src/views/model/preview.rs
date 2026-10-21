@@ -200,13 +200,13 @@ pub fn controls(
         {
             preview.muted = !preview.muted;
         }
-        if with_speed && widgets::chip(ui, &format!("{}×", preview.speed)).clicked() {
+        if with_speed && widgets::chip(ui, format!("{}×", preview.speed)).clicked() {
             preview.speeds = (preview.speeds + 1) % SPEEDS.len();
             preview.speed = SPEEDS[preview.speeds];
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if count > 0 {
-                widgets::chip(ui, &format!("{} / {count}", index + 1));
+                widgets::chip(ui, format!("{} / {count}", index + 1));
             }
         });
     });

@@ -52,6 +52,10 @@ impl ModuleSet for ShopDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<ShopModule> {
+        &mut self.modules
+    }
+
     fn rule(module: &ShopModule) -> ModuleRule {
         match module {
             ShopModule::Sells(_) | ShopModule::Buys(_) | ShopModule::Script(_) => {
@@ -200,9 +204,7 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("closed", &self.closed)]
-    }
+    crate::outputs!("closed" => closed);
     fn pauses(&self) -> bool {
         true
     }

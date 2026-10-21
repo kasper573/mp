@@ -10,7 +10,7 @@ pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, S
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
 pub use expr::{Expr, ExprKind};
 pub use may_do::MayDo;
-pub use node::{Assignment, Node, NodeKind, Target};
+pub use node::{Assignment, Exit, Node, NodeKind, Target};
 pub use run::{
     Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
     Owner, Pause, TraceStep,
@@ -45,6 +45,11 @@ impl Arrow {
 
     pub fn is_none(&self) -> bool {
         self.0.is_none()
+    }
+
+    /// Points the arrow at the node named `to`, or at nothing.
+    pub fn point(&mut self, to: Option<&str>) {
+        self.0 = to.map(str::to_owned);
     }
 }
 
@@ -172,6 +177,7 @@ pub trait EffectDef<V: Vocabulary> {
     }
     fn needs_subject(&self) -> bool;
     fn outputs(&self) -> Vec<(&'static str, &Arrow)>;
+    fn outputs_mut(&mut self) -> Vec<(&'static str, &mut Arrow)>;
     fn pauses(&self) -> bool {
         false
     }

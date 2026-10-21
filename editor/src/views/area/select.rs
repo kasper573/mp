@@ -628,9 +628,10 @@ pub(super) fn pasted(
             return None;
         }
     };
-    let open = match clip.from == bundle {
-        true => 0,
-        false => settle_holes(&mut read, &variables),
+    let open = if clip.from == bundle {
+        0
+    } else {
+        settle_holes(&mut read, &variables)
     };
     Some((read, open))
 }

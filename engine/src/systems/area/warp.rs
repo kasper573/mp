@@ -27,9 +27,7 @@ impl EffectDef<RiftScripting> for Warp {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

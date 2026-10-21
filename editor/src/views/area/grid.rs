@@ -327,20 +327,33 @@ impl GridDraft {
     }
 }
 
-/// The palette of every area and blueprint that has one, as its files read now, by its path.
-pub fn palettes(project: &Project) -> Vec<(String, Vec<PaletteRow>)> {
+/// The palette of an area or blueprint bundle, by the bundle's path.
+#[derive(Clone, Debug)]
+pub struct BundlePalette {
+    pub bundle: String,
+    pub rows: Vec<PaletteRow>,
+}
+
+/// The palette of every area and blueprint that has one, as its files read now.
+pub fn palettes(project: &Project) -> Vec<BundlePalette> {
     let reader = project.reader();
     let areas = reader.paths_of::<AreaDef>().iter().filter_map(|path| {
         let area = project.read::<AreaDef>(path).ok()?;
-        Some((path.clone(), area.blueprint.scene.grids.palette.clone()))
+        Some(BundlePalette {
+            bundle: path.clone(),
+            rows: area.blueprint.scene.grids.palette.clone(),
+        })
     });
     let blueprints = reader.paths_of::<BlueprintDef>().iter().filter_map(|path| {
         let blueprint = project.read::<BlueprintDef>(path).ok()?;
-        Some((path.clone(), blueprint.scene.grids.palette.clone()))
+        Some(BundlePalette {
+            bundle: path.clone(),
+            rows: blueprint.scene.grids.palette.clone(),
+        })
     });
     areas
         .chain(blueprints)
-        .filter(|(_, palette)| !palette.is_empty())
+        .filter(|palette| !palette.rows.is_empty())
         .collect()
 }
 

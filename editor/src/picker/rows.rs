@@ -1,14 +1,16 @@
 use engine::core::content::{ContentFile, fields_file, name_of, parent_of};
+use engine::field;
 use engine::systems::actor::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::attention::AttentionDef;
-use engine::systems::class::ClassDef;
+use engine::systems::class::{ClassDef, SkillNode};
 use engine::systems::interface::{CursorDef, InterfaceIconDef};
 use engine::systems::item::ItemDef;
 use engine::systems::npc::{self, NpcDef};
 use engine::systems::quest::QuestDef;
+use engine::systems::registry;
 use engine::systems::script::{RiftScripts, RunnerKind, ScriptDef};
 use engine::systems::skill::SkillDef;
 
@@ -17,7 +19,6 @@ use crate::forms::{FormAction, FormCx};
 use crate::icons::{self, KindIcon};
 use crate::tabs::file_title;
 use crate::tabs::shown_path;
-use crate::value::RowValue;
 
 const PICTURE_TABLES: [&str; 6] = [
     ModelDef::TABLE,
@@ -115,7 +116,7 @@ impl PickSource for RowSource {
                 listed.push(Candidate {
                     pick: Pick::new(table.as_str(), key),
                     category,
-                    name: display_name(cx, key),
+                    name: display_name(cx, table, key),
                     hint: format!("{from_here} · {}", pick_hint(cx, table, key)),
                     blocked: blocked(cx, table, &self.path, key),
                     nearness,
@@ -202,17 +203,19 @@ fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
             let owner = script_runner(cx, key);
             (runner_kind(&owner) != kind).then(|| format!("runs on {owner}"))
         }
-        SkillDef::TABLE if path.ends_with("/basic_attack") => {
-            let row = cx.files.json(&fields_file(key))?;
-            (row["basic_attack"] != true).then(|| "not flagged as a basic attack".to_owned())
+        SkillDef::TABLE if path.ends_with(field!(NpcDef, basic_attack)) => {
+            let skill = cx.project.read::<SkillDef>(key).ok()?;
+            (!skill.basic_attack).then(|| "not flagged as a basic attack".to_owned())
         }
         SkillDef::TABLE if cx.row_table.as_deref() == Some(ClassDef::TABLE) => {
-            let node = path.strip_prefix("/tree/")?.strip_suffix("/skill")?;
-            let class = cx.files.json(&fields_file(cx.row_key.as_deref()?))?;
-            let (holder, _) = class["tree"]
-                .as_object()?
-                .iter()
-                .find(|(other, held)| *other != node && held["skill"] == key)?;
+            let node = path
+                .strip_prefix(&format!("{}/", field!(ClassDef, tree)))?
+                .strip_suffix(field!(SkillNode, skill))?;
+            let class = cx.project.read::<ClassDef>(cx.row_key.as_deref()?).ok()?;
+            let reader = cx.project.reader();
+            let (holder, _) = class.tree.0.iter().find(|(other, held)| {
+                other.as_str() != node && reader.path_of(held.skill) == Some(key)
+            })?;
             Some(format!("already the node {holder}"))
         }
         NpcDef::TABLE
@@ -237,10 +240,10 @@ fn runner_kind(owner: &str) -> RunnerKind {
 }
 
 fn script_runner(cx: &FormCx, key: &str) -> String {
-    cx.files
-        .json(&fields_file(key))
-        .map(|row| row.text("runs_on").to_owned())
-        .unwrap_or_default()
+    cx.project.read::<ScriptDef>(key).map_or_else(
+        |_| String::new(),
+        |script| <&str>::from(script.runs_on).to_owned(),
+    )
 }
 
 fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
@@ -285,12 +288,9 @@ fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
     }
 }
 
-fn display_name(cx: &FormCx, key: &str) -> String {
-    let Some(row) = cx.files.json(&fields_file(key)) else {
-        return String::new();
-    };
-    ["name", "title", "label"]
-        .iter()
-        .find_map(|field| row[field].as_str().map(str::to_owned))
+fn display_name(cx: &FormCx, table: &str, key: &str) -> String {
+    cx.files
+        .json(&fields_file(key))
+        .and_then(|row| registry().shown_name(table, &row))
         .unwrap_or_default()
 }

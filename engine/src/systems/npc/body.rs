@@ -410,9 +410,7 @@ impl EffectDef<RiftScripting> for Wander {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -441,13 +439,7 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            (Outcome::Arrived.name(), &self.arrived),
-            (Outcome::Blocked.name(), &self.blocked),
-            (Outcome::Interrupted.name(), &self.interrupted),
-        ]
-    }
+    crate::outputs!(Outcome::Arrived.name() => arrived, Outcome::Blocked.name() => blocked, Outcome::Interrupted.name() => interrupted);
     fn pauses(&self) -> bool {
         true
     }
@@ -498,13 +490,7 @@ impl EffectDef<RiftScripting> for Attack {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            (Outcome::Defeated.name(), &self.defeated),
-            (Outcome::Lost.name(), &self.lost),
-            (Outcome::Interrupted.name(), &self.interrupted),
-        ]
-    }
+    crate::outputs!(Outcome::Defeated.name() => defeated, Outcome::Lost.name() => lost, Outcome::Interrupted.name() => interrupted);
     fn pauses(&self) -> bool {
         true
     }
@@ -545,9 +531,7 @@ impl EffectDef<RiftScripting> for Stop {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         Ok(Box::new(move |world, _, cx| {
@@ -566,9 +550,7 @@ impl EffectDef<RiftScripting> for FaceToward {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

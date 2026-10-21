@@ -53,9 +53,7 @@ impl EffectDef<RiftScripting> for ResetSkills {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(ACCEPTED, &self.accepted), (DECLINED, &self.declined)]
-    }
+    crate::outputs!(ACCEPTED => accepted, DECLINED => declined);
     fn pauses(&self) -> bool {
         true
     }

@@ -88,9 +88,7 @@ impl SchemaShapes {
     }
 
     pub fn modules_of(&self, table: &str) -> Option<&Value> {
-        let shape = &self.tables.get(table)?.shape;
-        let items = shape.get("properties")?.get("modules")?.get("items")?;
-        Some(items)
+        modules_in(&self.tables.get(table)?.shape)
     }
 
     pub fn module_variants(&self, table: &str) -> Vec<SchemaVariant<'_>> {
@@ -215,6 +213,140 @@ pub fn number_shorthand(root: &Value, field: &Value, number: f64) -> Option<Stri
     }
 }
 
+/// What the entries of the field `schema` describes are, as its type says in a few words.
+pub fn usage(schema: &Value) -> Option<&str> {
+    schema.get("x-usage").and_then(Value::as_str)
+}
+
+/// Whether the objects `schema` describes hold no field but their tag.
+pub fn is_fieldless(schema: &Value) -> bool {
+    let tag = tag_of(schema).map(|(field, _)| field);
+    properties(schema)
+        .iter()
+        .all(|(name, _)| tag.as_deref() == Some(name.as_str()))
+}
+
+/// The schema of each module of the rows `shape` describes, if they hold modules.
+pub fn modules_in(shape: &Value) -> Option<&Value> {
+    shape.get("properties")?.get("modules")?.get("items")
+}
+
+/// The schema of an object with `properties`, of which those `required` must be present.
+pub fn object_of(properties: Map<String, Value>, required: Vec<String>) -> Value {
+    json!({ "type": "object", "properties": properties, "required": required })
+}
+
+/// The schema of the field `name` of the object `schema` describes.
+pub fn property<'a>(schema: &'a Value, name: &str) -> &'a Value {
+    static NONE: Value = Value::Null;
+    schema
+        .get("properties")
+        .and_then(|properties| properties.get(name))
+        .unwrap_or(&NONE)
+}
+
+/// A short line of each field of `value`, the object `shape` describes within `root`: what a
+/// folded card or a comparison shows of it.
+pub fn lines_of(root: &Value, shape: &Value, value: &Value) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for (name, field) in value.as_object().into_iter().flatten() {
+        if tag_of(shape).is_some_and(|(tag, _)| tag == *name) {
+            continue;
+        }
+        let field_shape = property(shape, name);
+        match field {
+            Value::Array(items) => {
+                let item_shape = match kind(root, non_null(root, field_shape)) {
+                    SchemaKind::Array(items) => resolve(root, items),
+                    _ => &Value::Null,
+                };
+                for item in items {
+                    match item.as_object() {
+                        Some(_) => lines.push(entry_cells(root, item_shape, item).join("  ")),
+                        None => lines.push(item.to_string()),
+                    }
+                }
+            }
+            Value::Object(_) => lines.push(format!("{name} …")),
+            other => lines.push(format!("{name} {}", cell(root, field_shape, other))),
+        }
+    }
+    lines.join("\n")
+}
+
+fn entry_cells(root: &Value, shape: &Value, entry: &Value) -> Vec<String> {
+    let fields = properties(settle(root, shape, entry));
+    if fields.is_empty() {
+        return entry
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(_, value)| cell(root, &Value::Null, value))
+            .collect();
+    }
+    fields
+        .into_iter()
+        .filter_map(|(name, field)| match entry.get(name.as_str()) {
+            Some(value) if !value.is_null() => Some(cell(root, field, value)),
+            _ if field.get("x-count").is_some() => field
+                .get("default")
+                .map(|default| cell(root, field, default)),
+            _ => field
+                .get("x-blank")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        })
+        .collect()
+}
+
+fn cell(root: &Value, field: &Value, value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Number(number) => {
+            let number = number.as_f64().unwrap_or(0.0);
+            if non_null(root, field)["x-unit"] == "%" {
+                format!("{number}%")
+            } else {
+                number.to_string()
+            }
+        }
+        other => other.to_string(),
+    }
+}
+
+/// A few words of the fields of `value`, the object `shape` describes within `root`: each text
+/// as it is, each number in its unit, each list by its length, and each object `object` can say.
+pub fn summary_of(
+    root: &Value,
+    shape: &Value,
+    value: &Value,
+    object: impl Fn(&Value) -> Option<String>,
+) -> String {
+    let mut parts = Vec::new();
+    for (name, field) in value.as_object().into_iter().flatten() {
+        if tag_of(shape).is_some_and(|(tag, _)| tag == *name) {
+            continue;
+        }
+        match field {
+            Value::String(text) => parts.push(text.clone()),
+            Value::Number(number) => {
+                let number = number.as_f64().unwrap_or(0.0);
+                parts.push(
+                    number_shorthand(root, property(shape, name), number)
+                        .unwrap_or_else(|| format!("{name} {number}")),
+                );
+            }
+            Value::Array(items) => parts.push(format!("{} {name}", items.len())),
+            Value::Object(_) => parts.extend(object(field)),
+            _ => {}
+        }
+        if parts.len() >= 3 {
+            break;
+        }
+    }
+    parts.join(" · ")
+}
+
 pub fn blank_meaning<'a>(schema: &'a Value, value: &Value) -> Vec<&'a str> {
     properties(schema)
         .into_iter()
@@ -307,6 +439,21 @@ fn collect_variants<'a>(
         variants.push(SchemaVariant { field, tag, schema });
     } else {
         plain.push(schema);
+    }
+}
+
+/// The tagged variants among the alternatives `schema` is, within `root`.
+pub fn tagged_variants<'a>(root: &'a Value, schema: &'a Value) -> Vec<SchemaVariant<'a>> {
+    match kind(root, schema) {
+        SchemaKind::Union(variants) => variants,
+        SchemaKind::Choice(alternatives) => alternatives
+            .into_iter()
+            .filter_map(|schema| {
+                let (field, tag) = tag_of(schema)?;
+                Some(SchemaVariant { field, tag, schema })
+            })
+            .collect(),
+        _ => Vec::new(),
     }
 }
 
@@ -418,6 +565,17 @@ pub fn description(schema: &Value) -> Option<&str> {
 /// The game system a node belongs to, as its definition declares it.
 pub fn system_of(schema: &Value) -> Option<&str> {
     schema.get("x-system")?.as_str()
+}
+
+/// Whether the output a field holds is the one taken when what its node does fails.
+pub fn fails(schema: &Value) -> bool {
+    schema.get("x-fails").and_then(Value::as_bool) == Some(true)
+}
+
+/// Whether the field holds an arrow to another node, or a list of them.
+pub fn leads_out(field: &Value) -> bool {
+    let is_arrow = |schema: &Value| marker(schema) == Some("x-arrow");
+    is_arrow(field) || field.get("items").is_some_and(is_arrow)
 }
 
 pub fn marker(schema: &Value) -> Option<&str> {

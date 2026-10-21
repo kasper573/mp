@@ -659,18 +659,24 @@ pub fn retarget(
 }
 
 fn value_carries(variable: &Variable, value: &VarValue) -> bool {
-    match (variable.ty, value) {
+    matches!(
+        (variable.ty, value),
         (VariableType::Integer, VarValue::Integer(_))
-        | (VariableType::Number, VarValue::Integer(_) | VarValue::Number(_))
-        | (VariableType::Boolean, VarValue::Boolean(_))
-        | (VariableType::Place, VarValue::Place(_))
-        | (VariableType::Condition, VarValue::Condition(_) | VarValue::Boolean(_)) => true,
-        (
-            VariableType::Text | VariableType::Name | VariableType::Row | VariableType::Audio,
-            VarValue::Str(_),
-        ) => true,
-        _ => false,
-    }
+            | (
+                VariableType::Number,
+                VarValue::Integer(_) | VarValue::Number(_)
+            )
+            | (VariableType::Boolean, VarValue::Boolean(_))
+            | (VariableType::Place, VarValue::Place(_))
+            | (
+                VariableType::Condition,
+                VarValue::Condition(_) | VarValue::Boolean(_)
+            )
+            | (
+                VariableType::Text | VariableType::Name | VariableType::Row | VariableType::Audio,
+                VarValue::Str(_),
+            )
+    )
 }
 
 /// Replaces a placement with a folder of the same label holding what it places, and paints what it

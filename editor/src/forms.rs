@@ -10,6 +10,7 @@ use engine::core::content::{
 };
 use engine::core::script::VariableType;
 use engine::systems::area::AreaDef;
+use engine::systems::script::Condition;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -242,9 +243,10 @@ pub fn of_type_without<T: JsonSchema + Serialize + DeserializeOwned + 'static>(
         .iter()
         .map(|pointer| pointer.trim_start_matches('/'))
         .collect();
-    let changed = match hidden.is_empty() {
-        true => value(ui, cx, shape, &mut json, path),
-        false => object_without(ui, cx, shape, &mut json, path, &hidden),
+    let changed = if hidden.is_empty() {
+        value(ui, cx, shape, &mut json, path)
+    } else {
+        object_without(ui, cx, shape, &mut json, path, &hidden)
     };
     cx.root = root;
     if !changed.is_some() {
@@ -469,8 +471,16 @@ fn plain(
             "x-place" => return place(ui, cx, schema, value, path),
             "x-color" => return color(ui, value, path),
             "x-face" => return face(ui, cx, value, path),
-            "x-span" => return spans::edit(ui, cx, value, path),
-            "x-condition" => return condition::edit(ui, cx, schema, value, path),
+            "x-span" => {
+                return as_type(ui, cx, value, path, |ui, cx, span| {
+                    spans::edit(ui, cx, span, path)
+                });
+            }
+            "x-condition" => {
+                return as_type(ui, cx, value, path, |ui, cx, typed| {
+                    condition::edit(ui, cx, typed, path)
+                });
+            }
             _ => {}
         }
     }
@@ -671,7 +681,7 @@ fn params_map(ui: &mut Ui, cx: &mut FormCx, at: ParamsMapField, parent: &mut Val
         ui.label(theme::faint(format!("pick {sibling} first")).size(12.5));
         return changed;
     };
-    let specs = vfx::params_of(cx.files, &table, &owner);
+    let specs = vfx::params_of(cx.project, &table, &owner);
     let value_schema = schema::resolve(cx.root, field)
         .get("additionalProperties")
         .unwrap_or(&Value::Null);
@@ -1018,7 +1028,9 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
     let mut changed = FormChange::default();
     let item_schema = schema::resolve(cx.root, items);
     if schema::marker(item_schema) == Some("x-span") {
-        return spans::line_field(ui, cx, value, path);
+        return as_type(ui, cx, value, path, |ui, cx, line| {
+            spans::line_field(ui, cx, line, path)
+        });
     }
     if let Some(options) = item_schema.get("enum").and_then(Value::as_array) {
         let list = value.as_array_mut().expect("array");
@@ -1351,6 +1363,173 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
     changed
 }
 
+/// A text edited as `text` edits one.
+pub fn text_of(ui: &mut Ui, cx: &mut FormCx, text: &mut String, path: &str) -> FormChange {
+    let mut json = Value::String(std::mem::take(text));
+    let changed = self::text(ui, cx, &mut json, path);
+    if let Value::String(typed) = json {
+        *text = typed;
+    }
+    changed
+}
+
+/// The fields of `typed`, the variant of `root` that `schema` is, as `object_without` draws them:
+/// a part of a type the schema of a wider type describes.
+pub fn variant_of_type<T: Serialize + DeserializeOwned>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    root: &'static Value,
+    schema: &Value,
+    typed: &mut T,
+    path: &str,
+    hidden: &[&str],
+) -> FormChange {
+    let reader = cx.project.reader();
+    let Ok(mut value) = reader.to_json(typed) else {
+        widgets::hint(ui, "does not write as the game reads it");
+        return FormChange::default();
+    };
+    let held = std::mem::replace(&mut cx.root, root);
+    let changed = object_without(ui, cx, schema, &mut value, path, hidden);
+    cx.root = held;
+    if !changed.is_some() {
+        return changed;
+    }
+    match reader.from_json::<T>(&value) {
+        Ok(read) => {
+            *typed = read;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(path.to_owned(), error);
+            FormChange::default()
+        }
+    }
+}
+
+/// The fields of `typed`, the variant of `root` that `schema` is, in a row as a sentence lays them
+/// out, its conditions edited by `condition`.
+pub fn inline_fields_of<T: Serialize + DeserializeOwned>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    root: &'static Value,
+    schema: &Value,
+    typed: &mut T,
+    path: &str,
+    condition: &mut dyn FnMut(&mut Ui, &mut FormCx, &mut Condition, &str) -> FormChange,
+) -> FormChange {
+    let reader = cx.project.reader();
+    let Ok(mut value) = reader.to_json(typed) else {
+        return FormChange::default();
+    };
+    let held = std::mem::replace(&mut cx.root, root);
+    let mut changed = FormChange::default();
+    let required = schema::required(schema);
+    for (name, field) in schema::properties(schema) {
+        if schema::tag_of(schema).is_some_and(|(tag, _)| tag == *name) {
+            continue;
+        }
+        let field_path = format!("{path}/{name}");
+        let resolved = schema::resolve(cx.root, field);
+        let optional = !required.contains(&name.as_str()) || schema::is_optional(field);
+        if value.get(name).is_none_or(Value::is_null) {
+            if optional {
+                continue;
+            }
+            let fresh = schema::template(cx.root, field, cx.nearby());
+            value[name] = fresh;
+        }
+        let child = &mut value[name];
+        if schema::marker(resolved) == Some("x-condition") {
+            ui.label(theme::muted(name).size(12.0));
+            changed |= as_type(ui, cx, child, &field_path, |ui, cx, nested| {
+                condition(ui, cx, nested, &field_path)
+            });
+            continue;
+        }
+        if schema::table_of(schema::non_null(cx.root, field)).is_none() {
+            ui.label(theme::muted(name).size(12.0));
+        }
+        ui.scope(|ui| {
+            ui.set_max_width(170.0);
+            changed |= self::value(ui, cx, field, child, &field_path);
+        });
+    }
+    cx.root = held;
+    if !changed.is_some() {
+        return changed;
+    }
+    match reader.from_json::<T>(&value) {
+        Ok(read) => {
+            *typed = read;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(path.to_owned(), error);
+            FormChange::default()
+        }
+    }
+}
+
+/// The file `value` edited as the `Row` it reads as, by an editor of a part of it: a row that
+/// doesn't read shows a hint instead, its form saying why.
+pub fn of_row<Row: Serialize + DeserializeOwned>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    value: &mut Value,
+    path: &str,
+    edit: impl FnOnce(&mut Ui, &mut FormCx, &mut Row) -> FormChange,
+) -> FormChange {
+    let reader = cx.project.reader();
+    let Ok(mut row) = reader.from_json::<Row>(value) else {
+        widgets::hint(ui, "shows once the row reads");
+        return FormChange::default();
+    };
+    let changed = edit(ui, cx, &mut row);
+    if !changed.is_some() {
+        return changed;
+    }
+    match reader.to_json(&row) {
+        Ok(json) => {
+            *value = json;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(path.to_owned(), error);
+            FormChange::default()
+        }
+    }
+}
+
+/// `value` edited as the `T` it reads as, by an editor of `T`'s own: where the form of a schema
+/// meets a type it doesn't walk. A value that doesn't read is edited as raw JSON.
+pub fn as_type<T: Serialize + DeserializeOwned>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    value: &mut Value,
+    path: &str,
+    edit: impl FnOnce(&mut Ui, &mut FormCx, &mut T) -> FormChange,
+) -> FormChange {
+    let reader = cx.project.reader();
+    let Ok(mut typed) = reader.from_json::<T>(value) else {
+        return raw_json(ui, cx, value, path);
+    };
+    let changed = edit(ui, cx, &mut typed);
+    if !changed.is_some() {
+        return changed;
+    }
+    match reader.to_json(&typed) {
+        Ok(json) => {
+            *value = json;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(path.to_owned(), error);
+            FormChange::default()
+        }
+    }
+}
+
 pub fn number(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -1360,6 +1539,28 @@ pub fn number(
     integer: bool,
 ) -> FormChange {
     number_field(ui, cx, schema, value, path, integer, None)
+}
+
+/// An amount of `unit`, edited as `number` edits one.
+pub fn quantity(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    amount: &mut f32,
+    unit: Option<&str>,
+    path: &str,
+) -> FormChange {
+    let schema = match unit {
+        Some(unit) => serde_json::json!({ "type": "number", "x-unit": unit }),
+        None => serde_json::json!({ "type": "number" }),
+    };
+    let Ok(mut json) = value::json(amount) else {
+        return FormChange::default();
+    };
+    let changed = number(ui, cx, &schema, &mut json, path, false);
+    if let Some(typed) = json.as_f64() {
+        *amount = typed as f32;
+    }
+    changed
 }
 
 fn number_field(

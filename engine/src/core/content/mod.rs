@@ -32,7 +32,7 @@ pub use load::{
 pub use reader::{FolderReader, Unreadable, WrittenFiles};
 pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport, MISSING_FILE};
 pub use table::{
-    AnyTable, Content, ContentBuilder, ContentFile, ContentNames, ModuleRule, ModuleSet,
+    AnyTable, Content, ContentBuilder, ContentFile, ContentNames, MODULES, ModuleRule, ModuleSet,
     NamedContent, Table,
 };
 pub use version::ContentVersion;

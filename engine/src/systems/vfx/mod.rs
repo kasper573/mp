@@ -175,9 +175,7 @@ impl EffectDef<RiftScripting> for PlayVfx {
     fn needs_subject(&self) -> bool {
         self.on.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

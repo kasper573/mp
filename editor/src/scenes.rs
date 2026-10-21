@@ -73,9 +73,10 @@ pub enum SceneStep {
     },
     Script(String),
     Node(Vec<String>),
+    /// Links the output of `from` labelled `output` to `to`.
     Connect {
         from: String,
-        field: String,
+        output: String,
         to: String,
     },
     Bottom(BottomTab),
@@ -344,11 +345,11 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
                 editor.select(RowSelection::parts(ScriptDef::TABLE, &script.key, parts));
             }
         }
-        SceneStep::Connect { from, field, to } => set_pending(
+        SceneStep::Connect { from, output, to } => set_pending(
             editor,
             PendingScriptAction::Connect {
                 from: from.clone(),
-                field: format!("/{field}"),
+                output: output.clone(),
                 to: to.clone(),
             },
         ),

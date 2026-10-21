@@ -130,7 +130,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
             match &mut dialog.source {
                 NewGameSource::Template(picked) => {
                     ui.horizontal_top(|ui| {
-                        template_cards(ui, picked, &templates);
+                        template_cards(ui, picked, templates);
                         ui.add_space(20.0);
                         if let Some(template) = templates.iter().find(|t| t.key == *picked) {
                             template_summary(ui, editor, template);
@@ -863,17 +863,26 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
 fn confirmed(editor: &mut Editor, action: ConfirmAction) {
     match action {
         ConfirmAction::ReplaceModule {
-            table: _,
+            table,
             key,
             index,
             module,
         } => {
-            if let Some(mut value) = editor.row_value(&key) {
-                value["modules"][index] = module;
-                let mut edit =
-                    ContentEdit::new(format!("Replace module {index} of {}", shown_path(&key)));
-                edit.write_json(fields_file(&key), &value);
-                editor.apply(edit);
+            let (Some(value), Some(reader)) = (editor.row_value(&key), editor.reader()) else {
+                return;
+            };
+            let replaced = reader.modules_in(&table, &value).and_then(|mut modules| {
+                *modules.get_mut(index).ok_or("the module is gone")? = module;
+                reader.with_modules_in(&table, &value, &modules)
+            });
+            match replaced {
+                Ok(value) => {
+                    let mut edit =
+                        ContentEdit::new(format!("Replace module {index} of {}", shown_path(&key)));
+                    edit.write_json(fields_file(&key), &value);
+                    editor.apply(edit);
+                }
+                Err(error) => editor.toast(error),
             }
         }
         ConfirmAction::DeleteScriptNodes { script, names } => {

@@ -11,9 +11,7 @@ use design_tokens::glyph::{self, Mark};
 use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::math::Pos;
-use engine::core::script::{
-    FlowSteering, NodeKind, Pause, RunnerKindDef, Value as ScriptValue, ValueType,
-};
+use engine::core::script::{FlowSteering, Pause, RunnerKindDef, Value as ScriptValue, ValueType};
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
@@ -31,8 +29,8 @@ use engine::systems::quest::{
     ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
 };
 use engine::systems::script::{
-    EventKind, FlowKey, FlowTrace, Owner, Place, Reach, RiftInstances, RiftScripts, RunnerKind,
-    TraceStep,
+    EventKind, FlowKey, FlowTrace, Node, Owner, Place, Reach, RiftInstances, RiftScripts,
+    RunnerKind, TraceStep,
 };
 use engine::systems::{self, GameSettings, TICK_HZ};
 use strum::VariantArray;
@@ -43,7 +41,7 @@ use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
-use crate::project::{ProjectFiles, RowSelection, catalogue_of};
+use crate::project::{ProjectFiles, RowSelection};
 use crate::stage::live;
 use crate::tabs::EditorTab;
 use crate::tabs::shown_path;
@@ -137,7 +135,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let events: Vec<String> = doc
         .nodes()
         .values()
-        .filter_map(nodes::event_of)
+        .filter_map(nodes::event_name)
         .map(str::to_owned)
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -148,8 +146,10 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let randoms: Vec<(String, usize)> = doc
         .nodes()
         .iter()
-        .filter(|(_, node)| nodes::kind_of(node) == NodeKind::Random)
-        .map(|(name, node)| (name.clone(), node["weights"].as_array().map_or(0, Vec::len)))
+        .filter_map(|(name, node)| match node {
+            Node::Random { weights, .. } => Some((name.clone(), weights.len())),
+            _ => None,
+        })
         .collect();
     let characters: Vec<(String, String)> = editor
         .project
@@ -344,15 +344,18 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             editor.views.script.run = Some(run);
         }
     }
-    let cards: Vec<NodeCard> = doc
-        .nodes()
-        .iter()
-        .map(|(name, node)| NodeCard {
-            name: name.clone(),
-            title: super::graph::card_title(name, node),
-            detail: nodes::summary(node, catalogue_of(editor.project.as_ref())),
-        })
-        .collect();
+    let cards: Vec<NodeCard> = match editor.project.as_ref() {
+        Some(project) => doc
+            .nodes()
+            .iter()
+            .map(|(name, node)| NodeCard {
+                name: name.clone(),
+                title: super::graph::card_title(name, node),
+                detail: nodes::summary(node, &doc.text(project)),
+            })
+            .collect(),
+        None => Vec::new(),
+    };
     let owner_label = bound
         .get(setup.owner)
         .or(bound.first())
@@ -596,8 +599,8 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
         .or(bound.first())
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
-    let read_memories = NodeReads::of(&content, doc.nodes()).memories;
-    let state_names = inspect::names_of(&doc.script["state"]);
+    let read_memories = NodeReads::of(&doc.reader, doc.nodes()).memories;
+    let state_names = inspect::names_of(&doc.script.state);
     let mut open: Option<EditorTab> = None;
     let Some(run) = editor.views.script.run_of_mut(&row_key) else {
         return false;
@@ -1036,16 +1039,12 @@ fn set_quest_standing(
 fn branch_taken(doc: &ScriptDoc, node: &str, next: Option<&RunLogLine>) -> Option<String> {
     let next = next?.node()?;
     let source = doc.nodes().get(node)?;
-    match nodes::kind_of(source) {
-        NodeKind::If => ["yes", "no"]
+    match source {
+        Node::If { .. } | Node::Random { .. } => source
+            .exits()
             .into_iter()
-            .find(|arrow| source[arrow].as_str() == Some(next))
-            .map(str::to_owned),
-        NodeKind::Random => source["outputs"]
-            .as_array()?
-            .iter()
-            .position(|arrow| arrow.as_str() == Some(next))
-            .map(|index| format!("output {}", index + 1)),
+            .find(|(_, arrow)| arrow.to() == Some(next))
+            .map(|(exit, _)| nodes::exit_label(exit)),
         _ => None,
     }
 }

@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use design_tokens::controls;
 use egui::{RichText, Ui};
-use engine::core::content::{ModuleRule, fields_file};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{MODULES, ModuleRule, fields_file};
 use engine::systems::registry;
 use engine::systems::script::ScriptModule;
 use serde_json::Value;
@@ -12,7 +13,6 @@ use crate::app::Editor;
 use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection};
 use crate::schema::{self, SchemaKind};
-use crate::value::RowValue;
 
 pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection, wide: bool) {
     let table = selection.table.clone();
@@ -21,8 +21,21 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
         .iter()
         .filter_map(|key| editor.row_value(key).map(|value| (key.clone(), value)))
         .collect();
+    let Some(reader) = editor.reader() else {
+        return;
+    };
+    let modules: Vec<(String, Vec<Value>)> = values
+        .iter()
+        .filter_map(|(key, value)| Some((key.clone(), reader.modules_in(&table, value).ok()?)))
+        .collect();
+    let unread: Vec<&str> = values
+        .iter()
+        .map(|(key, _)| key.as_str())
+        .filter(|key| modules.iter().all(|(read, _)| read != key))
+        .collect();
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(&table);
+    let mut module_edits: Vec<(String, Vec<Value>)> = Vec::new();
     let mut edits: Vec<(String, Value)> = Vec::new();
     let mut actions = Vec::new();
     let mut add_to_all: Option<Value> = None;
@@ -63,7 +76,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                     edits,
                 };
                 for (name, field) in schema::properties(root) {
-                    if name == "modules" {
+                    if name == MODULES {
                         continue;
                     }
                     let resolved = schema::resolve(cx.root, field);
@@ -83,22 +96,17 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
         };
         let modules_part = |ui: &mut Ui,
                             cx: &mut FormCx,
-                            edits: &mut Vec<(String, Value)>,
+                            module_edits: &mut Vec<(String, Vec<Value>)>,
                             add_to_all: &mut Option<Value>,
                             status: &mut Option<String>| {
             let variants = cx.shapes.module_variants(&table);
-            let tags = |value: &Value| -> Vec<String> {
-                value["modules"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|m| m["type"].as_str().map(str::to_owned))
-                    .collect()
+            let tags = |list: &[Value]| -> Vec<String> {
+                list.iter().filter_map(TypeTag::of_json).collect()
             };
             let mut all: Option<Vec<String>> = None;
             let mut some: Vec<String> = Vec::new();
-            for (_, value) in &values {
-                let mine = tags(value);
+            for (_, list) in &modules {
+                let mine = tags(list);
                 for tag in &mine {
                     if !some.contains(tag) {
                         some.push(tag.clone());
@@ -110,16 +118,21 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                 });
             }
             let all = all.unwrap_or_default();
-            widgets::section(ui, &format!("Modules in all {}", values.len()));
+            widgets::section(ui, &format!("Modules in all {}", modules.len()));
+            if !unread.is_empty() {
+                widgets::hint(
+                    ui,
+                    &format!("the modules of {} show once they read", unread.join(", ")),
+                );
+            }
             for tag in &all {
-                let firsts: Vec<(String, usize, Value)> = values
+                let firsts: Vec<(&String, usize, &Value)> = modules
                     .iter()
-                    .filter_map(|(key, value)| {
-                        value["modules"].as_array().and_then(|list| {
-                            list.iter()
-                                .position(|m| m.kind() == tag)
-                                .map(|index| (key.clone(), index, list[index].clone()))
-                        })
+                    .filter_map(|(key, list)| {
+                        let index = list
+                            .iter()
+                            .position(|m| TypeTag::of_json(m).as_ref() == Some(tag))?;
+                        Some((key, index, &list[index]))
                     })
                     .collect();
                 let agree = firsts.iter().all(|(_, _, module)| *module == firsts[0].2);
@@ -129,7 +142,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                     ui.add_space(4.0);
                     if agree {
                         let mut shared = firsts[0].2.clone();
-                        let path = format!("/modules/{tag}");
+                        let path = format!("/{MODULES}/{tag}");
                         let changed = match schema::variant_of(&variants, &shared) {
                             Some(variant) => forms::object_without(
                                 ui,
@@ -137,26 +150,29 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                                 variant.schema,
                                 &mut shared,
                                 &path,
-                                &["nodes"],
+                                &[],
                             ),
                             None => forms::raw_json(ui, cx, &mut shared, &path),
                         };
                         if changed.is_some() {
                             for (key, index, _) in &firsts {
-                                if let Some((_, value)) = values.iter().find(|(k, _)| k == key) {
-                                    let mut next = value.clone();
-                                    next["modules"][*index] = shared.clone();
-                                    edits.push((key.clone(), next));
+                                if let Some((_, list)) = modules.iter().find(|(k, _)| k == *key) {
+                                    let mut next = list.clone();
+                                    next[*index] = shared.clone();
+                                    module_edits.push(((*key).clone(), next));
                                 }
                             }
                         }
                     } else if tag == ScriptModule::TAG {
+                        let reader = cx.project.reader();
                         let mut by_script: BTreeMap<String, Vec<String>> = BTreeMap::new();
                         for (key, _, module) in &firsts {
-                            by_script
-                                .entry(module.text_or("script", "?").to_owned())
-                                .or_default()
-                                .push(key.clone());
+                            let script = reader
+                                .from_json::<ScriptModule>(module)
+                                .ok()
+                                .and_then(|module| reader.path_of(module.script).map(str::to_owned))
+                                .unwrap_or_else(|| "?".to_owned());
+                            by_script.entry(script).or_default().push((*key).clone());
                         }
                         widgets::kv(ui, "script", |ui| {
                             ui.label(theme::muted(format!("{} values", by_script.len())).italics());
@@ -185,22 +201,21 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
             } else {
                 ui.horizontal_wrapped(|ui| {
                     for tag in only_some {
-                        let holders = values
+                        let holders = modules
                             .iter()
-                            .filter(|(_, value)| tags(value).contains(tag))
+                            .filter(|(_, list)| tags(list).contains(tag))
                             .count();
-                        widgets::chip(ui, &format!("{tag} · {holders} of {}", values.len()));
+                        widgets::chip(ui, format!("{tag} · {holders} of {}", modules.len()));
                     }
                 });
             }
             ui.add_space(6.0);
-            let button = controls::dropdown(ui, format!("+ Add module to all {}", values.len()));
+            let button = controls::dropdown(ui, format!("+ Add module to all {}", modules.len()));
             egui::Popup::from_toggle_button_response(&button)
                 .id(ui.id().with("add-all"))
                 .width(330.0)
                 .show(|ui| {
-                    if let Some(template) =
-                        add_module_popup(ui, cx, &table, &variants, &[], false, status)
+                    if let Some(template) = add_module_popup(ui, cx, &table, &variants, &[], status)
                     {
                         *add_to_all = Some(template);
                         ui.close();
@@ -216,13 +231,13 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                 ui.add_space(16.0);
                 ui.vertical(|ui| {
                     ui.set_width(ui.available_width().min(420.0));
-                    modules_part(ui, &mut cx, &mut edits, &mut add_to_all, &mut status);
+                    modules_part(ui, &mut cx, &mut module_edits, &mut add_to_all, &mut status);
                 });
             });
         } else {
             shared_card(ui, &mut cx, &mut edits);
             ui.add_space(8.0);
-            modules_part(ui, &mut cx, &mut edits, &mut add_to_all, &mut status);
+            modules_part(ui, &mut cx, &mut module_edits, &mut add_to_all, &mut status);
         }
     }
     editor
@@ -235,29 +250,31 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
         .push("an edit applies to every selected row".to_owned());
     if let Some(template) = add_to_all {
         let registry = registry();
-        let tag = template.kind_or("module").to_owned();
+        let tag = TypeTag::of_json(&template).unwrap_or_default();
         let mut skipped: Vec<String> = Vec::new();
-        for (key, value) in &values {
-            let modules = value["modules"].as_array().map_or(&[][..], Vec::as_slice);
-            if !registry.takes_module(&table, modules, &template) {
+        for (key, list) in &modules {
+            if !registry.takes_module(&table, list, &template) {
                 skipped.push(key.clone());
                 continue;
             }
-            let mut next = value.clone();
-            if !next["modules"].is_array() {
-                next["modules"] = Value::Array(Vec::new());
-            }
-            next["modules"]
-                .as_array_mut()
-                .expect("modules")
-                .push(template.clone());
-            edits.push((key.clone(), next));
+            let mut next = list.clone();
+            next.push(template.clone());
+            module_edits.push((key.clone(), next));
         }
         if !skipped.is_empty() {
             editor.toast(format!(
                 "{tag} skipped on {}: already there, at most one",
                 skipped.join(", ")
             ));
+        }
+    }
+    for (key, list) in module_edits {
+        let Some((_, value)) = values.iter().find(|(held, _)| *held == key) else {
+            continue;
+        };
+        match reader.with_modules_in(&table, value, &list) {
+            Ok(next) => edits.push((key, next)),
+            Err(error) => editor.toast(format!("{key}: {error}")),
         }
     }
     if !edits.is_empty() {
@@ -367,7 +384,7 @@ pub(super) fn shared_field(
 }
 
 pub(super) fn fieldless_note(variant: &Value) -> String {
-    match variant["description"].as_str() {
+    match schema::description(variant) {
         Some(description) => format!("No fields. {description}"),
         None => "No fields: having it is the setting.".to_owned(),
     }
@@ -377,16 +394,15 @@ pub(super) fn free_singles(
     cx: &FormCx,
     table: &str,
     variants: &[schema::SchemaVariant],
-    value: &Value,
+    list: &[Value],
 ) -> Vec<String> {
     let registry = registry();
-    let list = value["modules"].as_array().cloned().unwrap_or_default();
     variants
         .iter()
         .filter(|variant| {
             let template = schema::variant_template(cx.root, variant, cx.nearby());
             registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne)
-                && registry.takes_module(table, &list, &template)
+                && registry.takes_module(table, list, &template)
         })
         .map(|variant| variant.tag.replace('_', " "))
         .collect()

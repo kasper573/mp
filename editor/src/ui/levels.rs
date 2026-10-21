@@ -1,7 +1,11 @@
+use std::collections::BTreeMap;
+
 use design_tokens::glyph::{self, Mark};
 use egui::Ui;
+use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::{Map, Value};
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 use strum::VariantArray;
 
 use crate::forms::{self, FormChange, FormCx};
@@ -10,42 +14,58 @@ use crate::ui::{theme, widgets};
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
 
-/// How a row that grows by levels edits them: a class by its levels, a skill by its ranks. Each
-/// level holds whole-number fields, and the stats of kind `S` it adds.
-pub struct LevelCards<S: 'static> {
+/// A step of a row that grows by levels: a class's level, a skill's rank. The form of its type
+/// edits its fields, and the cards the stats of kind `Stat` it adds.
+pub trait Level: JsonSchema + Serialize + DeserializeOwned + 'static {
+    type Stat: VariantArray + Serialize + Copy + Ord;
     /// What one level is called, capitalized.
-    pub name: &'static str,
-    /// Each field a level holds, with the value a level lacking it shows.
-    pub fields: &'static [(&'static str, u64)],
-    /// The level added after the last one.
-    pub next: fn(last: Option<&Value>) -> Value,
-    pub unit: fn(S) -> Option<&'static str>,
+    const NAME: &'static str;
+    /// Where its stats are within it.
+    const STATS: &'static str;
+    fn stats(&mut self) -> &mut BTreeMap<Self::Stat, f32>;
+    fn unit(stat: Self::Stat) -> Option<&'static str>;
+    /// The level added after `last`.
+    fn next(last: Option<&Self>) -> Self;
 }
 
-/// The cards of a row's `levels`, each with a `note` beside its title, which sees every level in
-/// turn.
-pub fn cards<S>(
+/// The cards of the levels of the row `value` read as its type, which `levels` finds at `path` in
+/// it, each with a `note` beside its title, which sees every level in turn.
+pub fn row_cards<Row: Serialize + DeserializeOwned, L: Level>(
     ui: &mut Ui,
     cx: &mut FormCx,
     value: &mut Value,
-    look: &LevelCards<S>,
-    mut note: impl FnMut(usize, &Value) -> Option<String>,
-) -> FormChange
-where
-    S: VariantArray + Serialize + Copy + PartialEq,
-{
+    path: &str,
+    levels: fn(&mut Row) -> &mut Vec<L>,
+    note: impl FnMut(usize, &L) -> Option<String>,
+) -> FormChange {
+    forms::of_row(ui, cx, value, path, |ui, cx, row: &mut Row| {
+        cards(ui, cx, levels(row), path, note)
+    })
+}
+
+fn cards<L: Level>(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    levels: &mut Vec<L>,
+    path: &str,
+    mut note: impl FnMut(usize, &L) -> Option<String>,
+) -> FormChange {
     let mut changed = FormChange::default();
-    if !value["levels"].is_array() {
-        value["levels"] = Value::Array(Vec::new());
-    }
-    let levels = value["levels"].as_array_mut().expect("array");
-    let noun = look.name.to_lowercase();
+    let noun = L::NAME.to_lowercase();
     widgets::section_count(ui, &format!("{noun}s"), levels.len());
     let mut remove = None;
     for (index, level) in levels.iter_mut().enumerate() {
         let note = note(index, level);
         ui.push_id(index, |ui| {
-            if card(ui, cx, look, index, note, level, &mut changed) {
+            if card(
+                ui,
+                cx,
+                &format!("{path}/{index}"),
+                index,
+                note,
+                level,
+                &mut changed,
+            ) {
                 remove = Some(index);
             }
         });
@@ -53,39 +73,35 @@ where
     }
     if let Some(index) = remove {
         levels.remove(index);
-        changed = FormChange::at("/levels");
+        changed = FormChange::at(path);
     }
     if ui.button(format!("+ {noun}")).clicked() {
-        levels.push((look.next)(levels.last()));
-        changed = FormChange::at("/levels");
+        levels.push(L::next(levels.last()));
+        changed = FormChange::at(path);
     }
     changed
 }
 
-fn card<S>(
+fn card<L: Level>(
     ui: &mut Ui,
     cx: &mut FormCx,
-    look: &LevelCards<S>,
+    path: &str,
     index: usize,
     note: Option<String>,
-    level: &mut Value,
+    level: &mut L,
     changed: &mut FormChange,
-) -> bool
-where
-    S: VariantArray + Serialize + Copy + PartialEq,
-{
-    let path = format!("/levels/{index}");
+) -> bool {
     let mut removed = false;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            ui.label(theme::strong(format!("{} {}", look.name, index + 1)));
+            ui.label(theme::strong(format!("{} {}", L::NAME, index + 1)));
             if let Some(note) = note {
                 ui.label(theme::muted(note).size(12.0));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
-                    .on_hover_text(format!("Remove this {}", look.name.to_lowercase()))
+                    .on_hover_text(format!("Remove this {}", L::NAME.to_lowercase()))
                     .clicked()
                 {
                     removed = true;
@@ -93,88 +109,50 @@ where
             });
         });
         ui.add_space(4.0);
-        for &(field, fallback) in look.fields {
-            field_row(ui, &field.replace('_', " "), |ui| {
-                let schema = serde_json::json!({ "type": "integer", "minimum": 0 });
-                if !level[field].is_number() {
-                    level[field] = Value::from(fallback);
-                }
-                *changed |= forms::number(
-                    ui,
-                    cx,
-                    &schema,
-                    &mut level[field],
-                    &format!("{path}/{field}"),
-                    true,
-                );
-            });
-        }
+        *changed |= forms::of_type_without(ui, cx, level, path, &[L::STATS]);
         widgets::section(ui, "stats");
-        *changed |= stats(ui, cx, look, index, &path, level);
+        *changed |= stats(ui, cx, &format!("{path}{}", L::STATS), index, level);
     });
     removed
 }
 
-fn stats<S>(
+fn stats<L: Level>(
     ui: &mut Ui,
     cx: &mut FormCx,
-    look: &LevelCards<S>,
-    index: usize,
     path: &str,
-    level: &mut Value,
-) -> FormChange
-where
-    S: VariantArray + Serialize + Copy + PartialEq,
-{
+    index: usize,
+    level: &mut L,
+) -> FormChange {
     let mut changed = FormChange::default();
-    if !level["stats"].is_object() {
-        level["stats"] = Value::Object(Map::new());
-    }
+    let stats = level.stats();
     let mut unset = None;
-    let present: Vec<S> = S::VARIANTS
-        .iter()
-        .copied()
-        .filter(|stat| level["stats"].get(stat_key(*stat)).is_some())
-        .collect();
-    for &stat in &present {
+    for (&stat, amount) in stats.iter_mut() {
         let key = stat_key(stat);
-        let stat_path = format!("{path}/stats/{key}");
         field_row(ui, &key, |ui| {
-            let schema = match (look.unit)(stat) {
-                Some(unit) => serde_json::json!({ "type": "number", "x-unit": unit }),
-                None => serde_json::json!({ "type": "number" }),
-            };
-            changed |= forms::number(
-                ui,
-                cx,
-                &schema,
-                &mut level["stats"][&key],
-                &stat_path,
-                false,
-            );
+            changed |= forms::quantity(ui, cx, amount, L::unit(stat), &format!("{path}/{key}"));
             if glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
                 .on_hover_text(format!("Unset {key}"))
                 .clicked()
             {
-                unset = Some(key.clone());
+                unset = Some(stat);
             }
         });
     }
-    if present.is_empty() {
-        let noun = look.name.to_lowercase();
+    if stats.is_empty() {
+        let noun = L::NAME.to_lowercase();
         ui.label(theme::faint(format!("nothing changes at this {noun}")).size(12.5));
     }
-    if let Some(key) = unset {
-        level["stats"].as_object_mut().expect("object").remove(&key);
-        changed = FormChange::at(&format!("{path}/stats"));
+    if let Some(stat) = unset {
+        stats.remove(&stat);
+        changed = FormChange::at(path);
     }
-    let missing: Vec<S> = S::VARIANTS
+    let missing: Vec<L::Stat> = L::Stat::VARIANTS
         .iter()
         .copied()
-        .filter(|stat| !present.contains(stat))
+        .filter(|stat| !stats.contains_key(stat))
         .collect();
     if !missing.is_empty() {
-        let mut picked: Option<S> = None;
+        let mut picked: Option<L::Stat> = None;
         widgets::combo(("add-stat", index))
             .selected_text(theme::muted("+ stat"))
             .width(INPUT)
@@ -184,8 +162,8 @@ where
                 }
             });
         if let Some(stat) = picked {
-            level["stats"][stat_key(stat)] = Value::from(0.0);
-            changed = FormChange::at(&format!("{path}/stats"));
+            stats.insert(stat, 0.0);
+            changed = FormChange::at(path);
         }
     }
     changed

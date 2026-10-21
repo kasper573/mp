@@ -242,9 +242,7 @@ impl EffectDef<RiftScripting> for UseSkill {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next), (REFUSED, &self.refused)]
-    }
+    crate::outputs!(NEXT => next, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

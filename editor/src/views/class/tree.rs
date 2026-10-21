@@ -1,24 +1,24 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use design_tokens::{glyph, ink};
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
-use engine::core::assets::AssetKind;
-use engine::core::content::{Content, ContentFile};
+use engine::core::assets::{AssetKind, ImageRef};
+use engine::core::content::ContentFile;
 use engine::systems::class::{
-    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, ClassLevel, NodeKey,
-    SkillNode, SkillTree, TreeBackdrop,
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, ClassDef, NodeKey, SkillNode,
+    SkillTree, TreeBackdrop,
 };
 use engine::systems::skill::{Rank, SkillDef};
-use serde_json::{Map, Value, json};
 use strum::VariantArray;
 
 use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
+use crate::project::Project;
 use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
-use crate::value::{self, RowValue};
-use crate::{picker, rows, thumbs};
+use crate::{picker, rows, thumbs, views};
 
 pub const NODE_RADIUS: f32 = 24.0;
 const ICON: f32 = 28.0;
@@ -57,45 +57,68 @@ pub struct NodeDrag {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CarriedNode(pub NodeKey);
 
-/// The row's tree as far as it parses against the content last loaded, node by node, so a node
-/// being worked on leaves the others on the canvas.
-pub fn tree_of(content: &Content, row: &Value) -> SkillTree {
-    SkillTree(
-        row["tree"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .filter_map(|(key, node)| {
-                let node: SkillNode = value::typed(content, node.clone())?;
-                Some((NodeKey::from(key.as_str()), node))
-            })
-            .collect(),
-    )
+/// What the canvas shows of a node's skill, read from the files before the tree is drawn.
+pub struct NodeSkill {
+    pub def: Option<Arc<SkillDef>>,
+    pub path: String,
+    pub needs: Vec<String>,
 }
 
-pub fn backdrop_of(content: &Content, row: &Value) -> Option<TreeBackdrop> {
-    value::typed(content, row["backdrop"].clone())
+impl NodeSkill {
+    pub fn name(&self) -> &str {
+        self.def
+            .as_ref()
+            .map_or_else(|| shown_path(&self.path), |def| &def.name)
+    }
+
+    pub fn ranks(&self) -> u8 {
+        self.def.as_ref().map_or(1, |def| def.rank_count())
+    }
+
+    fn full_cost(&self) -> u32 {
+        self.def
+            .as_ref()
+            .map_or(0, |def| def.cost_to(Rank(def.rank_count())).0)
+    }
+}
+
+pub fn node_skills(project: &Project, tree: &SkillTree) -> BTreeMap<NodeKey, NodeSkill> {
+    let reader = project.reader();
+    tree.0
+        .iter()
+        .map(|(key, node)| {
+            let shown = NodeSkill {
+                def: project.read_id(node.skill),
+                path: reader.path_of(node.skill).unwrap_or_default().to_owned(),
+                needs: node
+                    .requires
+                    .iter()
+                    .map(|requirement| requirement.describe(project, tree))
+                    .collect(),
+            };
+            (key.clone(), shown)
+        })
+        .collect()
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(mut row) = editor.row_value(key) else {
+    let Some(read) = views::read_shown::<ClassDef>(editor, ui, key) else {
         return;
     };
-    let Some(content) = editor.loaded() else {
-        ui.label(theme::muted("waiting for the content to load"));
+    let Some(project) = &editor.project else {
         return;
     };
-    let tree = tree_of(&content, &row);
-    let backdrop = backdrop_of(&content, &row);
+    let mut class = (*read).clone();
+    let tree = read.tree.clone();
+    let skills = node_skills(project, &tree);
     let mut changed: Option<&str> = None;
-    toolbar(editor, ui, key, &content, &mut row, &tree, &mut changed);
+    toolbar(editor, ui, key, &mut class, &skills, &mut changed);
     backdrop_bar(
         editor,
         ui,
         key,
-        &mut row,
-        &tree,
-        backdrop.as_ref(),
+        &mut class,
+        read.backdrop.as_ref(),
         &mut changed,
     );
     ui.add_space(4.0);
@@ -104,32 +127,25 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             editor,
             ui,
             key,
-            &content,
-            &mut row,
+            &mut class,
             &tree,
-            backdrop.as_ref(),
+            read.backdrop.as_ref(),
+            &skills,
             &mut changed,
         );
     }
     if let Some(label) = changed {
-        write(editor, key, label, &row);
+        write(editor, key, label, &class);
     }
 }
 
-pub fn remove_node(row: &mut Value, node: &str) {
-    let Some(tree) = row["tree"].as_object_mut() else {
-        return;
-    };
-    tree.remove(node);
-    for other in tree.values_mut() {
-        if let Some(requires) = other["requires"].as_array_mut() {
-            requires.retain(|requirement| {
-                !(requirement["type"] == "skill" && requirement["node"] == node)
-            });
-            if requires.is_empty() {
-                other.remove_field("requires");
-            }
-        }
+/// Takes `node` out of `tree`, and every requirement of another node on it.
+pub fn remove_node(tree: &mut SkillTree, node: &NodeKey) {
+    tree.0.remove(node);
+    for other in tree.0.values_mut() {
+        other.requires.retain(|requirement| {
+            !matches!(requirement, AccessRequirement::Skill { node: needed, .. } if needed == node)
+        });
     }
 }
 
@@ -137,27 +153,15 @@ fn toolbar(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    content: &Content,
-    row: &mut Value,
-    tree: &SkillTree,
+    class: &mut ClassDef,
+    skills: &BTreeMap<NodeKey, NodeSkill>,
     changed: &mut Option<&'static str>,
 ) {
     let shapes = editor.shapes.clone();
     let mut snap = editor.views.class.snap;
     let mut picked = String::new();
-    let granted: u32 = value::typed::<Vec<ClassLevel>>(content, row["levels"].clone())
-        .unwrap_or_default()
-        .iter()
-        .map(|level| level.skill_points.0)
-        .sum();
-    let cost: u32 = tree
-        .0
-        .values()
-        .map(|node| {
-            let def = node.skill.get(content);
-            def.cost_to(Rank(def.rank_count())).0
-        })
-        .sum();
+    let granted: u32 = class.levels.iter().map(|level| level.skill_points.0).sum();
+    let cost: u32 = skills.values().map(NodeSkill::full_cost).sum();
     editor.with_form(
         ClassDef::TABLE,
         Some(key),
@@ -192,25 +196,32 @@ fn toolbar(
         },
     );
     editor.views.class.snap = snap;
-    if !picked.is_empty() {
-        let taken = tree.0.keys().map(|key| key.0.clone()).collect();
-        let node = rows::free_name(&picked, &taken);
-        let at = free_spot(tree);
-        if !row["tree"].is_object() {
-            row["tree"] = Value::Object(Map::new());
-        }
-        row["tree"][&node] = json!({ "skill": picked, "at": point_json(at) });
-        *changed = Some("Add node");
-        select_node(editor, key, Some(&node));
-    }
+    let Some(skill) = editor
+        .reader()
+        .and_then(|reader| reader.id_of::<SkillDef>(&picked))
+    else {
+        return;
+    };
+    let taken = class.tree.0.keys().map(|key| key.0.clone()).collect();
+    let node = NodeKey::from(rows::free_name(&picked, &taken));
+    let at = free_spot(&class.tree);
+    class.tree.0.insert(
+        node.clone(),
+        SkillNode {
+            skill,
+            requires: Vec::new(),
+            at,
+        },
+    );
+    *changed = Some("Add node");
+    select_node(editor, key, Some(node.as_str()));
 }
 
 fn backdrop_bar(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    row: &mut Value,
-    tree: &SkillTree,
+    class: &mut ClassDef,
     backdrop: Option<&TreeBackdrop>,
     changed: &mut Option<&'static str>,
 ) {
@@ -244,29 +255,30 @@ fn backdrop_bar(
             }
         });
     });
-    match backdrop {
-        None if !image.is_empty() => {
-            row["backdrop"] = json!({
-                "image": image,
-                "frame": frame_json(nodes_frame(tree)),
-                "fit": <&str>::from(BackdropFit::Contain),
+    let frame = canvas_rect(nodes_frame(&class.tree));
+    match (backdrop, class.backdrop.as_mut()) {
+        (None, _) if !image.is_empty() => {
+            class.backdrop = Some(TreeBackdrop {
+                image: ImageRef::new(image),
+                frame,
+                fit: BackdropFit::Contain,
             });
             *changed = Some("Add backdrop");
         }
-        Some(_) if removed => {
-            row.remove_field("backdrop");
+        (Some(_), _) if removed => {
+            class.backdrop = None;
             *changed = Some("Remove backdrop");
         }
-        Some(backdrop) if image != backdrop.image.as_str() => {
-            row["backdrop"]["image"] = Value::String(image);
+        (Some(held), Some(backdrop)) if image != held.image.as_str() => {
+            backdrop.image = ImageRef::new(image);
             *changed = Some("Change backdrop image");
         }
-        Some(backdrop) if fit != backdrop.fit => {
-            row["backdrop"]["fit"] = Value::String(<&str>::from(fit).to_owned());
+        (Some(held), Some(backdrop)) if fit != held.fit => {
+            backdrop.fit = fit;
             *changed = Some("Change backdrop fit");
         }
-        Some(_) if framed => {
-            row["backdrop"]["frame"] = frame_json(nodes_frame(tree));
+        (Some(_), Some(backdrop)) if framed => {
+            backdrop.frame = frame;
             *changed = Some("Frame the nodes");
         }
         _ => {}
@@ -283,10 +295,10 @@ fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    content: &Content,
-    row: &mut Value,
+    class: &mut ClassDef,
     tree: &SkillTree,
     backdrop: Option<&TreeBackdrop>,
+    skills: &BTreeMap<NodeKey, NodeSkill>,
     changed: &mut Option<&'static str>,
 ) {
     let selected = node_of(&editor.selection)
@@ -455,14 +467,17 @@ fn canvas(
                         .as_ref()
                         .is_some_and(|(dragged, _)| dragged == node_key),
                 };
-                let skill = node.skill.get(content);
-                let icon = editor.thumb_icon(ui.ctx(), skill.icon.as_str());
+                let skill = &skills[node_key];
+                let icon = skill
+                    .def
+                    .as_ref()
+                    .and_then(|def| editor.thumb_icon(ui.ctx(), def.icon.as_str()));
                 draw_node(&painter, center, look, icon.as_ref());
                 glyph::haloed(
                     &painter,
                     center + Vec2::new(0.0, NODE_RADIUS + 4.0),
                     egui::Align2::CENTER_TOP,
-                    &skill.name,
+                    skill.name(),
                     egui::FontId::proportional(11.5),
                     if look.selected {
                         ink::LIGHT
@@ -483,19 +498,13 @@ fn canvas(
                     );
                 }
                 let response = response.on_hover_ui(|ui| {
-                    ui.label(theme::strong(&skill.name));
+                    ui.label(theme::strong(skill.name()));
                     ui.label(
-                        theme::muted(format!(
-                            "node {node_key} · skill/{}",
-                            node.skill.path(content)
-                        ))
-                        .size(12.0),
+                        theme::muted(format!("node {node_key} · {}", shown_path(&skill.path)))
+                            .size(12.0),
                     );
-                    for requirement in &node.requires {
-                        ui.label(
-                            theme::muted(format!("needs {}", requirement.describe(content, tree)))
-                                .size(12.0),
-                        );
+                    for needs in &skill.needs {
+                        ui.label(theme::muted(format!("needs {needs}")).size(12.0));
                     }
                     ui.label(
                         theme::faint("drag to move · drop on the inspector's list to require it")
@@ -552,9 +561,10 @@ fn canvas(
         editor.views.class.frame_drag = None;
     }
     if let Some(now) = frame_released
-        && backdrop.is_some_and(|backdrop| backdrop.frame.rect() != now)
+        && let Some(backdrop) = class.backdrop.as_mut()
+        && backdrop.frame.rect() != now
     {
-        row["backdrop"]["frame"] = frame_json(now);
+        backdrop.frame = canvas_rect(now);
         *changed = Some("Reframe backdrop");
     }
     if let Some((node, at)) = released {
@@ -564,8 +574,10 @@ fn canvas(
             .any(|(other, placed)| *other != node && at.overlaps(placed.at));
         if blocked {
             editor.toast("Nodes can't overlap");
-        } else if tree.node(&node).is_some_and(|node| node.at != at) {
-            row["tree"][node.as_str()]["at"] = point_json(at);
+        } else if let Some(moved) = class.tree.0.get_mut(&node)
+            && moved.at != at
+        {
+            moved.at = at;
             *changed = Some("Move node");
         }
     }
@@ -579,7 +591,7 @@ fn canvas(
         removed = Some(node);
     }
     if let Some(node) = removed {
-        remove_node(row, node.as_str());
+        remove_node(&mut class.tree, &node);
         *changed = Some("Remove node");
         select_node(editor, key, None);
     }
@@ -777,18 +789,13 @@ fn free_spot(tree: &SkillTree) -> CanvasPoint {
         .unwrap_or(FIRST_SPOT)
 }
 
-fn point_json(at: CanvasPoint) -> Value {
-    value::json(&at).unwrap_or_default()
-}
-
-fn frame_json(rect: Rect) -> Value {
-    value::json(&CanvasRect {
+fn canvas_rect(rect: Rect) -> CanvasRect {
+    CanvasRect {
         x: rect.min.x,
         y: rect.min.y,
         width: rect.width(),
         height: rect.height(),
-    })
-    .unwrap_or_default()
+    }
 }
 
 fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {

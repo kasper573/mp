@@ -7,7 +7,7 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::IntoStaticStr;
+use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
@@ -163,7 +163,17 @@ pub struct Revealable {
 }
 
 #[derive(
-    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, IntoStaticStr,
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    IntoStaticStr,
+    VariantArray,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]

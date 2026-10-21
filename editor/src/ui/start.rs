@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 use design_tokens::glyph::Mark;
 use egui::{Align, Context, Layout, RichText, Ui};
-use engine::core::content::{SETTINGS_FILE, version};
+use engine::core::content::{ContentScope, SETTINGS_FILE, version, with_content};
+use engine::systems::GameSettings;
 
 use super::report::{self, ReportAction};
 use super::{theme, widgets};
@@ -160,8 +161,14 @@ fn recent_list(editor: &mut Editor, ui: &mut Ui) {
 pub fn game_name(folder: &Path) -> String {
     std::fs::read_to_string(folder.join(SETTINGS_FILE))
         .ok()
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|game| game["name"].as_str().map(str::to_owned))
+        .and_then(|text| {
+            // The folder isn't open, so its settings read without the paths their references
+            // name; only the name is wanted.
+            let (settings, _) = with_content(ContentScope::new(), || {
+                serde_json::from_str::<GameSettings>(&text)
+            });
+            settings.ok().map(|settings| settings.name)
+        })
         .unwrap_or_else(|| {
             folder
                 .file_name()

@@ -66,6 +66,7 @@ pub fn content(registry: &mut ContentRegistry) {
         .file::<tileset::SurfaceDef>()
         .bundle::<BlueprintDef>()
         .bundle::<AreaDef>()
+        .named::<AreaDef>()
         .file::<world_map::WorldMapDef>()
         .beside(grid::palette_beside(AreaDef::TABLE))
         .beside(grid::palette_beside(BlueprintDef::TABLE))

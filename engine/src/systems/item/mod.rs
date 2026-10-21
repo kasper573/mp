@@ -354,6 +354,10 @@ impl ModuleSet for ItemDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<ItemModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &ItemModule) -> ModuleRule {
         ModuleRule::AtMostOne
     }

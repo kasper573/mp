@@ -7,7 +7,6 @@ use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
 use engine::core::assets::ImageRef;
 use engine::core::content::files::NAME_RULE;
 use engine::core::content::{ContentFile, valid_name};
-use engine::systems::area::grid::PaletteRow;
 use engine::systems::area::tileset::TilesetDef;
 use image::RgbaImage;
 
@@ -24,6 +23,7 @@ use crate::ui::content_tree;
 use crate::ui::{dialogs, theme, widgets};
 use crate::views::area;
 use crate::views::area as area_view;
+use crate::views::area::grid::BundlePalette;
 use crate::views::tileset::{ANIMATION_PART, tile_size};
 use crate::{forms, rows, thumbs};
 
@@ -74,7 +74,7 @@ fn image_of(editor: &Editor, tileset: &str) -> Option<RgbaImage> {
     super::asset_image(editor, &parts::tileset_image(tileset))
 }
 
-fn palettes_of(editor: &Editor) -> Vec<(String, Vec<PaletteRow>)> {
+fn palettes_of(editor: &Editor) -> Vec<BundlePalette> {
     editor
         .project
         .as_ref()
@@ -623,8 +623,8 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         widgets::section(
             ui,
             &format!(
-                "{} · {} entr{} rewritten",
-                format!("{} palette", file_title(&rewrite.area)),
+                "{} palette · {} entr{} rewritten",
+                file_title(&rewrite.area),
                 rewrite.entries,
                 if rewrite.entries == 1 { "y" } else { "ies" }
             ),
@@ -652,7 +652,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.add_space(8.0);
     }
     editor.status.left = vec![
-        format!("{} · importing onto it", shown_path(&key)),
+        format!("{} · importing onto it", shown_path(key)),
         format!(
             "{} walk · {} surfaces · {} animations carried over",
             plan.walk, plan.surfaces, plan.animations
@@ -668,7 +668,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let names = formats::export_name(&draft.export.files);
     ui.label(
-        theme::mono(format!("{} › import", shown_path(&key)))
+        theme::mono(format!("{} › import", shown_path(key)))
             .color(theme::CODE)
             .size(12.0),
     );
@@ -717,7 +717,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     widgets::section(ui, "It rewrites");
     ui.horizontal(|ui| {
         widgets::badge(ui, "blueprint");
-        ui.label(theme::mono(shown_path(&key)));
+        ui.label(theme::mono(shown_path(key)));
         ui.label(theme::muted("tile data"));
     });
     for rewrite in &draft.plan.rewrites {
@@ -830,7 +830,11 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
         return;
     };
     let mut wrote = edit.write_content(project, key, &new_row).map(|_| ());
-    for (bundle, palette) in rewritten {
+    for BundlePalette {
+        bundle,
+        rows: palette,
+    } in rewritten
+    {
         let Some(read) = area_view::nodes::bundle_in(project, &bundle) else {
             continue;
         };

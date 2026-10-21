@@ -4,11 +4,11 @@ use engine::core::content::{CONFIG_FILE, ContentFile, Shape, content_path};
 use engine::core::vfx::VfxShaderDef;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
-use engine::systems::area::scene::SCENE_FILE;
+use engine::systems::area::scene::{self, GroundLayer, SCENE_FILE, SceneNode};
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::registry;
 use include_dir::{Dir, include_dir};
-use serde_json::json;
+use serde_json::Value;
 
 use crate::project::{FileBytes, ProjectFiles, json_bytes};
 use crate::schema::{self, SchemaShapes};
@@ -41,7 +41,7 @@ pub fn content_file(
             };
             schema::template(&table.shape, &table.shape, nearby)
         })
-        .unwrap_or_else(|| json!({}));
+        .unwrap_or_else(|| Value::Object(Default::default()));
     let files = match shape {
         Shape::Json => vec![(path.clone(), json_bytes(&fields))],
         Shape::Bundle => std::iter::once((CONFIG_FILE.to_owned(), json_bytes(&fields)))
@@ -63,12 +63,19 @@ fn blank_parts(table: &str) -> Vec<(String, FileBytes)> {
         TilesetDef::TABLE => vec![("image.png".to_owned(), default("blank.png"))],
         ModelDef::TABLE => vec![("sprites.png".to_owned(), default("blank.png"))],
         VfxShaderDef::TABLE => vec![("shader.wgsl".to_owned(), default("shader.wgsl"))],
-        AreaDef::TABLE => vec![(
-            SCENE_FILE.to_owned(),
-            json_bytes(&json!([{ "type": "ground_layer", "name": "ground" }])),
-        )],
+        AreaDef::TABLE => vec![(SCENE_FILE.to_owned(), json_bytes(&blank_scene()))],
         _ => Vec::new(),
     }
+}
+
+/// The scene of a new area: one ground layer to paint.
+fn blank_scene() -> Value {
+    let ground = SceneNode::GroundLayer(GroundLayer {
+        name: "ground".to_owned(),
+        hidden: false,
+        locked: false,
+    });
+    scene::write_nodes(&[ground]).expect("a ground layer writes")
 }
 
 fn default(name: &str) -> FileBytes {

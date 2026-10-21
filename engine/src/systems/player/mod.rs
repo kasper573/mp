@@ -138,6 +138,10 @@ impl ModuleSet for PlayerDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<PlayerModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &PlayerModule) -> ModuleRule {
         ModuleRule::AtMostOne
     }

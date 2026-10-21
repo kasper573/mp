@@ -1,47 +1,36 @@
-use std::str::FromStr;
+use std::collections::BTreeMap;
 
 use design_tokens::glyph::Mark;
 use egui::{Align, Layout, Ui};
-use engine::core::content::{ContentFile, fields_file};
-use engine::core::script::VariableType;
+use engine::core::content::ContentFile;
+use engine::field;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::ModelModule;
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{RiftScripts, ScriptDef, ScriptModule};
+use engine::systems::script::{Condition, RiftScripts, ScriptDef, ScriptModule, VarValue};
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::forms::{self, FormAction, FormChange, FormCx};
-use crate::value::RowValue;
+use crate::project::Project;
 use crate::views::model::busts;
+use crate::views::script::nodes::{NodeText, var_value_text};
 use crate::views::script::panel;
 use crate::{condition, schema};
 
+/// The scripts `scripts` lists at `path`, each as a card, in a row of `table`.
 pub fn script_cards(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    holder: &mut Value,
-    field: &str,
+    scripts: &mut Vec<ScriptModule>,
     path: &str,
 ) -> FormChange {
-    let item_schema = cx
-        .shapes
-        .module_variants(table)
-        .into_iter()
-        .find(|variant| variant.tag == holder.kind())
-        .map(|variant| schema::resolve(cx.root, &variant.schema["properties"][field]["items"]))
-        .unwrap_or(&Value::Null);
-    if !holder[field].is_array() {
-        holder[field] = Value::Array(Vec::new());
-    }
     let mut changed = FormChange::default();
-    let count = holder[field].as_array().map_or(0, Vec::len);
     let mut remove = None;
     let mut duplicate = None;
-    for index in 0..count {
-        let module_path = format!("{path}/{field}/{index}");
-        let module = &mut holder[field][index];
+    for (index, module) in scripts.iter_mut().enumerate() {
+        let module_path = format!("{path}/{index}");
         widgets::card_frame(true).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
@@ -60,27 +49,31 @@ pub fn script_cards(
                 });
             });
             ui.add_space(4.0);
-            changed |= script_module_body(ui, cx, table, item_schema, module, &module_path);
+            changed |= script_module_body(ui, cx, table, module, &module_path);
         });
         ui.add_space(2.0);
     }
     if design_tokens::controls::button(ui, "+ Add script").clicked() {
-        let template = schema::template(cx.root, item_schema, cx.nearby());
-        holder[field]
-            .as_array_mut()
-            .expect("scripts")
-            .push(template);
-        changed = FormChange::at(&format!("{path}/{field}"));
+        let shape = schema::of_type::<ScriptModule>();
+        let template = schema::template(shape, shape, cx.nearby());
+        match cx.project.reader().from_json::<ScriptModule>(&template) {
+            Ok(module) => {
+                scripts.push(module);
+                changed = FormChange::at(path);
+            }
+            Err(error) => {
+                cx.state.status = vec![format!("no script to add: {error}")];
+            }
+        }
     }
-    let list = holder[field].as_array_mut().expect("scripts");
     if let Some(index) = remove {
-        list.remove(index);
-        changed = FormChange::at(&format!("{path}/{field}"));
+        scripts.remove(index);
+        changed = FormChange::at(path);
     }
     if let Some(index) = duplicate {
-        let copy = list[index].clone();
-        list.insert(index + 1, copy);
-        changed = FormChange::at(&format!("{path}/{field}"));
+        let copy = scripts[index].clone();
+        scripts.insert(index + 1, copy);
+        changed = FormChange::at(path);
     }
     changed
 }
@@ -91,17 +84,16 @@ pub(super) fn script_module_body(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    module_schema: &Value,
-    module: &mut Value,
+    module: &mut ScriptModule,
     path: &str,
 ) -> FormChange {
-    let mut changed = forms::object_without(ui, cx, module_schema, module, path, &["values"]);
+    let mut changed = forms::of_type_without(ui, cx, module, path, &[field!(ScriptModule, values)]);
     changed |= script_values(ui, cx, module, path);
     script_extras(ui, cx, table, module, path);
     changed
 }
 
-fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path: &str) {
+fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &ScriptModule, path: &str) {
     let Some(pointer) = path.find("/modules/").map(|at| path[at..].to_owned()) else {
         return;
     };
@@ -146,7 +138,8 @@ fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path
             );
         });
     }
-    if let Some(script) = module["script"].as_str().filter(|key| !key.is_empty()) {
+    let reader = cx.project.reader();
+    if let Some(script) = reader.path_of(module.script) {
         ui.add_space(4.0);
         if ui.button((Mark::Arrow.text(13.0), "Open script")).clicked() {
             cx.actions.push(FormAction::OpenRow {
@@ -157,61 +150,62 @@ fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &Value, path
     }
 }
 
-pub(super) fn script_summary(module: &Value) -> String {
-    let mut parts = vec![module.text_or("script", "?").to_owned()];
-    for (name, value) in module["values"].as_object().into_iter().flatten() {
-        parts.push(format!(
-            "{name} {}",
-            value
-                .as_str()
-                .map(str::to_owned)
-                .or_else(|| value.as_f64().map(|number| number.to_string()))
-                .unwrap_or_else(|| value.to_string())
-        ));
+pub(super) fn script_summary(project: &Project, module: &ScriptModule) -> String {
+    let reader = project.reader();
+    let text = NodeText {
+        project,
+        reader: &reader,
+        catalogue: &project.catalogue,
+    };
+    let mut parts = vec![reader.path_of(module.script).unwrap_or("?").to_owned()];
+    for (name, value) in &module.values {
+        parts.push(format!("{name} {}", var_value_text(&text, value)));
     }
     parts.join(" · ")
 }
 
-pub(super) fn script_values(
+fn script_values(
     ui: &mut Ui,
     cx: &mut FormCx,
-    module: &mut Value,
+    module: &mut ScriptModule,
     path: &str,
 ) -> FormChange {
-    let Some(script) = module["script"].as_str().map(str::to_owned) else {
+    let Some(script) = cx.project.read_id(module.script) else {
         return FormChange::default();
     };
-    let Some(row) = cx.files.json(&fields_file(&script)) else {
-        return FormChange::default();
-    };
-    let Some(variables) = row["variables"].as_object() else {
-        return FormChange::default();
-    };
-    if variables.is_empty() {
+    if script.variables.is_empty() {
         return FormChange::default();
     }
     let mut properties = serde_json::Map::new();
     let mut required = Vec::new();
-    for (name, variable) in variables {
-        let ty = VariableType::from_str(variable.kind_or("text")).unwrap_or(VariableType::Text);
-        let kind = schema::variable_schema(ty, variable["table"].as_str());
+    for (name, variable) in &script.variables {
+        let kind = schema::variable_schema(variable.ty, variable.table.as_deref());
         properties.insert(name.clone(), kind);
-        if variable.get("default").is_none() {
-            required.push(Value::String(name.clone()));
+        if variable.default.is_none() {
+            required.push(name.clone());
         }
     }
-    let schema =
-        serde_json::json!({ "type": "object", "properties": properties, "required": required });
-    if !module["values"].is_object() {
-        module["values"] = Value::Object(serde_json::Map::new());
+    let shape = schema::object_of(properties, required);
+    let values_path = format!("{path}{}", field!(ScriptModule, values));
+    let reader = cx.project.reader();
+    let Ok(mut values) = reader.to_json(&module.values) else {
+        widgets::hint(ui, "the values do not write as the game reads them");
+        return FormChange::default();
+    };
+    let changed = forms::object(ui, cx, &shape, &mut values, &values_path);
+    if !changed.is_some() {
+        return changed;
     }
-    forms::object(
-        ui,
-        cx,
-        &schema,
-        &mut module["values"],
-        &format!("{path}/values"),
-    )
+    match reader.from_json::<BTreeMap<String, VarValue>>(&values) {
+        Ok(read) => {
+            module.values = read;
+            changed
+        }
+        Err(error) => {
+            cx.state.errors.insert(values_path, error);
+            FormChange::default()
+        }
+    }
 }
 
 pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
@@ -219,13 +213,9 @@ pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
 }
 
 pub fn summary_of(cx: &FormCx, module: &Value) -> String {
-    let Some(object) = module.as_object() else {
-        return String::new();
-    };
-    let shape = module_shape(cx.root, module);
-    let mut parts = Vec::new();
+    let reader = cx.project.reader();
     if cx.row_table.as_deref() == Some(ModelDef::TABLE)
-        && let Ok(ModelModule::Bust(_)) = serde_json::from_value::<ModelModule>(module.clone())
+        && let Ok(ModelModule::Bust(_)) = reader.from_json::<ModelModule>(module)
     {
         let model = cx
             .row_key
@@ -233,99 +223,18 @@ pub fn summary_of(cx: &FormCx, module: &Value) -> String {
             .and_then(|key| cx.project.read::<ModelDef>(key).ok());
         return format!("{} expressions", busts::face_names(model.as_deref()).len());
     }
-    for (name, field) in object {
-        if name == "type" {
-            continue;
-        }
-        match field {
-            Value::String(text) => parts.push(text.clone()),
-            Value::Number(number) => {
-                let number = number.as_f64().unwrap_or(0.0);
-                parts.push(
-                    schema::number_shorthand(cx.root, &shape["properties"][name], number)
-                        .unwrap_or_else(|| format!("{name} {number}")),
-                );
-            }
-            Value::Array(items) => parts.push(format!("{} {name}", items.len())),
-            Value::Object(nodes) if name == "nodes" => parts.push(format!("{} nodes", nodes.len())),
-            Value::Object(fields) if fields.contains_key("type") => {
-                parts.push(condition::summary(field))
-            }
-            _ => {}
-        }
-        if parts.len() >= 3 {
-            break;
-        }
-    }
-    parts.join(" · ")
+    schema::summary_of(cx.root, module_shape(cx.root, module), module, |field| {
+        reader
+            .from_json::<Condition>(field)
+            .ok()
+            .map(|condition| condition::summary(cx.project, &condition))
+    })
 }
 
 pub fn module_lines(root: &Value, module: &Value) -> String {
-    let shape = module_shape(root, module);
-    let mut lines: Vec<String> = Vec::new();
-    for (name, field) in module.as_object().into_iter().flatten() {
-        if name == "type" {
-            continue;
-        }
-        let field_shape = &shape["properties"][name];
-        match field {
-            Value::Array(items) => {
-                let item_shape =
-                    schema::resolve(root, &schema::non_null(root, field_shape)["items"]);
-                for item in items {
-                    match item.as_object() {
-                        Some(_) => lines.push(entry_cells(root, item_shape, item).join("  ")),
-                        None => lines.push(item.to_string()),
-                    }
-                }
-            }
-            Value::Object(_) => lines.push(format!("{name} …")),
-            other => lines.push(format!("{name} {}", cell(root, field_shape, other))),
-        }
-    }
-    lines.join("\n")
+    schema::lines_of(root, module_shape(root, module), module)
 }
 
 fn module_shape<'a>(root: &'a Value, module: &Value) -> &'a Value {
-    schema::settle(root, &root["properties"]["modules"]["items"], module)
-}
-
-fn entry_cells(root: &Value, shape: &Value, entry: &Value) -> Vec<String> {
-    let fields = schema::properties(schema::settle(root, shape, entry));
-    if fields.is_empty() {
-        return entry
-            .as_object()
-            .into_iter()
-            .flatten()
-            .map(|(_, value)| cell(root, &Value::Null, value))
-            .collect();
-    }
-    fields
-        .into_iter()
-        .filter_map(|(name, field)| match entry.get(name.as_str()) {
-            Some(value) if !value.is_null() => Some(cell(root, field, value)),
-            _ if field.get("x-count").is_some() => field
-                .get("default")
-                .map(|default| cell(root, field, default)),
-            _ => field
-                .get("x-blank")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-        })
-        .collect()
-}
-
-fn cell(root: &Value, field: &Value, value: &Value) -> String {
-    match value {
-        Value::String(text) => text.clone(),
-        Value::Number(number) => {
-            let number = number.as_f64().unwrap_or(0.0);
-            if schema::non_null(root, field)["x-unit"] == "%" {
-                format!("{number}%")
-            } else {
-                number.to_string()
-            }
-        }
-        other => other.to_string(),
-    }
+    schema::modules_in(root).map_or(&Value::Null, |items| schema::settle(root, items, module))
 }

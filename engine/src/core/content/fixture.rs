@@ -128,7 +128,7 @@ impl FixtureLock {
             FixtureLock::Variants { list, variants } => {
                 for (index, held) in entries(row, list) {
                     let variant = TypeTag::of_json(held).unwrap_or_default();
-                    if !variants.iter().any(|known| *known == variant) {
+                    if !variants.contains(&variant) {
                         check.error(
                             format!("{list}/{index}"),
                             "variant the engine never reads",

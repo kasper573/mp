@@ -24,7 +24,9 @@ use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
 use super::serial::TypeTag;
-use super::table::{Content, ContentBuilder, ContentFile, ModuleRule, ModuleSet, Table};
+use super::table::{
+    Content, ContentBuilder, ContentFile, MODULES, ModuleRule, ModuleSet, NamedContent, Table,
+};
 use super::version::ContentVersion;
 
 // The steps a load runs its hooks at, in order.
@@ -66,7 +68,8 @@ pub struct ContentRegistry {
     hooks: Vec<(LoadStep, Hook)>,
     settings: Option<Box<dyn SettingsLoader>>,
     writers: Vec<FolderWriter>,
-    module_rules: Vec<(&'static str, ModuleProbe)>,
+    module_sets: Vec<ModuleSetOf>,
+    named: Vec<(&'static str, ShownNameOf)>,
     list_kinds: Vec<ListKind>,
     beside: Vec<BesideFile>,
     json_parts: Vec<JsonPart>,
@@ -104,7 +107,51 @@ pub(super) struct ListKind {
     expected: &'static str,
 }
 
-type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
+/// The name a player reads a file of one type by, from its fields as JSON.
+type ShownNameOf = fn(&serde_json::Value) -> Option<String>;
+
+/// A type of file holding modules, as a tool that edits its files as JSON reaches them: each
+/// function runs in the scope the JSON's references are read in.
+struct ModuleSetOf {
+    table: &'static str,
+    rule: fn(&serde_json::Value) -> Option<ModuleRule>,
+    read: fn(&serde_json::Value) -> Result<Vec<serde_json::Value>, String>,
+    write: fn(&serde_json::Value, &[serde_json::Value]) -> Result<serde_json::Value, String>,
+}
+
+impl ModuleSetOf {
+    fn of<Row: ModuleSet>() -> ModuleSetOf {
+        ModuleSetOf {
+            table: Row::TABLE,
+            rule: |json| {
+                let (parsed, _) = with_content(ContentScope::new(), || {
+                    serde_json::from_value::<Row::Module>(json.clone())
+                });
+                parsed.ok().map(|module| Row::rule(&module))
+            },
+            read: |json| {
+                let row = parse_value::<Row>(json).map_err(|error| error.to_string())?;
+                row.modules()
+                    .iter()
+                    .map(|module| super::serial::json_of(module).map_err(|e| e.to_string()))
+                    .collect()
+            },
+            write: |json, modules| {
+                let mut row = parse_value::<Row>(json).map_err(|error| error.to_string())?;
+                *row.modules_mut() = modules
+                    .iter()
+                    .enumerate()
+                    .map(|(index, module)| {
+                        parse_value::<Row::Module>(module).map_err(|error| {
+                            format!("at /{MODULES}/{index}{}: {}", error.pointer, error.inner)
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
+                super::serial::json_of(&row).map_err(|error| error.to_string())
+            },
+        }
+    }
+}
 
 /// A part of a type's bundles that isn't JSON and names content of its own, as a palette names
 /// tilesets.
@@ -167,23 +214,60 @@ impl ContentRegistry {
 
     pub fn modules<Row: ModuleSet>(&mut self) -> &mut ContentRegistry {
         self.version.take();
-        self.module_rules.push((
-            Row::TABLE,
-            Box::new(|json| {
-                let (parsed, _) = with_content(ContentScope::new(), || {
-                    serde_json::from_value::<Row::Module>(json.clone())
-                });
-                parsed.ok().map(|module| Row::rule(&module))
-            }),
-        ));
+        self.module_sets.push(ModuleSetOf::of::<Row>());
         self.hook(LoadStep::Rows, module_rules::<Row>)
     }
 
+    /// Marks the files of `Row` as carrying the name a player reads them by.
+    pub fn named<Row: NamedContent>(&mut self) -> &mut ContentRegistry {
+        self.named.push((Row::TABLE, |json| {
+            let (parsed, _) = with_content(ContentScope::new(), || parse_value::<Row>(json).ok());
+            parsed.map(|row| row.shown_name().to_owned())
+        }));
+        self
+    }
+
+    /// The name a player reads `row`, a file of `table` as JSON, by, when its type carries one
+    /// and it reads.
+    pub fn shown_name(&self, table: &str, row: &serde_json::Value) -> Option<String> {
+        let (_, name) = self.named.iter().find(|(named, _)| *named == table)?;
+        name(row)
+    }
+
     pub fn module_rule(&self, table: &str, json: &serde_json::Value) -> Option<ModuleRule> {
-        self.module_rules
-            .iter()
-            .find(|(name, _)| *name == table)
-            .and_then(|(_, probe)| probe(json))
+        self.module_set(table).and_then(|set| (set.rule)(json))
+    }
+
+    /// Whether the files of `table` hold modules.
+    pub fn holds_modules(&self, table: &str) -> bool {
+        self.module_set(table).is_some()
+    }
+
+    /// The modules of `row`, a file of `table` as JSON, each as its type writes it, read in the
+    /// scope the caller runs in.
+    pub(super) fn modules_of_json(
+        &self,
+        table: &str,
+        row: &serde_json::Value,
+    ) -> Result<Vec<serde_json::Value>, String> {
+        let set = self.module_set(table).ok_or_else(|| no_modules(table))?;
+        (set.read)(row)
+    }
+
+    /// `row`, a file of `table` as JSON, holding `modules` in place of its own, read and written
+    /// as their types in the scope the caller runs in.
+    pub(super) fn with_modules_json(
+        &self,
+        table: &str,
+        row: &serde_json::Value,
+        modules: &[serde_json::Value],
+    ) -> Result<serde_json::Value, String> {
+        let set = self.module_set(table).ok_or_else(|| no_modules(table))?;
+        (set.write)(row, modules)
+    }
+
+    fn module_set(&self, table: &str) -> Option<&ModuleSetOf> {
+        self.module_sets.iter().find(|set| set.table == table)
     }
 
     /// Whether a row of `table` holding `modules` may take `module` as well: not when it holds
@@ -1088,6 +1172,12 @@ pub struct ParseError {
     pub inner: serde_json::Error,
 }
 
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "at {}: {}", self.pointer, self.inner)
+    }
+}
+
 impl From<serde_path_to_error::Error<serde_json::Error>> for ParseError {
     fn from(error: serde_path_to_error::Error<serde_json::Error>) -> ParseError {
         ParseError {
@@ -1631,6 +1721,10 @@ impl<Row: ContentFile> TableLoader for RowLoader<Row> {
     }
 }
 
+fn no_modules(table: &str) -> String {
+    format!("{} {table} files hold no modules", article(table))
+}
+
 pub fn parse_value<T: DeserializeOwned>(value: &serde_json::Value) -> Result<T, ParseError> {
     Ok(serde_path_to_error::deserialize(value)?)
 }
@@ -1719,7 +1813,7 @@ fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
     for (id, index, tag) in errors {
         loading.row_error(
             id,
-            &format!("/modules/{index}"),
+            &format!("/{MODULES}/{index}"),
             ContentProblem::new(
                 "too many",
                 format!("a second {tag} module"),

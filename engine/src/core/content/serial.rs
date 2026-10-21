@@ -30,6 +30,14 @@ pub struct RectRow {
     h: f32,
 }
 
+/// `value` as JSON holding each number as the files print it.
+// `serde_json::to_value` widens an f32 bit-exactly, so 538.33 would come out as
+// 538.3300170898438 while a written file holds the shortest form; going through text keeps both
+// alike.
+pub fn json_of<T: Serialize>(value: &T) -> serde_json::Result<serde_json::Value> {
+    serde_json::from_str(&serde_json::to_string(value)?)
+}
+
 pub fn rect<U, S: Serializer>(rect: &Rect<U>, serializer: S) -> Result<S::Ok, S::Error> {
     RectRow {
         x: rect.origin.x,

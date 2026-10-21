@@ -77,9 +77,7 @@ impl EffectDef<RiftScripting> for Animate {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next), (INTERRUPTED, &self.interrupted)]
-    }
+    crate::outputs!(NEXT => next, INTERRUPTED => interrupted);
     fn pauses(&self) -> bool {
         self.wait != Wait::No
     }

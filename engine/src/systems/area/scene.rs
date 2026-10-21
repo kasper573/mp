@@ -282,9 +282,10 @@ pub fn read_nodes(
     let files = parse_value::<Vec<NodeFile>>(json)
         .map_err(|error| vec![(error.pointer.clone(), shape_problem(&error))])?;
     let read = nodes_of(&files, "", variables);
-    match read.problems.is_empty() {
-        true => Ok(read.nodes),
-        false => Err(read.problems),
+    if read.problems.is_empty() {
+        Ok(read.nodes)
+    } else {
+        Err(read.problems)
     }
 }
 
@@ -375,9 +376,10 @@ impl TryFrom<String> for NonEmpty {
     type Error = &'static str;
 
     fn try_from(text: String) -> Result<NonEmpty, &'static str> {
-        match text.is_empty() {
-            true => Err("an empty label"),
-            false => Ok(NonEmpty(text)),
+        if text.is_empty() {
+            Err("an empty label")
+        } else {
+            Ok(NonEmpty(text))
         }
     }
 }

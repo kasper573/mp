@@ -127,17 +127,13 @@ impl Sheet<'_> {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let (Some(read), Some(reader)) = (editor.read::<CharacterSnapshot>(key), editor.reader())
-    else {
+    let (Some(character), Some(reader)) = (
+        super::read_shown::<CharacterSnapshot>(editor, ui, key),
+        editor.reader(),
+    ) else {
         return;
     };
-    let mut character = match read {
-        Ok(character) => (*character).clone(),
-        Err(errors) => {
-            widgets::unreadable(ui, key, &errors);
-            return;
-        }
-    };
+    let mut character = (*character).clone();
     let sheet = Sheet {
         reader: &reader,
         key,

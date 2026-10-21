@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use engine::core::content::{ContentFile, fields_file};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{ContentFile, MODULES, fields_file};
 use engine::systems::area::{AreaDef, AreaId, AreaModuleKind};
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
@@ -352,11 +353,11 @@ fn numbers_at(value: &Value, path: &[String]) -> Vec<f64> {
         Value::Object(fields) => match fields.get(head) {
             Some(field) => numbers_at(field, rest),
             None => fields
-                .get("modules")
+                .get(MODULES)
                 .and_then(Value::as_array)
                 .into_iter()
                 .flatten()
-                .filter(|module| module["type"] == *head)
+                .filter(|module| TypeTag::of_json(module).as_ref() == Some(head))
                 .flat_map(|module| numbers_at(module, rest))
                 .collect(),
         },

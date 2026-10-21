@@ -16,20 +16,19 @@ use std::sync::Arc;
 
 use atlas::WorldAtlas;
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use engine::core::content::{Content, ContentFile, Fixture, fields_file};
+use engine::core::content::{Content, ContentFile, ContentScope, Fixture, rescoped};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
+use engine::systems::area::AreaId;
 use engine::systems::area::world_map::{
     AreaCard, Note, Region, RegionColor, WorldMap, WorldMapDef,
 };
-use engine::systems::area::{self, AreaDef, AreaId};
 use serde::Deserialize;
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection};
 use crate::ui::{sidebar, theme};
-use crate::value;
 use crate::views::navigation;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
@@ -222,12 +221,17 @@ impl OpenWorldMap {
         self.write(editor, edit, &next)
     }
 
-    pub fn write(&self, editor: &mut Editor, mut edit: ContentEdit, layout: &WorldMapDef) -> bool {
-        let Some(json) = value::untyped(&self.content, layout) else {
+    pub fn write(&self, editor: &mut Editor, edit: ContentEdit, layout: &WorldMapDef) -> bool {
+        let Some(reader) = editor.reader() else {
             return false;
         };
-        edit.write_json(layout_file(), &json);
-        editor.apply(edit)
+        match rescoped(layout, &ContentScope::of(&self.content), reader.scope()) {
+            Ok(layout) => editor.write_content_as(edit, &WorldMap::Game.path(), &layout),
+            Err(error) => {
+                editor.toast(format!("{}: {error}", edit.label));
+                false
+            }
+        }
     }
 }
 
@@ -303,36 +307,6 @@ pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
         &WorldMap::Game.path(),
         parts.iter().map(MapPart::to_string).collect(),
     ));
-}
-
-pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, copy: &str) {
-    let Some(content) = project.content.clone() else {
-        return;
-    };
-    let Some(area) = content.by_path::<AreaDef>(original) else {
-        return;
-    };
-    let Some(card) = WorldMap::Game.get(&content).cards.get(&area) else {
-        return;
-    };
-    let size = area::load(&content, area).size;
-    let at = right_of(card_rect(size, card), footprint(size, card.size));
-    let file = layout_file();
-    let Some(mut row) = project.files.json_owned(&file) else {
-        return;
-    };
-    let Ok(beside) = value::json(&AreaCard {
-        size: card.size,
-        ..new_card(at)
-    }) else {
-        return;
-    };
-    row["cards"][copy] = beside;
-    edit.write_json(file, &row);
-}
-
-fn layout_file() -> String {
-    fields_file(&WorldMap::Game.path())
 }
 
 fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {

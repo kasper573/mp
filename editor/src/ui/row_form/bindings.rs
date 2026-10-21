@@ -2,43 +2,50 @@ use bevy::input::keyboard::KeyCode;
 use bevy::input::mouse::MouseButton;
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
-use engine::core::content::fixture::FixtureLock;
-use engine::core::content::{ContentFile, fields_file};
+use engine::core::content::ContentFile;
+use engine::field;
 use engine::systems::input::map::{InputBinding, InputBindingKind, InputDef, KeyModifiers};
 use serde_json::Value;
 
 use super::{theme, widgets};
-use crate::forms::FormChange;
-use crate::project::ProjectFiles;
+use crate::forms::{self, FormChange, FormCx};
+use crate::project::Project;
 use crate::tabs::file_title;
 
+/// The bindings of the input row `value` at `key`, each a chip, and a field that captures the
+/// next key or click as one more.
 pub(super) fn bindings_section(
     ui: &mut Ui,
-    files: &ProjectFiles,
-    locks: &[FixtureLock],
+    cx: &mut FormCx,
     key: &str,
     value: &mut Value,
 ) -> FormChange {
-    let mut changed = FormChange::default();
     widgets::section(ui, "Bindings");
-    let read = locks.iter().find_map(|lock| lock.variants("/bindings"));
+    let path = field!(InputDef, bindings);
+    forms::of_row(ui, cx, value, path, |ui, cx, input: &mut InputDef| {
+        bindings(ui, cx, key, &mut input.bindings, path)
+    })
+}
+
+fn bindings(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    key: &str,
+    bindings: &mut Vec<InputBinding>,
+    path: &str,
+) -> FormChange {
+    let mut changed = FormChange::default();
+    let read = cx.locks.iter().find_map(|lock| lock.variants(path));
     let reads = |kind: InputBindingKind| {
         read.is_none_or(|read| read.iter().any(|known| known == <&str>::from(kind)))
     };
-    if !value["bindings"].is_array() {
-        value["bindings"] = Value::Array(Vec::new());
-    }
     let mut remove = None;
     let mut conflicts = Vec::new();
     ui.horizontal_wrapped(|ui| {
-        for (index, binding) in value["bindings"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .enumerate()
-        {
-            let (name, kind) = label(binding);
-            let shared_with = also_bound(files, key, binding);
+        for (index, binding) in bindings.iter().enumerate() {
+            let name = binding.name();
+            let kind = <&str>::from(InputBindingKind::from(binding)).replace('_', " ");
+            let shared_with = also_bound(cx.project, key, binding);
             egui::Frame::new()
                 .fill(theme::RAISED)
                 .stroke(egui::Stroke::new(
@@ -78,11 +85,8 @@ pub(super) fn bindings_section(
         ui.label(theme::warn(conflict).size(12.5));
     }
     if let Some(index) = remove {
-        value["bindings"]
-            .as_array_mut()
-            .expect("bindings")
-            .remove(index);
-        changed = FormChange::at("/bindings");
+        bindings.remove(index);
+        changed = FormChange::at(path);
     }
     let id = ui.id().with("capture");
     let capturing = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
@@ -130,11 +134,9 @@ pub(super) fn bindings_section(
     }
     match ui.input(|input| capture(input, reads)) {
         Some(Capture::Bound(binding)) => {
-            let binding = serde_json::to_value(binding).expect("a binding serializes");
-            let list = value["bindings"].as_array_mut().expect("bindings");
-            if !list.contains(&binding) {
-                list.push(binding);
-                changed = FormChange::at("/bindings");
+            if !bindings.contains(&binding) {
+                bindings.push(binding);
+                changed = FormChange::at(path);
             }
             ui.ctx().data_mut(|d| d.insert_temp(id, false));
         }
@@ -144,17 +146,6 @@ pub(super) fn bindings_section(
         None => {}
     }
     changed
-}
-
-/// A binding as the game names it, and the kind of input it is.
-fn label(binding: &Value) -> (String, String) {
-    match serde_json::from_value::<InputBinding>(binding.clone()) {
-        Ok(binding) => {
-            let kind: &str = InputBindingKind::from(binding).into();
-            (binding.name(), kind.replace('_', " "))
-        }
-        Err(_) => ("?".to_owned(), "unreadable".to_owned()),
-    }
 }
 
 enum Capture {
@@ -234,17 +225,16 @@ fn key_code(key: Key) -> Option<KeyCode> {
 }
 
 /// The other inputs that carry this same binding.
-fn also_bound(files: &ProjectFiles, key: &str, binding: &Value) -> Vec<String> {
-    files
+fn also_bound(project: &Project, key: &str, binding: &InputBinding) -> Vec<String> {
+    project
+        .files
         .paths_of(InputDef::TABLE)
         .into_iter()
         .filter(|other| other != key)
         .filter(|other| {
-            files.json(&fields_file(other)).is_some_and(|row| {
-                row["bindings"]
-                    .as_array()
-                    .is_some_and(|list| list.contains(binding))
-            })
+            project
+                .read::<InputDef>(other)
+                .is_ok_and(|input| input.bindings.contains(binding))
         })
         .map(|other| file_title(&other).to_owned())
         .collect()

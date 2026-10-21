@@ -45,9 +45,13 @@ impl ContentNames for Content {
     }
 }
 
+/// The field a file of a `ModuleSet` lists its modules in.
+pub const MODULES: &str = "modules";
+
 pub trait ModuleSet: ContentFile {
     type Module: Serialize + DeserializeOwned;
     fn modules(&self) -> &[Self::Module];
+    fn modules_mut(&mut self) -> &mut Vec<Self::Module>;
     fn rule(module: &Self::Module) -> ModuleRule;
 }
 

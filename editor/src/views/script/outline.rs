@@ -3,18 +3,17 @@ use std::collections::{HashMap, HashSet};
 
 use design_tokens::glyph::Mark;
 use egui::{Align2, Color32, FontId, Sense, Ui};
-use engine::core::content::ContentFile;
-use engine::systems::script::ScriptDef;
-use serde_json::Value;
+use engine::core::content::{ContentFile, ContentNames};
+use engine::core::script::Exit;
+use engine::systems::script::{DialogueNode, Node, ScriptDef, Speaker};
 
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
-use super::nodes::{self, LineSpeaker, OutlineRow};
+use super::nodes::{self, OutlineRow};
 use super::{ScriptDoc, select_nodes};
 use crate::app::Editor;
-use crate::project::{RowSelection, catalogue_of};
+use crate::project::RowSelection;
 use crate::spans;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 
 const ROW: f32 = 22.0;
 const INDENT: f32 = 26.0;
@@ -26,7 +25,7 @@ pub fn show(
     actions: &mut Vec<ScriptGraphAction>,
 ) {
     let owner = doc.at.clone();
-    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), catalogue_of(editor.project.as_ref()));
+    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes());
     let summaries = summaries(editor, doc);
     let (focus, folded) = editor
         .views
@@ -121,8 +120,8 @@ pub fn show(
         let link = match row.choice {
             Some(index) => target
                 .is_none()
-                .then(|| (row.name.clone(), format!("/choices/{index}/to"))),
-            None => super::free_port_link(doc, catalogue_of(editor.project.as_ref()), &row.name),
+                .then(|| (row.name.clone(), Exit::Choice(index))),
+            None => super::free_port_link(doc, &row.name),
         };
         actions.push(ScriptGraphAction::Palette(NodePaletteOpen {
             at: ui.max_rect().left_top() + egui::vec2(60.0 + row.depth as f32 * INDENT, 40.0),
@@ -136,11 +135,11 @@ pub fn show(
     if keys.delete {
         match row.choice {
             Some(index) => {
-                let mut script = doc.script.clone();
-                if let Some(choices) = script["nodes"][&row.name]["choices"].as_array_mut()
-                    && index < choices.len()
+                let mut script = doc.edited();
+                if let Some(Node::Dialogue(dialogue)) = script.nodes.get_mut(&row.name)
+                    && index < dialogue.choices.len()
                 {
-                    choices.remove(index);
+                    dialogue.choices.remove(index);
                     let label = format!("Remove a choice in {}", doc.at.title());
                     super::write(editor, doc, script, label);
                 }
@@ -251,11 +250,14 @@ fn draw(
     }
     let target = match row.choice {
         Some(index) => {
-            let label = doc
-                .nodes()
-                .get(&row.name)
-                .map(|node| spans::plain(&node["choices"][index]["label"]))
-                .unwrap_or_default();
+            let label = match doc.nodes().get(&row.name) {
+                Some(Node::Dialogue(dialogue)) => dialogue
+                    .choices
+                    .get(index)
+                    .map(|choice| spans::plain(&choice.label))
+                    .unwrap_or_default(),
+                _ => String::new(),
+            };
             put(ui, &widgets::clip(&label, 60), &mono, theme::TEXT);
             put(ui, " → ", &mono, theme::FAINT);
             match line.target {
@@ -305,39 +307,42 @@ fn draw(
 }
 
 fn summaries(editor: &Editor, doc: &ScriptDoc) -> HashMap<String, String> {
-    let catalogue = catalogue_of(editor.project.as_ref());
+    let Some(project) = editor.project.as_ref() else {
+        return HashMap::new();
+    };
+    let text = doc.text(project);
     doc.nodes()
         .iter()
         .map(|(name, node)| {
-            let summary = if nodes::is_dialogue(node) {
-                dialogue_summary(editor, node)
-            } else {
-                nodes::summary(node, catalogue)
+            let summary = match node {
+                Node::Dialogue(dialogue) => dialogue_summary(editor, dialogue),
+                other => nodes::summary(other, &text),
             };
             (name.clone(), widgets::clip(&summary, 70))
         })
         .collect()
 }
 
-fn dialogue_summary(editor: &Editor, node: &Value) -> String {
-    let lines = node["lines"].as_array().cloned().unwrap_or_default();
-    let speaker = lines
-        .first()
-        .map(|line| match LineSpeaker::of(&line["by"]) {
-            Some(LineSpeaker::Npc { npc, face }) => {
-                let name = editor
-                    .row_value(&npc)
-                    .map(|row| row.text_or("name", &npc).to_owned())
-                    .unwrap_or(npc);
-                match face {
-                    Some(face) => format!("{name}, {face}"),
-                    None => name,
-                }
+fn dialogue_summary(editor: &Editor, dialogue: &DialogueNode) -> String {
+    let speaker = dialogue.lines.first().map(|line| match line.by {
+        Speaker::Npc(npc) => {
+            let name = editor
+                .project
+                .as_ref()
+                .map_or_else(String::new, |project| project.name_of(npc));
+            match &line.face {
+                Some(face) => format!("{name}, {}", String::from(face.clone())),
+                None => name,
             }
-            Some(LineSpeaker::Object) => "the object".to_owned(),
-            _ => "narrator".to_owned(),
-        });
-    let count = format!("{} line{}", lines.len(), widgets::plural(lines.len()));
+        }
+        Speaker::Object => "the object".to_owned(),
+        Speaker::Narrator | Speaker::Player => "narrator".to_owned(),
+    });
+    let count = format!(
+        "{} line{}",
+        dialogue.lines.len(),
+        widgets::plural(dialogue.lines.len())
+    );
     match speaker {
         Some(speaker) => format!("{speaker} · {count}"),
         None => count,

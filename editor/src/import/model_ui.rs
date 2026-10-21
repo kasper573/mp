@@ -1027,7 +1027,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
         });
     editor.status.left = vec![
-        format!("{} · its exports changed", shown_path(&key)),
+        format!("{} · its exports changed", shown_path(key)),
         "the game keeps the old frames until the import applies".to_owned(),
     ];
 }
@@ -1214,7 +1214,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     ui.label(
-        theme::mono(format!("{} › import", shown_path(&key)))
+        theme::mono(format!("{} › import", shown_path(key)))
             .color(theme::CODE)
             .size(12.0),
     );

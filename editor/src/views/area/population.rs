@@ -47,9 +47,10 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
                 .iter()
                 .map(|(name, value)| format!("{name} {}", short_value(value, cx.project)))
                 .collect();
-            match values.is_empty() {
-                true => named.to_owned(),
-                false => format!("{named} · {}", values.join(" · ")),
+            if values.is_empty() {
+                named.to_owned()
+            } else {
+                format!("{named} · {}", values.join(" · "))
             }
         })
         .collect();
@@ -68,7 +69,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
     ui.add_space(4.0);
     if widgets::chip_colored(
         ui,
-        &format!("{} →", shown_path(npc)),
+        format!("{} →", shown_path(npc)),
         theme::INPUT,
         theme::CODE,
     )

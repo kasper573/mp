@@ -56,9 +56,7 @@ impl EffectDef<RiftScripting> for Say {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

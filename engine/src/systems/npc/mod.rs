@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{
-    Content, ContentFile, ContentId, Loading, ModuleRule, ModuleSet, RowCheck, serial,
+    Content, ContentFile, ContentId, Loading, ModuleRule, ModuleSet, NamedContent, RowCheck, serial,
 };
 use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{CellPos, TilePos, Tiles};
@@ -138,11 +138,21 @@ impl ContentFile for NpcDef {
     }
 }
 
+impl NamedContent for NpcDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
+}
+
 impl ModuleSet for NpcDef {
     type Module = NpcModule;
 
     fn modules(&self) -> &[NpcModule] {
         &self.modules
+    }
+
+    fn modules_mut(&mut self) -> &mut Vec<NpcModule> {
+        &mut self.modules
     }
 
     fn rule(module: &NpcModule) -> ModuleRule {

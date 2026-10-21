@@ -1,25 +1,30 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Sense, Ui, Vec2};
-use engine::core::content::{ContentFile, fields_file, name_of};
+use engine::core::content::{ContentFile, name_of};
+use engine::core::script::Variable;
 use engine::core::tiling::TilePos;
-use engine::systems::area::{AreaModuleKind, Pictured};
-use serde_json::Value;
+use engine::field;
+use engine::systems::area::blueprint::{BlueprintDef, Placement};
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::{AreaModule, AreaModuleKind, Pictured};
+use engine::systems::script::RiftScripting;
 use strum::VariantArray;
 
 use super::grid::GridDraft;
+use super::nodes::SceneBundle;
 use super::scene_tree::{self, SceneAction, SceneSource, Toggle};
 use super::{AreaSnapshot, WALK_ROW, layers, nodes, placement, resize, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
-use crate::project::ContentEdit;
+use crate::project::files::content_of;
 use crate::tabs::{EditorTab, file_title};
 use crate::ui::tree::{self, DropAt, TreeState};
 use crate::ui::{breadcrumb, content_tree, row_form, theme, widgets};
-use crate::{schema, views};
+use crate::views;
 
 /// The left panel's own state between frames: the scene graph's tree, its filter, and what was
 /// cut from it.
@@ -72,23 +77,20 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
 
 fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
     let bundle = snapshot.bundle.clone();
-    let Some(mut row) = editor.row_value(&bundle) else {
-        return;
-    };
+    let def = snapshot.def.clone();
     let folded = editor.settings.boxes_folded;
     let size = snapshot.size();
     let tile = snapshot.area().tile;
     let facts = format!("{} × {} · {tile} px", size.width, size.height);
     let area = matches!(snapshot.pictured, Pictured::Area(_));
-    let title = if area {
-        row["name"].as_str().unwrap_or_default().to_owned()
-    } else {
-        name_of(&bundle).to_owned()
+    let title = match &def {
+        SceneBundle::Area(area) => area.name.clone(),
+        SceneBundle::Blueprint(_) => name_of(&bundle).to_owned(),
     };
     let mut fold = false;
     let mut menu = None;
     let mut renamed = None;
-    let mut variables_changed = false;
+    let mut variables_changed = None;
     let mut actions = Vec::new();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
@@ -130,11 +132,10 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
             return;
         }
         ui.add_space(4.0);
-        if area {
+        if let SceneBundle::Area(held) = &def {
             widgets::kv(ui, "name", |ui| {
                 let id = ui.id().with(("area-name", &bundle));
-                let name = row["name"].as_str().unwrap_or_default().to_owned();
-                renamed = forms::drafted(ui, id, &name, |ui, draft| {
+                renamed = forms::drafted(ui, id, &held.name, |ui, draft| {
                     forms::boxed_input(ui, None, |ui| {
                         ui.add(
                             egui::TextEdit::singleline(draft)
@@ -155,24 +156,28 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
         widgets::kv(ui, "tile", |ui| {
             forms::boxed_input(ui, Some("px"), |ui| ui.label(theme::mono(tile.to_string())));
         });
-        if !area {
-            variables_changed = variables(editor, ui, &bundle, &mut row, &mut actions);
+        if let SceneBundle::Blueprint(blueprint) = &def {
+            variables_changed = variables(editor, ui, &bundle, blueprint, &mut actions);
         }
     });
     if fold {
         editor.settings.boxes_folded = !folded;
         editor.save_settings();
     }
-    if let Some(name) = renamed {
-        row["name"] = Value::String(name);
-        let mut edit = ContentEdit::new(format!("Rename area {}", file_title(&bundle)));
-        edit.write_json(fields_file(&bundle), &row);
-        editor.apply(edit);
-    }
-    if variables_changed {
-        let mut edit = ContentEdit::new(format!("Edit the variables of {}", file_title(&bundle)));
-        edit.write_json(fields_file(&bundle), &row);
-        editor.apply(edit);
+    match (&def, renamed) {
+        (SceneBundle::Area(area), Some(name)) => {
+            let mut area = (**area).clone();
+            area.name = name;
+            let label = format!("Rename area {}", file_title(&bundle));
+            editor.write_content(&label, &bundle, &area);
+        }
+        (SceneBundle::Blueprint(blueprint), _) if let Some(variables) = variables_changed => {
+            let mut blueprint = (**blueprint).clone();
+            blueprint.variables = variables;
+            let label = format!("Edit the variables of {}", file_title(&bundle));
+            editor.write_content(&label, &bundle, &blueprint);
+        }
+        _ => {}
     }
     for action in actions {
         row_form::act(
@@ -209,49 +214,43 @@ enum BoxMenu {
     OpenRow,
 }
 
-/// A blueprint's variables, edited in its box, each with how many placements set it.
+/// A blueprint's variables, edited in its box, each with how many placements set it; the
+/// variables as edited, when they changed.
 fn variables(
     editor: &mut Editor,
     ui: &mut Ui,
     bundle: &str,
-    row: &mut Value,
+    blueprint: &BlueprintDef,
     actions: &mut Vec<crate::forms::FormAction>,
-) -> bool {
+) -> Option<BTreeMap<String, Variable<RiftScripting>>> {
     let placements = set_by(editor, bundle);
-    let table = engine::systems::area::blueprint::BlueprintDef::TABLE;
     let shapes = editor.shapes.clone();
-    let root = shapes.shape_of(table);
-    if !row["variables"].is_object() {
-        row["variables"] = Value::Object(Default::default());
-    }
-    let Some(schema) = schema::at_pointer(root, root, row, "/variables") else {
-        return false;
-    };
+    let root = shapes.shape_of(BlueprintDef::TABLE);
     let Editor {
         project,
         form,
         shapes,
         ..
     } = editor;
-    let Some(project) = project.as_ref() else {
-        return false;
-    };
-    let mut cx = FormCx::new(project, root, shapes, form, actions).editing(table, Some(bundle));
+    let project = project.as_ref()?;
+    let mut cx = FormCx::new(project, root, shapes, form, actions)
+        .editing(BlueprintDef::TABLE, Some(bundle));
     ui.add_space(2.0);
     widgets::kv(ui, "variables", |ui| {
-        if row["variables"]
-            .as_object()
-            .is_none_or(|vars| vars.is_empty())
-        {
+        if blueprint.variables.is_empty() {
             ui.label(theme::muted("none").size(12.5));
         }
     });
     for (name, (set, of)) in &placements {
-        if row["variables"].get(name).is_some() {
+        if blueprint.variables.contains_key(name) {
             widgets::hint(ui, &format!("{name}: set by {set} of {of} placements"));
         }
     }
-    forms::value(ui, &mut cx, schema, &mut row["variables"], "/variables").is_some()
+    let path = field!(BlueprintDef, variables);
+    let mut variables = blueprint.variables.clone();
+    forms::of_type(ui, &mut cx, &mut variables, path)
+        .is_some()
+        .then_some(variables)
 }
 
 /// For each variable placements of `bundle` set, how many set it and how many placements there are.
@@ -260,25 +259,34 @@ fn set_by(editor: &Editor, bundle: &str) -> HashMap<String, (usize, usize)> {
     let Some(project) = &editor.project else {
         return out;
     };
-    let usages = project.usages.of_content(bundle);
-    let mut placed = Vec::new();
-    for usage in usages {
-        let Some(node) = usage.pointer.strip_suffix("/blueprint") else {
+    let reader = project.reader();
+    let mut holders: Vec<&str> = project
+        .usages
+        .of_content(bundle)
+        .iter()
+        .filter_map(|usage| content_of(&usage.file).map(|(_, holder)| holder))
+        .collect();
+    holders.sort();
+    holders.dedup();
+    let mut placed: Vec<Placement> = Vec::new();
+    for holder in holders {
+        let Some(scene) = nodes::bundle_in(project, holder) else {
             continue;
         };
-        if let Some(json) = project.files.json(&usage.file)
-            && let Some(node) = json.pointer(node)
-        {
-            placed.push(node.clone());
-        }
+        nodes::walk(scene.nodes(), &mut |_, node| {
+            if let SceneNode::Module(ModuleNode {
+                module: AreaModule::Blueprint(placement),
+                ..
+            }) = node
+                && reader.path_of(placement.blueprint) == Some(bundle)
+            {
+                placed.push(placement.clone());
+            }
+        });
     }
     let total = placed.len();
-    for node in placed {
-        for name in node["values"]
-            .as_object()
-            .into_iter()
-            .flat_map(|values| values.keys())
-        {
+    for placement in placed {
+        for name in placement.values.keys() {
             out.entry(name.clone()).or_insert((0, total)).0 += 1;
         }
     }
@@ -305,7 +313,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnaps
             action = Some(HeaderAction::FirstFlagged);
         }
         if selected > 1 {
-            widgets::chip(ui, &format!("{selected} selected"));
+            widgets::chip(ui, format!("{selected} selected"));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {

@@ -10,7 +10,6 @@ pub mod strip;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
 use engine::core::content::{ContentFile, FolderReader};
@@ -249,19 +248,8 @@ impl ModelSheet {
     }
 }
 
-/// The model at `key` as the game reads it, or `None` once `ui` says why it doesn't read.
-pub fn read_model(editor: &Editor, ui: &mut Ui, key: &str) -> Option<Arc<ModelDef>> {
-    match editor.read::<ModelDef>(key)? {
-        Ok(model) => Some(model),
-        Err(errors) => {
-            widgets::unreadable(ui, key, &errors);
-            None
-        }
-    }
-}
-
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = read_model(editor, ui, key) else {
+    let Some(row) = super::read_shown::<ModelDef>(editor, ui, key) else {
         return;
     };
     ensure_view(editor, key);
@@ -379,7 +367,7 @@ pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
-    let Some(row) = read_model(editor, ui, key) else {
+    let Some(row) = super::read_shown::<ModelDef>(editor, ui, key) else {
         return;
     };
     ensure_view(editor, key);

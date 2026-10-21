@@ -52,9 +52,13 @@ impl Bundle for ModelDef {
             }
         }
         let keyed = parts.keyed(MODEL_BUSTS);
-        let measured: Vec<(String, Option<(u32, u32)>, Option<FileSize>)> = keyed
+        let measured: Vec<MeasuredBust> = keyed
             .iter()
-            .map(|(_, file)| (parts.path(file), parts.image_size(file), parts.weight(file)))
+            .map(|(_, file)| MeasuredBust {
+                path: parts.path(file),
+                size: parts.image_size(file),
+                weight: parts.weight(file),
+            })
             .collect();
         let busts = self.modules.iter_mut().find_map(|module| match module {
             ModelModule::Bust(busts) => Some(busts),
@@ -150,6 +154,10 @@ impl ModuleSet for ModelDef {
 
     fn modules(&self) -> &[ModelModule] {
         &self.modules
+    }
+
+    fn modules_mut(&mut self) -> &mut Vec<ModelModule> {
+        &mut self.modules
     }
 
     fn rule(_: &ModelModule) -> ModuleRule {
@@ -441,10 +449,22 @@ fn check_sheet(sheet: &SpriteSheet, (width, height): (u32, u32), cx: &mut RowChe
     }
 }
 
+/// A bust of a model's bundle as its file measures.
+struct MeasuredBust {
+    path: String,
+    size: Option<(u32, u32)>,
+    weight: Option<FileSize>,
+}
+
 /// What a model's busts must be to each other: one size, each light enough to download.
-fn check_busts(busts: &[(String, Option<(u32, u32)>, Option<FileSize>)], cx: &mut RowCheck) {
+fn check_busts(busts: &[MeasuredBust], cx: &mut RowCheck) {
     let mut first: Option<(&str, (u32, u32))> = None;
-    for (bust, size, weight) in busts {
+    for MeasuredBust {
+        path: bust,
+        size,
+        weight,
+    } in busts
+    {
         if let Some(weight) = weight
             && *weight > MAX_BUST_BYTES
         {

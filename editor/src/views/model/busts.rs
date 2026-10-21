@@ -79,7 +79,7 @@ pub fn face_names(model: Option<&ModelDef>) -> Vec<String> {
 /// The model the npc at `npc` wears, when both read.
 pub fn model_of_npc(project: &Project, npc: &str) -> Option<Arc<ModelDef>> {
     let npc = project.read::<NpcDef>(npc).ok()?;
-    project.read(project.reader().path_of(npc.model)?).ok()
+    project.read_id(npc.model)
 }
 
 /// The part of the model at `key` a bust of `name` is drawn in.

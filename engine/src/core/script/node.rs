@@ -121,7 +121,99 @@ impl NodeKind {
     }
 }
 
+/// Where an arrow leaves a node: an output it names, one of a random node's outputs, or the
+/// arrow a dialogue choice takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Exit {
+    Named(&'static str),
+    Output(usize),
+    Choice(usize),
+}
+
+pub const NEXT_EXIT: Exit = Exit::Named(super::NEXT);
+
 impl<V: Vocabulary> Node<V> {
+    pub fn kind(&self) -> NodeKind {
+        self.into()
+    }
+
+    /// Every arrow leaving the node, where it leaves.
+    pub fn exits(&self) -> Vec<(Exit, &Arrow)> {
+        match self {
+            Node::On { next, .. }
+            | Node::Wait { next, .. }
+            | Node::Set { next, .. }
+            | Node::Run { next, .. } => vec![(NEXT_EXIT, next)],
+            Node::If { yes, no, .. } => vec![(Exit::Named("yes"), yes), (Exit::Named("no"), no)],
+            Node::Random { outputs, .. } => outputs
+                .iter()
+                .enumerate()
+                .map(|(index, arrow)| (Exit::Output(index), arrow))
+                .collect(),
+            Node::Repeat { each, then, .. } => {
+                vec![(Exit::Named("each"), each), (Exit::Named("then"), then)]
+            }
+            Node::Return { .. } => Vec::new(),
+            Node::Dialogue(dialogue) => dialogue
+                .choices
+                .iter()
+                .enumerate()
+                .map(|(index, choice)| (Exit::Choice(index), &choice.to))
+                .chain([
+                    (NEXT_EXIT, &dialogue.next),
+                    (Exit::Named("left"), &dialogue.left),
+                ])
+                .collect(),
+            Node::Effect(effect) => effect
+                .outputs()
+                .into_iter()
+                .map(|(name, arrow)| (Exit::Named(name), arrow))
+                .collect(),
+        }
+    }
+
+    pub fn exits_mut(&mut self) -> Vec<(Exit, &mut Arrow)> {
+        match self {
+            Node::On { next, .. }
+            | Node::Wait { next, .. }
+            | Node::Set { next, .. }
+            | Node::Run { next, .. } => vec![(NEXT_EXIT, next)],
+            Node::If { yes, no, .. } => vec![(Exit::Named("yes"), yes), (Exit::Named("no"), no)],
+            Node::Random { outputs, .. } => outputs
+                .iter_mut()
+                .enumerate()
+                .map(|(index, arrow)| (Exit::Output(index), arrow))
+                .collect(),
+            Node::Repeat { each, then, .. } => {
+                vec![(Exit::Named("each"), each), (Exit::Named("then"), then)]
+            }
+            Node::Return { .. } => Vec::new(),
+            Node::Dialogue(dialogue) => dialogue
+                .choices
+                .iter_mut()
+                .enumerate()
+                .map(|(index, choice)| (Exit::Choice(index), &mut choice.to))
+                .chain([
+                    (NEXT_EXIT, &mut dialogue.next),
+                    (Exit::Named("left"), &mut dialogue.left),
+                ])
+                .collect(),
+            Node::Effect(effect) => effect
+                .outputs_mut()
+                .into_iter()
+                .map(|(name, arrow)| (Exit::Named(name), arrow))
+                .collect(),
+        }
+    }
+
+    /// The arrow leaving at `exit`, when the node has one there.
+    pub fn exit_mut(&mut self, exit: Exit) -> Option<&mut Arrow> {
+        self.exits_mut()
+            .into_iter()
+            .find(|(at, _)| *at == exit)
+            .map(|(_, arrow)| arrow)
+    }
+
     /// Whether a flow halts at the node until time passes or someone answers, the only way a
     /// loop may come back around.
     pub fn pauses(&self) -> bool {

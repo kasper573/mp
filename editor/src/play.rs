@@ -18,16 +18,14 @@ use engine::systems::launch::{
     fake_token,
 };
 use engine::systems::player::SpawnPolicy;
-use engine::systems::player::snapshot::CharacterSnapshot;
+use engine::systems::player::snapshot::{CharacterSnapshot, CharacterStart};
 use engine::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap};
-use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
 use crate::forms;
 use crate::keymap::EditorKey;
 use crate::ui::{self, theme, widgets};
-use crate::value::RowValue;
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
@@ -456,7 +454,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     }
     widgets::chip(
         ui,
-        &format!(
+        format!(
             "{changes} change{} since start",
             crate::ui::widgets::plural(changes)
         ),
@@ -567,6 +565,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
         return Vec::new();
     };
     let content = project.content.clone();
+    let reader = project.reader();
     let spawn_area = content.as_ref().map(|content| {
         content
             .built::<GameSettings>()
@@ -581,20 +580,18 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
         .iter()
         .filter_map(|file| {
             let key = file.as_str();
-            let row = project.files.json(file)?;
-            let xp = row["xp"].as_u64().unwrap_or(0) as u32;
+            let snapshot = project.read::<CharacterSnapshot>(key).ok()?;
             let level = content
                 .as_ref()
                 .and_then(|content| {
-                    row["class"]
-                        .as_str()
-                        .and_then(|class| content.by_path::<ClassDef>(class))
-                        .map(|class| class.get(content).level_at(xp))
+                    let class = reader.path_of(snapshot.class)?;
+                    let class = content.by_path::<ClassDef>(class)?;
+                    Some(class.get(content).level_at(snapshot.xp))
                 })
                 .unwrap_or(0);
-            let area = match &row["start"] {
-                Value::Object(place) => place.text_or("area", "?").to_owned(),
-                _ => spawn_area
+            let area = match &snapshot.start {
+                CharacterStart::At(place) => reader.path_of(place.area).unwrap_or("?").to_owned(),
+                CharacterStart::InitialSpawn(_) => spawn_area
                     .clone()
                     .map(|area| format!("the initial spawn · {area}"))
                     .unwrap_or_else(|| "the initial spawn".to_owned()),

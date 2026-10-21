@@ -3,8 +3,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use egui::{Color32, Sense, Ui, Vec2};
-use engine::core::content::{ContentFile, fields_file, parent_of};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{ContentFile, MODULES, fields_file, parent_of};
 use engine::systems::npc::{self, NpcDef};
+use engine::systems::registry;
 use engine::systems::script::RiftScripts;
 use serde_json::Value;
 
@@ -46,6 +48,7 @@ pub struct SpreadsheetState {
     pub last_edit: Option<(String, String, String)>,
     focus_editor: bool,
     columns: Option<(u64, Arc<Vec<SpreadsheetColumn>>)>,
+    rows: Option<(u64, Arc<Vec<SpreadsheetRow>>)>,
 }
 
 impl SpreadsheetState {
@@ -74,31 +77,33 @@ pub struct SpreadsheetColumn {
     pub numeric: bool,
 }
 
+/// A file of the table as its sheet reads it: its fields, and its modules each as its type
+/// writes it.
+#[derive(Clone)]
 pub struct SpreadsheetRow {
     pub key: String,
     pub value: Arc<Value>,
+    pub modules: Arc<Vec<Value>>,
 }
 
 impl SpreadsheetRow {
     pub fn has_module(&self, tag: &str) -> bool {
-        (*self.value)["modules"]
-            .as_array()
-            .is_some_and(|modules| modules.iter().any(|module| module["type"] == tag))
+        self.module(tag).is_some()
+    }
+
+    fn module(&self, tag: &str) -> Option<&Value> {
+        self.modules
+            .iter()
+            .find(|module| TypeTag::of_json(module).as_deref() == Some(tag))
     }
 }
 
 impl SpreadsheetColumn {
-    pub fn get<'a>(&self, row: &'a Value) -> Option<&'a Value> {
+    pub fn get<'a>(&self, row: &'a SpreadsheetRow) -> Option<&'a Value> {
         match &self.source {
             ColumnSource::Key | ColumnSource::Folder => None,
-            ColumnSource::First(path) => dig(row, path),
-            ColumnSource::Module { tag, path } => {
-                let module = row["modules"]
-                    .as_array()?
-                    .iter()
-                    .find(|module| module["type"] == *tag)?;
-                dig(module, path)
-            }
+            ColumnSource::First(path) => dig(&row.value, path),
+            ColumnSource::Module { tag, path } => dig(row.module(tag)?, path),
         }
     }
 
@@ -106,7 +111,7 @@ impl SpreadsheetColumn {
         match self.source {
             ColumnSource::Key => Some(file_title(&row.key).to_owned()),
             ColumnSource::Folder => Some(parent_of(&row.key).to_owned()),
-            _ => self.get(&row.value).map(cell_text),
+            _ => self.get(row).map(cell_text),
         }
     }
 
@@ -127,7 +132,7 @@ impl SpreadsheetColumn {
     }
 
     pub fn number(&self, row: &SpreadsheetRow) -> Option<f64> {
-        self.get(&row.value).and_then(Value::as_f64)
+        self.get(row).and_then(Value::as_f64)
     }
 
     pub fn lacks_module(&self, row: &SpreadsheetRow) -> bool {
@@ -190,7 +195,7 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
     let root = &shape.shape;
     let mut path = Vec::new();
     leaves(root, root, &mut path, &mut |path, schema| {
-        if path.first().is_some_and(|first| first == "modules") {
+        if path.first().is_some_and(|first| first == MODULES) {
             return;
         }
         let sub = match path.len() {
@@ -230,10 +235,11 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
         });
         let mut keyed: BTreeMap<(String, String), bool> = BTreeMap::new();
         for row in rows {
-            let Some(modules) = (*row.value)["modules"].as_array() else {
-                continue;
-            };
-            for module in modules.iter().filter(|m| m["type"] == variant.tag) {
+            for module in row
+                .modules
+                .iter()
+                .filter(|m| TypeTag::of_json(m).as_ref() == Some(&variant.tag))
+            {
                 for (name, field) in schema::properties(variant.schema) {
                     if !matches!(schema::kind(root, field), SchemaKind::Map(_)) {
                         continue;
@@ -257,7 +263,11 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
                     tag: variant.tag.clone(),
                     path: vec![map_name, entry],
                 },
-                schema: serde_json::json!({ "type": if numeric { "number" } else { "string" } }),
+                schema: if numeric {
+                    schema::of_type::<f64>().clone()
+                } else {
+                    schema::of_type::<String>().clone()
+                },
                 numeric,
             });
         }
@@ -319,17 +329,26 @@ fn leaves(
     }
 }
 
-pub fn rows_of(editor: &Editor, table: &str) -> Vec<SpreadsheetRow> {
+fn rows_of(editor: &Editor, table: &str) -> Vec<SpreadsheetRow> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
+    let reader = project.reader();
+    let holds_modules = registry().holds_modules(table);
     let mut rows: Vec<SpreadsheetRow> = project
         .files
         .paths_of(table)
         .into_iter()
         .filter_map(|key| {
+            let value = project.files.json(&fields_file(&key))?;
+            let modules = if holds_modules {
+                reader.modules_in(table, &value).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
             Some(SpreadsheetRow {
-                value: project.files.json(&fields_file(&key))?,
+                value,
+                modules: Arc::new(modules),
                 key,
             })
         })
@@ -487,7 +506,7 @@ pub fn shown_rows(
     SpreadsheetView,
     usize,
 ) {
-    let all = rows_of(editor, table);
+    let all = rows_cached(editor, table);
     let columns = columns_cached(editor, table, &all);
     let view = view_of(editor, table, &columns);
     let named = named_filters(editor, table);
@@ -501,13 +520,14 @@ pub fn shown_rows(
         .unwrap_or_default();
     let total = all.len();
     let mut rows: Vec<SpreadsheetRow> = all
-        .into_iter()
+        .iter()
         .filter(|row| {
             filters
                 .iter()
                 .all(|filter| passes(row, filter, &named, &columns))
         })
         .filter(|row| matches_search(row, &search, &columns))
+        .cloned()
         .collect();
     let folder = SpreadsheetColumn::folder();
     if let Some((id, descending)) = &view.sort
@@ -516,6 +536,21 @@ pub fn shown_rows(
         sort_rows(&mut rows, column, *descending);
     }
     (rows, columns, view, total)
+}
+
+fn rows_cached(editor: &mut Editor, table: &str) -> Arc<Vec<SpreadsheetRow>> {
+    let generation = editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.generation);
+    if let Some((built_for, rows)) = &editor.views.spreadsheet.state_mut(table).rows
+        && *built_for == generation
+    {
+        return rows.clone();
+    }
+    let rows = Arc::new(rows_of(editor, table));
+    editor.views.spreadsheet.state_mut(table).rows = Some((generation, rows.clone()));
+    rows
 }
 
 fn columns_cached(
@@ -1043,7 +1078,7 @@ fn edit_cell(
     let root = shapes.shape_of(table);
     let schema = column.schema.clone();
     let mut value = column
-        .get(&row.value)
+        .get(row)
         .cloned()
         .unwrap_or_else(|| match &editor.project {
             Some(project) => {
@@ -1101,8 +1136,16 @@ fn write_cells(
                 set_path(&mut row, path, value.clone());
             }
             ColumnSource::Module { tag, path } => {
-                let mut modules = row["modules"].as_array().cloned().unwrap_or_default();
-                let index = match modules.iter().position(|module| module["type"] == *tag) {
+                let Some(reader) = editor.reader() else {
+                    continue;
+                };
+                let Ok(mut modules) = reader.modules_in(table, &row) else {
+                    continue;
+                };
+                let index = match modules
+                    .iter()
+                    .position(|module| TypeTag::of_json(module).as_ref() == Some(tag))
+                {
                     Some(index) => index,
                     None => {
                         let Some(template) = module_template(editor, table, key, tag) else {
@@ -1113,7 +1156,13 @@ fn write_cells(
                     }
                 };
                 set_path(&mut modules[index], path, value.clone());
-                row["modules"] = Value::Array(modules);
+                match reader.with_modules_in(table, &row, &modules) {
+                    Ok(with) => row = with,
+                    Err(error) => {
+                        editor.toast(format!("{key}: {error}"));
+                        continue;
+                    }
+                }
             }
         }
         rows.insert(key.clone(), row);
@@ -1251,7 +1300,7 @@ fn keys(
         if !column.editable() {
             return;
         }
-        let Some(value) = column.get(&rows[row_index].value).cloned() else {
+        let Some(value) = column.get(&rows[row_index]).cloned() else {
             return;
         };
         let targets: Vec<String> = if range.is_empty() {
@@ -1506,15 +1555,7 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         for other in brief {
             widgets::kv_text(ui, &other.title, other.text(row).unwrap_or_default());
         }
-        let modules: Vec<String> = (*row.value)["modules"]
-            .as_array()
-            .map(|modules| {
-                modules
-                    .iter()
-                    .filter_map(|m| m["type"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let modules: Vec<String> = row.modules.iter().filter_map(TypeTag::of_json).collect();
         if !modules.is_empty() {
             widgets::kv_text(ui, "modules", modules.join(" · "));
         }

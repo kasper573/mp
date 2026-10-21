@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use design_tokens::glyph::Mark;
 use egui::{Align2, FontId, Sense, Ui};
+use engine::core::content::MODULES;
 use serde_json::Value;
 
 use super::{theme, widgets};
@@ -242,7 +243,7 @@ fn touched(before: Option<&FileBytes>, after: Option<&FileBytes>) -> String {
     };
     let modules = |value: &serde_json::Map<String, Value>| {
         value
-            .get("modules")
+            .get(MODULES)
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default()
@@ -253,11 +254,11 @@ fn touched(before: Option<&FileBytes>, after: Option<&FileBytes>) -> String {
         .count();
     let changed_fields = before
         .iter()
-        .filter(|(k, v)| *k != "modules" && after.get(*k) != Some(v))
+        .filter(|(k, v)| *k != MODULES && after.get(*k) != Some(v))
         .count()
         + after
             .keys()
-            .filter(|k| *k != "modules" && !before.contains_key(*k))
+            .filter(|k| *k != MODULES && !before.contains_key(*k))
             .count();
     let mut parts = Vec::new();
     if changed_modules > 0 {

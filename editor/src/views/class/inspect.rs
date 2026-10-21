@@ -1,39 +1,43 @@
+use std::collections::BTreeMap;
+
 use design_tokens::glyph::{self, Mark};
 use egui::{Sense, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentFile};
-use engine::systems::class::{ClassDef, NodeKey, SkillTree};
-use engine::systems::skill::SkillDef;
-use serde_json::{Map, Value};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{ContentFile, FolderReader};
+use engine::core::script::Expr;
+use engine::field;
+use engine::systems::class::{AccessRequirement, ClassDef, NodeKey, SkillNode, SkillTree};
+use engine::systems::skill::{Rank, SkillDef};
 
-use super::tree::{self, CarriedNode};
+use super::tree::{self, CarriedNode, NodeSkill};
 use super::{node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::RowSelection;
 use crate::tabs::shown_path;
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
-use crate::{condition, picker, schema};
+use crate::{picker, schema, views};
 
 const DROP_HEIGHT: f32 = 30.0;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    let Some(node) = node_of(selection).map(str::to_owned) else {
+    let Some(node) = node_of(selection).map(NodeKey::from) else {
         return;
     };
     let key = selection.keys[0].clone();
-    let Some(mut row) = editor.row_value(&key) else {
+    let Some(read) = views::read_shown::<ClassDef>(editor, ui, &key) else {
         return;
     };
-    if !row["tree"][&node].is_object() {
+    let (Some(project), Some(reader)) = (&editor.project, editor.reader()) else {
+        return;
+    };
+    let tree = read.tree.clone();
+    let Some(mut held) = tree.node(&node).cloned() else {
         ui.label(theme::muted(format!("node {node} is gone")));
         return;
-    }
-    let Some(content) = editor.loaded() else {
-        ui.label(theme::muted("waiting for the content to load"));
-        return;
     };
-    let tree = tree::tree_of(&content, &row);
+    let skills = tree::node_skills(project, &tree);
+    let level_count = read.levels.len().max(1) as u32;
     let shapes = editor.shapes.clone();
     let mut changed = FormChange::default();
     let mut removed = false;
@@ -51,9 +55,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                             .size(12.0),
                     );
                     ui.add_space(6.0);
-                    changed |= fields(ui, cx, &mut row, &node);
+                    let path = format!("{}{node}", super::TREE_PART);
+                    changed |= fields(ui, cx, &reader, &mut held, &path);
                     widgets::section(ui, "access requirements");
-                    changed |= requirements(ui, cx, &content, &mut row, &tree, &node);
+                    let around = Around {
+                        tree: &tree,
+                        skills: &skills,
+                        node: &node,
+                        level_count,
+                    };
+                    changed |= requirements(ui, cx, &around, &mut held.requires, &path);
                     ui.add_space(10.0);
                     if widgets::danger(ui, "Remove node").clicked() {
                         removed = true;
@@ -61,45 +72,51 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                 });
         },
     );
+    let mut class = (*read).clone();
     if removed {
-        tree::remove_node(&mut row, &node);
-        write(editor, &key, "Remove node", &row);
+        tree::remove_node(&mut class.tree, &node);
+        write(editor, &key, "Remove node", &class);
         select_node(editor, &key, None);
     } else if changed.is_some() {
-        write(editor, &key, "Edit node", &row);
+        class.tree.0.insert(node, held);
+        write(editor, &key, "Edit node", &class);
     }
 }
 
-fn fields(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, node: &str) -> FormChange {
+/// What the requirements of `node` are picked among.
+struct Around<'a> {
+    tree: &'a SkillTree,
+    skills: &'a BTreeMap<NodeKey, NodeSkill>,
+    node: &'a NodeKey,
+    level_count: u32,
+}
+
+fn fields(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    reader: &FolderReader,
+    node: &mut SkillNode,
+    path: &str,
+) -> FormChange {
     let mut changed = FormChange::default();
-    let path = format!("{}{node}", super::TREE_PART);
     widgets::kv(ui, "skill", |ui| {
-        let mut skill = row["tree"][node].text("skill").to_owned();
-        if picker::row(
-            ui,
-            cx,
-            SkillDef::TABLE,
-            &mut skill,
-            &format!("{path}/skill"),
-        ) {
-            row["tree"][node]["skill"] = Value::String(skill);
-            changed = FormChange::at(&path);
+        let mut skill = reader.path_of(node.skill).unwrap_or_default().to_owned();
+        let skill_path = format!("{path}{}", field!(SkillNode, skill));
+        if picker::row(ui, cx, SkillDef::TABLE, &mut skill, &skill_path)
+            && let Some(picked) = reader.id_of::<SkillDef>(&skill)
+        {
+            node.skill = picked;
+            changed = FormChange::at(path);
         }
     });
-    for axis in ["x", "y"] {
+    for (axis, at) in [("x", &mut node.at.x), ("y", &mut node.at.y)] {
         widgets::kv(ui, axis, |ui| {
-            let held = row["tree"][node]["at"][axis].as_f64().unwrap_or(0.0) as f32;
-            let mut draft = held;
+            let held = *at;
             let response = forms::boxed_input(ui, None, |ui| {
-                ui.add(
-                    egui::DragValue::new(&mut draft)
-                        .speed(1.0)
-                        .range(0.0..=f32::MAX),
-                )
+                ui.add(egui::DragValue::new(at).speed(1.0).range(0.0..=f32::MAX))
             });
-            if response.changed() && draft != held {
-                row["tree"][node]["at"][axis] = Value::from(draft);
-                changed = FormChange::at(&path);
+            if response.changed() && *at != held {
+                changed = FormChange::at(path);
             }
         });
     }
@@ -109,22 +126,16 @@ fn fields(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, node: &str) -> FormChan
 fn requirements(
     ui: &mut Ui,
     cx: &mut FormCx,
-    content: &Content,
-    row: &mut Value,
-    tree: &SkillTree,
-    node: &str,
+    around: &Around,
+    requires: &mut Vec<AccessRequirement>,
+    node_path: &str,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let path = format!("{}{node}/requires", super::TREE_PART);
-    if !row["tree"][node]["requires"].is_array() {
-        row["tree"][node]["requires"] = Value::Array(Vec::new());
-    }
-    let count = row["tree"][node]["requires"].as_array().map_or(0, Vec::len);
-    let level_count = row["levels"].as_array().map_or(1, Vec::len).max(1) as u32;
+    let path = format!("{node_path}{}", field!(SkillNode, requires));
     let mut remove = None;
-    for index in 0..count {
+    for (index, requirement) in requires.iter_mut().enumerate() {
         let item_path = format!("{path}/{index}");
-        let kind = row["tree"][node]["requires"][index].text("type").to_owned();
+        let kind = TypeTag::of(requirement).unwrap_or_default();
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
@@ -139,170 +150,163 @@ fn requirements(
                     }
                 });
             });
-            let schema_root = cx.root;
-            let item = &mut row["tree"][node]["requires"][index];
-            match kind.as_str() {
-                "skill" => {
-                    let named = item.text("node").to_owned();
-                    widgets::kv(ui, "node", |ui| {
-                        let mut picked = named.clone();
-                        widgets::combo(("requirement-node", index))
-                            .width(ui.available_width() - 8.0)
-                            .selected_text(if named.is_empty() {
-                                theme::muted("pick a node…")
-                            } else {
-                                theme::mono(&named).size(13.0)
-                            })
-                            .show_ui(ui, |ui| {
-                                for other in tree.0.keys().filter(|other| other.as_str() != node) {
-                                    let loops = tree.depends_on::<str>(other.as_str(), node);
-                                    let response = ui.add_enabled(
-                                        !loops,
-                                        egui::Button::selectable(picked == other.as_str(), other.as_str()),
-                                    );
-                                    if loops {
-                                        response.on_disabled_hover_text(format!(
-                                            "{other} already needs {node}: picking it would close a loop"
-                                        ));
-                                    } else if response.clicked() {
-                                        picked = other.to_string();
-                                    }
-                                }
-                            });
-                        if picked != named {
-                            item["node"] = Value::String(picked);
-                            changed = FormChange::at(&item_path);
-                        }
-                    });
-                    let ranks = tree
-                        .node(named.as_str())
-                        .map_or(1, |named| named.skill.get(content).rank_count());
-                    widgets::kv(ui, "rank", |ui| {
-                        let held = item["rank"].as_u64().unwrap_or(1) as u8;
-                        let mut draft = held.min(ranks);
-                        forms::boxed_input(ui, Some(&format!("of {ranks}")), |ui| {
-                            ui.add(egui::DragValue::new(&mut draft).range(1..=ranks))
-                        });
-                        if draft != held {
-                            item["rank"] = Value::from(draft);
-                            changed = FormChange::at(&item_path);
-                        }
-                    });
-                }
-                "level" => {
-                    widgets::kv(ui, "level", |ui| {
-                        let held = item["level"].as_u64().unwrap_or(1) as u32;
-                        let mut draft = held;
-                        let response =
-                            forms::boxed_input(ui, Some(&format!("of {level_count}")), |ui| {
-                                ui.add(egui::DragValue::new(&mut draft).range(1..=level_count))
-                            });
-                        if response.changed() && draft != held {
-                            item["level"] = Value::from(draft);
-                            changed = FormChange::at(&item_path);
-                        }
-                    });
-                }
-                "condition" => {
-                    let condition_path = format!("{item_path}/condition");
-                    let schema = schema::at_pointer(schema_root, schema_root, row, &condition_path)
-                        .cloned()
-                        .unwrap_or(Value::Null);
-                    let item = &mut row["tree"][node]["requires"][index];
-                    if item["condition"].is_null() {
-                        item["condition"] = Value::Object(Map::new());
-                    }
-                    changed |= condition::edit(ui, cx, &schema, &mut item["condition"], &condition_path);
-                }
-                _ => {
-                    ui.label(theme::warn(format!("unknown kind {kind:?}")));
-                }
+            if requirement_body(ui, cx, around, requirement, index, &item_path) {
+                changed = FormChange::at(&item_path);
             }
         });
         ui.add_space(4.0);
     }
-    if count == 0 {
+    if requires.is_empty() {
         ui.label(theme::faint("a root: available from the start").size(12.5));
     }
     if let Some(index) = remove {
-        row["tree"][node]["requires"]
-            .as_array_mut()
-            .expect("array")
-            .remove(index);
+        requires.remove(index);
         changed = FormChange::at(&path);
     }
     ui.add_space(4.0);
     widgets::dropdown_menu(ui, "+ add requirement", |ui| {
-        let kinds = [
-            (
-                "skill",
-                serde_json::json!({ "type": "skill", "node": "", "rank": 1 }),
-            ),
-            ("level", serde_json::json!({ "type": "level", "level": 2 })),
-            (
-                "condition",
-                serde_json::json!({ "type": "condition", "condition": {} }),
-            ),
-        ];
-        for (kind, template) in kinds {
-            if ui.button(schema::title(kind)).clicked() {
-                row["tree"][node]["requires"]
-                    .as_array_mut()
-                    .expect("array")
-                    .push(template);
+        for template in templates() {
+            let kind = TypeTag::of(&template).unwrap_or_default();
+            if ui.button(schema::title(&kind)).clicked() {
+                requires.push(template);
                 changed = FormChange::at(&path);
                 ui.close();
             }
         }
     });
-    if egui::DragAndDrop::has_payload_of_type::<CarriedNode>(ui.ctx()) {
-        let (rect, response) =
-            ui.allocate_exact_size(Vec2::new(ui.available_width(), DROP_HEIGHT), Sense::hover());
-        let lit = response.contains_pointer();
-        widgets::dashed_rect(
-            ui.painter(),
-            rect,
-            Stroke::new(1.0, if lit { theme::ACCENT } else { theme::BORDER }),
-            5.0,
-            3.0,
-        );
-        let carried = egui::DragAndDrop::payload::<CarriedNode>(ui.ctx())
-            .map(|carried| carried.0.clone())
-            .unwrap_or_default();
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            format!("drop to require {carried} at rank 1"),
-            egui::FontId::proportional(12.5),
-            if lit { theme::TEXT } else { theme::MUTED },
-        );
-        if let Some(dropped) = response.dnd_release_payload::<CarriedNode>() {
-            let named: &NodeKey = &dropped.0;
-            let listed = row["tree"][node]["requires"]
-                .as_array()
-                .is_some_and(|list| list.iter().any(|item| item["node"] == named.as_str()));
-            if named.as_str() == node {
-                cx.state.status = vec!["a node can't require itself".to_owned()];
-            } else if listed {
-                cx.state.status = vec![format!("{named} is already required")];
-            } else if tree.depends_on::<str>(named.as_str(), node) {
-                cx.state.status = vec![format!("{named} already needs {node}")];
-            } else {
-                row["tree"][node]["requires"]
-                    .as_array_mut()
-                    .expect("array")
-                    .push(
-                        serde_json::json!({ "type": "skill", "node": named.as_str(), "rank": 1 }),
-                    );
-                changed = FormChange::at(&path);
-            }
+    if let Some(dropped) = drop_slot(ui) {
+        let node = around.node;
+        let listed = requires.iter().any(|requirement| {
+            matches!(requirement, AccessRequirement::Skill { node: needed, .. } if *needed == dropped)
+        });
+        if dropped == *node {
+            cx.state.status = vec!["a node can't require itself".to_owned()];
+        } else if listed {
+            cx.state.status = vec![format!("{dropped} is already required")];
+        } else if around.tree.depends_on(&dropped, node) {
+            cx.state.status = vec![format!("{dropped} already needs {node}")];
+        } else {
+            requires.push(AccessRequirement::Skill {
+                node: dropped,
+                rank: Rank::FIRST,
+            });
+            changed = FormChange::at(&path);
         }
     }
-    if row["tree"][node]["requires"]
-        .as_array()
-        .is_some_and(Vec::is_empty)
-    {
-        row["tree"][node].remove_field("requires");
-    }
     changed
+}
+
+/// The requirement of each kind a node starts with when one is added.
+fn templates() -> [AccessRequirement; 3] {
+    [
+        AccessRequirement::Skill {
+            node: NodeKey::default(),
+            rank: Rank::FIRST,
+        },
+        AccessRequirement::Level { level: 2 },
+        AccessRequirement::Condition {
+            condition: Expr::Bool(true),
+        },
+    ]
+}
+
+/// The fields of one requirement; whether any changed.
+fn requirement_body(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    around: &Around,
+    requirement: &mut AccessRequirement,
+    index: usize,
+    path: &str,
+) -> bool {
+    let node = around.node;
+    match requirement {
+        AccessRequirement::Skill { node: needed, rank } => {
+            let mut changed = false;
+            widgets::kv(ui, "node", |ui| {
+                widgets::combo(("requirement-node", index))
+                    .width(ui.available_width() - 8.0)
+                    .selected_text(if needed.as_str().is_empty() {
+                        theme::muted("pick a node…")
+                    } else {
+                        theme::mono(needed.as_str()).size(13.0)
+                    })
+                    .show_ui(ui, |ui| {
+                        for other in around.tree.0.keys().filter(|other| *other != node) {
+                            let loops = around.tree.depends_on(other, node);
+                            let response = ui.add_enabled(
+                                !loops,
+                                egui::Button::selectable(needed == other, other.as_str()),
+                            );
+                            if loops {
+                                response.on_disabled_hover_text(format!(
+                                    "{other} already needs {node}: picking it would close a loop"
+                                ));
+                            } else if response.clicked() && needed != other {
+                                *needed = other.clone();
+                                changed = true;
+                            }
+                        }
+                    });
+            });
+            let ranks = around.skills.get(needed).map_or(1, NodeSkill::ranks);
+            widgets::kv(ui, "rank", |ui| {
+                let held = *rank;
+                let mut draft = held.0.min(ranks);
+                forms::boxed_input(ui, Some(&format!("of {ranks}")), |ui| {
+                    ui.add(egui::DragValue::new(&mut draft).range(1..=ranks))
+                });
+                if draft != held.0 {
+                    *rank = Rank(draft);
+                    changed = true;
+                }
+            });
+            changed
+        }
+        AccessRequirement::Level { level } => {
+            let mut changed = false;
+            let level_count = around.level_count;
+            widgets::kv(ui, "level", |ui| {
+                let held = *level;
+                let response = forms::boxed_input(ui, Some(&format!("of {level_count}")), |ui| {
+                    ui.add(egui::DragValue::new(level).range(1..=level_count))
+                });
+                changed = response.changed() && *level != held;
+            });
+            changed
+        }
+        AccessRequirement::Condition { condition } => {
+            forms::of_type(ui, cx, condition, &format!("{path}/condition")).is_some()
+        }
+    }
+}
+
+/// While a node is carried from the canvas, a slot to drop it on; the node let go of over it.
+fn drop_slot(ui: &mut Ui) -> Option<NodeKey> {
+    if !egui::DragAndDrop::has_payload_of_type::<CarriedNode>(ui.ctx()) {
+        return None;
+    }
+    let (rect, response) =
+        ui.allocate_exact_size(Vec2::new(ui.available_width(), DROP_HEIGHT), Sense::hover());
+    let lit = response.contains_pointer();
+    widgets::dashed_rect(
+        ui.painter(),
+        rect,
+        Stroke::new(1.0, if lit { theme::ACCENT } else { theme::BORDER }),
+        5.0,
+        3.0,
+    );
+    let carried = egui::DragAndDrop::payload::<CarriedNode>(ui.ctx())
+        .map(|carried| carried.0.clone())
+        .unwrap_or_default();
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        format!("drop to require {carried} at rank 1"),
+        egui::FontId::proportional(12.5),
+        if lit { theme::TEXT } else { theme::MUTED },
+    );
+    response
+        .dnd_release_payload::<CarriedNode>()
+        .map(|dropped| dropped.0.clone())
 }

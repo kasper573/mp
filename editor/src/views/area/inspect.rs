@@ -692,7 +692,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                             &mut value,
                             &format!("/stamp/{stamp}/{name}"),
                         );
-                        if edited || (values.get(name).is_none() && variable.default.is_none()) {
+                        if edited || (!values.contains_key(name) && variable.default.is_none()) {
                             values.insert(name.clone(), value);
                             values_changed = true;
                         }
@@ -961,7 +961,7 @@ fn module_inspector(
         }
         AreaModule::Object(object) => {
             ui.add_space(4.0);
-            changed |= object_scripts(ui, cx, &reader, object, &path);
+            changed |= object_scripts(ui, cx, object, &path);
             object_extras(ui, object, reader.as_ref(), out, node);
         }
         AreaModule::Soundscape(soundscape) => {
@@ -1020,31 +1020,10 @@ fn module_fields(ui: &mut Ui, cx: &mut FormCx, module: &mut AreaModule, path: &s
 }
 
 /// The scripts of `object`, each as a card.
-fn object_scripts(
-    ui: &mut Ui,
-    cx: &mut FormCx,
-    reader: &FolderReader,
-    object: &mut ObjectDef,
-    path: &str,
-) -> bool {
-    let Ok(mut json) = reader.to_json(&*object) else {
-        return false;
-    };
-    let scripts = field!(ObjectDef, scripts).trim_start_matches('/');
-    let changed =
-        crate::ui::row_form::scripts::script_cards(ui, cx, "area", &mut json, scripts, path)
-            .is_some();
-    match changed.then(|| reader.from_json::<ObjectDef>(&json)) {
-        Some(Ok(read)) => {
-            *object = read;
-            true
-        }
-        Some(Err(error)) => {
-            cx.state.errors.insert(path.to_owned(), error);
-            false
-        }
-        None => false,
-    }
+fn object_scripts(ui: &mut Ui, cx: &mut FormCx, object: &mut ObjectDef, path: &str) -> bool {
+    let path = format!("{path}{}", field!(ObjectDef, scripts));
+    crate::ui::row_form::scripts::script_cards(ui, cx, AreaDef::TABLE, &mut object.scripts, &path)
+        .is_some()
 }
 
 /// The holes of a blueprint's module as its form shows them: each filled by its variable, and

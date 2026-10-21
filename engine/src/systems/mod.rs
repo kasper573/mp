@@ -56,7 +56,7 @@ use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
     Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, LoadReport, Loading,
-    SETTINGS_FILE, Settings,
+    MODULES, SETTINGS_FILE, Settings,
 };
 use crate::core::gui::GuiPlugin;
 use crate::core::interpolate::SnapshotPlugin;
@@ -546,25 +546,32 @@ pub fn tables() -> ContentRegistry {
         .file::<interface::CursorDef>()
         .file::<interface::InterfaceIconDef>()
         .file::<item::ItemDef>()
+        .named::<item::ItemDef>()
         .modules::<item::ItemDef>()
         .file::<class::ClassDef>()
+        .named::<class::ClassDef>()
         .file::<memory::MemoryDef>()
+        .named::<memory::MemoryDef>()
         .file::<notification::NotificationDef>()
         .file::<npc::NpcDef>()
+        .named::<npc::NpcDef>()
         .modules::<npc::NpcDef>()
         .file::<player::PlayerDef>()
         .modules::<player::PlayerDef>()
         .file::<player::snapshot::CharacterSnapshot>()
         .file::<quest::QuestDef>()
+        .named::<quest::QuestDef>()
         .modules::<quest::QuestDef>()
         .file::<script::ScriptDef>()
         .file::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
         .file::<skill::SkillDef>()
+        .named::<skill::SkillDef>()
         .modules::<skill::SkillDef>()
         .file::<status::StatusEffectDef>()
+        .named::<status::StatusEffectDef>()
         .modules::<status::StatusEffectDef>()
-        .list_kind("modules", "unknown module type", "a module type")
+        .list_kind(MODULES, "unknown module type", "a module type")
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);
     actor::content(&mut registry);

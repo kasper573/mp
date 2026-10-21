@@ -3,8 +3,9 @@ use std::collections::{BTreeMap, HashSet};
 use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::content::files::NAME_RULE;
+use engine::core::content::serial::TypeTag;
 use engine::core::content::{
-    ContentFile, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
+    ContentFile, MODULES, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
 };
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::scene::SCENE_FILE;
@@ -558,17 +559,18 @@ pub fn field_of(project: &Project, file: &str, pointer: &str) -> String {
         && let Some(row) = project.files.json(file)
         && let Some(kind) = row
             .pointer(&crate::scene_graph::node_pointer(pointer))
-            .and_then(|node| node["type"].as_str())
+            .and_then(TypeTag::of_json)
     {
-        return kind.to_owned();
+        return kind;
     }
-    if segments.first() == Some(&"modules")
+    if segments.first() == Some(&MODULES)
         && let Some(index) = segments.get(1)
         && let Some(row) = project.files.json(file)
-        && let Some(kind) =
-            row["modules"][index.parse::<usize>().unwrap_or(usize::MAX)]["type"].as_str()
+        && let Some(kind) = row
+            .pointer(&format!("/{MODULES}/{index}"))
+            .and_then(TypeTag::of_json)
     {
-        return kind.to_owned();
+        return kind;
     }
     segments
         .first()
@@ -648,14 +650,15 @@ fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
     let root = project.shapes.shape_of(table);
     let shape = schema::at_pointer(root, root, &row, parent).unwrap_or(&Value::Null);
     let mut parts: Vec<String> = Vec::new();
+    let tag = schema::tag_of(shape).map(|(field, _)| field);
     for (name, value) in entry {
-        if format!("{parent}/{name}") == pointer || name == "type" {
+        if format!("{parent}/{name}") == pointer || tag.as_ref() == Some(name) {
             continue;
         }
         let text = match value {
             Value::Number(number) => {
                 let number = number.as_f64().unwrap_or(0.0);
-                schema::number_shorthand(root, &shape["properties"][name], number)
+                schema::number_shorthand(root, schema::property(shape, name), number)
                     .unwrap_or_else(|| format!("{name} {number}"))
             }
             Value::String(text) => format!("{name} {text}"),
@@ -958,7 +961,7 @@ fn usage_phrase(shapes: &SchemaShapes, table: &str, field: &str) -> String {
     shapes
         .tables
         .get(table)
-        .and_then(|table| table.shape["properties"][field]["x-usage"].as_str())
+        .and_then(|table| schema::usage(schema::property(&table.shape, field)))
         .unwrap_or("the entries")
         .to_owned()
 }

@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock};
 
-use engine::core::content::{SETTINGS_FILE, table_of};
+use engine::core::content::{
+    FilesystemFolder, FolderReader, MemoryFolder, SETTINGS_FILE, table_of,
+};
+use engine::systems::{GameSettings, registry};
 use include_dir::{Dir, include_dir};
 use walkdir::WalkDir;
 
 use crate::project::files::{content_holding, hidden};
-use crate::value::RowValue;
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
 
@@ -24,45 +27,13 @@ impl GameTemplate {
     }
 }
 
-pub fn list() -> Vec<GameTemplate> {
-    let mut templates: Vec<GameTemplate> = TEMPLATES
-        .dirs()
-        .map(|dir| {
-            let key = dir.path().to_string_lossy().into_owned();
-            let game = dir
-                .get_file(dir.path().join(SETTINGS_FILE))
-                .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
-                .unwrap_or_default();
-            let mut rows: BTreeMap<String, Vec<String>> = BTreeMap::new();
-            for file in all_files(dir) {
-                let path = file.path().strip_prefix(dir.path()).unwrap_or(file.path());
-                let Some(path) = path.to_str().and_then(content_holding) else {
-                    continue;
-                };
-                if let Some(table) = table_of(path) {
-                    let paths = rows.entry(table.to_owned()).or_default();
-                    if !paths.iter().any(|known| known == path) {
-                        paths.push(path.to_owned());
-                    }
-                }
-            }
-            GameTemplate {
-                name: game["name"]
-                    .as_str()
-                    .map_or_else(|| key.clone(), str::to_owned),
-                initial_spawn: format!(
-                    "{} · {}, {}",
-                    game["initial_spawn"].text_or("area", "?"),
-                    game["initial_spawn"]["x"].as_f64().unwrap_or_default(),
-                    game["initial_spawn"]["y"].as_f64().unwrap_or_default()
-                ),
-                key,
-                rows,
-            }
-        })
-        .collect();
-    templates.sort_by(|a, b| a.key.cmp(&b.key));
-    templates
+pub fn list() -> &'static [GameTemplate] {
+    static LISTED: LazyLock<Vec<GameTemplate>> = LazyLock::new(|| {
+        let mut templates: Vec<GameTemplate> = TEMPLATES.dirs().map(template_of).collect();
+        templates.sort_by(|a, b| a.key.cmp(&b.key));
+        templates
+    });
+    &LISTED
 }
 
 pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String> {
@@ -142,14 +113,22 @@ fn move_into_place(staging: &Path, folder: &Path) -> Result<(), String> {
 }
 
 fn write_name(folder: &Path, name: &str) -> Result<(), String> {
-    let path = folder.join(SETTINGS_FILE);
-    let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    let mut game: serde_json::Value =
-        serde_json::from_str(&text).map_err(|error| error.to_string())?;
-    game["name"] = serde_json::Value::String(name.to_owned());
-    let mut text = serde_json::to_string_pretty(&game).map_err(|error| error.to_string())?;
-    text.push('\n');
-    std::fs::write(&path, text).map_err(|error| error.to_string())
+    let reader = FolderReader::new(registry(), Arc::new(FilesystemFolder(folder.to_owned())));
+    let mut settings =
+        reader
+            .settings::<GameSettings>()
+            .map_err(|errors| match errors.first() {
+                Some(error) => format!("{SETTINGS_FILE} does not read: {}", error.problem),
+                None => format!("{SETTINGS_FILE} does not read"),
+            })?;
+    settings.name = name.to_owned();
+    let written = reader
+        .write_settings(&settings)
+        .map_err(|error| error.to_string())?;
+    for (file, bytes) in written {
+        std::fs::write(folder.join(file), bytes).map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
@@ -171,6 +150,49 @@ fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn template_of(dir: &Dir) -> GameTemplate {
+    let key = dir.path().to_string_lossy().into_owned();
+    let mut files = BTreeMap::new();
+    let mut rows: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for file in all_files(dir) {
+        let path = file.path().strip_prefix(dir.path()).unwrap_or(file.path());
+        let Some(path) = path.to_str() else {
+            continue;
+        };
+        files.insert(path.to_owned(), Arc::from(file.contents()));
+        let Some(holder) = content_holding(path) else {
+            continue;
+        };
+        if let Some(table) = table_of(holder) {
+            let paths = rows.entry(table.to_owned()).or_default();
+            if !paths.iter().any(|known| known == holder) {
+                paths.push(holder.to_owned());
+            }
+        }
+    }
+    let folder = MemoryFolder {
+        name: key.clone(),
+        files,
+    };
+    let reader = FolderReader::new(registry(), Arc::new(folder));
+    let settings = reader.settings::<GameSettings>().ok();
+    GameTemplate {
+        name: settings
+            .as_ref()
+            .map_or_else(|| key.clone(), |settings| settings.name.clone()),
+        initial_spawn: settings.map_or_else(
+            || "?".to_owned(),
+            |settings| {
+                let spawn = settings.initial_spawn;
+                let area = reader.path_of(spawn.area).unwrap_or("?");
+                format!("{area} · {}, {}", spawn.at.x, spawn.at.y)
+            },
+        ),
+        key,
+        rows,
+    }
 }
 
 fn all_files<'a>(dir: &'a Dir<'a>) -> Vec<&'a include_dir::File<'a>> {

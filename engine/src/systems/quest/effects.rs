@@ -110,13 +110,7 @@ impl EffectDef<RiftScripting> for OfferQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            ("accepted", &self.accepted),
-            ("declined", &self.declined),
-            (REFUSED, &self.refused),
-        ]
-    }
+    crate::outputs!("accepted" => accepted, "declined" => declined, REFUSED => refused);
     fn pauses(&self) -> bool {
         true
     }
@@ -161,9 +155,7 @@ impl EffectDef<RiftScripting> for AcceptQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -187,13 +179,7 @@ impl EffectDef<RiftScripting> for TurnIn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            ("done", &self.done),
-            (REFUSED, &self.refused),
-            ("cancelled", &self.cancelled),
-        ]
-    }
+    crate::outputs!("done" => done, REFUSED => refused, "cancelled" => cancelled);
     fn pauses(&self) -> bool {
         true
     }
@@ -244,9 +230,7 @@ impl EffectDef<RiftScripting> for FailQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -269,9 +253,7 @@ impl EffectDef<RiftScripting> for CompleteTask {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -305,9 +287,7 @@ impl EffectDef<RiftScripting> for Decide {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

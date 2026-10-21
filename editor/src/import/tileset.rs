@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use engine::systems::area::grid::PaletteRow;
+
+use crate::views::area::grid::BundlePalette;
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TileFrame, TilesetDef};
 use image::{GenericImage, RgbaImage};
 use serde::{Deserialize, Serialize};
@@ -166,7 +168,7 @@ pub fn tile_plan(
     tileset: &TilesetDef,
     new: &RgbaImage,
     key: &str,
-    palettes: &[(String, Vec<PaletteRow>)],
+    palettes: &[BundlePalette],
 ) -> Result<TilePlan, String> {
     let tile = tile_size(tileset)?;
     let old_hashes = tile_hashes(old, tile);
@@ -249,7 +251,7 @@ pub fn tile_plan(
     }
     let mut gone_used: BTreeMap<u32, Vec<PaletteUse>> = BTreeMap::new();
     let mut rewrites = Vec::new();
-    for (area, rows) in palettes {
+    for BundlePalette { bundle: area, rows } in palettes {
         let mut entries = 0;
         let mut first = None;
         let mut uses: BTreeMap<u32, usize> = BTreeMap::new();
@@ -316,8 +318,8 @@ pub fn apply_tile_plan(
     plan: &TilePlan,
     tileset: &TilesetDef,
     key: &str,
-    palettes: &[(String, Vec<PaletteRow>)],
-) -> Result<(TilesetDef, Vec<(String, Vec<PaletteRow>)>), String> {
+    palettes: &[BundlePalette],
+) -> Result<(TilesetDef, Vec<BundlePalette>), String> {
     plan.ready()?;
     let mut moved: BTreeMap<u32, TileData> = BTreeMap::new();
     for (index, data) in &tileset.tiles {
@@ -347,7 +349,7 @@ pub fn apply_tile_plan(
         ..tileset.clone()
     };
     let mut rewritten = Vec::new();
-    for (area, rows) in palettes {
+    for BundlePalette { bundle, rows } in palettes {
         let mut changed = false;
         let moved: Vec<PaletteRow> = rows
             .iter()
@@ -364,7 +366,10 @@ pub fn apply_tile_plan(
             })
             .collect();
         if changed {
-            rewritten.push((area.clone(), moved));
+            rewritten.push(BundlePalette {
+                bundle: bundle.clone(),
+                rows: moved,
+            });
         }
     }
     Ok((renumbered, rewritten))

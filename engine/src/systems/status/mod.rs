@@ -254,6 +254,10 @@ impl ModuleSet for StatusEffectDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<StatusModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &StatusModule) -> ModuleRule {
         ModuleRule::AnyNumber
     }

@@ -154,9 +154,7 @@ impl EffectDef<RiftScripting> for Items {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -184,9 +182,7 @@ impl EffectDef<RiftScripting> for UseItem {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("used", &self.used), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("used" => used, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -210,9 +206,7 @@ impl EffectDef<RiftScripting> for Equip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -236,9 +230,7 @@ impl EffectDef<RiftScripting> for Unequip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -262,9 +254,7 @@ impl EffectDef<RiftScripting> for DropItems {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -290,9 +280,7 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
     fn needs_subject(&self) -> bool {
         self.for_whom == GroundItemsFor::Subject || self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -333,9 +321,7 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
     fn needs_subject(&self) -> bool {
         self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -373,9 +359,7 @@ impl EffectDef<RiftScripting> for MoveItems {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

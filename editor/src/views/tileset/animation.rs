@@ -143,7 +143,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             painter.rect_filled(dot, 1.0, Color32::WHITE);
         }
         if odd.contains(&tile) {
-            glyph::alert(&painter, cell.center(), (cell.width() * 0.22).max(7.0));
+            glyph::alert(painter, cell.center(), (cell.width() * 0.22).max(7.0));
         }
     });
     sheet::select(editor, ui, tileset, &canvas);
@@ -589,7 +589,7 @@ fn preview_block(
         if glyph::button(ui, mark, 14.0, theme::TEXT, word).clicked() {
             view.preview.playing = !view.preview.playing;
         }
-        widgets::chip(ui, &format!("frame {} / {}", index + 1, frames.len()));
+        widgets::chip(ui, format!("frame {} / {}", index + 1, frames.len()));
     });
 }
 
