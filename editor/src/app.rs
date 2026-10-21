@@ -527,10 +527,39 @@ impl Editor {
                             None => edit.remove(change.file),
                         };
                     }
-                    if let Err(refusal) = project.apply(edit, EditViewpoint::default()) {
-                        self.say(format!("The journal did not apply: {}", refusal.sentence()));
-                    } else {
-                        self.say(format!("Recovered {} unsaved rows", recovered.len()));
+                    let changed: Vec<&str> = recovered
+                        .iter()
+                        .filter(|file| file.changed_on_disk(project.disk_hash(&file.path)))
+                        .map(|file| file.path.as_str())
+                        .collect();
+                    let applied = project
+                        .apply(edit, EditViewpoint::default())
+                        .and_then(|()| {
+                            project.settle();
+                            match project.take_refused() {
+                                Some(refused) => Err(Box::new(refused.refusal)),
+                                None => Ok(()),
+                            }
+                        });
+                    match applied {
+                        Err(refusal) => {
+                            let kept = RecoveryJournal::set_aside(&self.user, folder)
+                                .map_or(String::new(), |aside| {
+                                    format!("; it is kept at {}", aside.display())
+                                });
+                            self.toast(format!(
+                                "The journal did not apply: {}{kept}",
+                                refusal.sentence()
+                            ));
+                        }
+                        Ok(()) if !changed.is_empty() => self.toast(format!(
+                            "Recovered {} unsaved rows; {} changed on disk since, and saving \
+                             replaces what is there: {}",
+                            recovered.len(),
+                            changed.len(),
+                            changed.join(", ")
+                        )),
+                        Ok(()) => self.say(format!("Recovered {} unsaved rows", recovered.len())),
                     }
                 }
                 match (&project.report, project.last_load) {
@@ -897,6 +926,16 @@ impl Editor {
         if project.poll() {
             self.views.content_changed();
         }
+        self.take_refused();
+    }
+
+    /// Says why the last load took back an edit, when it did.
+    fn take_refused(&mut self) {
+        let Some(refused) = self.project.as_mut().and_then(Project::take_refused) else {
+            return;
+        };
+        self.views.content_changed();
+        self.refused(&refused.label, &refused.refusal);
     }
 
     fn poll_outside(&mut self) {

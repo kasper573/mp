@@ -291,13 +291,31 @@ pub struct Project {
     typed: typed::TypedFiles,
     loading: Option<Loading>,
     stale: bool,
+    unverified: Option<Unverified>,
+    refused: Option<RefusedEdit>,
 }
 
 // An edit is adopted at once and its content loaded on a thread, so the interface never waits on
-// a load. Files that turn out not to load are kept as they are, with the load's report beside
-// the last content that did load, so a half-finished row can be worked on until it loads again.
+// a load. An edit to a folder that loaded is checked up front only in the files it touches; the
+// load then vouches for the rules across files, and an edit it finds problems in is taken back.
+// Files that don't load for anything else, such as a change on disk, are kept as they are, with
+// the load's report beside the last content that did load.
 struct Loading {
     receiver: ChannelInbox<Result<Loaded, LoadReport>>,
+}
+
+/// An applied edit its load has yet to vouch for, with the edits that continue it: the files and
+/// history from before it, to go back to when the load finds problems they brought.
+struct Unverified {
+    label: String,
+    files: ProjectFiles,
+    history: EditHistory,
+}
+
+/// An edit taken back because the folder didn't load after it.
+pub struct RefusedEdit {
+    pub label: String,
+    pub refusal: EditRefusal,
 }
 
 struct Loaded {
@@ -349,6 +367,8 @@ impl Project {
             moved_outside: Vec::new(),
             catalogue,
             typed: typed::TypedFiles::default(),
+            unverified: None,
+            refused: None,
         };
         project.reload();
         Ok(project)
@@ -429,6 +449,7 @@ impl Project {
     pub fn reload(&mut self) {
         self.loading = None;
         self.stale = false;
+        self.unverified = None;
         match load(&self.files, &self.root.display().to_string()) {
             Ok((content, took)) => {
                 let loaded = Loaded::build(content, &self.files, took);
@@ -480,14 +501,41 @@ impl Project {
     fn take(&mut self, outcome: Result<Loaded, LoadReport>) {
         match outcome {
             Ok(loaded) => {
+                if !self.stale {
+                    self.unverified = None;
+                }
                 self.report = None;
                 self.install(loaded);
             }
             Err(_) if self.stale => {}
-            Err(report) => self.report = Some(report),
+            Err(report) => match self.unverified.take() {
+                Some(before) => {
+                    self.files = before.files;
+                    self.history = before.history;
+                    self.refused = Some(RefusedEdit {
+                        label: before.label,
+                        refusal: EditRefusal::of_errors(&report.errors),
+                    });
+                    self.begin_load();
+                }
+                None => self.report = Some(report),
+            },
         }
         if std::mem::take(&mut self.stale) {
             self.begin_load();
+        }
+    }
+
+    /// The edit the last load took back, once: what the folder didn't load for after it.
+    pub fn take_refused(&mut self) -> Option<RefusedEdit> {
+        self.refused.take()
+    }
+
+    /// Waits for the load to vouch for the last edit, so what comes next builds on files that
+    /// load.
+    fn settle_unverified(&mut self) {
+        if self.unverified.is_some() {
+            self.settle();
         }
     }
 
@@ -522,6 +570,13 @@ impl Project {
         if changes.is_empty() {
             return Ok(());
         }
+        let continues = edit.merge || edit.amends.is_some();
+        if !continues {
+            self.settle_unverified();
+        }
+        if changes.iter().any(|change| change.bytes.is_none()) {
+            self.settle();
+        }
         let next = self.files.with(&changes);
         let introduced = self.introduced_errors(&next, &changes);
         if !introduced.is_empty() {
@@ -534,13 +589,28 @@ impl Project {
                 bytes: self.files.get(&change.file).cloned(),
             })
             .collect();
+        let loads = self.loads();
+        match &mut self.unverified {
+            Some(unverified) => unverified.label = edit.label.clone(),
+            None if loads => {
+                self.unverified = Some(Unverified {
+                    label: edit.label.clone(),
+                    files: self.files.clone(),
+                    history: self.history.clone(),
+                });
+            }
+            None => {}
+        }
         self.adopt(next);
         let amended = edit.amends.as_deref().is_some_and(|step| {
             self.history
                 .amend_last(step, &edit.label, changes.clone(), &before)
         });
-        let merged =
-            amended || (edit.merge && self.history.merge_into_last(&edit.label, changes.clone()));
+        let merged = amended
+            || (edit.merge
+                && self
+                    .history
+                    .merge_into_last(&edit.label, changes.clone(), &before));
         if !merged {
             self.history.push(EditStep {
                 label: edit.label,
@@ -555,6 +625,7 @@ impl Project {
     }
 
     pub fn undo(&mut self) -> Option<AppliedStep> {
+        self.settle_unverified();
         let step = self.history.undo_step()?;
         let (applied, changes) = (AppliedStep::of(step), step.before.clone());
         self.restore(&changes);
@@ -563,6 +634,7 @@ impl Project {
     }
 
     pub fn redo(&mut self) -> Option<AppliedStep> {
+        self.settle_unverified();
         let step = self.history.redo_step()?;
         let (applied, changes) = (AppliedStep::of(step), step.after.clone());
         self.restore(&changes);
@@ -622,7 +694,8 @@ impl Project {
 
     /// The problems `changes` bring into the files they touch, and into the files naming what they
     /// remove, that those files did not have before: what refuses an edit, so the editor never
-    /// writes content the game would refuse.
+    /// writes content the game would refuse. What names a removed file is known only from the
+    /// usages of a settled load.
     fn introduced_errors(&self, next: &ProjectFiles, changes: &[FileChange]) -> Vec<LoadError> {
         let mut touched: BTreeSet<String> = changes.iter().map(|c| c.file.clone()).collect();
         for removed in changes.iter().filter(|change| change.bytes.is_none()) {
@@ -721,6 +794,7 @@ impl Project {
     }
 
     pub fn save(&mut self) -> Result<save::SaveOutcome, save::SaveError> {
+        self.settle_unverified();
         let outcome = save::save(&self.root, &self.files, &mut self.disk);
         if outcome.is_ok() {
             self.history.mark_saved();
@@ -729,6 +803,7 @@ impl Project {
     }
 
     pub fn outside_changes(&mut self, change: FolderChange) -> OutsideChanges {
+        self.settle_unverified();
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
         let candidates: Vec<String> = match change {
@@ -796,6 +871,7 @@ impl Project {
     }
 
     pub fn take_disk(&mut self, conflict: &FileConflict) {
+        self.settle_unverified();
         match &conflict.disk {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
             None => self.files.remove(&conflict.file),

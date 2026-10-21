@@ -223,9 +223,9 @@ pub enum ScriptGraphAction {
         exit: Exit,
     },
     DropInputs(String),
-    Delete(String),
+    Delete(Vec<String>),
     Rename(String),
-    Duplicate(String),
+    Duplicate(Vec<String>),
     Palette(NodePaletteOpen),
     AddLine(String),
     AddChoice(String),
@@ -289,8 +289,8 @@ impl ScriptGraphViewer<'_> {
             }));
     }
 
-    fn click_to_select(&mut self, ui: &mut Ui, name: &str) {
-        let response = ui.interact(ui.max_rect(), ui.id().with("select"), egui::Sense::click());
+    fn click_to_select(&mut self, ui: &mut Ui, rect: Rect, name: &str) {
+        let response = ui.interact(rect, ui.id().with("select"), egui::Sense::click());
         if response.clicked() {
             self.clicks.push(NodeClick {
                 name: name.to_owned(),
@@ -454,8 +454,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             return;
         };
         ui.set_width(big(CARD));
-        self.click_to_select(ui, &name);
-        ui.horizontal(|ui| {
+        let header = ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = big(6.0);
             let (mark, color) = kind_mark(&node);
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(big(14.0)), egui::Sense::hover());
@@ -465,6 +464,9 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             let title = card_title(&name, &node);
             ui.add(egui::Label::new(theme::strong(title).monospace().size(big(12.5))).truncate());
         });
+        // The header is laid out after the body, so selecting by its whole room would sit on top
+        // of the body's fields and take their clicks.
+        self.click_to_select(ui, header.response.rect, &name);
     }
 
     fn inputs(&mut self, node: &ScriptGraphNode) -> usize {
@@ -566,7 +568,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     ) {
         let name = snarl[id].name.clone();
         ui.set_width(big(CARD));
-        self.click_to_select(ui, &name);
+        self.click_to_select(ui, ui.max_rect(), &name);
         let Some(node) = self.node(&name).cloned() else {
             return;
         };
@@ -788,14 +790,14 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             .clicked()
         {
             self.actions
-                .push(ScriptGraphAction::Duplicate(name.clone()));
+                .push(ScriptGraphAction::Duplicate(vec![name.clone()]));
             ui.close();
         }
         if ui
             .add(widgets::shortcut_button("Delete", EditorKey::Delete))
             .clicked()
         {
-            self.actions.push(ScriptGraphAction::Delete(name));
+            self.actions.push(ScriptGraphAction::Delete(vec![name]));
             ui.close();
         }
     }

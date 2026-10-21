@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use design_tokens::controls;
-use egui::{RichText, Ui};
+use egui::Ui;
 use engine::core::content::serial::TypeTag;
 use engine::core::content::{MODULES, ModuleRule, fields_file};
 use engine::systems::registry;
@@ -26,7 +26,8 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
     };
     let mut modules: Vec<(String, Vec<Value>)> = Vec::new();
     let mut unread: Vec<(String, String)> = Vec::new();
-    for (key, value) in &values {
+    let holds_modules = registry().holds_modules(&table);
+    for (key, value) in values.iter().filter(|_| holds_modules) {
         match reader.modules_in(&table, value) {
             Ok(list) => modules.push((key.clone(), list)),
             Err(error) => unread.push((key.clone(), error)),
@@ -223,7 +224,9 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelecti
                     }
                 });
         };
-        if wide {
+        if !holds_modules {
+            shared_card(ui, &mut cx, &mut edits);
+        } else if wide {
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
                     ui.set_width(LEFT_COLUMN);
@@ -317,9 +320,7 @@ impl RowSet<'_> {
     fn set_all(&mut self, path: &str, shared: &Value) {
         for (key, value) in self.values {
             let mut next = value.clone();
-            if let Some(target) = next.pointer_mut(path) {
-                *target = shared.clone();
-            }
+            put(&mut next, path, shared.clone());
             self.edits.push((key.clone(), next));
         }
     }
@@ -362,33 +363,69 @@ pub(super) fn shared_field(
                 )
             })
             .collect();
-        let id = ui.id().with(path).with("set-all");
-        let typed = forms::drafted(ui, id, "", |ui, draft| {
-            egui::Frame::new()
-                .fill(theme::INPUT)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(4.0)
-                .inner_margin(egui::Margin::symmetric(6, 2))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width() - 12.0);
-                    ui.add(
-                        egui::TextEdit::singleline(draft)
-                            .frame(egui::Frame::NONE)
-                            .hint_text(
-                                RichText::new(format!("{} values", distinct.len())).italics(),
-                            )
-                            .desired_width(f32::INFINITY),
-                    )
-                })
-                .inner
-                .on_hover_text(listing.join("\n"))
+        ui.vertical(|ui| {
+            ui.set_min_width(ui.available_width());
+            if !settable_apart(cx.root, field) {
+                ui.label(
+                    theme::faint(format!(
+                        "{} values; edit the rows one by one",
+                        distinct.len()
+                    ))
+                    .size(12.0),
+                )
+                .on_hover_text(listing.join("\n"));
+                return;
+            }
+            ui.label(
+                theme::faint(format!("{} values; an edit sets them all", distinct.len()))
+                    .size(12.0),
+            )
+            .on_hover_text(listing.join("\n"));
+            let mut shared = schema::template(cx.root, field, cx.nearby());
+            if forms::value(ui, cx, field, &mut shared, path).is_some() {
+                rows.set_all(path, &shared);
+            }
         });
-        if let Some(draft) = typed.filter(|draft| !draft.trim().is_empty()) {
-            let parsed: Value = serde_json::from_str(draft.trim())
-                .unwrap_or(Value::String(draft.trim().to_owned()));
-            rows.set_all(path, &parsed);
-        }
     });
+}
+
+/// Whether a field the rows hold apart can take one value for them all: a value with nothing
+/// inside it, so setting it drops nothing a row held of its own.
+fn settable_apart(root: &Value, field: &Value) -> bool {
+    match schema::kind(root, field) {
+        SchemaKind::Text
+        | SchemaKind::Integer
+        | SchemaKind::Number
+        | SchemaKind::Boolean
+        | SchemaKind::Enum(_)
+        | SchemaKind::Const(_)
+        | SchemaKind::Null => true,
+        SchemaKind::Choice(options) => options
+            .into_iter()
+            .all(|option| settable_apart(root, option)),
+        SchemaKind::Object
+        | SchemaKind::Array(_)
+        | SchemaKind::Map(_)
+        | SchemaKind::Union(_)
+        | SchemaKind::Any => false,
+    }
+}
+
+/// Puts `value` at `pointer` in `json`, adding the fields on the way that a row leaves out.
+fn put(json: &mut Value, pointer: &str, value: Value) {
+    if let Some(at) = json.pointer_mut(pointer) {
+        *at = value;
+        return;
+    }
+    let Some((parent, key)) = pointer.rsplit_once('/') else {
+        return;
+    };
+    if json.pointer(parent).is_none_or(Value::is_null) {
+        put(json, parent, Value::Object(serde_json::Map::new()));
+    }
+    if let Some(Value::Object(map)) = json.pointer_mut(parent) {
+        map.insert(key.to_owned(), value);
+    }
 }
 
 pub(super) fn fieldless_note(variant: &Value) -> String {

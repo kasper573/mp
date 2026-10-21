@@ -1,5 +1,5 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
-use engine::core::content::{Content, SETTINGS_FILE};
+use engine::core::content::{Content, SETTINGS_FILE, name_of};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::scene::SCENE_FILE;
@@ -63,8 +63,9 @@ impl ArrivalPin {
     /// Whose file the arrival is in, and the object leading to it when a scene's object does.
     pub fn names(&self, editor: &Editor) -> (String, Option<String>) {
         let owner = content_of(&self.file)
-            .map(|(_, key)| key.to_owned())
-            .unwrap_or_else(|| self.file.clone());
+            .map(|(_, key)| name_of(key))
+            .unwrap_or_else(|| shown_path(&self.file))
+            .to_owned();
         let spot = self
             .file
             .strip_suffix(&format!("/{SCENE_FILE}"))
@@ -104,7 +105,7 @@ pub fn commit_pick(editor: &mut Editor, area_key: &str, at: Pos<Tiles>) {
     }
     if editor.apply(edit) {
         editor.pick = None;
-        editor.toast(format!("Picked {area_key} {}, {}", at.x, at.y));
+        editor.toast(format!("Picked {} {}, {}", name_of(area_key), at.x, at.y));
     }
 }
 

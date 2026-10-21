@@ -4,12 +4,13 @@ use std::sync::Arc;
 
 use design_tokens::glyph::Mark;
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use engine::core::content::files::{NAME_RULE, valid_name};
 use engine::core::content::{ContentFile, bundle_of};
 use engine::core::script::Node;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::{Expression, GenericExpression, MODEL_BUSTS, ModelModule};
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{ScriptDef, Speaker};
+use engine::systems::script::{Line, ScriptDef, Speaker};
 use strum::VariantArray;
 
 use crate::app::Editor;
@@ -306,11 +307,8 @@ fn add_expression(editor: &mut Editor, key: &str, faces: &[BustFace], path: &Pat
     };
     let stem = path
         .file_stem()
-        .map(|stem| {
-            stem.to_string_lossy()
-                .to_lowercase()
-                .replace([' ', '-'], "_")
-        })
+        .map(|stem| rows::name_from(&stem.to_string_lossy().replace('-', "_")))
+        .filter(|stem| valid_name(stem))
         .unwrap_or_else(|| "expression".to_owned());
     let taken: HashSet<String> = faces.iter().map(|face| face.name.clone()).collect();
     let name = rows::free_name(&stem, &taken);
@@ -340,27 +338,17 @@ pub struct FaceLine {
 
 /// Every line of every script spoken by an npc wearing the model at `key` that asks for a face.
 pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
-    let Some(reader) = editor.reader() else {
+    let (Some(reader), Some(speaks)) = (editor.reader(), speaks_with(editor, key)) else {
         return Vec::new();
     };
-    let speakers: Vec<String> = super::users(editor, key)
-        .into_iter()
-        .filter(|(table, _)| table == NpcDef::TABLE)
-        .map(|(_, key)| key)
-        .collect();
     let mut found = Vec::new();
     for path in reader.paths_of::<ScriptDef>() {
         let Some(Ok(script)) = editor.read::<ScriptDef>(path) else {
             continue;
         };
         for (node, line) in face_lines(&script) {
-            let Speaker::Npc(npc) = line.by else {
-                continue;
-            };
             if let Some(face) = &line.face
-                && reader
-                    .path_of(npc)
-                    .is_some_and(|npc| speakers.iter().any(|speaker| speaker == npc))
+                && speaks(line)
             {
                 found.push(FaceLine {
                     script: path.clone(),
@@ -373,9 +361,7 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
     found
 }
 
-fn face_lines(
-    script: &ScriptDef,
-) -> impl Iterator<Item = (&String, &engine::systems::script::Line)> {
+fn face_lines(script: &ScriptDef) -> impl Iterator<Item = (&String, &Line)> {
     script.nodes.iter().flat_map(|(name, node)| {
         let lines = match node {
             Node::Dialogue(dialogue) => dialogue.lines.as_slice(),
@@ -385,11 +371,31 @@ fn face_lines(
     })
 }
 
+/// Whether a line is spoken by an npc wearing the model at `key`.
+fn speaks_with(editor: &Editor, key: &str) -> Option<impl Fn(&Line) -> bool + use<>> {
+    let reader = editor.reader()?;
+    let speakers: Vec<String> = super::users(editor, key)
+        .into_iter()
+        .filter(|(table, _)| table == NpcDef::TABLE)
+        .map(|(_, key)| key)
+        .collect();
+    Some(move |line: &Line| match line.by {
+        Speaker::Npc(npc) => reader
+            .path_of(npc)
+            .is_some_and(|npc| speakers.iter().any(|speaker| speaker == npc)),
+        _ => false,
+    })
+}
+
 pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -> bool {
     let Some(Ok(model)) = editor.read::<ModelDef>(key) else {
         return false;
     };
     if !face.own {
+        return false;
+    }
+    if !valid_name(new_name) {
+        editor.toast(format!("A face's name is {NAME_RULE}"));
         return false;
     }
     if faces(&model).iter().any(|face| face.name == new_name) {
@@ -453,6 +459,7 @@ fn retarget_face(
         .collect();
     scripts.sort();
     scripts.dedup();
+    let speaks = speaks_with(editor, key)?;
     let (from, to) = (
         Expression::from(from.to_owned()),
         Expression::from(to.to_owned()),
@@ -463,7 +470,7 @@ fn retarget_face(
         for node in script.nodes.values_mut() {
             if let Node::Dialogue(dialogue) = node {
                 for line in &mut dialogue.lines {
-                    if line.face.as_ref() == Some(&from) {
+                    if line.face.as_ref() == Some(&from) && speaks(line) {
                         line.face = Some(to.clone());
                     }
                 }

@@ -10,7 +10,7 @@ use engine::core::content::{
 };
 use engine::core::script::VariableType;
 use engine::systems::area::AreaDef;
-use engine::systems::script::Condition;
+use engine::systems::script::{Condition, RunnerKind};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -42,6 +42,9 @@ pub struct FormCx<'a> {
     pub speaker: Option<String>,
     pub row_table: Option<String>,
     pub row_key: Option<String>,
+    /// What the scripts the form names run on, when that isn't the row being edited: the object
+    /// of an area's scene whose scripts the form shows.
+    pub runner: Option<RunnerKind>,
     pub holes: Option<FormHoles>,
     pub autofocus: bool,
     /// What the row being edited keeps as the engine reads it, when it is a fixture.
@@ -71,6 +74,7 @@ impl<'a> FormCx<'a> {
             speaker: None,
             row_table: None,
             row_key: None,
+            runner: None,
             holes: None,
             autofocus: false,
             locks: Vec::new(),
@@ -497,7 +501,7 @@ fn plain(
         SchemaKind::Choice(alternatives) => choice(ui, cx, &alternatives, value, path),
         SchemaKind::Object => object(ui, cx, schema, value, path),
         SchemaKind::Array(items) => array(ui, cx, items, value, path),
-        SchemaKind::Map(values) => map(ui, cx, values, value, path),
+        SchemaKind::Map(values) => map(ui, cx, values, schema::key_table(schema), value, path),
         SchemaKind::Text => text(ui, cx, value, path),
         SchemaKind::Integer => number(ui, cx, schema, value, path, true),
         SchemaKind::Number => number(ui, cx, schema, value, path, false),
@@ -919,6 +923,9 @@ fn geometry(
             FieldGeometry::Rect => &["x", "y", "w", "h"],
         };
         if numbers.len() == names.len() {
+            if !value.is_object() {
+                *value = Value::Object(Map::new());
+            }
             for (name, number) in names.iter().zip(numbers) {
                 if value[*name].as_f64() != Some(number) {
                     value[*name] = Value::from(number);
@@ -1155,11 +1162,10 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                             let resolved = schema::resolve(cx.root, field);
                             let is_reference = schema::marker(resolved) == Some("x-table");
                             if is_reference {
-                                let child = item
-                                    .as_object_mut()
-                                    .expect("object")
-                                    .entry((*name).clone())
-                                    .or_insert(Value::String(String::new()));
+                                let mut draft = item
+                                    .get(*name)
+                                    .cloned()
+                                    .unwrap_or(Value::String(String::new()));
                                 ui.allocate_ui_with_layout(
                                     egui::vec2(
                                         ui.available_width().max(120.0),
@@ -1170,7 +1176,14 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                         if locked {
                                             ui.disable();
                                         }
-                                        changed |= self::value(ui, cx, field, child, &field_path);
+                                        let edited =
+                                            self::value(ui, cx, field, &mut draft, &field_path);
+                                        if edited.is_some() {
+                                            item.as_object_mut()
+                                                .expect("object")
+                                                .insert((*name).clone(), draft);
+                                            changed |= edited;
+                                        }
                                     },
                                 );
                             } else {
@@ -1266,7 +1279,16 @@ fn name_newcomer(item: &mut Value, siblings: &[Value], singular: &str) {
     item["name"] = Value::String(fresh);
 }
 
-fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &str) -> FormChange {
+/// A map's entries, each under its key: typed, or the file it names when `keys` names the table
+/// of the files its keys name, which a picker adds and no typing renames.
+fn map(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    values: &Value,
+    keys: Option<&str>,
+    value: &mut Value,
+    path: &str,
+) -> FormChange {
     if !value.is_object() {
         *value = Value::Object(Map::new());
     }
@@ -1281,27 +1303,58 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                 if widgets::remove_button(ui, "Remove").clicked() {
                     remove = Some(key.clone());
                 }
-                let id = ui.id().with(&item_path).with("key");
-                let typed = drafted(ui, id, key, |ui, draft| {
-                    ui.add(egui::TextEdit::singleline(draft).desired_width(110.0))
-                });
-                if let Some(draft) = typed.filter(|draft| !draft.is_empty()) {
-                    rename = Some((key.clone(), draft));
+                match keys {
+                    Some(_) => {
+                        ui.add_sized(
+                            egui::vec2(110.0, 18.0),
+                            egui::Label::new(theme::mono(shown_path(key)).size(13.0)).truncate(),
+                        )
+                        .on_hover_text(key.as_str());
+                    }
+                    None => {
+                        let id = ui.id().with(&item_path).with("key");
+                        let typed = drafted(ui, id, key, |ui, draft| {
+                            ui.add(egui::TextEdit::singleline(draft).desired_width(110.0))
+                        });
+                        if let Some(draft) = typed.filter(|draft| !draft.is_empty()) {
+                            rename = Some((key.clone(), draft));
+                        }
+                    }
                 }
                 ui.vertical(|ui| {
                     changed |= self::value(ui, cx, values, item, &item_path);
                 });
             });
+            error_line(ui, cx, &key_error_path(&item_path));
         }
         if let Some(key) = remove {
             entries.remove(&key);
             changed = FormChange::at(path);
         }
         if let Some((from, to)) = rename
-            && let Some(item) = entries.remove(&from)
+            && from != to
         {
-            entries.insert(to, item);
-            changed = FormChange::at(path);
+            let error_path = key_error_path(&format!("{path}/{from}"));
+            if entries.contains_key(&to) {
+                cx.state
+                    .errors
+                    .insert(error_path, format!("{to} is already a key"));
+            } else if let Some(item) = entries.remove(&from) {
+                cx.state.errors.remove(&error_path);
+                entries.insert(to, item);
+                changed = FormChange::at(path);
+            }
+        }
+        if let Some(table) = keys {
+            let mut picked = String::new();
+            if crate::picker::row(ui, cx, table, &mut picked, path)
+                && !picked.is_empty()
+                && !entries.contains_key(&picked)
+            {
+                entries.insert(picked, schema::template(cx.root, values, cx.nearby()));
+                changed = FormChange::at(path);
+            }
+            return;
         }
         ui.horizontal(|ui| {
             let id = ui.id().with(path).with("new-key");
@@ -1409,6 +1462,10 @@ pub fn variant_of_type<T: Serialize + DeserializeOwned>(
 
 /// The fields of `typed`, the variant of `root` that `schema` is, in a row as a sentence lays them
 /// out, its conditions edited by `condition`.
+/// The room a condition nested in a row of fields needs beside its name: less than this left on
+/// the row, and it starts the next, so its own row of blocks wraps within the whole width.
+const NESTED_CONDITION_ROOM: f32 = 220.0;
+
 pub fn inline_fields_of<T: Serialize + DeserializeOwned>(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -1441,6 +1498,9 @@ pub fn inline_fields_of<T: Serialize + DeserializeOwned>(
         }
         let child = &mut value[name];
         if schema::marker(resolved) == Some("x-condition") {
+            if ui.available_width() < NESTED_CONDITION_ROOM {
+                ui.end_row();
+            }
             ui.label(theme::muted(name).size(12.0));
             changed |= as_type(ui, cx, child, &field_path, |ui, cx, nested| {
                 condition(ui, cx, nested, &field_path)
@@ -1611,7 +1671,14 @@ fn number_field(
                 Ok(parsed) => {
                     let min = schema::minimum(schema);
                     let max = schema::maximum(schema);
-                    if min.is_some_and(|min| parsed < min) || max.is_some_and(|max| parsed > max) {
+                    if integer && parsed.fract() != 0.0 {
+                        cx.state.errors.insert(
+                            path.to_owned(),
+                            format!("a whole number, not {}", draft.trim()),
+                        );
+                    } else if min.is_some_and(|min| parsed < min)
+                        || max.is_some_and(|max| parsed > max)
+                    {
                         cx.state.errors.insert(
                             path.to_owned(),
                             match (min, max) {
@@ -1626,7 +1693,7 @@ fn number_field(
                     } else {
                         cx.state.errors.remove(path);
                         *value = if integer {
-                            Value::from(parsed.round() as i64)
+                            Value::from(parsed as i64)
                         } else {
                             Value::from(parsed)
                         };
@@ -1927,4 +1994,10 @@ fn within<'v>(
             .collect(),
         None => variants,
     }
+}
+
+/// Where the form keeps what is wrong with the key of the map entry at `item_path`, apart from
+/// what is wrong with its value.
+fn key_error_path(item_path: &str) -> String {
+    format!("{item_path}#key")
 }

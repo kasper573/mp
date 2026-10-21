@@ -283,7 +283,8 @@ fn unnamed(value: Value) -> Value {
     }
 }
 
-/// Puts `value` at `pointer`, adding the field it names when the object has none.
+/// Puts `value` at `pointer`, adding the field it names, and the objects holding it, where they
+/// are missing: an optional map left out when empty, as a placement's values, still takes a hole.
 fn put(json: &mut Value, pointer: &str, value: Value) {
     if let Some(at) = json.pointer_mut(pointer) {
         *at = value;
@@ -292,6 +293,9 @@ fn put(json: &mut Value, pointer: &str, value: Value) {
     let Some((parent, key)) = pointer.rsplit_once('/') else {
         return;
     };
+    if json.pointer(parent).is_none() {
+        put(json, parent, Value::Object(serde_json::Map::new()));
+    }
     if let Some(Value::Object(map)) = json.pointer_mut(parent) {
         map.insert(unescape(key), value);
     }

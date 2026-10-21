@@ -533,11 +533,15 @@ pub fn lanes(
 ) {
     let has_steps = frames.iter().any(|frame| frame.step);
     let page = editor.views.model.view(key).page;
-    let kinds: Vec<FrameCueKind> = if page == ModelPage::Cues || has_steps {
-        vec![FrameCueKind::Apex, FrameCueKind::Sound, FrameCueKind::Step]
-    } else {
-        vec![FrameCueKind::Apex, FrameCueKind::Sound]
-    };
+    let has_apex = strip.action.takes_apex() || frames.iter().any(|frame| frame.apex);
+    let kinds: Vec<FrameCueKind> = [
+        (FrameCueKind::Apex, has_apex),
+        (FrameCueKind::Sound, true),
+        (FrameCueKind::Step, page == ModelPage::Cues || has_steps),
+    ]
+    .into_iter()
+    .filter_map(|(kind, shown)| shown.then_some(kind))
+    .collect();
     let selected_cue = editor.views.model.view(key).cue;
     let Some(reader) = editor.reader() else {
         return;
@@ -702,6 +706,10 @@ pub fn set_cue(
     index: usize,
     kind: FrameCueKind,
 ) {
+    if kind == FrameCueKind::Apex && !strip.action.takes_apex() {
+        editor.toast(format!("{} lands no hit to put an apex on", strip.name()));
+        return;
+    }
     let mut cued = frames.to_vec();
     let label = match kind {
         FrameCueKind::Apex => {

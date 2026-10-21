@@ -107,7 +107,7 @@ pub(super) fn status_bar(
                     "blocked".to_owned()
                 };
                 if let Some(surface) = area.footstep_at(cell) {
-                    what.push_str(&format!(" · {}", surface.path(&frame.content)));
+                    what.push_str(&format!(" · {}", file_title(surface.path(&frame.content))));
                 }
                 left.push(what);
             }

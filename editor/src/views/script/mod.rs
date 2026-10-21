@@ -15,8 +15,12 @@ use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
 use engine::core::content::{ContentFile, FolderReader, fields_file};
 use engine::core::script::{Arrow, Choice, Exit, RunnerKindDef};
+use engine::systems::area::AreaModule;
+use engine::systems::area::scene::{SCENE_FILE, SceneNode};
 use engine::systems::npc::NpcDef;
-use engine::systems::script::{Node, RunnerKind, ScriptDef, Speaker};
+use engine::systems::script::{
+    ListedScriptModule, Node, RunnerKind, ScriptDef, ScriptModule, Speaker,
+};
 use engine::systems::text::plain;
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{NodeText, Nodes};
@@ -62,6 +66,35 @@ impl ScriptPath {
         match self {
             ScriptPath::Module(module) => module.clone(),
             ScriptPath::ObjectScript { object, script } => format!("{object}/scripts/{script}"),
+        }
+    }
+
+    /// The script module at this place of `file`, as the file holds it now: one of a row's
+    /// modules, a script module of a scene, or one of the scripts of a scene's object.
+    pub fn module_in(&self, project: &Project, file: &str) -> Option<ScriptModule> {
+        let Some(bundle) = file.strip_suffix(&format!("/{SCENE_FILE}")) else {
+            return match self {
+                ScriptPath::Module(pointer) => project
+                    .value_at::<ListedScriptModule>(file, pointer)
+                    .map(|ListedScriptModule::Script(module)| module),
+                ScriptPath::ObjectScript { .. } => None,
+            };
+        };
+        let scene = crate::views::area::nodes::bundle_in(project, bundle)?;
+        let pointer = match self {
+            ScriptPath::Module(pointer) => pointer,
+            ScriptPath::ObjectScript { object, .. } => object,
+        };
+        let Some(SceneNode::Module(node)) = crate::views::area::nodes::node(scene.nodes(), pointer)
+        else {
+            return None;
+        };
+        match (&node.module, self) {
+            (AreaModule::Script(module), ScriptPath::Module(_)) => Some(module.clone()),
+            (AreaModule::Object(object), ScriptPath::ObjectScript { script, .. }) => {
+                object.scripts.get(*script).cloned()
+            }
+            _ => None,
         }
     }
 
@@ -567,6 +600,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
         });
     palette::show(editor, ui, &doc);
     for action in actions {
+        let Some(doc) = ScriptDoc::load(editor, at) else {
+            break;
+        };
         act(editor, &doc, action);
     }
     editor.views.script.keys = ScriptKeys::default();
@@ -1060,20 +1096,16 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
             link,
         }));
     }
-    if keys.delete {
-        for name in &selected {
-            actions.push(ScriptGraphAction::Delete(name.clone()));
-        }
+    if keys.delete && !selected.is_empty() {
+        actions.push(ScriptGraphAction::Delete(selected.clone()));
     }
     if keys.rename
         && let Some(name) = &first
     {
         actions.push(ScriptGraphAction::Rename(name.clone()));
     }
-    if keys.duplicate {
-        for name in &selected {
-            actions.push(ScriptGraphAction::Duplicate(name.clone()));
-        }
+    if keys.duplicate && !selected.is_empty() {
+        actions.push(ScriptGraphAction::Duplicate(selected.clone()));
     }
     if let Some(name) = &first
         && doc.nodes().get(name).is_some_and(nodes::is_dialogue)
@@ -1136,7 +1168,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
             let label = format!("Unlink arrows into {to} in {}", at.title());
             write(editor, doc, script, label);
         }
-        ScriptGraphAction::Delete(name) => delete_nodes(editor, doc, vec![name]),
+        ScriptGraphAction::Delete(names) => delete_nodes(editor, doc, names),
         ScriptGraphAction::Rename(name) => {
             editor
                 .dialogs
@@ -1146,7 +1178,7 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
                     draft: name,
                 }));
         }
-        ScriptGraphAction::Duplicate(name) => duplicate(editor, doc, &name),
+        ScriptGraphAction::Duplicate(names) => duplicate(editor, doc, &names),
         ScriptGraphAction::Palette(open) => {
             editor
                 .views
@@ -1197,36 +1229,49 @@ pub fn add_choice(node: &mut Node) {
     });
 }
 
-fn duplicate(editor: &mut Editor, doc: &ScriptDoc, name: &str) {
+/// Copies each of the nodes `names`, each copy led to from a free output of its original, as one
+/// step; a node with no free output is left uncopied.
+fn duplicate(editor: &mut Editor, doc: &ScriptDoc, names: &[String]) {
     let at = doc.at.clone();
-    let Some(mut copy) = doc.nodes().get(name).cloned() else {
-        return;
-    };
-    let Some(free) = nodes::ports(&copy)
-        .into_iter()
-        .find(|port| port.target.is_none())
-    else {
-        editor.toast(format!("{name} has no free output to lead to its copy"));
-        return;
-    };
-    for (_, arrow) in copy.exits_mut() {
-        arrow.point(None);
-    }
-    let fresh = nodes::free_name(doc.nodes(), name);
     let mut script = doc.edited();
-    script.nodes.insert(fresh.clone(), copy);
-    if let Some(source) = script.nodes.get_mut(name) {
-        nodes::set_arrow(source, free.exit, Some(&fresh));
+    let mut copies: Vec<(String, String)> = Vec::new();
+    for name in names {
+        let Some(mut copy) = doc.nodes().get(name).cloned() else {
+            continue;
+        };
+        let Some(free) = nodes::ports(&copy)
+            .into_iter()
+            .find(|port| port.target.is_none())
+        else {
+            editor.toast(format!("{name} has no free output to lead to its copy"));
+            continue;
+        };
+        for (_, arrow) in copy.exits_mut() {
+            arrow.point(None);
+        }
+        let fresh = nodes::free_name(&script.nodes, name);
+        script.nodes.insert(fresh.clone(), copy);
+        if let Some(source) = script.nodes.get_mut(name) {
+            nodes::set_arrow(source, free.exit, Some(&fresh));
+        }
+        copies.push((name.clone(), fresh));
     }
-    let label = format!("Duplicate {name} in {}", at.title());
+    let label = match copies.as_slice() {
+        [] => return,
+        [(name, _)] => format!("Duplicate {name} in {}", at.title()),
+        many => format!("Duplicate {} nodes in {}", many.len(), at.title()),
+    };
     if write(editor, doc, script, label) {
         let view = editor
             .views
             .script
             .view_mut(&at, &editor.user, editor.project.as_ref());
-        let at = beside(&view.graph, name);
-        view.place_node(&fresh, at);
-        select_nodes(editor, doc, &[fresh]);
+        for (name, fresh) in &copies {
+            let at = beside(&view.graph, name);
+            view.place_node(fresh, at);
+        }
+        let fresh: Vec<String> = copies.into_iter().map(|(_, fresh)| fresh).collect();
+        select_nodes(editor, doc, &fresh);
     }
 }
 

@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use editor::app::Editor;
 use editor::project::{Project, RowSelection};
-use editor::schema::SchemaShapes;
+use editor::schema::{self, SchemaShapes};
 use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::nodes::SceneTree;
 use editor::views::area::{AreaAction, AreaSnapshot, nodes, placement, run_action};
 use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Pos, Rect, Size};
+use engine::core::script::VariableType;
 use engine::systems::area::blueprint::{BlueprintDef, Placement};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaModule, AreaModuleKind};
@@ -96,6 +97,20 @@ fn new_nodes_land_in_the_selected_folder_or_beside_the_selected_node() {
     let added = nodes::node(&scene, "/1/children/2").expect("the door");
     assert_eq!(names(std::slice::from_ref(added)), ["door"]);
     assert_eq!(editor.selection.parts, ["/1/children/2"]);
+}
+
+#[test]
+fn a_change_remaps_only_the_nodes_the_scene_held_before_it() {
+    let mut scene = vec![object("a"), folder("f", vec![object("b")])];
+    let mut tree = SceneTree::new(&mut scene);
+    tree.append("", vec![object("c")]);
+    tree.duplicate(&["/1".to_owned()], Clone::clone);
+    let remap = tree.remap();
+
+    let mut before: Vec<&str> = remap.keys().map(String::as_str).collect();
+    before.sort();
+    assert_eq!(before, ["/0", "/1", "/1/children/0"]);
+    assert_eq!(nodes::remapped(&remap, "/7"), None);
 }
 
 #[test]
@@ -203,7 +218,57 @@ fn a_placement_covers_on_the_map_what_it_places() {
 
 #[test]
 fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content() {
-    let spot = json!({ "area": area(), "x": 3.0, "y": 4.0 });
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(signposted(), &scratch);
+    settled(&mut editor);
+    let reader = editor.reader().expect("a reader");
+    let signpost = editor
+        .read::<BlueprintDef>(&path("blueprint", "signpost"))
+        .and_then(Result::ok)
+        .expect("the signpost reads");
+    let variable = &signpost.variables["spot"];
+
+    assert_eq!(placement::variable_default(&reader, variable), Some(spot()));
+}
+
+#[test]
+fn a_blueprint_made_of_modules_with_holes_takes_their_variables_and_its_placement_fills_them() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = open(signposted(), &scratch);
+    settled(&mut editor);
+    let signpost = path("blueprint", "signpost");
+    let scene = nodes::scene_of(&editor, &signpost);
+    let door = (0..scene.len())
+        .map(|index| format!("/{index}"))
+        .find(|pointer| !nodes::node(&scene, pointer).is_some_and(nodes::is_layer))
+        .expect("the door");
+    editor.selection = RowSelection::parts(BlueprintDef::TABLE, &signpost, vec![door.clone()]);
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &signpost).expect("the signpost is open");
+    run_action(&mut editor, &snapshot, AreaAction::MakeBlueprint);
+
+    let content = settled(&mut editor);
+    let made = content
+        .by_path::<BlueprintDef>(&path("blueprint", "door"))
+        .expect("the new blueprint loads");
+    assert!(made.get(content).variables.contains_key("spot"));
+    let scene = nodes::scene_of(&editor, &signpost);
+    let Some(SceneNode::Module(placed)) = nodes::node(&scene, &door) else {
+        panic!("a placement where the door was");
+    };
+    assert!(matches!(placed.module, AreaModule::Blueprint(_)));
+    assert_eq!(
+        placed.holes.0.values().collect::<Vec<_>>(),
+        ["spot"],
+        "the placement fills the new blueprint's variable from the signpost's"
+    );
+}
+
+fn spot() -> serde_json::Value {
+    json!({ "area": area(), "x": 3.0, "y": 4.0 })
+}
+
+/// The chapel with a signpost blueprint, whose door warps to the place its `spot` variable holds.
+fn signposted() -> Game {
     let warp = json!({
         "runs_on": "object",
         "variables": { "to": { "type": "place" } },
@@ -218,23 +283,12 @@ fn a_variable_left_unset_takes_its_default_even_when_the_default_names_content()
         "shape": { "type": "rect", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0 },
         "scripts": [{ "script": path("script", "warp"), "values": { "to": { "var": "spot" } } }]
     }]);
-    let game = chapel().row("script", "warp", warp).blueprint(
+    chapel().row("script", "warp", warp).blueprint(
         "signpost",
         (1, 1),
-        json!({ "spot": { "type": "place", "default": spot } }),
+        json!({ "spot": { "type": "place", "default": spot() } }),
         door,
-    );
-    let scratch = tempfile::tempdir().expect("a scratch folder");
-    let mut editor = open(game, &scratch);
-    settled(&mut editor);
-    let reader = editor.reader().expect("a reader");
-    let signpost = editor
-        .read::<BlueprintDef>(&path("blueprint", "signpost"))
-        .and_then(Result::ok)
-        .expect("the signpost reads");
-    let variable = &signpost.variables["spot"];
-
-    assert_eq!(placement::variable_default(&reader, variable), Some(spot));
+    )
 }
 
 /// A chapel: its ground layer, then a folder of two pews placed from a blueprint.
@@ -300,4 +354,35 @@ fn settled(editor: &mut Editor) -> &Content {
                 .unwrap_or_default()
         )
     })
+}
+
+#[test]
+fn every_field_of_a_module_a_variable_could_fill_is_offered_as_a_hole() {
+    let door = json!({
+        "type": "object",
+        "name": "door",
+        "title": "Chapel door",
+        "shape": { "type": "rect", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0 },
+        "scripts": [{ "script": path("script", "warp") }],
+    });
+
+    let offered: Vec<(String, VariableType)> =
+        schema::holeable_fields(schema::of_type::<AreaModule>(), &door)
+            .into_iter()
+            .map(|field| (field.pointer, field.kind))
+            .collect();
+
+    for wanted in [
+        ("/name", VariableType::Name),
+        ("/title", VariableType::Text),
+        ("/scripts/0/script", VariableType::Row),
+    ] {
+        assert!(
+            offered
+                .iter()
+                .any(|(pointer, kind)| (pointer.as_str(), *kind) == wanted),
+            "{wanted:?} in {offered:?}"
+        );
+    }
+    assert!(!offered.iter().any(|(pointer, _)| pointer == "/type"));
 }

@@ -20,10 +20,10 @@ use engine::core::content::{Content, ContentFile, ContentScope, Fixture, rescope
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
-use engine::systems::area::AreaId;
 use engine::systems::area::world_map::{
     AreaCard, Note, Region, RegionColor, WorldMap, WorldMapDef,
 };
+use engine::systems::area::{AreaDef, AreaId};
 use serde::Deserialize;
 
 use crate::app::Editor;
@@ -342,6 +342,56 @@ fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {
 
 fn shows_areas(zoom: f32) -> bool {
     zoom * TILE.0 > AREA_PX_PER_TILE
+}
+
+/// Gives every area among `copies`, each the path copied from and the path of its copy, a world
+/// map card of its own beside the card of the area it was copied from, written into `edit`. A
+/// copied folder's areas count, each at its place inside the copy. A world map that doesn't read
+/// takes no cards; the folder's report already says why.
+pub fn cards_beside(
+    project: &Project,
+    edit: &mut ContentEdit,
+    copies: &[(String, String)],
+) -> Result<(), String> {
+    let after = project.reader_after(edit);
+    let path = WorldMap::Game.path();
+    let Ok(mut layout) = after.read::<WorldMapDef>(&path) else {
+        return Ok(());
+    };
+    let mut placed = false;
+    for (from, to) in copies {
+        let inside = format!("{from}/");
+        for original in after.paths_of::<AreaDef>() {
+            let copy = match original.strip_prefix(&inside) {
+                Some(rest) => format!("{to}/{rest}"),
+                None if original == from => to.clone(),
+                None => continue,
+            };
+            let (Some(area), Some(copied)) = (
+                after.id_of::<AreaDef>(original),
+                after.id_of::<AreaDef>(&copy),
+            ) else {
+                continue;
+            };
+            let (Some(card), Ok(def)) = (layout.cards.get(&area), after.read::<AreaDef>(original))
+            else {
+                continue;
+            };
+            let map = def.blueprint.map.size;
+            let size = Size::new(map.width as f32, map.height as f32);
+            let at = right_of(card_rect(size, card), footprint(size, card.size));
+            let beside = AreaCard {
+                size: card.size,
+                ..new_card(at)
+            };
+            layout.cards.insert(copied, beside);
+            placed = true;
+        }
+    }
+    if placed {
+        edit.write_content_in(&after, &path, &layout)?;
+    }
+    Ok(())
 }
 
 fn card_at(card: &AreaCard) -> Pos2 {

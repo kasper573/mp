@@ -138,6 +138,38 @@ fn step(label: &str) -> EditStep {
     }
 }
 
+#[test]
+fn undoing_a_merged_step_restores_every_file_it_came_to_touch() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let folder = game_folder(scratch.path().join("game"));
+    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
+    let settings = project.files.get(SETTINGS_FILE).cloned();
+    let note = "notes/plan.md";
+
+    let mut first = rename(&project, "Lowtide");
+    first.label = "paint".to_owned();
+    project
+        .apply(first.merging(), viewpoint())
+        .expect("applies");
+    let mut second = ContentEdit::new("paint");
+    second.write(note, Arc::from(&b"later"[..]));
+    project
+        .apply(second.merging(), viewpoint())
+        .expect("applies");
+    assert_eq!(
+        project.history.steps().len(),
+        1,
+        "the edits merge into one step"
+    );
+
+    project.undo();
+    assert_eq!(project.files.get(SETTINGS_FILE).cloned(), settings);
+    assert!(
+        project.files.get(note).is_none(),
+        "the note the step wrote is gone"
+    );
+}
+
 fn viewpoint() -> EditViewpoint {
     EditViewpoint {
         selection: RowSelection::game(),

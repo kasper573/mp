@@ -238,6 +238,8 @@ pub fn copy_into(
         write_moved(&mut edit, &files, path, &copy);
         copies.push(copy);
     }
+    let copied: Vec<(String, String)> = paths.iter().cloned().zip(copies.iter().cloned()).collect();
+    crate::views::world::cards_beside(project, &mut edit, &copied)?;
     editor.try_apply(edit)?;
     Ok(copies)
 }
@@ -403,7 +405,7 @@ pub fn delete_dialog(editor: &mut Editor, paths: Vec<String>) {
         editor.toast("Fixtures stay where the engine finds them");
         return;
     }
-    let Some(project) = &editor.project else {
+    let Ok(project) = moves::settled(editor) else {
         return;
     };
     let index = project.files.index();
@@ -997,9 +999,8 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     }
     let mut renames: BTreeMap<String, String> = BTreeMap::new();
     let mut repointed: Vec<&str> = Vec::new();
-    for (file, mut entries) in by_file {
-        entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
-        let mut value = None;
+    for (file, entries) in by_file {
+        let mut taken: Vec<TakenSlot> = Vec::new();
         for (usage, group) in entries {
             match &group.decision {
                 UsageDecision::Repoint(to) => {
@@ -1012,22 +1013,30 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
                     );
                     repointed.push(&usage.file);
                 }
-                UsageDecision::Remove | UsageDecision::Unpack => {
-                    let Some(value) = value.get_or_insert_with(|| project.files.json_owned(&file))
-                    else {
-                        continue;
-                    };
-                    match group.decision {
-                        UsageDecision::Remove => remove_entry(value, &usage.pointer),
-                        _ => unpack_entry(project, &file, value, &usage.pointer),
-                    }
-                }
+                UsageDecision::Remove => taken.extend(TakenSlot::of(&usage.pointer, false)),
+                UsageDecision::Unpack => taken.extend(TakenSlot::of(
+                    &scene_graph::node_pointer(&usage.pointer),
+                    true,
+                )),
                 UsageDecision::Undecided => {}
             }
         }
-        if let Some(Some(value)) = value {
-            edit.write_json(file, &value);
+        if taken.is_empty() {
+            continue;
         }
+        let Some(mut value) = project.files.json_owned(&file) else {
+            continue;
+        };
+        taken.sort_by(|a, b| b.steps.cmp(&a.steps).then(a.unpack.cmp(&b.unpack)));
+        taken.dedup_by(|later, first| later.steps == first.steps);
+        for slot in taken {
+            if slot.unpack {
+                unpack_entry(project, &file, &mut value, &slot.parent, slot.index);
+            } else {
+                remove_entry(&mut value, &slot.parent, slot.index);
+            }
+        }
+        edit.write_json(file, &value);
     }
     moves::rewrite_renamed(project, &mut edit, repointed, &renames)?;
     for path in &dialog.paths {
@@ -1061,16 +1070,13 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     Ok(())
 }
 
-/// Puts in place of the placement a usage at `pointer` of the scene file `file` names what it
-/// places, as nodes of that scene.
-fn unpack_entry(project: &Project, file: &str, value: &mut Value, pointer: &str) {
+/// Puts in place of the placement at entry `index` of the list at `parent` of the scene file
+/// `file` the nodes it places, as nodes of that scene.
+fn unpack_entry(project: &Project, file: &str, value: &mut Value, parent: &str, index: usize) {
     let Some(bundle) = file.strip_suffix(&format!("/{SCENE_FILE}")) else {
         return;
     };
-    let node = scene_graph::node_pointer(pointer);
-    let Some((parent, index)) = list_slot(&node) else {
-        return;
-    };
+    let node = format!("{parent}/{index}");
     let reader = project.reader();
     let unpacked = area::nodes::bundle_in(project, bundle).and_then(|read| {
         let placement = area::nodes::placement_of(area::nodes::node(read.nodes(), &node)?)?;
@@ -1081,7 +1087,7 @@ fn unpack_entry(project: &Project, file: &str, value: &mut Value, pointer: &str)
     let Some(parts) = unpacked.and_then(|copied| copied.into_json().as_array().cloned()) else {
         return;
     };
-    let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut) else {
+    let Some(list) = value.pointer_mut(parent).and_then(Value::as_array_mut) else {
         return;
     };
     if index >= list.len() {
@@ -1093,13 +1099,48 @@ fn unpack_entry(project: &Project, file: &str, value: &mut Value, pointer: &str)
     }
 }
 
-fn remove_entry(value: &mut Value, pointer: &str) {
-    if let Some((parent, index)) = list_slot(pointer)
-        && let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut)
+fn remove_entry(value: &mut Value, parent: &str, index: usize) {
+    if let Some(list) = value.pointer_mut(parent).and_then(Value::as_array_mut)
         && index < list.len()
     {
         list.remove(index);
     }
+}
+
+/// A list entry a delete takes out of a file: removed, or unpacked when it places a blueprint.
+struct TakenSlot {
+    parent: String,
+    index: usize,
+    unpack: bool,
+    steps: Vec<PointerStep>,
+}
+
+impl TakenSlot {
+    fn of(pointer: &str, unpack: bool) -> Option<TakenSlot> {
+        let (parent, index) = list_slot(pointer)?;
+        let steps = format!("{parent}/{index}")
+            .split('/')
+            .skip(1)
+            .map(|step| match step.parse() {
+                Ok(index) => PointerStep::Index(index),
+                Err(_) => PointerStep::Key(step.to_owned()),
+            })
+            .collect();
+        Some(TakenSlot {
+            parent,
+            index,
+            unpack,
+            steps,
+        })
+    }
+}
+
+/// A step of a JSON pointer, its list indices ordered as numbers, so that taking entries out in
+/// descending order never shifts one still to be taken.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum PointerStep {
+    Key(String),
+    Index(usize),
 }
 
 pub fn close_tabs(editor: &mut Editor, path: &str) {

@@ -74,12 +74,11 @@ fn image_of(editor: &Editor, tileset: &str) -> Option<RgbaImage> {
     super::asset_image(editor, &parts::tileset_image(tileset))
 }
 
-fn palettes_of(editor: &Editor) -> Vec<BundlePalette> {
+fn palettes_of(editor: &Editor) -> Result<Vec<BundlePalette>, String> {
     editor
         .project
         .as_ref()
-        .map(area::grid::palettes)
-        .unwrap_or_default()
+        .map_or(Ok(Vec::new()), area::grid::palettes)
 }
 
 /// The tileset at `key` as its files read now.
@@ -141,6 +140,9 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
+    if super::refuses_unread::<TilesetDef>(editor, key) {
+        return None;
+    }
     let Some(row) = tileset_of(editor, key) else {
         return land_new(editor, export);
     };
@@ -170,7 +172,7 @@ pub fn land(
     let sheet = export.sheet.as_ref()?;
     let planned = settings.and_then(|settings| {
         let image = tileset::cut_grid(sheet, settings)?.image;
-        let plan = tileset::tile_plan(&old, &row, &image, key, &palettes_of(editor))?;
+        let plan = tileset::tile_plan(&old, &row, &image, key, &palettes_of(editor)?)?;
         Ok((settings, image, plan))
     });
     let (settings, image, plan) = match planned {
@@ -804,8 +806,9 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
     let Some(row) = tileset_of(editor, key) else {
         return;
     };
-    let palettes = palettes_of(editor);
-    let (new_row, rewritten) = match tileset::apply_tile_plan(&draft.plan, &row, key, &palettes) {
+    let applied = palettes_of(editor)
+        .and_then(|palettes| tileset::apply_tile_plan(&draft.plan, &row, key, &palettes));
+    let (new_row, rewritten) = match applied {
         Ok(result) => result,
         Err(error) => {
             editor.toast(format!("Not imported: {error}"));
@@ -835,13 +838,12 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
         rows: palette,
     } in rewritten
     {
-        let Some(read) = area_view::nodes::bundle_in(project, &bundle) else {
-            continue;
-        };
         wrote = wrote.and_then(|()| {
-            read.write(&mut edit, project, &bundle, |blueprint| {
-                blueprint.scene.grids.palette = palette
-            })
+            area_view::nodes::bundle_in(project, &bundle)
+                .ok_or_else(|| format!("{} doesn't read", shown_path(&bundle)))?
+                .write(&mut edit, project, &bundle, |blueprint| {
+                    blueprint.scene.grids.palette = palette
+                })
         });
     }
     if let Err(error) = wrote {

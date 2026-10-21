@@ -28,6 +28,36 @@ pub fn add(editor: &mut Editor, bundle: &str, folder: &str) -> Option<String> {
 }
 
 /// Copies the layer at `pointer` right after it, its cells too, under a free name.
+/// Gives every ground layer in `node` a name no layer among `taken` has, adding it to `taken`;
+/// answers each layer's name before and after, for its cells to go with it.
+pub fn rename_copied(node: &mut SceneNode, taken: &mut Vec<String>) -> Vec<(String, String)> {
+    match node {
+        SceneNode::Folder(folder) => folder
+            .children
+            .iter_mut()
+            .flat_map(|child| rename_copied(child, taken))
+            .collect(),
+        SceneNode::GroundLayer(layer) => {
+            let fresh = free_name(&layer.name, taken);
+            taken.push(fresh.clone());
+            vec![(std::mem::replace(&mut layer.name, fresh.clone()), fresh)]
+        }
+        SceneNode::Module(_) => Vec::new(),
+    }
+}
+
+/// `node` without the ground layers it holds, at any depth.
+pub fn without_layers(mut node: SceneNode) -> SceneNode {
+    if let SceneNode::Folder(folder) = &mut node {
+        folder.children = std::mem::take(&mut folder.children)
+            .into_iter()
+            .filter(|child| !nodes::is_layer(child))
+            .map(without_layers)
+            .collect();
+    }
+    node
+}
+
 pub fn duplicate(editor: &mut Editor, bundle: &str, pointer: &str) {
     let mut made = Vec::new();
     let applied = nodes::change_blueprint(editor, bundle, |blueprint| {

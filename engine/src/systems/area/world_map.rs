@@ -27,6 +27,7 @@ pub const MAX_NOTE: usize = 280;
 #[serde(deny_unknown_fields)]
 pub struct WorldMapDef {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(extend("propertyNames" = { "type": "string", "x-table": super::AreaDef::TABLE }))]
     pub cards: BTreeMap<super::AreaId, AreaCard>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub regions: Vec<Region>,

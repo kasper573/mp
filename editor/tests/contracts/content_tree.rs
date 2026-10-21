@@ -9,7 +9,11 @@ use editor::schema::SchemaShapes;
 use editor::ui::content_tree;
 use editor::ui::tree::TreeRow;
 use editor::user::{EditorSettings, TreeView, UserFolder};
+use editor::views::area::pins;
+use engine::core::content::Fixture;
 use engine::core::content::{FIXTURES_DIR, parent_of, table_of};
+use engine::systems::area::AreaDef;
+use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::registry;
 use serde_json::json;
 use testkit::{Game, path, png};
@@ -268,6 +272,33 @@ fn pasting_a_folder_copies_all_it_holds_beside_it_under_a_free_name() {
 }
 
 #[test]
+fn a_duplicated_area_gets_its_own_card_beside_the_original_on_the_world_map() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = camp().edit("world_map", WorldMap::Game.name(), |map| {
+        map["cards"] = json!({ area(): { "at": { "x": 0.0, "y": 0.0 }, "size": 100 } });
+    });
+    let mut editor = open(game, &scratch);
+
+    let copy = rows::duplicate(&mut editor, &area()).expect("duplicated");
+
+    let reader = editor.reader().expect("a reader");
+    let map = editor
+        .read::<WorldMapDef>(&WorldMap::Game.path())
+        .expect("a project")
+        .expect("the world map reads");
+    let card = |path: &str| {
+        let id = reader.id_of::<AreaDef>(path).expect("an area");
+        map.cards.get(&id).cloned().expect("a card")
+    };
+    let (original, copied) = (card(&area()), card(&copy));
+    assert_eq!(copied.size, original.size);
+    assert!(
+        copied.at.x > original.at.x,
+        "the copy's card lies right of the original's"
+    );
+}
+
+#[test]
 fn moving_a_file_into_a_folder_rewrites_what_names_it_in_one_undo_step() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(camp(), &scratch);
@@ -305,6 +336,56 @@ fn deleting_a_file_can_point_what_named_it_at_another_in_one_step() {
         .json(&format!("{}/scene.json", area()))
         .expect("the scene");
     assert_eq!(scene[1]["npc"], goblin);
+    assert!(editor.project.as_ref().expect("a project").loads());
+}
+
+#[test]
+fn deleting_files_removes_exactly_the_entries_that_named_them_wherever_they_sit() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let names: Vec<String> = (0..12).map(|n| format!("villager_{n}")).collect();
+    let game = names.iter().fold(camp(), |game, name| {
+        game.npc(name, 5.0, json!([])).edit_scene("area", support::AREA, |scene| {
+            scene.as_array_mut().expect("a scene").push(
+                json!({ "type": "resident", "npc": path("npc", name), "at": { "x": 3.0, "y": 3.0 } }),
+            );
+        })
+    });
+    let mut editor = open(game, &scratch);
+    let residents = |editor: &mut Editor| -> Vec<String> {
+        let scene = files(editor)
+            .json(&format!("{}/scene.json", area()))
+            .expect("the scene");
+        scene
+            .as_array()
+            .expect("a scene")
+            .iter()
+            .filter_map(|node| node["npc"].as_str().map(str::to_owned))
+            .collect()
+    };
+    let before = residents(&mut editor);
+    let gone = [path("npc", "villager_7"), path("npc", "villager_8")];
+    assert_eq!(
+        gone.iter()
+            .map(|npc| before.iter().position(|named| named == npc))
+            .collect::<Vec<_>>(),
+        [Some(8), Some(9)],
+        "the scene's entries 9 and 10, counting its ground"
+    );
+
+    rows::delete_dialog(&mut editor, gone.to_vec());
+    let Some(ModalDialog::Delete(mut dialog)) = editor.dialogs.pop() else {
+        panic!("a delete dialog");
+    };
+    for group in &mut dialog.groups {
+        group.decision = UsageDecision::Remove;
+    }
+    rows::delete(&mut editor, &dialog).expect("deleted");
+
+    let kept: Vec<String> = before
+        .into_iter()
+        .filter(|named| !gone.contains(named))
+        .collect();
+    assert_eq!(residents(&mut editor), kept);
     assert!(editor.project.as_ref().expect("a project").loads());
 }
 
@@ -531,4 +612,70 @@ fn drawn_text(output: &egui::FullOutput, text: &str) -> Option<egui::Rect> {
         .shapes
         .iter()
         .find_map(|clipped| find(&clipped.shape, text))
+}
+
+#[test]
+fn a_card_on_the_world_map_is_called_by_its_file_name_not_its_path() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(camp(), &scratch);
+    let ctx = egui::Context::default();
+    editor::ui::theme::apply(&ctx);
+    let mut texts = Vec::new();
+    for _ in 0..3 {
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1200.0, 900.0),
+            )),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| editor::views::world::show(&mut editor, ui));
+        output.textures_delta.clear();
+        texts = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+                _ => None,
+            })
+            .collect();
+    }
+
+    assert!(texts.iter().any(|text| text == support::AREA), "{texts:?}");
+    assert!(!texts.iter().any(|text| *text == area()), "{texts:?}");
+}
+
+#[test]
+fn an_arrival_into_an_area_is_called_by_the_file_and_object_leading_there_not_their_paths() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let warp = json!({
+        "runs_on": "object",
+        "variables": { "to": { "type": "place" } },
+        "nodes": {
+            "entered": { "type": "on", "event": "entered", "by": "characters", "next": "warp" },
+            "warp": { "type": "warp", "to": { "var": "to" } }
+        }
+    });
+    let door = json!([{
+        "type": "object",
+        "name": "door",
+        "shape": { "type": "rect", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0 },
+        "scripts": [{
+            "script": path("script", "warp"),
+            "values": { "to": { "area": area(), "x": 1.0, "y": 1.0 } }
+        }]
+    }]);
+    let game =
+        support::game()
+            .row("script", "warp", warp)
+            .area("hall", &testkit::Map::open(4, 4), door);
+    let editor = open(game, &scratch);
+
+    let names: Vec<(String, Option<String>)> = pins::arrivals(&editor, &area())
+        .iter()
+        .filter(|arrival| !arrival.initial_spawn)
+        .map(|arrival| arrival.names(&editor))
+        .collect();
+
+    assert_eq!(names, [("hall".to_owned(), Some("door".to_owned()))]);
 }

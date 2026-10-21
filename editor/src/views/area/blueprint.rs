@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
+use engine::core::content::locate::escape;
 use engine::core::content::{Content, ContentFile, FolderReader, name_of, parent_of, rescoped};
 use engine::core::math::{Pos, Rect};
 use engine::core::tiling::Tiles;
 use engine::systems::area::blueprint::{BlueprintDef, Placement};
-use engine::systems::area::scene::{GroundLayer, ModuleNode, Scene, SceneGrids, SceneNode};
+use engine::systems::area::scene::{
+    self, GroundLayer, Holes, ModuleNode, Scene, SceneGrids, SceneNode,
+};
 use engine::systems::area::{AreaModule, MapSize, Tilemap};
+use engine::systems::script::Variable;
 
 use super::grid::GridDraft;
 use super::{AreaSnapshot, nodes, placement, shapes};
@@ -65,6 +69,14 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
         (bounds.min().x + 0.5).floor(),
         (bounds.min().y + 0.5).floor(),
     );
+    let named = scene::holes(&held);
+    let variables: BTreeMap<String, Variable> = own
+        .blueprint()
+        .variables
+        .iter()
+        .filter(|(name, _)| named.contains(name))
+        .map(|(name, variable)| (name.clone(), variable.clone()))
+        .collect();
     let mut shifted = held;
     for node in &mut shifted {
         shift_tree(node, -origin.x, -origin.y);
@@ -81,7 +93,7 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
         tile: own.blueprint().map.tile,
     };
     let made = BlueprintDef {
-        variables: BTreeMap::new(),
+        variables,
         scene: Scene {
             nodes: layers.chain(shifted).collect(),
             grids: SceneGrids::empty(&map),
@@ -103,6 +115,12 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
             .ok()?;
         *nodes::node_mut(&mut changed.scene.nodes, &first)? = SceneNode::Module(ModuleNode {
             label: Some(label.clone()),
+            holes: Holes(
+                named
+                    .iter()
+                    .map(|name| (format!("/values/{}", escape(name)), name.clone()))
+                    .collect(),
+            ),
             ..ModuleNode::new(AreaModule::Blueprint(Placement {
                 blueprint: made,
                 at: origin,
@@ -111,6 +129,9 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
             }))
         });
         nodes::SceneTree::new(&mut changed.scene.nodes).remove(&selected[1..]);
+        changed.scene.nodes = nodes::CopiedNodes::of(&after, &changed.scene.nodes)?
+            .read(&after, &changed.variables)
+            .ok()?;
         Some(changed)
     }) else {
         editor.toast("The new blueprint doesn't read where it was made");

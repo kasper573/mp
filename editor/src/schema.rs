@@ -126,15 +126,9 @@ pub struct SchemaVariant<'a> {
 
 pub fn resolve<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str)
-        && let Some(path) = reference.strip_prefix("#/")
+        && let Some(pointer) = reference.strip_prefix('#')
+        && let Some(at) = root.pointer(pointer)
     {
-        let mut at = root;
-        for part in path.split('/') {
-            at = match at.get(part) {
-                Some(next) => next,
-                None => return schema,
-            };
-        }
         return at;
     }
     schema
@@ -597,6 +591,11 @@ pub fn table_of(schema: &Value) -> Option<&str> {
     schema.get("x-table").and_then(Value::as_str)
 }
 
+/// The table whose files a map's keys name, when they name files.
+pub fn key_table(map: &Value) -> Option<&str> {
+    map.get("propertyNames").and_then(table_of)
+}
+
 pub fn minimum(schema: &Value) -> Option<f64> {
     schema.get("minimum").and_then(Value::as_f64)
 }
@@ -853,7 +852,7 @@ fn collect_holeable(
     pointer: &str,
     out: &mut Vec<HoleableField>,
 ) {
-    let schema = resolve(root, schema);
+    let schema = settle(root, schema, value);
     let kind = match marker(schema) {
         Some("x-name") => Some(VariableType::Name),
         Some("x-condition") => Some(VariableType::Condition),

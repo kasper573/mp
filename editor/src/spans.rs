@@ -87,7 +87,7 @@ pub fn line(ui: &mut Ui, stored: &[Span], id: egui::Id, font: FontId, hint: &str
     let enter = ui.input(|i| EditorKey::Confirm.pressed(i));
     let mut entered = false;
     if response.changed() {
-        let typed = text.trim_end_matches('\n').to_owned();
+        let typed = text.replace('\n', "");
         if typed != text && enter {
             entered = true;
         }

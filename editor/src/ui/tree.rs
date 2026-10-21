@@ -610,7 +610,7 @@ fn row_label(ui: &mut Ui, cx: &RowsCx, id: &str, row: &TreeRow, open: bool) {
         mark.mark.paint(ui.painter(), painted, mark.color);
         ui.interact(
             Rect::from_center_size(at, Vec2::splat(MARK)),
-            Id::new(("tree mark", id, index)),
+            ui.id().with(("tree mark", id, index)),
             egui::Sense::hover(),
         )
         .on_hover_text(&mark.tip);
@@ -801,7 +801,7 @@ fn row_toggles(
         } else {
             egui::Sense::click()
         };
-        let response = ui.interact(rect, Id::new(("tree toggle", id, toggle as u8)), sense);
+        let response = ui.interact(rect, ui.id().with(("tree toggle", id, toggle as u8)), sense);
         let (on, off, verb, undo) = match toggle {
             Toggle::Hide => (Mark::EyeSlash, Mark::Eye, "Hide", "Show"),
             Toggle::Lock => (Mark::Lock, Mark::Unlock, "Lock", "Unlock"),

@@ -77,6 +77,9 @@ impl QueryGroup {
     }
 }
 
+/// How wide the name of a kept value is typed.
+const NAME_WIDTH: f32 = 120.0;
+
 fn sign(kind: ExprKind) -> Option<&'static str> {
     Some(match kind {
         ExprKind::Equal => "=",
@@ -317,8 +320,11 @@ fn block(
                 | Expr::State { state: name }
                 | Expr::Event { event: name } = condition
                 {
+                    if ui.available_width() < NAME_WIDTH {
+                        ui.end_row();
+                    }
                     ui.scope(|ui| {
-                        ui.set_width(120.0);
+                        ui.set_width(NAME_WIDTH.min(ui.available_width()));
                         changed |= forms::text_of(ui, cx, name, &format!("{path}/name"));
                     });
                 }

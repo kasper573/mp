@@ -4,8 +4,8 @@ use design_tokens::glyph::Mark;
 use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
 use engine::core::content::{ContentFile, FolderReader};
+use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::{MAX_FRAME_MS, SheetFrame};
-use engine::systems::actor::{Action, ModelDef};
 use engine::systems::script::ScriptDef;
 
 use super::busts::{BustFace, FaceLine};
@@ -201,7 +201,11 @@ fn frame_card(
         });
         widgets::kv(ui, "apex", |ui| {
             let mut on = frame.apex;
-            if ui.checkbox(&mut on, "").changed() {
+            let settable = strip.action.takes_apex() || frame.apex;
+            if ui
+                .add_enabled(settable, egui::Checkbox::without_text(&mut on))
+                .changed()
+            {
                 changed.apex = on;
                 label = Some(if on {
                     format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
@@ -213,7 +217,7 @@ fn frame_card(
                     )
                 });
             }
-            ui.label(theme::muted(if strip.action == Action::Attack {
+            ui.label(theme::muted(if strip.action.takes_apex() {
                 "the hit lands here"
             } else {
                 "only attack strips land a hit"
@@ -502,7 +506,7 @@ fn cue_card(
                 widgets::kv_text(ui, "on frame", on_frame);
                 let lands = "the hit, on server and client, when the swing reaches this frame";
                 widgets::kv_text(ui, "lands", lands);
-                if strip.action != Action::Attack {
+                if !strip.action.takes_apex() {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("!").color(theme::WARN).strong());
                         let why = "an apex belongs in attack strips only; the folder will not load with it here";

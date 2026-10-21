@@ -553,17 +553,14 @@ pub fn shown_rows(
 }
 
 fn rows_cached(editor: &mut Editor, table: &str) -> Arc<Vec<SpreadsheetRow>> {
-    let generation = editor
-        .project
-        .as_ref()
-        .map_or(0, |project| project.generation);
+    let revision = files_revision(editor);
     if let Some((built_for, rows)) = &editor.views.spreadsheet.state_mut(table).rows
-        && *built_for == generation
+        && *built_for == revision
     {
         return rows.clone();
     }
     let rows = Arc::new(rows_of(editor, table));
-    editor.views.spreadsheet.state_mut(table).rows = Some((generation, rows.clone()));
+    editor.views.spreadsheet.state_mut(table).rows = Some((revision, rows.clone()));
     rows
 }
 
@@ -572,18 +569,22 @@ fn columns_cached(
     table: &str,
     rows: &[SpreadsheetRow],
 ) -> Arc<Vec<SpreadsheetColumn>> {
-    let generation = editor
-        .project
-        .as_ref()
-        .map_or(0, |project| project.generation);
+    let revision = files_revision(editor);
     if let Some((built_for, columns)) = &editor.views.spreadsheet.state_mut(table).columns
-        && *built_for == generation
+        && *built_for == revision
     {
         return columns.clone();
     }
     let columns = Arc::new(columns_of(editor, table, rows));
-    editor.views.spreadsheet.state_mut(table).columns = Some((generation, columns.clone()));
+    editor.views.spreadsheet.state_mut(table).columns = Some((revision, columns.clone()));
     columns
+}
+
+fn files_revision(editor: &Editor) -> u64 {
+    editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.files.revision())
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
@@ -1403,7 +1404,13 @@ struct Pressed {
 }
 
 fn parse_cell(root: &Value, column: &SpreadsheetColumn, text: &str) -> Option<Value> {
-    match schema::kind(root, &column.schema) {
+    parse_as(root, &column.schema, text)
+}
+
+/// `text` as a value of `schema`: of the first of its alternatives it reads as, nothing when
+/// the text is empty and nothing is one of them.
+fn parse_as(root: &Value, schema: &Value, text: &str) -> Option<Value> {
+    match schema::kind(root, schema) {
         SchemaKind::Integer => text.parse::<i64>().ok().map(Value::from),
         SchemaKind::Number => text.parse::<f64>().ok().map(Value::from),
         SchemaKind::Boolean => match text {
@@ -1411,6 +1418,22 @@ fn parse_cell(root: &Value, column: &SpreadsheetColumn, text: &str) -> Option<Va
             "no" | "false" | "0" | "" => Some(Value::Bool(false)),
             _ => None,
         },
+        SchemaKind::Null => text.is_empty().then_some(Value::Null),
+        SchemaKind::Choice(alternatives) => {
+            let empty_is_null = text.is_empty()
+                && alternatives.iter().any(|alternative| {
+                    matches!(
+                        schema::kind(root, schema::resolve(root, alternative)),
+                        SchemaKind::Null
+                    )
+                });
+            if empty_is_null {
+                return Some(Value::Null);
+            }
+            alternatives
+                .iter()
+                .find_map(|alternative| parse_as(root, schema::resolve(root, alternative), text))
+        }
         _ => Some(Value::String(text.to_owned())),
     }
 }

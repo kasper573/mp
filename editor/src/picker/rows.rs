@@ -203,7 +203,10 @@ impl PickSource for RowSource {
 fn blocked(cx: &FormCx, table: &str, path: &str, key: &str) -> Option<String> {
     match table {
         ScriptDef::TABLE => {
-            let kind = runner_kind(cx.row_table.as_deref()?);
+            let kind = match cx.runner {
+                Some(kind) => kind,
+                None => runner_kind(cx.row_table.as_deref()?),
+            };
             let owner = script_runner(cx, key);
             (runner_kind(&owner) != kind).then(|| format!("runs on {owner}"))
         }

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{Content, name_of};
 use engine::systems::area::tileset::TilesetDef;
 use strum::VariantArray;
 
@@ -244,7 +244,7 @@ fn tile_sheet(
                     EStroke::new(1.0, Color32::WHITE),
                     egui::StrokeKind::Inside,
                 );
-                let mut info = format!("{tileset_key} #{tile}");
+                let mut info = format!("{} #{tile}", name_of(&tileset_key));
                 if let Some(data) = def.data(tile) {
                     if let Some(walk) = data.walk {
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
@@ -411,8 +411,10 @@ fn terrain_sheet(
                     let cell = layout.clamped_cell(&sheet, p);
                     let tile = cell.y * columns + cell.x;
                     let status = match corners.get(&tile) {
-                        Some(mix) => format!("{tileset_key} #{tile} · {}", mix.join(" ")),
-                        None => format!("{tileset_key} #{tile} · not in {set}"),
+                        Some(mix) => {
+                            format!("{} #{tile} · {}", name_of(&tileset_key), mix.join(" "))
+                        }
+                        None => format!("{} #{tile} · not in {set}", name_of(&tileset_key)),
                     };
                     editor.status.left.push(status);
                 }

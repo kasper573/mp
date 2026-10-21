@@ -287,6 +287,9 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     &path,
                     &[field!(Variable, default)],
                 );
+                if (draft.ty, &draft.table) != (variable.ty, &variable.table) {
+                    draft.default = None;
+                }
                 widgets::kv(ui, "default", |ui| {
                     edited |= default_value(ui, &mut cx, &mut draft, &path);
                 });
@@ -620,7 +623,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             }));
     }
     if duplicate {
-        super::act(editor, doc, ScriptGraphAction::Duplicate(name.to_owned()));
+        super::act(
+            editor,
+            doc,
+            ScriptGraphAction::Duplicate(vec![name.to_owned()]),
+        );
     }
     if delete {
         super::delete_nodes(editor, doc, vec![name.to_owned()]);
@@ -713,7 +720,17 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
     let schema = shapes.shape_of(MemoryDef::TABLE);
     let mut actions = Vec::new();
     let changed = {
-        let mut cx = doc.form_cx(editor, schema, &mut actions);
+        let Editor {
+            project,
+            form,
+            shapes,
+            ..
+        } = editor;
+        let Some(project) = project.as_ref() else {
+            return;
+        };
+        let mut cx = FormCx::new(project, schema, shapes, form, &mut actions)
+            .editing(MemoryDef::TABLE, Some(memory));
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -1253,6 +1270,9 @@ fn speaker_rows(
             && let Some(picked) = reader.id_of::<NpcDef>(&npc_path)
         {
             line.by = Speaker::Npc(picked);
+            if nodes::bust_file(cx.project, line.by, line.face.as_ref()).is_none() {
+                line.face = None;
+            }
             changed = FormChange::at(path);
         }
     });

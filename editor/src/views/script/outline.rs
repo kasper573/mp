@@ -144,7 +144,7 @@ pub fn show(
                     super::write(editor, doc, script, label);
                 }
             }
-            None => actions.push(ScriptGraphAction::Delete(row.name.clone())),
+            None => actions.push(ScriptGraphAction::Delete(vec![row.name.clone()])),
         }
     }
 }

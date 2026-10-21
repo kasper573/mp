@@ -395,6 +395,10 @@ fn modules_column(
     let mut swap = None;
     let mut duplicate = None;
     let mut objectives = 0;
+    let singles: Vec<bool> = modules
+        .iter()
+        .map(|module| registry().module_rule(table, module) == Some(ModuleRule::AtMostOne))
+        .collect();
     for (index, module) in modules.iter_mut().enumerate() {
         let path = format!("{}/{index}", modules_pointer());
         let tag = TypeTag::of_json(module).unwrap_or_default();
@@ -433,7 +437,14 @@ fn modules_column(
                                 ops.push(ModuleOp::Copy(index));
                                 ui.close();
                             }
-                            if ui.button("Duplicate").clicked() {
+                            if ui
+                                .add_enabled(!singles[index], egui::Button::new("Duplicate"))
+                                .on_disabled_hover_text(format!(
+                                    "A row holds at most one {} module",
+                                    tag.replace('_', " ")
+                                ))
+                                .clicked()
+                            {
                                 duplicate = Some(index);
                                 ui.close();
                             }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use design_tokens::glyph::{self, Mark};
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentFile, Fixture};
+use engine::core::content::{ContentFile, Fixture, name_of};
 use engine::systems::area::world_map::{MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap};
 use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
@@ -114,7 +114,7 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
                 .or_default()
                 .entry(source)
                 .or_default()
-                .push(atlas.key(*area));
+                .push(atlas.file_name(*area));
         }
     }
     if by_kind.is_empty() {
@@ -252,7 +252,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             for (row, bump) in rows.iter().zip(&bumps) {
                 ui.horizontal(|ui| {
                     let ink = if *bump { theme::WARN } else { theme::TEXT };
-                    ui.label(theme::mono(shown_path(row.key)).size(12.5).color(ink));
+                    ui.label(theme::mono(name_of(row.key)).size(12.5).color(ink));
                     if *bump {
                         ui.label(Mark::Raise.text(12.0).color(ink));
                     }
@@ -328,9 +328,10 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                 ui.label(RichText::new(&step.label).size(12.5));
                 ui.label(theme::faint("·").size(12.0));
                 for &area in &step.areas {
-                    let label =
-                        egui::Label::new(theme::faint(atlas.key(area)).monospace().size(12.0))
-                            .sense(Sense::click());
+                    let label = egui::Label::new(
+                        theme::faint(atlas.file_name(area)).monospace().size(12.0),
+                    )
+                    .sense(Sense::click());
                     if ui.add(label).clicked() {
                         go = Some(area);
                     }
@@ -346,9 +347,15 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
             editor.views.world.quest_line = Some(line.category.clone());
         }
         ui.label(
-            theme::mono(line.quests.join(" → "))
-                .size(11.5)
-                .color(theme::MUTED),
+            theme::mono(
+                line.quests
+                    .iter()
+                    .map(|quest| name_of(quest))
+                    .collect::<Vec<_>>()
+                    .join(" → "),
+            )
+            .size(11.5)
+            .color(theme::MUTED),
         );
         ui.add_space(4.0);
     }
@@ -366,13 +373,13 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         .id(&route.from)
         .zip(atlas.id(&route.to))
         .and_then(|(from, to)| atlas.route(from, to));
-    let heading = format!("{} → {}", route.from, route.to);
+    let heading = format!("{} → {}", name_of(&route.from), name_of(&route.to));
     match hops {
         Some(hops) => {
             widgets::section(ui, &format!("{heading} · {} warps", hops.len()));
             for hop in hops {
                 ui.horizontal(|ui| {
-                    ui.label(theme::mono(atlas.key(hop.from)).size(12.5));
+                    ui.label(theme::mono(atlas.file_name(hop.from)).size(12.5));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
                             theme::faint(&atlas.owners[hop.owner].name)
@@ -394,7 +401,7 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         .areas
         .iter()
         .filter(|(area, _)| !atlas.distances.contains_key(area))
-        .map(|(_, info)| info.key.as_str())
+        .map(|(_, info)| name_of(&info.key))
         .collect();
     check(
         ui,
@@ -416,7 +423,13 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         .warps
         .iter()
         .filter(|warp| !atlas.both_ways(warp))
-        .map(|warp| format!("{} → {}", atlas.key(warp.from), atlas.key(warp.to)))
+        .map(|warp| {
+            format!(
+                "{} → {}",
+                atlas.file_name(warp.from),
+                atlas.file_name(warp.to)
+            )
+        })
         .collect();
     check(
         ui,
@@ -448,7 +461,10 @@ fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas, a: &str, b
     };
     let mut opened: Option<OpenTarget> = None;
     for (from, to) in [(a, b), (b, a)] {
-        widgets::section(ui, &format!("{} → {}", atlas.key(from), atlas.key(to)));
+        widgets::section(
+            ui,
+            &format!("{} → {}", atlas.file_name(from), atlas.file_name(to)),
+        );
         let mut any = false;
         for warp in atlas.warps_between(from, to) {
             any = true;
@@ -483,15 +499,16 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     let atlas = &map.atlas;
     let first = cards[0];
     let first_key = atlas.key(first);
+    let first_name = atlas.file_name(first);
     let card = map.layout.cards[&first];
     let title = match cards.len() {
-        1 => first_key.to_owned(),
+        1 => first_name.to_owned(),
         n => format!("{n} cards"),
     };
     crumb(
         ui,
         &match cards.len() {
-            1 => format!("card · {first_key}"),
+            1 => format!("card · {first_name}"),
             _ => title.clone(),
         },
     );
@@ -503,8 +520,9 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         widgets::card_title(ui, &title);
         if cards.len() == 1 {
             widgets::kv(ui, "area", |ui| {
-                open_area = widgets::keyed_button(ui, &format!("area/ {first_key} →"), None, true)
-                    .clicked();
+                open_area =
+                    widgets::keyed_button(ui, &format!("{} →", shown_path(first_key)), None, true)
+                        .clicked();
             });
             widgets::kv(ui, "at", |ui| {
                 let (mut x, mut y) = (card.at.x, card.at.y);
@@ -521,7 +539,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
                     && let Some(moved) = next.cards.get_mut(&first)
                 {
                     super::move_card(moved, egui::pos2(x, y));
-                    label = Some(format!("Move {first_key} on the world map"));
+                    label = Some(format!("Move {first_name} on the world map"));
                 }
             });
         }
@@ -679,7 +697,7 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
         let holds: Vec<&str> = region
             .cards
             .iter()
-            .map(|area| map.atlas.key(*area))
+            .map(|area| map.atlas.file_name(*area))
             .collect();
         widgets::kv_text(
             ui,

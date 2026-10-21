@@ -16,6 +16,28 @@ pub struct EditStep {
     pub at: SystemTime,
 }
 
+impl EditStep {
+    /// Takes `after` into the step, keeping from `before` what a file it didn't touch was.
+    fn fold(&mut self, after: Vec<FileChange>, before: &[FileChange]) {
+        for change in after {
+            match self
+                .after
+                .iter_mut()
+                .find(|known| known.file == change.file)
+            {
+                Some(known) => known.bytes = change.bytes,
+                None => {
+                    if let Some(was) = before.iter().find(|was| was.file == change.file) {
+                        self.before.push(was.clone());
+                    }
+                    self.after.push(change);
+                }
+            }
+        }
+        self.at = SystemTime::now();
+    }
+}
+
 pub const GAME: &str = "game";
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -55,6 +77,7 @@ impl RowSelection {
     }
 }
 
+#[derive(Clone)]
 pub struct EditHistory {
     steps: Vec<EditStep>,
     applied: usize,
@@ -118,7 +141,14 @@ impl EditHistory {
         *self = EditHistory::default();
     }
 
-    pub fn merge_into_last(&mut self, label: &str, after: Vec<FileChange>) -> bool {
+    /// Folds `after` into the last step when it carries the same label, was made within the last
+    /// second and nothing was undone since; files the step didn't touch keep `before` to undo to.
+    pub fn merge_into_last(
+        &mut self,
+        label: &str,
+        after: Vec<FileChange>,
+        before: &[FileChange],
+    ) -> bool {
         if self.applied != self.steps.len() {
             return false;
         }
@@ -132,17 +162,7 @@ impl EditHistory {
         if last.label != label || !recent {
             return false;
         }
-        for change in after {
-            match last
-                .after
-                .iter_mut()
-                .find(|known| known.file == change.file)
-            {
-                Some(known) => known.bytes = change.bytes,
-                None => last.after.push(change),
-            }
-        }
-        last.at = SystemTime::now();
+        last.fold(after, before);
         true
     }
 
@@ -164,23 +184,8 @@ impl EditHistory {
         if last.label != step {
             return false;
         }
-        for change in after {
-            match last
-                .after
-                .iter_mut()
-                .find(|known| known.file == change.file)
-            {
-                Some(known) => known.bytes = change.bytes,
-                None => {
-                    if let Some(was) = before.iter().find(|was| was.file == change.file) {
-                        last.before.push(was.clone());
-                    }
-                    last.after.push(change);
-                }
-            }
-        }
+        last.fold(after, before);
         last.label = label.to_owned();
-        last.at = SystemTime::now();
         true
     }
 

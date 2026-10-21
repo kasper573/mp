@@ -11,7 +11,7 @@ use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::object::ObjectDef;
 use engine::systems::area::scene::{self, SceneNode, scene_file};
 use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SoundscapeDef};
-use engine::systems::script::{VarValue, Variable};
+use engine::systems::script::{RunnerKind, VarValue, Variable};
 use serde_json::Value;
 
 use super::placement::{self, placement_extras};
@@ -1022,8 +1022,16 @@ fn module_fields(ui: &mut Ui, cx: &mut FormCx, module: &mut AreaModule, path: &s
 /// The scripts of `object`, each as a card.
 fn object_scripts(ui: &mut Ui, cx: &mut FormCx, object: &mut ObjectDef, path: &str) -> bool {
     let path = format!("{path}{}", field!(ObjectDef, scripts));
-    crate::ui::row_form::scripts::script_cards(ui, cx, AreaDef::TABLE, &mut object.scripts, &path)
-        .is_some()
+    let held = cx.runner.replace(RunnerKind::Object);
+    let changed = crate::ui::row_form::scripts::script_cards(
+        ui,
+        cx,
+        AreaDef::TABLE,
+        &mut object.scripts,
+        &path,
+    );
+    cx.runner = held;
+    changed.is_some()
 }
 
 /// The holes of a blueprint's module as its form shows them: each filled by its variable, and

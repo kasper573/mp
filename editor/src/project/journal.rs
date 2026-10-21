@@ -64,9 +64,12 @@ impl RecoveryJournal {
         serde_json::from_str(&text).ok()
     }
 
-    pub fn set_aside(user: &UserFolder, folder: &Path) {
+    /// Moves the folder's journal out of the way of the next one, keeping it beside it. Gives
+    /// where it went.
+    pub fn set_aside(user: &UserFolder, folder: &Path) -> Option<PathBuf> {
         let file = file_for(user, folder);
-        let _ = std::fs::rename(&file, file.with_extension("json.old"));
+        let aside = file.with_extension("json.old");
+        std::fs::rename(&file, &aside).ok().map(|()| aside)
     }
 }
 
@@ -77,6 +80,12 @@ impl RecoveryJournalFile {
             base: base.map(str::to_owned),
             bytes: bytes.map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
         }
+    }
+
+    /// Whether the file on disk is no longer the one the journaled bytes were edited from, given
+    /// the hash of the one there now.
+    pub fn changed_on_disk(&self, now: Option<&str>) -> bool {
+        self.base.as_deref() != now
     }
 
     pub fn change(&self) -> FileChange {

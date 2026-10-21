@@ -71,6 +71,55 @@ fn duplicating_a_module_places_its_copy_one_tile_on_under_a_fresh_name() {
 }
 
 #[test]
+fn a_duplicated_ground_layer_takes_a_fresh_name_and_its_cells_along() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = editor_with_a_door(&scratch);
+    editor.selection = RowSelection::parts(
+        AreaDef::TABLE,
+        &area(),
+        vec!["/0".to_owned(), DOOR.to_owned()],
+    );
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    run_action(&mut editor, &snapshot, AreaAction::Duplicate);
+
+    assert_eq!(modules(&editor).len(), 2, "the duplicate applies");
+    let bundle = nodes::bundle_of(&editor, &area()).expect("the area reads");
+    let grids = &bundle.blueprint().scene.grids;
+    let names: Vec<&String> = grids.layers.keys().collect();
+    assert_eq!(names.len(), 2);
+    assert_eq!(grids.layers[names[0]], grids.layers[names[1]]);
+}
+
+#[test]
+fn copying_rows_keeps_them_in_the_order_the_scene_lists_them() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = editor_with_a_door(&scratch);
+    let reader = editor.reader().expect("a reader");
+    let named = |name: &str| {
+        let mut door = barn_door();
+        door["name"] = json!(name);
+        SceneNode::Module(ModuleNode::new(reader.from_json(&door).expect("a door")))
+    };
+    let more: Vec<SceneNode> = (2..=10).map(|n| named(&format!("door-{n}"))).collect();
+    assert!(nodes::change_scene(&mut editor, &area(), |scene| {
+        SceneTree::new(scene).append("", more);
+        Some("Add doors".to_owned())
+    }));
+    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+    let rows = ["/10".to_owned(), "/2".to_owned()];
+    editor::views::area::scene_tree::copy_rows(&mut editor, &snapshot, &rows);
+    let Some(editor::app::Clipboard::Scene(clip)) = &editor.clipboard else {
+        panic!("rows copied");
+    };
+    let copied = clip
+        .nodes
+        .read(&reader, &Default::default())
+        .expect("the copies read");
+    let names = crate::support::names(&copied);
+    assert_eq!(names, ["door-2", "door-10"]);
+}
+
+#[test]
 fn duplicating_is_one_undo_step() {
     let scratch = tempfile::tempdir().expect("a scratch folder");
     let mut editor = editor_with_a_door(&scratch);

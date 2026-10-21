@@ -105,6 +105,9 @@ pub fn land(
     export: AnimationExport,
     again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
+    if super::refuses_unread::<ModelDef>(editor, key) {
+        return None;
+    }
     let reader = editor.reader()?;
     let row = model_of(editor, key);
     let record = editor.imports.record_for(ModelDef::TABLE, key).cloned();

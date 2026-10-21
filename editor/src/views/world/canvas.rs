@@ -7,6 +7,7 @@ use egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
     Vec2,
 };
+use engine::core::content::name_of;
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::core::tiling::{TilePos, Tiles};
@@ -484,7 +485,7 @@ pub fn corners(rect: Rect) -> [Pos2; 4] {
 }
 
 fn draw_caption(painter: &Painter, atlas: &WorldAtlas, card: &MapCard, dimmed: bool) {
-    let key = atlas.key(card.area);
+    let name = atlas.file_name(card.area);
     let ink = if dimmed { theme::FAINT } else { theme::TEXT };
     let top = card.art.max.y + 2.0;
     let width = card.caption_width - 2.0 * PAD;
@@ -500,12 +501,12 @@ fn draw_caption(painter: &Painter, atlas: &WorldAtlas, card: &MapCard, dimmed: b
         );
     };
     if card.compact {
-        for (i, part) in split_name(key).iter().enumerate() {
+        for (i, part) in split_name(name).iter().enumerate() {
             line(part, FontId::monospace(10.0), ink, top + 10.0 * i as f32);
         }
         return;
     }
-    line(key, FontId::monospace(11.0), ink, top);
+    line(name, FontId::monospace(11.0), ink, top);
     let ways = atlas
         .exits(card.area)
         .iter()
@@ -694,13 +695,14 @@ fn overview_status(editor: &Editor, map: &OpenWorldMap, overlays: &Overlays) -> 
         return vec![match &overlays.route {
             Some(hops) => format!(
                 "World · route {} → {} · {} warps",
-                route.from,
-                route.to,
+                name_of(&route.from),
+                name_of(&route.to),
                 hops.len()
             ),
             None => format!(
                 "World · route {} → {} · no chain of warps leads there",
-                route.from, route.to
+                name_of(&route.from),
+                name_of(&route.to)
             ),
         }];
     }
@@ -787,10 +789,10 @@ fn dots(painter: &Painter, viewport: &Viewport<Tiles>) {
     }
 }
 
-fn split_name(key: &str) -> Vec<&str> {
-    match key.rfind('_') {
-        Some(at) if key.chars().count() > 12 => vec![&key[..=at], &key[at + 1..]],
-        _ => vec![key],
+fn split_name(name: &str) -> Vec<&str> {
+    match name.rfind('_') {
+        Some(at) if name.chars().count() > 12 => vec![&name[..=at], &name[at + 1..]],
+        _ => vec![name],
     }
 }
 
@@ -1048,7 +1050,7 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
         painter,
         card.frame.left_bottom() + Vec2::new(0.0, 4.0),
         Align2::LEFT_TOP,
-        atlas.key(card.area),
+        atlas.file_name(card.area),
         theme::PANEL,
         theme::TEXT,
         11.0,
@@ -1073,7 +1075,7 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
         let tx = reach(d.x, inset.min.x, inset.max.x, origin.x);
         let ty = reach(d.y, inset.min.y, inset.max.y, origin.y);
         let at = (origin + d * tx.min(ty).max(0.0)).clamp(inset.min, inset.max);
-        let name = atlas.key(to);
+        let name = atlas.file_name(to);
         let (text, anchor) = if tx < ty {
             if d.x > 0.0 {
                 (format!("{name} →"), Align2::RIGHT_CENTER)

@@ -403,6 +403,23 @@ fn names_of(job: &ImportReading) -> String {
     formats::names(&job.dropped.files())
 }
 
+/// Whether `key` names a file of `Row` that is there but doesn't read, saying so: an import onto
+/// it would take it for a new file and lose what it holds.
+fn refuses_unread<Row: ContentFile>(editor: &mut Editor, key: &str) -> bool {
+    let present = editor
+        .project
+        .as_ref()
+        .is_some_and(|project| project.files.contains(&fields_file(key)));
+    if !present || matches!(editor.read::<Row>(key), Some(Ok(_))) {
+        return false;
+    }
+    editor.toast(format!(
+        "Not imported onto {}: it doesn't read; its row on the left shows why",
+        shown_path(key)
+    ));
+    true
+}
+
 fn asset_image(editor: &Editor, path: &str) -> Option<RgbaImage> {
     let bytes = editor.project.as_ref()?.files.get(path)?;
     formats::decode_image_bytes(bytes).ok()

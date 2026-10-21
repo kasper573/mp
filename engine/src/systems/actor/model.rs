@@ -539,7 +539,7 @@ fn check_strips(sheet: &SpriteSheet, cx: &mut RowCheck) {
                     apexes.push(index);
                 }
             }
-            if (apexes.len() > 1) || (!apexes.is_empty() && action != Action::Attack) {
+            if (apexes.len() > 1) || (!apexes.is_empty() && !action.takes_apex()) {
                 cx.error(
                     &pointer,
                     "apex out of place",

@@ -177,3 +177,141 @@ fn replacing_a_sheet_with_one_too_small_for_its_frames_is_refused() {
     let refused = editor.try_apply(edit).expect_err("refused");
     assert!(refused.contains("tile out of range"), "{refused}");
 }
+
+/// The orc's npc made to wear the elf's model, applied but not yet loaded.
+fn orc_wearing_elf(editor: &mut Editor) {
+    let before = editor.project.as_ref().expect("a project").files.clone();
+    let mut edit = ContentEdit::new("dress the orc as an elf");
+    edit.update_json(&before, &fields_file(&path("npc", "orc")), |npc| {
+        npc["model"] = json!(path("model", "elf"));
+        Some(())
+    })
+    .expect("the npc is there");
+    editor.try_apply(edit).expect("applies");
+}
+
+#[test]
+fn renaming_what_an_edit_still_loading_names_rewrites_that_edit_too() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(camp().model("elf", 1.5, json!([])), &scratch);
+    orc_wearing_elf(&mut editor);
+
+    let renamed = rows::rename(&mut editor, &path("model", "elf"), "fae").expect("renames");
+
+    let files = files(&mut editor);
+    let npc = files
+        .json(&fields_file(&path("npc", "orc")))
+        .expect("the npc");
+    assert_eq!(npc["model"], json!(renamed));
+    let project = editor.project.as_ref().expect("a project");
+    assert!(
+        project.loads(),
+        "{:?}",
+        project.report.as_ref().map(ToString::to_string)
+    );
+}
+
+#[test]
+fn removing_what_an_edit_still_loading_names_is_refused() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(camp().model("elf", 1.5, json!([])), &scratch);
+    orc_wearing_elf(&mut editor);
+    let model = path("model", "elf");
+    let mut edit = ContentEdit::new("remove the elf's model");
+    for file in editor
+        .project
+        .as_ref()
+        .expect("a project")
+        .files
+        .files_of(&model)
+    {
+        edit.remove(file);
+    }
+
+    let refused = editor.try_apply(edit).expect_err("refused");
+    assert!(refused.contains("missing file"), "{refused}");
+}
+
+/// An area placing a yard blueprint, and a post blueprint the yard may place.
+fn yard() -> Game {
+    let post = json!([{
+        "type": "object",
+        "name": "post",
+        "shape": { "type": "point", "x": 0.5, "y": 0.5 },
+    }]);
+    camp()
+        .blueprint("post", (1, 1), json!({}), post)
+        .blueprint("yard", (2, 2), json!({}), json!([]))
+        .edit_scene("area", support::AREA, |scene| {
+            scene.as_array_mut().expect("a scene").push(json!({
+                "type": "blueprint",
+                "label": "yard",
+                "blueprint": path("blueprint", "yard"),
+                "at": { "x": 3.0, "y": 3.0 },
+            }));
+        })
+}
+
+fn yard_scene() -> String {
+    format!("{}/scene.json", path("blueprint", "yard"))
+}
+
+#[test]
+fn an_edit_that_breaks_a_file_it_never_touched_is_taken_back_once_the_folder_loads() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(yard(), &scratch);
+    let before = files(&mut editor);
+    let mut edit = ContentEdit::new("place a post far out in the yard");
+    let far_post = json!([{
+        "type": "blueprint",
+        "label": "post",
+        "blueprint": path("blueprint", "post"),
+        "at": { "x": 6.0, "y": 6.0 },
+    }]);
+    edit.write(
+        yard_scene(),
+        FileBytes::from(serde_json::to_vec_pretty(&far_post).expect("json")),
+    );
+
+    editor.try_apply(edit).expect("the yard alone reads");
+    let project = editor.project.as_mut().expect("a project");
+    project.settle();
+
+    let refused = project.take_refused().expect("the edit is taken back");
+    assert_eq!(refused.label, "place a post far out in the yard");
+    assert_eq!(
+        refused.refusal.file,
+        format!("{}/scene.json", support::area())
+    );
+    assert_eq!(project.files.get(&yard_scene()), before.get(&yard_scene()));
+    assert!(project.history.steps().is_empty());
+    assert!(project.loads());
+}
+
+#[test]
+fn an_edit_that_keeps_every_file_loading_stays() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(yard(), &scratch);
+    let mut edit = ContentEdit::new("place a post in the yard");
+    let near_post = json!([{
+        "type": "blueprint",
+        "label": "post",
+        "blueprint": path("blueprint", "post"),
+        "at": { "x": 1.0, "y": 1.0 },
+    }]);
+    let bytes = FileBytes::from(serde_json::to_vec_pretty(&near_post).expect("json"));
+    edit.write(yard_scene(), bytes.clone());
+
+    editor.try_apply(edit).expect("applies");
+    let project = editor.project.as_mut().expect("a project");
+    project.settle();
+
+    let refused = project.take_refused();
+    assert!(
+        refused.is_none(),
+        "{:?}",
+        refused.map(|refused| refused.refusal.sentence())
+    );
+    assert_eq!(project.files.get(&yard_scene()), Some(&bytes));
+    assert_eq!(project.history.steps().len(), 1);
+}

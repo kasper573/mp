@@ -92,6 +92,25 @@ fn renaming_an_own_face_moves_its_picture_and_the_game_still_loads() {
 }
 
 #[test]
+fn a_face_keeps_its_name_when_asked_for_one_no_file_can_hold() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(&scratch);
+    let smug = faces(&editor)
+        .into_iter()
+        .find(|face| face.name == "smug")
+        .expect("smug");
+
+    for wanted in ["grin!", "a/b", "happy (2) x"] {
+        assert!(
+            !busts::rename(&mut editor, &path("model", "orc"), &smug, wanted),
+            "{wanted}"
+        );
+    }
+    let names: Vec<String> = faces(&editor).into_iter().map(|face| face.name).collect();
+    assert!(names.contains(&"smug".to_owned()), "{names:?}");
+}
+
+#[test]
 fn removing_an_own_face_removes_its_picture_and_a_generic_face_stays() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = open(&scratch);
@@ -111,4 +130,53 @@ fn removing_an_own_face_removes_its_picture_and_a_generic_face_stays() {
 
     settled_loads(&mut editor);
     assert_eq!(faces(&editor).len(), GenericExpression::VARIANTS.len());
+}
+
+#[test]
+fn renaming_a_face_leaves_the_lines_of_speakers_wearing_another_model_alone() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let line = |npc: &str| json!({ "by": { "type": "npc", "npc": path("npc", npc), "face": "smug" }, "text": ["Hm."] });
+    let game = ["grunt", "lady"].iter().fold(support::game(), |game, npc| {
+        game.npc(npc, 10.0, json!([]))
+            .busts(npc)
+            .part("model", npc, "busts/smug.png", png(4, 4))
+    });
+    let game = game.script(
+        "talk",
+        "npc",
+        json!({
+            "start": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "said" },
+            "said": { "type": "dialogue", "lines": [line("grunt"), line("lady")], "choices": [{ "label": ["Bye."] }] },
+        }),
+    );
+    let folder = scratch.path().join("game");
+    game.write_to(&folder);
+    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
+    project.settle();
+    let mut editor = Editor::new(
+        UserFolder::at(scratch.path().join("user")),
+        EditorSettings::default(),
+    );
+    editor.project = Some(project);
+    let grunt = path("model", "grunt");
+    let model = editor
+        .read::<ModelDef>(&grunt)
+        .expect("a project")
+        .expect("the model reads");
+    let smug = busts::faces(&model)
+        .into_iter()
+        .find(|face| face.name == "smug")
+        .expect("smug");
+
+    assert!(busts::rename(&mut editor, &grunt, &smug, "sly"));
+
+    settled_loads(&mut editor);
+    let faces_of = |model: &str| -> Vec<String> {
+        busts::lines(&editor, &path("model", model))
+            .into_iter()
+            .map(|line| line.face)
+            .collect()
+    };
+    assert_eq!(faces_of("grunt"), ["sly"]);
+    assert_eq!(faces_of("lady"), ["smug"]);
 }

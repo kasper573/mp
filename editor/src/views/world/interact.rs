@@ -681,8 +681,8 @@ fn snapped(
                             shift,
                             note: format!(
                                 "{} snapped {how} {}",
-                                atlas.key(*mover),
-                                atlas.key(*other)
+                                atlas.file_name(*mover),
+                                atlas.file_name(*other)
                             ),
                         });
                     }

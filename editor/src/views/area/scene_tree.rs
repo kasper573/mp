@@ -1501,7 +1501,7 @@ pub fn paste_target(snapshot: &AreaSnapshot, folder: &str) -> String {
 /// The topmost of the rows `ids` of one scene, by their pointers in it, without layers' cells.
 fn topmost(ids: &[String]) -> Vec<String> {
     let mut pointers: Vec<String> = ids.iter().map(|id| local(id).to_owned()).collect();
-    pointers.sort();
+    nodes::sort_in_scene_order(&mut pointers);
     pointers.dedup();
     let all = pointers.clone();
     pointers.retain(|pointer| {
@@ -1523,6 +1523,7 @@ pub fn copy_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String]) {
         .iter()
         .filter_map(|pointer| nodes::node(&scene, pointer).cloned())
         .filter(|node| !nodes::is_layer(node))
+        .map(super::layers::without_layers)
         .collect();
     if copied.is_empty() {
         editor.toast("Ground layers copy with Duplicate");
@@ -1622,20 +1623,29 @@ pub fn duplicate_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[Strin
     let reader = snapshot.reader.clone();
     let mut taken: HashSet<String> = snapshot.object_names();
     let mut made = Vec::new();
-    let applied = nodes::change_scene(editor, &bundle, |scene| {
+    let applied = nodes::change_blueprint(editor, &bundle, |blueprint| {
+        let scene = &mut blueprint.scene;
         let label = match pointers.as_slice() {
             [one] => format!(
                 "Duplicate {}",
-                shapes::node_label(nodes::node(scene, one)?, reader.as_ref())
+                shapes::node_label(nodes::node(&scene.nodes, one)?, reader.as_ref())
             ),
             many => format!("Duplicate {} rows", many.len()),
         };
-        made = nodes::SceneTree::new(scene).duplicate(&pointers, |node| {
+        let mut layer_names = super::layers::names(&scene.nodes);
+        let mut renamed_layers = Vec::new();
+        made = nodes::SceneTree::new(&mut scene.nodes).duplicate(&pointers, |node| {
             let mut node = node.clone();
             super::blueprint::shift_tree(&mut node, 1.0, 1.0);
             rename_objects(&mut node, &mut taken);
+            renamed_layers.extend(super::layers::rename_copied(&mut node, &mut layer_names));
             node
         });
+        for (from, to) in renamed_layers {
+            if let Some(cells) = scene.grids.layers.get(&from).cloned() {
+                scene.grids.layers.insert(to, cells);
+            }
+        }
         Some(label)
     });
     if applied {

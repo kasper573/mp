@@ -88,7 +88,7 @@ impl Thumbnails {
         budget: &mut u32,
     ) -> Option<Thumbnail> {
         let file = path.to_owned();
-        self.load(ctx, files, file.clone(), file, budget, |image| image)
+        self.load(ctx, files, file.clone(), file, budget, Some)
     }
 
     /// The `frame`th cell, each `size` pixels, of the sheet at `path`, cut down to the pixels it
@@ -104,7 +104,7 @@ impl Thumbnails {
     ) -> Option<Thumbnail> {
         let key = format!("cell:{path}:{}x{}:{frame}", size.0, size.1);
         self.load(ctx, files, key, path.to_owned(), budget, |image| {
-            trimmed(&cell(&image, size, frame))
+            cell(&image, size, frame).map(|cell| trimmed(&cell))
         })
     }
 
@@ -117,7 +117,9 @@ impl Thumbnails {
     ) -> Option<Thumbnail> {
         let file = path.to_owned();
         let key = format!("icon:{file}");
-        self.load(ctx, files, key, file, budget, |image| shrink(image, ICON))
+        self.load(ctx, files, key, file, budget, |image| {
+            Some(shrink(image, ICON))
+        })
     }
 
     fn load(
@@ -127,7 +129,7 @@ impl Thumbnails {
         key: String,
         file: String,
         budget: &mut u32,
-        prepare: impl FnOnce(RgbaImage) -> RgbaImage,
+        prepare: impl FnOnce(RgbaImage) -> Option<RgbaImage>,
     ) -> Option<Thumbnail> {
         let bytes = files.get(&file)?;
         let hash = files.hash_of(&file)?.to_owned();
@@ -142,8 +144,7 @@ impl Thumbnails {
         }
         *budget -= 1;
         let max_side = ctx.input(|i| i.max_texture_side) as u32;
-        let thumb = decode(bytes).map(|image| {
-            let image = prepare(image);
+        let thumb = decode(bytes).and_then(prepare).map(|image| {
             let size = [image.width() as usize, image.height() as usize];
             let image = to_color_image(shrink(image, max_side));
             Thumbnail {
@@ -201,12 +202,20 @@ fn to_color_image(image: RgbaImage) -> ColorImage {
     ColorImage::from_rgba_unmultiplied(size, image.as_raw())
 }
 
-/// The `frame`th cell of a sheet of `size` cells, laid out row by row.
-fn cell(image: &RgbaImage, (width, height): (u32, u32), frame: u32) -> RgbaImage {
-    let columns = (image.width() / width.max(1)).max(1);
-    let x = (frame % columns) * width;
-    let y = (frame / columns) * height;
-    image::imageops::crop_imm(image, x, y, width, height).to_image()
+/// The `frame`th cell of a sheet of `size` cells, laid out row by row, if the sheet holds it.
+fn cell(image: &RgbaImage, (width, height): (u32, u32), frame: u32) -> Option<RgbaImage> {
+    let columns = image
+        .width()
+        .checked_div(width)
+        .filter(|&columns| columns > 0)?;
+    let rows = image
+        .height()
+        .checked_div(height)
+        .filter(|&rows| rows > 0)?;
+    (frame < columns * rows).then(|| {
+        let (x, y) = ((frame % columns) * width, (frame / columns) * height);
+        image::imageops::crop_imm(image, x, y, width, height).to_image()
+    })
 }
 
 /// The picture without the transparent margins around what it draws; a picture that draws

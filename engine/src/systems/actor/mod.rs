@@ -65,6 +65,13 @@ pub enum Action {
     Dead,
 }
 
+impl Action {
+    /// Whether the action's strips mark the frame its hit lands on.
+    pub fn takes_apex(self) -> bool {
+        self == Action::Attack
+    }
+}
+
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tint {

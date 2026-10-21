@@ -2,7 +2,7 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, ContentFile, fields_file};
+use engine::core::content::{Content, ContentFile, fields_file, name_of};
 use engine::core::math::{Pos, Size};
 use engine::core::script::Expr;
 use engine::core::tiling::Tiles;
@@ -19,7 +19,6 @@ use engine::systems::shop::ShopDef;
 use strum::VariantArray;
 
 use crate::project::ProjectFiles;
-use crate::tabs::file_title;
 use crate::tabs::shown_path;
 use crate::usages::ContentUsages;
 
@@ -307,6 +306,11 @@ impl WorldAtlas {
         &self.areas[&id].key
     }
 
+    /// What a card is called on the map: its file's name, without the folders holding it.
+    pub fn file_name(&self, id: AreaId) -> &str {
+        name_of(self.key(id))
+    }
+
     pub fn size(&self, id: AreaId) -> Size<Tiles> {
         self.areas[&id].size
     }
@@ -419,15 +423,27 @@ impl WorldAtlas {
                 let link = &info.after[0];
                 let label = match &link.how {
                     QuestLinkHow::During => {
-                        format!("while {} is open, {giver} offers {}", link.quest, info.key)
+                        format!(
+                            "while {} is open, {giver} offers {}",
+                            name_of(&link.quest),
+                            name_of(&info.key)
+                        )
                     }
                     QuestLinkHow::Memory(memory) => {
-                        format!("after {memory}, {giver} offers {}", info.key)
+                        format!(
+                            "after {}, {giver} offers {}",
+                            name_of(memory),
+                            name_of(&info.key)
+                        )
                     }
                     QuestLinkHow::Failed => {
-                        format!("failing {}, {giver} offers {}", link.quest, info.key)
+                        format!(
+                            "failing {}, {giver} offers {}",
+                            name_of(&link.quest),
+                            name_of(&info.key)
+                        )
                     }
-                    QuestLinkHow::Done => format!("{giver} offers {}", info.key),
+                    QuestLinkHow::Done => format!("{giver} offers {}", name_of(&info.key)),
                 };
                 let offered = info
                     .steps
@@ -449,8 +465,10 @@ impl WorldAtlas {
                 number += 1;
                 let label = match &step.kind {
                     QuestStepKind::Offered => match &info.requires {
-                        Some(requires) => format!("{giver} offers {} · {requires}", info.key),
-                        None => format!("{giver} offers {}", info.key),
+                        Some(requires) => {
+                            format!("{giver} offers {} · {requires}", name_of(&info.key))
+                        }
+                        None => format!("{giver} offers {}", name_of(&info.key)),
                     },
                     QuestStepKind::TurnedIn => {
                         format!("hand in to {}", step.who.as_deref().unwrap_or(giver))
@@ -487,7 +505,7 @@ impl WorldAtlas {
         let mut seeds = vec![AtlasOwner {
             area: id,
             kind: RunnerKind::Area,
-            name: key.to_owned(),
+            name: name_of(key).to_owned(),
             label: shown_path(key).to_owned(),
             at: None,
             reaches: Vec::new(),
@@ -510,7 +528,7 @@ impl WorldAtlas {
             seeds.push(AtlasOwner {
                 area: id,
                 kind: RunnerKind::Object,
-                label: format!("{} › {name}", file_title(key)),
+                label: format!("{} › {name}", name_of(key)),
                 name,
                 at: Some(match object.shape {
                     ObjectShape::Point(at) => at,
@@ -536,8 +554,8 @@ impl WorldAtlas {
             seeds.push(AtlasOwner {
                 area: id,
                 kind: RunnerKind::Blueprint,
-                name: blueprint.to_owned(),
-                label: format!("{} in {} {ordinal}", file_title(blueprint), file_title(key)),
+                name: name_of(blueprint).to_owned(),
+                label: format!("{} in {} {ordinal}", name_of(blueprint), name_of(key)),
                 at: Some(placement.at),
                 reaches: Vec::new(),
                 opens: OpenTarget::Area {
@@ -1075,7 +1093,7 @@ fn positive_queries<'a>(condition: &'a Condition, out: &mut Vec<&'a RiftQuery>) 
 
 fn counted(verb: &str, count: u32, what: &str) -> String {
     match count {
-        1 => format!("{verb} {what}"),
-        _ => format!("{verb} {count} {what}"),
+        1 => format!("{verb} {}", name_of(what)),
+        _ => format!("{verb} {count} {}", name_of(what)),
     }
 }

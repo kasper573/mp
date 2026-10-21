@@ -421,7 +421,7 @@ fn spawn_sturdy(
     area: AreaId,
 ) -> Entity {
     let def = NpcDef {
-        name: model.path(content).to_owned(),
+        name: model.name(content).to_owned(),
         model,
         stats: Stats(BTreeMap::from([
             (StatKind::MaxHealth, STURDY),

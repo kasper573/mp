@@ -11,6 +11,7 @@ use engine::systems::area::scene;
 use super::nodes;
 use crate::app::Editor;
 use crate::project::Project;
+use crate::tabs::shown_path;
 
 /// The grids an area's or a blueprint's bundle keeps, being painted: its palette, its ground
 /// layers in tree order and its forced walk cells. What placed blueprints paint over them is not
@@ -334,27 +335,32 @@ pub struct BundlePalette {
     pub rows: Vec<PaletteRow>,
 }
 
-/// The palette of every area and blueprint that has one, as its files read now.
-pub fn palettes(project: &Project) -> Vec<BundlePalette> {
+/// The palette of every area and blueprint that has one, as its files read now; refused while
+/// any of them doesn't read, as its palette can't be told.
+pub fn palettes(project: &Project) -> Result<Vec<BundlePalette>, String> {
     let reader = project.reader();
-    let areas = reader.paths_of::<AreaDef>().iter().filter_map(|path| {
-        let area = project.read::<AreaDef>(path).ok()?;
-        Some(BundlePalette {
+    let unread = |path: &str| format!("{} doesn't read", shown_path(path));
+    let areas = reader.paths_of::<AreaDef>().iter().map(|path| {
+        let area = project.read::<AreaDef>(path).map_err(|_| unread(path))?;
+        Ok(BundlePalette {
             bundle: path.clone(),
             rows: area.blueprint.scene.grids.palette.clone(),
         })
     });
-    let blueprints = reader.paths_of::<BlueprintDef>().iter().filter_map(|path| {
-        let blueprint = project.read::<BlueprintDef>(path).ok()?;
-        Some(BundlePalette {
+    let blueprints = reader.paths_of::<BlueprintDef>().iter().map(|path| {
+        let blueprint = project
+            .read::<BlueprintDef>(path)
+            .map_err(|_| unread(path))?;
+        Ok(BundlePalette {
             bundle: path.clone(),
             rows: blueprint.scene.grids.palette.clone(),
         })
     });
-    areas
-        .chain(blueprints)
+    let palettes: Vec<BundlePalette> = areas.chain(blueprints).collect::<Result<_, String>>()?;
+    Ok(palettes
+        .into_iter()
         .filter(|palette| !palette.rows.is_empty())
-        .collect()
+        .collect())
 }
 
 /// The blueprint an area or blueprint bundle holds, as `content` loaded it.

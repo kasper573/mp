@@ -455,7 +455,10 @@ pub fn remapped(remap: &Remap, pointer: &str) -> Option<String> {
         return Some(now.clone());
     }
     let (folder, index) = place_of(pointer)?;
-    let folder = remapped(remap, folder).filter(|_| !folder.is_empty())?;
+    if folder.is_empty() {
+        return None;
+    }
+    let folder = remapped(remap, folder)?;
     Some(format!("{folder}/children/{index}"))
 }
 
@@ -491,7 +494,8 @@ impl NodeFlag {
 pub struct SceneTree<'a> {
     nodes: &'a mut Vec<SceneNode>,
     followed: Vec<Option<Vec<usize>>>,
-    was: Vec<String>,
+    /// Each followed node's pointer before the change; `None` for one the change added.
+    was: Vec<Option<String>>,
 }
 
 /// A node a `SceneTree` follows.
@@ -507,8 +511,12 @@ struct Lifted {
 impl<'a> SceneTree<'a> {
     pub fn new(nodes: &'a mut Vec<SceneNode>) -> SceneTree<'a> {
         let mut was = Vec::new();
-        walk(nodes, &mut |pointer, _| was.push(pointer.to_owned()));
-        let followed = was.iter().map(|pointer| path_of(pointer)).collect();
+        walk(nodes, &mut |pointer, _| was.push(Some(pointer.to_owned())));
+        let followed = was
+            .iter()
+            .flatten()
+            .map(|pointer| path_of(pointer))
+            .collect();
         SceneTree {
             nodes,
             followed,
@@ -525,7 +533,7 @@ impl<'a> SceneTree<'a> {
         self.was
             .iter()
             .zip(&self.followed)
-            .filter_map(|(was, now)| Some((was.clone(), pointer_of(now.as_ref()?))))
+            .filter_map(|(was, now)| Some((was.clone()?, pointer_of(now.as_ref()?))))
             .collect()
     }
 
@@ -794,7 +802,7 @@ impl<'a> SceneTree<'a> {
             return Some(Followed(known));
         }
         self.followed.push(Some(path));
-        self.was.push(String::new());
+        self.was.push(None);
         Some(Followed(self.followed.len() - 1))
     }
 
@@ -831,7 +839,7 @@ impl<'a> SceneTree<'a> {
         let mut path = holder.to_vec();
         path.push(index);
         self.followed.push(Some(path));
-        self.was.push(String::new());
+        self.was.push(None);
         Some(Followed(self.followed.len() - 1))
     }
 
@@ -910,6 +918,11 @@ pub fn restructure<R>(
 }
 
 /// How many folders hold the node at `pointer`.
+/// Sorts `pointers` into the order their nodes stand in the scene, depth first.
+pub fn sort_in_scene_order(pointers: &mut [String]) {
+    pointers.sort_by_key(|pointer| indices(pointer));
+}
+
 pub fn depth(pointer: &str) -> usize {
     pointer.matches("/children/").count()
 }

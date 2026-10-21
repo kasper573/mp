@@ -93,6 +93,7 @@ pub struct AreaScene {
     zoom: f32,
     center: Pos<Tiles>,
     changed_at: Duration,
+    settling: u32,
     active: bool,
 }
 
@@ -125,9 +126,12 @@ const IDLE_FOR: Duration = Duration::from_secs(2);
 // cards) gets them over a few frames instead of one long one.
 const SPAWNS_PER_FRAME: usize = 6;
 
-// A still scene keeps rendering for this long after a change, so its spawned tiles and uploaded
-// images are all on the target before the camera rests.
+// A still scene keeps rendering for this long and this many frames after a change, so its
+// spawned tiles and uploaded images are all on the target before the camera rests. Time alone
+// isn't enough: a frame that spawns a large scene can outlast it, leaving one render made while
+// its tiles' materials were still being prepared.
 const SETTLE_FOR: Duration = Duration::from_millis(50);
+const SETTLE_FRAMES: u32 = 4;
 
 pub fn sync(
     scenes: &mut AreaScenes,
@@ -167,8 +171,11 @@ pub fn sync(
             || scene.center != request.center;
         if changed {
             scene.changed_at = now;
+            scene.settling = SETTLE_FRAMES;
         }
-        let active = request.live || now.saturating_sub(scene.changed_at) < SETTLE_FOR;
+        let settled = now.saturating_sub(scene.changed_at) >= SETTLE_FOR && scene.settling == 0;
+        scene.settling = scene.settling.saturating_sub(1);
+        let active = request.live || !settled;
         let rest = !changed && active == scene.active;
         scene.zoom = request.zoom;
         scene.center = request.center;
@@ -368,6 +375,7 @@ fn spawn(
             zoom: request.zoom,
             center: request.center,
             changed_at: now,
+            settling: SETTLE_FRAMES,
             active: true,
         },
     );

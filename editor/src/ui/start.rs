@@ -257,7 +257,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
             }
             if keep.is_some() && (widgets::danger(ui, "Discard").clicked() || pressed.escape) {
                 let (folder, _) = keep.take().expect("kept");
-                RecoveryJournal::set_aside(&editor.user, &folder);
+                let _ = RecoveryJournal::set_aside(&editor.user, &folder);
                 editor.open_now(&folder, Vec::new());
             }
         });
