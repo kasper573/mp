@@ -398,18 +398,22 @@ pub fn build_all(loading: &mut Loading) {
     let mut errors: Vec<(ScriptSite, ScriptError)> = Vec::new();
     let mut bind = |row: OwnerRow, label: String, modules: Vec<(ScriptSite, &ScriptModule)>| {
         if modules.is_empty() {
-            return;
+            return true;
         }
         let scripts: Vec<&ScriptModule> = modules.iter().map(|(_, module)| *module).collect();
         match compile_row(&content, row, &label, &scripts) {
             Ok(procedures) => {
                 all.insert(row, procedures);
+                true
             }
-            Err(failed) => errors.extend(
-                failed
-                    .into_iter()
-                    .map(|failed| (modules[failed.module].0.clone(), failed.error)),
-            ),
+            Err(failed) => {
+                errors.extend(
+                    failed
+                        .into_iter()
+                        .map(|failed| (modules[failed.module].0.clone(), failed.error)),
+                );
+                false
+            }
         }
     };
     bind_table::<NpcDef>(loading, &mut bind);
@@ -505,9 +509,11 @@ pub fn build_all(loading: &mut Loading) {
     loading.built(Scripts(Arc::new(all)));
 }
 
+/// Binds each row's scripts. A row whose scripts don't compile has failed, so the rules about what
+/// its scripts do leave it to its own errors.
 fn bind_table<Row: ScriptedRow>(
     loading: &mut Loading,
-    bind: &mut impl FnMut(OwnerRow, String, Vec<(ScriptSite, &ScriptModule)>),
+    bind: &mut impl FnMut(OwnerRow, String, Vec<(ScriptSite, &ScriptModule)>) -> bool,
 ) {
     let content = loading.content();
     for (id, def) in loading.rows::<Row>(&content) {
@@ -524,7 +530,9 @@ fn bind_table<Row: ScriptedRow>(
                 Some((site, Row::script(module)?))
             })
             .collect();
-        bind(OwnerRow::of_row(id), owner_label(key, None), modules);
+        if !bind(OwnerRow::of_row(id), owner_label(key, None), modules) {
+            loading.fail(id);
+        }
     }
 }
 

@@ -4,10 +4,13 @@ use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use design_tokens::controls::{self, Pill};
-use design_tokens::glyph::{self, Mark};
-use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentFile, ContentScope, version, with_content};
 use engine::core::time::UtcHour;
 use engine::systems::GameSettings;
@@ -21,11 +24,15 @@ use engine::systems::player::SpawnPolicy;
 use engine::systems::player::snapshot::{CharacterSnapshot, CharacterStart};
 use engine::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap};
+use ui::controls::{self, Pill};
+use ui::egui::{RichText, Ui};
+use ui::glyph::{self, Mark};
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
-use crate::forms;
 use crate::keymap::EditorKey;
-use crate::ui::{self, theme, widgets};
+use crate::project::{EditRefusal, Project, problem_place};
+use crate::shell::{self, content_tree, widgets};
+use ui::input;
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
@@ -284,7 +291,10 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         return;
     }
     let Some(character) = current_character(editor) else {
-        editor.toast("No test character: add a test_character row first");
+        editor.toast(format!(
+            "No test character: {} makes one",
+            EditorKey::PlayedCharacter.name()
+        ));
         return;
     };
     let Some(binaries) =
@@ -296,6 +306,27 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
     editor.play.failure = None;
     if editor.has_unsaved() && !editor.save() {
         fail(editor, PlayFailure::SaveFailed);
+        return;
+    }
+    if let Some(report) = editor.project.as_ref().and_then(Project::unplayable) {
+        for error in &report.errors {
+            editor.output.say(
+                "editor",
+                format!(
+                    "{}: {}",
+                    problem_place(&error.file, error.at.pointer()),
+                    error.problem
+                ),
+            );
+        }
+        editor.panels.bottom = BottomTab::Output;
+        fail(
+            editor,
+            PlayFailure::NotStarted(format!(
+                "the game isn't whole yet: {}",
+                EditRefusal::of(&report).sentence()
+            )),
+        );
         return;
     }
     editor.play.binaries = Some(binaries.clone());
@@ -382,7 +413,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let mut stop_now = false;
     let mut play_now = false;
     menu.show(|ui| {
-        widgets::section(ui, "Test character");
+        sheet::section(ui, "Test character");
         for character in &characters {
             let picked = current.as_deref() == Some(character.key.as_str());
             let response = ui.add(
@@ -402,11 +433,13 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
             ui.label(theme::muted("no test_character rows").size(12.5));
         }
         ui.separator();
+        let label = if characters.is_empty() {
+            "New test character"
+        } else {
+            "Edit test characters…"
+        };
         if ui
-            .add(
-                widgets::shortcut_button("Edit test characters…", EditorKey::PlayedCharacter)
-                    .frame(false),
-            )
+            .add(widgets::shortcut_button(label, EditorKey::PlayedCharacter).frame(false))
             .clicked()
         {
             edit = true;
@@ -428,8 +461,8 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     if play.clicked() || play_now {
         start(editor, None);
     }
-    if edit && let Some(key) = current_character(editor) {
-        editor.open_row(CharacterSnapshot::TABLE, &key);
+    if edit {
+        edit_test_characters(editor);
     }
     if stop_now {
         stop(editor);
@@ -446,18 +479,15 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     if controls::marked_danger(ui, Mark::Stop, "Stop").clicked() {
         stop_now = true;
     }
-    if widgets::keyed_button(ui, "Restart", None, !stopping)
+    if controls::keyed(ui, "Restart", None, !stopping)
         .on_hover_text("Save, then start both again as the same character")
         .clicked()
     {
         restart_now = true;
     }
-    widgets::chip(
+    chip::plain(
         ui,
-        format!(
-            "{changes} change{} since start",
-            crate::ui::widgets::plural(changes)
-        ),
+        format!("{changes} change{} since start", words::plural(changes)),
     );
     controls::pill(
         ui,
@@ -491,7 +521,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
         .order(egui::Order::Foreground)
         .fixed_pos(ui.max_rect().left_top() + egui::vec2(12.0, 12.0))
         .show(ui.ctx(), |ui| {
-            design_tokens::slip::show(ui, |ui| {
+            ui::slip::show(ui, |ui| {
                 ui.set_max_width(700.0);
                 ui.horizontal_top(|ui| {
                     glyph::show(ui, Mark::Warning, 15.0, theme::DANGER);
@@ -500,7 +530,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
                 });
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary(ui, "Copy output").clicked() {
+                    if controls::primary(ui, "Copy output").clicked() {
                         copy = true;
                     }
                     if ui.button("Save to file…").clicked() {
@@ -536,6 +566,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
 
 pub fn save_output(editor: &Editor) {
     if let Some(path) = rfd::FileDialog::new()
+        .set_title("Save the output")
         .set_file_name("rift-editor-output.txt")
         .save_file()
     {
@@ -605,6 +636,14 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
         .collect();
     characters.sort_by(|a, b| a.key.cmp(&b.key));
     characters
+}
+
+/// Opens the picked test character, or makes one in the game folder when there is none.
+pub fn edit_test_characters(editor: &mut Editor) {
+    match current_character(editor) {
+        Some(key) => editor.open_row(CharacterSnapshot::TABLE, &key),
+        None => content_tree::new_file(editor, "", CharacterSnapshot::TABLE),
+    }
 }
 
 pub fn current_character(editor: &Editor) -> Option<String> {
@@ -710,10 +749,10 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         ui.label(RichText::new("Game binaries").strong().size(18.0));
     });
     ui.add_space(8.0);
-    widgets::kv(ui, "folder", |ui| {
-        let response = forms::boxed_input(ui, Some("pick…"), |ui| {
+    form::kv(ui, "folder", |ui| {
+        let response = input::boxed(ui, Some("pick…"), |ui| {
             ui.add(
-                egui::Label::new(theme::mono(ui::pretty_path(&folder)).size(13.0))
+                egui::Label::new(theme::mono(shell::pretty_path(&folder)).size(13.0))
                     .sense(egui::Sense::click()),
             )
         });
@@ -801,7 +840,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     ui.add_space(10.0);
     ui.horizontal(|ui| {
         if ok || checked.is_none() {
-            if widgets::primary(ui, "Done").clicked() {
+            if controls::primary(ui, "Done").clicked() {
                 close = true;
             }
         } else {

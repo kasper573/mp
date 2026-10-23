@@ -16,7 +16,7 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, RowCheck,
+    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, Nearby, RowCheck,
 };
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
@@ -234,6 +234,18 @@ impl<T> Phased<T> {
 
 impl ContentFile for StatusEffectDef {
     const TABLE: &'static str = "status_effect";
+
+    fn fresh(near: &Nearby) -> Result<StatusEffectDef, String> {
+        Ok(StatusEffectDef {
+            name: near.name(),
+            icon: near.image()?,
+            category: StatusCategory::Buff,
+            description: String::new(),
+            vfx: Phased::default(),
+            sfx: Phased::default(),
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);

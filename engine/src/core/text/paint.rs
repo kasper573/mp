@@ -1,16 +1,17 @@
 use std::ops::Range;
 use std::sync::Arc;
+use ui::egui;
 
 use bevy::prelude::World;
-use design_tokens::face::{Face, TextRole};
-use design_tokens::ink::Ground;
-use egui::emath::TSTransform;
-use egui::epaint::TextShape;
-use egui::text::{LayoutJob, TextFormat};
-use egui::{
+use ui::egui::emath::TSTransform;
+use ui::egui::epaint::TextShape;
+use ui::egui::text::{LayoutJob, TextFormat};
+use ui::egui::{
     Color32, FontId, Galley, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, Vec2,
     WidgetInfo, WidgetType,
 };
+use ui::face::{Face, TextRole};
+use ui::ink::Ground;
 
 use super::{KeyNames, SpanInk, StyledLine, TextMotion, TextPiece, TextVoice};
 

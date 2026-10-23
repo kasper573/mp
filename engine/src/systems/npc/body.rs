@@ -23,13 +23,20 @@ use crate::systems::{dialogue, reach, skill, stat};
 pub struct Priority(pub u8);
 
 impl Priority {
+    pub const LOWEST: u8 = 1;
+    pub const HIGHEST: u8 = 9;
+
     pub fn checked(priority: u8) -> Result<Priority, ScriptFault> {
-        if (1..=9).contains(&priority) {
+        if (Priority::LOWEST..=Priority::HIGHEST).contains(&priority) {
             Ok(Priority(priority))
         } else {
             Err(ScriptFault::new(
                 "out of range",
-                format!("a priority 1 to 9, not {priority}"),
+                format!(
+                    "a priority {} to {}, not {priority}",
+                    Priority::LOWEST,
+                    Priority::HIGHEST
+                ),
             ))
         }
     }
@@ -321,7 +328,9 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Wander {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 8.0))]
     pub leash: Option<Condition>,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -332,7 +341,9 @@ pub struct Wander {
 #[schemars(extend("x-system" = "npc body"))]
 pub struct WalkTo {
     pub to: WalkTarget,
+    #[schemars(extend("default" = 1.0))]
     pub within: Condition,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     /// Taken on getting there.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -352,6 +363,7 @@ pub struct WalkTo {
 pub enum WalkTarget {
     Place(Place),
     Object(String),
+    #[schemars(extend("default" = {"type": "subject"}))]
     Actor(Condition),
 }
 
@@ -359,8 +371,11 @@ pub enum WalkTarget {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Attack {
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub target: Condition,
+    #[schemars(extend("default" = 1.5))]
     pub within: Condition,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub defeated: Arrow,
@@ -377,6 +392,7 @@ pub struct Attack {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Stop {
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -388,6 +404,7 @@ pub struct Stop {
 #[schemars(extend("x-system" = "actor"))]
 pub struct FaceToward {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub toward: FaceTarget,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -398,6 +415,7 @@ pub struct FaceToward {
 #[serde(untagged)]
 pub enum FaceTarget {
     Place(Place),
+    #[schemars(extend("default" = {"type": "subject"}))]
     Actor(Condition),
 }
 

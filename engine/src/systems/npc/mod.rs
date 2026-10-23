@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{
-    Content, ContentFile, ContentId, Loading, ModuleRule, ModuleSet, NamedContent, RowCheck, serial,
+    Content, ContentFile, ContentId, Loading, ModuleRule, ModuleSet, NamedContent, Nearby,
+    RowCheck, serial,
 };
 use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{CellPos, TilePos, Tiles};
@@ -114,6 +115,17 @@ pub struct NpcSkill {
 
 impl ContentFile for NpcDef {
     const TABLE: &'static str = "npc";
+
+    fn fresh(near: &Nearby) -> Result<NpcDef, String> {
+        Ok(NpcDef {
+            name: near.name(),
+            model: near.file()?,
+            stats: Stats::default(),
+            basic_attack: None,
+            skills: Vec::new(),
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         let mut seen = std::collections::BTreeSet::new();

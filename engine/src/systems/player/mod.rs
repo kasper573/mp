@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snapshot::{CharacterSnapshot, JoinAs};
 
-use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentFile, ContentId, ModuleRule, ModuleSet, Nearby};
 use crate::core::math::{Direction, Pos, Rgba, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
@@ -129,6 +129,16 @@ pub struct PlayerDef {
 
 impl ContentFile for PlayerDef {
     const TABLE: &'static str = "player";
+
+    fn fresh(near: &Nearby) -> Result<PlayerDef, String> {
+        Ok(PlayerDef {
+            model: near.file()?,
+            class: near.file()?,
+            stats: Stats::default(),
+            wearing: Vec::new(),
+            modules: Vec::new(),
+        })
+    }
 }
 
 impl ModuleSet for PlayerDef {
@@ -324,7 +334,7 @@ pub fn join(world: &mut World) {
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let spawn = spawn_position(world, policy, zone, area);
                 let at = movement::place_beside(world, zone, &area.grid, spawn);
-                let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
+                let fresh = CharacterSnapshot::of_player(&content, &name, def(&content));
                 let start = Place { area: zone, at };
                 let state = snapshot::materialize(&content, &fresh, start, clock);
                 (at, state)

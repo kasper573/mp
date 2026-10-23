@@ -1,12 +1,16 @@
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, RichText, Sense, Ui, Vec2};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::SheetFrame;
+use ui::chip;
+use ui::egui;
+use ui::egui::{Color32, RichText, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::{self, Mark};
+use ui::panel;
+use ui::theme;
 
 use super::{ModelStrip, play_rule, strip_of, total_ms};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
@@ -93,7 +97,7 @@ fn steps(
                 .then_some((other, frames))
         });
         let Some(found) = found else {
-            widgets::hint(ui, "No strip of this model has a step cue.");
+            form::hint(ui, "No strip of this model has a step cue.");
             return;
         };
         found
@@ -126,13 +130,7 @@ fn steps(
                     for frame in &strip {
                         let w = (frame.ms as f32 * px_per_ms).max(20.0);
                         let (rect, _) = ui.allocate_exact_size(Vec2::new(w, 56.0), Sense::hover());
-                        ui.painter().rect(
-                            rect,
-                            3.0,
-                            theme::INPUT,
-                            egui::Stroke::new(1.0, theme::BORDER),
-                            egui::StrokeKind::Inside,
-                        );
+                        panel::paint_well(ui.painter(), rect);
                         sheet.draw(
                             &ui.painter_at(rect),
                             rect.shrink(3.0),
@@ -150,13 +148,7 @@ fn steps(
                     let (lane, _) =
                         ui.allocate_exact_size(Vec2::new(width - 44.0, 20.0), Sense::hover());
                     let painter = ui.painter_at(lane);
-                    painter.rect(
-                        lane,
-                        3.0,
-                        theme::INPUT,
-                        egui::Stroke::new(1.0, theme::BORDER),
-                        egui::StrokeKind::Inside,
-                    );
+                    panel::paint_well(&painter, lane);
                     for (index, frame) in strip.iter().enumerate() {
                         if frame.step
                             && let Some(rect) = rects.get(index)
@@ -174,7 +166,7 @@ fn steps(
             for surface in &surfaces {
                 ui.horizontal(|ui| {
                     let on = chosen.as_deref() == Some(surface.key.as_str());
-                    if widgets::mode_chip(ui, Mark::Play.text(12.0), on).clicked() {
+                    if chip::mode(ui, Mark::Play.text(12.0), on).clicked() {
                         play = Some((surface.key.clone(), surface.footstep.clone()));
                     }
                     ui.label(theme::mono(surface.name.to_lowercase()).size(12.5));
@@ -186,7 +178,7 @@ fn steps(
                 });
             }
             if surfaces.is_empty() {
-                widgets::hint(ui, "no surface rows");
+                form::hint(ui, "no surface rows");
             }
         });
     });

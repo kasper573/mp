@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use ui::words;
 
 use engine::systems::area::grid::PaletteRow;
 
@@ -8,7 +9,6 @@ use image::{GenericImage, RgbaImage};
 use serde::{Deserialize, Serialize};
 
 use super::formats::{self, AnimationExport};
-use crate::ui::widgets;
 use crate::views::tileset::tile_size;
 
 pub const MAX_COLORS: usize = 256;
@@ -144,7 +144,7 @@ impl TilePlan {
         }
         Err(format!(
             "tile{} {} {} gone but still painted; pick what replaces {}",
-            widgets::plural(waiting.len()),
+            words::plural(waiting.len()),
             waiting.join(", "),
             if waiting.len() == 1 { "is" } else { "are" },
             if waiting.len() == 1 { "it" } else { "them" }

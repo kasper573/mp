@@ -63,6 +63,7 @@ pub enum ShownFor {
 #[schemars(extend("x-system" = "npc"))]
 pub struct Despawn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,

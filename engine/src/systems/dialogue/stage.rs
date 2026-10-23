@@ -1,19 +1,21 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::controls::{self, Pill, RowLook};
-use design_tokens::face::TextRole;
-use design_tokens::glyph::{self, Mark};
-use design_tokens::motion::SheetPose;
-use design_tokens::sheet::{self, Sheet};
-use design_tokens::{ink, slip};
-use egui::{
+use ui::controls::{self, Pill, RowLook};
+use ui::egui::{
     Align, Align2, Color32, Id, LayerId, Layout, Pos2, Rect, Sense, Ui, UiBuilder, Vec2,
     WidgetInfo, WidgetType,
 };
+use ui::face::TextRole;
+use ui::glyph::{self, Mark};
+use ui::motion::SheetPose;
+use ui::sheet::{self, Sheet};
+use ui::{ink, slip};
 
 use super::{
     ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, RefusedPick,
@@ -23,7 +25,7 @@ use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
-use crate::core::gui::{self, Afterimage, Band, Tier};
+use crate::core::gui::{self, Band, Tier};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece, Typewriter};
 use crate::systems::actor::model::{BustFigure, Busts, Expression, GenericExpression, ModelId};
 use crate::systems::actor::{ActorModel, Name};
@@ -625,7 +627,7 @@ fn draw_stage(world: &mut World) {
 #[derive(Resource, Default)]
 struct StageSheets {
     dialogue_height: f32,
-    drawn: HashMap<&'static str, (Afterimage, Rect)>,
+    drawn: HashMap<&'static str, (float::Afterimage, Rect)>,
 }
 
 fn sheet_layer(key: &'static str) -> LayerId {
@@ -633,7 +635,7 @@ fn sheet_layer(key: &'static str) -> LayerId {
 }
 
 fn keep_afterimage(world: &mut World, gui: &egui::Context, key: &'static str, rect: Rect) {
-    let image = Afterimage::of(gui, sheet_layer(key));
+    let image = float::Afterimage::of(gui, sheet_layer(key));
     world
         .resource_mut::<StageSheets>()
         .drawn
@@ -694,7 +696,7 @@ fn docked_panels(
         .fixed_pos(Pos2::new(screen.center().x, bottom))
         .constrain(false)
         .fade_in(false);
-    let shown = gui::show_anchored(gui, area, |ui| {
+    let shown = float::anchored(gui, area, |ui| {
         ui.multiply_opacity(pose.opacity);
         ui.spacing_mut().item_spacing.x = PANEL_GAP;
         ui.with_layout(Layout::left_to_right(Align::Max), |ui| {

@@ -1,14 +1,21 @@
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, RichText, Stroke, Ui};
 use engine::core::content::ContentNames;
 use engine::core::script::{Expr, ExprKind, ValueType};
 use engine::systems::script::{Condition, RiftQueryKind, condition as script_condition};
 use serde_json::Value;
 use strum::VariantArray;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::egui::{RichText, Stroke, Ui};
+use ui::glyph::{self, Mark};
+use ui::input;
+use ui::paint;
+use ui::sheet;
+use ui::theme;
 
 use crate::forms::{self, FormChange, FormCx};
 use crate::schema::{self, SchemaVariant};
-use crate::ui::{theme, widgets};
+use ui::input::InputField;
 
 #[derive(Clone, Copy, PartialEq, Eq, VariantArray)]
 enum QueryGroup {
@@ -79,6 +86,10 @@ impl QueryGroup {
 
 /// How wide the name of a kept value is typed.
 const NAME_WIDTH: f32 = 120.0;
+const NUMBER_WIDTH: f32 = 56.0;
+const TEXT_WIDTH: f32 = 120.0;
+const VARIABLE_WIDTH: f32 = 100.0;
+const CARET_WIDTH: f32 = 16.0;
 
 fn sign(kind: ExprKind) -> Option<&'static str> {
     Some(match kind {
@@ -255,7 +266,7 @@ fn block(
     match condition {
         Expr::Bool(flag) => {
             let text = if *flag { "true" } else { "false" };
-            let response = chip(ui, text, theme::INPUT, theme::TEXT);
+            let response = chip::colored(ui, text, theme::INPUT, theme::TEXT);
             if response.clicked() {
                 *flag = !*flag;
                 changed = FormChange::at(path);
@@ -263,111 +274,130 @@ fn block(
             changed |= picked(ui, cx, &response, condition).unwrap_or_default();
         }
         Expr::Int(_) | Expr::Num(_) => {
+            make_room(ui, NUMBER_WIDTH + CARET_WIDTH);
             ui.scope(|ui| {
-                ui.set_width(56.0);
+                ui.set_width(NUMBER_WIDTH);
                 changed |= number(ui, cx, condition, &format!("{path}~n"));
             });
             let response = glyph::button(ui, Mark::CaretDown, 12.0, theme::FAINT, "Pick");
             changed |= picked(ui, cx, &response, condition).unwrap_or_default();
         }
         Expr::Text(text) => {
+            make_room(ui, TEXT_WIDTH + CARET_WIDTH);
             ui.scope(|ui| {
-                ui.set_width(120.0);
+                ui.set_width(TEXT_WIDTH);
                 changed |= forms::text_of(ui, cx, text, &format!("{path}~s"));
             });
             let response = glyph::button(ui, Mark::CaretDown, 12.0, theme::FAINT, "Pick");
             changed |= picked(ui, cx, &response, condition).unwrap_or_default();
         }
         Expr::Var { var } => {
-            ui.scope(|ui| {
-                ui.set_width(100.0);
-                changed |= forms::text_of(ui, cx, var, &format!("{path}/var"));
-            });
-            let response = chip(ui, "◇ variable", theme::INPUT, theme::VARIABLE);
+            let declared: Vec<(String, &str)> = cx
+                .kept
+                .iter()
+                .flat_map(|kept| &kept.variables)
+                .map(|(name, ty)| (name.clone(), ty.name()))
+                .collect();
+            make_room(ui, VARIABLE_WIDTH);
+            if declared.is_empty() {
+                ui.scope(|ui| {
+                    ui.set_width(VARIABLE_WIDTH);
+                    changed |= forms::text_of(ui, cx, var, &format!("{path}/var"));
+                });
+            } else {
+                changed |= declared_name(ui, &declared, var, path);
+            }
+            let response = chip::colored(ui, "◇ variable", theme::INPUT, forms::VARIABLE);
             changed |= picked(ui, cx, &response, condition).unwrap_or_default();
         }
         Expr::All { .. } | Expr::Any { .. } | Expr::Join { .. } => {
             changed = list_block(ui, cx, palette, condition, path, slot);
         }
         Expr::Not { .. } | Expr::Round { .. } => {
-            ui.horizontal_wrapped(|ui| {
-                let response = tag_chip(ui, BlockKind::of(condition));
-                if let Some(picked) = picked(ui, cx, &response, condition) {
-                    changed = picked;
-                    return;
-                }
-                let inner_slot = if matches!(condition, Expr::Not { .. }) {
-                    Slot::YesOrNo
-                } else {
-                    Slot::Any
-                };
-                let (Expr::Not { of } | Expr::Round { of }) = condition else {
-                    return;
-                };
-                if block(ui, cx, palette, of, &format!("{path}/of"), inner_slot).is_some() {
-                    changed = FormChange::at(path);
-                }
-            });
+            let response = tag_chip(ui, BlockKind::of(condition));
+            if let Some(picked) = picked(ui, cx, &response, condition) {
+                return picked;
+            }
+            let inner_slot = if matches!(condition, Expr::Not { .. }) {
+                Slot::YesOrNo
+            } else {
+                Slot::Any
+            };
+            if let Expr::Not { of } | Expr::Round { of } = condition
+                && block(ui, cx, palette, of, &format!("{path}/of"), inner_slot).is_some()
+            {
+                changed = FormChange::at(path);
+            }
         }
         Expr::Local { .. } | Expr::State { .. } | Expr::Event { .. } => {
-            ui.horizontal_wrapped(|ui| {
-                let response = tag_chip(ui, BlockKind::of(condition));
-                if let Some(picked) = picked(ui, cx, &response, condition) {
-                    changed = picked;
-                    return;
-                }
-                if let Expr::Local { local: name }
-                | Expr::State { state: name }
-                | Expr::Event { event: name } = condition
-                {
-                    if ui.available_width() < NAME_WIDTH {
-                        ui.end_row();
+            let response = tag_chip(ui, BlockKind::of(condition));
+            if let Some(picked) = picked(ui, cx, &response, condition) {
+                return picked;
+            }
+            let kept = cx.kept.clone().unwrap_or_default();
+            let declared = match condition {
+                Expr::Local { .. } => Some(kept.locals),
+                Expr::State { .. } => Some(kept.state),
+                _ => None,
+            };
+            if let Expr::Local { local: name }
+            | Expr::State { state: name }
+            | Expr::Event { event: name } = condition
+            {
+                make_room(ui, NAME_WIDTH);
+                match declared {
+                    Some(declared) => {
+                        let declared: Vec<(String, &str)> = declared
+                            .into_iter()
+                            .map(|(name, ty)| (name, type_word(Some(ty))))
+                            .collect();
+                        changed |= declared_name(ui, &declared, name, path);
                     }
-                    ui.scope(|ui| {
-                        ui.set_width(NAME_WIDTH.min(ui.available_width()));
-                        changed |= forms::text_of(ui, cx, name, &format!("{path}/name"));
-                    });
+                    None => {
+                        ui.scope(|ui| {
+                            ui.set_width(NAME_WIDTH.min(ui.available_size_before_wrap().x));
+                            changed |= forms::text_of(ui, cx, name, &format!("{path}/name"));
+                        });
+                    }
                 }
-            });
+            }
         }
         Expr::Query(_) => changed = query_block(ui, cx, palette, condition, path, slot),
         binary => {
             let kind = binary.kind();
-            ui.horizontal_wrapped(|ui| {
-                let Some([a, b]) = binary.operands_mut() else {
-                    return;
-                };
-                if block(ui, cx, palette, a, &format!("{path}/a"), Slot::Any).is_some() {
-                    changed = FormChange::at(path);
-                }
-                let response =
-                    dropdown_chip(ui, sign(kind).unwrap_or("?"), theme::INPUT, theme::CODE);
-                let mut swapped = None;
-                egui::Popup::from_toggle_button_response(&response)
-                    .id(ui.id().with(path).with("op"))
-                    .show(|ui| {
-                        for &op in ExprKind::VARIANTS {
-                            let Some(sign) = sign(op) else { continue };
-                            if ui
-                                .button(format!("{sign}  {}", schema::title(op.name())))
-                                .clicked()
-                            {
-                                swapped = Some(op);
-                                ui.close();
-                            }
+            let Some([a, b]) = binary.operands_mut() else {
+                return changed;
+            };
+            if block(ui, cx, palette, a, &format!("{path}/a"), Slot::Any).is_some() {
+                changed = FormChange::at(path);
+            }
+            let response =
+                chip::dropdown_colored(ui, sign(kind).unwrap_or("?"), theme::INPUT, theme::CODE);
+            let mut swapped = None;
+            egui::Popup::from_toggle_button_response(&response)
+                .id(ui.id().with(path).with("op"))
+                .show(|ui| {
+                    for &op in ExprKind::VARIANTS {
+                        let Some(sign) = sign(op) else { continue };
+                        if ui
+                            .button(format!("{sign}  {}", schema::title(op.name())))
+                            .clicked()
+                        {
+                            swapped = Some(op);
+                            ui.close();
                         }
-                    });
-                if block(ui, cx, palette, b, &format!("{path}/b"), Slot::Any).is_some() {
-                    changed = FormChange::at(path);
-                }
-                if let Some(op) = swapped
-                    && let Some([a, b]) = binary.operands_mut()
-                    && let Some(swapped) = Expr::binary(op, taken(a), taken(b))
-                {
-                    *binary = swapped;
-                    changed = FormChange::at(path);
-                }
-            });
+                    }
+                });
+            if block(ui, cx, palette, b, &format!("{path}/b"), Slot::Any).is_some() {
+                changed = FormChange::at(path);
+            }
+            if let Some(op) = swapped
+                && let Some([a, b]) = binary.operands_mut()
+                && let Some(swapped) = Expr::binary(op, taken(a), taken(b))
+            {
+                *binary = swapped;
+                changed = FormChange::at(path);
+            }
         }
     }
     changed
@@ -385,15 +415,8 @@ fn number(ui: &mut Ui, cx: &mut FormCx, condition: &mut Condition, path: &str) -
         _ => return FormChange::default(),
     };
     let id = ui.id().with(path).with("number");
-    let typed = forms::drafted(ui, id, &current, |ui, draft| {
-        forms::boxed_input(ui, None, |ui| {
-            ui.add(
-                egui::TextEdit::singleline(draft)
-                    .frame(egui::Frame::NONE)
-                    .font(egui::TextStyle::Monospace)
-                    .desired_width(f32::INFINITY),
-            )
-        })
+    let typed = input::drafted(ui, id, &current, |ui, draft| {
+        InputField::new(draft).show(ui)
     });
     let Some(typed) = typed else {
         forms::error_line(ui, cx, path);
@@ -446,7 +469,7 @@ fn list_block(
         let bottom = ui
             .vertical(|ui| {
                 for (index, item) in items.iter_mut().enumerate() {
-                    let row = ui.horizontal_top(|ui| {
+                    let row = ui.horizontal_wrapped(|ui| {
                         if block(
                             ui,
                             cx,
@@ -483,7 +506,7 @@ fn list_block(
                         }
                     }
                 }
-                let add = dropdown_chip(ui, "+ condition", theme::INPUT, theme::TEXT);
+                let add = chip::dropdown_colored(ui, "+ condition", theme::INPUT, theme::TEXT);
                 let id = ui.id().with(path).with("add");
                 egui::Popup::from_toggle_button_response(&add)
                     .id(id)
@@ -528,29 +551,24 @@ fn query_block(
         return FormChange::default();
     };
     let kind = RiftQueryKind::from(&*query);
-    let mut changed = FormChange::default();
-    ui.horizontal_wrapped(|ui| {
-        let response = tag_chip(ui, BlockKind::Query(kind));
-        if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, condition, path) {
-            changed = picked;
-            return;
-        }
-        let (Expr::Query(query), Some(variant)) = (&mut *condition, palette.query(kind)) else {
-            return;
-        };
-        changed = forms::inline_fields_of(
-            ui,
-            cx,
-            palette.root,
-            variant.schema,
-            query,
-            path,
-            &mut |ui, cx, nested: &mut Condition, nested_path| {
-                block(ui, cx, palette, nested, nested_path, Slot::Any)
-            },
-        );
-    });
-    changed
+    let response = tag_chip(ui, BlockKind::Query(kind));
+    if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, condition, path) {
+        return picked;
+    }
+    let (Expr::Query(query), Some(variant)) = (&mut *condition, palette.query(kind)) else {
+        return FormChange::default();
+    };
+    forms::inline_fields_of(
+        ui,
+        cx,
+        palette.root,
+        variant.schema,
+        query,
+        path,
+        &mut |ui, cx, nested: &mut Condition, nested_path| {
+            block(ui, cx, palette, nested, nested_path, Slot::Any)
+        },
+    )
 }
 
 fn picker_popup(
@@ -597,33 +615,67 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                 if members.is_empty() {
                     continue;
                 }
-                widgets::section(ui, group.title());
+                sheet::section(ui, group.title());
                 for query in members {
                     if entry(ui, query) {
                         picked = palette.fresh(cx, query);
                     }
                 }
             }
-            widgets::section(ui, "Kept values");
+            sheet::section(ui, "Kept values");
             ui.horizontal_wrapped(|ui| {
-                let kept = [
-                    Expr::Local {
-                        local: String::new(),
-                    },
-                    Expr::State {
-                        state: String::new(),
-                    },
-                    Expr::Event {
-                        event: String::new(),
-                    },
+                let kept = cx.kept.clone().unwrap_or_default();
+                let fitting = |declared: &[(String, ValueType)]| {
+                    declared
+                        .iter()
+                        .find(|(_, ty)| slot == Slot::Any || *ty == ValueType::Boolean)
+                        .map(|(name, _)| name.clone())
+                };
+                let offers = [
+                    (
+                        ExprKind::Local,
+                        fitting(&kept.locals).map(|local| Expr::Local { local }),
+                    ),
+                    (
+                        ExprKind::State,
+                        fitting(&kept.state).map(|state| Expr::State { state }),
+                    ),
+                    (
+                        ExprKind::Event,
+                        Some(Expr::Event {
+                            event: String::new(),
+                        }),
+                    ),
                 ];
-                for fresh in kept {
-                    if chip(ui, fresh.kind().name(), theme::INPUT, theme::TEXT).clicked() {
-                        picked = Some(fresh);
+                for (kind, fresh) in offers {
+                    let offered = fresh.is_some();
+                    let chip = ui
+                        .add_enabled_ui(offered, |ui| {
+                            chip::colored(ui, kind.name(), theme::INPUT, theme::TEXT)
+                        })
+                        .inner
+                        .on_disabled_hover_text(format!(
+                            "None fits here: declare a {} in the script's header",
+                            kind.name()
+                        ));
+                    if chip.clicked() {
+                        picked = fresh;
                     }
                 }
-                if chip(ui, "◇ variable", theme::INPUT, theme::VARIABLE).clicked() {
-                    picked = Some(Expr::Var { var: String::new() });
+                let variable = kept
+                    .variables
+                    .first()
+                    .map(|(name, _)| Expr::Var { var: name.clone() });
+                let chip = ui
+                    .add_enabled_ui(variable.is_some(), |ui| {
+                        chip::colored(ui, "◇ variable", theme::INPUT, forms::VARIABLE)
+                    })
+                    .inner
+                    .on_disabled_hover_text(
+                        "The script has no variable yet: make one from a field's ◇ menu",
+                    );
+                if chip.clicked() {
+                    picked = variable;
                 }
             });
             ui.add_space(6.0);
@@ -637,25 +689,20 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     }),
                 ];
                 for (kind, fresh) in joins {
-                    if chip(
-                        ui,
-                        &BlockKind::Expr(kind).title(),
-                        theme::INPUT,
-                        theme::TEXT,
-                    )
-                    .clicked()
+                    if chip::colored(ui, BlockKind::Expr(kind).title(), theme::INPUT, theme::TEXT)
+                        .clicked()
                     {
                         picked = Some(fresh());
                     }
                 }
-                if chip(ui, "compare", theme::INPUT, theme::TEXT).clicked() {
+                if chip::colored(ui, "compare", theme::INPUT, theme::TEXT).clicked() {
                     picked = Some(Expr::Equal {
                         a: zero(),
                         b: zero(),
                     });
                 }
                 if slot == Slot::Any {
-                    if chip(ui, "arithmetic", theme::INPUT, theme::TEXT).clicked() {
+                    if chip::colored(ui, "arithmetic", theme::INPUT, theme::TEXT).clicked() {
                         picked = Some(Expr::Add {
                             a: zero(),
                             b: zero(),
@@ -667,11 +714,11 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                         ("text", Expr::Text(String::new())),
                     ];
                     for (label, constant) in constants {
-                        if chip(ui, label, theme::INPUT, theme::MUTED).clicked() {
+                        if chip::colored(ui, label, theme::INPUT, theme::MUTED).clicked() {
                             picked = Some(constant);
                         }
                     }
-                } else if chip(ui, "true", theme::INPUT, theme::MUTED).clicked() {
+                } else if chip::colored(ui, "true", theme::INPUT, theme::MUTED).clicked() {
                     picked = Some(Expr::Bool(true));
                 }
             });
@@ -680,48 +727,13 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
 }
 
 fn tag_chip(ui: &mut Ui, block: BlockKind) -> egui::Response {
-    let response = chip(ui, &block.title(), theme::RAISED, theme::TEXT);
+    let response = chip::colored(ui, block.title(), theme::RAISED, theme::TEXT);
     ui.label(
         RichText::new(type_word(block.yields()).to_uppercase())
             .size(10.0)
             .color(theme::FAINT),
     );
     response
-}
-
-fn chip(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> egui::Response {
-    framed_chip(ui, text, fill, ink, false)
-}
-
-/// A chip that opens a list to choose from, its caret on the right.
-fn dropdown_chip(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> egui::Response {
-    framed_chip(ui, text, fill, ink, true)
-}
-
-fn framed_chip(
-    ui: &mut Ui,
-    text: &str,
-    fill: Color32,
-    ink: Color32,
-    caret: bool,
-) -> egui::Response {
-    egui::Frame::new()
-        .fill(fill)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(7, 2))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
-                ui.label(RichText::new(text).monospace().size(12.5).color(ink));
-                if caret {
-                    ui.label(Mark::CaretDown.text(10.0).color(ink));
-                }
-            });
-        })
-        .response
-        .interact(egui::Sense::click())
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 fn entry(ui: &mut Ui, query: RiftQueryKind) -> bool {
@@ -734,11 +746,7 @@ fn entry(ui: &mut Ui, query: RiftQueryKind) -> bool {
         .response
         .interact(egui::Sense::click());
     if response.hovered() {
-        ui.painter().rect_filled(
-            response.rect.expand2(egui::vec2(6.0, 1.0)),
-            3.0,
-            theme::ACCENT_SOFT,
-        );
+        paint::row_wash(ui.painter(), response.rect.expand2(egui::vec2(6.0, 1.0)));
     }
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -797,4 +805,35 @@ pub fn summary(names: &impl ContentNames, condition: &Condition) -> String {
     let mut out = String::new();
     go(names, condition, &mut out, 0);
     out
+}
+
+/// Starts the next row of blocks unless `width` is left on this one, as a field of a set width
+/// doesn't wrap by itself.
+fn make_room(ui: &mut Ui, width: f32) {
+    if ui.available_size_before_wrap().x < width {
+        ui.end_row();
+    }
+}
+
+/// The name of a value the script names, picked among those it declares, each shown with what
+/// type it is.
+fn declared_name(
+    ui: &mut Ui,
+    declared: &[(String, &str)],
+    name: &mut String,
+    path: &str,
+) -> FormChange {
+    let mut picked = name.clone();
+    controls::combo(ui.id().with(path).with("name"))
+        .selected_text(name.as_str())
+        .show_ui(ui, |ui| {
+            for (declared, ty) in declared {
+                ui.selectable_value(&mut picked, declared.clone(), format!("{declared}  {ty}"));
+            }
+        });
+    if picked == *name {
+        return FormChange::default();
+    }
+    *name = picked;
+    FormChange::at(path)
 }

@@ -1,10 +1,11 @@
 use editor::app::Editor;
 use editor::project::RowSelection;
-use editor::ui::row_form;
+use editor::shell::row_form;
 use editor::views::script::inspect;
 use editor::views::script::{ScriptDoc, ScriptRow};
 use serde_json::json;
 use testkit::path;
+use ui::egui;
 
 use crate::support;
 
@@ -55,7 +56,7 @@ fn open(scratch: &tempfile::TempDir) -> Editor {
 /// How wide `body` lays itself out when it is given [`WIDTH`], once remembered sizes settle.
 fn laid_out_width(editor: &mut Editor, body: impl Fn(&mut Editor, &mut egui::Ui)) -> f32 {
     let ctx = egui::Context::default();
-    editor::ui::theme::apply(&ctx);
+    ui::apply(&ctx);
     let mut width = 0.0;
     for _ in 0..3 {
         let input = egui::RawInput {

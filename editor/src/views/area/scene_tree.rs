@@ -1,11 +1,15 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
+use ui::egui;
+use ui::menu;
+use ui::theme;
+use ui::words;
 
-use egui::Ui;
 use engine::core::content::{ContentFile, ErrorPlace, table_of};
 use engine::systems::area::blueprint::{BlueprintDef, Placement};
 use engine::systems::area::scene::{MAX_FOLDER_DEPTH, SceneNode, scene_file};
 use engine::systems::area::{AreaModule, AreaModuleKind, Pictured};
+use ui::egui::Ui;
 
 use super::flags::Flag;
 use super::modules::ADD_MENU;
@@ -16,10 +20,10 @@ use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 use crate::project::{ContentEdit, Project, RowSelection};
 use crate::scene_graph;
+pub use crate::shell::tree::Toggle;
+use crate::shell::tree::{self, DropAt, RowToggles, ToggleState, TreeDrop, TreeRow, TreeSource};
+use crate::shell::widgets;
 use crate::tabs::file_title;
-pub use crate::ui::tree::Toggle;
-use crate::ui::tree::{self, DropAt, RowToggles, ToggleState, TreeDrop, TreeRow, TreeSource};
-use crate::ui::{theme, widgets};
 
 /// What the scene graph's menus and keys ask for.
 #[derive(Clone, Debug)]
@@ -260,8 +264,8 @@ impl<'a> SceneSource<'a> {
         Some(TreeRow {
             name: format!("new {}", kind.tag().replace('_', " ")),
             badge: Some((
-                theme::badge_letter(kind.tag()),
-                theme::badge_color(kind.tag()),
+                widgets::badge_letter(kind.tag()),
+                widgets::badge_color(kind.tag()),
             )),
             dim: true,
             detail: "click the map".to_owned(),
@@ -475,7 +479,7 @@ impl<'a> SceneSource<'a> {
     fn folder_menu(&self, ui: &mut Ui, id: &str) -> Option<SceneAction> {
         let one = || vec![id.to_owned()];
         let mut picked = None;
-        widgets::submenu(ui, "Add", |ui| {
+        menu::submenu(ui, "Add", |ui| {
             if let Some(action) = self.add_menu(ui, id) {
                 picked = Some(action);
             }
@@ -558,7 +562,7 @@ impl<'a> SceneSource<'a> {
             ui,
             &format!(
                 "Delete folder and its {count} module{}",
-                widgets::plural(count)
+                words::plural(count)
             ),
             Some(EditorKey::Delete),
             SceneAction::Delete(one()),
@@ -625,10 +629,7 @@ impl<'a> SceneSource<'a> {
             .unwrap_or(0);
         item(
             ui,
-            &format!(
-                "Delete layer and its {cells} cell{}",
-                widgets::plural(cells)
-            ),
+            &format!("Delete layer and its {cells} cell{}", words::plural(cells)),
             Some(EditorKey::Delete),
             SceneAction::Delete(one()),
         );
@@ -697,7 +698,7 @@ impl<'a> SceneSource<'a> {
     fn empty_menu(&self, ui: &mut Ui) -> Option<SceneAction> {
         let folder = self.top();
         let mut picked = None;
-        widgets::submenu(ui, "Add", |ui| {
+        menu::submenu(ui, "Add", |ui| {
             if let Some(action) = self.add_menu(ui, &folder) {
                 picked = Some(action);
             }
@@ -824,14 +825,14 @@ impl TreeSource for SceneSource<'_> {
             row.detail = count.to_string();
             row.spoken = Some(format!("{name}, folder, {count} inside"));
         } else if nodes::is_layer(node) {
-            row.badge = Some((theme::badge_letter(kind), theme::badge_color(kind)));
+            row.badge = Some((widgets::badge_letter(kind), widgets::badge_color(kind)));
             if Self::level(id) == 0 {
                 let cells = self.cells.get(&name).copied().unwrap_or(0);
-                row.detail = format!("{cells} cell{}", widgets::plural(cells));
+                row.detail = format!("{cells} cell{}", words::plural(cells));
             }
             row.spoken = Some(format!("{name}, ground layer"));
         } else if let SceneNode::Module(module) = node {
-            row.badge = Some((theme::badge_letter(kind), theme::badge_color(kind)));
+            row.badge = Some((widgets::badge_letter(kind), widgets::badge_color(kind)));
             row.detail = shapes::node_detail(&module.module, self.snapshot.reader.as_ref());
             row.spoken = Some(format!("{name}, {}", kind.replace('_', " ")));
             if let AreaModule::Blueprint(placement) = &module.module {
@@ -1117,7 +1118,7 @@ fn problems(project: &Project, snapshot: &AreaSnapshot) -> HashMap<String, Strin
     }
     for (folder, count) in inside {
         out.entry(folder)
-            .or_insert_with(|| format!("{count} problem{} inside", widgets::plural(count)));
+            .or_insert_with(|| format!("{count} problem{} inside", words::plural(count)));
     }
     out
 }
@@ -1594,7 +1595,7 @@ pub fn copy_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String]) {
         count,
         origin,
     }));
-    editor.toast(format!("Copied {count} row{}", widgets::plural(count)));
+    editor.toast(format!("Copied {count} row{}", words::plural(count)));
 }
 
 /// Pastes what was copied into the folder row `folder`, where it was copied from.
@@ -1641,7 +1642,7 @@ pub fn paste_rows(editor: &mut Editor, snapshot: &AreaSnapshot, folder: &str) {
         editor,
         &bundle,
         nodes_in,
-        &format!("Paste {count} row{}", widgets::plural(count)),
+        &format!("Paste {count} row{}", words::plural(count)),
     ) && open > 0
     {
         super::select::toast_open(editor, open);
@@ -1757,7 +1758,7 @@ pub fn delete_rows(editor: &mut Editor, snapshot: &AreaSnapshot, ids: &[String])
         let label = match (pointers.as_slice(), folders.as_slice(), layers.as_slice()) {
             ([_], [folder], _) => format!(
                 "Delete folder {folder} and its {modules} module{}",
-                widgets::plural(modules)
+                words::plural(modules)
             ),
             ([_], [], [layer]) => {
                 let cells = blueprint

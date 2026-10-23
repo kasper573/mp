@@ -1,6 +1,7 @@
 use editor::keymap::{EditorKey, KeyScope};
-use egui::{Context, Event, Key, Modifiers, RawInput};
 use strum::VariantArray;
+use ui::egui;
+use ui::egui::{Context, Event, Key, Modifiers, RawInput};
 
 #[test]
 fn a_chord_with_more_modifiers_held_claims_its_key_alone() {
@@ -65,4 +66,26 @@ fn pressed_by(key: Key, modifiers: Modifiers) -> Vec<EditorKey> {
     });
     output.textures_delta.clear();
     pressed
+}
+
+#[test]
+fn saving_reaches_the_editor_while_a_field_is_typed_into_and_undo_stays_with_the_field() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = crate::support::open(crate::support::game(), &scratch);
+    let made = editor::rows::new_file(&mut editor, "", "npc").expect("a new npc");
+    let mut frames = crate::support::Frames::new(egui::vec2(800.0, 600.0));
+    let mut typed = String::new();
+    let mut frame = |editor: &mut editor::app::Editor, events: Vec<Event>| {
+        frames.run(events, |ui| {
+            ui.text_edit_singleline(&mut typed).request_focus();
+            editor::shell::shortcuts(editor, ui.ctx());
+        });
+    };
+
+    frame(&mut editor, Vec::new());
+    frame(&mut editor, crate::support::key(Key::Z, Modifiers::COMMAND));
+    assert!(crate::support::files(&mut editor).contains(&made));
+    frame(&mut editor, crate::support::key(Key::S, Modifiers::COMMAND));
+    assert!(!editor.has_unsaved());
+    assert!(scratch.path().join("game").join(&made).is_file());
 }

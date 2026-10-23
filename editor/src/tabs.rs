@@ -1,5 +1,3 @@
-use design_tokens::glyph::Mark;
-use egui_dock::DockState;
 use engine::core::content::{
     ContentFile, Fixture, NOTE_EXTENSION, SETTINGS_FILE, fields_file, table_of,
 };
@@ -8,8 +6,12 @@ use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::systems::input::map::InputDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
+use ui::egui_dock;
+use ui::egui_dock::DockState;
+use ui::glyph::Mark;
 
 use crate::icons::{self, KindIcon};
 use crate::project::files::content_holding;
@@ -133,6 +135,9 @@ impl EditorTab {
             },
             ScriptDef::TABLE => EditorTab::Script(ScriptRow::new(key)),
             WorldMapDef::TABLE => EditorTab::World,
+            InputDef::TABLE => EditorTab::Spreadsheet {
+                table: table.to_owned(),
+            },
             _ => EditorTab::Row {
                 table: table.to_owned(),
                 key: key.to_owned(),

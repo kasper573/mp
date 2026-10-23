@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
+use ui::egui;
+use ui::theme;
 
 use bevy::asset::{AssetPath, AssetServer};
 use bevy::prelude::{Entity, World};
-use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::assets::SyncedFiles;
 use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
@@ -15,10 +16,10 @@ use engine::core::math::Pos;
 use engine::core::text::{StyledLine, Typewriter};
 use engine::core::tiling::Tiles;
 use engine::systems::area::{self, AreaId};
+use ui::egui::Ui;
 
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::theme;
 
 pub const BABBLE_SAMPLE: &str = "The quick brown fox jumps over the lazy dog";
 

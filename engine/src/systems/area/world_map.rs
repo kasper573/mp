@@ -4,7 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::locate::escape;
-use crate::core::content::{ContentFile, ContentProblem, Fixture, Loading, RowCheck, serial};
+use crate::core::content::{
+    ContentFile, ContentProblem, Fixture, Loading, Nearby, RowCheck, serial,
+};
 use crate::core::math::Pos;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
@@ -37,6 +39,10 @@ pub struct WorldMapDef {
 
 impl ContentFile for WorldMapDef {
     const TABLE: &'static str = "world_map";
+
+    fn fresh(_: &Nearby) -> Result<WorldMapDef, String> {
+        Ok(WorldMapDef::default())
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         let mut placed: Vec<&super::AreaId> = Vec::new();

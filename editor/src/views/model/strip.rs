@@ -1,12 +1,20 @@
-use design_tokens::controls;
-use design_tokens::glyph::Mark;
-use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES, SheetFrame};
 use strum::VariantArray;
+use ui::chip;
+use ui::controls;
+use ui::dialog;
+use ui::drag;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::Mark;
+use ui::paint;
+use ui::panel;
+use ui::theme;
 
 use super::{
     FrameCueKind, ModelPage, ModelStrip, action_timing, play_rule, starts_at, strip_of, total_ms,
@@ -14,8 +22,6 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{patterns, theme, widgets};
 use crate::{import, stage};
 
 const CARD_H: f32 = 128.0;
@@ -50,6 +56,7 @@ pub enum StripConfirm {
     Cues,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DraggedFrame(pub u32);
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
@@ -192,7 +199,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef, strip
             } else {
                 direction.as_ref().to_owned()
             };
-            let response = widgets::mode_chip(ui, &text, on);
+            let response = chip::mode(ui, &text, on);
             if marked {
                 response
                     .clone()
@@ -338,16 +345,23 @@ pub fn timeline(
             3.0,
         ));
         let label = format!("was {was} ms");
-        let galley = painter.layout_no_wrap(label, egui::FontId::monospace(11.0), theme::TEXT);
-        let chip_size = galley.size() + Vec2::new(10.0, 4.0);
-        let chip_x = if x + 4.0 + chip_size.x > rect.max.x {
-            x - 4.0 - chip_size.x
+        let room = rect.max.x - x - 4.0;
+        let fits =
+            room > paint::text_size(ui.ctx(), &label, egui::FontId::proportional(11.0)).x + 10.0;
+        let (at, anchor) = if fits {
+            (egui::pos2(x + 4.0, top - 22.0), egui::Align2::LEFT_TOP)
         } else {
-            x + 4.0
+            (egui::pos2(x - 4.0, top - 22.0), egui::Align2::RIGHT_TOP)
         };
-        let chip = ERect::from_min_size(egui::pos2(chip_x, top - 22.0), chip_size);
-        painter.rect_filled(chip, 3.0, theme::RAISED);
-        painter.galley(chip.min + Vec2::new(5.0, 2.0), galley, theme::TEXT);
+        chip::floating(
+            &painter,
+            at,
+            anchor,
+            &label,
+            theme::RAISED,
+            theme::TEXT,
+            11.0,
+        );
     }
     let layout = TimelineLayout {
         rect,
@@ -455,7 +469,7 @@ fn interact(
         view.preview.playing = false;
         view.preview.position = super::starts_at(frames, index) as f32;
     }
-    if let Some(payload) = response.dnd_release_payload::<DraggedFrame>()
+    if let Some(payload) = drag::dropped::<DraggedFrame>(response)
         && let Some(pos) = response.interact_pointer_pos()
     {
         let at = layout
@@ -573,13 +587,7 @@ pub fn lanes(
             ui.id().with(("lane", key, kind.key())),
             Sense::click(),
         );
-        painter.rect(
-            lane,
-            3.0,
-            theme::INPUT,
-            egui::Stroke::new(1.0, theme::BORDER),
-            egui::StrokeKind::Inside,
-        );
+        panel::paint_well(&painter, lane);
         painter.line_segment(
             [
                 egui::pos2(strip_end, lane.min.y),
@@ -807,7 +815,7 @@ pub fn frame_card(
     index: usize,
     selected: bool,
 ) {
-    patterns::paint_card(painter, rect, selected);
+    panel::paint_card(painter, rect, selected);
     let art = ERect::from_min_max(
         rect.min + Vec2::new(2.0, 4.0),
         rect.right_bottom() - Vec2::new(2.0, 44.0),
@@ -843,14 +851,14 @@ fn rides(ui: &mut Ui, frames: &[SheetFrame]) {
     ui.add_space(4.0);
     ui.vertical_centered(|ui| {
         if cued.is_empty() {
-            widgets::hint(ui, "no cues on this strip");
+            form::hint(ui, "no cues on this strip");
         } else {
             let text = cued
                 .iter()
                 .map(|(index, at)| format!("frame {}, now at {at} ms", index + 1))
                 .collect::<Vec<_>>()
                 .join(" · ");
-            widgets::hint(ui, &format!("cues ride on {text}"));
+            form::hint(ui, &format!("cues ride on {text}"));
         }
     });
 }
@@ -1186,7 +1194,7 @@ pub fn confirm(
         StripConfirm::Cues => ("Copy cues to the other directions", "cues"),
     };
     let mut answer = None;
-    dialogs::card(ctx, "model-confirm", 420.0, |ui| {
+    dialog::card(ctx, "model-confirm", 420.0, |ui| {
         ui.label(RichText::new(title).size(16.0).strong());
         ui.add_space(6.0);
         ui.label(format!(
@@ -1202,13 +1210,13 @@ pub fn confirm(
             )));
         }
         ui.add_space(10.0);
-        answer = dialogs::answer_row(ui, &format!("Apply to {others} directions"));
+        answer = dialog::answer_row(ui, &format!("Apply to {others} directions"));
     });
     let Some(answer) = answer else {
         return;
     };
     editor.views.model.view_mut(key).confirm = None;
-    if answer == DialogAnswer::Cancel {
+    if answer == dialog::Answer::Cancel {
         return;
     }
     let mut changed = row.clone();

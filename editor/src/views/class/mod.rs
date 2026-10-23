@@ -2,20 +2,24 @@ pub mod inspect;
 pub mod tree;
 
 use std::collections::{BTreeMap, HashMap};
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::theme;
 
-use egui::Ui;
 use engine::core::content::{ContentFile, fields_file};
 use engine::field;
 use engine::systems::class::{ClassDef, ClassLevel, SkillPoints};
 use engine::systems::stat::{StatKind, Stats};
 use serde_json::Value;
+use ui::egui::Ui;
 
 use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection};
+use crate::shell::levels::{self, Level};
+use crate::shell::{self, row_form, sidebar};
 use crate::tabs::shown_path;
-use crate::ui::levels::{self, Level};
-use crate::ui::{self, row_form, sidebar, theme, widgets};
 
 pub const TREE_PART: &str = "/tree/";
 
@@ -68,13 +72,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             if selection.keys.first().is_some_and(|k| k == key) && node_of(&selection).is_some() {
                 inspect::show(editor, ui, &selection);
             } else {
-                sidebar::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
+                form::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
             }
         }),
         ClassPage::Levels => {}
     }
     egui::Frame::new()
-        .inner_margin(ui::CONTENT_PADDING)
+        .inner_margin(shell::CONTENT_PADDING)
         .show(ui, |ui| {
             ui.set_min_size(ui.available_size());
             page_body(editor, ui, key, page);
@@ -87,7 +91,7 @@ fn page_body(editor: &mut Editor, ui: &mut Ui, key: &str, page: ClassPage) {
             (ClassPage::Levels, "levels"),
             (ClassPage::Tree, "skill tree"),
         ] {
-            if widgets::mode_chip(ui, label, page == target).clicked() {
+            if chip::mode(ui, label, page == target).clicked() {
                 editor.views.class.pages.insert(key.to_owned(), target);
                 if target == ClassPage::Levels {
                     editor.select(RowSelection::row(ClassDef::TABLE, key));

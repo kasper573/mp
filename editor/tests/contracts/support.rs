@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use ui::egui;
 
 use editor::app::Editor;
 use editor::project::{Project, ProjectFiles};
@@ -153,7 +154,7 @@ pub struct Frames {
 impl Frames {
     pub fn new(screen: egui::Vec2) -> Frames {
         let ctx = egui::Context::default();
-        editor::ui::theme::apply(&ctx);
+        ui::apply(&ctx);
         Frames {
             ctx,
             screen,

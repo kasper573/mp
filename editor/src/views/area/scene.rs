@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use ui::egui;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -19,7 +20,7 @@ use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaGrids, AreaModule, Picture, Scenery};
 use engine::systems::screen::area::TileSheets;
 
-use crate::project::{ProjectFiles, hash};
+use crate::project::ProjectFiles;
 
 pub struct AreaSceneRequest {
     pub key: String,
@@ -425,13 +426,11 @@ pub fn image_handle(
     path: &str,
     world: &mut World,
 ) -> Handle<Image> {
-    let file = path.to_owned();
-    let Some(bytes) = files.get(&file) else {
+    let (Some(bytes), Some(hash)) = (files.get(path), files.hash_of(path)) else {
         return Handle::default();
     };
-    let hash = hash(bytes);
-    if let Some((known, handle)) = scenes.images.get(&file)
-        && *known == hash
+    if let Some((known, handle)) = scenes.images.get(path)
+        && known == hash
     {
         return handle.clone();
     }
@@ -454,7 +453,9 @@ pub fn image_handle(
         }
         Err(_) => Handle::default(),
     };
-    scenes.images.insert(file, (hash, handle.clone()));
+    scenes
+        .images
+        .insert(path.to_owned(), (hash.to_owned(), handle.clone()));
     handle
 }
 

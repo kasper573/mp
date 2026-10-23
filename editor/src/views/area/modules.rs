@@ -1,25 +1,30 @@
 use std::collections::BTreeMap;
+use ui::egui;
+use ui::paint;
+use ui::theme;
 
-use egui::{Pos2, RichText, Ui, Vec2};
+use engine::core::audio::mix::AudioCategory;
 use engine::core::audio::soundscape::SoundscapeShape;
-use engine::core::content::FolderReader;
+use engine::core::content::{FolderReader, Nearby};
 use engine::core::math::{Offset, Pos, Rect, Size};
 use engine::core::tiling::{Cell, CellPos, TilePos, Tiles};
 use engine::systems::area::blueprint::Placement;
 use engine::systems::area::object::{ObjectDef, ObjectShape};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{
-    AreaModule, AreaModuleKind, Flip, Population, Resident, SafeZone, Scenery, SoundscapeDef,
+    AreaModule, AreaModuleKind, Flip, Population, Resident, SafeZone, Scenery, SoundChannel,
+    SoundscapeDef,
 };
 use engine::systems::script::{Place, ScriptModule};
+use ui::egui::{Pos2, RichText, Ui, Vec2};
 
 use super::select::start_paste;
 use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, nodes, pick, pins, placement, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::play;
+use crate::shell::widgets;
 use crate::tabs::file_title;
-use crate::ui::{theme, widgets};
 
 #[derive(Clone, Copy)]
 pub struct AreaMenuAnchor {
@@ -85,7 +90,7 @@ pub fn module_menu_row(ui: &mut Ui, kind: &str, description: &str) -> bool {
         egui::Sense::click(),
     );
     if response.hovered() {
-        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+        paint::row_wash(ui.painter(), rect);
     }
     let mut child = ui.new_child(
         egui::UiBuilder::new()
@@ -193,16 +198,12 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         ui.label(
             RichText::new(format!("ADD MODULE{into}"))
                 .size(11.0)
-                .color(crate::ui::theme::MUTED)
+                .color(ui::theme::MUTED)
                 .family(theme::medium()),
         );
         for (group, kinds) in ADD_MENU {
             ui.add_space(2.0);
-            ui.label(
-                RichText::new(*group)
-                    .size(11.0)
-                    .color(crate::ui::theme::FAINT),
-            );
+            ui.label(RichText::new(*group).size(11.0).color(ui::theme::FAINT));
             for &(kind, description) in *kinds {
                 if module_menu_row(ui, kind.tag(), description) {
                     action = Some(MenuAction::Add(kind));
@@ -367,61 +368,70 @@ pub fn template_bounds(kind: AreaModuleKind, cell: CellPos) -> Rect<Tiles> {
     }
 }
 
-/// A module of `kind` as it is first placed at `cell`, or area-wide when there is no cell, naming
-/// the file at `named` when its kind names one. `None` when its kind needs a cell or a file it
-/// wasn't given.
+/// A module of `kind` as it is first placed in `bundle` at `cell`, or area-wide when there is no
+/// cell, naming the file at `named` when its kind names one, and the media nearest `bundle` when it
+/// plays some. Refused, saying why, when its kind needs a cell, a file or media it hasn't.
 pub fn module_template(
     reader: &FolderReader,
+    bundle: &str,
     kind: AreaModuleKind,
     cell: Option<CellPos>,
     named: Option<&str>,
-) -> Option<AreaModule> {
+) -> Result<AreaModule, String> {
     let at = cell.map(|cell| Pos::new(cell.x as f32, cell.y as f32));
     let corner = at.map(|at| at - Offset::new(0.5, 0.5));
+    let placed = || format!("a {} is placed on the map", kind.tag().replace('_', " "));
     let named = named.unwrap_or_default();
-    Some(match kind {
+    let unnamed = || format!("{named} can't be named by a {}", kind.tag());
+    Ok(match kind {
         AreaModuleKind::Object => AreaModule::Object(ObjectDef {
             name: None,
             title: None,
-            shape: ObjectShape::Point(at?),
+            shape: ObjectShape::Point(at.ok_or_else(placed)?),
             look: None,
             shown: None,
             scripts: Vec::new(),
         }),
         AreaModuleKind::SafeZone => AreaModule::SafeZone(SafeZone {
-            rect: spot_rect(cell?),
+            rect: spot_rect(cell.ok_or_else(placed)?),
         }),
         AreaModuleKind::Soundscape => AreaModule::Soundscape(SoundscapeDef {
-            shape: SoundscapeShape::Rect(spot_rect(cell?)),
+            shape: SoundscapeShape::Rect(spot_rect(cell.ok_or_else(placed)?)),
             emit: 4.0,
-            channels: Vec::new(),
+            channels: vec![SoundChannel {
+                channel: 1,
+                file: Nearby::new(reader, bundle).audio()?,
+                volume: 1.0,
+                pan: 0.0,
+                category: AudioCategory::default(),
+            }],
         }),
         AreaModuleKind::Population => AreaModule::Population(Population {
-            npc: reader.id_of(named)?,
+            npc: reader.id_of(named).ok_or_else(unnamed)?,
             count: 1,
             roams: cell.map(spot_rect),
         }),
         AreaModuleKind::Resident => AreaModule::Resident(Resident {
-            npc: reader.id_of(named)?,
-            at: at?,
+            npc: reader.id_of(named).ok_or_else(unnamed)?,
+            at: at.ok_or_else(placed)?,
             shown: None,
         }),
         AreaModuleKind::Blueprint => AreaModule::Blueprint(Placement {
-            blueprint: reader.id_of(named)?,
-            at: at?,
+            blueprint: reader.id_of(named).ok_or_else(unnamed)?,
+            at: at.ok_or_else(placed)?,
             flip: Flip::default(),
             values: BTreeMap::new(),
         }),
         AreaModuleKind::Scenery => AreaModule::Scenery(Scenery {
-            at: corner?,
-            tileset: reader.id_of(named)?,
+            at: corner.ok_or_else(placed)?,
+            tileset: reader.id_of(named).ok_or_else(unnamed)?,
             tiles: Vec::new(),
             sort: None,
             flip: Flip::default(),
             blocks: Vec::new(),
         }),
         AreaModuleKind::Script => AreaModule::Script(ScriptModule {
-            script: reader.id_of(named)?,
+            script: reader.id_of(named).ok_or_else(unnamed)?,
             values: BTreeMap::new(),
         }),
     })
@@ -458,18 +468,21 @@ pub fn add_module(
             let Some(reader) = editor.reader() else {
                 return;
             };
-            if let Some(module) = module_template(&reader, kind, Some(tile.cell()), None) {
-                let label = format!(
-                    "Add {} to {}",
-                    shapes::label(&module, reader.as_ref()),
-                    file_title(&bundle)
-                );
-                nodes::add(
-                    editor,
-                    &bundle,
-                    vec![SceneNode::Module(ModuleNode::new(module))],
-                    &label,
-                );
+            match module_template(&reader, &bundle, kind, Some(tile.cell()), None) {
+                Ok(module) => {
+                    let label = format!(
+                        "Add {} to {}",
+                        shapes::label(&module, reader.as_ref()),
+                        file_title(&bundle)
+                    );
+                    nodes::add(
+                        editor,
+                        &bundle,
+                        vec![SceneNode::Module(ModuleNode::new(module))],
+                        &label,
+                    );
+                }
+                Err(why) => editor.toast(format!("No {} here: {why}", kind.tag())),
             }
         }
     }

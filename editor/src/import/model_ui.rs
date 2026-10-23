@@ -1,14 +1,23 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
+use ui::chip;
+use ui::dialog;
+use ui::egui;
+use ui::form;
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
 use engine::core::content::files::NAME_RULE;
 use engine::core::content::{ContentFile, FolderReader, valid_name};
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::model::SheetFrame;
 use image::RgbaImage;
+use ui::controls;
+use ui::egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::formats::{self, AnimationExport, ExportFormat};
 use super::model::{
@@ -19,11 +28,12 @@ use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::tabs::shown_path;
-use crate::ui::{dialogs, theme, widgets};
 use crate::views::model::{self as model_view, FrameCue, frame_size};
 use crate::{rows, schema, thumbs};
+use ui::input::InputField;
 
 const FRAME_CARD: f32 = 48.0;
+const GRID_SIDE_WIDTH: f32 = 72.0;
 
 #[derive(Default)]
 pub struct TextureCache {
@@ -172,7 +182,7 @@ pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::I
     let name = super::suggested_name(&export, ModelDef::TABLE);
     let reader = editor.reader()?;
     let mut dialog = new_dialog(name, true, export, None, &reader, None, None);
-    dialog.folder = crate::ui::content_tree::current_folder(editor);
+    dialog.folder = crate::shell::content_tree::current_folder(editor);
     Some(super::ImportDialog::Model(Box::new(dialog)))
 }
 
@@ -305,7 +315,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     let mut import = false;
     let mut changed = false;
     let width = 1130.0;
-    dialogs::card(ctx, "import-model", width, |ui| {
+    dialog::card(ctx, "import-model", width, |ui| {
         ui.horizontal(|ui| {
             glyph::show(ui, Mark::File, 16.0, theme::MUTED);
             ui.label(
@@ -355,11 +365,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 if !dialog.folder.is_empty() {
                     ui.label(theme::mono(format!("{}/", dialog.folder)).color(theme::CODE));
                 }
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut dialog.key)
-                        .desired_width(160.0)
-                        .font(egui::TextStyle::Monospace),
-                );
+                let response = InputField::new(&mut dialog.key).width(160.0).show(ui);
                 if response.changed() {
                     dialog.error = None;
                 }
@@ -376,16 +382,20 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
             ] {
                 let on = dialog.export.kind == kind
                     || (kind == ExportFormat::Gif && dialog.export.kind == ExportFormat::Apng);
-                widgets::mode_chip(ui, label, on);
+                chip::mode(ui, label, on);
             }
             ui.label(theme::faint("picked from the files dropped"));
             if dialog.export.kind == ExportFormat::Grid {
                 ui.add_space(12.0);
                 ui.label(theme::muted("frame"));
-                let w = ui.add(egui::TextEdit::singleline(&mut dialog.grid.0).desired_width(40.0));
+                let w = InputField::new(&mut dialog.grid.0)
+                    .width(GRID_SIDE_WIDTH)
+                    .show(ui);
                 ui.label(theme::muted("×"));
-                let h = ui.add(egui::TextEdit::singleline(&mut dialog.grid.1).desired_width(40.0));
-                ui.label(theme::muted("px"));
+                let h = InputField::new(&mut dialog.grid.1)
+                    .unit("px")
+                    .width(GRID_SIDE_WIDTH)
+                    .show(ui);
                 if w.changed() || h.changed() {
                     if let (Ok(w), Ok(h)) =
                         (dialog.grid.0.trim().parse(), dialog.grid.1.trim().parse())
@@ -533,7 +543,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 }
                 let current = dialog.mapping.get(tag).cloned().flatten();
                 let mut picked: Option<Option<String>> = None;
-                widgets::combo(("import-strip", tag))
+                controls::combo(("import-strip", tag))
                     .width(150.0)
                     .selected_text(
                         current
@@ -579,7 +589,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label(theme::muted("every model needs this strip"));
                     });
                     let mut picked = None;
-                    widgets::combo(("import-pick-tag", &name))
+                    controls::combo(("import-pick-tag", &name))
                         .width(120.0)
                         .selected_text("pick a tag")
                         .show_ui(ui, |ui| {
@@ -693,25 +703,20 @@ fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
     let Some(strip) = dialog.export.strip(&tag).cloned() else {
         return false;
     };
-    widgets::section(ui, &format!("{tag} · {} frames", strip.frames.len()));
+    sheet::section(ui, &format!("{tag} · {} frames", strip.frames.len()));
     let per_row = 8;
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(6.0)
-        .show(ui, |ui| {
-            ui.set_width(288.0);
-            for chunk in strip.frames.chunks(per_row) {
-                ui.horizontal(|ui| {
-                    for frame in chunk {
-                        let texture = dialog.textures.of(ctx, &frame.hash, &frame.image);
-                        let (rect, _) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::hover());
-                        draw_fit(ui.painter(), rect, &texture, dialog.export.frame);
-                    }
-                });
-            }
-        });
+    panel::well().show(ui, |ui| {
+        ui.set_width(288.0);
+        for chunk in strip.frames.chunks(per_row) {
+            ui.horizontal(|ui| {
+                for frame in chunk {
+                    let texture = dialog.textures.of(ctx, &frame.hash, &frame.image);
+                    let (rect, _) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::hover());
+                    draw_fit(ui.painter(), rect, &texture, dialog.export.frame);
+                }
+            });
+        }
+    });
     ui.horizontal(|ui| {
         if dialog.export.timed() {
             for frame in strip.frames.iter().take(per_row) {
@@ -733,8 +738,8 @@ fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 .asked
                 .entry(tag.clone())
                 .or_insert_with(|| formats::DEFAULT_MS.to_string());
-            let response = ui.add(egui::TextEdit::singleline(text).desired_width(50.0));
-            ui.label(theme::muted("ms each · no lengths in the export"));
+            let response = InputField::new(text).unit("ms").width(90.0).show(ui);
+            ui.label(theme::muted("each · no lengths in the export"));
             if response.changed() {
                 changed = true;
             }
@@ -744,7 +749,7 @@ fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
 }
 
 fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
-    widgets::section(ui, "What the import does");
+    sheet::section(ui, "What the import does");
     let plan = &dialog.plan;
     let (fw, fh) = plan.frame;
     let line = super::check_line;
@@ -873,10 +878,7 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
             .table(ModelDef::TABLE)
             .ok_or("the model type has no shape")?;
         let key = rows::new_path(&project.files, &dialog.folder, ModelDef::TABLE, name);
-        let nearby = schema::Nearby {
-            files: &project.files,
-            from: Some(&key),
-        };
+        let nearby = schema::Nearby::of(project, Some(&key));
         let template = schema::template(&shape.shape, &shape.shape, nearby);
         let base = reader
             .from_json::<ModelDef>(&template)
@@ -958,7 +960,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     } else {
         format!(
             "Imported {names} into {key} again · {changed} strip{}, cues followed",
-            widgets::plural(changed)
+            words::plural(changed)
         )
     };
     let record = model::record(&draft.export, key, &draft.mapping, built.lengths.clone());
@@ -986,26 +988,22 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         })
         .map(|(index, _)| index)
         .collect();
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(10, 6))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(theme::strong(format!("{names} changed")));
-                ui.label(theme::muted(format!(
-                    "imported on this machine{} · {} strip{} · {}",
-                    if draft.while_closed {
-                        ", while the editor was closed"
-                    } else {
-                        ""
-                    },
-                    changed.len(),
-                    widgets::plural(changed.len()),
-                    to_decide(&draft.plan)
-                )));
-            });
+    panel::well().show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label(theme::strong(format!("{names} changed")));
+            ui.label(theme::muted(format!(
+                "imported on this machine{} · {} strip{} · {}",
+                if draft.while_closed {
+                    ", while the editor was closed"
+                } else {
+                    ""
+                },
+                changed.len(),
+                words::plural(changed.len()),
+                to_decide(&draft.plan)
+            )));
         });
+    });
     ui.add_space(10.0);
     egui::ScrollArea::vertical()
         .id_salt(("reimport", key))
@@ -1057,7 +1055,7 @@ fn strip_section(
         old_frame,
         frame,
     } = *frames;
-    widgets::section(
+    sheet::section(
         ui,
         &format!(
             "{} · {} → {} frames",
@@ -1093,13 +1091,7 @@ fn strip_section(
     };
     for (index, frame_data) in strip.before.iter().enumerate() {
         let card = card_at(0, index);
-        painter.rect(
-            card,
-            3.0,
-            theme::INPUT,
-            egui::Stroke::new(1.0, theme::BORDER),
-            egui::StrokeKind::Inside,
-        );
+        panel::paint_well(&painter, card);
         if let Some(sheet) = sheet
             && let Some(old_frame) = old_frame
             && let Some(image) = formats::cell(sheet, old_frame, frame_data.frame)
@@ -1137,13 +1129,7 @@ fn strip_section(
             .cues
             .iter()
             .any(|cue| !cue.settled() && cue.offered(after.len()) == index);
-        painter.rect(
-            card,
-            3.0,
-            theme::INPUT,
-            egui::Stroke::new(1.0, theme::BORDER),
-            egui::StrokeKind::Inside,
-        );
+        panel::paint_well(&painter, card);
         if let Some(source) = source
             && let Some(export_frame) = source.frames.get(index)
         {
@@ -1151,7 +1137,7 @@ fn strip_section(
             draw_fit(&painter, card.shrink(2.0), &texture, frame);
         }
         if waiting {
-            widgets::dashed_rect(
+            paint::dashed_rect(
                 &painter,
                 card,
                 egui::Stroke::new(1.5, theme::DANGER),
@@ -1188,17 +1174,7 @@ fn strip_section(
         let start = egui::pos2(from_card.center().x, from_card.max.y + 20.0);
         let end = egui::pos2(to_card.center().x, to_card.min.y - 4.0);
         painter.line_segment([start, end], egui::Stroke::new(1.5, theme::SELECTION));
-        let dir = (end - start).normalized();
-        let side = Vec2::new(-dir.y, dir.x);
-        painter.add(egui::Shape::convex_polygon(
-            vec![
-                end,
-                end - dir * 8.0 + side * 4.0,
-                end - dir * 8.0 - side * 4.0,
-            ],
-            theme::SELECTION,
-            egui::Stroke::NONE,
-        ));
+        glyph::arrow_head(&painter, end, end - start, 8.0, theme::SELECTION);
     }
 }
 
@@ -1227,9 +1203,9 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             continue;
         }
         let count = strip.after_count();
-        widgets::card_frame(strip.needs_place() > 0).show(ui, |ui| {
+        panel::card(strip.needs_place() > 0).show(ui, |ui| {
             ui.vertical(|ui| {
-                widgets::card_title(ui, &model::pretty(&strip.name));
+                panel::title(ui, &model::pretty(&strip.name));
                 let mut followed: Vec<String> = Vec::new();
                 for cue in &strip.cues {
                     if let Some(to) = cue.to
@@ -1255,7 +1231,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             "{} follow{} their frame{}. Found by its pixels.",
                             followed.join(", "),
                             if followed.len() == 1 { "s" } else { "" },
-                            widgets::plural(followed.len())
+                            words::plural(followed.len())
                         )));
                     });
                 }
@@ -1283,7 +1259,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .map(|cue| cue.offered(count))
                 .unwrap_or(0);
             let origin = strip.origins.get(offered).copied().flatten();
-            widgets::hint(
+            form::hint(
                 ui,
                 &match origin {
                     Some(old) => format!(
@@ -1304,9 +1280,9 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let Some(retimed) = &mut strip.retimed else {
             continue;
         };
-        widgets::card_frame(false).show(ui, |ui| {
+        panel::card(false).show(ui, |ui| {
             ui.vertical(|ui| {
-                widgets::card_header(
+                panel::header(
                     ui,
                     &format!("{} · lengths", model::pretty(&strip.name)),
                     "",
@@ -1321,8 +1297,8 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                     glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                     ui.label(theme::muted(format!(
                         "Frame{} {} {} retimed here since the last import.",
-                        widgets::plural(differing.len()),
-                        widgets::join_and(&differing),
+                        words::plural(differing.len()),
+                        words::join_and(&differing),
                         if differing.len() == 1 { "was" } else { "were" }
                     )));
                 });
@@ -1348,7 +1324,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
     });
     if let Err(reason) = ready {
-        widgets::hint(ui, &reason);
+        form::hint(ui, &reason);
     }
     if apply {
         apply_reimport(editor, key, false);
@@ -1374,7 +1350,7 @@ fn place_cue(ui: &mut Ui, strip: &str, cue: &mut CueMove, count: usize, width: f
             Some(CuePlacement::Remove) => "remove the cue".to_owned(),
             None => format!("frame {}", cue.offered(count) + 1),
         };
-        widgets::combo(("import-place", strip, cue.from, cue.cue.label()))
+        controls::combo(("import-place", strip, cue.from, cue.cue.label()))
             .width(ui.available_width().min(width))
             .selected_text(theme::mono(shown).color(if cue.choice.is_some() {
                 theme::TEXT
@@ -1411,7 +1387,7 @@ fn keep_lengths(ui: &mut Ui, strip: &str, retimed: &mut StripRetiming, width: f3
     ui.horizontal(|ui| {
         ui.label(theme::muted("keep"));
         let mut picked = None;
-        widgets::combo(("import-keep", strip))
+        controls::combo(("import-keep", strip))
             .width(ui.available_width().min(width))
             .selected_text(theme::mono(if retimed.keep_here {
                 "the lengths set here"

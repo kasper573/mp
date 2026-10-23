@@ -13,6 +13,8 @@ use bevy::window::{
 use bevy_egui::EguiPrimaryContextPass;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
+use ui::egui;
+use ui::float;
 
 use super::ActiveTileHighlight;
 use super::map::{self, InputAction};
@@ -261,10 +263,10 @@ fn draw_cursor(world: &mut World) {
     let Some(image) = gui::image(world, &cursor.image) else {
         return;
     };
-    gui::at_pointer(
+    float::at_pointer(
         &gui,
         egui::Id::new("drawn cursor"),
-        Band::Cursor,
+        Band::Cursor.order(),
         -hotspot,
         |ui| ui.add(image.widget(image.size)),
     );

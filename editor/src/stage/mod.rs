@@ -8,9 +8,10 @@ mod mirror;
 
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
+use ui::egui;
+use ui::theme;
 
 use bevy::prelude::*;
-use egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 use engine::core::content::Content;
 use engine::core::geometry::{Footprint, Radians};
 use engine::core::math::{Direction, Pos, Rgba};
@@ -25,13 +26,14 @@ use engine::systems::actor::{Action, ModelId};
 use engine::systems::item::ItemId;
 use engine::systems::skill::SkillId;
 use engine::systems::status::StatusEffectId;
+use ui::egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 
 use self::live::LiveWorld;
 use self::mirror::{ActorPose, Site, Source, Stage, VfxPose};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::thumbs;
-use crate::ui::theme;
+
 use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes};
 
 pub const SIZE: [u32; 2] = [384, 288];

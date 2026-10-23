@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use ui::egui;
+use ui::float;
 
 use bevy::diagnostic::FrameCount;
 use bevy::input::ButtonState;
@@ -1020,7 +1022,7 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 editable,
                 button: role == accesskit::Role::Button,
                 focused: tree.focus == *id,
-                click_through: gui::layer_at(&gui, rect.center()) != Some(widget.layer_id),
+                click_through: float::layer_at(&gui, rect.center()) != Some(widget.layer_id),
                 in_world: world_layers.contains(widget.layer_id),
                 slider,
                 rect: window_rect(rect),

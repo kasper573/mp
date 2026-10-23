@@ -53,11 +53,13 @@ The content layer is a game folder (`example_game/` is the example game): folder
 
 Code must not depend on arbitrary game content, so the same server and client can run any game's data:
 - Code never names a content file. A file that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are files every game must provide at their place under `fixtures/`, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
-- When code needs content for a role, the content says which file plays it: the game's settings (`GameSettings::initial_spawn`), or a role a file picks from a list (an sfx's `role`).
+- When code needs content for a role, the content says which file plays it: the game's settings (`GameSettings::initial_spawn`), or the file the role belongs to (a surface's `footstep`).
 - Only content files name media; another game reskins with its own files.
 - Integration tests name content by its path.
 
-2. The design_tokens and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
+2. The ui and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
+
+3. The ui crate is the interface the editor and the game share: its look and every general-purpose egui component (fields, chips, cards, panels, menus, dialogs, floating labels, painted patterns, wording helpers). A component that isn't about one mechanic or one editor view lives there, so the game and the editor never draw the same thing two ways; a crate's own UI code keeps only what is about its domain. The editor and the engine reach egui and its extension crates only through ui's re-exports (`ui::egui`, `ui::egui_dock`, …), so they always build against the versions ui is built on; bevy_egui stays their own dependency, as the host that runs egui inside bevy.
 
 ## Comments
 

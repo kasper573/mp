@@ -1,14 +1,21 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use ui::dialog;
+use ui::egui;
+use ui::form;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
 use engine::core::assets::ImageRef;
 use engine::core::content::files::NAME_RULE;
 use engine::core::content::{ContentFile, valid_name};
 use engine::systems::area::tileset::TilesetDef;
 use image::RgbaImage;
+use ui::controls;
+use ui::egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::formats::{self, AnimationExport, ExportFormat};
 use super::model_ui::TextureCache;
@@ -17,15 +24,16 @@ use super::tileset::{self, AnimPlan, TileBlock, TileGridCut, TileGridSettings, T
 use crate::app::Editor;
 use crate::parts;
 use crate::project::{ContentEdit, RowSelection};
+use crate::shell::content_tree;
+use crate::shell::widgets;
 use crate::tabs::EditorTab;
 use crate::tabs::{file_title, shown_path};
-use crate::ui::content_tree;
-use crate::ui::{dialogs, theme, widgets};
 use crate::views::area;
 use crate::views::area as area_view;
 use crate::views::area::grid::BundlePalette;
-use crate::views::tileset::{ANIMATION_PART, tile_size};
-use crate::{forms, rows, thumbs};
+use crate::views::tileset::{ANIMATION_PART, reset_view, tile_size};
+use crate::{rows, thumbs};
+use ui::input::InputField;
 
 pub struct TilesetDialog {
     /// The tileset's path when importing onto one, or the name of the one to make.
@@ -273,7 +281,7 @@ pub fn dialog(
         .as_ref()
         .map(|sheet| sheet.dimensions())
         .unwrap_or((0, 0));
-    dialogs::card(ctx, "import-tileset", width, |ui| {
+    dialog::card(ctx, "import-tileset", width, |ui| {
         ui.horizontal(|ui| {
             glyph::show(ui, Mark::File, 16.0, theme::MUTED);
             ui.label(theme::strong("Import a tileset").size(17.0));
@@ -339,15 +347,11 @@ pub fn dialog(
                         if !dialog.folder.is_empty() {
                             ui.label(theme::mono(format!("{}/", dialog.folder)).color(theme::CODE));
                         }
-                        ui.add(
-                            egui::TextEdit::singleline(&mut dialog.key)
-                                .desired_width(160.0)
-                                .font(egui::TextStyle::Monospace),
-                        );
+                        InputField::new(&mut dialog.key).width(160.0).show(ui);
                         ui.label(theme::mono(".tileset").color(theme::CODE));
                     }
                 });
-                widgets::section(ui, "Grid");
+                sheet::section(ui, "Grid");
                 let mut changed = false;
                 for (label, text) in [
                     ("tile", &mut dialog.tile),
@@ -359,23 +363,17 @@ pub fn dialog(
                         ui.allocate_ui(Vec2::new(80.0, 20.0), |ui| {
                             ui.label(theme::muted(label));
                         });
-                        ui.scope(|ui| {
-                            ui.set_max_width(170.0);
-                            let response = forms::boxed_input(ui, Some("px"), |ui| {
-                                ui.add(
-                                    egui::TextEdit::singleline(text)
-                                        .desired_width(110.0)
-                                        .font(egui::TextStyle::Monospace),
-                                )
-                            });
-                            changed |= response.changed();
-                        });
+                        changed |= InputField::new(text)
+                            .unit("px")
+                            .width(170.0)
+                            .show(ui)
+                            .changed();
                     });
                 }
                 if changed {
                     recut(&mut dialog);
                 }
-                widgets::section(ui, "Checks");
+                sheet::section(ui, "Checks");
                 match &dialog.cut {
                     Ok(cut) => {
                         for text in [
@@ -558,7 +556,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ] {
             ui.vertical(|ui| {
                 ui.set_width(panel.x);
-                widgets::section(ui, &title);
+                sheet::section(ui, &title);
                 let (rect, _) = ui.allocate_exact_size(panel, Sense::hover());
                 let painter = ui.painter_at(rect);
                 painter.rect_filled(rect, 3.0, theme::CANVAS);
@@ -622,7 +620,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     });
     ui.add_space(20.0);
     for rewrite in &plan.rewrites {
-        widgets::section(
+        sheet::section(
             ui,
             &format!(
                 "{} palette · {} entr{} rewritten",
@@ -635,22 +633,17 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             Some((old, new)) => format!("- {key},{old},\n+ {key},{new},\n…"),
             None => "…".to_owned(),
         };
-        egui::Frame::new()
-            .fill(theme::INPUT)
-            .stroke(egui::Stroke::new(1.0, theme::BORDER))
-            .corner_radius(4.0)
-            .inner_margin(10.0)
-            .show(ui, |ui| {
-                ui.set_width(panel.x - 20.0);
-                for line in text.lines() {
-                    let color = match line.chars().next() {
-                        Some('-') => theme::DANGER,
-                        Some('+') => theme::OK,
-                        _ => theme::MUTED,
-                    };
-                    ui.label(theme::mono(line).color(color));
-                }
-            });
+        panel::well().show(ui, |ui| {
+            ui.set_width(panel.x - 20.0);
+            for line in text.lines() {
+                let color = match line.chars().next() {
+                    Some('-') => theme::DANGER,
+                    Some('+') => theme::OK,
+                    _ => theme::MUTED,
+                };
+                ui.label(theme::mono(line).color(color));
+            }
+        });
         ui.add_space(8.0);
     }
     editor.status.left = vec![
@@ -675,9 +668,9 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .size(12.0),
     );
     ui.add_space(6.0);
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.vertical(|ui| {
-            widgets::card_title(ui, &format!("importing {names}"));
+            panel::title(ui, &format!("importing {names}"));
             for (mark, color, text, count) in [
                 (
                     Mark::Check,
@@ -716,7 +709,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             }
         });
     });
-    widgets::section(ui, "It rewrites");
+    sheet::section(ui, "It rewrites");
     ui.horizontal(|ui| {
         widgets::badge(ui, "blueprint");
         ui.label(theme::mono(shown_path(key)));
@@ -736,7 +729,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
     }
     if !draft.plan.gone_used.is_empty() {
-        widgets::section(ui, "Gone but still painted");
+        sheet::section(ui, "Gone but still painted");
         let gone: Vec<(u32, Vec<tileset::PaletteUse>)> = draft
             .plan
             .gone_used
@@ -760,11 +753,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui.label(theme::muted("replace with"));
                 let current = draft.plan.replacements.get(&tile).copied().flatten();
                 let mut text = current.map(|t| t.to_string()).unwrap_or_default();
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut text)
-                        .desired_width(70.0)
-                        .hint_text("tile"),
-                );
+                let response = InputField::new(&mut text).hint("tile").width(70.0).show(ui);
                 if response.changed() {
                     let picked = text.trim().parse::<u32>().ok().filter(|t| *t < new_count);
                     draft.plan.replacements.insert(tile, picked);
@@ -789,7 +778,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
     });
     if let Err(reason) = ready {
-        widgets::hint(ui, &reason);
+        form::hint(ui, &reason);
     }
     if apply {
         apply_reimport(editor, key);
@@ -825,7 +814,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
     let image = parts::tileset_image(key);
     let names = formats::export_name(&draft.export.files);
     let mut edit = ContentEdit::new(format!(
-        "Imported {names} into {key} again · {} tiles renumbered",
+        "Imported {names} onto {key} · {} tiles renumbered",
         draft.plan.renumbered
     ));
     edit.write(image.to_owned(), Arc::from(png));
@@ -861,7 +850,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
     if editor.apply(edit) {
         editor.imports.remember(record);
         editor.views.tileset.reimports.remove(key);
-        editor.views.tileset.views.remove(key);
+        reset_view(editor, key);
     }
 }
 
@@ -877,7 +866,7 @@ pub fn animation_dialog(
     let row = tileset_of(editor, &dialog.key)?;
     let strip = dialog.export.strips.first().cloned();
     let columns_total = (dialog.tileset.width() / dialog.tile.max(1)).max(1);
-    dialogs::card(ctx, "import-animation", width, |ui| {
+    dialog::card(ctx, "import-animation", width, |ui| {
         ui.horizontal(|ui| {
             glyph::show(ui, Mark::File, 16.0, theme::MUTED);
             ui.label(
@@ -942,7 +931,7 @@ pub fn animation_dialog(
                         }
                     });
                 }
-                widgets::section(
+                sheet::section(
                     ui,
                     &format!(
                         "Onto the block at column {}, row {} · picked on the tileset",
@@ -1004,7 +993,7 @@ pub fn animation_dialog(
             ui.add_space(16.0);
             ui.vertical(|ui| {
                 ui.set_width(width - 600.0 - 60.0);
-                widgets::section(ui, "What the import does");
+                sheet::section(ui, "What the import does");
                 match &dialog.plan {
                     Ok(plan) => {
                         let line = super::check_line;
@@ -1047,8 +1036,8 @@ pub fn animation_dialog(
                                 true,
                                 format!(
                                     "{frames_text} already in the tileset, found by their pixels at column{} {}. No tiles added.",
-                                    widgets::plural(columns.len()),
-                                    widgets::join_and(&columns)
+                                    words::plural(columns.len()),
+                                    words::join_and(&columns)
                                 ),
                             );
                         } else {
@@ -1058,7 +1047,7 @@ pub fn animation_dialog(
                                 format!(
                                     "{} new tile{} go after the last tile, so nothing renumbers{}.",
                                     plan.new_images.len(),
-                                    widgets::plural(plan.new_images.len()),
+                                    words::plural(plan.new_images.len()),
                                     match plan.reused.len() {
                                         0 => String::new(),
                                         n => format!("; {n} found by their pixels already"),
@@ -1151,7 +1140,7 @@ fn apply_animation(
         },
     );
     editor.imports.remember(record);
-    editor.views.tileset.views.remove(&dialog.key);
+    reset_view(editor, &dialog.key);
     editor.select(RowSelection::parts(
         TilesetDef::TABLE,
         &dialog.key,

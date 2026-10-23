@@ -1,16 +1,18 @@
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use ui::dialog;
+use ui::egui;
+use ui::sheet;
+use ui::theme;
 
-use egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
 use engine::systems::area::AreaId;
 use engine::systems::area::world_map::WorldMapDef;
+use ui::egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
 
 use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
 use crate::app::{Editor, ModalDialog};
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{theme, widgets};
 use crate::views::navigation;
 
 const GAP: f32 = 18.75;
@@ -23,8 +25,8 @@ const SLACK: f32 = 0.1;
 const ROUNDS: usize = 50;
 const PREVIEW: Vec2 = Vec2::new(330.0, 250.0);
 const PREVIEW_LINK: Color32 = Color32::from_rgba_premultiplied(19, 14, 9, 115);
-const PREVIEW_PINNED: Color32 = design_tokens::ink::AZURE;
-const PREVIEW_CARD: Color32 = design_tokens::ink::INK3;
+const PREVIEW_PINNED: Color32 = ui::ink::AZURE;
+const PREVIEW_CARD: Color32 = ui::ink::INK3;
 
 pub struct ArrangeDialog {
     options: ArrangeOptions,
@@ -102,7 +104,7 @@ pub fn dialog(
         .filter(|(area, card)| before.cards.get(area).is_some_and(|was| was.at != card.at))
         .count();
     let mut answer = None;
-    dialogs::card(ctx, "arrange-world", 720.0, |ui| {
+    dialog::card(ctx, "arrange-world", 720.0, |ui| {
         ui.label(RichText::new("Arrange the world map").size(17.0).strong());
         ui.add_space(8.0);
         toggle_row(
@@ -138,12 +140,12 @@ pub fn dialog(
         ui.add_space(10.0);
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
-                widgets::section(ui, "Now");
+                sheet::section(ui, "Now");
                 preview(ui, &map, before);
             });
             ui.add_space(12.0);
             ui.vertical(|ui| {
-                widgets::section(ui, "After");
+                sheet::section(ui, "After");
                 preview(ui, &map, after);
             });
         });
@@ -156,11 +158,11 @@ pub fn dialog(
             .size(13.0),
         );
         ui.add_space(8.0);
-        answer = dialogs::answer_row(ui, &format!("Arrange {moved} cards"));
+        answer = dialog::answer_row(ui, &format!("Arrange {moved} cards"));
     });
     editor.status.left = vec!["World · arrange preview".to_owned()];
     match answer {
-        Some(DialogAnswer::Confirm) => {
+        Some(dialog::Answer::Confirm) => {
             if moved > 0
                 && map.write(
                     editor,
@@ -172,7 +174,7 @@ pub fn dialog(
             }
             None
         }
-        Some(DialogAnswer::Cancel) => None,
+        Some(dialog::Answer::Cancel) => None,
         None => {
             dialog.solved = Some(solved);
             Some(dialog)

@@ -34,7 +34,7 @@ use crate::core::audio::soundscape::{
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, FileWriter,
-    LoadError, LoadStep, Loading, NamedContent, PartSpec, Parts, RowCheck, Shape, serial,
+    LoadError, LoadStep, Loading, NamedContent, Nearby, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::render::dynamic_z;
@@ -44,7 +44,7 @@ use crate::systems::movement;
 use crate::systems::npc::NpcId;
 use crate::systems::script::{self, Condition, OwnerRow, Reach, RiftScripts, ScriptModule};
 use blueprint::FlattenAt;
-use scene::{SCENE_PARTS, scene_file};
+use scene::{GroundLayer, SCENE_PARTS, SceneGrids, scene_file};
 
 pub type AreaId = ContentId<AreaDef>;
 
@@ -108,6 +108,24 @@ impl ContentFile for AreaDef {
     const TABLE: &'static str = "area";
     const SHAPE: Shape = Shape::Bundle;
 
+    fn fresh(near: &Nearby) -> Result<AreaDef, String> {
+        let ground = SceneNode::GroundLayer(GroundLayer::named(GroundLayer::FIRST));
+        Ok(AreaDef {
+            name: near.name(),
+            blueprint: BlueprintDef {
+                map: Tilemap::fresh(MapSize {
+                    width: 16,
+                    height: 12,
+                }),
+                variables: BTreeMap::new(),
+                scene: Scene {
+                    nodes: vec![ground],
+                    grids: SceneGrids::default(),
+                },
+            },
+        })
+    }
+
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);
         self.blueprint.map.check("/blueprint/map", MIN_SIDE, cx);
@@ -165,6 +183,10 @@ pub struct Tilemap {
 }
 
 impl Tilemap {
+    pub fn fresh(size: MapSize) -> Tilemap {
+        Tilemap { size, tile: 16 }
+    }
+
     pub(super) fn check(&self, pointer: &str, min_side: u32, cx: &mut RowCheck) {
         cx.range(
             format!("{pointer}/size/width"),

@@ -1,9 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::paint;
+use ui::panel;
+use ui::theme;
+use ui::words;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, Sense, Ui, Vec2};
 use engine::core::content::{ContentFile, name_of};
 use engine::core::script::Variable;
 use engine::core::tiling::TilePos;
@@ -13,6 +17,9 @@ use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{AreaModule, AreaModuleKind, Pictured};
 use engine::systems::script::RiftScripting;
 use strum::VariantArray;
+use ui::controls;
+use ui::egui::{Align, Layout, Sense, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::grid::GridDraft;
 use super::nodes::SceneBundle;
@@ -22,11 +29,12 @@ use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::{self, FormCx};
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
+use crate::shell::tree::{self, DropAt, TreeSource, TreeState};
+use crate::shell::widgets::{self, KindMark};
+use crate::shell::{breadcrumb, content_tree, row_form};
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::tree::{self, DropAt, TreeSource, TreeState};
-use crate::ui::widgets::{self, KindMark};
-use crate::ui::{breadcrumb, content_tree, row_form, theme};
 use crate::views;
+use ui::input::{self, InputField};
 
 /// The left panel's own state between frames: the scene graph's tree, its filter, and what was
 /// cut from it.
@@ -96,7 +104,7 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
     let mut renamed = None;
     let mut variables_changed = None;
     let mut actions = Vec::new();
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             let mark = if folded {
@@ -137,28 +145,22 @@ fn boxes(editor: &mut Editor, ui: &mut Ui, snapshot: &AreaSnapshot) {
         }
         ui.add_space(4.0);
         if let SceneBundle::Area(held) = &def {
-            widgets::kv(ui, "name", |ui| {
+            form::kv(ui, "name", |ui| {
                 let id = ui.id().with(("area-name", &bundle));
-                renamed = forms::drafted(ui, id, &held.name, |ui, draft| {
-                    forms::boxed_input(ui, None, |ui| {
-                        ui.add(
-                            egui::TextEdit::singleline(draft)
-                                .frame(egui::Frame::NONE)
-                                .desired_width(f32::INFINITY),
-                        )
-                    })
+                renamed = input::drafted(ui, id, &held.name, |ui, draft| {
+                    InputField::new(draft).show(ui)
                 });
             });
             ui.add_space(2.0);
             ui.label(theme::faint("BLUEPRINT").size(10.5));
         }
-        widgets::kv(ui, "size", |ui| {
-            forms::boxed_input(ui, Some("tiles"), |ui| {
-                ui.label(theme::mono(format!("{} × {}", size.width, size.height)))
+        form::kv(ui, "size", |ui| {
+            input::boxed(ui, Some("tiles"), |ui| {
+                ui.label(format!("{} × {}", size.width, size.height))
             });
         });
-        widgets::kv(ui, "tile", |ui| {
-            forms::boxed_input(ui, Some("px"), |ui| ui.label(theme::mono(tile.to_string())));
+        form::kv(ui, "tile", |ui| {
+            input::boxed(ui, Some("px"), |ui| ui.label(tile.to_string()));
         });
         if let SceneBundle::Blueprint(blueprint) = &def {
             variables_changed = variables(editor, ui, &bundle, blueprint, &mut actions);
@@ -240,14 +242,14 @@ fn variables(
     let mut cx = FormCx::new(project, root, shapes, form, actions)
         .editing(BlueprintDef::TABLE, Some(bundle));
     ui.add_space(2.0);
-    widgets::kv(ui, "variables", |ui| {
+    form::kv(ui, "variables", |ui| {
         if blueprint.variables.is_empty() {
             ui.label(theme::muted("none").size(12.5));
         }
     });
     for (name, (set, of)) in &placements {
         if blueprint.variables.contains_key(name) {
-            widgets::hint(ui, &format!("{name}: set by {set} of {of} placements"));
+            form::hint(ui, &format!("{name}: set by {set} of {of} placements"));
         }
     }
     let path = field!(BlueprintDef, variables);
@@ -308,16 +310,16 @@ fn header(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSnaps
     let mut action = None;
     let mut add = None;
     ui.horizontal(|ui| {
-        ui.label(widgets::section_heading(&format!("Scene · {count}")));
+        ui.label(form::section_heading(&format!("Scene · {count}")));
         if let Some(said) = &flagged
-            && widgets::chip(ui, said)
+            && chip::plain(ui, said)
                 .on_hover_text("Opens the tree to the first one")
                 .clicked()
         {
             action = Some(HeaderAction::FirstFlagged);
         }
         if selected > 1 {
-            widgets::chip(ui, format!("{selected} selected"));
+            chip::plain(ui, format!("{selected} selected"));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
@@ -427,11 +429,11 @@ fn filter_row(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let ((), changed) = tree::filter_row(
         ui,
         |ui| {
-            let response = widgets::search_box(
+            let response = input::search(
                 ui,
                 &mut panel.filter,
                 "Filter the scene",
-                Some(EditorKey::FilterScene),
+                Some(&EditorKey::FilterScene.name()),
             );
             if std::mem::take(&mut panel.focus_filter) {
                 response.request_focus();
@@ -474,17 +476,17 @@ fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSna
     if selected {
         painter.rect_filled(rect, 3.0, theme::SELECTION);
     } else if response.hovered() {
-        painter.rect_filled(rect, 3.0, theme::ACCENT_SOFT);
+        paint::row_wash(painter, rect);
     }
     let badge =
         egui::Rect::from_center_size(rect.left_center() + Vec2::new(12.0, 0.0), Vec2::splat(14.0));
-    painter.rect_filled(badge, 3.0, theme::badge_color("walk"));
+    painter.rect_filled(badge, 3.0, widgets::badge_color("walk"));
     painter.text(
         badge.center(),
         egui::Align2::CENTER_CENTER,
         "W",
         egui::FontId::monospace(10.0),
-        design_tokens::ink::CREAM,
+        ui::ink::CREAM,
     );
     painter.text(
         rect.left_center() + Vec2::new(26.0, 0.0),
@@ -922,7 +924,7 @@ fn act(editor: &mut Editor, view_key: &str, snapshot: &AreaSnapshot, action: Sce
             editor.views.area.view_mut(view_key).scene.cut = ids;
             editor.toast(format!(
                 "Cut {count} row{}; {} moves {} into the selected folder",
-                widgets::plural(count),
+                words::plural(count),
                 EditorKey::Paste.name(),
                 if count == 1 { "it" } else { "them" }
             ));

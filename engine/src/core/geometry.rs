@@ -34,10 +34,28 @@ impl Radians {
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Shape {
-    Circle { radius: Tiles },
-    Rect { width: Tiles, height: Tiles },
-    Cone { angle: Degrees, length: Tiles },
-    Line { length: Tiles, width: Tiles },
+    Circle {
+        #[schemars(extend("default" = 2.0))]
+        radius: Tiles,
+    },
+    Rect {
+        #[schemars(extend("default" = 3.0))]
+        width: Tiles,
+        #[schemars(extend("default" = 3.0))]
+        height: Tiles,
+    },
+    Cone {
+        #[schemars(extend("default" = 60.0))]
+        angle: Degrees,
+        #[schemars(extend("default" = 3.0))]
+        length: Tiles,
+    },
+    Line {
+        #[schemars(extend("default" = 4.0))]
+        length: Tiles,
+        #[schemars(extend("default" = 1.0))]
+        width: Tiles,
+    },
 }
 
 impl Shape {

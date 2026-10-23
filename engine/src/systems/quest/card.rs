@@ -1,10 +1,10 @@
 use bevy::prelude::*;
-use design_tokens::card::{self, Art, Card, CardResponse};
-use design_tokens::controls::{self, Pill};
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::{self, Kind, Mark};
-use design_tokens::ink;
-use egui::{Align, Label, Layout, Margin, Response, Sense, Stroke, Ui, Vec2};
+use ui::card::{self, Art, Card, CardResponse};
+use ui::controls::{self, Pill};
+use ui::egui::{Align, Label, Layout, Response, Sense, Ui};
+use ui::face::{self, TextRole};
+use ui::glyph::{self, Kind, Mark};
+use ui::ink;
 
 use super::{
     ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
@@ -412,22 +412,10 @@ fn item_chip(
     content: &Content,
     stack: ItemStack,
 ) -> Response {
-    egui::Frame::new()
-        .fill(ink::white_wash(0.25))
-        .stroke(Stroke::new(1.0, ink::ink_wash(0.35)))
-        .corner_radius(controls::PILL_HEIGHT / 2.0)
-        .inner_margin(Margin::symmetric(8, 1))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-                hud::icon(ui, images, &stack.item.get(content).icon, CHIP_ICON);
-                ui.label(
-                    face::bold(counted(content, stack))
-                        .size(12.0)
-                        .color(ink::GOLD),
-                );
-            });
-        })
-        .response
-        .interact(Sense::click())
+    controls::pill_with(ui, Pill::Gold, |ui| {
+        hud::icon(ui, images, &stack.item.get(content).icon, CHIP_ICON);
+        ui.label(counted(content, stack));
+    })
+    .response
+    .interact(Sense::click())
 }

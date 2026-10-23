@@ -1,8 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use ui::controls;
+use ui::drag;
+use ui::egui;
+use ui::paint;
+use ui::theme;
+use ui::words;
 
-use design_tokens::{glyph, ink};
-use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use engine::core::assets::{AssetKind, ImageRef};
 use engine::core::content::ContentFile;
 use engine::systems::class::{
@@ -11,13 +15,14 @@ use engine::systems::class::{
 };
 use engine::systems::skill::{Rank, SkillDef};
 use strum::VariantArray;
+use ui::egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::{glyph, ink};
 
 use super::{edit, node_of, select_node, write};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::Project;
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
 use crate::{picker, rows, thumbs, views};
 
 pub const NODE_RADIUS: f32 = 24.0;
@@ -179,7 +184,7 @@ fn toolbar(
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let line = format!(
                         "levels grant {granted} point{} · the tree costs {cost}",
-                        widgets::plural(granted)
+                        words::plural(granted)
                     );
                     if granted > cost && cost > 0 {
                         ui.label(theme::warn(format!(
@@ -238,7 +243,7 @@ fn backdrop_bar(
                 picker::asset_of(ui, cx, AssetKind::Image, &mut image, "/backdrop/image");
             });
             if backdrop.is_some() {
-                widgets::combo(ui.id().with("backdrop-fit"))
+                controls::combo(ui.id().with("backdrop-fit"))
                     .selected_text(<&str>::from(fit))
                     .show_ui(ui, |ui| {
                         for &option in BackdropFit::VARIANTS {
@@ -383,7 +388,7 @@ fn canvas(
                     editor.views.class.frame_drag = Some(FrameDrag { now, ..*drag });
                 }
             }
-            dots(&painter, rect, origin);
+            paint::dot_grid(&painter, rect, origin, GRID, ui::ink::ink_wash(0.25));
             if background.clicked() {
                 clicked = Some(None);
             }
@@ -528,7 +533,7 @@ fn canvas(
                         offset: pointer - center,
                         at,
                     });
-                    egui::DragAndDrop::set_payload(ui.ctx(), CarriedNode(node_key.clone()));
+                    drag::carry(ui.ctx(), CarriedNode(node_key.clone()));
                 }
             }
             if let Some(drag) = editor.views.class.drag.as_mut() {
@@ -795,18 +800,5 @@ fn canvas_rect(rect: Rect) -> CanvasRect {
         y: rect.min.y,
         width: rect.width(),
         height: rect.height(),
-    }
-}
-
-fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {
-    let color = design_tokens::ink::ink_wash(0.25);
-    let mut x = origin.x - ((origin.x - rect.min.x) / GRID).floor() * GRID;
-    while x <= rect.max.x {
-        let mut y = origin.y - ((origin.y - rect.min.y) / GRID).floor() * GRID;
-        while y <= rect.max.y {
-            painter.circle_filled(Pos2::new(x, y), 1.0, color);
-            y += GRID;
-        }
-        x += GRID;
     }
 }

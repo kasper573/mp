@@ -1,11 +1,8 @@
 //! What stands for a file wherever the editor lists one: a picture of what it holds when it has
 //! one, or else the icon of its kind.
 
-use design_tokens::glyph::{Icon, Mark, phosphor};
-use design_tokens::ink;
-use egui::{Color32, Painter, Rect, TextureId, Vec2};
 use engine::core::assets::{AssetKind, ImageRef};
-use engine::core::audio::playback::{SfxDef, SfxRoleDef};
+use engine::core::audio::playback::SfxDef;
 use engine::core::babble::{BabbleBankDef, BabbleDef};
 use engine::core::content::{ContentFile, SETTINGS_FILE, table_of};
 use engine::core::vfx::VfxDef;
@@ -30,11 +27,16 @@ use engine::systems::script::ScriptDef;
 use engine::systems::shop::ShopDef;
 use engine::systems::skill::SkillDef;
 use engine::systems::status::StatusEffectDef;
+use ui::egui;
+use ui::egui::{Color32, Painter, Rect, TextureId, Vec2};
+use ui::glyph::{Icon, Mark, phosphor};
+use ui::ink;
+use ui::theme;
 
 use crate::project::files::FolderIndex;
 use crate::project::{Project, ProjectFiles};
 use crate::thumbs::{self, Thumbnails};
-use crate::ui::theme;
+
 use crate::views::model::{self, ModelStrip};
 
 /// The largest picture, in pixels each way, that still reads as an icon; a bigger one leaves its
@@ -165,9 +167,7 @@ impl KindFamily {
             QuestDef::TABLE | MemoryDef::TABLE | NotificationDef::TABLE | ScriptDef::TABLE => {
                 KindFamily::Story
             }
-            SfxDef::TABLE | SfxRoleDef::TABLE | BabbleDef::TABLE | BabbleBankDef::TABLE => {
-                KindFamily::Sound
-            }
+            SfxDef::TABLE | BabbleDef::TABLE | BabbleBankDef::TABLE => KindFamily::Sound,
             InputDef::TABLE | CursorDef::TABLE | InterfaceIconDef::TABLE | AttentionDef::TABLE => {
                 KindFamily::Interface
             }
@@ -177,13 +177,13 @@ impl KindFamily {
 
     pub fn color(self) -> Color32 {
         match self {
-            KindFamily::World => theme::FAMILY_WORLD,
-            KindFamily::Characters => theme::FAMILY_CHARACTERS,
-            KindFamily::Items => theme::FAMILY_ITEMS,
-            KindFamily::Abilities => theme::FAMILY_ABILITIES,
-            KindFamily::Story => theme::FAMILY_STORY,
-            KindFamily::Sound => theme::FAMILY_SOUND,
-            KindFamily::Interface => theme::FAMILY_INTERFACE,
+            KindFamily::World => Color32::from_rgb(0x2F, 0x62, 0xB0),
+            KindFamily::Characters => Color32::from_rgb(0x2F, 0x8A, 0x52),
+            KindFamily::Items => Color32::from_rgb(0xC0, 0x8A, 0x12),
+            KindFamily::Abilities => Color32::from_rgb(0x8A, 0x44, 0xB0),
+            KindFamily::Story => Color32::from_rgb(0xB3, 0x40, 0x2A),
+            KindFamily::Sound => Color32::from_rgb(0x1F, 0x80, 0x88),
+            KindFamily::Interface => Color32::from_rgb(0x5C, 0x68, 0x78),
         }
     }
 }
@@ -214,7 +214,6 @@ pub fn of_table(table: &str) -> KindIcon {
         InterfaceIconDef::TABLE => KindIcon::plain(phosphor::APP_WINDOW),
         AttentionDef::TABLE => KindIcon::plain(phosphor::SEAL_WARNING),
         SfxDef::TABLE => KindIcon::plain(phosphor::SPEAKER_HIGH),
-        SfxRoleDef::TABLE => KindIcon::badged(phosphor::SPEAKER_HIGH, phosphor::TAG),
         BabbleDef::TABLE => KindIcon::plain(phosphor::WAVEFORM),
         BabbleBankDef::TABLE => KindIcon::plain(phosphor::CHATS),
         VfxDef::TABLE => KindIcon::plain(phosphor::SPARKLE),

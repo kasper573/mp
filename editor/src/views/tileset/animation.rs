@@ -1,20 +1,28 @@
 use std::collections::BTreeSet;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::paint;
+use ui::panel;
+use ui::theme;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
 use engine::systems::actor::Action;
 use engine::systems::actor::model::SheetFrame;
 use engine::systems::area::tileset::{MAX_TILE_FRAME_MS, MAX_TILE_FRAMES, TileFrame};
 use strum::{IntoStaticStr, VariantArray};
+use ui::egui::{Color32, Pos2, Rect as ERect, Sense, Stroke, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;
-use crate::forms;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::tabs::shown_path;
-use crate::ui::{patterns, theme, widgets};
 use crate::views::model::{self, preview};
+use ui::input::InputField;
+use ui::words;
 
 const PREVIEW_W: f32 = 224.0;
 
@@ -111,7 +119,7 @@ pub fn legend(ui: &mut Ui) {
             .rect_filled(swatch.shrink(4.0), 1.0, Color32::WHITE);
         ui.label(theme::muted("animated"));
         let (swatch, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
-        widgets::dashed_rect(
+        paint::dashed_rect(
             ui.painter(),
             swatch,
             Stroke::new(1.0, theme::SELECTION),
@@ -162,10 +170,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             let label = if index == 0 {
                 format!("frame +0 · {} tiles", common.tiles.len())
             } else {
-                widgets::dashed_rect(&painter, rect, Stroke::new(1.5, theme::SELECTION), 6.0, 4.0);
-                format!("frame {}", signed(frame.offset))
+                paint::dashed_rect(&painter, rect, Stroke::new(1.5, theme::SELECTION), 6.0, 4.0);
+                format!("frame {}", words::signed(frame.offset as f64))
             };
-            widgets::floating_chip(
+            chip::floating(
                 &painter,
                 Pos2::new(rect.center().x, rect.max.y + 3.0),
                 egui::Align2::CENTER_TOP,
@@ -190,7 +198,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
 pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let key = tileset.key.as_str();
     let Some(selection) = editor.views.tileset.view(key).selection else {
-        widgets::hint(ui, "Drag over tiles to select them.");
+        form::hint(ui, "Drag over tiles to select them.");
         return;
     };
     ui.label(
@@ -212,28 +220,28 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mut add = false;
     let mut typed_ms = None;
     let mut fix_odd = None;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "animation");
+        panel::title(ui, "animation");
         ui.add_space(4.0);
-        widgets::kv(ui, "frames", |ui| {
+        form::kv(ui, "frames", |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             for (index, each) in common.frames.iter().enumerate() {
                 let text = offset_text(each.offset, unit, columns);
-                if widgets::mode_chip(ui, &text, frame == Some(index)).clicked() {
+                if chip::mode(ui, &text, frame == Some(index)).clicked() {
                     picked_frame = Some(index);
                 }
             }
             if common.frames.len() < MAX_TILE_FRAMES
-                && widgets::chip(ui, Mark::Plus.text(12.0))
+                && chip::plain(ui, Mark::Plus.text(12.0))
                     .on_hover_text("another frame, one step further")
                     .clicked()
             {
                 add = true;
             }
         });
-        widgets::kv(ui, "offset by", |ui| {
-            widgets::combo(("offset-unit", key))
+        form::kv(ui, "offset by", |ui| {
+            controls::combo(("offset-unit", key))
                 .selected_text(<&str>::from(unit))
                 .width(140.0)
                 .show_ui(ui, |ui| {
@@ -249,22 +257,15 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         } else {
             "each"
         };
-        widgets::kv(ui, label, |ui| {
+        form::kv(ui, label, |ui| {
             let current = match frame {
                 Some(index) => common.frames[index].ms.to_string(),
                 None if same => first.to_string(),
                 None => String::new(),
             };
             let id = ui.id().with(("each-ms", key));
-            let typed = forms::drafted(ui, id, &current, |ui, draft| {
-                forms::boxed_input(ui, Some("ms"), |ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(draft)
-                            .desired_width(70.0)
-                            .font(egui::TextStyle::Monospace)
-                            .hint_text("mixed"),
-                    )
-                })
+            let typed = input::drafted(ui, id, &current, |ui, draft| {
+                InputField::new(draft).unit("ms").hint("mixed").show(ui)
             });
             if let Some(typed) = typed
                 && typed.trim() != current
@@ -274,7 +275,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 typed_ms = Some(ms);
             }
         });
-        widgets::kv_text(ui, "plays", "loops, as every tile animation");
+        form::kv_text(ui, "plays", "loops, as every tile animation");
     });
     if let Some(odd) = common.odd.first() {
         ui.add_space(6.0);
@@ -286,7 +287,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     "Tile {} has {} frames, +0 to {}; the other {} have {}.",
                     odd.tile,
                     odd.frames.len(),
-                    signed(last),
+                    words::signed(last as f64),
                     common.tiles.len(),
                     common.frames.len()
                 ))
@@ -304,14 +305,14 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             fix_odd = Some(odd.tile);
         }
         if common.odd.len() > 1 {
-            widgets::hint(
+            form::hint(
                 ui,
                 &format!("… and {} more out of step", common.odd.len() - 1),
             );
         }
     }
     if !common.still.is_empty() {
-        widgets::hint(
+        form::hint(
             ui,
             &format!(
                 "{} of the selected tiles do not animate.",
@@ -340,7 +341,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         });
         let label = format!(
             "Add frame {} to {tiles} animated tiles of {key}",
-            signed(last.offset + step)
+            words::signed((last.offset + step) as f64)
         );
         animate(editor, key, &common.tiles, &frames, ContentEdit::new(label));
     }
@@ -351,7 +352,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 frames[index].ms = ms;
                 format!(
                     "Frame {} lasts {ms} ms on {tiles} tiles of {key}",
-                    signed(frames[index].offset)
+                    words::signed(frames[index].offset as f64)
                 )
             }
             None => {
@@ -380,12 +381,12 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let key = tileset.key.as_str();
     let Some(selection) = editor.views.tileset.view(key).selection else {
         ui.add_space(8.0);
-        widgets::hint(ui, "Select animated tiles to see their frames here.");
+        form::hint(ui, "Select animated tiles to see their frames here.");
         return;
     };
     let Some(common) = CommonAnimation::of(tileset, selection) else {
         ui.add_space(8.0);
-        widgets::hint(ui, "None of the selected tiles animates.");
+        form::hint(ui, "None of the selected tiles animates.");
         return;
     };
     let frame = editor.views.tileset.view(key).frame;
@@ -434,16 +435,12 @@ fn same_offsets(a: &[OffsetFrame], b: &[OffsetFrame]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.offset == b.offset)
 }
 
-fn signed(offset: i64) -> String {
-    format!("{offset:+}")
-}
-
 fn offset_text(offset: i64, unit: OffsetUnit, columns: i64) -> String {
     match unit {
         OffsetUnit::Rows if offset % columns == 0 => {
-            format!("{} rows", signed(offset / columns))
+            format!("{} rows", words::signed((offset / columns) as f64))
         }
-        OffsetUnit::Rows | OffsetUnit::Columns => signed(offset),
+        OffsetUnit::Rows | OffsetUnit::Columns => words::signed(offset as f64),
     }
 }
 
@@ -485,7 +482,7 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str, common: &CommonAnimation) {
         };
         let label = format!(
             "Retime frame {} of {} animated tiles of {key}",
-            signed(frames[index].offset),
+            words::signed(frames[index].offset as f64),
             common.tiles.len()
         );
         animate(
@@ -510,7 +507,7 @@ fn remove_frame(editor: &mut Editor, key: &str, common: &CommonAnimation, index:
     let removed = frames.remove(index);
     let label = format!(
         "Remove frame {} from {} animated tiles of {key}",
-        signed(removed.offset),
+        words::signed(removed.offset as f64),
         common.tiles.len()
     );
     if animate(editor, key, &common.tiles, &frames, ContentEdit::new(label)) {
@@ -534,11 +531,11 @@ fn animate(
 
 fn still_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, selection: SheetRect) {
     let mut animate_now = false;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "animation");
+        panel::title(ui, "animation");
         ui.add_space(4.0);
-        widgets::hint(ui, "None of these tiles animates yet.");
+        form::hint(ui, "None of these tiles animates yet.");
         animate_now = ui.button("+ Animate with a second frame").clicked();
     });
     if animate_now {
@@ -568,7 +565,7 @@ fn preview_block(
     selection: SheetRect,
     common: &CommonAnimation,
 ) {
-    widgets::section(ui, "Preview");
+    ui::sheet::section(ui, "Preview");
     let frames = reference_frames(Some(common));
     let view = editor.views.tileset.view_mut(&tileset.key);
     let index = preview::index_at(&frames, view.preview.position, false);
@@ -589,7 +586,7 @@ fn preview_block(
         if glyph::button(ui, mark, 14.0, theme::TEXT, word).clicked() {
             view.preview.playing = !view.preview.playing;
         }
-        widgets::chip(ui, format!("frame {} / {}", index + 1, frames.len()));
+        chip::plain(ui, format!("frame {} / {}", index + 1, frames.len()));
     });
 }
 
@@ -601,7 +598,7 @@ fn timeline_card(
     frame: OffsetFrame,
     on: bool,
 ) -> egui::Response {
-    let (response, painter) = patterns::card_slot(ui, Vec2::new(136.0, 132.0), on);
+    let (response, painter) = panel::card_slot(ui, Vec2::new(136.0, 132.0), on);
     let rect = response.rect;
     let art = ERect::from_min_max(
         rect.min + Vec2::new(8.0, 6.0),
@@ -619,7 +616,7 @@ fn timeline_card(
     painter.text(
         Pos2::new(rect.center().x, rect.max.y - 12.0),
         egui::Align2::CENTER_CENTER,
-        format!("{} · {} ms", signed(frame.offset), frame.ms),
+        format!("{} · {} ms", words::signed(frame.offset as f64), frame.ms),
         egui::FontId::monospace(12.0),
         theme::TEXT,
     );

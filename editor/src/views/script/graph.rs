@@ -1,29 +1,35 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use ui::egui;
+use ui::egui_snarl;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::Mark;
-use design_tokens::ink;
-use egui::emath::TSTransform;
-use egui::text::{LayoutJob, TextFormat};
-use egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
-use egui_snarl::ui::{
-    AnyPins, NodeLayout, PinInfo, PinPlacement, SnarlPin, SnarlStyle, SnarlViewer, SnarlWidget,
-    WireStyle,
-};
-use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 use engine::core::script::{Exit, NodeKind};
 use engine::systems::actor::model::Expression;
 use engine::systems::script::{Line, Node, Speaker};
 use engine::systems::text::{Span, plain};
 use serde::{Deserialize, Serialize};
+use ui::egui::emath::TSTransform;
+use ui::egui::text::{LayoutJob, TextFormat};
+use ui::egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
+use ui::egui_snarl::ui::{
+    AnyPins, NodeLayout, PinInfo, PinPlacement, SnarlPin, SnarlStyle, SnarlViewer, SnarlWidget,
+    WireStyle,
+};
+use ui::egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
+use ui::glyph::Mark;
+use ui::ink;
 
 use super::ScriptDoc;
 use super::nodes::{self, NodePort, NodeText, SummaryPiece, SummaryTone};
 use crate::keymap::EditorKey;
+use crate::shell::widgets;
 use crate::spans;
-use crate::ui::{theme, widgets};
 
 const COLUMN: f32 = 240.0;
 pub const CARD: f32 = 176.0;
+/// Where the graph's first node goes: a node placed nowhere else starts its column from here.
+pub const FIRST: Pos2 = Pos2::new(40.0, 40.0);
 const FACE: f32 = 20.0;
 const PAD: f32 = 10.0;
 const ROUNDING: f32 = 6.0;
@@ -156,7 +162,7 @@ impl ScriptGraph {
             if let Some(node) = nodes.get(name) {
                 let depth = depths.get(name).copied().unwrap_or(0);
                 let bottom = at.y + estimated_height(node, text) + 24.0;
-                let entry = next_y.entry(depth).or_insert(40.0);
+                let entry = next_y.entry(depth).or_insert(FIRST.y);
                 *entry = entry.max(bottom);
             }
         }
@@ -166,8 +172,8 @@ impl ScriptGraph {
                 continue;
             }
             let depth = depths.get(name).copied().unwrap_or(0);
-            let y = next_y.entry(depth).or_insert(40.0);
-            let x = 40.0 + depth as f32 * COLUMN;
+            let y = next_y.entry(depth).or_insert(FIRST.y);
+            let x = FIRST.x + depth as f32 * COLUMN;
             placed.push((name.clone(), Pos2::new(x, *y)));
             *y += estimated_height(node, text) + 24.0;
         }
@@ -339,7 +345,7 @@ impl ScriptGraphViewer<'_> {
                                     .push(ScriptGraphAction::AddLine(name.to_owned()));
                             }
                         } else {
-                            let text = widgets::clip(&spans::plain(&line.text), 64);
+                            let text = words::clip(&spans::plain(&line.text), 64);
                             let job = spans::layout_job(
                                 &[plain(text)],
                                 FontId::proportional(big(12.5)),
@@ -425,7 +431,7 @@ pub fn style() -> SnarlStyle {
     style.header_drag_space = Some(Vec2::new(0.0, 0.0));
     style.bg_pattern = Some(egui_snarl::ui::BackgroundPattern::NoPattern);
     style.select_stoke = Some(Stroke::new(1.0, theme::ACCENT));
-    style.select_fill = Some(theme::alpha(theme::ACCENT, 20));
+    style.select_fill = Some(ink::wash(theme::ACCENT, 0.08));
     style.min_scale = Some(MIN_ZOOM);
     style.max_scale = Some(MAX_ZOOM);
     style.crisp_magnified_text = Some(true);
@@ -459,7 +465,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
             let (mark, color) = kind_mark(&node);
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(big(14.0)), egui::Sense::hover());
             ui.painter()
-                .rect_filled(rect, big(3.0), theme::alpha(color, 70));
+                .rect_filled(rect, big(3.0), ink::wash(color, 0.27));
             mark.paint(ui.painter(), rect.shrink(big(3.0)), color);
             let title = card_title(&name, &node);
             ui.add(egui::Label::new(theme::strong(title).monospace().size(big(12.5))).truncate());
@@ -596,7 +602,7 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
         let name = &snarl[id].name;
         let mut frame = default;
         frame.fill = CARD_FILL;
-        frame.shadow = magnified_shadow(design_tokens::slip::SHADOW);
+        frame.shadow = magnified_shadow(ui::slip::SHADOW);
         frame.corner_radius = CornerRadius::same(big(ROUNDING) as u8);
         frame.inner_margin = card_margin();
         frame.stroke = if self.current == Some(name.as_str()) {
@@ -908,7 +914,7 @@ fn pieces_job(pieces: &[SummaryPiece], width: f32) -> LayoutJob {
             }
             SummaryTone::Var => {
                 let mut format = TextFormat::simple(FontId::monospace(big(11.0)), DIALOGUE);
-                format.background = theme::alpha(DIALOGUE, 30);
+                format.background = ink::wash(DIALOGUE, 0.12);
                 format
             }
         };

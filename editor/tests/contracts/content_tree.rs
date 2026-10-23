@@ -3,19 +3,22 @@ use editor::moves;
 use editor::project::MovedOutside;
 use editor::project::watch::FolderChange;
 use editor::rows::{self, UsageDecision};
-use editor::ui::content_tree;
-use editor::ui::tree::TreeRow;
+use editor::shell::tree::TreeRow;
+use editor::shell::{content_tree, dialogs};
+use editor::tabs::EditorTab;
 use editor::user::{TreeView, UserFolder};
 use editor::views::area::{self as area_view, pins};
 use engine::core::content::Fixture;
 use engine::core::content::{FIXTURES_DIR, parent_of, table_of};
 use engine::systems::area::AreaDef;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::systems::npc::NpcDef;
 use engine::systems::registry;
 use serde_json::json;
 use testkit::{Game, path, png};
+use ui::egui;
 
-use crate::support::{self, Drawn, Frames, area, click};
+use crate::support::{self, Drawn, Frames, area, click, key};
 
 /// A game with an orc living in the start, a pew blueprint and its tileset, a note, and an icon
 /// kept in a folder of its own.
@@ -177,40 +180,49 @@ fn show_narrows_the_tree_to_the_kinds_ticked_and_can_drop_folders_left_empty() {
 
 #[test]
 fn a_missing_fixture_shows_where_it_belongs_and_making_it_writes_its_default() {
-    let fixture = registry()
-        .fixture_paths()
-        .find(|path| table_of(path) == Some("sfx"))
-        .expect("an sfx fixture")
-        .to_owned();
-    let mut game = camp();
-    for part in ["config.json", "clip.wav", "clip.ogg"] {
-        let file = format!("{fixture}/{part}");
-        if game.folder().files.contains_key(&file) {
-            game = game.remove(&file);
-        }
-    }
-    let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = support::open_as_is(game, &scratch);
-
-    let listed = content_tree::listed(&editor, parent_of(&fixture));
-    let (_, row) = listed
-        .iter()
-        .find(|(path, _)| *path == fixture)
-        .expect("a placeholder where the fixture belongs");
-    assert!(row.dim);
-    assert!(row.problem.is_some());
-
-    rows::make_fixture(&mut editor, &fixture).expect("made");
-    assert!(
-        support::settled(&mut editor)
+    let mut tables: Vec<&str> = registry().fixture_paths().filter_map(table_of).collect();
+    tables.dedup();
+    for table in tables {
+        let fixture = registry()
+            .fixture_paths()
+            .find(|path| table_of(path) == Some(table))
+            .expect("a fixture")
+            .to_owned();
+        let game = camp();
+        let inside = format!("{fixture}/");
+        let gone: Vec<String> = game
+            .folder()
             .files
-            .index()
-            .is_content(&fixture)
-    );
+            .keys()
+            .filter(|file| **file == fixture || file.starts_with(&inside))
+            .cloned()
+            .collect();
+        let game = gone.iter().fold(game, |game, file| game.remove(file));
+        let scratch = tempfile::tempdir().expect("scratch");
+        let mut editor = support::open_as_is(game, &scratch);
+
+        let listed = content_tree::listed(&editor, parent_of(&fixture));
+        let (_, row) = listed
+            .iter()
+            .find(|(path, _)| *path == fixture)
+            .expect("a placeholder where the fixture belongs");
+        assert!(row.dim, "{fixture}");
+        assert!(row.problem.is_some(), "{fixture}");
+
+        rows::make_fixture(&mut editor, &fixture).expect("made");
+        assert!(
+            support::settled(&mut editor)
+                .files
+                .index()
+                .is_content(&fixture),
+            "{fixture}"
+        );
+    }
 }
 
 #[test]
-fn new_makes_the_type_at_once_numbered_past_a_taken_name_with_its_name_up_for_typing() {
+fn new_makes_the_type_at_once_numbered_past_a_taken_name_with_its_name_up_for_typing_and_named_in_its_step()
+ {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = support::open(camp(), &scratch);
 
@@ -221,8 +233,68 @@ fn new_makes_the_type_at_once_numbered_past_a_taken_name_with_its_name_up_for_ty
     assert!(support::files(&mut editor).contains("icons/npc.npc.json"));
     assert!(support::files(&mut editor).contains(made));
     assert_eq!(editor.content_tree.tree.renaming(), Some(made));
+    rows::rename(&mut editor, made, "frost_wolf").expect("named");
+    let wolf = "icons/frost_wolf.npc.json";
+    let named = editor.read::<NpcDef>(wolf).expect("a project");
+    assert_eq!(named.expect("an npc").name, "Frost wolf");
     editor.undo();
+    assert!(!support::files(&mut editor).contains(wolf));
     assert!(!support::files(&mut editor).contains(made));
+    assert!(support::files(&mut editor).contains("icons/npc.npc.json"));
+
+    content_tree::new_file(&mut editor, "icons", "skill");
+    rows::rename(&mut editor, "icons/skill.skill.json", "lunge").expect("named");
+    let files = support::files(&mut editor);
+    assert!(files.contains("icons/lunge.skill.json"));
+    assert!(files.contains("icons/lunge_used.script.json"));
+    assert!(!files.contains("icons/skill_used.script.json"));
+}
+
+#[test]
+fn a_file_may_share_its_name_with_a_file_of_another_kind_beside_it_but_not_of_its_own() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+
+    content_tree::new_file(&mut editor, "icons", "npc");
+    rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect("an npc beside cap.png");
+    content_tree::new_file(&mut editor, "icons", "npc");
+    let refused = rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect_err("taken");
+
+    assert!(refused.contains("cap.npc.json"), "{refused}");
+    assert!(support::files(&mut editor).contains("icons/cap.npc.json"));
+}
+
+#[test]
+fn a_name_refused_as_a_file_is_made_stays_in_its_edit_box_to_be_put_right() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+    content_tree::new_file(&mut editor, "icons", "npc");
+    rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect("an npc beside cap.png");
+    content_tree::new_file(&mut editor, "icons", "npc");
+    let mut frames = Frames::new(egui::vec2(300.0, 900.0));
+    let mut tree = |editor: &mut Editor, events: Vec<egui::Event>| {
+        frames.run(events, |ui| content_tree::show(editor, ui))
+    };
+    tree(&mut editor, Vec::new());
+    tree(&mut editor, Vec::new());
+
+    for events in [
+        key(egui::Key::A, egui::Modifiers::COMMAND),
+        vec![
+            egui::Event::ModifiersChanged(egui::Modifiers::NONE),
+            egui::Event::Text("cap".to_owned()),
+        ],
+        key(egui::Key::Enter, egui::Modifiers::NONE),
+        Vec::new(),
+    ] {
+        tree(&mut editor, events);
+    }
+
+    assert_eq!(
+        editor.content_tree.tree.renaming(),
+        Some("icons/npc.npc.json")
+    );
+    assert!(tree(&mut editor, Vec::new()).any(|text| text == "cap"));
     assert!(support::files(&mut editor).contains("icons/npc.npc.json"));
 }
 
@@ -418,6 +490,40 @@ fn deleting_a_file_refuses_to_point_what_named_it_where_the_game_would_refuse_it
 }
 
 #[test]
+fn new_of_any_type_is_typed_for_walked_to_by_arrows_and_made_by_enter() {
+    for (typed, downs, made) in [
+        ("test_char", 0, "test_character"),
+        ("babble", 1, "babble_bank"),
+    ] {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let mut editor = support::open(camp(), &scratch);
+        let before = support::files(&mut editor).paths_of(made).len();
+        let mut frames = Frames::new(egui::vec2(1600.0, 1000.0));
+        content_tree::new_of_type_dialog(&mut editor, String::new());
+        let mut presses = vec![Vec::new(), vec![egui::Event::Text(typed.to_owned())]];
+        presses
+            .extend((0..downs).map(|_| support::key(egui::Key::ArrowDown, egui::Modifiers::NONE)));
+        presses.push(support::key(egui::Key::Enter, egui::Modifiers::NONE));
+
+        for events in presses {
+            frames.run(events, |ui| dialogs::show(&mut editor, ui.ctx()));
+        }
+
+        let after = support::files(&mut editor).paths_of(made).len();
+        assert_eq!(
+            after,
+            before + 1,
+            "{typed}: {:?}",
+            support::files(&mut editor)
+                .paths()
+                .filter(|p| !p.starts_with("fixtures"))
+                .collect::<Vec<_>>()
+        );
+        assert!(editor.dialogs.is_empty(), "{typed}");
+    }
+}
+
+#[test]
 fn a_fixture_never_moves() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = support::open(camp(), &scratch);
@@ -542,6 +648,187 @@ fn a_click_anywhere_on_a_folder_row_opens_or_closes_it_once() {
             view(&mut editor).open.contains("icons"),
             was_open,
             "a click at x {x} toggles the folder once"
+        );
+    }
+}
+
+#[test]
+fn a_file_of_any_kind_opens_its_types_table_from_its_menu() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+    let mut frames = Frames::new(egui::vec2(TREE_WIDTH, 600.0));
+    frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui));
+    for (row, table) in [("orc.npc", "npc"), ("wood.tileset", "tileset")] {
+        editor.open_tabs.clear();
+        let at = frames
+            .run(Vec::new(), |ui| content_tree::show(&mut editor, ui))
+            .at(row);
+        let press = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        for events in [
+            vec![egui::Event::PointerMoved(at)],
+            vec![press(true)],
+            vec![press(false)],
+        ] {
+            frames.run(events, |ui| content_tree::show(&mut editor, ui));
+        }
+        let item = frames
+            .run(Vec::new(), |ui| content_tree::show(&mut editor, ui))
+            .at(&format!("Open the {table} table"));
+
+        for events in click(item) {
+            frames.run(events, |ui| content_tree::show(&mut editor, ui));
+        }
+
+        assert!(
+            editor.open_tabs.iter().any(|(tab, _)| *tab
+                == EditorTab::Spreadsheet {
+                    table: table.to_owned()
+                }),
+            "{row}'s menu opens the {table} table"
+        );
+    }
+}
+
+#[test]
+fn a_tree_taller_than_its_panel_still_has_empty_space_below_its_rows_for_its_menu() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+    view(&mut editor).open.insert("icons".to_owned());
+    let height = 120.0;
+    let mut frames = Frames::new(egui::vec2(TREE_WIDTH, height));
+    frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui));
+    let middle = egui::pos2(TREE_WIDTH / 2.0, height / 2.0);
+    for _ in 0..10 {
+        let wheel = vec![
+            egui::Event::PointerMoved(middle),
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -400.0),
+                modifiers: egui::Modifiers::NONE,
+                phase: egui::TouchPhase::Move,
+            },
+        ];
+        frames.run(wheel, |ui| content_tree::show(&mut editor, ui));
+    }
+
+    let bottom = egui::pos2(TREE_WIDTH / 2.0, height - 4.0);
+    let press = |pressed| egui::Event::PointerButton {
+        pos: bottom,
+        button: egui::PointerButton::Secondary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    for events in [
+        vec![egui::Event::PointerMoved(bottom)],
+        vec![press(true)],
+        vec![press(false)],
+    ] {
+        frames.run(events, |ui| content_tree::show(&mut editor, ui));
+    }
+
+    let menu = frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui));
+    assert!(menu.any(|text| text == "Close all"), "{menu:?}");
+}
+
+#[test]
+fn a_row_renamed_in_its_edit_box_is_scrolled_to_wherever_its_new_name_sorts_it() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = (0..10).fold(camp(), |game, n| {
+        game.asset(&format!("icons/f{n}/cap.png"), png(16, 16))
+    });
+    let mut editor = support::open(game, &scratch);
+    let height = 160.0;
+    let mut frames = Frames::new(egui::vec2(TREE_WIDTH, height));
+    let made = rows::new_folder(&mut editor, "icons").expect("a new folder");
+    content_tree::begin_rename(&mut editor, &made);
+    let settle = |editor: &mut Editor, frames: &mut Frames| {
+        (0..20)
+            .map(|_| frames.run(Vec::new(), |ui| content_tree::show(editor, ui)))
+            .last()
+            .expect("a frame")
+    };
+    settle(&mut editor, &mut frames);
+
+    for events in [
+        key(egui::Key::A, egui::Modifiers::COMMAND),
+        vec![
+            egui::Event::ModifiersChanged(egui::Modifiers::NONE),
+            egui::Event::Text("a".to_owned()),
+        ],
+        key(egui::Key::Enter, egui::Modifiers::NONE),
+    ] {
+        frames.run(events, |ui| content_tree::show(&mut editor, ui));
+    }
+
+    let drawn = settle(&mut editor, &mut frames);
+    let row = drawn.rect("a").expect("the renamed folder drawn");
+    assert!(row.min.y >= 0.0 && row.max.y <= height, "{row:?} {drawn:?}");
+}
+
+#[test]
+fn a_tree_that_shrinks_shows_its_first_rows_however_far_down_it_was_scrolled() {
+    for search in [true, false] {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let game = (0..10).fold(camp(), |game, n| {
+            game.asset(&format!("icons/f{n}/cap.png"), png(16, 16))
+        });
+        let mut editor = support::open(game, &scratch);
+        let rows_closed = content_tree::listed(&editor, "").len() as f32;
+        let height = (rows_closed + 12.0) * 31.0;
+        view(&mut editor).open.insert("icons".to_owned());
+        let mut frames = Frames::new(egui::vec2(TREE_WIDTH, height));
+        frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui));
+        let middle = egui::pos2(TREE_WIDTH / 2.0, height / 2.0);
+        for _ in 0..10 {
+            let wheel = vec![
+                egui::Event::PointerMoved(middle),
+                egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Point,
+                    delta: egui::vec2(0.0, -400.0),
+                    modifiers: egui::Modifiers::NONE,
+                    phase: egui::TouchPhase::Move,
+                },
+            ];
+            frames.run(wheel, |ui| content_tree::show(&mut editor, ui));
+        }
+        for _ in 0..20 {
+            frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui));
+        }
+
+        if search {
+            editor.content_tree.search = "f9".to_owned();
+        } else {
+            editor
+                .content_tree
+                .tree
+                .set_open(vec!["icons".to_owned()], false);
+            view(&mut editor).open.clear();
+        }
+        let drawn = (0..20)
+            .map(|_| frames.run(Vec::new(), |ui| content_tree::show(&mut editor, ui)))
+            .last()
+            .expect("a frame");
+
+        let first = content_tree::listed(&editor, "")[0].1.name.clone();
+        let row = drawn.rect(&first).unwrap_or_else(|| {
+            panic!(
+                "search {search}: {first} not drawn {:?}",
+                drawn
+                    .0
+                    .iter()
+                    .filter(|(t, _)| t.len() > 1)
+                    .map(|(t, r)| (t, r.min.y))
+                    .collect::<Vec<_>>()
+            )
+        });
+        assert!(
+            row.min.y >= 0.0 && row.max.y <= height,
+            "search {search}: {row:?} {drawn:?}"
         );
     }
 }

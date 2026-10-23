@@ -12,7 +12,7 @@ use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{HushVoice, PlayClip, SfxPlace, SfxTune};
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ContentRegistry, ErrorPlace,
-    FileWriter, MISSING_FILE, PartSpec, Parts, RowCheck, Shape,
+    FileWriter, MISSING_FILE, Nearby, PartSpec, Parts, RowCheck, Shape,
 };
 use crate::core::math::Rng;
 use crate::core::text::{
@@ -49,6 +49,15 @@ pub struct BabbleDef {
 
 impl ContentFile for BabbleDef {
     const TABLE: &'static str = "babble";
+
+    fn fresh(near: &Nearby) -> Result<BabbleDef, String> {
+        Ok(BabbleDef {
+            babble_bank: near.file()?,
+            pitch: PlaybackRate(1.0),
+            range: Semitones(1.0),
+            pace: Hertz(11.0),
+        })
+    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -68,6 +77,13 @@ impl ContentFile for BabbleBankDef {
     const TABLE: &'static str = "babble_bank";
     const SHAPE: Shape = Shape::Bundle;
 
+    fn fresh(_: &Nearby) -> Result<BabbleBankDef, String> {
+        Ok(BabbleBankDef {
+            letters: String::new(),
+            volume: 1.0,
+        })
+    }
+
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/volume", self.volume, 0.0, 4.0, "a volume");
     }
@@ -78,9 +94,19 @@ impl Bundle for BabbleBankDef {
 
     fn read_parts(&mut self, parts: &mut Parts) {
         self.letters = parts.path("letters");
+        for (key, part) in parts.keyed(BABBLE_LETTERS) {
+            let letter = key.len() == 1 && LETTERS.contains(key);
+            if !letter {
+                parts.error(
+                    part,
+                    ErrorPlace::WholeFile,
+                    ContentProblem::new("babble letter", key, "a clip named by one letter, a to z"),
+                );
+            }
+        }
         let missing: Vec<char> = LETTERS
             .chars()
-            .filter(|letter| !parts.has(&format!("letters/{letter}.wav")))
+            .filter(|letter| !parts.has(&BABBLE_LETTERS.named(&letter.to_string(), "wav")))
             .collect();
         if !missing.is_empty() {
             let missing: String = missing.into_iter().collect();

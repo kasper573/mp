@@ -1,8 +1,13 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::systems::area::tileset::{TileData, TilesetDef};
 use strum::VariantArray;
+use ui::controls;
+use ui::egui;
+use ui::egui::Ui;
+use ui::form;
+use ui::glyph::{self, Mark};
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
 use super::sheet::TileBrush;
 use super::terrain::{self, MixCompleteness, TerrainSetTiles, TileCorner};
@@ -14,7 +19,6 @@ use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
 
@@ -32,7 +36,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         .show(ui, |ui| {
             if let Some(tile) = super::tile_of_part(part) {
                 tile_card(editor, ui, &tileset, tile);
-                selection_card(editor, ui, key);
+                selection_card(editor, ui, &tileset);
                 let view = editor.views.tileset.view(key);
                 if view.mode == TilesetMode::Surface {
                     let surface = tileset
@@ -54,7 +58,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
 
 pub fn row_body(ui: &mut Ui, cx: &mut FormCx, tileset: &TilesetDef) {
     let image = tileset.image.as_str();
-    widgets::kv_text(ui, "image", shown_path(image));
+    form::kv_text(ui, "image", shown_path(image));
     let ctx = ui.ctx().clone();
     let tile = tileset.tile;
     let columns = cx
@@ -62,7 +66,7 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, tileset: &TilesetDef) {
         .thumbnails
         .image(&ctx, cx.files, image)
         .map(|thumb| thumb.size[0] as u32 / tile.max(1));
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "tile",
         match columns {
@@ -70,10 +74,10 @@ pub fn row_body(ui: &mut Ui, cx: &mut FormCx, tileset: &TilesetDef) {
             None => format!("{tile} × {tile} px, imported"),
         },
     );
-    widgets::kv_text(ui, "tiles", format!("{} with data", tileset.tiles.len()));
+    form::kv_text(ui, "tiles", format!("{} with data", tileset.tiles.len()));
     if !tileset.terrains.is_empty() {
         let names: Vec<&str> = tileset.terrains.keys().map(String::as_str).collect();
-        widgets::kv_text(ui, "terrains", names.join(" · "));
+        form::kv_text(ui, "terrains", names.join(" · "));
     }
 }
 
@@ -92,13 +96,13 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
     let mode = editor.views.tileset.view(key).mode;
     let surfaces = sounds::surfaces(editor);
     let mut picked = None;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &format!("tile {tile} · {}, {}", cell.x, cell.y));
+        panel::title(ui, &format!("tile {tile} · {}, {}", cell.x, cell.y));
         ui.add_space(4.0);
         if mode == TilesetMode::Surface {
-            widgets::kv(ui, "surface", |ui| {
-                widgets::combo(("tile-surface", key, tile))
+            form::kv(ui, "surface", |ui| {
+                controls::combo(("tile-surface", key, tile))
                     .selected_text(theme::mono(surface.unwrap_or("none")))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -117,10 +121,10 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
                         }
                     });
             });
-            widgets::kv_text(ui, "walk", walk_label(walk));
+            form::kv_text(ui, "walk", walk_label(walk));
         } else {
-            widgets::kv(ui, "walk", |ui| {
-                widgets::combo(("tile-walk", key, tile))
+            form::kv(ui, "walk", |ui| {
+                controls::combo(("tile-walk", key, tile))
                     .selected_text(theme::mono(walk_label(walk)))
                     .width(ui.available_width() - 8.0)
                     .show_ui(ui, |ui| {
@@ -135,9 +139,9 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
                         }
                     });
             });
-            widgets::kv_text(ui, "surface", surface.unwrap_or("none"));
-            widgets::kv_text(ui, "corners", corners_text(data));
-            widgets::kv_text(ui, "animation", animation_text(data));
+            form::kv_text(ui, "surface", surface.unwrap_or("none"));
+            form::kv_text(ui, "corners", corners_text(data));
+            form::kv_text(ui, "animation", animation_text(data));
         }
     });
     if let Some(brush) = picked
@@ -150,12 +154,31 @@ fn tile_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, tile: u32)
     }
 }
 
-fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(selection) = editor.views.tileset.view(key).selection else {
+fn selection_card(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
+    let key = tileset.key.as_str();
+    let view = editor.views.tileset.view(key);
+    let Some(selection) = view.selection else {
         return;
     };
-    widgets::section(ui, &format!("Selection · {}", selection.text()));
-    ui.horizontal(|ui| {
+    let brush = TileBrush::of(view);
+    sheet::section(ui, &format!("Selection · {}", selection.text()));
+    let mut painted = None;
+    ui.horizontal_wrapped(|ui| {
+        if let Some(brush) = brush {
+            let tiles: Vec<u32> = selection
+                .tiles(tileset.sheet.columns())
+                .filter(|tile| brush.changes(tileset, *tile))
+                .collect();
+            let response = ui
+                .add_enabled(
+                    !tiles.is_empty(),
+                    egui::Button::new(format!("Paint {} on these tiles", brush.label())),
+                )
+                .on_disabled_hover_text("Every tile here already has it");
+            if response.clicked() {
+                painted = Some((brush, tiles));
+            }
+        }
         if controls::marked(ui, Mark::Grid, "Make blueprint from these tiles…").clicked() {
             let dialog = TileBlueprintDialog {
                 name: format!("{key}_{}_{}", selection.x, selection.y),
@@ -171,6 +194,18 @@ fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str) {
             editor.views.tileset.view_mut(key).selection = None;
         }
     });
+    if let Some((brush, tiles)) = painted {
+        let edit = ContentEdit::new(format!(
+            "Paint {} on {} tiles of {key}",
+            brush.label(),
+            tiles.len()
+        ));
+        change_tileset(editor, key, edit, |def, reader| {
+            for tile in tiles {
+                brush.paint(tile_mut(def, tile), reader);
+            }
+        });
+    }
 }
 
 fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
@@ -190,17 +225,17 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         let view = editor.views.tileset.view(key);
         let on = view.set.as_ref() == Some(set);
         let missing_shown = view.missing_shown.contains(set);
-        let response = widgets::card_frame(on)
+        let response = panel::card(on)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, set, "", |ui| {
+                panel::header(ui, set, "", |ui| {
                     if ui.button("Remove this set").clicked() {
                         removed_set = Some(set.clone());
                         ui.close();
                     }
                 });
                 ui.add_space(4.0);
-                widgets::kv(ui, "terrains", |ui| {
+                form::kv(ui, "terrains", |ui| {
                     ui.horizontal_wrapped(|ui| {
                         for (index, terrain) in terrains.iter().enumerate() {
                             ui.label(theme::mono(terrain).color(palette::terrain_color(index)));
@@ -217,8 +252,8 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     0 => tiles.tiles.to_string(),
                     twins => format!("{}, {twins} of them twins", tiles.tiles),
                 };
-                widgets::kv_text(ui, "tiles", tile_text);
-                widgets::kv(ui, "mixes", |ui| {
+                form::kv_text(ui, "tiles", tile_text);
+                form::kv(ui, "mixes", |ui| {
                     if mixes.missing.is_empty() {
                         glyph::show(ui, Mark::Check, 14.0, theme::OK);
                         ui.label(format!("all {} beyond its base", mixes.total));
@@ -283,7 +318,7 @@ fn corners_grid(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     };
     let terrains = tileset.terrains(&set);
     let corners = tileset.corners(tile, &set);
-    widgets::section(ui, &format!("Tile {tile} · corners"));
+    sheet::section(ui, &format!("Tile {tile} · corners"));
     let mut picked = None;
     egui::Grid::new(("corners", key, tile))
         .spacing(egui::vec2(8.0, 6.0))
@@ -294,7 +329,7 @@ fn corners_grid(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                     || terrains.first().cloned().unwrap_or_default(),
                     |corners| corners[corner.index()].clone(),
                 );
-                widgets::combo(("corner", key, tile, corner.index()))
+                controls::combo(("corner", key, tile, corner.index()))
                     .selected_text(theme::mono(&current))
                     .width(90.0)
                     .show_ui(ui, |ui| {

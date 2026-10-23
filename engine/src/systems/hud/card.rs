@@ -1,9 +1,10 @@
 use bevy::prelude::*;
-use design_tokens::card::{self, CardResponse};
-use design_tokens::motion::{self, CardPose};
-use design_tokens::sheet::Depth;
-use egui::epaint::Mesh;
-use egui::{Id, LayerId, Pos2, Rect, Shape, Ui, Vec2};
+use ui::card::{self, CardResponse};
+use ui::egui;
+use ui::egui::epaint::Mesh;
+use ui::egui::{Id, LayerId, Pos2, Rect, Shape, Ui, Vec2};
+use ui::motion::{self, CardPose};
+use ui::sheet::Depth;
 
 use super::panel;
 use crate::core::gui::{self, Band, GuiContext};

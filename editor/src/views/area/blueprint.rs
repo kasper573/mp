@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use ui::words;
 
 use engine::core::content::locate::escape;
 use engine::core::content::{Content, ContentFile, FolderReader, name_of, parent_of, rescoped};
@@ -155,7 +156,7 @@ pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) 
     editor.toast(format!(
         "Made {} holding {count} module{}; Ctrl Z takes it back",
         file_title(&path),
-        crate::ui::widgets::plural(count)
+        words::plural(count)
     ));
 }
 

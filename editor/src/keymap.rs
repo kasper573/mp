@@ -1,6 +1,6 @@
-use egui::os::OperatingSystem;
-use egui::{InputState, Key, KeyboardShortcut, ModifierNames, Modifiers};
 use strum::VariantArray;
+use ui::egui::os::OperatingSystem;
+use ui::egui::{InputState, Key, KeyboardShortcut, ModifierNames, Modifiers};
 
 /// Every input the editor answers to. Handlers ask a key whether it was pressed or is held, and
 /// every hint, menu and the key sheet names it, so a key is bound in one place only.
@@ -378,10 +378,10 @@ impl EditorKey {
                 KeyboardShortcut::new(plain, Key::Delete),
                 KeyboardShortcut::new(plain, Key::Backspace),
             ]),
-            Confirm => press(plain, Key::Enter),
+            Confirm => Binding::Press(vec![ui::keys::CONFIRM]),
             NewLine => press(Modifiers::SHIFT, Key::Enter),
             OpenInNewTab | AddChoice | OpenBlueprint => press(command, Key::Enter),
-            Cancel => press(plain, Key::Escape),
+            Cancel => Binding::Press(vec![ui::keys::CANCEL]),
             Move => Binding::Arrows(plain),
             Pick => Binding::Digits,
             Copy => press(command, Key::C),

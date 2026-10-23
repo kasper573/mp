@@ -1,4 +1,3 @@
-use egui::{Pos2, Ui};
 use engine::core::content::table_of;
 use engine::core::math::{Offset, Pos, Rect};
 use engine::core::tiling::{TilePos, Tiles};
@@ -6,6 +5,9 @@ use engine::systems::area::AreaModule;
 use engine::systems::area::scene::SceneNode;
 use engine::systems::script::Variable;
 use std::collections::BTreeMap;
+use ui::egui;
+use ui::egui::{Pos2, Ui};
+use ui::words;
 
 use super::flags::RowFlags;
 use super::placement::{self, AreaPlacement, PartView};
@@ -16,7 +18,6 @@ use super::{
 use crate::app::{Clipboard, Editor, SceneClip};
 use crate::keymap::EditorKey;
 use crate::project::RowSelection;
-use crate::ui::widgets;
 
 /// The modules of the scene of `bundle` the selection moves, in tree order: those selected and
 /// what selected folders hold.
@@ -597,7 +598,7 @@ pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, clip: &SceneClip,
         editor,
         &frame.bundle,
         placed,
-        &format!("Paste {count} row{}", widgets::plural(count)),
+        &format!("Paste {count} row{}", words::plural(count)),
     ) && open > 0
     {
         toast_open(editor, open);
@@ -639,7 +640,7 @@ pub(super) fn pasted(
 pub(super) fn toast_open(editor: &mut Editor, open: usize) {
     editor.toast(format!(
         "{open} value{} the blueprint left open came along as a stand-in: fill {} in",
-        widgets::plural(open),
+        words::plural(open),
         if open == 1 { "it" } else { "them" }
     ));
 }

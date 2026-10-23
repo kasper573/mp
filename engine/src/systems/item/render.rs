@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use design_tokens::motion;
+use ui::motion;
 
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::Content;

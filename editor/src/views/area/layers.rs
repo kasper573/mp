@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use ui::words;
 
 use engine::core::content::{ContentFile, numbered, table_of, valid_name};
 use engine::systems::area::AreaDef;
@@ -10,7 +11,6 @@ use super::nodes;
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project};
 use crate::tabs::file_title;
-use crate::ui::widgets;
 
 /// Adds a ground layer at the end of `folder` of `bundle`'s scene, named apart from every layer
 /// there, and selects it; answers its pointer.
@@ -264,7 +264,7 @@ pub fn cell_count(draft: &GridDraft, name: &str) -> usize {
 }
 
 pub fn cells_said(count: usize) -> String {
-    format!("{count} cell{}", widgets::plural(count))
+    format!("{count} cell{}", words::plural(count))
 }
 
 fn rename_in(blueprint: &mut BlueprintDef, old: &str, new: &str) {

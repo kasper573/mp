@@ -1,17 +1,25 @@
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::egui::{Align, Layout, RichText, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::{self, Mark};
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
 use engine::core::content::{Content, ContentFile, FolderReader, table_of};
-use engine::core::math::Rng;
+use engine::core::math::{Pos, Rect, Rng, Size};
 use engine::core::script::VariableType;
+use engine::core::tiling::Tiles;
 use engine::field;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::object::ObjectDef;
 use engine::systems::area::scene::{self, SceneNode, scene_file};
-use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SoundscapeDef};
-use engine::systems::script::{RunnerKind, VarValue, Variable};
+use engine::systems::area::{self, AreaDef, AreaModule, MapSize, Scenery, SoundscapeDef};
+use engine::systems::script::{RunnerKind, ScriptModule, VarValue, Variable};
 use serde_json::Value;
 
 use super::placement::{self, placement_extras};
@@ -21,13 +29,14 @@ use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
 use super::{AreaTool, AreaViewState, brush, grid, nodes, scene_tree, stamp, terrain};
 use crate::app::Editor;
-use crate::forms::{self, FieldHole, FormCx, FormHoles, HoleRequest};
+use crate::forms::{self, FieldHole, FormAction, FormCx, FormHoles, HoleRequest};
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, IdPaths, RowSelection};
+use crate::shell::{row_form, widgets};
 use crate::tabs::file_title;
-use crate::ui::{patterns, row_form, sidebar, theme, widgets};
 use crate::user::BrushSettings;
 use crate::{picker, rows, schema};
+use ui::input::InputField;
 
 /// The view's inspector: a paste or a pick under way, the selected nodes, the blueprint parts
 /// edited in place, or else the card of the tool in hand.
@@ -89,7 +98,7 @@ fn tool(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super::Area
         }
         AreaTool::Terrain => terrain_card(editor, ui, view_key, snapshot),
         AreaTool::Stamp => stamp_card(editor, ui, view_key, &content),
-        AreaTool::Select | AreaTool::Module => sidebar::nothing_selected(
+        AreaTool::Select | AreaTool::Module => form::nothing_selected(
             ui,
             "Select nodes in the scene or on the map, or take a tool with settings, to inspect them here.",
         ),
@@ -116,28 +125,28 @@ fn layer_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot, 
         .unwrap_or(0);
     let flags = snapshot.flags.row(pointer);
     let mut toggled = None;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         let state = if flags.hidden.on() { "hidden" } else { "" };
-        widgets::card_header(ui, &format!("ground layer {name}"), state, |_| {});
+        panel::header(ui, &format!("ground layer {name}"), state, |_| {});
         ui.add_space(4.0);
-        widgets::kv_text(ui, "file", format!("layers/{name}.csv"));
+        form::kv_text(ui, "file", format!("layers/{name}.csv"));
         let listed = |names: &[String]| match names {
             [] => "nothing".to_owned(),
             names => names.join(" and "),
         };
-        widgets::kv_text(
+        form::kv_text(
             ui,
             "draws",
             format!("over {}, under {}", listed(under), listed(over)),
         );
-        widgets::kv_text(ui, "painted", format!("{painted} cells"));
-        widgets::kv(ui, "shown", |ui| {
+        form::kv_text(ui, "painted", format!("{painted} cells"));
+        form::kv(ui, "shown", |ui| {
             if ui.checkbox(&mut !flags.hidden.on(), "").clicked() {
                 toggled = Some(scene_tree::Toggle::Hide);
             }
         });
-        widgets::kv(ui, "locked", |ui| {
+        form::kv(ui, "locked", |ui| {
             if ui.checkbox(&mut flags.locked.on(), "").clicked() {
                 toggled = Some(scene_tree::Toggle::Lock);
             }
@@ -168,10 +177,10 @@ fn folder_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot,
             .size(13.0),
     );
     ui.add_space(4.0);
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         let state = if flags.hidden.on() { "hidden" } else { "" };
-        widgets::card_header(ui, &format!("folder {label}"), state, |_| {});
+        panel::header(ui, &format!("folder {label}"), state, |_| {});
         ui.add_space(4.0);
         if counts.is_empty() {
             ui.label(theme::muted("Empty").size(12.5));
@@ -183,12 +192,12 @@ fn folder_card(editor: &mut Editor, ui: &mut Ui, snapshot: &super::AreaSnapshot,
             });
         }
         ui.add_space(4.0);
-        widgets::kv(ui, "shown", |ui| {
+        form::kv(ui, "shown", |ui| {
             if ui.checkbox(&mut !flags.hidden.on(), "").clicked() {
                 action = Some(FolderAction::Toggle(scene_tree::Toggle::Hide));
             }
         });
-        widgets::kv(ui, "locked", |ui| {
+        form::kv(ui, "locked", |ui| {
             if ui.checkbox(&mut flags.locked.on(), "").clicked() {
                 action = Some(FolderAction::Toggle(scene_tree::Toggle::Lock));
             }
@@ -238,7 +247,7 @@ enum FolderAction {
 }
 
 fn tool_card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(theme::strong(title).monospace());
@@ -266,10 +275,10 @@ fn paint_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         }
     };
     tool_card(ui, title, |ui| {
-        widgets::kv(ui, "brush", |ui| {
+        form::kv(ui, "brush", |ui| {
             changed |= brush_size_field(ui, &mut brush, true);
         });
-        widgets::kv(ui, "random", |ui| {
+        form::kv(ui, "random", |ui| {
             changed |= ui.checkbox(&mut brush.random, "").changed();
             ui.label(
                 theme::muted(if brush.random {
@@ -280,7 +289,7 @@ fn paint_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 .size(12.5),
             );
         });
-        widgets::kv(ui, "flip", |ui| {
+        form::kv(ui, "flip", |ui| {
             if flip_chip(ui, "X", EditorKey::FlipHorizontal, brush.flip_x) {
                 brush.flip_x = !brush.flip_x;
                 changed = true;
@@ -297,24 +306,17 @@ fn paint_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
 }
 
 fn flip_chip(ui: &mut Ui, axis: &str, key: EditorKey, on: bool) -> bool {
-    let fill = if on { theme::SELECTION } else { theme::INPUT };
-    let ink = theme::TEXT;
-    let response = egui::Frame::new()
-        .fill(fill)
-        .stroke(egui::Stroke::new(
-            1.0,
-            if on { theme::TEXT } else { theme::BORDER },
-        ))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(7, 2))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(axis).color(ink).size(13.0));
-                widgets::key_chip(ui, key);
-            });
-        })
-        .response
-        .interact(Sense::click());
+    let (fill, border) = if on {
+        (theme::ACCENT_SOFT, theme::ACCENT)
+    } else {
+        (theme::RAISED, theme::BORDER)
+    };
+    let response = chip::holding(ui, fill, border, |ui| {
+        ui.label(RichText::new(axis).color(theme::TEXT).size(13.0));
+        controls::key_hint(ui, &key.name());
+    })
+    .response
+    .interact(Sense::click());
     response.clicked()
 }
 
@@ -326,13 +328,13 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
     let mut changed = false;
     tool_card(ui, "Terrain brush", |ui| {
         let view = editor.views.area.view_mut(view_key);
-        widgets::kv(ui, "terrains", |ui| {
+        form::kv(ui, "terrains", |ui| {
             let current = view
                 .terrain
                 .set
                 .clone()
                 .unwrap_or_else(|| "pick a set".to_owned());
-            widgets::combo((view_key, "terrain-set"))
+            controls::combo((view_key, "terrain-set"))
                 .selected_text(theme::mono(current))
                 .width(ui.available_width())
                 .show_ui(ui, |ui| {
@@ -365,25 +367,25 @@ fn terrain_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &sup
             view.terrain.tileset.as_deref() == Some(&set.tileset)
                 && view.terrain.set.as_deref() == Some(&set.set)
         }) {
-            widgets::kv(ui, "paint", |ui| {
+            form::kv(ui, "paint", |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for (index, terrain) in picked.terrains.iter().enumerate() {
                         let on = view.terrain.terrain == index;
-                        if widgets::mode_chip(ui, terrain, on).clicked() {
+                        if chip::mode(ui, terrain, on).clicked() {
                             view.terrain.terrain = index;
                         }
                     }
                 });
             });
         }
-        widgets::kv(ui, "brush", |ui| {
+        form::kv(ui, "brush", |ui| {
             changed |= brush_size_field(ui, &mut brush, false);
         });
     });
     if changed {
         editor.set_brush(brush);
     }
-    widgets::section(ui, "Terrains of these tilesets");
+    sheet::section(ui, "Terrains of these tilesets");
     let used = snapshot.picture.ground.tilesets();
     let mut own: Vec<&terrain::TerrainSet> = sets
         .iter()
@@ -479,20 +481,20 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super:
         .filter(|cell| cell.is_some())
         .count();
     tool_card(ui, "Paint walkability", |ui| {
-        widgets::kv_text(ui, "forced", format!("{forced} cells"));
+        form::kv_text(ui, "forced", format!("{forced} cells"));
         let view = editor.views.area.view_mut(view_key);
-        widgets::kv(ui, "paint", |ui| {
+        form::kv(ui, "paint", |ui| {
             for (value, label, color) in [
                 (Some(false), "blocked", theme::DANGER),
                 (Some(true), "walkable", theme::OK),
                 (None, "clear", theme::MUTED),
             ] {
                 let on = view.walk_value == value;
-                if widgets::chip_colored(
+                if chip::colored(
                     ui,
                     label,
                     if on {
-                        design_tokens::ink::wash(color, 0.2)
+                        ui::ink::wash(color, 0.2)
                     } else {
                         theme::INPUT
                     },
@@ -504,14 +506,14 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super:
                 }
             }
         });
-        widgets::kv(ui, "brush", |ui| {
+        form::kv(ui, "brush", |ui| {
             changed |= brush_size_field(ui, &mut brush, true);
         });
-        widgets::kv(ui, "overlay", |ui| {
+        form::kv(ui, "overlay", |ui| {
             ui.checkbox(&mut view.walk_overlay, "");
-            widgets::key_hint_text(ui, EditorKey::WalkOverlay, "toggles");
+            controls::key_hint_text(ui, &EditorKey::WalkOverlay.name(), "toggles");
         });
-        widgets::kv(ui, "locked", |ui| {
+        form::kv(ui, "locked", |ui| {
             ui.checkbox(&mut view.walk_locked, "");
         });
     });
@@ -521,7 +523,7 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &super:
 }
 
 fn overlays_legend(ui: &mut Ui) {
-    widgets::section(ui, "Overlays");
+    sheet::section(ui, "Overlays");
     let swatch = |ui: &mut Ui, color: egui::Color32, hatch: bool| {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
         ui.painter().rect_stroke(
@@ -531,7 +533,7 @@ fn overlays_legend(ui: &mut Ui) {
             egui::StrokeKind::Inside,
         );
         if hatch {
-            patterns::hatch(ui.painter(), rect, color, 4.0);
+            paint::hatched(ui.painter(), rect, color, 4.0);
         } else {
             ui.painter().rect_filled(rect.shrink(3.0), 1.0, color);
         }
@@ -549,7 +551,11 @@ fn overlays_legend(ui: &mut Ui) {
         ui.label(theme::muted("surface: a band per footstep sound").size(12.5));
     });
     ui.horizontal(|ui| {
-        ui.label(RichText::new("– ·").color(theme::SORT_LINE).size(12.5));
+        ui.label(
+            RichText::new("– ·")
+                .color(super::overlays::SORT_LINE)
+                .size(12.5),
+        );
         ui.label(theme::muted("sort lines").size(12.5));
     });
 }
@@ -574,7 +580,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             let root = Value::Null;
             let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
                 .editing(table_of(&viewed).unwrap_or_default(), Some(&viewed));
-            widgets::kv(ui, "blueprint", |ui| {
+            form::kv(ui, "blueprint", |ui| {
                 if picker::row(
                     ui,
                     &mut cx,
@@ -591,7 +597,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             row_form::act(editor, action, AreaDef::TABLE, "");
         }
         let Some(stamp) = editor.views.area.view(view_key).stamp.clone() else {
-            widgets::hint(
+            form::hint(
                 ui,
                 "Pick a blueprint below, then click to place one or drag a line.",
             );
@@ -614,7 +620,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
             .map(|def| def.variables.clone())
             .unwrap_or_default();
         let settings = editor.settings.stamps.entry(stamp.clone()).or_default();
-        widgets::kv(ui, "flip", |ui| {
+        form::kv(ui, "flip", |ui| {
             if flip_chip(ui, "X", EditorKey::FlipHorizontal, settings.flip_x) {
                 settings.flip_x = !settings.flip_x;
                 save = true;
@@ -624,12 +630,12 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 save = true;
             }
         });
-        widgets::kv(ui, "spacing", |ui| {
+        form::kv(ui, "spacing", |ui| {
             let label = match settings.spacing {
                 None => format!("footprint · {} × {}", footprint.0, footprint.1),
                 Some(n) => format!("{n} tiles"),
             };
-            widgets::combo((view_key, "spacing"))
+            controls::combo((view_key, "spacing"))
                 .selected_text(theme::mono(label))
                 .width(ui.available_width())
                 .show_ui(ui, |ui| {
@@ -657,12 +663,12 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                     }
                 });
         });
-        widgets::kv(ui, "snap", |ui| {
+        form::kv(ui, "snap", |ui| {
             ui.label(theme::muted("whole tiles").size(12.5));
-            widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
+            controls::key_hint_text(ui, &EditorKey::Unsnapped.name(), "for 1/16");
         });
         if variables.is_empty() {
-            widgets::kv_text(ui, "values", "none: no variables");
+            form::kv_text(ui, "values", "none: no variables");
         } else {
             let mut values = settings.values.clone();
             let mut values_changed = false;
@@ -679,7 +685,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
                 let mut cx = FormCx::new(project, &root, shapes, form, &mut actions)
                     .editing(table_of(&viewed).unwrap_or_default(), Some(&viewed));
                 for (name, variable) in &variables {
-                    widgets::kv(ui, name, |ui| {
+                    form::kv(ui, name, |ui| {
                         let mut value = values.get(name).cloned().unwrap_or_else(|| {
                             placement::variable_default(&reader, variable).unwrap_or_else(|| {
                                 placement::variable_template(variable, cx.nearby())
@@ -779,9 +785,9 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
                 theme::muted(spans(&blueprint.scene.nodes, &selected, reader.as_ref())).size(12.5),
             );
             ui.add_space(4.0);
-            widgets::card_frame(true).show(ui, |ui| {
+            panel::card(true).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &format!("{} modules", selected.len()), "", |ui| {
+                panel::header(ui, &format!("{} modules", selected.len()), "", |ui| {
                     if ui.button("Copy").clicked() {
                         out.actions.push(super::AreaAction::Copy);
                         ui.close();
@@ -817,9 +823,9 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, view_key: &str, selection: &
                     out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
-            widgets::key_hint_text(
+            controls::key_hint_text(
                 ui,
-                EditorKey::MakeBlueprint,
+                &EditorKey::MakeBlueprint.name(),
                 "makes a blueprint of the selection",
             );
         }
@@ -888,13 +894,14 @@ fn module_inspector(
             &path,
         ));
     }
+    let map = blueprint.map.size;
     let Some(module) = nodes::module_node_mut(&mut blueprint.scene.nodes, node) else {
         return false;
     };
     let mut changed = false;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, &shown_kind, "", |ui| {
+        panel::header(ui, &shown_kind, "", |ui| {
             if ui.button("Copy").clicked() {
                 out.actions.push(super::AreaAction::Copy);
                 ui.close();
@@ -913,13 +920,20 @@ fn module_inspector(
             }
         });
         ui.add_space(4.0);
+        let roamed = matches!(&module.module, AreaModule::Population(p) if p.roams.is_some());
         changed |= module_fields(ui, cx, &mut module.module, &path);
+        if let AreaModule::Population(population) = &mut module.module
+            && !roamed
+            && let Some(roams) = &mut population.roams
+        {
+            *roams = whole_map(map);
+        }
         match &mut module.module {
             AreaModule::Scenery(scenery) => changed |= scenery_rows(ui, scenery, &path),
             AreaModule::Population(_) => {
                 if let Some(view) = view {
                     let preview = view.population_previews.entry(path.clone()).or_default();
-                    widgets::kv(ui, "preview", |ui| {
+                    form::kv(ui, "preview", |ui| {
                         let mut shown = !preview.hidden;
                         if ui.checkbox(&mut shown, "").changed() {
                             preview.hidden = !shown;
@@ -943,10 +957,10 @@ fn module_inspector(
             if let Some((def, placed)) = placed
                 && !def.variables.is_empty()
             {
-                widgets::section(ui, &format!("Values · {}", file_title(&placed)));
-                widgets::card_frame(false).show(ui, |ui| {
+                sheet::section(ui, &format!("Values · {}", file_title(&placed)));
+                panel::card(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    widgets::card_title(ui, "values");
+                    panel::title(ui, "values");
                     ui.add_space(4.0);
                     changed |= placement::placement_card(ui, cx, placement, &def, &path);
                 });
@@ -965,14 +979,14 @@ fn module_inspector(
         }
         AreaModule::Object(object) => {
             ui.add_space(4.0);
-            changed |= object_scripts(ui, cx, object, &path);
+            changed |= object_scripts(ui, cx, object, node);
             object_extras(ui, object, reader.as_ref(), out, node);
         }
         AreaModule::Soundscape(soundscape) => {
             changed |= soundscape_extras(ui, cx, soundscape, &path)
         }
         AreaModule::Script(_) if holes_here => {
-            widgets::hint(
+            form::hint(
                 ui,
                 "In a blueprint, this script runs once for each placement.",
             );
@@ -1023,19 +1037,60 @@ fn module_fields(ui: &mut Ui, cx: &mut FormCx, module: &mut AreaModule, path: &s
     .is_some()
 }
 
-/// The scripts of `object`, each as a card.
-fn object_scripts(ui: &mut Ui, cx: &mut FormCx, object: &mut ObjectDef, path: &str) -> bool {
-    let path = format!("{path}{}", field!(ObjectDef, scripts));
+/// The scripts of the object at the scene node `node`, each as a card.
+fn object_scripts(ui: &mut Ui, cx: &mut FormCx, object: &mut ObjectDef, node: &str) -> bool {
+    let path = format!("{node}{}", field!(ObjectDef, scripts));
     let held = cx.runner.replace(RunnerKind::Object);
-    let changed = crate::ui::row_form::scripts::script_cards(
+    let changed = crate::shell::row_form::scripts::script_cards(
         ui,
         cx,
         AreaDef::TABLE,
+        RunnerKind::Object,
         &mut object.scripts,
         &path,
+        FormAction::NewObjectScript {
+            node: node.to_owned(),
+        },
     );
     cx.runner = held;
     changed.is_some()
+}
+
+/// Makes a script run by the object at the scene node `node` of `bundle`, beside it and named after
+/// the object, and names it in the object's scripts, as one step.
+pub fn new_object_script(editor: &mut Editor, bundle: &str, node: &str) -> Result<(), String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let read = nodes::bundle_of(editor, bundle)
+        .ok_or_else(|| format!("{} doesn't read", file_title(bundle)))?;
+    let Some(AreaModule::Object(object)) =
+        nodes::module_node(read.nodes(), node).map(|module| &module.module)
+    else {
+        return Err(format!("no object at {node} in {}", file_title(bundle)));
+    };
+    let name = object.name.clone().unwrap_or_else(|| "object".to_owned());
+    let mut edit = ContentEdit::new(String::new());
+    let answering = rows::answering_first(project, bundle, RunnerKind::Object, &HashSet::new())?;
+    let (path, reader, script) = rows::new_script(
+        &mut edit,
+        project,
+        bundle,
+        &name,
+        RunnerKind::Object,
+        answering,
+    )?;
+    edit.label = format!("New {} run by {name}", file_title(&path));
+    read.write_in(&mut edit, &reader, bundle, |blueprint| {
+        if let Some(AreaModule::Object(object)) =
+            nodes::module_node_mut(&mut blueprint.scene.nodes, node)
+                .map(|module| &mut module.module)
+        {
+            object.scripts.push(ScriptModule {
+                script,
+                values: BTreeMap::new(),
+            });
+        }
+    })?;
+    editor.try_apply(edit)
 }
 
 /// The holes of a blueprint's module as its form shows them: each filled by its variable, and
@@ -1184,32 +1239,24 @@ fn brush_size_field(ui: &mut Ui, brush: &mut BrushSettings, square: bool) -> boo
         (false, 1) => "corner",
         (false, _) => "corners",
     };
-    forms::boxed_input(ui, Some(unit), |ui| {
-        let mut text = if square {
-            format!("{} × {}", brush.size, brush.size)
-        } else {
-            brush.size.to_string()
-        };
-        let response = ui.add(
-            egui::TextEdit::singleline(&mut text)
-                .frame(egui::Frame::NONE)
-                .font(egui::TextStyle::Monospace)
-                .desired_width(f32::INFINITY),
-        );
-        if response.changed()
-            && let Some(first) = text
-                .split(['×', 'x', ' '])
-                .next()
-                .and_then(|n| n.trim().parse::<u32>().ok())
-        {
-            let size = first.clamp(1, 9);
-            if size != brush.size {
-                brush.size = size;
-                changed = true;
-            }
+    let mut text = if square {
+        format!("{} × {}", brush.size, brush.size)
+    } else {
+        brush.size.to_string()
+    };
+    let response = InputField::new(&mut text).unit(unit).show(ui);
+    if response.changed()
+        && let Some(first) = text
+            .split(['×', 'x', ' '])
+            .next()
+            .and_then(|n| n.trim().parse::<u32>().ok())
+    {
+        let size = first.clamp(1, 9);
+        if size != brush.size {
+            brush.size = size;
+            changed = true;
         }
-        response
-    });
+    }
     changed
 }
 
@@ -1250,4 +1297,13 @@ fn spans(scene: &[SceneNode], pointers: &[String], paths: &impl IdPaths) -> Stri
         [a, b, rest @ ..] => format!("{a}, {b} and {} more folders", rest.len()),
     };
     format!("In {shown}")
+}
+
+/// The rect of every cell of a map of `size`: where a population roams when it is given no rect,
+/// so the one it is first given.
+fn whole_map(size: MapSize) -> Rect<Tiles> {
+    Rect::new(
+        Pos::new(-0.5, -0.5),
+        Size::new(size.width as f32, size.height as f32),
+    )
 }

@@ -1,16 +1,26 @@
 use std::collections::{BTreeMap, HashSet};
+use ui::controls;
+use ui::egui;
+use ui::panel;
+use ui::theme;
+use ui::words;
 
-use egui::Ui;
 use engine::core::assets::AssetKind;
 use engine::core::content::files::NAME_RULE;
 use engine::core::content::serial::TypeTag;
 use engine::core::content::{
-    ContentFile, MODULES, ModuleRule, NOTE_EXTENSION, parent_of, table_of, valid_name,
+    ContentFile, FolderReader, MODULES, ModuleRule, NOTE_EXTENSION, PartSpec, fields_file, name_of,
+    parent_of, table_of, valid_name,
 };
+use engine::core::script::RunnerKindDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::scene::SCENE_FILE;
 use engine::systems::registry;
+use engine::systems::script::{
+    ListedScriptModule, Node, RunnerKind, ScriptDef, ScriptId, ScriptModule,
+};
 use serde_json::Value;
+use ui::egui::Ui;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog};
 use crate::make;
@@ -19,11 +29,12 @@ use crate::project::files::{FolderIndex, content_holding, folder_entry};
 use crate::project::{ContentEdit, FileBytes, Project, ProjectFiles};
 use crate::scene_graph;
 use crate::schema::{self, SchemaShapes};
+use crate::shell::widgets;
 use crate::tabs::shown_path;
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
 use crate::views::area::{self as area, placement};
+use crate::views::script::nodes as script_nodes;
 
 /// What deleted files leave behind: the uses of one kind of a deleted file, and what becomes of
 /// them.
@@ -51,11 +62,14 @@ pub enum UsageDecision {
 }
 
 /// Why `name` can't name a file or folder beside the others in `folder`, leaving out the one at
-/// `own` that is being renamed.
+/// `own` that is being renamed. `kind` is what follows a name in the file's name, its type and
+/// extension (`.npc.json`), empty for a folder: two files of different kinds may share a name,
+/// as an npc and its model often do.
 pub fn name_problem(
     files: &ProjectFiles,
     folder: &str,
     name: &str,
+    kind: &str,
     own: Option<&str>,
 ) -> Option<String> {
     let note = own.is_some_and(|own| own.ends_with(&format!(".{NOTE_EXTENSION}")));
@@ -67,7 +81,7 @@ pub fn name_problem(
     if !note && !valid_name(name) {
         return Some(format!("a name is {NAME_RULE}"));
     }
-    let wanted = name.to_lowercase();
+    let wanted = format!("{name}{kind}").to_lowercase();
     let prefix = match folder {
         "" => String::new(),
         folder => folder_entry(folder),
@@ -78,14 +92,15 @@ pub fn name_problem(
         .filter(|file| !file.is_empty())
         .find(|file| {
             let path = format!("{prefix}{file}");
-            Some(path.as_str()) != own
-                && file
-                    .split_once('.')
-                    .map_or(*file, |(stem, _)| stem)
-                    .to_lowercase()
-                    == wanted
+            Some(path.as_str()) != own && file.to_lowercase() == wanted
         })
         .map(|taken| format!("{taken} already has that name here (names ignore case)"))
+}
+
+/// What follows the name in the file name of `path`: its type and extension, with the dot.
+pub fn name_kind(path: &str) -> &str {
+    let file = path.rsplit('/').next().unwrap_or(path);
+    file.find('.').map_or("", |dot| &file[dot..])
 }
 
 /// `name` as a name within a file, such as a node's or a variable's: `name` itself when none of
@@ -130,10 +145,9 @@ pub fn new_path(files: &ProjectFiles, folder: &str, table: &str, name: &str) -> 
 /// taken, holding the type's default content, and opens it. Gives its path.
 pub fn new_file(editor: &mut Editor, folder: &str, table: &str) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let made = make::content_file(&editor.shapes, &project.files, table, folder, table);
-    let path = free_path(&project.files, folder, moves::file_name(&made.path), &[]);
+    let path = new_path(&project.files, folder, table, table);
     let mut edit = ContentEdit::new(format!("New {}", shown_path(&path)));
-    write_moved(&mut edit, &made.files, &made.path, &path);
+    make::content_file(&mut edit, project, table, &path)?;
     editor.try_apply(edit)?;
     editor.open_row(table, &path);
     Ok(path)
@@ -149,10 +163,9 @@ pub fn new_file_into(
 ) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let folder = parent_of(content_holding(file).unwrap_or(file)).to_owned();
-    let made = make::content_file(&editor.shapes, &project.files, table, &folder, table);
-    let path = free_path(&project.files, &folder, moves::file_name(&made.path), &[]);
+    let path = new_path(&project.files, &folder, table, table);
     let mut edit = ContentEdit::new(format!("New {}", shown_path(&path)));
-    write_moved(&mut edit, &made.files, &made.path, &path);
+    make::content_file(&mut edit, project, table, &path)?;
     edit.update_json(&project.files, file, |target| {
         *target.pointer_mut(pointer)? = Value::String(path.clone());
         Some(())
@@ -162,11 +175,103 @@ pub fn new_file_into(
     Ok(path)
 }
 
+/// Gives the row `key` of `table` a script module naming a new script beside it, run by rows of
+/// its kind, as one step: what adding a script module takes when no script runs on its kind yet.
+pub fn new_script_module(editor: &mut Editor, table: &str, key: &str) -> Result<String, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let runs_on: RunnerKind = table
+        .parse()
+        .map_err(|_| format!("a {table} runs no scripts"))?;
+    let file = fields_file(key);
+    let row = project
+        .files
+        .json_owned(&file)
+        .ok_or_else(|| format!("{} doesn't read", shown_path(key)))?;
+    let listed = project.reader().modules_in(table, &row)?;
+    let answered = answered_by(project, &listed);
+    let mut edit = ContentEdit::new(String::new());
+    let answering = answering_first(project, key, runs_on, &answered)?;
+    let (path, reader, script) =
+        new_script(&mut edit, project, key, name_of(key), runs_on, answering)?;
+    edit.label = format!("New {} run by {}", shown_path(&path), shown_path(key));
+    let module = reader
+        .to_json(&ListedScriptModule::Script(ScriptModule {
+            script,
+            values: BTreeMap::new(),
+        }))
+        .map_err(|error| error.to_string())?;
+    let mut modules = reader.modules_in(table, &row)?;
+    modules.push(module);
+    let row = reader.with_modules_in(table, &row, &modules)?;
+    edit.write_json(&file, &row);
+    editor.try_apply(edit)?;
+    Ok(path)
+}
+
+/// The nodes of a new script run by owners of `runs_on`, made for the file `key`: one starting a
+/// flow at the first event they answer that none in `answered` is, as every script a row runs
+/// needs one and an owner answers each event once.
+pub fn answering_first(
+    project: &Project,
+    key: &str,
+    runs_on: RunnerKind,
+    answered: &HashSet<&str>,
+) -> Result<BTreeMap<String, Node>, String> {
+    let nearby = schema::Nearby::of(project, Some(key));
+    let event = script_nodes::free_event(
+        &project.reader(),
+        &project.catalogue,
+        runs_on,
+        answered,
+        nearby,
+    )
+    .ok_or_else(|| {
+        format!(
+            "every event a {} answers already starts a script of {}",
+            runs_on.name(),
+            shown_path(key)
+        )
+    })?;
+    let name = script_nodes::event_name(&event).unwrap_or("on").to_owned();
+    Ok(BTreeMap::from([(name, event)]))
+}
+
+/// Writes into `edit` a script of `nodes`, run by owners of `runs_on`, named `name` beside the file
+/// `beside`. Gives its path, what reads the files with it, and its id there.
+pub fn new_script(
+    edit: &mut ContentEdit,
+    project: &Project,
+    beside: &str,
+    name: &str,
+    runs_on: RunnerKind,
+    nodes: BTreeMap<String, Node>,
+) -> Result<(String, FolderReader, ScriptId), String> {
+    let path = new_path(
+        &project.files.with(&edit.changes),
+        parent_of(beside),
+        ScriptDef::TABLE,
+        name,
+    );
+    let script = ScriptDef {
+        nodes,
+        ..ScriptDef::running_on(runs_on)
+    };
+    edit.write_content(project, &path, &script)?;
+    let reader = project.reader_after(edit);
+    let script = reader
+        .id_of(&path)
+        .ok_or_else(|| format!("{} doesn't read", shown_path(&path)))?;
+    Ok((path, reader, script))
+}
+
 /// Makes a folder named "folder", numbered when that is taken, in `parent`. Gives its path.
 pub fn new_folder(editor: &mut Editor, parent: &str) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let path = free_path(&project.files, parent, "folder", &[]);
-    let mut edit = ContentEdit::new(format!("New folder {path}"));
+    let mut edit = ContentEdit::new(match parent {
+        "" => "New folder".to_owned(),
+        parent => format!("New folder in {}", shown_path(parent)),
+    });
     edit.write(folder_entry(&path), FileBytes::from([]));
     editor.try_apply(edit)?;
     Ok(path)
@@ -231,6 +336,9 @@ pub fn copy_into(
         } else {
             project.files.files_of(path)
         };
+        if let Some(reason) = held.iter().find_map(|file| moves::uncopyable(file)) {
+            return Err(format!("{} can't be copied: {reason}", shown_path(path)));
+        }
         let files: Vec<(String, FileBytes)> = held
             .into_iter()
             .filter_map(|file| Some((file.clone(), project.files.get(&file)?.clone())))
@@ -291,21 +399,62 @@ pub fn replace_media(
     editor.try_apply(edit)
 }
 
+/// Puts the files `sources` into the part `spec` of the bundle at `bundle`: the one file of a file
+/// part, in place of what it held, or each file of a keyed part under the name it comes with.
+pub fn put_parts(
+    editor: &mut Editor,
+    bundle: &str,
+    spec: PartSpec,
+    sources: &[std::path::PathBuf],
+) -> Result<usize, String> {
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let part = match spec {
+        PartSpec::File { name, .. } if sources.len() != 1 => {
+            return Err(format!("the {name} of {} is one file", shown_path(bundle)));
+        }
+        PartSpec::File { name, .. } => name,
+        PartSpec::Keyed { folder, .. } => folder,
+    };
+    let exts = spec.exts();
+    let title = file_title(bundle);
+    let mut edit = ContentEdit::new(match (spec, sources) {
+        (PartSpec::File { .. }, [one]) => {
+            format!("Replace the {part} of {title} with {}", import_name(one))
+        }
+        (_, [one]) => format!("Import {} into the {part} of {title}", import_name(one)),
+        (_, many) => format!("Import {} {part} into {title}", many.len()),
+    });
+    for source in sources {
+        let name = import_name(source);
+        let Some((stem, ext)) = name.rsplit_once('.').filter(|(_, ext)| exts.contains(ext)) else {
+            return Err(format!("{name} isn't a {} file", exts.join(" or ")));
+        };
+        let key = name_from(stem);
+        if matches!(spec, PartSpec::Keyed { .. }) && !valid_name(&key) {
+            return Err(format!("{name} names no {part}: {NAME_RULE}"));
+        }
+        let bytes = std::fs::read(source).map_err(|error| format!("{name}: {error}"))?;
+        for other in exts.iter().filter(|other| **other != ext) {
+            let stale = format!("{bundle}/{}", spec.named(&key, other));
+            if project.files.contains(&stale) {
+                edit.remove(stale);
+            }
+        }
+        edit.write(
+            format!("{bundle}/{}", spec.named(&key, ext)),
+            FileBytes::from(bytes),
+        );
+    }
+    editor.try_apply(edit)?;
+    Ok(sources.len())
+}
+
 /// Writes the default content of the fixture at `path`, which the engine looks for there.
 pub fn make_fixture(editor: &mut Editor, path: &str) -> Result<(), String> {
     let table = table_of(path).ok_or("no type in its name")?;
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let made = make::content_file(
-        &editor.shapes,
-        &project.files,
-        table,
-        parent_of(path),
-        engine::core::content::name_of(path),
-    );
     let mut edit = ContentEdit::new(format!("Make {}", shown_path(path)));
-    for (file, bytes) in made.files {
-        edit.write(file, bytes);
-    }
+    make::content_file(&mut edit, project, table, path)?;
     editor.try_apply(edit)?;
     let table = table.to_owned();
     editor.open_row(&table, path);
@@ -320,22 +469,71 @@ fn import_name(source: &std::path::Path) -> String {
 }
 
 /// Renames the file, bundle or folder at `path` to `name`, keeping its type, and rewrites every
-/// reference to it and to what is inside it.
+/// reference to it and to what is inside it. A content file the last step made, untouched since,
+/// is made under the name instead, in that step, so what it takes from its name takes the new one.
 pub fn rename(editor: &mut Editor, path: &str, name: &str) -> Result<String, String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let to = moves::renamed(path, name);
     if to == path {
         return Ok(to);
     }
-    if let Some(problem) = name_problem(&project.files, parent_of(path), name, Some(path)) {
+    if let Some(problem) = name_problem(
+        &project.files,
+        parent_of(path),
+        name,
+        name_kind(path),
+        Some(path),
+    ) {
         return Err(problem);
     }
-    moves::apply(
-        editor,
-        &[PathMove::new(path, &to)],
-        format!("Rename {} to {name}", shown_path(path)),
-    )?;
+    let made = format!("New {}", shown_path(path));
+    let history = &project.history;
+    let just_made = project.files.index().is_content(path)
+        && history.applied() == history.steps().len()
+        && history
+            .steps()
+            .last()
+            .is_some_and(|step| step.label == made);
+    let step = PathMove::new(path, &to);
+    match table_of(path).filter(|_| just_made) {
+        Some(table) => {
+            let table = table.to_owned();
+            make_as_named(editor, step, &table, &made)?
+        }
+        None => moves::apply(
+            editor,
+            &[step],
+            format!("Rename {} to {name}", shown_path(path)),
+        )?,
+    }
     Ok(to)
+}
+
+fn make_as_named(
+    editor: &mut Editor,
+    step: PathMove,
+    table: &str,
+    made: &str,
+) -> Result<(), String> {
+    let project = moves::settled(editor)?;
+    let label = format!("New {}", shown_path(&step.to));
+    let mut planned = moves::plan(project, std::slice::from_ref(&step), label)?;
+    let made_beside: Vec<String> = project
+        .history
+        .steps()
+        .last()
+        .into_iter()
+        .flat_map(|made| &made.after)
+        .map(|change| change.file.clone())
+        .filter(|file| *file != step.from && !file.starts_with(&format!("{}/", step.from)))
+        .collect();
+    for file in made_beside {
+        planned.edit.remove(file);
+    }
+    make::content_file(&mut planned.edit, project, table, &step.to)?;
+    editor.try_apply(planned.edit.amending(made))?;
+    moves::follow(editor, &[step]);
+    Ok(())
 }
 
 /// Moves what is at each path into `folder`, numbering a name taken there.
@@ -467,8 +665,7 @@ pub fn delete_dialog(editor: &mut Editor, paths: Vec<String>) {
     }));
 }
 
-/// Every content file and media file that goes when `paths` do: each one itself, and what the
-/// folders among them hold.
+/// Every file that goes when `paths` do: each one itself, and what the folders among them hold.
 fn gone_with(index: &FolderIndex, paths: &[String]) -> Vec<String> {
     let mut gone = Vec::new();
     for path in paths {
@@ -480,6 +677,7 @@ fn gone_with(index: &FolderIndex, paths: &[String]) -> Vec<String> {
                     .values()
                     .flatten()
                     .chain(&index.media)
+                    .chain(&index.notes)
                     .filter(|file| file.starts_with(&inside))
                     .cloned(),
             );
@@ -498,16 +696,19 @@ pub fn delete_title(dialog: &DeleteDialog) -> String {
         [one] if dialog.gone.len() == 1 && dialog.gone[0] == *one => {
             format!("Delete {}", file_title(one))
         }
+        [one] if dialog.gone.is_empty() => {
+            format!("Delete empty folder {}", moves::file_name(one))
+        }
         [one] => format!(
             "Delete folder {} and its {} file{}",
             moves::file_name(one),
             dialog.gone.len(),
-            widgets::plural(dialog.gone.len())
+            words::plural(dialog.gone.len())
         ),
         _ => format!(
             "Delete {} file{}",
             dialog.gone.len(),
-            widgets::plural(dialog.gone.len())
+            words::plural(dialog.gone.len())
         ),
     }
 }
@@ -712,8 +913,8 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     } else {
         let used = format!(
             "Used in {total} place{} in {rows} file{}. Nothing is deleted until every group has an answer.",
-            widgets::plural(total),
-            widgets::plural(rows)
+            words::plural(total),
+            words::plural(rows)
         );
         ui.label(theme::muted(used));
     }
@@ -781,7 +982,7 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         .show(ui, |ui| {
             for (index, group) in dialog.groups.iter_mut().enumerate() {
                 let title = group_title(project, group);
-                widgets::card_frame(false).show(ui, |ui| {
+                panel::card(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -812,14 +1013,14 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     let summary = if dialog.groups.is_empty() {
         format!(
             "{files_removed} deleted file{}, one undo step.",
-            widgets::plural(files_removed)
+            words::plural(files_removed)
         )
     } else {
         format!(
             "{total} edit{} in {rows} file{} and {files_removed} deleted file{}, one undo step.",
-            widgets::plural(total),
-            widgets::plural(rows),
-            widgets::plural(files_removed)
+            words::plural(total),
+            words::plural(rows),
+            words::plural(files_removed)
         )
     };
     ui.label(theme::muted(summary).size(12.5));
@@ -879,7 +1080,7 @@ fn decision_picker(
             UsageDecision::Unpack => "Unpack into scenery".to_owned(),
             _ => remove_label.clone(),
         };
-        widgets::combo(("decision", index))
+        controls::combo(("decision", index))
             .selected_text(theme::mono(label).size(13.0))
             .show_ui(ui, |ui| {
                 if unpackable
@@ -928,7 +1129,7 @@ fn decision_picker(
         egui::vec2(170.0, ui.spacing().interact_size.y),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
-            widgets::combo(("repoint", index))
+            controls::combo(("repoint", index))
                 .width(160.0)
                 .selected_text(selected)
                 .show_ui(ui, |ui| {
@@ -1179,4 +1380,22 @@ pub fn close_tabs(editor: &mut Editor, path: &str) {
             editor.dock.remove_tab(path);
         }
     }
+}
+
+/// The events the scripts among `modules`, a row's modules as its file lists them, answer.
+fn answered_by(project: &Project, modules: &[Value]) -> HashSet<&'static str> {
+    let reader = project.reader();
+    modules
+        .iter()
+        .filter_map(|module| reader.from_json::<ListedScriptModule>(module).ok())
+        .filter_map(|ListedScriptModule::Script(module)| reader.path_of(module.script))
+        .filter_map(|path| project.read::<ScriptDef>(path).ok())
+        .flat_map(|script| {
+            script
+                .nodes
+                .values()
+                .filter_map(script_nodes::event_name)
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }

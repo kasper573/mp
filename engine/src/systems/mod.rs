@@ -50,7 +50,7 @@ use skill::Cooldowns;
 use status::{ActiveAspects, Boosts, Statuses};
 
 use crate::core::assets::SyncedFiles;
-use crate::core::audio::playback::{SfxDef, SfxPlugin, SfxRoleDef};
+use crate::core::audio::playback::{SfxDef, SfxPlugin};
 use crate::core::audio::soundscape::SoundscapePlugin;
 use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
@@ -470,6 +470,19 @@ pub fn load_content(
     )
 }
 
+/// Loads a game still being made, through `making_registry`.
+pub fn load_making(
+    folder: std::sync::Arc<dyn ContentFolder>,
+    outcome: &str,
+) -> Result<Content, LoadReport> {
+    crate::core::content::load(
+        making_registry(),
+        folder,
+        crate::core::content::version::build(),
+        outcome,
+    )
+}
+
 pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), LoadReport> {
     let before = world.get_resource::<SyncedContent>();
     if before.is_some_and(|before| before.same_as(&synced)) {
@@ -514,6 +527,17 @@ pub fn registry() -> &'static ContentRegistry {
     &REGISTRY
 }
 
+/// A game being made: all a whole game is, but that its quests and shops may still be out of a
+/// player's reach, as one is made before the scripts that offer or open it can name it.
+pub fn making_registry() -> &'static ContentRegistry {
+    static REGISTRY: std::sync::LazyLock<ContentRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = settled_tables();
+        registry.require_fixtures();
+        registry
+    });
+    &REGISTRY
+}
+
 /// Every table a game is made of, and the settings its `game.config.json` holds: a folder of only some of
 /// a game's rows, set up to be played, loads through this.
 pub fn settled_tables() -> ContentRegistry {
@@ -531,7 +555,7 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
-        .fixture::<input::map::InputAction>()
+        .fixture::<input::map::InputFixture>()
         .fixture::<attention::AttentionMark>()
         .fixture::<interface::InterfaceSound>()
         .fixture::<interface::CursorShape>()
@@ -540,11 +564,8 @@ pub fn tables() -> ContentRegistry {
         .fixture::<vfx::VfxShaderFixture>()
         .fixture::<area::world_map::WorldMap>()
         .bundle::<SfxDef>()
-        .file::<SfxRoleDef>()
-        .named::<SfxRoleDef>()
         .file::<attention::AttentionDef>()
         .file::<input::map::InputDef>()
-        .named::<input::map::InputDef>()
         .file::<interface::CursorDef>()
         .file::<interface::InterfaceIconDef>()
         .file::<item::ItemDef>()

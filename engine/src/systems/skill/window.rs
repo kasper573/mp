@@ -1,26 +1,29 @@
 use std::collections::BTreeMap;
+use ui::drag;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
-use design_tokens::controls::{self, Pill};
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink;
-use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
-use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
+use ui::controls::{self, Pill};
+use ui::egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
+use ui::egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
+use ui::face::{self, TextRole};
+use ui::glyph::{self, Mark};
+use ui::ink;
 
 use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind, card};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::class::{self, ClassDef, NodeKey, SkillPoints};
-use crate::systems::hud::{self, Carried, HudWindow};
+use crate::systems::hud::{Carried, HudWindow};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::skill::bar;
-use crate::systems::text::counted;
+use ui::words::counted;
 
 const WINDOW_SIZE: Vec2 = Vec2::new(560.0, 440.0);
 const NODE_RADIUS: f32 = 24.0;
@@ -222,7 +225,7 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
     let passive = def.kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, &response) {
         if !passive {
-            hud::carry(ui.ctx(), Carried::Skill(skill));
+            drag::carry(ui.ctx(), Carried::Skill(skill));
         }
     } else if map::clicked(world, InputAction::PinToHotbar, &response) && !passive {
         bar::pin(world, super::HotbarEntry::Skill(skill));
@@ -399,7 +402,7 @@ fn node_input(
     let passive = skill.get(world.resource::<Content>()).kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, response) {
         if held > Rank::NONE && !passive {
-            hud::carry(ui.ctx(), Carried::Skill(skill));
+            drag::carry(ui.ctx(), Carried::Skill(skill));
         }
     } else if map::clicked(world, InputAction::PinToHotbar, response) {
         if passive {
@@ -514,11 +517,11 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
         |ui| {
             let confirm =
                 controls::primary(ui, format!("Confirm · {}", counted(picked.0, "point")));
-            gui::tooltip(&confirm, |ui| {
+            float::tooltip(&confirm, |ui| {
                 ui.label("Spends the picked points for good");
             });
             let reset = controls::button(ui, "Reset");
-            gui::tooltip(&reset, |ui| {
+            float::tooltip(&reset, |ui| {
                 ui.label("Takes every pick back; nothing is spent");
             });
             if confirm.clicked() {

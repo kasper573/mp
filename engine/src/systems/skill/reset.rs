@@ -14,7 +14,7 @@ use crate::systems::script::{
     Condition, EffectCall, FlowKey, Reach, RiftInstances, RiftScripting, effect as effects,
 };
 use crate::systems::stat;
-use crate::systems::text::counted;
+use ui::words::counted;
 
 /// Asks the player before forgetting every learned rank and returning the points. The answer
 /// picks the output, so whatever the reset costs is wired after it by the script.
@@ -22,6 +22,7 @@ use crate::systems::text::counted;
 #[schemars(extend("x-system" = "skill"))]
 pub struct ResetSkills {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub accepted: Arrow,

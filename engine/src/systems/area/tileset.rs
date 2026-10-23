@@ -8,8 +8,8 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::id::nearest;
 use crate::core::content::locate::escape;
 use crate::core::content::{
-    Bundle, ContentFile, ContentId, ContentProblem, FileWriter, NamedContent, PartSpec, Parts,
-    RowCheck, Shape,
+    Bundle, ContentFile, ContentId, ContentProblem, FileWriter, NamedContent, Nearby, PartSpec,
+    Parts, RowCheck, Shape,
 };
 use crate::core::math::{Pos, Rect, Size, WorldPx};
 
@@ -54,6 +54,15 @@ impl Bundle for TilesetDef {
 impl ContentFile for TilesetDef {
     const TABLE: &'static str = "tileset";
     const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(_: &Nearby) -> Result<TilesetDef, String> {
+        Ok(TilesetDef {
+            image: ImageRef::default(),
+            tile: 16,
+            terrains: BTreeMap::new(),
+            tiles: BTreeMap::new(),
+        })
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/tile", self.tile, 1, MAX_TILE_PX, "a tile size in pixels");
@@ -182,6 +191,13 @@ impl NamedContent for SurfaceDef {
 
 impl ContentFile for SurfaceDef {
     const TABLE: &'static str = "surface";
+
+    fn fresh(near: &Nearby) -> Result<SurfaceDef, String> {
+        Ok(SurfaceDef {
+            name: near.name(),
+            footstep: near.file()?,
+        })
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);

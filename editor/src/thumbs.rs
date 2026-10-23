@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use ui::egui;
 
-use egui::{ColorImage, TextureHandle, TextureOptions};
 use engine::core::assets::ImageRef;
 use engine::core::gui::{GuiImage, ImageSource};
 use image::RgbaImage;
 use image::imageops::FilterType;
+use ui::egui::{ColorImage, TextureHandle, TextureOptions};
 
 use crate::project::ProjectFiles;
 

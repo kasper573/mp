@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
-use crate::core::content::{Content, ContentFile, Fixture};
+use crate::core::content::{Content, ContentFile, Fixture, Nearby};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct CursorDef {
@@ -14,6 +14,13 @@ pub struct CursorDef {
 
 impl ContentFile for CursorDef {
     const TABLE: &'static str = "cursor";
+
+    fn fresh(near: &Nearby) -> Result<CursorDef, String> {
+        Ok(CursorDef {
+            image: near.image()?,
+            hotspot: Hotspot { x: 0, y: 0 },
+        })
+    }
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,6 +63,12 @@ pub struct InterfaceIconDef {
 
 impl ContentFile for InterfaceIconDef {
     const TABLE: &'static str = "interface_icon";
+
+    fn fresh(near: &Nearby) -> Result<InterfaceIconDef, String> {
+        Ok(InterfaceIconDef {
+            image: near.image()?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]

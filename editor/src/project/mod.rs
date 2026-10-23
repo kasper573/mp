@@ -20,7 +20,7 @@ use engine::core::content::ErrorPlace::WholeFile;
 use engine::core::content::{
     CheckedFiles, Content, ContentFile, ContentId, ContentNames, ContentProblem, FolderReader,
     LoadError, LoadReport, MISSING_FILE, NamedContent, ReadRow, SETTINGS_FILE, Unreadable,
-    table_of,
+    parent_of, table_of,
 };
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
@@ -428,12 +428,19 @@ impl Project {
         if files.paths_revision() == self.files.paths_revision() {
             self.reader().rereading(folder)
         } else {
-            FolderReader::new(systems::registry(), folder)
+            FolderReader::new(systems::making_registry(), folder)
         }
     }
 
     fn name(&self) -> String {
         self.root.display().to_string()
+    }
+
+    /// What keeps the game from being played as it is now, though it loads to be worked on:
+    /// quests and shops out of a player's reach.
+    pub fn unplayable(&self) -> Option<LoadReport> {
+        let folder = Arc::new(self.files.folder(&self.name()));
+        systems::load_content(folder, "it can't be played yet").err()
     }
 
     pub fn loads(&self) -> bool {
@@ -584,7 +591,7 @@ impl Project {
                 errors: 1,
             }));
         }
-        let changes: Vec<FileChange> = edit
+        let mut changes: Vec<FileChange> = edit
             .changes
             .into_iter()
             .filter(
@@ -598,6 +605,11 @@ impl Project {
         if changes.is_empty() {
             return Ok(());
         }
+        let filled = self.filled_folders(&changes);
+        changes.extend(filled.into_iter().map(|entry| FileChange {
+            file: entry,
+            bytes: None,
+        }));
         let continues = edit.merge || edit.amends.is_some();
         if changes.iter().any(|change| change.bytes.is_none()) {
             self.settle();
@@ -904,6 +916,24 @@ impl Project {
         OutsideChanges { taken, conflicts }
     }
 
+    /// The entries keeping folders that were empty and that `changes` put something in: a folder
+    /// is kept by its entry only while nothing else is in it, as the disk shows it.
+    fn filled_folders(&self, changes: &[FileChange]) -> BTreeSet<String> {
+        let mut filled = BTreeSet::new();
+        for change in changes.iter().filter(|change| change.bytes.is_some()) {
+            let mut folder = parent_of(change.file.trim_end_matches('/'));
+            while !folder.is_empty() {
+                let entry = files::folder_entry(folder);
+                if self.files.contains(&entry) && !changes.iter().any(|change| change.file == entry)
+                {
+                    filled.insert(entry);
+                }
+                folder = parent_of(folder);
+            }
+        }
+        filled
+    }
+
     /// Every file and kept folder a change to `paths` may touch: each path itself and, for a
     /// folder or a bundle, everything it holds on disk and held before.
     fn held_by(&self, paths: Vec<String>) -> Vec<String> {
@@ -1061,7 +1091,7 @@ fn read_entry(root: &Path, entry: &str) -> Option<FileBytes> {
 pub fn load(files: &ProjectFiles, name: &str) -> Result<(Content, Duration), LoadReport> {
     let started = Instant::now();
     let folder = Arc::new(files.folder(name));
-    systems::load_content(folder, "the folder did not load")
+    systems::load_making(folder, "the folder did not load")
         .map(|content| (content, started.elapsed()))
 }
 

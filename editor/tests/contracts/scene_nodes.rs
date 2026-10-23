@@ -2,10 +2,11 @@ use editor::app::Editor;
 use editor::project::RowSelection;
 use editor::schema::{self, SchemaShapes};
 use editor::views::area::nodes::SceneTree;
-use editor::views::area::{AreaAction, AreaSnapshot, nodes, placement, run_action};
+use editor::views::area::{AreaAction, AreaSnapshot, modules, nodes, placement, run_action};
 use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
+use engine::core::tiling::CellPos;
 use engine::systems::area::blueprint::{self, BlueprintDef, Placement};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaModule, AreaModuleKind};
@@ -29,6 +30,44 @@ fn every_kind_of_scene_module_has_a_shape_to_add_it_from() {
             offered.iter().any(|tag| tag == kind.tag()),
             "{}",
             kind.tag()
+        );
+    }
+}
+
+#[test]
+fn a_module_placed_on_the_map_naming_no_file_lands_in_the_area_as_the_game_takes_it() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let game = support::game().file("audio/wind.wav", testkit::wav());
+    let mut editor = support::open(game, &scratch);
+    let unnamed = [
+        AreaModuleKind::Object,
+        AreaModuleKind::SafeZone,
+        AreaModuleKind::Soundscape,
+    ];
+
+    for kind in unnamed {
+        let reader = editor.reader().expect("a reader");
+        let module =
+            modules::module_template(&reader, &area(), kind, Some(CellPos::new(2, 2)), None)
+                .unwrap_or_else(|why| panic!("{}: {why}", kind.tag()));
+
+        let added = nodes::add(
+            &mut editor,
+            &area(),
+            vec![SceneNode::Module(ModuleNode::new(module))],
+            kind.tag(),
+        );
+        support::files(&mut editor);
+
+        let refused = editor
+            .project
+            .as_mut()
+            .and_then(|project| project.take_refused());
+        assert!(
+            added && refused.is_none(),
+            "{}: {:?}",
+            kind.tag(),
+            refused.map(|taken| taken.refusal.sentence())
         );
     }
 }

@@ -13,9 +13,9 @@ pub use inspect::inspect_parts;
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
+use ui::theme;
 
 use atlas::WorldAtlas;
-use egui::{Color32, Pos2, Rect, Ui, Vec2};
 use engine::core::content::{Content, ContentFile, ContentScope, Fixture, rescoped};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
@@ -25,10 +25,11 @@ use engine::systems::area::world_map::{
 };
 use engine::systems::area::{AreaDef, AreaId};
 use serde::Deserialize;
+use ui::egui::{Color32, Pos2, Rect, Ui, Vec2};
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection};
-use crate::ui::{sidebar, theme};
+use crate::shell::sidebar;
 use crate::views::navigation;
 
 const AREA_PX_PER_TILE: f32 = 2.0;

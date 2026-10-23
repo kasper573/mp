@@ -1,12 +1,13 @@
 use bevy::prelude::*;
-use design_tokens::face::{self, TextRole};
-use design_tokens::ink::{self, Ground};
-use design_tokens::sheet;
-use egui::{Color32, Id, Rect, Ui, Vec2};
 use strum::{IntoStaticStr, VariantArray};
+use ui::egui;
+use ui::egui::{Color32, Ui, Vec2};
+use ui::face::{self, TextRole};
+use ui::ink::{self, Ground};
+use ui::{panel, sheet};
 
 use super::{
-    HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally, signed,
+    HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally,
 };
 use crate::core::platform::ClientPlatform;
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook};
@@ -16,6 +17,8 @@ use crate::systems::input::map::InputAction;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
 use crate::systems::screen::ClientScreen;
+use ui::form;
+use ui::words;
 
 const SIZE: Vec2 = Vec2::new(780.0, 460.0);
 const TIME_WIDTH: f32 = 72.0;
@@ -129,9 +132,9 @@ impl HudWindow for HistoryWindow {
                 .inner_margin(egui::Margin::symmetric(0, PADDING))
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 3.0;
-                    for (index, row) in rows.iter().enumerate() {
-                        let id = ui.id().with(index);
-                        lazily(ui, id, row, |ui| show_row(ui, world, row, clock));
+                    for row in &rows {
+                        let id = ui.id().with(row.key());
+                        panel::in_view(ui, id, |ui| show_row(ui, world, row, clock));
                     }
                 });
         });
@@ -156,7 +159,11 @@ pub(crate) fn tallied(
                 (true, false) => earned,
                 (false, _) => base.gamma_multiply(0.6),
             };
-            prefix(text, format!("{} ", signed(change)), color);
+            prefix(
+                text,
+                format!("{} ", words::signed(f64::from(change))),
+                color,
+            );
         }
         Some(RecordTally::Progress { have, need }) => {
             text.pieces
@@ -171,6 +178,24 @@ enum Row {
     Trimmed,
     Empty(HistoryTab),
     Record(HistoryRecord),
+}
+
+/// What tells a row from every other, so a history laid out lazily keeps each row's height.
+#[derive(Debug, Hash)]
+enum RowKey {
+    Trimmed,
+    Empty(HistoryTab),
+    Record(u64),
+}
+
+impl Row {
+    fn key(&self) -> RowKey {
+        match self {
+            Row::Trimmed => RowKey::Trimmed,
+            Row::Empty(tab) => RowKey::Empty(*tab),
+            Row::Record(record) => RowKey::Record(record.nth),
+        }
+    }
 }
 
 fn receive_news(mut news: MessageReader<HistoryNews>, mut book: ResMut<HistoryBook>) {
@@ -198,36 +223,6 @@ fn forget(mut book: ResMut<HistoryBook>) {
     };
 }
 
-// A history holds hundreds of rows, so only those in sight are laid out; the rest keep the height
-// they had when last drawn, for as long as they and the width they wrap to stay the same.
-#[derive(Clone)]
-struct Measured {
-    row: Row,
-    width: f32,
-    height: f32,
-}
-
-fn lazily(ui: &mut Ui, id: Id, row: &Row, add: impl FnOnce(&mut Ui)) {
-    let width = ui.available_width();
-    let known = ui
-        .data(|data| data.get_temp::<Measured>(id))
-        .filter(|measured| measured.row == *row && measured.width == width);
-    if let Some(measured) = known {
-        let rect = Rect::from_min_size(ui.cursor().min, Vec2::new(width, measured.height));
-        if !ui.is_rect_visible(rect) {
-            ui.allocate_space(rect.size());
-            return;
-        }
-    }
-    let height = ui.scope(add).response.rect.height();
-    let measured = Measured {
-        row: row.clone(),
-        width,
-        height,
-    };
-    ui.data_mut(|data| data.insert_temp(id, measured));
-}
-
 fn rows(world: &World, tab: HistoryTab) -> Vec<Row> {
     let book = world.resource::<HistoryBook>();
     let mut rows = Vec::new();
@@ -250,12 +245,12 @@ fn rows(world: &World, tab: HistoryTab) -> Vec<Row> {
 
 fn show_row(ui: &mut Ui, world: &mut World, row: &Row, clock: LocalClock) {
     match row {
-        Row::Trimmed => caption(
+        Row::Trimmed => form::caption(
             ui,
             format!("Older records are gone. The last {KEPT} are kept."),
             ink::INK2,
         ),
-        Row::Empty(tab) => caption(ui, empty_text(*tab).to_owned(), ink::INK2),
+        Row::Empty(tab) => form::caption(ui, empty_text(*tab).to_owned(), ink::INK2),
         Row::Record(record) => record_row(ui, world, record, clock),
     }
 }
@@ -269,10 +264,6 @@ fn empty_text(tab: HistoryTab) -> &'static str {
         HistoryTab::Notifications => "No notifications yet.",
         HistoryTab::Errors => "No errors yet.",
     }
-}
-
-fn caption(ui: &mut Ui, text: String, color: Color32) {
-    ui.label(TextRole::Small.rich(text).color(color));
 }
 
 fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: LocalClock) {
@@ -292,7 +283,7 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
             return;
         }
         Some(HistoryMark::Arrived) => {
-            divider(ui, format!("{} · {time}", entry.text.plain_words()));
+            form::divider(ui, format!("{} · {time}", entry.text.plain_words()));
             return;
         }
         _ => {}
@@ -309,7 +300,7 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
     ui.horizontal_top(|ui| {
         ui.allocate_ui(Vec2::new(TIME_WIDTH, 0.0), |ui| {
             ui.set_min_width(TIME_WIDTH);
-            caption(ui, time, ink::INK3);
+            form::caption(ui, time, ink::INK3);
         });
         ui.add_space(indent);
         if let Some(icon) = &entry.icon {
@@ -356,28 +347,4 @@ fn record_line(entry: &HistoryEntry) -> StyledLine {
 fn prefix(text: &mut StyledLine, label: String, color: Color32) {
     text.pieces
         .insert(0, StyledSpan::plain(label).ink(color).into());
-}
-
-fn divider(ui: &mut Ui, text: String) {
-    let font = TextRole::Small.font_id();
-    let text_width = ui
-        .painter()
-        .layout_no_wrap(text.clone(), font, Color32::WHITE)
-        .size()
-        .x;
-    let gap = ui.spacing().item_spacing.x;
-    let lead = ((ui.available_width() - text_width) / 2.0 - gap).max(0.0);
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        rule(ui, lead);
-        caption(ui, text, ink::INK2);
-        let rest = ui.available_width();
-        rule(ui, rest);
-    });
-    ui.add_space(4.0);
-}
-
-fn rule(ui: &mut Ui, width: f32) {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 1.0), egui::Sense::hover());
-    ui.painter().rect_filled(rect, 0.0, ink::ink_wash(0.25));
 }

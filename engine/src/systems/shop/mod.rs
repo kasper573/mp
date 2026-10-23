@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
     Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
-    serial,
+    Nearby, serial,
 };
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -50,6 +50,14 @@ impl NamedContent for ShopDef {
 
 impl ContentFile for ShopDef {
     const TABLE: &'static str = "shop";
+
+    fn fresh(near: &Nearby) -> Result<ShopDef, String> {
+        Ok(ShopDef {
+            title: near.name(),
+            mark: near.file()?,
+            modules: Vec::new(),
+        })
+    }
 }
 
 impl ModuleSet for ShopDef {
@@ -201,6 +209,7 @@ pub struct ShopReactions {
 #[schemars(extend("x-system" = "shop"))]
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub shop: ShopId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]

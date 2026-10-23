@@ -1,4 +1,4 @@
-use engine::core::content::{ContentFile, ContentRegistry};
+use engine::core::content::{ContentFile, ContentRegistry, Nearby};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -63,15 +63,34 @@ struct SameShape {
 
 impl ContentFile for Narrow {
     const TABLE: &'static str = "thing";
+
+    fn fresh(near: &Nearby) -> Result<Narrow, String> {
+        Ok(Narrow { name: near.name() })
+    }
 }
 impl ContentFile for Wide {
     const TABLE: &'static str = "thing";
+
+    fn fresh(near: &Nearby) -> Result<Wide, String> {
+        Ok(Wide {
+            name: near.name(),
+            weight: 0,
+        })
+    }
 }
 impl ContentFile for Retyped {
     const TABLE: &'static str = "thing";
+
+    fn fresh(_: &Nearby) -> Result<Retyped, String> {
+        Ok(Retyped { name: Vec::new() })
+    }
 }
 impl ContentFile for SameShape {
     const TABLE: &'static str = "thing";
+
+    fn fresh(near: &Nearby) -> Result<SameShape, String> {
+        Ok(SameShape { name: near.name() })
+    }
 }
 
 fn version_of<Row: ContentFile>() -> String {

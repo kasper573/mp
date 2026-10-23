@@ -10,18 +10,23 @@ pub use self::assets::AssetSource;
 pub use self::rows::RowSource;
 
 use std::sync::Arc;
+use ui::chip;
+use ui::drag;
+use ui::egui;
+use ui::menu;
+use ui::theme;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Color32, Layout, Rect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::core::assets::AssetKind;
 use engine::core::content::{ContentFile, ContentId};
+use ui::egui::{Align, Color32, Layout, Rect, RichText, Sense, Stroke, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
-use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
 use crate::icons::{self, IconTone, KindIcon};
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
+use ui::input;
+use ui::input::{clear_draft, draft_of, set_draft};
 
 /// What a picker field holds: a key within a category (a row's key within its table, a file's
 /// path within its kind).
@@ -247,7 +252,7 @@ pub fn field(
                 let painter = ui
                     .ctx()
                     .layer_painter(egui::LayerId::new(egui::Order::Tooltip, id.with("verdict")));
-                widgets::floating_chip(
+                chip::floating(
                     &painter,
                     pointer + egui::vec2(12.0, 34.0),
                     egui::Align2::LEFT_TOP,
@@ -258,7 +263,7 @@ pub fn field(
                 );
             }
         }
-        if let Some(dragged) = response.dnd_release_payload::<Dragged>() {
+        if let Some(dragged) = drag::dropped::<Dragged>(&response) {
             match source.accepts(cx, &dragged) {
                 Ok(dropped) => {
                     if dropped != *pick {
@@ -268,6 +273,9 @@ pub fn field(
                 }
                 Err(reason) => cx.state.status = vec![reason],
             }
+        }
+        if std::mem::take(&mut cx.autofocus) {
+            egui::Popup::open_id(ui.ctx(), id);
         }
         let popup = egui::Popup::from_toggle_button_response(&response)
             .id(id)
@@ -286,14 +294,10 @@ const MIN_PREFIX: f32 = 24.0;
 
 fn chip(ui: &mut Ui, cx: &mut FormCx, source: &dyn PickSource, pick: &Pick) -> egui::Response {
     let empty = pick.is_empty();
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(6, 2))
+    input::frame()
         .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let row = egui::vec2(ui.available_width(), input::row_height(ui));
+            ui.allocate_ui_with_layout(row, Layout::right_to_left(Align::Center), |ui| {
                 ui.label(Mark::CaretDown.text(11.0).color(theme::MUTED));
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     if empty {
@@ -339,6 +343,9 @@ fn popover(
     id: egui::Id,
 ) -> bool {
     let mut changed = false;
+    if menu::opened_afresh(ui, id) {
+        forget(ui, id);
+    }
     let field = path.rsplit('/').next().unwrap_or(path);
     cx.state.status = vec![
         field.to_owned(),
@@ -412,36 +419,31 @@ fn popover(
             (PickLayout::Grid, Mark::Grid, "Grid"),
         ];
         let buttons = layouts.len() as f32 * (LAYOUT_BUTTON + ui.spacing().item_spacing.x);
-        egui::Frame::new()
-            .fill(theme::INPUT)
-            .stroke(Stroke::new(1.0, theme::BORDER))
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(6, 3))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width() - buttons - 12.0);
-                ui.horizontal(|ui| {
-                    glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
-                    let count = ui.painter().layout_no_wrap(
-                        counted.clone(),
-                        egui::FontId::monospace(11.5),
-                        theme::MUTED,
-                    );
-                    let response = ui.add(
-                        egui::TextEdit::singleline(&mut search)
-                            .frame(egui::Frame::NONE)
-                            .hint_text(format!("filter · {}", source.placeholder()))
-                            .desired_width(ui.available_width() - count.size().x - 8.0),
-                    );
-                    widgets::default_focus(ui, &response);
-                    if response.changed() {
-                        set_draft(ui, search_id, &search);
-                        highlight = 0;
-                    }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::muted(&counted).monospace().size(11.5));
-                    });
+        ui.scope(|ui| {
+            ui.set_max_width(ui.available_width() - buttons);
+            input::boxed(ui, None, |ui| {
+                glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
+                let count = ui.painter().layout_no_wrap(
+                    counted.clone(),
+                    egui::FontId::monospace(11.5),
+                    theme::MUTED,
+                );
+                let response = ui.add(
+                    input::unframed(egui::TextEdit::singleline(&mut search))
+                        .hint_text(theme::muted(format!("filter · {}", source.placeholder())))
+                        .desired_width(ui.available_width() - count.size().x - 8.0),
+                );
+                input::default_focus(ui, &response);
+                if response.changed() {
+                    set_draft(ui, search_id, &search);
+                    highlight = 0;
+                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(theme::muted(&counted).monospace().size(11.5));
                 });
+                response
             });
+        });
         for (choice, mark, label) in layouts {
             let color = if layout == choice {
                 theme::ACCENT
@@ -466,7 +468,7 @@ fn popover(
                     .iter()
                     .filter(|candidate| candidate.category == listed.id)
                     .count();
-                if widgets::toggle_chip(ui, &format!("{} · {count}", listed.label), on).clicked() {
+                if chip::toggle(ui, &format!("{} · {count}", listed.label), on).clicked() {
                     category = (!on).then(|| listed.id.clone());
                     match &category {
                         Some(picked) => set_draft(ui, category_id, picked),
@@ -623,7 +625,7 @@ impl Cell {
         if self.lit {
             theme::ACCENT_SOFT
         } else if hovered {
-            design_tokens::ink::gold_wash(0.2)
+            ui::ink::gold_wash(0.2)
         } else if self.held {
             theme::RAISED
         } else {
@@ -817,10 +819,14 @@ fn found(ui: &Ui, cx: &FormCx, source: &dyn PickSource, id: egui::Id) -> Found {
 }
 
 fn close(ui: &mut Ui, id: egui::Id) {
+    forget(ui, id);
+    ui.close();
+}
+
+fn forget(ui: &Ui, id: egui::Id) {
     ui.ctx().data_mut(|d| d.remove::<Found>(id.with("found")));
     clear_draft(ui, id.with("search"));
     clear_draft(ui, id.with("category"));
     ui.ctx()
         .data_mut(|d| d.remove_temp::<usize>(id.with("highlight")));
-    ui.close();
 }

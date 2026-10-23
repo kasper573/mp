@@ -1,10 +1,12 @@
 use std::collections::VecDeque;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::face::Face;
-use design_tokens::{ink, slip};
-use egui::{Align2, Mesh, RichText, Sense, UiBuilder, Vec2};
+use ui::egui::{Align2, Mesh, RichText, Sense, UiBuilder, Vec2};
+use ui::face::Face;
+use ui::{ink, slip};
 
 use crate::core::gui::{self, Band};
 use crate::core::time::{Hertz, Seconds};
@@ -47,7 +49,7 @@ pub fn show_meter(
         .order(order)
         .anchor(corner, offset)
         .interactable(false);
-    gui::show_anchored(gui, area, |ui| {
+    float::anchored(gui, area, |ui| {
         let (panel, _) = ui.allocate_exact_size(SIZE, Sense::hover());
         slip::paint(ui.painter(), panel);
         ui.scope_builder(

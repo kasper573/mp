@@ -1,20 +1,22 @@
 use std::collections::BTreeMap;
+use ui::chip;
+use ui::egui;
+use ui::theme;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Sense, Ui, Vec2};
 use engine::core::content::ContentFile;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
 use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
 use strum::VariantArray;
+use ui::controls;
+use ui::egui::{Color32, Sense, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::{ModelPage, ModelStrip, action_timing, play_rule, shifted, starts_at, strip_of};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
 use crate::{import, stage};
 
 const CELL: f32 = 58.0;
@@ -311,7 +313,7 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
                                 super::FrameCue::Sound(sound) => format!("sound {sound}"),
                                 other => other.label(),
                             };
-                            widgets::chip_colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
+                            chip::colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }
                     });
                 });

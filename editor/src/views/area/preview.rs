@@ -1,15 +1,21 @@
-use egui::{Sense, Ui, Vec2};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::systems::area;
 use engine::systems::script::Place;
+use ui::controls;
+use ui::egui;
+use ui::egui::{Sense, Ui, Vec2};
+use ui::form;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
 use super::scene::{AreaSceneRequest, AreaSceneSpec};
 use super::{pins, select};
 use crate::app::{Clipboard, Editor};
 use crate::forms;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
 use crate::views::navigation;
 
 pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
@@ -20,7 +26,7 @@ pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
         theme::muted(format!(
             "clipboard · {} row{}",
             clip.count,
-            widgets::plural(clip.count)
+            words::plural(clip.count)
         ))
         .monospace()
         .size(13.0),
@@ -28,7 +34,7 @@ pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
     ui.add_space(4.0);
     let text = clip.nodes.text();
     let shown: String = text.lines().take(40).collect::<Vec<_>>().join("\n");
-    widgets::code_block(ui, &shown);
+    panel::code_block(ui, &shown);
     if text.lines().count() > 40 {
         ui.label(theme::faint("…").size(12.5));
     }
@@ -55,8 +61,8 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         .map(|id| id.path(&content).to_owned())
         .collect();
     areas.sort();
-    widgets::section(ui, "Pick a place");
-    widgets::combo("pick-area")
+    sheet::section(ui, "Pick a place");
+    controls::combo("pick-area")
         .width(ui.available_width())
         .selected_text(theme::mono(
             area_key
@@ -166,7 +172,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
             pins::commit_pick(editor, &area_key, at);
         }
     }
-    widgets::hint(
+    form::hint(
         ui,
         &format!(
             "Click a cell for its centre, {} click for any point, in 1/16 tiles. {} keeps the old place.",

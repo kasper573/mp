@@ -1,9 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::menu;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::core::content::{ContentFile, FolderReader};
-use engine::core::script::{EventDef, Expr, RunnerKindDef};
+use engine::core::script::{EventDef, Expr, Fill, RunnerKindDef};
 use engine::field;
 use engine::systems::dialogue::ChoiceReveal;
 use engine::systems::memory::MemoryDef;
@@ -11,20 +17,24 @@ use engine::systems::npc::NpcDef;
 use engine::systems::script::{
     Choice, DialogueNode, Line, Node, RiftEffect, RiftEvent, ScriptDef, Speaker, VarValue, Variable,
 };
+use serde::Deserialize;
+use serde_json::Value;
 use strum::VariantArray;
+use ui::egui::Ui;
+use ui::glyph::{self, Mark};
 
 use super::graph::ScriptGraphAction;
 use super::nodes::{self, SpeakerKind};
 use super::{RenameNodeDialog, ScriptDoc, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
-use crate::forms::{self, FormAction, FormChange, FormCx};
+use crate::forms::{self, FieldHole, FormAction, FormChange, FormCx, FormHoles, HoleRequest};
 use crate::keymap::EditorKey;
-use crate::project::RowSelection;
 use crate::project::files::content_of;
+use crate::project::{Project, RowSelection};
+use crate::shell::browser::{self, RowMenu};
+use crate::shell::{row_form, widgets};
 use crate::tabs::shown_path;
-use crate::ui::browser::{self, RowMenu};
-use crate::ui::{row_form, sidebar, theme, widgets};
-use crate::{condition, picker, schema, spans, thumbs};
+use crate::{condition, picker, rows, schema, spans, thumbs};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSelection) {
     super::sync_with_content(editor);
@@ -40,7 +50,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
         .show(ui, |ui| match names.as_slice() {
             [] => {
                 if !super::run::inspector(editor, ui, doc) {
-                    sidebar::nothing_selected(ui, "Select a node to inspect it here.");
+                    form::nothing_selected(ui, "Select a node to inspect it here.");
                 }
             }
             [name] => {
@@ -54,9 +64,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
             }
             many => {
                 breadcrumb(ui, &format!("{} › {} nodes", doc.at.title(), many.len()));
-                widgets::card_frame(true).show(ui, |ui| {
+                panel::card(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    widgets::card_title(ui, &format!("{} nodes", many.len()));
+                    panel::title(ui, &format!("{} nodes", many.len()));
                     for name in many {
                         if let (Some(node), Some(project)) =
                             (doc.nodes().get(name), editor.project.as_ref())
@@ -64,12 +74,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, selection: &RowSe
                             let summary = nodes::summary(node, &doc.text(project));
                             ui.horizontal(|ui| {
                                 ui.label(theme::mono(name).size(12.5));
-                                ui.label(theme::muted(widgets::clip(&summary, 50)).size(12.5));
+                                ui.label(theme::muted(words::clip(&summary, 50)).size(12.5));
                             });
                         }
                     }
                     ui.add_space(6.0);
-                    if widgets::danger(ui, "Delete these nodes").clicked() {
+                    if controls::danger(ui, "Delete these nodes").clicked() {
                         super::delete_nodes(editor, doc, many.to_vec());
                     }
                 });
@@ -94,8 +104,8 @@ fn selected_nodes(doc: &ScriptDoc, selection: &RowSelection) -> Vec<String> {
 pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     super::sync_with_content(editor);
     let key = doc.at.key.clone();
-    if let Some(folder) = crate::ui::breadcrumb::show(ui, &key) {
-        crate::ui::content_tree::reveal(editor, &folder);
+    if let Some(folder) = crate::shell::breadcrumb::show(ui, &key) {
+        crate::shell::content_tree::reveal(editor, &folder);
     }
     ui.add_space(4.0);
     let shapes = editor.shapes.clone();
@@ -106,20 +116,20 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut picked = None;
     let changed = {
         let mut cx = doc.form_cx(editor, root, &mut actions);
-        widgets::card_frame(false)
+        panel::card(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, shown_path(&key), what, |ui| {
+                panel::header(ui, shown_path(&key), what, |ui| {
                     let menu = RowMenu::of(&key);
                     picked = browser::row_menu(ui, &menu, false);
                 });
                 let mut changed = FormChange::default();
-                widgets::kv(ui, "runs on", |ui| {
+                form::kv(ui, "runs on", |ui| {
                     let path = field!(ScriptDef, runs_on);
                     changed |= forms::of_type(ui, &mut cx, &mut script.runs_on, path);
                 });
                 let variables = script.variables.len();
-                widgets::kv_text(
+                form::kv_text(
                     ui,
                     "variables",
                     if variables == 0 {
@@ -128,16 +138,20 @@ pub fn script_row(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         variables.to_string()
                     },
                 );
-                if !script.state.is_empty() {
-                    widgets::kv_text(ui, "state", names_of(&script.state));
-                }
-                widgets::kv_text(ui, "locals", names_of(&script.locals));
+                form::kv(ui, "state", |ui| {
+                    let path = field!(ScriptDef, state);
+                    changed |= forms::of_type(ui, &mut cx, &mut script.state, path);
+                });
+                form::kv(ui, "locals", |ui| {
+                    let path = field!(ScriptDef, locals);
+                    changed |= forms::of_type(ui, &mut cx, &mut script.locals, path);
+                });
                 let returns = doc
                     .nodes()
                     .values()
                     .any(|node| matches!(node, Node::Return { value: Some(_) }));
-                widgets::kv_text(ui, "returns", if returns { "a value" } else { "nothing" });
-                widgets::kv_text(ui, "nodes", nodes_line(doc));
+                form::kv_text(ui, "returns", if returns { "a value" } else { "nothing" });
+                form::kv_text(ui, "nodes", nodes_line(doc));
                 changed
             })
             .inner
@@ -181,7 +195,7 @@ fn nodes_line(doc: &ScriptDoc) -> String {
 }
 
 fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    widgets::section(ui, "Events");
+    sheet::section(ui, "Events");
     let mut go: Option<String> = None;
     let mut any = false;
     for (name, node) in doc.nodes() {
@@ -218,7 +232,7 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         }
     }
     if !any {
-        widgets::hint(
+        form::hint(
             ui,
             &format!(
                 "No event yet: {} opens the palette with the events this owner answers.",
@@ -242,7 +256,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if variables.is_empty() {
         return;
     }
-    widgets::section_count(ui, "Variables", variables.len());
+    form::section_count(ui, "Variables", variables.len());
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(ScriptDef::TABLE);
     let users = editor
@@ -269,9 +283,9 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 .filter(|(_, node)| nodes::node_vars(&doc.reader, node).contains(name))
                 .map(|(node_name, _)| node_name.clone())
                 .collect();
-            widgets::card_frame(false).show(ui, |ui| {
+            panel::card(false).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, name, "", |ui| {
+                panel::header(ui, name, "", |ui| {
                     if ui.button("Remove the variable").clicked() {
                         script.variables.remove(name);
                         changed = FormChange::at(field!(ScriptDef, variables));
@@ -290,14 +304,14 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 if (draft.ty, &draft.table) != (variable.ty, &variable.table) {
                     draft.default = None;
                 }
-                widgets::kv(ui, "default", |ui| {
+                form::kv(ui, "default", |ui| {
                     edited |= default_value(ui, &mut cx, &mut draft, &path);
                 });
                 if edited.is_some() && script.variables.contains_key(name) {
                     script.variables.insert(name.clone(), draft);
                     changed = FormChange::at(&path);
                 }
-                widgets::kv_text(
+                form::kv_text(
                     ui,
                     "holes",
                     match filled.as_slice() {
@@ -306,7 +320,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         many => format!("{} · in {}", many.len(), many.join(", ")),
                     },
                 );
-                widgets::kv_text(
+                form::kv_text(
                     ui,
                     "values",
                     match users {
@@ -406,7 +420,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         })
         .collect();
     if !callers.is_empty() {
-        widgets::section_count(ui, "Run by", callers.len());
+        form::section_count(ui, "Run by", callers.len());
         let mut open: Option<&Caller> = None;
         for caller in &callers {
             let response = ui
@@ -449,7 +463,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         })
         .collect();
     if !speakers.is_empty() {
-        widgets::section(ui, "Speaks for");
+        sheet::section(ui, "Speaks for");
         for npc in &speakers {
             ui.horizontal(|ui| {
                 widgets::badge(ui, "npc");
@@ -473,7 +487,7 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 
 fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     ui.add_space(8.0);
-    if widgets::keyed_button(ui, "Run", Some(EditorKey::RunScript), true).clicked() {
+    if controls::keyed(ui, "Run", Some(&EditorKey::RunScript.name()), true).clicked() {
         editor.panels.bottom = BottomTab::Run;
         editor.views.script.fire(&doc.at);
     }
@@ -508,6 +522,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         .map_or(String::new(), |entry| entry.blurb.clone());
     let mut draft = node.clone();
     let mut actions = Vec::new();
+    let mut hole_requests = Vec::new();
     let mut label = format!("Edit {name} in {}", doc.at.title());
     let mut rename = false;
     let mut delete = false;
@@ -515,10 +530,10 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     let title = super::graph::card_title(name, &node);
     let changed = {
         let mut cx = doc.form_cx(editor, root, &mut actions);
-        widgets::card_frame(true)
+        panel::card(true)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &title, "", |ui| {
+                panel::header(ui, &title, "", |ui| {
                     if ui
                         .add(widgets::shortcut_button("Rename…", EditorKey::Rename))
                         .clicked()
@@ -549,6 +564,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                     Node::Dialogue(_) => {}
                     other => {
                         if let Some((schema, hidden)) = nodes::form_fields(other) {
+                            cx.holes = Some(node_holes(doc, schema, other, &path));
                             let hidden: Vec<&str> = hidden.iter().map(String::as_str).collect();
                             changed = forms::variant_of_type(
                                 ui,
@@ -565,6 +581,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
                 if !nodes::is_dialogue(&node) {
                     arrows_rows(ui, &mut cx, &outs, &unwired);
                 }
+                hole_requests = cx
+                    .holes
+                    .take()
+                    .map(|holes| holes.requests)
+                    .unwrap_or_default();
                 changed
             })
             .inner
@@ -633,17 +654,131 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
         super::delete_nodes(editor, doc, vec![name.to_owned()]);
         return;
     }
-    if changed.is_some() {
+    if !hole_requests.is_empty() {
+        let Some(project) = editor.project.as_ref() else {
+            return;
+        };
+        let mut script = doc.edited();
+        for request in hole_requests {
+            fill_hole(doc, project, &mut script, &mut draft, &path, request);
+        }
+        script.nodes.insert(name.to_owned(), draft);
+        write(editor, doc, script, label);
+    } else if changed.is_some() {
         let mut script = doc.edited();
         script.nodes.insert(name.to_owned(), draft);
         write(editor, doc, script, label);
     }
 }
 
+/// The fields of `node` a variable of the script could fill, each filled by the variable it
+/// names or open to one.
+fn node_holes(doc: &ScriptDoc, schema: &Value, node: &Node, path: &str) -> FormHoles {
+    let json = doc.reader.to_json(node).unwrap_or_default();
+    let fields = schema::var_fields(nodes::node_root(), schema, &json)
+        .into_iter()
+        .map(|var| {
+            let hole = match json.pointer(&var.field.pointer).and_then(var_name) {
+                Some(name) => FieldHole::Filled(name),
+                None => FieldHole::Open(var.field.kind),
+            };
+            (format!("{path}{}", var.field.pointer), hole)
+        })
+        .collect();
+    FormHoles {
+        fields,
+        variables: doc
+            .script
+            .variables
+            .iter()
+            .map(|(name, variable)| (name.clone(), variable.ty))
+            .collect(),
+        requests: Vec::new(),
+    }
+}
+
+/// Fills a field of `node` from a variable of `script`, a new one or one it has, or gives the
+/// field back a value of its own.
+fn fill_hole(
+    doc: &ScriptDoc,
+    project: &Project,
+    script: &mut ScriptDef,
+    node: &mut Node,
+    path: &str,
+    request: HoleRequest,
+) {
+    let Some((schema, _)) = nodes::form_fields(node) else {
+        return;
+    };
+    let Ok(mut json) = doc.reader.to_json(&*node) else {
+        return;
+    };
+    let fields = schema::var_fields(nodes::node_root(), schema, &json);
+    let (field, filled) = match request {
+        HoleRequest::Make { field, kind } => {
+            let pointer = field.strip_prefix(path).unwrap_or(&field).to_owned();
+            let table = fields
+                .iter()
+                .find(|var| var.field.pointer == pointer)
+                .and_then(|var| var.field.table.clone());
+            let base = pointer.rsplit('/').next().unwrap_or("value");
+            let name = rows::free_name(base, &script.variables.keys().cloned().collect());
+            script.variables.insert(
+                name.clone(),
+                Variable {
+                    ty: kind,
+                    table,
+                    default: None,
+                },
+            );
+            (pointer, VarFill::Var(name))
+        }
+        HoleRequest::Use { field, name } => (
+            field.strip_prefix(path).unwrap_or(&field).to_owned(),
+            VarFill::Var(name),
+        ),
+        HoleRequest::Fix { field, .. } => {
+            let pointer = field.strip_prefix(path).unwrap_or(&field).to_owned();
+            let Some(var) = fields.iter().find(|var| var.field.pointer == pointer) else {
+                return;
+            };
+            let nearby = schema::Nearby::of(project, Some(&doc.file));
+            let fixed = schema::template(nodes::node_root(), &var.fixed, nearby);
+            (pointer, VarFill::Fixed(fixed))
+        }
+    };
+    let Some(at) = json.pointer_mut(&field) else {
+        return;
+    };
+    *at = match filled {
+        VarFill::Var(name) => doc
+            .reader
+            .to_json(&Fill::<()>::Var { var: name })
+            .unwrap_or_default(),
+        VarFill::Fixed(fixed) => fixed,
+    };
+    if let Ok(read) = doc.reader.from_json(&json) {
+        *node = read;
+    }
+}
+
+enum VarFill {
+    Var(String),
+    Fixed(Value),
+}
+
+/// The variable a field's value names, when it names one rather than holding a value.
+fn var_name(value: &Value) -> Option<String> {
+    match Fill::<Value>::deserialize(value).ok()? {
+        Fill::Var { var } => Some(var),
+        Fill::Const(_) => None,
+    }
+}
+
 fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], unwired: &[String]) {
     let mut go: Option<String> = None;
     for (port, unwired) in outs.iter().zip(unwired) {
-        widgets::kv(ui, &port.label, |ui| match &port.target {
+        form::kv(ui, &port.label, |ui| match &port.target {
             Some(target) => {
                 ui.label(theme::muted("→").size(13.0));
                 if ui
@@ -696,12 +831,12 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) 
         }
         _ => {
             if !blurb.is_empty() {
-                widgets::hint(ui, blurb);
+                form::hint(ui, blurb);
             }
         }
     }
     if ins.len() > 1 {
-        widgets::section(ui, "Arrows in");
+        sheet::section(ui, "Arrows in");
         for (from, label) in ins {
             ui.horizontal(|ui| {
                 ui.label(theme::mono(from).size(12.5));
@@ -731,10 +866,10 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &s
         };
         let mut cx = FormCx::new(project, schema, shapes, form, &mut actions)
             .editing(MemoryDef::TABLE, Some(memory));
-        widgets::card_frame(false)
+        panel::card(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, shown_path(memory), "row", |ui| {
+                panel::header(ui, shown_path(memory), "row", |ui| {
                     if ui.button("Open the row").clicked() {
                         cx.actions.push(FormAction::OpenRow {
                             table: MemoryDef::TABLE.to_owned(),
@@ -770,15 +905,15 @@ fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
             "values that last one flow".to_owned(),
         ),
     ] {
-        widgets::card_frame(false).show(ui, |ui| {
+        panel::card(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_title(ui, title);
+            panel::title(ui, title);
             ui.label(theme::muted(format!("{names} · {sentence}")).size(13.0));
         });
     }
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "variables");
+        panel::title(ui, "variables");
         let text = format!("{} · each runner's values", names_of(&script.variables));
         ui.label(theme::muted(text).size(13.0));
     });
@@ -819,11 +954,11 @@ fn bounds_card(ui: &mut Ui, doc: &ScriptDoc, name: &str, node: &Node) {
     } else {
         (body.len() + 1) * at_most as usize
     };
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "bounds", "compiler", |_| {});
-        widgets::kv_text(ui, "steps", format!("at most {steps} between two waits"));
-        widgets::kv_text(
+        panel::header(ui, "bounds", "compiler", |_| {});
+        form::kv_text(ui, "steps", format!("at most {steps} between two waits"));
+        form::kv_text(
             ui,
             "waits",
             match waits.as_slice() {
@@ -850,8 +985,8 @@ fn on_form(
     let events = nodes::event_variants();
     let current: &str = event.kind().into();
     let mut picked = current.to_owned();
-    widgets::kv(ui, "event", |ui| {
-        widgets::combo(ui.id().with(path).with("event"))
+    form::kv(ui, "event", |ui| {
+        controls::combo(ui.id().with(path).with("event"))
             .selected_text(current)
             .show_ui(ui, |ui| {
                 for variant in &events {
@@ -890,16 +1025,16 @@ fn dialogue_form(
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    widgets::section(ui, "Lines");
+    sheet::section(ui, "Lines");
     let mut remove_line = None;
     let mut swap_line = None;
     let count = node.lines.len();
     for (index, line) in node.lines.iter_mut().enumerate() {
         let line_path = format!("{path}/lines/{index}");
-        widgets::card_frame(false).show(ui, |ui| {
+        panel::card(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_header(ui, &format!("line {}", index + 1), "", |ui| {
-                swap_line = widgets::move_entries(ui, index, count).or(swap_line);
+            panel::header(ui, &format!("line {}", index + 1), "", |ui| {
+                swap_line = menu::move_entries(ui, index, count).or(swap_line);
                 if count > 1 && ui.button("Remove the line").clicked() {
                     remove_line = Some(index);
                     ui.close();
@@ -929,7 +1064,7 @@ fn dialogue_form(
         changed = FormChange::at(path);
         *label = format!("Add a line in {}", doc.at.title());
     }
-    widgets::section(ui, "Choices");
+    sheet::section(ui, "Choices");
     let mut go: Option<String> = None;
     let count = node.choices.len();
     let mut menu = ChoiceMenu::default();
@@ -1013,7 +1148,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Choice, at: &ChoiceAt)
     let mut changed = FormChange::default();
     let mut menu = ChoiceMenu::default();
     let mut go: Option<String> = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
             ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
@@ -1045,7 +1180,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Choice, at: &ChoiceAt)
                 }
             });
         });
-        widgets::kv(ui, "condition", |ui| match &mut choice.requires {
+        form::kv(ui, "condition", |ui| match &mut choice.requires {
             Some(requires) => {
                 let mut dropped = false;
                 ui.vertical(|ui| {
@@ -1079,7 +1214,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Choice, at: &ChoiceAt)
                 }
             }
         });
-        widgets::kv(ui, "reveal", |ui| {
+        form::kv(ui, "reveal", |ui| {
             ui.horizontal_wrapped(|ui| {
                 for &option in ChoiceReveal::VARIANTS {
                     let on = choice.reveal.contains(&option);
@@ -1100,7 +1235,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Choice, at: &ChoiceAt)
                 }
             });
         });
-        widgets::kv(ui, "warning", |ui| match &mut choice.warn {
+        form::kv(ui, "warning", |ui| match &mut choice.warn {
             None => {
                 if ui
                     .add(
@@ -1123,7 +1258,7 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Choice, at: &ChoiceAt)
                 }
             }
         });
-        widgets::kv(ui, "arrow", |ui| match choice.to.to() {
+        form::kv(ui, "arrow", |ui| match choice.to.to() {
             Some(to) => {
                 let target = to.to_owned();
                 let what = doc
@@ -1165,7 +1300,7 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &st
         &format!(
             "{} › {name} › {}",
             doc.at.title(),
-            widgets::clip(&label_text, 40)
+            words::clip(&label_text, 40)
         ),
     );
     let shapes = editor.shapes.clone();
@@ -1223,8 +1358,8 @@ fn speaker_rows(
     let reader = cx.project.reader();
     let current = SpeakerKind::of(line.by);
     let mut picked = current;
-    widgets::kv(ui, "by", |ui| {
-        widgets::combo(ui.id().with(path).with("speaker"))
+    form::kv(ui, "by", |ui| {
+        controls::combo(ui.id().with(path).with("speaker"))
             .selected_text(theme::mono(current.name()).size(13.0))
             .width(ui.available_width())
             .show_ui(ui, |ui| {
@@ -1268,7 +1403,7 @@ fn speaker_rows(
         return changed;
     };
     let mut npc_path = reader.path_of(npc).unwrap_or_default().to_owned();
-    widgets::kv(ui, "  npc", |ui| {
+    form::kv(ui, "  npc", |ui| {
         if picker::row(ui, cx, NpcDef::TABLE, &mut npc_path, &format!("{path}/npc"))
             && let Some(picked) = reader.id_of::<NpcDef>(&npc_path)
         {
@@ -1280,7 +1415,7 @@ fn speaker_rows(
         }
     });
     cx.speaker = Some(npc_path);
-    widgets::kv(ui, "  face", |ui| {
+    form::kv(ui, "  face", |ui| {
         let ctx = ui.ctx().clone();
         if let Some(file) = nodes::bust_file(cx.project, line.by, line.face.as_ref())
             && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &file)

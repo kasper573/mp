@@ -101,7 +101,7 @@ pub enum Node<V: Vocabulary> {
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-#[schemars(bound = "")]
+#[schemars(bound = "", extend("x-assignment" = true))]
 pub struct Assignment<V: Vocabulary> {
     #[serde(flatten)]
     pub target: Target,

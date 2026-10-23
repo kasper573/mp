@@ -83,7 +83,7 @@ stack: build wasm (up "--profile dev")
 # The stack, rebuilding the wasm and the website on every change: reload the page to pick one up.
 dev: stack
     source docker/.env.test && echo "sign in and play at https://$RIFT_DOMAIN/play"
-    cargo watch -w engine -w design_tokens -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
+    cargo watch -w engine -w ui -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
 
 # Tears the stack down and wipes its data, so keycloak imports its realm again on the next start.
 reset:

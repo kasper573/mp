@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::time::Duration;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::dusk;
-use design_tokens::face::TextRole;
-use design_tokens::ink::Ground;
+use ui::dusk;
+use ui::face::TextRole;
+use ui::ink::Ground;
 
 use super::ClientScreen;
 use crate::core::audio::soundscape::Soundscape;
@@ -460,7 +462,7 @@ fn death_notice(world: &mut World) {
         .order(Band::Notices.order())
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .interactable(false);
-    gui::show_anchored(&gui, area, |ui| {
+    float::anchored(&gui, area, |ui| {
         dusk::frame().show(ui, |ui| {
             let look = TextLook::new(TextRole::Body.size(), dusk::TEXT).on(Ground::Dusk);
             text::show(ui, world, &line, look, None);

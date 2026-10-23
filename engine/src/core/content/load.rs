@@ -20,6 +20,7 @@ use super::files::{
     table_of,
 };
 use super::fixture::{Fixture, FixtureIds, FixtureLock};
+use super::fresh::Nearby;
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE, article};
@@ -57,7 +58,13 @@ struct FixtureEntry {
     whole_table: bool,
     paths: Vec<(String, Vec<FixtureLock>)>,
     check: FixtureCheck,
+    fresh: FreshFixture,
 }
+
+/// The fresh file of the fixture at a path, when one of the entry's fixtures is there.
+type FreshFixture = Box<dyn Fn(&str, &Nearby) -> Option<Result<AnyRow, String>> + Send + Sync>;
+
+type AnyRow = Box<dyn Any + Send + Sync>;
 
 pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> + Send + Sync>;
 
@@ -317,8 +324,26 @@ impl ContentRegistry {
                 .map(|fixture| (fixture.path(), fixture.locks()))
                 .collect(),
             check: Box::new(check_fixture::<F>),
+            fresh: Box::new(|path, near| {
+                let fixture = F::VARIANTS.iter().find(|fixture| fixture.path() == path)?;
+                Some(fixture.fresh(near).map(|row| Box::new(row) as AnyRow))
+            }),
         });
         self
+    }
+
+    /// The fresh file of the content at `path`: the fixture's when a fixture belongs there, else
+    /// its type's.
+    pub(super) fn fresh_row(
+        &self,
+        loader: &dyn TableLoader,
+        path: &str,
+        near: &Nearby,
+    ) -> Result<AnyRow, String> {
+        self.fixtures
+            .iter()
+            .find_map(|fixture| (fixture.fresh)(path, near))
+            .unwrap_or_else(|| loader.fresh_row(near))
     }
 
     /// Holds a game to every fixture: without this, a game's fixtures are found wherever it has
@@ -1620,6 +1645,7 @@ pub(super) trait TableLoader: Send + Sync {
     fn check_rows(&self, content: &Content, errors: &mut Vec<(&'static str, String, RowCheck)>);
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()>;
     fn write_row(&self, row: &dyn Any, path: &str, writer: &mut FileWriter) -> io::Result<()>;
+    fn fresh_row(&self, near: &Nearby) -> Result<AnyRow, String>;
 }
 
 fn shape_of<T: JsonSchema>(settings: &SchemaSettings) -> serde_json::Value {
@@ -1729,6 +1755,10 @@ impl<Row: ContentFile> TableLoader for RowLoader<Row> {
             (bundle.write)(row, path, writer)?;
         }
         Ok(())
+    }
+
+    fn fresh_row(&self, near: &Nearby) -> Result<AnyRow, String> {
+        Ok(Box::new(Row::fresh(near)?))
     }
 }
 

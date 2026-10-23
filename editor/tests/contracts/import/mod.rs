@@ -3,6 +3,7 @@ mod exports;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use ui::egui;
 
 use editor::import::formats::{self, ExportFormat, ExportStrip};
 use editor::import::model::{self, CuePlacement};
@@ -10,12 +11,13 @@ use editor::import::records::{ImportMapping, ImportRecord};
 use editor::import::tileset;
 use editor::views::area::grid::BundlePalette;
 use editor::views::model::{ModelStrip, strip_of};
+use editor::views::tileset::SheetRect;
 use engine::core::content::FolderReader;
 use engine::core::math::Direction;
 use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
 use engine::systems::area::grid::{self, PaletteRow};
-use engine::systems::area::tileset::TilesetDef;
+use engine::systems::area::tileset::{TilesetDef, Walk};
 use image::RgbaImage;
 use testkit::path;
 
@@ -426,6 +428,87 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     if let Err(report) = &loaded {
         panic!("the folder loads after the re-import:\n{report}");
     }
+}
+
+#[test]
+fn importing_onto_an_open_tileset_lands_on_a_click_and_the_tileset_shows_on() {
+    let dir = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = crate::support::open(beach_game(), &dir);
+    let beach = path("tileset", "beach");
+    let old = art::tileset();
+    let mut wide = RgbaImage::new(old.width() + 64, old.height());
+    image::GenericImage::copy_from(&mut wide, &old, 0, 0).unwrap();
+    fill(&mut wide, old.width(), 0, 64, 16, [200, 90, 120, 255]);
+    let delivered = dir.path().join("beach_wide.png");
+    wide.save(&delivered).unwrap();
+    editor.open_tab(editor::tabs::EditorTab::Tileset { key: beach.clone() });
+    editor.place_tabs();
+    editor::import::dropped(&mut editor, vec![delivered]);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !editor.views.tileset.reimports.contains_key(&beach) {
+        assert!(std::time::Instant::now() < until, "the import reads");
+        editor::import::poll(&mut editor);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let mut frames = crate::support::Frames::new(egui::vec2(1600.0, 1000.0));
+    let mut show = |editor: &mut editor::app::Editor, events| {
+        frames.run(events, |ui| {
+            editor::views::tileset::show(editor, ui, &beach)
+        })
+    };
+    let confirm = show(&mut editor, Vec::new()).at("Import, as one step");
+
+    for events in crate::support::click(confirm) {
+        show(&mut editor, events);
+    }
+    let drawn = show(&mut editor, Vec::new());
+
+    let image = crate::support::files(&mut editor)
+        .get(&format!("{beach}/image.png"))
+        .map(|bytes| image::load_from_memory(bytes).expect("a png").to_rgba8());
+    assert_eq!(image.map(|image| image.width()), Some(wide.width()));
+    assert!(drawn.rect("Import, as one step").is_none(), "{drawn:?}");
+}
+
+#[test]
+fn tiles_selected_on_a_sheet_take_the_brush_in_one_step() {
+    let dir = tempfile::tempdir().expect("a scratch folder");
+    let mut editor = crate::support::open(beach_game(), &dir);
+    let beach = path("tileset", "beach");
+    editor.open_tab(editor::tabs::EditorTab::Tileset { key: beach.clone() });
+    editor.place_tabs();
+    let mut frames = crate::support::Frames::new(egui::vec2(1600.0, 1000.0));
+    let mut show = |editor: &mut editor::app::Editor, events| {
+        frames.run(events, |ui| {
+            editor::views::tileset::show(editor, ui, &beach)
+        })
+    };
+    show(&mut editor, Vec::new());
+    let selection = SheetRect {
+        x: 2,
+        y: 3,
+        w: 4,
+        h: 2,
+    };
+    let tiles: Vec<u32> = selection.tiles(art::COLUMNS).collect();
+    editor.views.tileset.view_mut(&beach).selection = Some(selection);
+    editor::views::tileset::select_tile(&mut editor, &beach, tiles[0]);
+    let walks = |editor: &mut editor::app::Editor| -> Vec<Option<Walk>> {
+        let row = crate::support::settled(editor)
+            .read::<TilesetDef>(&beach)
+            .expect("the tileset reads");
+        tiles.iter().map(|tile| row.walk(*tile)).collect()
+    };
+    let before = walks(&mut editor);
+    let paint = show(&mut editor, Vec::new()).at("Paint walk: blocks on these tiles");
+
+    for events in crate::support::click(paint) {
+        show(&mut editor, events);
+    }
+
+    assert_eq!(walks(&mut editor), vec![Some(Walk::Blocks); tiles.len()]);
+    editor.undo();
+    assert_eq!(walks(&mut editor), before);
 }
 
 #[test]

@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use ui::egui;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::face::Face;
-use design_tokens::ink::{Ground, Prose};
-use egui::emath::{GuiRounding, TSTransform};
-use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
+use ui::egui::emath::{GuiRounding, TSTransform};
+use ui::egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
+use ui::face::Face;
+use ui::ink::{Ground, Prose};
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band, GuiImage};
@@ -22,6 +23,7 @@ use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::{PlayedBy, session};
 use crate::systems::screen::ClientScreen;
+use ui::paint;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
@@ -257,10 +259,7 @@ fn plate_rect(gui: &egui::Context, top: egui::Pos2, size: egui::Vec2) -> egui::R
 }
 
 fn plate_size(gui: &egui::Context, label: &PlateLabel, icons: &[Option<GuiImage>]) -> egui::Vec2 {
-    let text = |text: String, font: FontId| {
-        gui.fonts_mut(|fonts| fonts.layout_no_wrap(text, font, Color32::WHITE))
-            .size()
-    };
+    let text = |text: String, font: FontId| paint::text_size(gui, &text, font);
     let icons = match icons.len() {
         0 => egui::Vec2::ZERO,
         count => egui::vec2(count as f32 * ICON + (count - 1) as f32 * ICON_GAP, ICON),

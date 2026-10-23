@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use cargo_metadata::MetadataCommand;
+use cargo_metadata::{Metadata, MetadataCommand};
 use engine::core::content::{FilesystemFolder, write};
 use engine::systems::{load_content, registry};
 use syn::UseTree;
@@ -43,13 +43,14 @@ fn main() {
         check_json_keys(&package.name, &src, &mut violations);
     }
     let root = metadata.workspace_root.as_std_path();
+    check_standalone(&metadata, &mut violations);
     let scratch = metadata.target_directory.as_std_path().join("lint");
     for game in SHIPPED_GAMES {
         check_shipped_game(game, &root.join(game), &scratch.join(game), &mut violations);
     }
 
     if violations.is_empty() {
-        println!("lint: layering, content keys, JSON keys and shipped games OK");
+        println!("lint: layering, standalone crates, content keys, JSON keys and shipped games OK");
         return;
     }
     for violation in &violations {
@@ -123,9 +124,44 @@ const CONTENT_CODE: &[&str] = &["engine", "editor", "showcase", "driver"];
 /// The files that walk a JSON Schema, keyed by the package they are in.
 const SCHEMA_WALKERS: &[(&str, &str)] = &[("editor", "schema.rs"), ("editor", "forms.rs")];
 
+/// The folders of the crates that know nothing of rift, so any game or tool could use them.
+const STANDALONE: &[&str] = &["ui", "bevy"];
+
 /// The game folders the repo ships: the example game, and the template the editor starts new games
 /// from.
 const SHIPPED_GAMES: &[&str] = &["example_game", "editor/templates/new_game"];
+
+fn check_standalone(metadata: &Metadata, out: &mut Vec<String>) {
+    let root = metadata.workspace_root.as_std_path();
+    let members: BTreeSet<&str> = metadata
+        .packages
+        .iter()
+        .map(|package| package.name.as_str())
+        .collect();
+    for package in &metadata.packages {
+        let folder = package
+            .manifest_path
+            .as_std_path()
+            .strip_prefix(root)
+            .expect("a member inside the workspace");
+        if !STANDALONE
+            .iter()
+            .any(|standalone| folder.starts_with(standalone))
+        {
+            continue;
+        }
+        for dependency in package
+            .dependencies
+            .iter()
+            .filter(|dependency| members.contains(dependency.name.as_str()))
+        {
+            out.push(format!(
+                "[{}] depends on `{}` — a standalone crate may not depend on another crate in this repo",
+                package.name, dependency.name
+            ));
+        }
+    }
+}
 
 /// A shipped game loads as a whole game, and every JSON and CSV file in it reads exactly as the
 /// editor writes it, so saving it in the editor changes only what was edited.

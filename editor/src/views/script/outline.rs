@@ -1,11 +1,14 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+use ui::egui;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::Mark;
-use egui::{Align2, Color32, FontId, Sense, Ui};
 use engine::core::content::{ContentFile, ContentNames};
 use engine::core::script::Exit;
 use engine::systems::script::{DialogueNode, Node, ScriptDef, Speaker};
+use ui::egui::{Align2, Color32, FontId, Sense, Ui};
+use ui::glyph::Mark;
 
 use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
 use super::nodes::{self, OutlineRow};
@@ -13,7 +16,6 @@ use super::{ScriptDoc, select_nodes};
 use crate::app::Editor;
 use crate::project::RowSelection;
 use crate::spans;
-use crate::ui::{theme, widgets};
 
 const ROW: f32 = 22.0;
 const INDENT: f32 = 26.0;
@@ -258,7 +260,7 @@ fn draw(
                     .unwrap_or_default(),
                 _ => String::new(),
             };
-            put(ui, &widgets::clip(&label, 60), &mono, theme::TEXT);
+            put(ui, &words::clip(&label, 60), &mono, theme::TEXT);
             put(ui, " → ", &mono, theme::FAINT);
             match line.target {
                 Some(target) => Some(&rows[target]),
@@ -318,7 +320,7 @@ fn summaries(editor: &Editor, doc: &ScriptDoc) -> HashMap<String, String> {
                 Node::Dialogue(dialogue) => dialogue_summary(editor, dialogue),
                 other => nodes::summary(other, &text),
             };
-            (name.clone(), widgets::clip(&summary, 70))
+            (name.clone(), words::clip(&summary, 70))
         })
         .collect()
 }
@@ -341,7 +343,7 @@ fn dialogue_summary(editor: &Editor, dialogue: &DialogueNode) -> String {
     let count = format!(
         "{} line{}",
         dialogue.lines.len(),
-        widgets::plural(dialogue.lines.len())
+        words::plural(dialogue.lines.len())
     );
     match speaker {
         Some(speaker) => format!("{speaker} · {count}"),

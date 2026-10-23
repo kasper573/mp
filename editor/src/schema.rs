@@ -5,14 +5,18 @@ use std::sync::{LazyLock, Mutex, OnceLock, PoisonError};
 use engine::core::assets::{AssetKind, AudioRef};
 use engine::core::content::fixture::FixtureLock;
 use engine::core::content::load::{ContentShapes, TableShape};
-use engine::core::content::locate;
+use engine::core::content::{
+    Content, ContentFile, ContentScope, fields_file, locate, with_content,
+};
+use engine::core::math::Pos;
 use engine::core::script::VariableType;
-use engine::systems::area::AreaModule;
+use engine::core::script::{Assignment, Target, ValueType};
+use engine::systems::area::{self, AreaDef, AreaModule};
 use engine::systems::registry;
-use engine::systems::script::Place;
+use engine::systems::script::{Condition, Place, RiftQuery, RunnerKind, ScriptDef};
 use serde_json::{Map, Value, json};
 
-use crate::project::ProjectFiles;
+use crate::project::{Project, ProjectFiles};
 
 pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,
@@ -423,6 +427,7 @@ fn collect_variants<'a>(
         .or_else(|| schema.get("anyOf"))
         .and_then(Value::as_array)
         && schema.get("properties").is_none()
+        && marker(schema).is_none()
     {
         for alternative in nested {
             collect_variants(root, alternative, variants, plain);
@@ -552,6 +557,12 @@ pub fn required(schema: &Value) -> Vec<&str> {
         .unwrap_or_default()
 }
 
+/// Whether `schema`, a map, keys rows the engine fixes: a sheet lists them, and none is added,
+/// removed or renamed.
+pub fn fixed_rows(schema: &Value) -> bool {
+    schema.get("x-fixed-rows").and_then(Value::as_bool) == Some(true)
+}
+
 pub fn description(schema: &Value) -> Option<&str> {
     schema.get("description")?.as_str()
 }
@@ -611,21 +622,151 @@ pub struct Nearby<'a> {
     pub files: &'a ProjectFiles,
     /// The file the value is written into, when it is known yet.
     pub from: Option<&'a str>,
+    /// The game as it last loaded, whose maps say where a fresh place may stand.
+    pub loaded: Option<&'a Content>,
+    /// What the script written into keeps by name, when the value is written into a script.
+    pub kept: Option<&'a KeptValues>,
+}
+
+/// The values a script names, each with its type: the locals that last one flow, the state its
+/// runner shares across flows, and the variables each runner gives it.
+#[derive(Clone, Default)]
+pub struct KeptValues {
+    pub locals: Vec<(String, ValueType)>,
+    pub state: Vec<(String, ValueType)>,
+    pub variables: Vec<(String, VariableType)>,
+}
+
+impl KeptValues {
+    pub fn of(script: &ScriptDef) -> KeptValues {
+        let listed = |kept: &BTreeMap<String, ValueType>| {
+            kept.iter().map(|(name, ty)| (name.clone(), *ty)).collect()
+        };
+        KeptValues {
+            locals: listed(&script.locals),
+            state: listed(&script.state),
+            variables: script
+                .variables
+                .iter()
+                .map(|(name, variable)| (name.clone(), variable.ty))
+                .collect(),
+        }
+    }
+
+    /// The first kept value, a local before state, as a target an assignment writes.
+    pub fn first(&self) -> Option<(Target, ValueType)> {
+        let local = self
+            .locals
+            .first()
+            .map(|(name, ty)| (Target::Local(name.clone()), *ty));
+        local.or_else(|| {
+            self.state
+                .first()
+                .map(|(name, ty)| (Target::State(name.clone()), *ty))
+        })
+    }
 }
 
 impl<'a> Nearby<'a> {
+    /// Values written into `from` in `project`.
+    pub fn of(project: &'a Project, from: Option<&'a str>) -> Nearby<'a> {
+        Nearby {
+            files: &project.files,
+            from,
+            loaded: project.content.as_ref(),
+            kept: None,
+        }
+    }
+
     /// Values made for no game, naming nothing: what a catalogue of every kind of value reads.
     pub fn nowhere() -> Nearby<'static> {
         static NONE: LazyLock<ProjectFiles> = LazyLock::new(ProjectFiles::default);
         Nearby {
             files: &NONE,
             from: None,
+            loaded: None,
+            kept: None,
         }
+    }
+
+    /// A place on the walkable cell nearest the corner of the area written into, or else of the
+    /// area nearest the file written into.
+    fn place(&self) -> Option<Value> {
+        let content = self.loaded?;
+        let area = self
+            .from
+            .and_then(|from| content.by_path::<AreaDef>(from))
+            .or_else(|| content.by_path::<AreaDef>(&self.content(AreaDef::TABLE)?))?;
+        let at = area::load(content, area)
+            .grid
+            .nearest_walkable(Pos::new(0.0, 0.0))?;
+        let place = Place { area, at };
+        with_content(ContentScope::of(content), || serde_json::to_value(place))
+            .0
+            .ok()
+    }
+
+    /// `place` moved to the walkable cell of its area nearest where it stands, as a place whose
+    /// area changed starts.
+    pub fn walkable(&self, place: &Value) -> Option<Value> {
+        let content = self.loaded?;
+        let scope = || ContentScope::of(content);
+        let mut place: Place = with_content(scope(), || serde_json::from_value(place.clone()))
+            .0
+            .ok()?;
+        place.at = area::load(content, place.area)
+            .grid
+            .nearest_walkable(place.at)?;
+        with_content(scope(), || serde_json::to_value(place)).0.ok()
     }
 
     /// The file of `table` nearest the file written into, by how far up their paths meet.
     pub fn content(&self, table: &str) -> Option<String> {
-        self.nearest(self.files.index().paths_of(table))
+        let from = self.from.map(fields_file);
+        self.nearest(
+            self.files
+                .index()
+                .paths_of(table)
+                .filter(|path| Some(fields_file(path)) != from),
+        )
+    }
+
+    /// An assignment of the first value the script keeps, to a value of its type: what a set
+    /// node writes first.
+    fn assignment(&self) -> Option<Value> {
+        let (target, ty) = self.kept?.first()?;
+        let to = match ty {
+            ValueType::Boolean => Condition::Bool(false),
+            ValueType::Integer => Condition::Int(0),
+            ValueType::Number => Condition::Num(0.0),
+            ValueType::Text => Condition::Text(String::new()),
+            ValueType::Actor => Condition::Query(RiftQuery::Subject),
+            ValueType::Actors | ValueType::Point | ValueType::Area => match &target {
+                Target::Local(name) => Condition::Local {
+                    local: name.clone(),
+                },
+                Target::State(name) => Condition::State {
+                    state: name.clone(),
+                },
+            },
+        };
+        serde_json::to_value(Assignment { target, to }).ok()
+    }
+
+    /// The script nearest the file written into that a script run by `kind` may run: one for that
+    /// kind, or for any.
+    pub fn script_run_by(&self, kind: RunnerKind) -> Option<String> {
+        let content = self.loaded?;
+        let scripts = content.table::<ScriptDef>();
+        let from = self.from.map(fields_file);
+        let index = self.files.index();
+        self.nearest(index.paths_of(ScriptDef::TABLE).filter(|path| {
+            Some(fields_file(path)) != from
+                && content.by_path::<ScriptDef>(path).is_some_and(|id| {
+                    matches!(scripts.row(id).runs_on, RunnerKind::Any)
+                        || scripts.row(id).runs_on == kind
+                })
+        }))
     }
 
     /// The media file of `kind` nearest the file written into.
@@ -652,7 +793,17 @@ pub fn template(root: &Value, schema: &Value, nearby: Nearby) -> Value {
     if let Some(default) = schema.get("default") {
         return default.clone();
     }
+    let fresh = match marker(resolve(root, schema)) {
+        Some("x-place") => nearby.place(),
+        Some("x-assignment") => nearby.assignment(),
+        _ => None,
+    };
+    if let Some(fresh) = fresh {
+        return fresh;
+    }
+    let least = minimum(schema);
     let schema = resolve(root, schema);
+    let least = least.or_else(|| minimum(schema)).unwrap_or(0.0);
     match kind(root, schema) {
         SchemaKind::Const(value) => value.clone(),
         SchemaKind::Enum(values) => Value::String(values.first().cloned().unwrap_or_default()),
@@ -688,8 +839,8 @@ pub fn template(root: &Value, schema: &Value, nearby: Nearby) -> Value {
         }
         SchemaKind::Map(_) => Value::Object(Map::new()),
         SchemaKind::Text => Value::String(named(schema, nearby).unwrap_or_default()),
-        SchemaKind::Integer => Value::from(minimum(schema).unwrap_or(0.0) as i64),
-        SchemaKind::Number => Value::from(minimum(schema).unwrap_or(0.0)),
+        SchemaKind::Integer => Value::from(least as i64),
+        SchemaKind::Number => Value::from(least),
         SchemaKind::Boolean => Value::Bool(false),
         SchemaKind::Null | SchemaKind::Any => Value::Null,
     }
@@ -843,6 +994,77 @@ pub fn holeable_fields(root: &Value, value: &Value) -> Vec<HoleableField> {
     let mut out = Vec::new();
     collect_holeable(root, root, value, "", &mut out);
     out
+}
+
+/// A field of a script node that holds its value or a variable of the script, as `Fill` does.
+pub struct VarField {
+    pub field: HoleableField,
+    /// The schema of a value it holds in place of a variable.
+    pub fixed: Value,
+}
+
+/// Every field of `value`, a value of the type whose schema is `schema` within `root`, that holds
+/// a value or the name of one of the script's variables.
+pub fn var_fields(root: &Value, schema: &Value, value: &Value) -> Vec<VarField> {
+    let mut out = Vec::new();
+    collect_var_fields(root, schema, value, "", &mut out);
+    out
+}
+
+fn collect_var_fields(
+    root: &Value,
+    schema: &Value,
+    value: &Value,
+    pointer: &str,
+    out: &mut Vec<VarField>,
+) {
+    let resolved = resolve(root, schema);
+    let schema = match kind(root, resolved) {
+        SchemaKind::Choice(alternatives)
+            if alternatives
+                .iter()
+                .any(|alternative| is_var_fill(alternative)) =>
+        {
+            resolved
+        }
+        _ => settle(root, schema, value),
+    };
+    match kind(root, schema) {
+        SchemaKind::Choice(alternatives)
+            if alternatives
+                .iter()
+                .any(|alternative| is_var_fill(alternative)) =>
+        {
+            let Some(fixed) = alternatives.iter().find(|alternative| {
+                !is_var_fill(alternative) && type_names(alternative) != ["null"]
+            }) else {
+                return;
+            };
+            let fixed = resolve(root, fixed);
+            let mut kinds = Vec::new();
+            collect_holeable(root, fixed, &Value::Null, pointer, &mut kinds);
+            if let Some(field) = kinds.pop() {
+                out.push(VarField {
+                    field,
+                    fixed: fixed.clone(),
+                });
+            }
+        }
+        SchemaKind::Object => {
+            for (name, field) in properties(schema) {
+                if let Some(child) = value.get(name) {
+                    let at = format!("{pointer}/{}", locate::escape(name));
+                    collect_var_fields(root, field, child, &at, out);
+                }
+            }
+        }
+        SchemaKind::Array(items) => {
+            for (index, child) in value.as_array().into_iter().flatten().enumerate() {
+                collect_var_fields(root, items, child, &format!("{pointer}/{index}"), out);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn collect_holeable(

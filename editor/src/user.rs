@@ -6,7 +6,7 @@ use engine::core::time::UnixMillis;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::ui::widgets;
+use crate::shell::widgets;
 
 // Per-user state stays outside content folders, so it never ships with a game.
 #[derive(Clone, Debug)]

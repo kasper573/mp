@@ -9,9 +9,12 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use ui::egui;
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{Content, ContentFile, ContentId, Loading, NamedContent, RowCheck};
+use crate::core::content::{
+    Content, ContentFile, ContentId, Loading, NamedContent, Nearby, RowCheck,
+};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::notification;
@@ -77,6 +80,22 @@ impl ClassDef {
 
 impl ContentFile for ClassDef {
     const TABLE: &'static str = "class";
+
+    fn fresh(near: &Nearby) -> Result<ClassDef, String> {
+        let first = ClassLevel {
+            xp: 0,
+            stats: Stats::default(),
+            skill_points: SkillPoints(1),
+        };
+        Ok(ClassDef {
+            name: near.name(),
+            icon: near.image()?,
+            flavour: String::new(),
+            levels: vec![first],
+            tree: SkillTree::default(),
+            backdrop: None,
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
@@ -255,7 +274,9 @@ pub fn check_all(loading: &mut Loading) {
 #[schemars(extend("x-system" = "class"))]
 pub struct GrantXp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
+    #[schemars(extend("default" = 10))]
     pub xp: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,

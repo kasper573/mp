@@ -1,6 +1,11 @@
 use std::collections::BTreeSet;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use egui::{RichText, Ui};
 use engine::core::content::{Content, ContentFile, fields_file};
 use engine::core::script::{Expr, MayDo};
 use engine::systems::area::blueprint::BlueprintDef;
@@ -10,6 +15,7 @@ use engine::systems::script::{
     VarValue,
 };
 use engine::systems::stat::StatKind;
+use ui::egui::{RichText, Ui};
 
 use super::nodes::{self, NodeReads, NodeText};
 use super::{ScriptDoc, ScriptPanel, ScriptPath, ScriptRef, ScriptRow, run};
@@ -18,7 +24,6 @@ use crate::project::RowSelection;
 use crate::project::files::content_of;
 use crate::tabs::shown_path;
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::{theme, widgets};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
     match panel {
@@ -160,7 +165,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if bound.len() > 1 {
         ui.horizontal(|ui| {
             ui.label(theme::muted("as").size(13.0));
-            widgets::combo(pick_id)
+            controls::combo(pick_id)
                 .selected_text(
                     theme::mono(
                         bound
@@ -207,7 +212,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     ui.add_space(16.0);
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width());
-                        widgets::section(ui, "Read by");
+                        sheet::section(ui, "Read by");
                         for (who, what) in &read_by {
                             ui.horizontal(|ui| {
                                 ui.add_sized(
@@ -216,7 +221,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                                 );
                                 ui.add(egui::Label::new(theme::muted(what).size(13.0)).wrap());
                             });
-                            widgets::rule(ui);
+                            form::rule(ui);
                         }
                     });
                 }
@@ -326,7 +331,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             "says",
             format!(
                 "{dialogue_count} dialogue node{} to the subject{by}{more}",
-                widgets::plural(dialogue_count)
+                words::plural(dialogue_count)
             ),
         ));
     }
@@ -707,7 +712,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         }
     }
     if rows.is_empty() {
-        widgets::hint(ui, "Nothing names this script yet.");
+        form::hint(ui, "Nothing names this script yet.");
         return;
     }
     let owners: BTreeSet<(&str, &str)> = rows
@@ -744,7 +749,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         module: row.module.clone(),
                     });
                 }
-                widgets::rule(ui);
+                form::rule(ui);
             }
             if rows.len() > shown {
                 let all_areas = owners.iter().all(|(table, _)| *table == AreaDef::TABLE);
@@ -754,7 +759,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         rows.len() - shown,
                         owners.len(),
                         if all_areas { "area" } else { "owner" },
-                        widgets::plural(owners.len()),
+                        words::plural(owners.len()),
                         if all_areas {
                             "area with it selected"
                         } else {

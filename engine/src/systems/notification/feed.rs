@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::time::Duration;
+use ui::egui;
 
 use bevy::prelude::*;
-use design_tokens::ink::{self, Ground};
-use egui::{Color32, Id, Pos2, Rect, Vec2};
+use ui::egui::{Color32, Id, Pos2, Rect, Vec2};
+use ui::ink::{self, Ground};
 
 use super::rows::{self, Clock, Fades, Move, Presence, Swell};
 use super::{Notification, NotificationKind, NotificationSent, reading, window_visible};

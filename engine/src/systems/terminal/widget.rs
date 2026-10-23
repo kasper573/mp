@@ -1,13 +1,16 @@
 use bevy::prelude::*;
 use bevy_terminal::{LineTone, TerminalInput};
-use design_tokens::face::TextRole;
-use design_tokens::{controls, ink, sheet};
-use egui::{Id, Pos2, Stroke, Ui};
+use ui::egui;
+use ui::egui::{Id, Stroke, Ui};
+use ui::face::TextRole;
+use ui::input::InputField;
+use ui::{ink, sheet};
 
 use crate::systems::hud::{self, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::terminal::TerminalLog;
+use ui::form;
 
 const TITLE: &str = "Terminal";
 
@@ -49,17 +52,9 @@ fn log(ui: &mut Ui, world: &World) {
                 LineTone::Said => ink::INK,
                 LineTone::Failed => ink::RUBRIC,
             };
-            let shown = ui
-                .add(egui::Label::new(TextRole::Mono.rich(line.text.as_str()).color(color)).wrap());
-            let rect = shown.rect.expand2(egui::vec2(0.0, 2.0));
-            let y = rect.max.y;
-            ui.painter().line_segment(
-                [
-                    Pos2::new(ui.max_rect().min.x, y),
-                    Pos2::new(ui.max_rect().max.x, y),
-                ],
-                Stroke::new(1.0, ink::ink_wash(0.12)),
-            );
+            ui.add(egui::Label::new(TextRole::Mono.rich(line.text.as_str()).color(color)).wrap());
+            ui.add_space(2.0);
+            form::rule_with(ui, Stroke::new(1.0, ink::ink_wash(0.12)));
             ui.add_space(4.0);
         }
     });
@@ -73,14 +68,10 @@ fn command_line(ui: &mut Ui, world: &mut World, arrived: bool) {
     let field = ui
         .horizontal(|ui| {
             ui.label(TextRole::Mono.rich(">").color(ink::INK2));
-            controls::text_field(
-                ui,
-                egui::TextEdit::singleline(&mut draft)
-                    .id(Id::new("terminal field"))
-                    .font(TextRole::Mono.font_id())
-                    .desired_width(f32::INFINITY)
-                    .return_key(send),
-            )
+            InputField::new(&mut draft)
+                .id(Id::new("terminal field"))
+                .return_key(send)
+                .show(ui)
         })
         .inner;
     let submitted = field.lost_focus()

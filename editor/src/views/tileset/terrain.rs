@@ -1,17 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet};
+use ui::controls;
+use ui::dialog;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::theme;
 
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::systems::area::tileset::TilesetDef;
 use strum::VariantArray;
+use ui::egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::{NewTerrainSetDialog, OpenTileset, TERRAINS_PART, sheet, tile_mut, try_change_tileset};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{theme, widgets};
+use crate::rows;
 use crate::views::area::palette::terrain_color;
-use crate::{forms, rows};
+use ui::input::InputField;
 
 const CLOSEUP: f32 = 192.0;
 
@@ -162,11 +167,11 @@ pub fn current_set(editor: &mut Editor, tileset: &OpenTileset) -> Option<String>
 
 pub fn legend(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let Some(set) = current_set(editor, tileset) else {
-        widgets::hint(ui, "no terrain sets yet");
+        form::hint(ui, "no terrain sets yet");
         return;
     };
     let view = editor.views.tileset.view_mut(&tileset.key);
-    widgets::combo(("terrain-set", &tileset.key))
+    controls::combo(("terrain-set", &tileset.key))
         .selected_text(theme::mono(&set))
         .width(110.0)
         .show_ui(ui, |ui| {
@@ -251,7 +256,7 @@ pub fn shape(painter: &egui::Painter, center: Pos2, radius: f32, index: usize, f
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let Some(set) = current_set(editor, tileset) else {
-        widgets::hint(ui, "This tileset declares no terrain set.");
+        form::hint(ui, "This tileset declares no terrain set.");
         return;
     };
     let key = tileset.key.as_str();
@@ -331,7 +336,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             "Clicking a corner sets the terrain picked above;",
         ));
         for digit in (0..terrains.len()).map_while(EditorKey::digit_name) {
-            widgets::key_hint(ui, digit);
+            controls::key_hint(ui, digit);
         }
         ui.label(theme::muted(
             "pick one. The area brush reads these corners.",
@@ -383,7 +388,7 @@ pub fn remove_set(editor: &mut Editor, tileset: &OpenTileset, set: &str) {
 
 pub fn mixes(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let Some(set) = current_set(editor, tileset) else {
-        widgets::hint(ui, "no terrain set");
+        form::hint(ui, "no terrain set");
         return;
     };
     let terrains = tileset.terrains(&set);
@@ -457,43 +462,33 @@ pub fn new_set_dialog(
     mut dialog: NewTerrainSetDialog,
 ) -> Option<NewTerrainSetDialog> {
     let mut answer = None;
-    dialogs::card(ctx, "new-terrain-set", 420.0, |ui| {
+    dialog::card(ctx, "new-terrain-set", 420.0, |ui| {
         ui.label(RichText::new("New terrain set").size(16.0).strong());
         ui.add_space(6.0);
         ui.label(theme::muted(
             "Two to eight terrains; the first is the base an empty cell reads as.",
         ));
         ui.add_space(8.0);
-        widgets::kv(ui, "set", |ui| {
-            let response = forms::boxed_input(ui, None, |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut dialog.name)
-                        .desired_width(220.0)
-                        .font(egui::TextStyle::Monospace),
-                )
-            });
-            widgets::default_focus(ui, &response);
+        form::kv(ui, "set", |ui| {
+            let response = InputField::new(&mut dialog.name).width(220.0).show(ui);
+            input::default_focus(ui, &response);
         });
-        widgets::kv(ui, "terrains", |ui| {
-            forms::boxed_input(ui, None, |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut dialog.terrains)
-                        .desired_width(220.0)
-                        .font(egui::TextStyle::Monospace)
-                        .hint_text("floor, rug"),
-                )
-            });
+        form::kv(ui, "terrains", |ui| {
+            InputField::new(&mut dialog.terrains)
+                .hint("floor, rug")
+                .width(220.0)
+                .show(ui);
         });
         if let Some(error) = &dialog.error {
             ui.colored_label(theme::DANGER, error);
         }
         ui.add_space(10.0);
-        answer = dialogs::answer_row(ui, "Add set");
+        answer = dialog::answer_row(ui, "Add set");
     });
     match answer {
         None => Some(dialog),
-        Some(DialogAnswer::Cancel) => None,
-        Some(DialogAnswer::Confirm) => match add_set(editor, tileset, &dialog) {
+        Some(dialog::Answer::Cancel) => None,
+        Some(dialog::Answer::Confirm) => match add_set(editor, tileset, &dialog) {
             Ok(()) => None,
             Err(error) => Some(NewTerrainSetDialog {
                 error: Some(error),
@@ -534,7 +529,7 @@ fn add_set(
 
 fn close_up(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset, set: &str) {
     let Some(tile) = editor.views.tileset.view(&tileset.key).closeup else {
-        widgets::hint(ui, "Click a tile's corner to see it close up here.");
+        form::hint(ui, "Click a tile's corner to see it close up here.");
         return;
     };
     let terrains = tileset.terrains(set);

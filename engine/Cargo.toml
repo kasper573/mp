@@ -69,7 +69,7 @@ bevy = { workspace = true, features = [
     "webgl2",
     "web",
 ] }
-design_tokens = { path = "../design_tokens" }
+ui = { path = "../ui" }
 bevy_tilemap = { path = "../bevy/tilemap" }
 bevy_terminal = { path = "../bevy/terminal" }
 bevy_app.workspace = true
@@ -78,7 +78,6 @@ bevy_platform.workspace = true
 slotmap.workspace = true
 smallvec.workspace = true
 bevy_egui.workspace = true
-egui.workspace = true
 accesskit = "0.24"
 bevy_replicon = { workspace = true, features = ["client", "server"] }
 bevy_state.workspace = true

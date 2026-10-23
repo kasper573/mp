@@ -51,13 +51,13 @@ impl RowCheck {
 
     pub fn text(&mut self, pointer: impl Into<String>, text: &str, min: usize, max: usize) {
         let length = text.chars().count();
-        if text.trim().is_empty() || length < min || length > max {
-            self.error(
-                pointer,
-                "out of range",
-                format!("{text:?}"),
-                format!("{min} to {max} characters, not blank"),
-            );
+        let blank = min > 0 && text.trim().is_empty();
+        if blank || length < min || length > max {
+            let expected = match min {
+                0 => format!("at most {max} characters"),
+                _ => format!("{min} to {max} characters, not blank"),
+            };
+            self.error(pointer, "out of range", format!("{text:?}"), expected);
         }
     }
 

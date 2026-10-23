@@ -163,40 +163,48 @@ pub enum Among {
 pub enum RiftQuery {
     Level {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
     },
     IsClass {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         class: ClassId,
     },
     SkillRank {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         skill: SkillId,
     },
     SkillStat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         skill: SkillId,
         stat: SkillStat,
     },
     SpentSkillPoints {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
     },
     Stat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         stat: StatKind,
     },
     HasStatus {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         effect: StatusEffectId,
     },
     StatusCount {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         category: Option<StatusCategory>,
@@ -204,67 +212,81 @@ pub enum RiftQuery {
     StatusPower,
     Holding {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         item: ItemId,
     },
     FreeSlots {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
     },
     Wearing {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         item: ItemId,
     },
     Memory {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         memory: MemoryId,
     },
     SetWithin {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         memory: MemoryId,
+        #[schemars(extend("default" = 60.0))]
         seconds: Box<Condition>,
     },
     OnQuest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         quest: QuestId,
     },
     QuestCooling {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         quest: QuestId,
     },
     TaskDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         quest: QuestId,
         task: String,
     },
     QuestResetsIn {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         quest: QuestId,
     },
     Inside {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         object: String,
     },
     InArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         area: AreaId,
     },
     KnowsArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         of: Option<Box<Condition>>,
         area: AreaId,
     },
@@ -272,38 +294,48 @@ pub enum RiftQuery {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         npc: Option<NpcId>,
+        #[schemars(extend("default" = 6.0))]
         within: Box<Condition>,
     },
     Count {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         npc: Option<NpcId>,
+        #[schemars(extend("default" = 6.0))]
         within: Box<Condition>,
     },
     Present {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     Distance {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     Health {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     IsNpc {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     Subject,
     Target,
     Walking {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     Hostile {
+        #[schemars(extend("default" = {"type": "subject"}))]
         actor: Box<Condition>,
     },
     GroundItems {
         item: ItemId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(extend("default" = {"type": "subject"}))]
         at: Option<Box<Condition>>,
+        #[schemars(extend("default" = 6.0))]
         within: Box<Condition>,
     },
     SkillTargets,

@@ -15,7 +15,7 @@ editor grow by building it: every feature is made for it and proven on it.
 | [`engine/`](engine) | The engine: the simulation the server and clients share, the game server, the browser (wasm) and desktop clients, and the bench, load test and lint tools. |
 | [`editor/`](editor) | The editor: opens a game folder, edits it through the engine's own loader and writer, and play-tests it on the engine's binaries. |
 | [`example_game/`](example_game) | The example game: a game folder like any other, and what production runs. |
-| [`design_tokens/`](design_tokens) | The look the editor and the game share: colors, shapes, text roles, fonts and themed egui helpers. |
+| [`ui/`](ui) | The interface the editor and the game share: colors, shapes, text roles, fonts and every general-purpose egui component, so both look and behave alike. |
 | [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and a server-authoritative terminal. |
 | [`testkit/`](testkit), [`driver/`](driver), [`showcase/`](showcase) | Testing and showing the game: small games declared in code and a bare world of only the systems a test runs, and real clients driven by real input for the showcase's recorded chapters. |
 | [`website/`](website), [`service/`](service), [`docker/`](docker), [`e2e/`](e2e) | The hosted game: the website, the stack it runs in, and the browser suite that tests it. |

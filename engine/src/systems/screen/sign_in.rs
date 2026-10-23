@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{controls, ink};
+use ui::egui;
+use ui::input::InputField;
+use ui::{controls, ink};
 
 use super::{ClientScreen, note, pace_as_before, pace_slowly, panel, system_screen};
 use crate::core::content::Content;
@@ -129,12 +131,10 @@ fn any_account(
     if let Some(failure) = failure {
         ui.label(failure);
     }
-    let field = controls::text_field(
-        ui,
-        egui::TextEdit::singleline(name)
-            .hint_text("Account name")
-            .return_key(submit),
-    );
+    let field = InputField::new(name)
+        .hint("Account name")
+        .return_key(submit)
+        .show(ui);
     let entered = field.lost_focus()
         && submit.is_some_and(|submit| ui.input(|input| input.key_pressed(submit.logical_key)));
     if ui.memory(|memory| memory.focused().is_none()) {

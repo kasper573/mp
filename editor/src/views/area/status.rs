@@ -1,12 +1,14 @@
-use egui::{Rect as ERect, Vec2};
 use engine::core::tiling::{Cell, TilePos};
 use engine::systems::area::{self, Pictured};
+use ui::egui;
+use ui::egui::{Rect as ERect, Vec2};
+use ui::theme;
+use ui::words;
 
 use super::{AreaFrame, AreaTool, Armed, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::tabs::file_title;
-use crate::ui::{theme, widgets};
 
 pub(super) fn status_bar(
     editor: &mut Editor,
@@ -35,7 +37,7 @@ pub(super) fn status_bar(
         left.push(format!(
             "{} · {parts} part{}",
             file_title(blueprint),
-            widgets::plural(parts)
+            words::plural(parts)
         ));
         left.push(
             placement::placement_count(&frame.content, blueprint)
@@ -156,7 +158,7 @@ pub(super) fn status_bar(
         let galley = painter.layout_no_wrap(text, egui::FontId::monospace(12.0), theme::TEXT);
         let at = frame.canvas.screen.min + Vec2::new(16.0, 12.0);
         let back = ERect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0));
-        design_tokens::slip::paint(painter, back);
+        ui::slip::paint(painter, back);
         painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT);
     }
 }

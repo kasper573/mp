@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use ui::egui;
 
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContext, EguiGlobalSettings, EguiOutput, EguiPlugin, EguiPostUpdateSet,
     EguiPrimaryContextPass, PrimaryEguiContext,
 };
-use egui::load::SizedTexture;
-use egui::{LayerId, Order};
 use strum::VariantArray;
+use ui::egui::load::SizedTexture;
+use ui::egui::{LayerId, Order};
 
 use crate::core::assets::ImageRef;
 
@@ -158,97 +159,6 @@ pub fn world_area(world: &mut World, id: impl Hash + std::fmt::Debug) -> egui::A
         .constrain(false)
 }
 
-/// egui places an area by the size it had the pass before, so one held by any point but its top
-/// left shows out of place on the pass its size changes, and that pass is drawn again.
-pub fn show_anchored<R>(
-    gui: &egui::Context,
-    area: egui::Area,
-    add: impl FnOnce(&mut egui::Ui) -> R,
-) -> egui::InnerResponse<R> {
-    let before = gui.memory(|memory| memory.area_rect(area.layer().id));
-    let shown = area.show(gui, add);
-    if before.is_some_and(|before| before.size() != shown.response.rect.size()) {
-        gui.request_discard("an anchored area changed size");
-    }
-    shown
-}
-
-/// What a layer drew in its last pass, kept to be drawn again after what it showed is gone, so a
-/// sheet whose content has ended can still lift off the table.
-#[derive(Clone, Default)]
-pub struct Afterimage(Vec<egui::epaint::ClippedShape>);
-
-impl Afterimage {
-    pub fn of(gui: &egui::Context, layer: LayerId) -> Afterimage {
-        Afterimage(gui.graphics(|graphics| {
-            graphics
-                .get(layer)
-                .map(|list| list.all_entries().cloned().collect())
-                .unwrap_or_default()
-        }))
-    }
-
-    pub fn paint(&self, painter: &egui::Painter) {
-        for shape in &self.0 {
-            painter
-                .with_clip_rect(shape.clip_rect)
-                .add(shape.shape.clone());
-        }
-    }
-}
-
-/// A widget's tooltip opens once the pointer has been on it a moment, however the pointer moves or
-/// clicks there, and at once while another has only just closed. egui's own waits for the pointer to
-/// rest, and after a click to move again, so it never opened on a widget the player clicks.
-pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
-    let gui = &response.ctx;
-    let key = response.id.with("tooltip");
-    if !response.contains_pointer() || gui.dragged_id().is_some() || egui::Popup::is_any_open(gui) {
-        gui.data_mut(|data| data.remove::<Pointed>(key));
-        return;
-    }
-    let (delay, grace) = {
-        let style = gui.global_style();
-        (
-            style.interaction.tooltip_delay,
-            style.interaction.tooltip_grace_time,
-        )
-    };
-    let (now, pass) = (gui.input(|input| input.time), gui.cumulative_pass_nr());
-    let since = gui.data_mut(|data| {
-        let since = data
-            .get_temp::<Pointed>(key)
-            .filter(|pointed| pointed.pass + 1 >= pass)
-            .map_or(now, |pointed| pointed.since);
-        data.insert_temp(key, Pointed { since, pass });
-        since
-    });
-    let follows_another = egui::Tooltip::seconds_since_last_tooltip(gui) < grace;
-    if follows_another || now - since >= f64::from(delay) {
-        egui::Tooltip::for_widget(response).show(add);
-    }
-}
-
-/// A menu at the pointer, laid out as a right-click menu is, but opened whenever `open` says.
-pub fn pointer_menu<R>(
-    response: &egui::Response,
-    open: bool,
-    add: impl FnOnce(&mut egui::Ui) -> R,
-) -> Option<R> {
-    let command = if open {
-        Some(egui::SetOpenCommand::Bool(true))
-    } else if response.clicked() {
-        Some(egui::SetOpenCommand::Bool(false))
-    } else {
-        None
-    };
-    egui::Popup::menu(response)
-        .open_memory(command)
-        .at_pointer_fixed()
-        .show(add)
-        .map(|shown| shown.inner)
-}
-
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.
 pub fn image(world: &mut World, asset: &ImageRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
@@ -289,49 +199,13 @@ pub fn pointer_claimed(world: &World) -> bool {
         || gui.viewport(|viewport| viewport.hits.click.is_some() || viewport.hits.drag.is_some())
 }
 
-/// egui keeps a root layer under the whole screen for panels to catch clicks on, which this
-/// interface never draws on.
-pub fn layer_at(gui: &egui::Context, at: egui::Pos2) -> Option<LayerId> {
-    gui.layer_id_at(at)
-        .filter(|&layer| layer != LayerId::background())
-}
-
 /// Whether the interface is dragging something, which follows the pointer while it lasts.
 pub fn dragging(world: &World) -> bool {
     context(world).is_some_and(|gui| gui.dragged_id().is_some())
 }
 
-/// Draws what follows the pointer, its top left `from` the pointer, in the frame the pointer is read:
-/// never kept on screen or faded in, as egui does to its areas, which would part it from the pointer.
-pub fn at_pointer<R>(
-    gui: &egui::Context,
-    id: egui::Id,
-    band: Band,
-    from: egui::Vec2,
-    add: impl FnOnce(&mut egui::Ui) -> R,
-) -> Option<R> {
-    let at = gui.pointer_latest_pos()?;
-    let shown = egui::Area::new(id)
-        .order(band.order())
-        .fixed_pos(at + from)
-        .interactable(false)
-        .constrain(false)
-        .fade_in(false)
-        .show(gui, add);
-    Some(shown.inner)
-}
-
 pub fn cursor(world: &World) -> egui::CursorIcon {
     world.resource::<GuiCursor>().0
-}
-
-const TOOLTIP_DELAY_SECS: f32 = 0.4;
-const TOOLTIP_GRACE_SECS: f32 = 0.3;
-
-#[derive(Clone, Copy)]
-struct Pointed {
-    since: f64,
-    pass: u64,
 }
 
 #[derive(Resource, Default)]
@@ -353,14 +227,7 @@ fn adopt_context(
         return;
     };
     let gui = context.get_mut().clone();
-    design_tokens::apply(&gui);
-    // A window's corner reaches this far past its edge for a resize, which would take the clicks
-    // meant for a slot in the window beside it.
-    gui.all_styles_mut(|style| {
-        style.interaction.resize_grab_radius_corner = style.interaction.resize_grab_radius_side;
-        style.interaction.tooltip_delay = TOOLTIP_DELAY_SECS;
-        style.interaction.tooltip_grace_time = TOOLTIP_GRACE_SECS;
-    });
+    ui::apply(&gui);
     gui.options_mut(|options| options.zoom_with_keyboard = false);
     commands.insert_resource(GuiContext(gui));
 }

@@ -44,6 +44,7 @@ pub struct Say {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text: Vec<Span>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 8.0))]
     pub within: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,

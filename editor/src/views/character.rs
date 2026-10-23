@@ -1,8 +1,14 @@
 use std::sync::Arc;
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::menu;
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, Ui, Vec2};
 use engine::core::content::{Content, ContentFile, ContentId, FolderReader, fields_file};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
@@ -28,21 +34,26 @@ use engine::systems::skill::{HOTBAR_SLOTS, HotbarEntry, HotbarSlot, Rank, SkillD
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use strum::{AsRefStr, VariantArray};
+use ui::controls;
+use ui::egui::{Align, Layout, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::project::ContentEdit;
+use crate::shell::browser::BrowserAction;
+use crate::shell::{row_form, widgets};
 use crate::tabs::{EditorTab, file_title, shown_path};
-use crate::ui::browser::BrowserAction;
-use crate::ui::{row_form, theme, widgets};
 use crate::views::area::AreaViews;
 use crate::{picker, play, stage};
+use ui::input::{InputField, NumberField};
 
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;
 const MAP: Vec2 = Vec2::new(272.0, 96.0);
 const SLOT_WIDTH: f32 = 90.0;
+const MEMORY_WIDTH: f32 = 140.0;
 const HOTBAR_COLUMN: f32 = 440.0;
 
 #[derive(Default)]
@@ -158,7 +169,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         .monospace()
                         .size(11.5),
                 );
-                widgets::dropdown_menu(ui, theme::faint("other…"), |ui| {
+                menu::dropdown(ui, theme::faint("other…"), |ui| {
                     for other in &characters {
                         if ui
                             .selectable_label(
@@ -179,7 +190,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
                 if selected {
-                    ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+                    paint::row_wash(ui.painter(), rect);
                 } else if response.hovered() {
                     ui.painter().rect_filled(rect, 4.0, theme::RAISED);
                 }
@@ -303,7 +314,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
         ui.vertical(|ui| {
             ui.set_width(preview_width);
-            widgets::section(ui, "preview");
+            sheet::section(ui, "preview");
             row_form::preview::show(editor, ui, CharacterSnapshot::TABLE, key);
         });
     });
@@ -359,13 +370,13 @@ fn identity(
     let classes = sheet.reader.paths_of::<ClassDef>();
     let level = level_of(cx, sheet, character);
     card(ui, "Identity", |ui| {
-        widgets::kv(ui, "name", |ui| {
+        form::kv(ui, "name", |ui| {
             changed |= forms::of_type(ui, cx, &mut character.name, field!(CharacterSnapshot, name));
         });
-        widgets::kv(ui, "class", |ui| {
+        form::kv(ui, "class", |ui| {
             let current = sheet.path_of(character.class);
             let mut picked = current.clone();
-            widgets::combo("character-class")
+            controls::combo("character-class")
                 .width(ui.available_width() - 8.0)
                 .truncate()
                 .selected_text(theme::mono(shown_path(&current)).size(13.0))
@@ -381,13 +392,9 @@ fn identity(
                 changed = FormChange::at(field!(CharacterSnapshot, class));
             }
         });
-        widgets::kv(ui, "xp", |ui| {
-            let mut draft = character.xp;
-            let response = forms::boxed_input(ui, Some(&format!("level {level}")), |ui| {
-                ui.add(egui::DragValue::new(&mut draft).speed(1.0))
-            });
-            if response.changed() && draft != character.xp {
-                character.xp = draft;
+        form::kv(ui, "xp", |ui| {
+            let level = format!("level {level}");
+            if NumberField::new(&mut character.xp).unit(&level).show(ui) {
                 changed = FormChange::at(field!(CharacterSnapshot, xp));
             }
         });
@@ -424,7 +431,7 @@ fn bag(
         for (index, stack) in character.bag.iter_mut().enumerate() {
             let path = format!("{}/{index}", field!(CharacterSnapshot, bag));
             ui.horizontal(|ui| {
-                if widgets::remove_button(ui, "Remove").clicked() {
+                if controls::remove(ui, "Remove").clicked() {
                     remove = Some(index);
                 }
                 let mut picked = false;
@@ -440,12 +447,12 @@ fn bag(
                     stack.count = stack.count.clamp(1, cap);
                     changed = FormChange::at(&path);
                 }
-                let mut draft = stack.count;
-                let response = forms::boxed_input(ui, Some(&format!("/{cap}")), |ui| {
-                    ui.add(egui::DragValue::new(&mut draft).speed(0.2).range(1..=cap))
-                });
-                if response.changed() && draft != stack.count {
-                    stack.count = draft;
+                let of = format!("/{cap}");
+                if NumberField::new(&mut stack.count)
+                    .range(1..=cap)
+                    .unit(&of)
+                    .show(ui)
+                {
                     changed = FormChange::at(&path);
                 }
             });
@@ -497,9 +504,9 @@ fn equipment(
                 .equipment
                 .get(slot)
                 .map(|&item| sheet.path_of(item));
-            widgets::kv(ui, slot.label(), |ui| {
+            form::kv(ui, slot.label(), |ui| {
                 let mut picked = current.clone();
-                widgets::combo(("equipment", slot.label()))
+                controls::combo(("equipment", slot.label()))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
                         Some(item) => theme::mono(shown_path(item)).size(13.0),
@@ -552,11 +559,11 @@ fn skills(
                 .as_ref()
                 .map_or(0, |skill| skill.cost_to(learned.rank).0);
             ui.horizontal(|ui| {
-                if widgets::remove_button(ui, "Forget").clicked() {
+                if controls::remove(ui, "Forget").clicked() {
                     remove = Some(index);
                 }
                 let mut picked = learned.node.clone();
-                widgets::combo(("learned-node", index))
+                controls::combo(("learned-node", index))
                     .width(170.0)
                     .selected_text(theme::mono(learned.node.as_str()).size(13.0))
                     .show_ui(ui, |ui| {
@@ -569,10 +576,12 @@ fn skills(
                     changed = FormChange::at(&path);
                 }
                 let mut draft = learned.rank.0.min(ranks);
-                let response = forms::boxed_input(ui, Some(&format!("of {ranks}")), |ui| {
-                    ui.add(egui::DragValue::new(&mut draft).range(1..=ranks))
-                });
-                if draft != learned.rank.0 && (response.changed() || draft < learned.rank.0) {
+                let of = format!("of {ranks}");
+                let typed = NumberField::new(&mut draft)
+                    .range(1..=ranks)
+                    .unit(&of)
+                    .show(ui);
+                if draft != learned.rank.0 && (typed || draft < learned.rank.0) {
                     learned.rank = Rank(draft);
                     changed = FormChange::at(&path);
                 }
@@ -611,37 +620,30 @@ fn skills(
 fn hotbar(ui: &mut Ui, cx: &mut FormCx, character: &mut CharacterSnapshot) -> FormChange {
     let mut changed = FormChange::default();
     let mut remove = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(HOTBAR_COLUMN);
-        widgets::card_title(ui, "Hotbar");
-        widgets::kv(ui, "basic attack", |ui| {
+        panel::title(ui, "Hotbar");
+        form::kv(ui, "basic attack", |ui| {
             let path = field!(CharacterSnapshot, basic_attack);
             if picker::maybe_content(ui, cx, &mut character.basic_attack, path) {
                 changed = FormChange::at(path);
             }
         });
         ui.label(theme::faint("empty, a worn weapon that grants one fills it").size(12.0));
-        widgets::section(ui, "slots");
+        sheet::section(ui, "slots");
         for (index, entry) in character.hotbar.iter_mut().enumerate() {
             let path = format!("{}/{index}", field!(CharacterSnapshot, hotbar));
             ui.horizontal(|ui| {
-                if widgets::remove_button(ui, "Empty the slot").clicked() {
+                if controls::remove(ui, "Empty the slot").clicked() {
                     remove = Some(index);
                 }
                 let mut draft = entry.slot.0;
-                let response = ui
-                    .allocate_ui_with_layout(
-                        egui::vec2(SLOT_WIDTH, ui.spacing().interact_size.y),
-                        Layout::left_to_right(Align::Center),
-                        |ui| {
-                            ui.set_width(SLOT_WIDTH);
-                            forms::boxed_input(ui, Some("slot"), |ui| {
-                                ui.add(egui::DragValue::new(&mut draft).range(0..=HOTBAR_SLOTS - 1))
-                            })
-                        },
-                    )
-                    .inner;
-                if response.changed() && draft != entry.slot.0 {
+                let typed = NumberField::new(&mut draft)
+                    .range(0..=HOTBAR_SLOTS - 1)
+                    .unit("slot")
+                    .width(SLOT_WIDTH)
+                    .show(ui);
+                if typed && draft != entry.slot.0 {
                     entry.slot = HotbarSlot(draft);
                     changed = FormChange::at(&path);
                 }
@@ -742,7 +744,7 @@ fn start(
         CharacterStart::At(place) => (false, sheet.path_of(place.area), place.at),
     };
     card(ui, "Start", |ui| {
-        widgets::kv(ui, "area", |ui| {
+        form::kv(ui, "area", |ui| {
             if at_spawn {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(theme::faint("· the initial spawn").size(12.0));
@@ -760,22 +762,13 @@ fn start(
                 }
             }
         });
-        widgets::kv(ui, "at", |ui| {
+        form::kv(ui, "at", |ui| {
             if at_spawn {
                 ui.label(theme::mono(format!("{}, {}", at.x, at.y)).size(13.0));
                 ui.label(theme::faint("tiles").size(12.0));
             } else if let CharacterStart::At(place) = &mut character.start {
                 let (mut x, mut y) = (at.x, at.y);
-                let response = forms::boxed_input(ui, Some("tiles"), |ui| {
-                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        let a = ui.add(egui::DragValue::new(&mut x).speed(0.5).fixed_decimals(1));
-                        ui.label(theme::faint(","));
-                        let b = ui.add(egui::DragValue::new(&mut y).speed(0.5).fixed_decimals(1));
-                        a | b
-                    })
-                    .inner
-                });
-                if response.changed() && (x != at.x || y != at.y) {
+                if NumberField::of([&mut x, &mut y]).unit("tiles").show(ui) {
                     place.at = Pos::new(x, y);
                     changed = FormChange::at(path);
                 }
@@ -788,15 +781,10 @@ fn start(
             let (rect, _) = ui.allocate_exact_size(MAP, egui::Sense::hover());
             let ppp = ui.ctx().pixels_per_point();
             let px_per_tile = 8.0;
+            let half = MAP / px_per_tile / 2.0;
             let center = Pos::<Tiles>::new(
-                at.x.clamp(
-                    MAP.x / px_per_tile / 2.0,
-                    size.width - MAP.x / px_per_tile / 2.0,
-                ),
-                at.y.clamp(
-                    MAP.y / px_per_tile / 2.0,
-                    size.height - MAP.y / px_per_tile / 2.0,
-                ),
+                kept_in_view(at.x, half.x, size.width),
+                kept_in_view(at.y, half.y, size.height),
             );
             area.requests.push(AreaSceneRequest {
                 key: scene_key.clone(),
@@ -872,7 +860,7 @@ fn areas_known(ui: &mut Ui, sheet: &Sheet, character: &mut CharacterSnapshot) ->
     card(ui, "Areas known", |ui| {
         ui.horizontal_wrapped(|ui| {
             for (index, &area) in character.known_areas.iter().enumerate() {
-                let (_, closed) = widgets::chip_closable(ui, shown_path(&sheet.path_of(area)));
+                let (_, closed) = chip::closable(ui, shown_path(&sheet.path_of(area)));
                 if closed {
                     remove = Some(index);
                 }
@@ -1050,7 +1038,7 @@ fn quests(
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(COLUMN);
-            widgets::section_count(ui, "Quests", all.len());
+            form::section_count(ui, "Quests", all.len());
             for &quest in &order {
                 let path = sheet.path_of(quest);
                 let entry = character
@@ -1078,7 +1066,7 @@ fn quests(
                         .map(|giver| format!("from {giver}"))
                         .unwrap_or_default(),
                 };
-                widgets::card_frame(standing == Standing::Active).show(ui, |ui| {
+                panel::card(standing == Standing::Active).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
@@ -1089,7 +1077,7 @@ fn quests(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            widgets::combo(("quest-state", &path))
+                            controls::combo(("quest-state", &path))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
                                     for &option in Standing::VARIANTS {
@@ -1108,21 +1096,15 @@ fn quests(
                     {
                         let objectives = objectives_of(cx, sheet, quest);
                         for (i, objective) in objectives.iter().enumerate() {
-                            widgets::kv(ui, &objective.label, |ui| {
+                            form::kv(ui, &objective.label, |ui| {
                                 let held = entry.progress.get(i).copied().unwrap_or(0);
                                 let mut draft = held;
-                                let response = forms::boxed_input(
-                                    ui,
-                                    Some(&format!("/ {}", objective.max)),
-                                    |ui| {
-                                        ui.add(
-                                            egui::DragValue::new(&mut draft)
-                                                .speed(0.2)
-                                                .range(0..=objective.max),
-                                        )
-                                    },
-                                );
-                                if response.changed() && draft != held {
+                                let of = format!("/ {}", objective.max);
+                                if NumberField::new(&mut draft)
+                                    .range(0..=objective.max)
+                                    .unit(&of)
+                                    .show(ui)
+                                {
                                     entry.progress.resize(objectives.len(), 0);
                                     entry.progress[i] = draft;
                                     changed = FormChange::at(field!(CharacterSnapshot, quests));
@@ -1158,7 +1140,7 @@ fn quests(
                                 in_log.clone()
                             };
                             for &quest in &subjects {
-                                widgets::section(
+                                sheet::section(
                                     ui,
                                     &format!("Set up for {}", shown_path(&sheet.path_of(quest))),
                                 );
@@ -1175,7 +1157,7 @@ fn quests(
                                         egui::Sense::click(),
                                     );
                                     if response.hovered() {
-                                        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+                                        paint::row_wash(ui.painter(), rect);
                                     }
                                     ui.painter().text(
                                         rect.left_top() + egui::vec2(8.0, 4.0),
@@ -1379,7 +1361,7 @@ fn memories(
         defs.iter().filter(|(key, _)| held(key).is_some()).collect();
     order.extend(defs.iter().filter(|(key, _)| held(key).is_none()));
     let mut updates: Vec<(String, Option<MemoryValue>)> = Vec::new();
-    widgets::section_count(ui, "Memories", defs.len());
+    form::section_count(ui, "Memories", defs.len());
     let hidden = if view.more_memories {
         0
     } else {
@@ -1407,43 +1389,43 @@ fn memories(
                         }
                     }
                     ValueType::Text => {
-                        let mut text = match value {
-                            Some(MemoryValue::Text(text)) => text.clone(),
-                            _ => String::new(),
+                        let text = match value {
+                            Some(MemoryValue::Text(text)) => text.as_str(),
+                            _ => "",
                         };
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut text)
-                                .desired_width(100.0)
-                                .font(egui::TextStyle::Monospace),
-                        );
-                        if response.lost_focus() && response.changed() {
-                            updates.push((key.clone(), Some(MemoryValue::Text(text))));
+                        let id = ui.id().with(("memory", key));
+                        if let Some(typed) = input::drafted(ui, id, text, |ui, draft| {
+                            InputField::new(draft).width(MEMORY_WIDTH).show(ui)
+                        }) {
+                            updates.push((key.clone(), Some(MemoryValue::Text(typed))));
                         }
                     }
-                    ty => {
-                        let held = match value {
+                    ValueType::Integer => {
+                        let mut count = match value {
+                            Some(MemoryValue::Int(count)) => *count,
+                            Some(MemoryValue::Num(number)) => *number as i64,
+                            _ => 0,
+                        };
+                        if NumberField::new(&mut count)
+                            .unit("times")
+                            .width(MEMORY_WIDTH)
+                            .show(ui)
+                        {
+                            updates.push((key.clone(), Some(MemoryValue::Int(count))));
+                        }
+                    }
+                    _ => {
+                        let mut number = match value {
                             Some(MemoryValue::Int(count)) => *count as f64,
                             Some(MemoryValue::Num(number)) => *number,
                             _ => 0.0,
                         };
-                        let whole = ty == ValueType::Integer;
-                        let mut draft = held;
-                        let response = forms::boxed_input(ui, Some("times"), |ui| {
-                            ui.add(
-                                egui::DragValue::new(&mut draft)
-                                    .speed(0.2)
-                                    .fixed_decimals(if whole { 0 } else { 1 }),
-                            )
-                        });
-                        if response.changed() && draft != held {
-                            updates.push((
-                                key.clone(),
-                                Some(if whole {
-                                    MemoryValue::Int(draft as i64)
-                                } else {
-                                    MemoryValue::Num(draft)
-                                }),
-                            ));
+                        if NumberField::new(&mut number)
+                            .unit("times")
+                            .width(MEMORY_WIDTH)
+                            .show(ui)
+                        {
+                            updates.push((key.clone(), Some(MemoryValue::Num(number))));
                         }
                     }
                 }
@@ -1492,9 +1474,9 @@ fn memories(
 }
 
 fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(COLUMN);
-        widgets::card_title(ui, title);
+        panel::title(ui, title);
         body(ui);
     });
 }
@@ -1557,7 +1539,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             path_of(settings.initial_spawn.area)
         ),
     };
-    widgets::kv_text(ui, "level", format!("{level}{next}"));
+    form::kv_text(ui, "level", format!("{level}{next}"));
     let granted = class.as_ref().map_or(0, |class| class.granted_points(xp).0);
     let spent: u32 = character
         .skills
@@ -1568,7 +1550,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             Some(skill.cost_to(learned.rank).0)
         })
         .sum();
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "skill points",
         format!(
@@ -1576,9 +1558,9 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             granted.saturating_sub(spent)
         ),
     );
-    widgets::kv_text(ui, "health", format!("{} of {}", health, health));
-    widgets::kv_text(ui, "starts", starts);
-    widgets::kv_code(ui, "file", shown_path(key));
+    form::kv_text(ui, "health", format!("{} of {}", health, health));
+    form::kv_text(ui, "starts", starts);
+    form::kv_code(ui, "file", shown_path(key));
     ui.add_space(6.0);
     ui.horizontal_wrapped(|ui| {
         if controls::marked_primary(ui, Mark::Play, format!("Play as {}", file_title(key)))
@@ -1597,4 +1579,14 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             );
         }
     });
+}
+
+/// Where along an area `extent` tiles long a view reaching `half` tiles each way centres on `at`
+/// without showing past the area's edges, or the area's middle when the view is the longer.
+fn kept_in_view(at: f32, half: f32, extent: f32) -> f32 {
+    if extent <= 2.0 * half {
+        extent / 2.0
+    } else {
+        at.clamp(half, extent - half)
+    }
 }

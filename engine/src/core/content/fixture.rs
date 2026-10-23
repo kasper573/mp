@@ -6,6 +6,7 @@ use strum::VariantArray;
 
 use super::check::RowCheck;
 use super::files::{content_path, fixture_dir};
+use super::fresh::Nearby;
 use super::id::ContentId;
 use super::locate::unescape;
 use super::serial::TypeTag;
@@ -49,6 +50,12 @@ pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
     /// The parts of the fixture's file the engine reads beyond the file being there.
     fn locks(self) -> Vec<FixtureLock> {
         Vec::new()
+    }
+
+    /// What the fixture's file holds when a designer makes it where it is missing: its type's
+    /// fresh file, holding whatever its locks keep.
+    fn fresh(self, near: &Nearby) -> Result<Self::Row, String> {
+        Self::Row::fresh(near)
     }
 }
 

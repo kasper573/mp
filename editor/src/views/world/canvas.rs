@@ -1,18 +1,22 @@
 use std::collections::{BTreeMap, HashSet};
+use ui::chip;
+use ui::paint;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink;
-use egui::epaint::QuadraticBezierShape;
-use egui::{
-    Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
-    Vec2,
-};
 use engine::core::content::name_of;
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::systems::area::world_map::WorldMapDef;
 use engine::systems::area::{self, AreaId};
+use ui::egui::epaint::QuadraticBezierShape;
+use ui::egui::{
+    Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
+    Vec2,
+};
+use ui::glyph::{self, Mark};
+use ui::ink;
 
 use super::atlas::{AtlasSource, AtlasWarp, WorldAtlas};
 use super::filters::{self, ColorRanges};
@@ -23,7 +27,6 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
-use crate::ui::{patterns, theme, widgets};
 use crate::views::area::scene;
 use crate::views::navigation::{self, Viewport};
 
@@ -121,7 +124,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
         fit(editor, map, rect);
     }
     let viewport = navigate(editor, ui, &response, rect);
-    dots(&painter, &viewport);
+    paint::dot_grid(
+        &painter,
+        viewport.screen,
+        viewport.to_screen(Pos::origin()),
+        DOT_STEP,
+        DOT,
+    );
     let preview = editor
         .views
         .world
@@ -328,8 +337,8 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
         match colors.areas.get(&card.area) {
             Some(range) => {
                 let tint = viridis(colors.fraction(range.shown(color.show)));
-                painter.rect_filled(card.art, 2.0, theme::alpha(tint, 150));
-                widgets::floating_chip(
+                painter.rect_filled(card.art, 2.0, ink::wash(tint, 0.59));
+                chip::floating(
                     painter,
                     card.art.center(),
                     Align2::CENTER_CENTER,
@@ -339,7 +348,7 @@ fn draw_card(editor: &mut Editor, painter: &Painter, drawing: &Drawing, card: &M
                     12.0,
                 );
             }
-            None => patterns::hatch(painter, card.art, NO_VALUE, 8.0),
+            None => paint::hatched(painter, card.art, NO_VALUE, 8.0),
         }
     }
     let on_art = |at: Pos<Tiles>| card.art.min + Vec2::new(at.x, at.y) * px_per_tile;
@@ -440,7 +449,7 @@ fn draw_overlaps(painter: &Painter, cards: &[&MapCard]) {
         for other in &cards[index + 1..] {
             let shared = card.frame.intersect(other.frame);
             if shared.is_positive() {
-                patterns::hatch(painter, shared, theme::DANGER, 8.0);
+                paint::hatched(painter, shared, theme::DANGER, 8.0);
             }
         }
     }
@@ -454,7 +463,7 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
         .and_then(|lit| lit.get(&card.area))
         .filter(|sources| !sources.is_empty())
         .map(|sources| {
-            widgets::floating_chip(
+            chip::floating(
                 painter,
                 card.frame.right_top() + Vec2::new(-4.0, -4.0),
                 Align2::RIGHT_BOTTOM,
@@ -466,7 +475,7 @@ fn draw_card_chips(painter: &Painter, drawing: &Drawing, card: &MapCard) {
         });
     if card.area == drawing.map.atlas.initial_spawn {
         let bottom = tags.map_or(card.frame.top() - 6.0, |tags| tags.top() - 2.0);
-        widgets::floating_chip(
+        chip::floating(
             painter,
             Pos2::new(card.frame.left(), bottom),
             Align2::LEFT_BOTTOM,
@@ -493,7 +502,7 @@ fn draw_caption(painter: &Painter, atlas: &WorldAtlas, card: &MapCard, dimmed: b
     let top = card.art.max.y + 2.0;
     let width = card.caption_width - 2.0 * PAD;
     let line = |text: &str, font: FontId, color: Color32, y: f32| {
-        widgets::text_within(
+        paint::text_within(
             painter,
             Pos2::new(card.frame.center().x, y),
             Align2::CENTER_TOP,
@@ -638,7 +647,7 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
             format!(
                 "moving {} card{}{}",
                 cards.len(),
-                widgets::plural(cards.len()),
+                words::plural(cards.len()),
                 snap.as_ref()
                     .map(|snap| format!(" · {snap}"))
                     .unwrap_or_default()
@@ -773,25 +782,6 @@ fn navigate(editor: &mut Editor, ui: &Ui, response: &Response, rect: Rect) -> Vi
     viewport
 }
 
-fn dots(painter: &Painter, viewport: &Viewport<Tiles>) {
-    let rect = viewport.screen;
-    let origin = viewport.to_screen(Pos::origin());
-    let start = |origin: f32, min: f32| origin + ((min - origin) / DOT_STEP).floor() * DOT_STEP;
-    let mut y = start(origin.y, rect.min.y);
-    while y < rect.max.y {
-        let mut x = start(origin.x, rect.min.x);
-        while x < rect.max.x {
-            painter.rect_filled(
-                Rect::from_center_size(Pos2::new(x, y), Vec2::splat(1.5)),
-                0.0,
-                DOT,
-            );
-            x += DOT_STEP;
-        }
-        y += DOT_STEP;
-    }
-}
-
 fn split_name(name: &str) -> Vec<&str> {
     match name.rfind('_') {
         Some(at) if name.chars().count() > 12 => vec![&name[..=at], &name[at + 1..]],
@@ -834,13 +824,13 @@ fn draw_regions(painter: &Painter, viewport: &Viewport<Tiles>, drawing: &Drawing
         let screen = viewport.rect(navigation::rect_from_egui(r));
         let lit = drawing.selected.contains(&MapPart::Region(index));
         let color = region_color(region.color);
-        painter.rect_filled(screen, 6.0, theme::alpha(color, 14));
+        painter.rect_filled(screen, 6.0, ink::wash(color, 0.05));
         let stroke = if lit {
             Stroke::new(2.0, theme::SELECTION)
         } else {
             Stroke::new(1.0, color)
         };
-        widgets::dashed_rect(painter, screen, stroke, 6.0, 4.0);
+        paint::dashed_rect(painter, screen, stroke, 6.0, 4.0);
     }
 }
 
@@ -858,7 +848,7 @@ fn draw_region_labels(
             let screen = viewport.rect(navigation::rect_from_egui(
                 drawing.map.region_rect(layout, region)?,
             ));
-            let label = widgets::floating_chip(
+            let label = chip::floating(
                 painter,
                 screen.left_top() + Vec2::new(8.0, -2.0),
                 Align2::LEFT_BOTTOM,
@@ -899,18 +889,18 @@ fn draw_edges(painter: &Painter, edges: &[MapEdge], drawing: &Drawing) {
         };
         if both {
             painter.line_segment([a, b], stroke);
-            arrow_head(painter, a, a - b, stroke);
+            glyph::arrow_head(painter, a, a - b, 8.0, stroke.color);
         } else {
             painter.add(Shape::dashed_line(&[a, b], stroke, 6.0, 4.0));
         }
-        arrow_head(painter, b, b - a, stroke);
+        glyph::arrow_head(painter, b, b - a, 8.0, stroke.color);
         if (a - b).length() >= 70.0 {
             let (fill, ink) = if is_selected {
                 (theme::ACCENT_SOFT, theme::TEXT)
             } else {
                 (theme::PANEL, theme::MUTED)
             };
-            widgets::floating_chip(
+            chip::floating(
                 painter,
                 a + (b - a) / 2.0,
                 Align2::CENTER_CENTER,
@@ -933,19 +923,8 @@ fn draw_route(painter: &Painter, cards: &[MapCard], route: &[&AtlasWarp]) {
         let a = edge_point(from.frame, to.frame.center());
         let b = edge_point(to.frame, from.frame.center());
         painter.line_segment([a, b], stroke);
-        arrow_head(painter, b, b - a, stroke);
+        glyph::arrow_head(painter, b, b - a, 8.0, stroke.color);
     }
-}
-
-fn arrow_head(painter: &Painter, tip: Pos2, direction: Vec2, stroke: Stroke) {
-    let dir = direction.normalized();
-    let side = Vec2::new(-dir.y, dir.x);
-    let base = tip - dir * 8.0;
-    painter.add(Shape::convex_polygon(
-        vec![tip, base + side * 4.5, base - side * 4.5],
-        stroke.color,
-        Stroke::NONE,
-    ));
 }
 
 fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], category: &str) {
@@ -983,7 +962,7 @@ fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], cat
                 )
                 .flatten(Some(1.0));
                 painter.add(Shape::dashed_line(&points, stroke, 6.0, 5.0));
-                arrow_head(painter, *to, *to - bend, stroke);
+                glyph::arrow_head(painter, *to, *to - bend, 8.0, stroke.color);
             }
         }
         if !here.is_empty() {
@@ -1049,7 +1028,7 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
     else {
         return;
     };
-    widgets::floating_chip(
+    chip::floating(
         painter,
         card.frame.left_bottom() + Vec2::new(0.0, 4.0),
         Align2::LEFT_TOP,
@@ -1092,7 +1071,7 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
                 (format!("↑ {name}"), Align2::CENTER_TOP)
             }
         };
-        widgets::floating_chip(painter, at, anchor, &text, theme::PANEL, theme::TEXT, 11.0);
+        chip::floating(painter, at, anchor, &text, theme::PANEL, theme::TEXT, 11.0);
     }
 }
 
@@ -1110,7 +1089,7 @@ fn draw_drag(
                 return;
             };
             let r = Rect::from_two_pos(*from, p);
-            painter.rect_filled(r, 0.0, theme::alpha(theme::SELECTION, 30));
+            painter.rect_filled(r, 0.0, ink::wash(theme::SELECTION, 0.12));
             painter.rect_stroke(
                 r,
                 0.0,
@@ -1134,9 +1113,9 @@ fn draw_drag(
                 return;
             };
             let ghost = viewport.rect(navigation::rect_from_egui(map.art_rect(id, stored)));
-            widgets::dashed_rect(painter, ghost, Stroke::new(1.0, theme::MUTED), 4.0, 3.0);
+            paint::dashed_rect(painter, ghost, Stroke::new(1.0, theme::MUTED), 4.0, 3.0);
             let tiles = map.atlas.size(id);
-            widgets::floating_chip(
+            chip::floating(
                 painter,
                 card.frame.left_bottom() + Vec2::new(0.0, 6.0),
                 Align2::LEFT_TOP,
@@ -1145,7 +1124,7 @@ fn draw_drag(
                 Color32::WHITE,
                 11.0,
             );
-            widgets::floating_chip(
+            chip::floating(
                 painter,
                 ghost.right_bottom() + Vec2::new(8.0, 6.0),
                 Align2::LEFT_TOP,
@@ -1159,7 +1138,7 @@ fn draw_drag(
             snap: Some(snap), ..
         } => {
             if let Some(p) = pointer {
-                widgets::floating_chip(
+                chip::floating(
                     painter,
                     p + Vec2::new(16.0, 16.0),
                     Align2::LEFT_TOP,
@@ -1186,11 +1165,11 @@ fn legend(painter: &Painter, rect: Rect) {
         let b = a + Vec2::new(30.0, 0.0);
         if both {
             painter.line_segment([a, b], stroke);
-            arrow_head(painter, a, a - b, stroke);
+            glyph::arrow_head(painter, a, a - b, 8.0, stroke.color);
         } else {
             painter.add(Shape::dashed_line(&[a, b], stroke, 5.0, 3.0));
         }
-        arrow_head(painter, b, b - a, stroke);
+        glyph::arrow_head(painter, b, b - a, 8.0, stroke.color);
         painter.text(
             b + Vec2::new(10.0, 0.0),
             Align2::LEFT_CENTER,
@@ -1222,7 +1201,7 @@ fn minimap(
         rect.right_bottom() - Vec2::new(192.0, 132.0),
         Vec2::new(180.0, 120.0),
     );
-    design_tokens::slip::paint(painter, box_rect);
+    ui::slip::paint(painter, box_rect);
     let scale = ((box_rect.width() - 8.0) / bounds.width().max(1.0))
         .min((box_rect.height() - 8.0) / bounds.height().max(1.0));
     let to_box = |p: Pos2| box_rect.center() + (p - bounds.center()) * scale;

@@ -1,13 +1,14 @@
 use bevy::prelude::*;
-use design_tokens::face::{self, TextRole};
-use design_tokens::{ink, slip};
-use egui::{Pos2, Rect, Sense, Stroke, Ui, Vec2};
+use ui::egui::{Pos2, Rect, Ui, Vec2};
+use ui::face::{self, TextRole};
+use ui::{ink, slip};
 
 use crate::core::content::Content;
 use crate::systems::actor::Name;
 use crate::systems::hud::HudWidget;
 use crate::systems::player::{Xp, session};
 use crate::systems::{class, stat, status};
+use ui::paint;
 
 const WIDTH: f32 = 178.0;
 const HEALTH_BAR: Vec2 = Vec2::new(70.0, 6.0);
@@ -66,20 +67,8 @@ struct CharacterSheet {
 
 fn health(ui: &mut Ui, current: f32, max: f32) {
     ui.horizontal(|ui| {
-        let (rect, _) = ui.allocate_exact_size(HEALTH_BAR, Sense::hover());
-        let y = rect.center().y;
-        let share = if max > 0.0 {
-            (current / max).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        ui.painter()
-            .hline(rect.x_range(), y, Stroke::new(1.0, ink::ink_wash(0.45)));
-        ui.painter().hline(
-            rect.min.x..=rect.min.x + rect.width() * share,
-            y,
-            Stroke::new(HEALTH_BAR.y, ink::RUBRIC),
-        );
+        let share = if max > 0.0 { current / max } else { 0.0 };
+        paint::progress_line(ui, HEALTH_BAR, share, ink::RUBRIC);
         ui.label(face::body(format!("{current:.0} / {max:.0}")));
     });
 }

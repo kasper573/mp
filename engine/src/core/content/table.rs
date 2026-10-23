@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 
 use super::check::RowCheck;
 use super::files::{GameFiles, Shape};
+use super::fresh::Nearby;
 use super::id::{ContentId, ScopePaths};
 
 /// A type of content file: what its files hold, named `<name>.<TABLE>.json`, or kept as bundles
@@ -21,6 +22,11 @@ pub trait ContentFile: DeserializeOwned + Serialize + JsonSchema + Send + Sync +
     /// Whether every file is in use by being there, offered to pick from rather than named by
     /// another file.
     const PICKED_FROM_TABLE: bool = false;
+
+    /// What a file of this type holds when a designer makes one at the place `near` tells: the
+    /// least that loads, naming the nearest files and media wherever it must name some. Says why
+    /// when the game holds nothing it must name.
+    fn fresh(near: &Nearby) -> Result<Self, String>;
 
     fn check(&self, _cx: &mut RowCheck) {}
 

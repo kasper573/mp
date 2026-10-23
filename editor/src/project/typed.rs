@@ -121,7 +121,7 @@ impl TypedFiles {
                         (last.reader.rereading(folder), last.read)
                     }
                     _ => (
-                        FolderReader::new(systems::registry(), folder),
+                        FolderReader::new(systems::making_registry(), folder),
                         HashMap::new(),
                     ),
                 };

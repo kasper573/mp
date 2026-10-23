@@ -3,6 +3,7 @@
 //! requested of it.
 
 use std::collections::{HashMap, HashSet};
+use ui::egui;
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{ClearColorConfig, RenderTarget};
@@ -223,14 +224,16 @@ impl Stage {
         }
         for pose in &frame.actors {
             let model = ActorModel::get(frame.content, pose.model);
+            let image = scene::image_handle(scenes, frame.files, model.sheet().as_str(), world);
             let entity = match self.actors.get(&pose.source) {
                 Some(staged) => staged.entity,
                 None => {
-                    let image =
-                        scene::image_handle(scenes, frame.files, model.sheet().as_str(), world);
                     let entity = world
                         .spawn((
-                            Sprite { image, ..default() },
+                            Sprite {
+                                image: image.clone(),
+                                ..default()
+                            },
                             ACTOR_ANCHOR,
                             Transform::default(),
                             RowDepth::default(),
@@ -257,6 +260,9 @@ impl Stage {
             };
             let mut staged = world.entity_mut(entity);
             if let Some(mut sprite) = staged.get_mut::<Sprite>() {
+                if sprite.image != image {
+                    sprite.image = image;
+                }
                 draw_actor_frame(
                     &mut sprite,
                     model,

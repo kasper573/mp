@@ -21,11 +21,14 @@ use crate::systems::stat::{Stat, StatKind};
 #[schemars(extend("x-system" = "status"))]
 pub struct ApplyStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub effect: StatusEffectId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 1.0))]
     pub power: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 10.0))]
     pub seconds: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -36,6 +39,7 @@ pub struct ApplyStatus {
 #[schemars(extend("x-system" = "status"))]
 pub struct RemoveStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect: Option<StatusEffectId>,
@@ -51,6 +55,7 @@ pub struct RemoveStatus {
 #[schemars(extend("x-system" = "status"))]
 pub struct Boost {
     pub stat: StatKind,
+    #[schemars(extend("default" = 1.0))]
     pub by: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,

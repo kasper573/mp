@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
+use ui::egui;
+use ui::ink;
+use ui::input;
+use ui::theme;
 
-use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use engine::core::content::{Content, ContentScope, FolderReader, parent_of, rescoped};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::script::VariableType;
@@ -9,11 +12,12 @@ use engine::systems::area::blueprint::{BlueprintDef, BlueprintId, Placement};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaModule, Flip};
 use engine::systems::script::VarValue;
+use ui::egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 
 use super::{AreaFrame, AreaSnapshot, modules, select, shapes};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::theme;
+
 use crate::{rows, thumbs};
 
 /// A placement of the blueprint `blueprint`, an id among the paths it was read against.
@@ -48,12 +52,7 @@ pub fn stamp_panel(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &
         ui.horizontal(|ui| {
             ui.scope(|ui| {
                 ui.set_width(220.0);
-                crate::ui::widgets::search_box(
-                    ui,
-                    &mut view.blueprint_search,
-                    "Search blueprints",
-                    None,
-                );
+                input::search(ui, &mut view.blueprint_search, "Search blueprints", None);
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
@@ -110,7 +109,7 @@ pub fn stamp_panel(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &
             match refused {
                 Some(reason) => {
                     ui.painter()
-                        .rect_filled(response.rect, 4.0, theme::alpha(theme::PANEL, 180));
+                        .rect_filled(response.rect, 4.0, ink::wash(theme::PANEL, 0.71));
                     response.on_hover_text(format!("{key}: {reason}"));
                 }
                 None => {

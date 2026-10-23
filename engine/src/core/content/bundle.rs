@@ -54,6 +54,13 @@ impl PartSpec {
         }
     }
 
+    /// The extensions a file of the part may have.
+    pub fn exts(&self) -> &'static [&'static str] {
+        match *self {
+            PartSpec::File { exts, .. } | PartSpec::Keyed { exts, .. } => exts,
+        }
+    }
+
     /// The path in its bundle of the part with the extension `ext`, the file `key` of a keyed
     /// folder.
     pub fn named(&self, key: &str, ext: &str) -> String {

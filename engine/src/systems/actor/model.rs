@@ -12,7 +12,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
     Bundle, Content, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading,
-    MISSING_FILE, ModuleRule, ModuleSet, PartSpec, Parts, RowCheck, Shape, serial,
+    MISSING_FILE, ModuleRule, ModuleSet, Nearby, PartSpec, Parts, RowCheck, Shape, serial,
 };
 use crate::core::math::{Direction, FrameSize, Pos, Rect, Size, WorldPx};
 use crate::core::tiling::Tiles;
@@ -115,6 +115,42 @@ impl Bundle for ModelDef {
 impl ContentFile for ModelDef {
     const TABLE: &'static str = "model";
     const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(_: &Nearby) -> Result<ModelDef, String> {
+        let still = || {
+            vec![SheetFrame {
+                frame: 0,
+                ms: 100,
+                step: false,
+                apex: false,
+                sound: None,
+            }]
+        };
+        let strips = || {
+            Direction::VARIANTS
+                .iter()
+                .map(|&direction| (direction, still()))
+                .collect()
+        };
+        Ok(ModelDef {
+            hitbox: HitboxSize {
+                width: 1.0,
+                height: 1.0,
+            },
+            sprites: SpriteSheet {
+                image: ImageRef::default(),
+                frame_size: FrameSize {
+                    width: 1,
+                    height: 1,
+                },
+                actions: Action::VARIANTS
+                    .iter()
+                    .map(|&action| (action, strips()))
+                    .collect(),
+            },
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");

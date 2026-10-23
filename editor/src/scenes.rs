@@ -29,7 +29,7 @@ use crate::views::tileset::{
 use crate::views::world::{
     self, ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::{rows, ui};
+use crate::{rows, shell};
 
 #[derive(Clone, Debug, Deserialize, VariantNames)]
 #[serde(rename_all = "snake_case")]
@@ -447,7 +447,7 @@ fn sheet_step(editor: &mut Editor, step: &SheetStep) {
             EditorTab::Spreadsheet { table } => Some(table.clone()),
             _ => None,
         });
-    let active = match ui::active_tab(editor) {
+    let active = match shell::active_tab(editor) {
         Some(EditorTab::Spreadsheet { table }) => Some(table),
         _ => None,
     };
@@ -493,7 +493,7 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
         editor.open_tab(EditorTab::Model { key: key.clone() });
         return;
     }
-    let key = match ui::active_tab(editor) {
+    let key = match shell::active_tab(editor) {
         Some(EditorTab::Model { key }) => key,
         _ if editor.selection.table == ModelDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
@@ -562,7 +562,7 @@ fn tileset_step(editor: &mut Editor, step: &TilesetStep) {
         editor.open_tab(EditorTab::Tileset { key: key.clone() });
         return;
     }
-    let key = match ui::active_tab(editor) {
+    let key = match shell::active_tab(editor) {
         Some(EditorTab::Tileset { key }) => key,
         _ if editor.selection.table == TilesetDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()

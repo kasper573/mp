@@ -1,5 +1,6 @@
-use engine::core::content::{ErrorPlace, LoadReport, SETTINGS_FILE};
-use serde_json::json;
+use engine::core::content::{ErrorPlace, Fixture, LoadReport, SETTINGS_FILE};
+use engine::systems::input::map::InputFixture;
+use serde_json::{Value, json};
 use testkit::{Game, Map, path};
 
 use crate::support::game;
@@ -13,11 +14,7 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
             settings["initial_spawn"]["y"] = json!(40.0);
         })
         .sfx("slash")
-        .row(
-            "sfx",
-            "splash",
-            json!({ "role": path("sfx_role", "sounds"), "volume": 1.0, "pitch": 1.0 }),
-        )
+        .row("sfx", "splash", json!({ "volume": 1.0, "pitch": 1.0 }))
         .file("apprentice.class.json", "{ \"name\": 3 }")
         .edit("class", "hero", |hero| {
             hero["icon"] = json!("icons/heroo.png")
@@ -188,25 +185,52 @@ fn a_part_a_bundle_type_never_declares_is_refused() {
 }
 
 #[test]
-fn a_binding_the_game_never_reads_for_its_action_is_refused() {
-    let report = Game::new()
-        .row(
-            "input",
-            "carry_item",
-            json!({
-                "label": "Carry an item",
-                "bindings": [{ "type": "click", "button": "Left", "times": 1 }],
-            }),
-        )
-        .whole()
-        .try_load()
-        .err()
-        .expect("refused");
+fn the_input_file_binds_every_action_only_as_the_game_reads_it() {
+    struct Case {
+        case: &'static str,
+        change: fn(&mut Value),
+        refusal: (&'static str, &'static str),
+    }
+    let cases = [
+        Case {
+            case: "a click carrying an item",
+            change: |input| {
+                input["actions"]["carry_item"]["bindings"] =
+                    json!([{ "type": "click", "button": "Left", "times": 1 }]);
+            },
+            refusal: ("variant the engine never reads", "drag"),
+        },
+        Case {
+            case: "an action left out",
+            change: |input| {
+                input["actions"]
+                    .as_object_mut()
+                    .expect("the actions")
+                    .remove("respawn");
+            },
+            refusal: ("missing input", "every action the engine reads"),
+        },
+    ];
+    for Case {
+        case,
+        change,
+        refusal,
+    } in cases
+    {
+        let report = Game::new()
+            .engine_rows()
+            .edit("input", InputFixture::Game.name(), change)
+            .whole()
+            .try_load()
+            .err()
+            .expect(case);
 
-    assert_eq!(
-        rules_in(&report, "fixtures/input/carry_item.input.json"),
-        vec![("variant the engine never reads", "drag")]
-    );
+        assert_eq!(
+            rules_in(&report, &InputFixture::Game.path()),
+            vec![refusal],
+            "{case}"
+        );
+    }
 }
 
 #[test]
@@ -399,10 +423,10 @@ fn a_fixture_without_its_row_is_refused() {
     let report = Game::new().whole().try_load().err().expect("refused");
 
     assert_eq!(
-        rules_in(&report, "fixtures/input/interact.input.json"),
+        rules_in(&report, "fixtures/game.input.json"),
         vec![(
             "missing fixture",
-            "the input the engine requires at fixtures/input/interact.input.json"
+            "the input the engine requires at fixtures/game.input.json"
         )]
     );
 }
@@ -410,11 +434,7 @@ fn a_fixture_without_its_row_is_refused() {
 #[test]
 fn a_file_of_its_own_of_a_type_of_fixtures_alone_is_refused() {
     let report = Game::new()
-        .row(
-            "input",
-            "wave_hello",
-            json!({ "label": "Wave hello", "bindings": [] }),
-        )
+        .row("world_map", "wave_hello", json!({}))
         .whole()
         .try_load()
         .err()
@@ -423,7 +443,7 @@ fn a_file_of_its_own_of_a_type_of_fixtures_alone_is_refused() {
     let error = report
         .errors
         .iter()
-        .find(|error| error.file == "wave_hello.input.json")
+        .find(|error| error.file == "wave_hello.world_map.json")
         .expect("the stray file is refused");
     assert_eq!(error.problem.rule, "file the engine never reads");
 }

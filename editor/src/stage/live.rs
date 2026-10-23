@@ -306,7 +306,8 @@ fn skill_setup(
 ) -> Result<Setup, String> {
     let def = skill.get(content);
     let settings = content.built::<GameSettings>();
-    let mut snapshot = CharacterSnapshot::fresh(content, "Caster", settings.player.get(content));
+    let mut snapshot =
+        CharacterSnapshot::of_player(content, "Caster", settings.player.get(content));
     match taught_by(content, skill) {
         Some((class, node)) => {
             let levels = &class.get(content).levels;
@@ -337,7 +338,8 @@ fn skill_setup(
     let free = |at: Pos<Tiles>| area.grid.nearest_walkable_where(at, |_| true).unwrap_or(at);
     let caster = join(world, snapshot.clone(), spawn, ClientId(1))?.actor;
     let ally = || {
-        let mut friend = CharacterSnapshot::fresh(content, "Friend", settings.player.get(content));
+        let mut friend =
+            CharacterSnapshot::of_player(content, "Friend", settings.player.get(content));
         friend.start = snapshot.start;
         friend
     };

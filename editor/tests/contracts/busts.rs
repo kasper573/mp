@@ -17,11 +17,7 @@ fn open(scratch: &tempfile::TempDir) -> Editor {
 }
 
 fn faces(editor: &Editor) -> Vec<BustFace> {
-    let model = editor
-        .read::<ModelDef>(&path("model", "orc"))
-        .expect("a project")
-        .expect("the model reads");
-    busts::faces(&model)
+    faces_of(editor, &path("model", "orc"))
 }
 
 #[test]
@@ -147,4 +143,60 @@ fn renaming_a_face_leaves_the_lines_of_speakers_wearing_another_model_alone() {
     };
     assert_eq!(faces_of("grunt"), ["sly"]);
     assert_eq!(faces_of("lady"), ["smug"]);
+}
+
+#[test]
+fn a_model_takes_a_bust_with_all_its_faces_in_one_step_and_only_with_every_generic_one() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(support::game().model("elder", 1.0, json!([])), &scratch);
+    let model = path("model", "elder");
+    let art = tempfile::tempdir().expect("art");
+    let face = |name: &str| {
+        let file = art.path().join(format!("{name}.png"));
+        std::fs::write(&file, png(4, 4)).expect("a face");
+        file
+    };
+    let generic: Vec<_> = GenericExpression::VARIANTS
+        .iter()
+        .map(|expression| face(expression.as_ref()))
+        .collect();
+    let has_bust = |editor: &mut Editor| {
+        support::settled(editor);
+        editor
+            .read::<ModelDef>(&model)
+            .expect("a project")
+            .expect("the model reads")
+            .busts()
+            .is_some()
+    };
+
+    busts::give(&mut editor, &model, &generic[1..]);
+    assert!(!has_bust(&mut editor));
+
+    let mut all = generic.clone();
+    all.push(face("wistful"));
+    busts::give(&mut editor, &model, &all);
+    assert!(has_bust(&mut editor));
+    let names: Vec<String> = faces_of(&editor, &model)
+        .into_iter()
+        .map(|face| face.name)
+        .collect();
+    assert_eq!(names.len(), GenericExpression::VARIANTS.len() + 1);
+    assert!(names.contains(&"wistful".to_owned()), "{names:?}");
+
+    editor.undo();
+    assert!(!has_bust(&mut editor));
+    assert!(
+        !support::files(&mut editor)
+            .paths()
+            .any(|file| file.starts_with(&format!("{model}/busts/")))
+    );
+}
+
+fn faces_of(editor: &Editor, model: &str) -> Vec<BustFace> {
+    let model = editor
+        .read::<ModelDef>(model)
+        .expect("a project")
+        .expect("the model reads");
+    busts::faces(&model)
 }

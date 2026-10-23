@@ -1,7 +1,13 @@
+use bevy::input::keyboard::KeyCode;
+use editor::rows;
 use editor::schema::SchemaShapes;
-use engine::core::content::ContentFile;
+use editor::tabs::EditorTab;
+use editor::views::spreadsheet;
+use engine::core::content::{ContentFile, Fixture};
 use engine::core::vfx::VfxShaderDef;
+use engine::systems::input::map::{InputAction, InputBinding, InputDef, InputFixture};
 use serde_json::json;
+use strum::VariantArray;
 use testkit::path;
 
 #[test]
@@ -12,6 +18,16 @@ fn a_table_of_fixtures_alone_takes_no_rows_of_its_own_and_a_mixed_one_does() {
     assert!(shapes.is_fixture(VfxShaderDef::TABLE, &path("vfx_shader", "skill_area")));
     assert!(!shapes.is_closed("vfx_shader"));
     assert!(!shapes.is_closed("vfx"));
+
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = crate::support::open(crate::support::game(), &scratch);
+    let files_before = crate::support::files(&mut editor).paths().count();
+    let copied = rows::duplicate(&mut editor, &InputFixture::Game.path());
+    assert!(copied.is_err_and(|refusal| refusal.contains("can't be copied")));
+    assert_eq!(
+        crate::support::files(&mut editor).paths().count(),
+        files_before
+    );
 }
 
 #[test]
@@ -32,17 +48,31 @@ fn a_fixture_keeps_the_parameter_the_engine_sets_with_its_name_and_kind_pinned()
 }
 
 #[test]
-fn an_input_fixture_takes_only_the_bindings_the_game_reads_for_it() {
-    let shapes = SchemaShapes::load();
-    let read = |key: &str| {
-        shapes
-            .locks("input", &path("input", key))
-            .iter()
-            .find_map(|lock| lock.variants("/bindings"))
-            .map(<[String]>::to_vec)
-    };
+fn the_input_file_opens_as_a_sheet_of_the_actions_the_engine_fixes() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = crate::support::game().edit(InputDef::TABLE, InputFixture::Game.name(), |input| {
+        input["actions"]["dismiss"]["bindings"] = json!([{ "type": "key", "key": "Escape" }]);
+    });
+    let mut editor = crate::support::open(game, &scratch);
 
-    assert_eq!(read("carry_item"), Some(vec!["drag".to_owned()]));
-    assert_eq!(read("raise_rank"), Some(vec!["click".to_owned()]));
-    assert!(read("dismiss").is_some_and(|kinds| kinds.contains(&"key".to_owned())));
+    assert_eq!(
+        EditorTab::for_row(InputDef::TABLE, &InputFixture::Game.path()),
+        EditorTab::Spreadsheet {
+            table: InputDef::TABLE.to_owned()
+        }
+    );
+    let (rows, columns, _, _) = spreadsheet::shown_rows(&mut editor, InputDef::TABLE);
+    let actions: Vec<&str> = rows.iter().map(|row| row.key.as_str()).collect();
+    let fixed: Vec<&str> = InputAction::VARIANTS.iter().map(|&a| a.into()).collect();
+    assert_eq!(actions, fixed);
+    let titles: Vec<&str> = columns.iter().map(|c| c.title.as_str()).collect();
+    assert_eq!(titles, ["label", "bindings"]);
+    let dismiss = rows
+        .iter()
+        .find(|row| row.key == "dismiss")
+        .expect("dismiss");
+    assert_eq!(
+        columns[1].text(dismiss),
+        Some(InputBinding::key(KeyCode::Escape).name())
+    );
 }

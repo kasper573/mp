@@ -28,7 +28,7 @@ use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
-    RowCheck, serial,
+    Nearby, RowCheck, serial,
 };
 use crate::core::geometry::{Footprint, Shape};
 use crate::core::math::Pos;
@@ -86,6 +86,7 @@ pub struct SkillDef {
     pub sfx: Option<SfxId>,
     pub target: Targeting,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 4.0))]
     pub range: Option<Tiles>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area: Option<Shape>,
@@ -104,6 +105,28 @@ pub struct SkillDef {
 
 impl ContentFile for SkillDef {
     const TABLE: &'static str = "skill";
+
+    fn fresh(near: &Nearby) -> Result<SkillDef, String> {
+        let first = SkillLevel {
+            cost: SkillPoints(1),
+            stats: BTreeMap::new(),
+        };
+        Ok(SkillDef {
+            name: near.name(),
+            icon: near.image()?,
+            kind: SkillKind::Active,
+            sfx: None,
+            target: Targeting::SingleEnemy,
+            range: None,
+            area: None,
+            cooldown: Seconds(0.0),
+            requires: None,
+            cost: Vec::new(),
+            basic_attack: false,
+            levels: vec![first],
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);

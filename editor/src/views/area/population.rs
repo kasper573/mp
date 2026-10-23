@@ -1,4 +1,3 @@
-use egui::{Ui, Vec2};
 use engine::core::content::{Content, ContentFile};
 use engine::core::math::{Direction, Pos, Rng};
 use engine::core::tiling::Tiles;
@@ -8,13 +7,18 @@ use engine::systems::actor::{Action, ActorModel};
 use engine::systems::area::{self, Population};
 use engine::systems::npc::{NpcDef, NpcModule};
 use engine::systems::stat::StatKind;
+use ui::chip;
+use ui::egui;
+use ui::egui::{Ui, Vec2};
+use ui::form;
+use ui::sheet;
+use ui::theme;
 
 use super::placement::short_value;
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
 use crate::tabs::shown_path;
 use crate::thumbs;
-use crate::ui::{theme, widgets};
 
 /// What the npc at `npc` brings to every module placing it: when it respawns, its scripts and its
 /// health, and a way to open it.
@@ -23,12 +27,12 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
         return;
     };
     let reader = cx.project.reader();
-    widgets::section(ui, &format!("From {}", shown_path(npc)));
+    sheet::section(ui, &format!("From {}", shown_path(npc)));
     let respawn = row.modules.iter().find_map(|module| match module {
         NpcModule::Respawn(respawn) => Some(respawn.after),
         _ => None,
     });
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "respawn",
         respawn.map_or("never".to_owned(), |after| format!("{} s", after.0)),
@@ -54,7 +58,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
             }
         })
         .collect();
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "script",
         if scripts.is_empty() {
@@ -64,10 +68,10 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, npc: &str) {
         },
     );
     if let Some(health) = row.stats.0.get(&StatKind::Health) {
-        widgets::kv_text(ui, "health", health.to_string());
+        form::kv_text(ui, "health", health.to_string());
     }
     ui.add_space(4.0);
-    if widgets::chip_colored(
+    if chip::colored(
         ui,
         format!("{} →", shown_path(npc)),
         theme::INPUT,

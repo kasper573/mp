@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
+use ui::egui;
+use ui::form;
+use ui::theme;
+use ui::words;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{RichText, Stroke as EStroke, Ui, Vec2};
 use engine::core::content::{
     Content, ContentFile, ContentScope, FolderReader, name_of, rescoped, table_of,
 };
@@ -18,6 +19,9 @@ use engine::systems::area::scene::{ModuleNode, SceneFolder, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaId, AreaModule, Flip};
 use engine::systems::script::{Place, VarValue, Variable, condition};
 use serde_json::Value;
+use ui::controls;
+use ui::egui::{RichText, Stroke as EStroke, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::grid::GridDraft;
 use super::inspect::Followups;
@@ -29,7 +33,6 @@ use crate::project::files::content_of;
 use crate::project::{IdPaths, Project, RowSelection};
 use crate::schema;
 use crate::tabs::file_title;
-use crate::ui::{theme, widgets};
 
 /// What each placement of a scene covers on the map, by its node's pointer: the modules it brings,
 /// placed.
@@ -103,7 +106,7 @@ pub fn placement_count(content: &Content, blueprint: &str) -> String {
             let name = only.get(content).name.clone();
             format!(
                 "Placed {direct} time{}, all in {name}.",
-                widgets::plural(direct)
+                words::plural(direct)
             )
         }
         many => format!("Placed {direct} times in {} areas.", many.len()),
@@ -123,13 +126,13 @@ pub fn placement_card(
     path: &str,
 ) -> bool {
     if def.variables.is_empty() {
-        widgets::kv_text(ui, "values", "none: no variables");
+        form::kv_text(ui, "values", "none: no variables");
         return false;
     }
     let reader = cx.project.reader();
     let mut changed = false;
     for (name, variable) in &def.variables {
-        widgets::kv(ui, name, |ui| {
+        form::kv(ui, name, |ui| {
             ui.vertical(|ui| {
                 ui.set_min_width(ui.available_width());
                 let default = variable_default(&reader, variable);
@@ -771,7 +774,7 @@ pub fn replace_with(editor: &mut Editor, bundle: &str, node: &str, replacement: 
     if applied && let Some((old, dropped)) = replaced {
         editor.toast(format!(
             "Replaced {old} with {replacement}; {dropped} value{} didn't carry",
-            widgets::plural(dropped)
+            words::plural(dropped)
         ));
     }
 }
@@ -789,12 +792,12 @@ pub(super) fn placement_extras(
     };
     ui.add_space(4.0);
     if let Some(content) = cx.content.clone() {
-        widgets::hint(ui, &placement_count(&content, &key));
+        form::hint(ui, &placement_count(&content, &key));
     }
     if let Ok(def) = cx.project.read::<BlueprintDef>(&key)
         && let Some(said) = painted(&key, &def)
     {
-        widgets::hint(ui, &said);
+        form::hint(ui, &said);
     }
     ui.horizontal_wrapped(|ui| {
         if controls::marked(ui, Mark::Grid, "Edit blueprint").clicked() {
@@ -809,7 +812,11 @@ pub(super) fn placement_extras(
                 .push(super::AreaAction::Replace(node.to_owned()));
         }
     });
-    widgets::key_hint_text(ui, EditorKey::Confirm, "edits the blueprint in place");
+    controls::key_hint_text(
+        ui,
+        &EditorKey::Confirm.name(),
+        "edits the blueprint in place",
+    );
 }
 
 /// Why placing the blueprint `blueprint` into `bundle` is refused, when it would end up inside
@@ -873,7 +880,7 @@ fn painted(key: &str, def: &BlueprintDef) -> Option<String> {
         )),
     };
     let forced =
-        (forced > 0).then(|| format!("forces {forced} walk cell{}", widgets::plural(forced)));
+        (forced > 0).then(|| format!("forces {forced} walk cell{}", words::plural(forced)));
     let said: Vec<String> = [layers, forced].into_iter().flatten().collect();
     (!said.is_empty()).then(|| {
         let mut said = said.join(" and ");

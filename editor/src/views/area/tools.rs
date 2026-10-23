@@ -1,8 +1,12 @@
-use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area::{AreaModule, AreaModuleKind};
 use strum::VariantArray;
+use ui::egui;
+use ui::egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
+use ui::paint;
+use ui::theme;
+use ui::words;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
 use super::modules::{context_menu_at, open_add_menu, show_add_menu};
@@ -17,7 +21,6 @@ use super::{
 use crate::app::{Clipboard, Editor};
 use crate::keymap::EditorKey;
 use crate::tabs::file_title;
-use crate::ui::{theme, widgets};
 use crate::views::navigation::{self, Viewport};
 
 pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
@@ -37,7 +40,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 egui::StrokeKind::Inside,
             );
         } else if response.hovered() {
-            painter.rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+            paint::row_wash(painter, rect);
         }
         tool_icon(
             painter,
@@ -288,7 +291,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                 let kind = placed.kind();
                 let color = super::overlays::module_color(Some(kind));
                 let rect = canvas.rect(bounds);
-                widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+                paint::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
                 if matches!(
                     kind,
                     AreaModuleKind::Population | AreaModuleKind::Resident | AreaModuleKind::Object
@@ -304,7 +307,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         }
         if let Some(whole) = whole {
             let rect = canvas.rect(whole);
-            widgets::dashed_rect(
+            paint::dashed_rect(
                 painter,
                 rect,
                 EStroke::new(1.0, Color32::from_rgba_unmultiplied(255, 120, 160, 160)),
@@ -317,7 +320,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             format!(
                 "{} module{} from {}",
                 ghosts.len(),
-                crate::ui::widgets::plural(ghosts.len()),
+                words::plural(ghosts.len()),
                 file_title(&ghost.clip.from)
             ),
             Color32::WHITE,
@@ -358,7 +361,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                     accent
                 };
                 if covered.is_some() {
-                    widgets::dashed_rect(
+                    paint::dashed_rect(
                         painter,
                         canvas.rect(rect),
                         EStroke::new(1.5, color),
@@ -394,7 +397,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             let kind = view.placing.expect("a kind being placed");
             let color = super::overlays::module_color(Some(kind));
             let rect = canvas.rect(super::modules::template_bounds(kind, cell));
-            widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+            paint::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
             frame.labels.chip(
                 rect.min + Vec2::new(0.0, -4.0),
                 format!("new {}", kind.tag().replace('_', " ")),
@@ -587,7 +590,7 @@ fn under_placement_tip(frame: &AreaFrame, placement: &str, armed: &Armed) {
         .map(|module| shapes::label(module, frame.reader.as_ref()))
         .unwrap_or_default();
     if let Some(bounds) = frame.module_bounds(placement) {
-        widgets::dashed_rect(
+        paint::dashed_rect(
             &frame.response.ctx.layer_painter(frame.response.layer_id),
             frame.canvas.rect(bounds),
             EStroke::new(1.0, theme::DROP),

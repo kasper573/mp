@@ -1,23 +1,31 @@
 use std::collections::HashMap;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::menu;
+use ui::theme;
 
-use design_tokens::ink::{self, Ground};
-use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
-use egui::{Color32, FontId, RichText, Stroke, Ui};
 use engine::core::script::Expr;
 use engine::core::text::{TextMotion, TextVoice};
 use engine::core::time::Millis;
 use engine::systems::input::map::InputAction;
 use engine::systems::text::{Fx, Ink, Span};
 use strum::VariantArray;
+use ui::egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
+use ui::egui::{Color32, FontId, RichText, Stroke, Ui};
+use ui::ink::{self, Ground};
 
-use crate::drafts::{draft_of, set_draft, take_draft};
-use crate::forms::{self, FormChange, FormCx, committed};
+use crate::forms::{self, FormChange, FormCx};
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
+use ui::input;
+use ui::input::NumberField;
+use ui::input::committed;
 
 const VALUE_TOKEN: &str = "⟨value⟩";
 const INPUT_TOKEN: &str = "⟨input⟩";
 const PAUSE: Millis = Millis(400.0);
+const PAUSE_WIDTH: f32 = 96.0;
 
 pub struct SpanLineEdit {
     pub spans: Option<Vec<Span>>,
@@ -200,59 +208,52 @@ pub fn retype(spans: &[Span], before: &str, after: &str) -> Option<Vec<Span>> {
 
 fn toolbar(ui: &mut Ui, spans: &[Span], range: (usize, usize)) -> Option<Vec<Span>> {
     let mut outcome = None;
-    egui::Frame::new()
-        .fill(theme::RAISED)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(4, 2))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
-                let mut styled = |kind: FxKind, to: Option<Fx>| {
-                    outcome = Some(restyle(spans, range, |fx| kind.set(fx, to)));
-                };
-                fx_menu(ui, FxKind::Ink, Ink::VARIANTS, Fx::Ink, &mut styled);
-                fx_menu(
-                    ui,
-                    FxKind::Voice,
-                    TextVoice::VARIANTS,
-                    Fx::Voice,
-                    &mut styled,
-                );
-                fx_menu(
-                    ui,
-                    FxKind::Motion,
-                    TextMotion::VARIANTS,
-                    Fx::Motion,
-                    &mut styled,
-                );
-                if ui
-                    .add(egui::Button::new(RichText::new("slow").size(12.0)))
-                    .clicked()
-                {
-                    outcome = Some(restyle(spans, range, |fx| {
-                        FxKind::Slow.toggle(fx, Fx::Slow)
-                    }));
-                }
-                if ui
-                    .add(egui::Button::new(RichText::new("pause").size(12.0)))
-                    .on_hover_text("A 400 ms pause after the span")
-                    .clicked()
-                {
-                    outcome = Some(restyle(spans, range, |fx| {
-                        FxKind::PauseAfter.toggle(fx, Fx::PauseAfter(PAUSE))
-                    }));
-                }
-                if ui
-                    .add(egui::Button::new(RichText::new("value").size(12.0)))
-                    .on_hover_text("Replace the selection with a value span showing an expression")
-                    .clicked()
-                {
-                    outcome = with_value(spans, range);
-                }
-                ui.label(theme::faint(format!("{} chars", range.1 - range.0)).size(11.0));
-            });
-        });
+    chip::holding(ui, theme::RAISED, theme::BORDER, |ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let mut styled = |kind: FxKind, to: Option<Fx>| {
+            outcome = Some(restyle(spans, range, |fx| kind.set(fx, to)));
+        };
+        fx_menu(ui, FxKind::Ink, Ink::VARIANTS, Fx::Ink, &mut styled);
+        fx_menu(
+            ui,
+            FxKind::Voice,
+            TextVoice::VARIANTS,
+            Fx::Voice,
+            &mut styled,
+        );
+        fx_menu(
+            ui,
+            FxKind::Motion,
+            TextMotion::VARIANTS,
+            Fx::Motion,
+            &mut styled,
+        );
+        if ui
+            .add(egui::Button::new(RichText::new("slow").size(12.0)))
+            .clicked()
+        {
+            outcome = Some(restyle(spans, range, |fx| {
+                FxKind::Slow.toggle(fx, Fx::Slow)
+            }));
+        }
+        if ui
+            .add(egui::Button::new(RichText::new("pause").size(12.0)))
+            .on_hover_text("A 400 ms pause after the span")
+            .clicked()
+        {
+            outcome = Some(restyle(spans, range, |fx| {
+                FxKind::PauseAfter.toggle(fx, Fx::PauseAfter(PAUSE))
+            }));
+        }
+        if ui
+            .add(egui::Button::new(RichText::new("value").size(12.0)))
+            .on_hover_text("Replace the selection with a value span showing an expression")
+            .clicked()
+        {
+            outcome = with_value(spans, range);
+        }
+        ui.label(theme::faint(format!("{} chars", range.1 - range.0)).size(11.0));
+    });
     outcome
 }
 
@@ -264,7 +265,7 @@ fn fx_menu<T: Copy + Into<&'static str>>(
     styled: &mut impl FnMut(FxKind, Option<Fx>),
 ) {
     let field = kind.name();
-    widgets::dropdown_menu(ui, RichText::new(field).size(12.0), |ui| {
+    menu::dropdown(ui, RichText::new(field).size(12.0), |ui| {
         for &option in options {
             if ui.button(option.into()).clicked() {
                 styled(kind, Some(wrap(option)));
@@ -327,7 +328,7 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, span: &mut Span, path: &str) -> FormCh
             ui.horizontal(|ui| {
                 ui.label("key of");
                 let mut picked = *action;
-                widgets::combo(ui.id().with(path).with("input"))
+                controls::combo(ui.id().with(path).with("input"))
                     .selected_text(<&str>::from(*action))
                     .show_ui(ui, |ui| {
                         for &option in InputAction::VARIANTS {
@@ -358,8 +359,8 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, span: &mut Span, path: &str) -> FormCh
 pub fn line_field(ui: &mut Ui, cx: &mut FormCx, spans: &mut Vec<Span>, path: &str) -> FormChange {
     let id = ui.id().with(path).with("line");
     let mut changed = FormChange::default();
-    forms::boxed_input(ui, None, |ui| {
-        let edit = line(ui, spans, id, FontId::proportional(13.5), "…");
+    input::boxed(ui, None, |ui| {
+        let edit = line(ui, spans, id, input::font(ui), "…");
         if let Some(typed) = edit.spans {
             *spans = typed;
             changed = FormChange::at(path);
@@ -370,7 +371,7 @@ pub fn line_field(ui: &mut Ui, cx: &mut FormCx, spans: &mut Vec<Span>, path: &st
         let Span::Value { value, .. } = span else {
             continue;
         };
-        widgets::kv(ui, "value", |ui| {
+        form::kv(ui, "value", |ui| {
             changed |= forms::of_type(ui, cx, &mut **value, &format!("{path}/{index}/value"));
         });
     }
@@ -395,28 +396,18 @@ fn effects(ui: &mut Ui, fx: &mut Vec<Fx>, path: &str) -> FormChange {
             FxKind::Slow.set(fx, slow.then_some(Fx::Slow));
             changed = FormChange::at(path);
         }
-        let id = ui.id().with(path).with("pause");
-        let current = match FxKind::PauseAfter.of(fx) {
+        let mut pause = match FxKind::PauseAfter.of(fx) {
             Some(Fx::PauseAfter(pause)) => pause.0,
             _ => 0.0,
         };
-        let mut draft: f32 = draft_of(ui, id)
-            .and_then(|t| t.parse().ok())
-            .unwrap_or(current);
-        ui.label("pause ms");
-        let response = ui.add(
-            egui::DragValue::new(&mut draft)
-                .range(0.0..=10_000.0)
-                .speed(10.0),
-        );
-        if response.changed() {
-            set_draft(ui, id, &draft.to_string());
-        }
-        if (response.drag_stopped() || committed(ui, &response))
-            && take_draft(ui, id).is_some()
-            && draft != current
+        ui.label("pause");
+        if NumberField::new(&mut pause)
+            .range(0.0..=10_000.0)
+            .unit("ms")
+            .width(PAUSE_WIDTH)
+            .show(ui)
         {
-            let pause = (draft > 0.0).then_some(Fx::PauseAfter(Millis(draft)));
+            let pause = (pause > 0.0).then_some(Fx::PauseAfter(Millis(pause)));
             FxKind::PauseAfter.set(fx, pause);
             changed = FormChange::at(path);
         }
@@ -438,7 +429,7 @@ fn fx_combo<T: Copy + PartialEq + Into<&'static str>>(
         .copied()
         .find(|option| kind.of(fx) == Some(wrap(*option)));
     let mut picked = current;
-    widgets::combo(ui.id().with(path).with(field))
+    controls::combo(ui.id().with(path).with(field))
         .selected_text(current.map_or(field, Into::into))
         .width(90.0)
         .show_ui(ui, |ui| {

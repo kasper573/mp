@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentFile, ContentId, NamedContent};
+use crate::core::content::{Content, ContentFile, ContentId, NamedContent, Nearby};
 use crate::core::script::{
     Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
 };
@@ -23,6 +23,14 @@ pub struct MemoryDef {
 
 impl ContentFile for MemoryDef {
     const TABLE: &'static str = "memory";
+
+    fn fresh(near: &Nearby) -> Result<MemoryDef, String> {
+        Ok(MemoryDef {
+            label: near.name(),
+            ty: ValueType::Boolean,
+            resets: Resets::Never,
+        })
+    }
 }
 
 impl NamedContent for MemoryDef {
@@ -144,6 +152,7 @@ pub fn forget(world: &mut World, player: Entity, key: MemoryId) {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Remember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub memory: MemoryId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -157,6 +166,7 @@ pub struct Remember {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Forget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub memories: Vec<MemoryId>,

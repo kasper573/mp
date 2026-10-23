@@ -32,10 +32,12 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use ui::controls;
+use ui::egui;
+use ui::theme;
+use ui::words;
 
 use bevy::prelude::World;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::{Content, ContentFile, FolderReader, table_of};
 use engine::core::math::{Offset, Pos, Rect, Size};
 use engine::core::render::TILE;
@@ -44,6 +46,8 @@ use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, Picture, Pictured};
 use strum::{AsRefStr, VariantArray};
+use ui::egui::{Color32, Pos2, Rect as ERect, Sense, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use self::flags::{SceneFlags, SceneLevel};
 use self::overlays::{
@@ -54,8 +58,8 @@ use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
 use crate::keymap::EditorKey;
 use crate::project::{AreaCameraState, Project, RowSelection};
+use crate::shell::{sidebar, widgets};
 use crate::tabs::{EditorTab, file_title};
-use crate::ui::{sidebar, theme, widgets};
 use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
 
@@ -642,7 +646,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
             .layout(egui::Layout::top_down(egui::Align::Min)),
     );
     let chip = |ui: &mut Ui, body: &mut dyn FnMut(&mut Ui)| {
-        design_tokens::slip::show(ui, |ui| {
+        ui::slip::show(ui, |ui| {
             ui.horizontal(|ui| body(ui));
         });
         ui.add_space(4.0);
@@ -664,15 +668,15 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
             ui.label(
                 theme::mono(format!(
                     "Editing {label}'s blueprint · {count} placement{} change",
-                    widgets::plural(count)
+                    words::plural(count)
                 ))
                 .size(13.0)
                 .color(theme::TEXT),
             );
-            if widgets::primary(ui, "Done").clicked() {
+            if controls::primary(ui, "Done").clicked() {
                 done = true;
             }
-            widgets::key_chip(ui, EditorKey::Cancel);
+            controls::key_hint(ui, &EditorKey::Cancel.name());
         });
     }
     let view = editor.views.area.view(view_key);
@@ -692,7 +696,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
             if ui.button("Show the rest").clicked() {
                 back = true;
             }
-            widgets::key_chip(ui, EditorKey::Cancel);
+            controls::key_hint(ui, &EditorKey::Cancel.name());
         });
         if back {
             editor.views.area.view_mut(view_key).show_only = None;
@@ -705,7 +709,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
             ui.label(
                 theme::mono(format!(
                     "{hidden} hidden module{} play{} too",
-                    widgets::plural(hidden),
+                    words::plural(hidden),
                     if hidden == 1 { "s" } else { "" }
                 ))
                 .size(13.0)
@@ -749,7 +753,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, canvas_rect: ERect)
         chip(&mut child, &mut |ui| {
             glyph::show(ui, Mark::Eye, 13.0, theme::MUTED);
             ui.label(theme::mono("backdrop").size(13.0).color(theme::TEXT));
-            widgets::combo((view_key, "backdrop"))
+            controls::combo((view_key, "backdrop"))
                 .selected_text(theme::mono(
                     picked.as_deref().map_or("none", file_title).to_owned(),
                 ))

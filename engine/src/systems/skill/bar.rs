@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
+use ui::drag;
+use ui::egui;
+use ui::menu;
 
 use bevy::prelude::*;
-use design_tokens::face::TextRole;
-use design_tokens::glyph::{self, Halo, Mark};
-use design_tokens::{controls, ink, sheet, slip};
-use egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
+use ui::egui::{Align2, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::face::TextRole;
+use ui::glyph::{self, Halo, Mark};
+use ui::{controls, ink, sheet, slip};
 
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, Cooldowns, Hotbar,
@@ -18,9 +21,9 @@ use crate::core::gui;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::{self, Seconds};
 use crate::systems::equipment::{self, EquipmentSlot};
-use crate::systems::hud::{self, Carried, Confirm, GripCorner, HudWidget};
+use crate::systems::hud::{self, Carried, Confirm, HudWidget};
 use crate::systems::input::map::{
-    self, InputAction, InputBinding, InputMap, KeyGesture, KeyModifiers, input,
+    self, InputAction, InputBinding, InputFixture, InputMap, KeyGesture, KeyModifiers, input,
 };
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::widget::{SLOT, SlotLook, slot};
@@ -31,6 +34,8 @@ use crate::systems::script::condition;
 use crate::systems::settings::{HotbarKey, HotbarShape, UserSettings};
 use crate::systems::skill::{CastAim, aim};
 use crate::systems::{notification, stat};
+use ui::paint;
+use ui::panel::{self, GripCorner};
 
 pub const HOTBAR_KEYS: [InputAction; 9] = [
     InputAction::Hotbar1,
@@ -95,7 +100,7 @@ impl HudWidget for HotbarWidget {
         } else {
             GripCorner::BottomRight
         };
-        let grip = hud::slip_grip(ui, ui.id().with("hotbar grip"), outer, corner);
+        let grip = panel::grip(ui, ui.id().with("hotbar grip"), outer, corner);
         resize(world, ui, &grip, outer, corner);
         rebind_panel(ui, world, outer);
     }
@@ -216,7 +221,7 @@ pub fn drop_off_bar(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let Some(Carried::HotbarEntry { from, entry }) = hud::carried(&gui) else {
+    let Some(Carried::HotbarEntry { from, entry }) = drag::carried::<Carried>(&gui) else {
         return;
     };
     if !gui.input(|input| input.pointer.any_released()) {
@@ -424,7 +429,7 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
         .map_or(HotbarEntry::Empty, |hotbar| hotbar.entry(index));
     let view = SlotView::of(world, entry);
     let rebinding = world.resource::<BarState>().rebinding == Some(index);
-    let carried = hud::carried(ui.ctx());
+    let carried = drag::carried::<Carried>(ui.ctx());
     let ghost = matches!(carried, Some(Carried::HotbarEntry { from, .. }) if from == index);
     let look = SlotLook {
         icon: view.icon.as_ref(),
@@ -482,10 +487,10 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: HotbarSlot) {
     } else if map::drag_started(world, InputAction::CarryItem, &response)
         && entry != HotbarEntry::Empty
     {
-        hud::carry(ui.ctx(), Carried::HotbarEntry { from: index, entry });
+        drag::carry(ui.ctx(), Carried::HotbarEntry { from: index, entry });
     }
     let options = map::clicked(world, InputAction::SlotOptions, &response);
-    gui::pointer_menu(&response, options, |ui| {
+    menu::at_pointer(&response, options, |ui| {
         if ui.button("Rebind key").clicked() {
             world.resource_mut::<BarState>().rebinding = Some(index);
             ui.close();
@@ -527,7 +532,8 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
         .and_then(|slot| slot.0);
     let entry = held.map_or(HotbarEntry::Empty, HotbarEntry::Skill);
     let view = SlotView::of(world, entry);
-    let carried = hud::carried(ui.ctx()).and_then(|carried| carried_pick(world, carried));
+    let carried =
+        drag::carried::<Carried>(ui.ctx()).and_then(|carried| carried_pick(world, carried));
     let look = SlotLook {
         icon: view.icon.as_ref(),
         faded: view.dimmed,
@@ -551,7 +557,9 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
         )
     });
     overlay(ui, response.rect, view.fill);
-    if let Some(pick) = hud::dropped(&response).and_then(|dropped| carried_pick(world, dropped)) {
+    if let Some(pick) =
+        drag::dropped::<Carried>(&response).and_then(|dropped| carried_pick(world, dropped))
+    {
         match refusal(&content, pick) {
             None => {
                 world.write_message(AssignBasicAttackRequest { pick });
@@ -569,10 +577,10 @@ fn basic_attack_slot(ui: &mut Ui, world: &mut World) {
     } else if map::drag_started(world, InputAction::CarryItem, &response)
         && let Some(skill) = held
     {
-        hud::carry(ui.ctx(), Carried::Skill(skill));
+        drag::carry(ui.ctx(), Carried::Skill(skill));
     }
     let options = map::clicked(world, InputAction::SlotOptions, &response);
-    gui::pointer_menu(&response, options, |ui| {
+    menu::at_pointer(&response, options, |ui| {
         if ui
             .add_enabled(held.is_some(), egui::Button::new("Clear"))
             .clicked()
@@ -639,7 +647,7 @@ fn refusal(content: &Content, pick: BasicAttackPick) -> Option<String> {
 }
 
 fn take_drop(world: &mut World, response: &egui::Response, index: HotbarSlot, held: HotbarEntry) {
-    let Some(dropped) = hud::dropped(response) else {
+    let Some(dropped) = drag::dropped::<Carried>(response) else {
         return;
     };
     match dropped {
@@ -1008,7 +1016,8 @@ fn capture(world: &mut World, slot: HotbarSlot) {
         .filter(|action| !HOTBAR_KEYS.contains(action))
         .find(|action| map.bindings(*action).contains(&InputBinding::Key(gesture)));
     if let Some(action) = taken {
-        let label = action.get(&content).label.clone();
+        let input = InputFixture::Game.get(&content);
+        let label = input.actions.get(&action).map_or("", |bound| &bound.label);
         notification::local_error(
             world,
             format!(
@@ -1116,18 +1125,6 @@ fn resize(world: &mut World, ui: &Ui, grip: &egui::Response, outer: Rect, corner
         });
     }
     if world.resource::<BarState>().resizing.is_some() {
-        let points = [
-            outer.left_top(),
-            outer.right_top(),
-            outer.right_bottom(),
-            outer.left_bottom(),
-            outer.left_top(),
-        ];
-        ui.painter().add(egui::Shape::dashed_line(
-            &points,
-            Stroke::new(1.0, ink::OCHRE),
-            5.0,
-            3.0,
-        ));
+        paint::dashed_rect(ui.painter(), outer, Stroke::new(1.0, ink::OCHRE), 5.0, 3.0);
     }
 }

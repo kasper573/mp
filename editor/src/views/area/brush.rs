@@ -1,11 +1,15 @@
 use std::collections::HashSet;
+use ui::egui;
+use ui::ink;
+use ui::paint;
+use ui::theme;
 
-use egui::{Color32, Stroke as EStroke, Vec2};
 use engine::core::math::{Pos, Rect, Rng, Size};
 use engine::core::tiling::{Cell, CellPos, TilePos, TileSize};
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::{self, Flip};
 use engine::systems::script::Place;
+use ui::egui::{Color32, Stroke as EStroke, Vec2};
 
 use super::{
     AreaFrame, AreaSnapshot, AreaTool, Armed, grid, nodes, overlays, pins, select, terrain,
@@ -13,7 +17,6 @@ use super::{
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
 use crate::thumbs;
-use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
 
@@ -71,6 +74,9 @@ pub struct BrushStroke {
     pub layer: usize,
     pub cells: HashSet<CellPos>,
     pub anchor: CellPos,
+    /// The cell the brush was last applied at, from which the next one draws a line, so a drag
+    /// faster than a cell a frame leaves no gaps.
+    pub last: CellPos,
     pub rng: Rng,
 }
 
@@ -123,6 +129,10 @@ pub(super) fn grid_stroke(
         let Some(draft) = grid::GridDraft::own(editor, &frame.bundle) else {
             return;
         };
+        let start = response
+            .ctx
+            .input(|i| i.pointer.press_origin())
+            .map_or(cell, |origin| frame.canvas.to_tile(origin).cell());
         let layer = match kind {
             BrushStrokeKind::Walk(_) => 0,
             _ => match target_layer(editor, frame, &draft) {
@@ -138,12 +148,25 @@ pub(super) fn grid_stroke(
             kind,
             layer,
             cells: HashSet::new(),
-            anchor: cell,
+            anchor: start,
+            last: start,
             rng: Rng::new(seed),
         });
+        apply_brush(editor, view_key, frame, start, &brush);
     }
     if pressed || down {
-        apply_brush(editor, view_key, frame, cell, &brush);
+        let last = editor
+            .views
+            .area
+            .view(view_key)
+            .stroke()
+            .map(|stroke| stroke.last);
+        for step in last.map(|last| cells_after(last, cell)).unwrap_or_default() {
+            apply_brush(editor, view_key, frame, step, &brush);
+        }
+        if let Some(stroke) = editor.views.area.view_mut(view_key).stroke_mut() {
+            stroke.last = cell;
+        }
     }
     if released {
         finish_stroke(editor, view_key, frame);
@@ -418,10 +441,10 @@ pub(super) fn pick_place(
             !area.grid.walkable(cell.center()) || warps.iter().any(|shape| shape.covers_cell(cell))
         },
         |run| {
-            patterns::hatch(
+            paint::hatched(
                 painter,
                 canvas.rect(run),
-                theme::alpha(theme::BLOCKED, 90),
+                ink::wash(theme::BLOCKED, 0.35),
                 canvas.scale(),
             )
         },
@@ -527,4 +550,19 @@ fn stroke_seed(frame: u64, cell: CellPos) -> u64 {
     frame
         .wrapping_mul(6364136223846793005)
         .wrapping_add((cell.x as i64).wrapping_mul(31).wrapping_add(cell.y as i64) as u64)
+}
+
+/// The cells of the line from `from` to `to`, `to` last and `from` left out: what a brush dragged
+/// between them crosses.
+fn cells_after(from: CellPos, to: CellPos) -> Vec<CellPos> {
+    let steps = (to.x - from.x).abs().max((to.y - from.y).abs());
+    (1..=steps)
+        .map(|step| {
+            let t = step as f32 / steps as f32;
+            CellPos::new(
+                from.x + ((to.x - from.x) as f32 * t).round() as i32,
+                from.y + ((to.y - from.y) as f32 * t).round() as i32,
+            )
+        })
+        .collect()
 }

@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use engine::core::audio::playback::{SfxDef, SfxRoleDef};
+use engine::core::audio::playback::SfxDef;
 use engine::core::content::{FolderReader, write};
 use engine::systems::GameSettings;
 use engine::systems::actor::model::{GenericExpression, ModelDef, ModelModule};
 use engine::systems::area::AreaDef;
+use engine::systems::area::tileset::SurfaceDef;
 use serde_json::json;
 use testkit::{Game, path};
 
@@ -36,29 +37,31 @@ fn a_bundle_reads_with_its_parts() {
     );
 }
 
+/// A sand surface stepping with the sound `step`: a file naming another by its path.
+fn sand(game: Game, footstep: &str) -> Game {
+    game.sfx("step").row(
+        "surface",
+        "sand",
+        json!({ "name": "Sand", "footstep": footstep }),
+    )
+}
+
 #[test]
 fn a_reference_reads_as_the_id_of_the_path_it_names() {
-    let game = game().sfx("hit");
+    let step = path("sfx", "step");
+    let game = sand(game(), &step);
     let reader = reader(&game);
-    let sfx: SfxDef = reader.read(&path("sfx", "hit")).expect("reads");
+    let sand: SurfaceDef = reader.read(&path("surface", "sand")).expect("reads");
 
-    assert_eq!(
-        reader.path_of(sfx.role),
-        Some(path("sfx_role", "sounds").as_str())
-    );
-    assert_eq!(
-        reader.id_of::<SfxRoleDef>(&path("sfx_role", "sounds")),
-        Some(sfx.role)
-    );
+    assert_eq!(reader.path_of(sand.footstep), Some(step.as_str()));
+    assert_eq!(reader.id_of::<SfxDef>(&step), Some(sand.footstep));
 }
 
 #[test]
 fn a_file_naming_a_path_no_file_has_does_not_read() {
-    let game = game().sfx("hit").edit("sfx", "hit", |sfx| {
-        sfx["role"] = json!("nowhere/gone.sfx_role.json");
-    });
+    let game = sand(game(), "nowhere/gone.sfx");
     let errors = reader(&game)
-        .read::<SfxDef>(&path("sfx", "hit"))
+        .read::<SurfaceDef>(&path("surface", "sand"))
         .err()
         .expect("refused");
     assert!(
@@ -71,26 +74,19 @@ fn a_file_naming_a_path_no_file_has_does_not_read() {
 
 #[test]
 fn a_file_read_in_another_scope_names_the_ids_of_its_paths() {
-    let held = game().sfx("hit");
-    let other = game().sfx("hit").row(
-        "sfx_role",
-        "alarms",
-        json!({ "name": "Alarms", "loudness": -28.0 }),
-    );
-    let other = reader(&other);
-    let sfx: SfxDef = reader(&held)
-        .read_in(&path("sfx", "hit"), other.scope())
+    let step = path("sfx", "step");
+    let held = sand(game(), &step);
+    let other = reader(&sand(game().sfx("alarm"), &step));
+    let sand: SurfaceDef = reader(&held)
+        .read_in(&path("surface", "sand"), other.scope())
         .expect("reads");
 
-    assert_eq!(
-        other.path_of(sfx.role),
-        Some(path("sfx_role", "sounds").as_str())
-    );
+    assert_eq!(other.path_of(sand.footstep), Some(step.as_str()));
 
     let without_it = reader(&game().sfx("miss"));
     assert!(
         reader(&held)
-            .read_in::<SfxDef>(&path("sfx", "hit"), without_it.scope())
+            .read_in::<SurfaceDef>(&path("surface", "sand"), without_it.scope())
             .is_err(),
         "a file the other scope does not hold does not read in it"
     );
@@ -197,24 +193,22 @@ fn a_rename_of_a_path_a_file_does_not_name_writes_it_back_unchanged() {
 
 #[test]
 fn a_file_naming_a_path_that_moved_away_reads_and_names_where_it_went() {
-    let gone = "lost/sounds.sfx_role.json";
-    let sounds = path("sfx_role", "sounds");
-    let game = game().sfx("hit").edit("sfx", "hit", |sfx| {
-        sfx["role"] = json!(gone);
-    });
-    let hit = path("sfx", "hit");
-    assert!(reader(&game).read::<SfxDef>(&hit).is_err());
+    let gone = "lost/step.sfx";
+    let step = path("sfx", "step");
+    let game = sand(game(), gone);
+    let sand = path("surface", "sand");
+    assert!(reader(&game).read::<SurfaceDef>(&sand).is_err());
     assert!(
-        reader(&game).rewritten(&hit, &BTreeMap::new()).is_err(),
+        reader(&game).rewritten(&sand, &BTreeMap::new()).is_err(),
         "without the move it names, the file is not rewritten"
     );
 
     let written = reader(&game)
-        .rewritten(&hit, &renames(&[(gone, &sounds)]))
+        .rewritten(&sand, &renames(&[(gone, &step)]))
         .expect("rewritten");
 
-    let fields = text(&written.files, &engine::core::content::fields_file(&hit));
-    assert!(fields.contains(&format!("\"{sounds}\"")), "{fields}");
+    let fields = text(&written.files, &engine::core::content::fields_file(&sand));
+    assert!(fields.contains(&format!("\"{step}\"")), "{fields}");
     assert!(!fields.contains(gone), "{fields}");
 }
 

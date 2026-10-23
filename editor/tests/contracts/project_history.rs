@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use editor::project::watch::FolderChange;
-use editor::project::{ContentEdit, EditViewpoint, FileChange, Project, RowSelection, json_bytes};
+use editor::project::{
+    ContentEdit, EditViewpoint, FileBytes, FileChange, Project, RowSelection, json_bytes,
+};
 use editor::schema::SchemaShapes;
 use engine::core::content::SETTINGS_FILE;
 
@@ -36,6 +38,29 @@ fn an_outside_change_restarts_the_saved_marker_at_the_disk_state() {
     }
     assert_eq!(project.history.steps().len(), 3);
     assert_eq!(project.history.saved(), Some(0));
+}
+
+#[test]
+fn a_folder_made_then_filled_saves_as_the_disk_reads_it_back_and_undo_keeps_it() {
+    let scratch = tempfile::tempdir().expect("a scratch folder");
+    let folder = game_folder(scratch.path().join("game"));
+    let mut project = Project::open(&folder, Arc::new(SchemaShapes::load())).expect("opens");
+    for (file, label) in [("props/", "New folder"), ("props/crate.md", "New note")] {
+        let mut edit = ContentEdit::new(label);
+        edit.write(file, FileBytes::from(b"".as_slice()));
+        project.apply(edit, viewpoint()).expect("applies");
+    }
+
+    assert!(project.save().is_ok(), "the project saves");
+    let changes = project.outside_changes(FolderChange::Unknown);
+
+    assert!(changes.taken.is_empty(), "{:?}", changes.taken);
+    assert_eq!(project.history.steps().len(), 2);
+    project.undo();
+    assert!(
+        project.files.index().folders.contains("props"),
+        "the emptied folder stays"
+    );
 }
 
 #[test]

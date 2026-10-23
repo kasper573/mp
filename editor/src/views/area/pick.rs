@@ -57,9 +57,12 @@ pub fn add_picked(
     let Some(reader) = editor.reader() else {
         return;
     };
-    let Some(module) = modules::module_template(&reader, kind, at, Some(picked)) else {
-        editor.toast(format!("{picked} can't be named by a {}", kind.tag()));
-        return;
+    let module = match modules::module_template(&reader, area, kind, at, Some(picked)) {
+        Ok(module) => module,
+        Err(why) => {
+            editor.toast(why);
+            return;
+        }
     };
     let label = format!(
         "Add {} to {}",

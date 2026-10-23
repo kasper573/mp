@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::ink;
+use ui::ink;
 
 use super::{ClientScreen, Notice, Retry, notice_screen, pace_as_before, pace_slowly};
 use crate::core::content::sync::{
@@ -18,6 +18,7 @@ use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform,
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
 use crate::systems::install_content;
+use ui::words;
 
 pub struct LoadingPlugin;
 
@@ -250,8 +251,8 @@ fn card_model(
                 ));
                 lines.push(format!(
                     "{} of {} files changed{}",
-                    grouped(fetched.files_total),
-                    grouped(progress.files_in_index),
+                    words::thousands(fetched.files_total),
+                    words::thousands(progress.files_in_index),
                     if progress.rows_changed {
                         ", and the rows"
                     } else {
@@ -267,8 +268,8 @@ fn card_model(
                 ));
                 lines.push(format!(
                     "{} of {} files",
-                    grouped(fetched.files),
-                    grouped(fetched.files_total)
+                    words::thousands(fetched.files),
+                    words::thousands(fetched.files_total)
                 ));
             }
         }
@@ -371,16 +372,4 @@ fn loading_card(world: &mut World) {
 
 fn megabytes(bytes: u64) -> String {
     format!("{:.1}", bytes as f64 / 1_000_000.0)
-}
-
-fn grouped(count: usize) -> String {
-    let digits = count.to_string();
-    let mut out = String::new();
-    for (i, digit) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(digit);
-    }
-    out
 }

@@ -26,7 +26,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::content::{Content, ContentFile, ContentId};
+use crate::core::content::{Content, ContentFile, ContentId, Nearby};
 
 /// The output an effect takes when nothing else is said.
 pub const NEXT: &str = "next";
@@ -202,8 +202,25 @@ pub struct ScriptDef<V: Vocabulary> {
     pub nodes: BTreeMap<String, Node<V>>,
 }
 
+impl<V: Vocabulary> ScriptDef<V> {
+    /// A script with no nodes yet, run by owners of `kind`.
+    pub fn running_on(kind: V::RunnerKind) -> ScriptDef<V> {
+        ScriptDef {
+            runs_on: kind,
+            variables: BTreeMap::new(),
+            state: BTreeMap::new(),
+            locals: BTreeMap::new(),
+            nodes: BTreeMap::new(),
+        }
+    }
+}
+
 impl<V: Vocabulary> ContentFile for ScriptDef<V> {
     const TABLE: &'static str = "script";
+
+    fn fresh(_: &Nearby) -> Result<ScriptDef<V>, String> {
+        Ok(ScriptDef::running_on(V::RunnerKind::ANY))
+    }
 }
 
 pub type ScriptId<V> = ContentId<ScriptDef<V>>;

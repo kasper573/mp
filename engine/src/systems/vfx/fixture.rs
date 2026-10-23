@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, Fixture};
+use crate::core::content::{Content, ContentFile, Fixture, Nearby};
 use crate::core::vfx::{ParamKind, ShaderParam, VfxDef, VfxParams, VfxShaderDef, VfxSite};
 
 /// The parameter the engine sets when it draws the ground an area skill is aimed at: whether the
@@ -43,6 +43,32 @@ impl Fixture for VfxShaderFixture {
     const FOLDER: Option<&'static str> = Some("vfx");
 
     fn locks(self) -> Vec<FixtureLock> {
+        self.params()
+            .iter()
+            .map(|param| {
+                FixtureLock::entry(
+                    crate::field!(VfxShaderDef, params),
+                    param,
+                    &[
+                        crate::field!(ShaderParam, name),
+                        crate::field!(ShaderParam, kind),
+                    ],
+                )
+            })
+            .collect()
+    }
+
+    fn fresh(self, near: &Nearby) -> Result<VfxShaderDef, String> {
+        Ok(VfxShaderDef {
+            params: self.params(),
+            ..VfxShaderDef::fresh(near)?
+        })
+    }
+}
+
+impl VfxShaderFixture {
+    /// The parameters the engine hands the fixture's shader.
+    fn params(self) -> Vec<ShaderParam> {
         let set: &[(&str, ParamKind)] = match self {
             VfxShaderFixture::SkillArea => &[(HOSTILE, ParamKind::Bool)],
             VfxShaderFixture::Pop
@@ -52,22 +78,12 @@ impl Fixture for VfxShaderFixture {
             | VfxShaderFixture::LevelPop => &[],
         };
         set.iter()
-            .map(|&(name, kind)| {
-                let param = ShaderParam {
-                    name: name.to_owned(),
-                    kind,
-                    default: kind.blank(),
-                    min: None,
-                    max: None,
-                };
-                FixtureLock::entry(
-                    crate::field!(VfxShaderDef, params),
-                    &param,
-                    &[
-                        crate::field!(ShaderParam, name),
-                        crate::field!(ShaderParam, kind),
-                    ],
-                )
+            .map(|&(name, kind)| ShaderParam {
+                name: name.to_owned(),
+                kind,
+                default: kind.blank(),
+                min: None,
+                max: None,
             })
             .collect()
     }

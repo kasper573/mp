@@ -1,9 +1,15 @@
 use editor::app::Editor;
 use editor::project::{ContentEdit, FileBytes, ProjectFiles};
-use editor::{rows, ui::content_tree};
-use engine::core::content::fields_file;
+use editor::rows;
+use editor::schema::{self, SchemaKind};
+use engine::core::audio::playback::SFX_CLIP;
+use engine::core::babble::BABBLE_LETTERS;
+use engine::core::content::{ContentFile, fields_file};
+use engine::core::vfx::VfxDef;
+use engine::field;
 use engine::systems::npc::NpcDef;
-use serde_json::json;
+use engine::systems::registry;
+use serde_json::{Value, json};
 use testkit::{Game, path, png};
 
 use crate::support;
@@ -61,7 +67,7 @@ fn an_edit_writing_an_image_that_does_not_decode_is_refused() {
 }
 
 #[test]
-fn a_new_file_names_the_content_nearest_it_and_loads() {
+fn a_new_file_of_any_type_names_the_content_nearest_it_and_holds_as_it_is() {
     let scratch = tempfile::tempdir().expect("scratch");
     let orc = camp().folder();
     let game = orc
@@ -74,11 +80,30 @@ fn a_new_file_names_the_content_nearest_it_and_loads() {
                 bytes.to_vec(),
             )
         });
-    let mut editor = support::open(game, &scratch);
+    let mut editor = support::open(game.babble("low"), &scratch);
+    let tables: Vec<String> = editor
+        .shapes
+        .order
+        .iter()
+        .filter(|table| !registry().closed(table))
+        .cloned()
+        .collect();
 
-    content_tree::new_file(&mut editor, "wilds", "npc");
+    let mut taken_back = Vec::new();
+    for table in &tables {
+        let made = rows::new_file(&mut editor, "wilds", table)
+            .unwrap_or_else(|refused| panic!("{table}: {refused}"));
 
-    support::settled(&mut editor);
+        support::settled(&mut editor);
+        let project = editor.project.as_mut().expect("a project");
+        if let Some(refused) = project.take_refused() {
+            taken_back.push(format!("{table}: {}", refused.refusal.sentence()));
+            continue;
+        }
+        let errors = project.reader().check(std::slice::from_ref(&made)).errors;
+        assert!(errors.is_empty(), "{table}: {errors:?}");
+    }
+    assert!(taken_back.is_empty(), "taken back: {taken_back:#?}");
     let made = editor
         .read::<NpcDef>("wilds/npc.npc.json")
         .expect("a project")
@@ -88,6 +113,94 @@ fn a_new_file_names_the_content_nearest_it_and_loads() {
         reader.path_of(made.model),
         Some(format!("wilds/{}", path("model", "wolf")).as_str())
     );
+}
+
+#[test]
+fn a_vfx_layer_switched_to_any_of_its_kinds_holds_as_it_is() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(camp(), &scratch);
+    let vfx = rows::new_file(&mut editor, "icons", VfxDef::TABLE).expect("a vfx");
+    support::settled(&mut editor);
+    let project = editor.project.as_ref().expect("a project");
+    let root = editor.shapes.shape_of(VfxDef::TABLE);
+    let layers = schema::properties(root)
+        .into_iter()
+        .find(|(name, _)| *name == &field!(VfxDef, layers)[1..])
+        .map(|(_, layers)| layers)
+        .expect("the layers");
+    let SchemaKind::Array(layer) = schema::kind(root, layers) else {
+        panic!("a list of layers");
+    };
+    let nearby = schema::Nearby::of(project, Some(&vfx));
+    let kinds: Vec<(String, Value)> = schema::tagged_variants(root, layer)
+        .iter()
+        .map(|kind| {
+            let template = schema::variant_template(root, kind, nearby);
+            (kind.tag.clone(), template)
+        })
+        .collect();
+    let files = project.files.clone();
+    assert_eq!(kinds.len(), 2);
+
+    for (kind, template) in kinds {
+        let mut edit = ContentEdit::new(format!("Switch to a {kind} layer"));
+        edit.update_json(&files, &vfx, |row| {
+            *row.pointer_mut(&format!("{}/0", field!(VfxDef, layers)))? = template;
+            Some(())
+        });
+        let switched = editor.try_apply(edit);
+        assert!(switched.is_ok(), "{kind}: {switched:?}");
+    }
+}
+
+#[test]
+fn a_sound_and_a_voice_take_their_clips_from_files_under_the_names_their_types_give_them() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = support::open(support::game().sfx("hit").babble("low"), &scratch);
+    let mut louder = testkit::wav();
+    *louder.last_mut().expect("samples") ^= 0x10;
+    let delivered = |name: &str| {
+        let file = scratch.path().join(name);
+        std::fs::write(&file, &louder).expect("a delivered file");
+        file
+    };
+    let (hit, low) = (path("sfx", "hit"), path("babble_bank", "low"));
+
+    rows::put_parts(&mut editor, &hit, SFX_CLIP, &[delivered("Coin Clink.WAV")]).expect("a clip");
+    rows::put_parts(
+        &mut editor,
+        &low,
+        BABBLE_LETTERS,
+        &[delivered("A.wav"), delivered("b.wav")],
+    )
+    .expect("two letters");
+    let refused = [
+        rows::put_parts(&mut editor, &hit, SFX_CLIP, &[delivered("hit.ogg")]),
+        rows::put_parts(&mut editor, &low, BABBLE_LETTERS, &[delivered("a b?.wav")]),
+    ];
+
+    let files = files(&mut editor);
+    for part in [
+        format!("{hit}/{}", SFX_CLIP.named("", "wav")),
+        format!("{low}/{}", BABBLE_LETTERS.named("a", "wav")),
+        format!("{low}/{}", BABBLE_LETTERS.named("b", "wav")),
+    ] {
+        assert_eq!(
+            files.get(&part).map(|bytes| bytes.to_vec()),
+            Some(louder.clone()),
+            "{part}"
+        );
+    }
+    assert_ne!(
+        files
+            .get(&format!("{low}/{}", BABBLE_LETTERS.named("c", "wav")))
+            .map(|bytes| bytes.to_vec()),
+        Some(louder.clone())
+    );
+    assert!(refused.iter().all(Result::is_err), "{refused:?}");
+    let project = support::settled(&mut editor);
+    let errors = project.reader().check(&[hit, low]).errors;
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]

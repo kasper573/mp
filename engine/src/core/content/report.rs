@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
+use ui::words;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadError {
@@ -180,7 +181,7 @@ impl Display for LoadReport {
         writeln!(
             f,
             "result   not loaded · {} · {}",
-            counted(self.errors.len(), self.files()),
+            errors_in_files(self.errors.len(), self.files()),
             self.outcome
         )?;
         writeln!(f)?;
@@ -227,7 +228,7 @@ impl Display for LoadReport {
             index = next;
         }
         writeln!(f)?;
-        write!(f, "## End · {}", plural(self.errors.len(), "error"))
+        write!(f, "## End · {}", words::counted(self.errors.len(), "error"))
     }
 }
 
@@ -239,16 +240,12 @@ fn repeats(a: &LoadError, b: &LoadError) -> bool {
         && a.file != b.file
 }
 
-fn counted(errors: usize, files: usize) -> String {
-    format!("{} in {}", plural(errors, "error"), plural(files, "file"))
-}
-
-fn plural(count: usize, what: &str) -> String {
-    if count == 1 {
-        format!("1 {what}")
-    } else {
-        format!("{count} {what}s")
-    }
+fn errors_in_files(errors: usize, files: usize) -> String {
+    format!(
+        "{} in {}",
+        words::counted(errors, "error"),
+        words::counted(files, "file")
+    )
 }
 
 pub(super) fn article(word: &str) -> &'static str {

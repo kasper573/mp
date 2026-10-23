@@ -4,6 +4,7 @@ use std::io;
 use std::sync::Arc;
 
 use super::files::{Listing, list, table_of};
+use super::fresh::Nearby;
 use super::id::{ContentId, ContentScope, with_content};
 use super::load::{
     CheckedFiles, ContentFolder, ContentRegistry, FileWriter, Settings, TableLoader, check_files,
@@ -248,6 +249,24 @@ impl FolderReader {
 
     pub fn paths_of<Row: ContentFile>(&self) -> &[String] {
         self.listed.scope.paths_of::<Row>()
+    }
+
+    /// The files a fresh content file of `table` at `path` is kept in, written as the game writes
+    /// them.
+    pub fn fresh(&self, table: &str, path: &str) -> Result<BTreeMap<String, Vec<u8>>, String> {
+        let loader = self
+            .registry
+            .loader_named(table)
+            .ok_or_else(|| format!("no {table} files in this game's registry"))?;
+        let row = self
+            .registry
+            .fresh_row(loader, path, &Nearby::new(self, path))?;
+        self.write_with(|writer| loader.write_row(row.as_ref(), path, writer))
+            .map_err(|error| error.to_string())
+    }
+
+    pub(super) fn media(&self) -> &[String] {
+        &self.listed.listing.media
     }
 
     fn write_with(

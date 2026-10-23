@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
+use ui::words;
 
 use engine::core::content::{ContentFile, ContentId, ContentScope, FolderReader, with_content};
 use engine::core::script::node::{MAX_CALL_DEPTH, NEXT_EXIT};
@@ -23,7 +24,6 @@ use crate::keymap::EditorKey;
 use crate::project::Project;
 use crate::schema::{self, SchemaVariant};
 use crate::tabs::shown_path;
-use crate::ui::widgets;
 use crate::{condition, rows, spans};
 
 pub type Nodes = BTreeMap<String, Node>;
@@ -200,7 +200,7 @@ impl OwnerRefusal {
         match self.allowed.first() {
             Some(first) => format!(
                 "only for {} {} owner",
-                widgets::article(first.name()),
+                words::article(first.name()),
                 first.name()
             ),
             None => self.text(),
@@ -367,7 +367,7 @@ pub fn ports(node: &Node) -> Vec<NodePort> {
                 .iter()
                 .enumerate()
                 .map(|(index, choice)| {
-                    let label = widgets::clip(&spans::plain(&choice.label), 22);
+                    let label = words::clip(&spans::plain(&choice.label), 22);
                     port(label, Exit::Choice(index), &choice.to)
                 })
                 .collect();
@@ -528,6 +528,7 @@ pub fn event_variant(event: &str) -> Option<&'static Value> {
 pub fn fresh(
     reader: &FolderReader,
     kind: &str,
+    runs_on: RunnerKind,
     nearby: schema::Nearby,
     speaker: Speaker,
 ) -> Option<Node> {
@@ -566,12 +567,34 @@ pub fn fresh(
             next: none(),
         },
         Some(NodeKind::Return) => Node::Return { value: None },
-        Some(NodeKind::Run | NodeKind::Effect) | None => {
+        Some(NodeKind::Run) => Node::Run {
+            script: reader.id_of(&nearby.script_run_by(runs_on)?)?,
+            values: BTreeMap::new(),
+            into: None,
+            next: none(),
+        },
+        Some(NodeKind::Effect) | None => {
             let variant = variants().into_iter().find(|variant| variant.tag == kind)?;
             let template = schema::variant_template(node_root(), &variant, nearby);
             return reader.from_json(&template).ok();
         }
     })
+}
+
+/// A node starting a flow at the first event a script of `kind` answers that none in `used`
+/// already starts.
+pub fn free_event(
+    reader: &FolderReader,
+    catalogue: &NodeCatalogue,
+    kind: RunnerKind,
+    used: &HashSet<&str>,
+    nearby: schema::Nearby,
+) -> Option<Node> {
+    let (event, _) = catalogue
+        .events
+        .iter()
+        .find(|(event, owners)| owners.contains(&kind) && !used.contains(event.as_str()))?;
+    fresh_event(reader, event, nearby)
 }
 
 /// An event node for `event`, its fields at a start a writer can see work.
@@ -1073,7 +1096,7 @@ fn dialogue_pieces(text: &NodeText, dialogue: &DialogueNode<RiftScripting>) -> V
     let mut line = vec![
         strong(speaker_name(text.reader, first.by)),
         muted(": "),
-        strong(widgets::clip(&spans::plain(&first.text), 48)),
+        strong(words::clip(&spans::plain(&first.text), 48)),
     ];
     if dialogue.lines.len() > 1 {
         line.push(muted(format!(" (+{} lines)", dialogue.lines.len() - 1)));

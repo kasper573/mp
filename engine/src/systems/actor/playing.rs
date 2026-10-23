@@ -37,11 +37,9 @@ struct Awaited {
     apex_answered: bool,
 }
 
-#[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Wait {
-    #[default]
-    No,
     Apex,
     End,
 }
@@ -51,12 +49,13 @@ pub enum Wait {
 #[schemars(extend("x-system" = "actor"))]
 pub struct Animate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub action: Action,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sfx: Option<SfxId>,
-    #[serde(default, skip_serializing_if = "Wait::is_no")]
-    pub wait: Wait,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait: Option<Wait>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
     /// Taken when the action can't play or is cut short.
@@ -67,19 +66,13 @@ pub struct Animate {
 
 const INTERRUPTED: &str = "interrupted";
 
-impl Wait {
-    fn is_no(&self) -> bool {
-        *self == Wait::No
-    }
-}
-
 impl EffectDef<RiftScripting> for Animate {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
     crate::outputs!(NEXT => next, INTERRUPTED => interrupted);
     fn pauses(&self) -> bool {
-        self.wait != Wait::No
+        self.wait.is_some()
     }
     fn keeps_box(&self) -> bool {
         true
@@ -100,9 +93,9 @@ impl EffectDef<RiftScripting> for Animate {
             if let Some(sfx) = sfx {
                 notification::play_sound(world, Some(actor), cx.subject, sfx, Audience::Everyone);
             }
-            if wait == Wait::No {
+            let Some(wait) = wait else {
                 return EffectStep::Done;
-            }
+            };
             world.entity_mut(actor).insert(Awaited {
                 flow,
                 wait,

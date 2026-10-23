@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
-use crate::core::content::{Content, ContentFile, ContentId, Fixture, Loading, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, Fixture, Loading, Nearby, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::{Pos, Rgba};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
@@ -330,6 +330,17 @@ pub enum NotificationDefKind {
 
 impl ContentFile for NotificationDef {
     const TABLE: &'static str = "notification";
+
+    fn fresh(near: &Nearby) -> Result<NotificationDef, String> {
+        Ok(NotificationDef {
+            kind: NotificationDefKind::Narration {
+                label: near.name(),
+                sfx: None,
+            },
+            text: Vec::new(),
+            lasts: None,
+        })
+    }
 }
 
 impl NotificationDef {
@@ -383,6 +394,7 @@ impl From<&NotificationDefKind> for NotificationKind {
 #[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub notification: NotificationId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]

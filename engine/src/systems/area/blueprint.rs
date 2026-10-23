@@ -9,14 +9,14 @@ use super::grid::{AreaGrids, Flip, LayerGrid, PaletteEntry};
 use super::scene::{
     self, Holes, ModuleNode, SCENE_FILE, SCENE_PARTS, Scene, SceneNode, scene_file,
 };
-use super::{AreaId, AreaModule, ObjectShape, Tilemap};
+use super::{AreaId, AreaModule, MapSize, ObjectShape, Tilemap};
 use crate::core::audio::soundscape::SoundscapeShape;
 use crate::core::content::id::{Leaf, in_scope, nearest, nearest_path, read_aside};
 use crate::core::content::load::{ParseError, parse_value, shape_problem};
 use crate::core::content::locate::{escape, unescape};
 use crate::core::content::{
     Bundle, CONFIG_FILE, Content, ContentFile, ContentId, ContentProblem, ContentScope, FileWriter,
-    PartSpec, Parts, RowCheck, Shape, serial, valid_key, with_content,
+    Nearby, PartSpec, Parts, RowCheck, Shape, serial, valid_key, with_content,
 };
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
@@ -47,6 +47,17 @@ pub struct BlueprintDef {
 impl ContentFile for BlueprintDef {
     const TABLE: &'static str = "blueprint";
     const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(_: &Nearby) -> Result<BlueprintDef, String> {
+        Ok(BlueprintDef {
+            map: Tilemap::fresh(MapSize {
+                width: 4,
+                height: 4,
+            }),
+            variables: BTreeMap::new(),
+            scene: Scene::default(),
+        })
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         self.map.check("/map", 1, cx);

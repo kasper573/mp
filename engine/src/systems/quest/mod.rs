@@ -17,7 +17,7 @@ use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
     Content, ContentFile, ContentId, ContentProblem, Fixture, Loading, ModuleRule, ModuleSet,
-    NamedContent, RowCheck,
+    NamedContent, Nearby, RowCheck,
 };
 use crate::core::math::{Percent, Rng};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
@@ -66,6 +66,25 @@ pub struct QuestDef {
 
 impl ContentFile for QuestDef {
     const TABLE: &'static str = "quest";
+
+    fn fresh(near: &Nearby) -> Result<QuestDef, String> {
+        Ok(QuestDef {
+            title: near.name(),
+            category: String::new(),
+            blurb: String::new(),
+            xp: 0,
+            reveal: Vec::new(),
+            modules: vec![
+                QuestModule::Objective(Objective::Task {
+                    task: "task".to_owned(),
+                    label: "See it through".to_owned(),
+                }),
+                QuestModule::HandOver {
+                    text: vec![crate::systems::text::plain("It's done.")],
+                },
+            ],
+        })
+    }
 }
 
 impl NamedContent for QuestDef {

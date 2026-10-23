@@ -2,6 +2,7 @@ pub mod bundle;
 pub mod check;
 pub mod files;
 pub mod fixture;
+pub mod fresh;
 pub mod id;
 pub mod key;
 pub mod load;
@@ -22,6 +23,7 @@ pub use files::{
     bundle_of, content_path, fields_file, name_of, numbered, parent_of, table_of, valid_name,
 };
 pub use fixture::Fixture;
+pub use fresh::Nearby;
 pub use id::{ContentId, ContentScope, rescoped, with_content};
 pub use key::key_of;
 pub use load::{

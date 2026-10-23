@@ -9,10 +9,14 @@ pub mod run;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
+use ui::chip;
+use ui::controls;
+use ui::dialog;
+use ui::egui;
+use ui::input;
+use ui::theme;
+use ui::words;
 
-use egui::emath::TSTransform;
-use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
-use egui_snarl::ui::get_selected_nodes;
 use engine::core::content::{ContentFile, FolderReader, fields_file};
 use engine::core::script::{Arrow, Choice, Exit, RunnerKindDef};
 use engine::systems::area::AreaModule;
@@ -25,6 +29,9 @@ use engine::systems::text::plain;
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{NodeText, Nodes};
 use serde_json::Value;
+use ui::egui::emath::TSTransform;
+use ui::egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
+use ui::egui_snarl::ui::get_selected_nodes;
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
@@ -32,10 +39,11 @@ use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::project::{ContentEdit, Project, RowSelection};
 use crate::scene_graph;
+use crate::shell::sidebar;
 use crate::tabs::{DockRequest, EditorTab};
 use crate::thumbs;
-use crate::ui::{dialogs, sidebar, theme, widgets};
 use crate::user::UserFolder;
+use ui::input::InputField;
 
 /// Where in its file a module that runs a script is: a module by its pointer, the place of a
 /// module in a list of modules or of a node in a scene, or one of an object's scripts.
@@ -244,6 +252,7 @@ impl ScriptDoc {
         let project = project.as_ref().expect("a project");
         let mut cx = FormCx::new(project, root, shapes, form, actions)
             .editing(ScriptDef::TABLE, Some(&self.at.key));
+        cx.kept = Some(crate::schema::KeptValues::of(&self.script));
         cx.speaker = match self.default_speaker() {
             Speaker::Npc(npc) => self.reader.path_of(npc).map(str::to_owned),
             _ => None,
@@ -622,29 +631,33 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow, tab: BottomTab) 
     panel::show(editor, ui, &doc, panel);
 }
 
-/// Canvas and Outline, at the top right of the view they switch between.
+/// Canvas and Outline, at the top right of the view they switch between, in a layer above the
+/// canvas's, which would otherwise take their clicks.
 fn view_switch(editor: &mut Editor, ui: &mut Ui, at: &ScriptRow) {
     let view = editor
         .views
         .script
         .view_mut(at, &editor.user, editor.project.as_ref());
     let mut switch = false;
-    let corner = egui::UiBuilder::new()
-        .max_rect(ui.max_rect().shrink(10.0))
-        .layout(egui::Layout::right_to_left(egui::Align::Min));
-    ui.scope_builder(corner, |ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        for (label, outline) in [("Outline", true), ("Canvas", false)] {
-            let tip = format!("{} switches between them", EditorKey::Outline.name());
-            if widgets::mode_chip(ui, label, view.outline == outline)
-                .on_hover_text(tip)
-                .clicked()
-                && view.outline != outline
-            {
-                switch = true;
-            }
-        }
-    });
+    egui::Area::new(ui.id().with("view-switch"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(ui.max_rect().right_top() + vec2(-10.0, 10.0))
+        .pivot(egui::Align2::RIGHT_TOP)
+        .show(ui.ctx(), |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
+                for (label, outline) in [("Canvas", false), ("Outline", true)] {
+                    let tip = format!("{} switches between them", EditorKey::Outline.name());
+                    if chip::mode(ui, label, view.outline == outline)
+                        .on_hover_text(tip)
+                        .clicked()
+                        && view.outline != outline
+                    {
+                        switch = true;
+                    }
+                }
+            });
+        });
     if switch {
         view.toggle_outline();
     }
@@ -706,13 +719,16 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
             fit: None,
         };
         if view.to_global.is_none() {
-            let mut bounds = Rect::NOTHING;
-            for at in view.graph.positions().values() {
-                bounds = bounds.union(Rect::from_min_size(*at, vec2(graph::CARD + 20.0, 120.0)));
-            }
-            if bounds.is_finite() {
-                viewer.fit = Some((bounds, ui.max_rect()));
-            }
+            let placed = view.graph.positions();
+            let spots: Vec<Pos2> = if placed.is_empty() {
+                vec![graph::FIRST]
+            } else {
+                placed.into_values().collect()
+            };
+            let bounds = spots.into_iter().fold(Rect::NOTHING, |bounds, at| {
+                bounds.union(Rect::from_min_size(at, vec2(graph::CARD + 20.0, 120.0)))
+            });
+            viewer.fit = Some((bounds, ui.max_rect()));
         }
         let graph = &mut view.graph;
         let before = graph.node_spots();
@@ -816,12 +832,19 @@ fn header_chip(editor: &Editor, ui: &Ui, doc: &ScriptDoc) {
         Some(_) => format!("{} · running with a pretend subject", doc.at.title()),
         None => chip_title(editor, doc),
     };
-    widgets::floating_chip(
-        ui.painter(),
+    let above_the_canvas = ui
+        .ctx()
+        .layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            ui.id().with("header-chip"),
+        ))
+        .with_clip_rect(ui.max_rect());
+    chip::floating(
+        &above_the_canvas,
         ui.max_rect().min + vec2(16.0, 12.0),
         egui::Align2::LEFT_TOP,
         &text,
-        theme::OVERLAY,
+        theme::PANEL,
         theme::TEXT,
         12.5,
     );
@@ -833,7 +856,7 @@ pub fn chip_title(editor: &Editor, doc: &ScriptDoc) -> String {
         "{} · runs on {} · {count} node{}",
         doc.at.title(),
         doc.kind.name(),
-        widgets::plural(count)
+        words::plural(count)
     );
     if editor.shapes.is_fixture(ScriptDef::TABLE, &doc.at.key) {
         text.push_str(" · from New Game");
@@ -914,7 +937,7 @@ fn status(editor: &mut Editor, doc: &ScriptDoc) {
 fn beside(graph: &ScriptGraph, from: &str) -> Pos2 {
     let placed = graph.positions();
     let Some(origin) = placed.get(from) else {
-        return Pos2::new(40.0, 40.0);
+        return graph::FIRST;
     };
     let mut pos = Pos2::new(origin.x + 280.0, origin.y);
     while placed
@@ -1016,7 +1039,7 @@ fn callout_card(ui: &Ui, painter: &egui::Painter, anchor: Rect, callout: &Script
         top_left.y = anchor.top() - size.y - 10.0;
     }
     let rect = Rect::from_min_size(top_left, size);
-    design_tokens::slip::paint(painter, rect);
+    ui::slip::paint(painter, rect);
     painter.rect_stroke(
         rect,
         0.0,
@@ -1342,22 +1365,24 @@ pub fn add_node(
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let nearby = crate::schema::Nearby {
-        files: &project.files,
-        from: Some(&doc.file),
-    };
-    let Some(mut node) = nodes::fresh(&doc.reader, kind, nearby, doc.default_speaker()) else {
+    let nearby = crate::schema::Nearby::of(project, Some(&doc.file));
+    let Some(mut node) = nodes::fresh(&doc.reader, kind, doc.kind, nearby, doc.default_speaker())
+    else {
         editor.toast(format!("No {kind} node can be made here"));
         return;
     };
     if nodes::is_event(&node) {
-        let catalogue = &project.catalogue;
         let used: HashSet<&str> = doc.nodes().values().filter_map(nodes::event_name).collect();
-        if let Some((event, _)) = catalogue.events.iter().find(|(event, _)| {
-            catalogue.event_refusal(event, doc.kind).is_none() && !used.contains(event.as_str())
-        }) {
-            node = nodes::fresh_event(&doc.reader, event, nearby).unwrap_or(node);
-        }
+        let Some(event) =
+            nodes::free_event(&doc.reader, &project.catalogue, doc.kind, &used, nearby)
+        else {
+            editor.toast(format!(
+                "Every event a {} script answers already starts a flow here",
+                doc.kind.name()
+            ));
+            return;
+        };
+        node = event;
     }
     let base = if nodes::is_dialogue(&node) {
         &doc.at.key
@@ -1387,7 +1412,7 @@ pub fn add_node(
             (Some(at), None) => at,
             (None, _) => link
                 .as_ref()
-                .map_or(Pos2::new(40.0, 40.0), |(from, _)| beside(&view.graph, from)),
+                .map_or(graph::FIRST, |(from, _)| beside(&view.graph, from)),
         };
         view.place_node(&name, graph_pos);
         select_nodes(editor, doc, &[name]);
@@ -1438,25 +1463,22 @@ pub fn rename_node_dialog(
 ) -> Option<RenameNodeDialog> {
     let doc = ScriptDoc::load(editor, &dialog.at)?;
     let mut outcome: Option<Option<String>> = None;
-    dialogs::card(ctx, "rename-node", 360.0, |ui| {
-        let pressed = dialogs::keys(ui);
+    dialog::card(ctx, "rename-node", 360.0, |ui| {
+        let pressed = dialog::keys(ui);
         ui.label(RichText::new("Rename node").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(theme::muted(format!("{} becomes:", dialog.old)).size(13.5));
-        let output = egui::TextEdit::singleline(&mut dialog.draft)
-            .font(egui::TextStyle::Monospace)
-            .desired_width(f32::INFINITY)
-            .show(ui);
-        if !output.response.has_focus() {
-            output.response.request_focus();
-            let mut state = output.state;
+        let response = InputField::new(&mut dialog.draft).show(ui);
+        if !response.has_focus() {
+            response.request_focus();
+            let mut state = egui::TextEdit::load_state(ui.ctx(), response.id).unwrap_or_default();
             state
                 .cursor
                 .set_char_range(Some(egui::text::CCursorRange::two(
                     egui::text::CCursor::new(0),
                     egui::text::CCursor::new(dialog.draft.chars().count()),
                 )));
-            state.store(ui.ctx(), output.response.id);
+            state.store(ui.ctx(), response.id);
         }
         let taken = dialog.draft != dialog.old && doc.nodes().contains_key(&dialog.draft);
         if taken {
@@ -1470,10 +1492,11 @@ pub fn rename_node_dialog(
                 .all(|c| c.is_ascii_alphanumeric() || c == '_');
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if ui.add_enabled(ok, egui::Button::new("Rename")).clicked() || (ok && pressed.enter) {
+            if ui.add_enabled(ok, egui::Button::new("Rename")).clicked() || (ok && pressed.confirm)
+            {
                 outcome = Some(Some(dialog.draft.clone()));
             }
-            if ui.button("Cancel").clicked() || pressed.escape {
+            if ui.button("Cancel").clicked() || pressed.cancel {
                 outcome = Some(None);
             }
         });
@@ -1517,19 +1540,19 @@ pub fn link_node_dialog(
         .map(nodes::ports)
         .unwrap_or_default();
     let mut outcome: Option<Option<String>> = None;
-    dialogs::card(ctx, "link-node", 360.0, |ui| {
-        let pressed = dialogs::keys(ui);
+    dialog::card(ctx, "link-node", 360.0, |ui| {
+        let pressed = dialog::keys(ui);
         ui.label(
             RichText::new(format!("Link {} to…", dialog.from))
                 .strong()
                 .size(18.0),
         );
         ui.add_space(6.0);
-        let response = widgets::search_box(ui, &mut dialog.search, "node name", None);
-        widgets::default_focus(ui, &response);
+        let response = input::search(ui, &mut dialog.search, "node name", None);
+        input::default_focus(ui, &response);
         let needle = dialog.search.to_lowercase();
         if ports.len() > 1 {
-            widgets::combo("link-port")
+            controls::combo("link-port")
                 .selected_text(
                     ports
                         .get(dialog.port)
@@ -1556,12 +1579,12 @@ pub fn link_node_dialog(
                     }
                 }
             });
-        if pressed.enter
+        if pressed.confirm
             && let Some(name) = matches.first()
         {
             outcome = Some(Some((*name).clone()));
         }
-        if pressed.escape {
+        if pressed.cancel {
             outcome = Some(None);
         }
     });

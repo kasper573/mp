@@ -9,6 +9,7 @@ use crate::project::{ContentEdit, FileBytes, MovedOutside, Project, ProjectFiles
 use crate::tabs::EditorTab;
 use crate::usages::{ContentUsage, ContentUsages};
 use crate::user::UserFolder;
+use ui::words;
 
 /// A file, bundle, media file or folder going from one path to another.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,6 +60,14 @@ pub fn fixed_place(path: &str) -> Option<&'static str> {
         .fixture_paths()
         .any(|fixture| fixture.starts_with(&inside))
         .then_some("it holds fixtures, files the engine itself reads at their paths")
+}
+
+/// Why a copy of `file` could never load, when its type's files are the engine's fixtures and no
+/// others.
+pub fn uncopyable(file: &str) -> Option<&'static str> {
+    content_of(file)
+        .filter(|(table, _)| registry().closed(table))
+        .map(|_| "the engine reads only its own fixtures of this type, and a game adds none")
 }
 
 /// The path a file or folder named `file` gets in `folder`: `file` itself when no neighbour has
@@ -183,7 +192,7 @@ pub fn moved_outside_summary(moved: &[MovedOutside], index: &FolderIndex) -> Str
     let references: usize = moved.iter().map(|step| step.references).sum();
     let broken = format!(
         "{references} reference{} to {} {} broken",
-        plural(references),
+        words::plural(references),
         if moved.len() == 1 { "it" } else { "them" },
         if references == 1 { "is" } else { "are" }
     );
@@ -295,8 +304,8 @@ pub fn apply(editor: &mut Editor, moves: &[PathMove], label: String) -> Result<(
     if rewritten > 0 {
         said.push_str(&format!(
             ": {rewritten} reference{} in {files} file{} rewritten",
-            plural(rewritten),
-            plural(files)
+            words::plural(rewritten),
+            words::plural(files)
         ));
     }
     editor.toast(said);
@@ -408,8 +417,4 @@ fn names_in(files: &ProjectFiles, folder: &str, leaving: &[String]) -> HashSet<S
         .filter(|name| !name.is_empty())
         .map(str::to_lowercase)
         .collect()
-}
-
-fn plural(count: usize) -> &'static str {
-    if count == 1 { "" } else { "s" }
 }

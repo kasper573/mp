@@ -12,6 +12,7 @@ use crate::systems::{combat, stat};
 #[schemars(extend("x-system" = "stat"))]
 pub struct Heal {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub by: HealBy,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -22,6 +23,7 @@ pub struct Heal {
 #[serde(untagged)]
 pub enum HealBy {
     Full(Fully),
+    #[schemars(extend("default" = 10.0))]
     Amount(Condition),
 }
 
@@ -36,7 +38,9 @@ pub enum Fully {
 #[schemars(extend("x-system" = "stat"))]
 pub struct Damage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
+    #[schemars(extend("default" = 5.0))]
     pub by: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,

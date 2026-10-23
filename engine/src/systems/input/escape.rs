@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use egui::LayerId;
+use ui::egui::LayerId;
 
 use super::map::{self, InputAction, InputMap};
 use crate::core::gui;

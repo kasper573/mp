@@ -1,10 +1,11 @@
-use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
 use engine::core::content::{Content, SETTINGS_FILE, name_of};
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::area::scene::SCENE_FILE;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModule, ObjectShape};
 use engine::systems::script::Place;
+use ui::egui;
+use ui::egui::{Color32, Pos2, Stroke as EStroke, Vec2};
 
 use super::{AreaFrame, nodes};
 use crate::app::{Editor, PlacePick};

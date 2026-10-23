@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::card::{self, Art, Card, CardResponse};
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::Kind;
-use design_tokens::ink;
-use design_tokens::sheet::Depth;
-use egui::{Rect, Response, Ui};
+use ui::card::{self, Art, Card, CardResponse};
+use ui::egui;
+use ui::egui::{Rect, Response, Ui};
+use ui::face::{self, TextRole};
+use ui::float;
+use ui::glyph::Kind;
+use ui::ink;
+use ui::sheet::Depth;
 
 use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};
 use crate::core::content::Content;
@@ -19,7 +21,8 @@ use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
 use crate::systems::skill::Learned;
-use crate::systems::text::counted;
+use ui::words;
+use ui::words::counted;
 
 pub(crate) const BASIC_ATTACK_MARK: &str = "basic attack";
 
@@ -122,7 +125,7 @@ pub fn tooltip(
     card: &SkillCard,
     hint: Option<&StyledLine>,
 ) {
-    gui::tooltip(response, |ui| {
+    float::tooltip(response, |ui| {
         let content = world.resource::<Content>().clone();
         let def = card.skill.get(&content);
         let line = overview(world, &content, def, card);
@@ -270,7 +273,11 @@ fn rank_line(def: &SkillDef, rank: Rank, cost: u32) -> String {
         .iter()
         .map(|(stat, value)| {
             let unit = stat.unit().map_or(String::new(), |unit| format!(" {unit}"));
-            format!("{} {}{unit}", stat.label(), signed(*value))
+            format!(
+                "{} {}{unit}",
+                stat.label(),
+                words::signed(f64::from(*value))
+            )
         })
         .collect();
     if !changes.is_empty() {
@@ -323,15 +330,6 @@ fn use_lines(world: &World, content: &Content, def: &SkillDef) -> Vec<(String, b
         ));
     }
     lines
-}
-
-fn signed(value: f32) -> String {
-    let text = trim(value.abs());
-    if value < 0.0 {
-        format!("−{text}")
-    } else {
-        format!("+{text}")
-    }
 }
 
 fn trim(value: f32) -> String {

@@ -1,15 +1,16 @@
-use design_tokens::glyph::Mark;
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::audio::playback::{SfxDef, SfxRoleDef, SfxScalar};
+use engine::core::audio::playback::{SfxDef, SfxScalar};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::SurfaceDef;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::Mark;
+use ui::input;
+use ui::theme;
 
 use crate::app::Editor;
-use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
+use crate::audio::Waveform;
 use crate::project::ContentEdit;
-use crate::ui::{theme, widgets};
-
-pub const PEAK_CEILING_DBFS: f64 = -12.0;
 
 pub fn wave_of_sfx(editor: &mut Editor, ctx: &egui::Context, sfx: &str) -> Option<Waveform> {
     let path = sfx_file(editor, sfx)?;
@@ -45,77 +46,6 @@ pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], color: Colo
         color.gamma_multiply(0.85),
         egui::Stroke::NONE,
     ));
-}
-
-pub struct SfxRole {
-    pub key: String,
-    pub def: SfxRoleDef,
-}
-
-pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
-    let Some(reader) = editor.reader() else {
-        return Vec::new();
-    };
-    reader
-        .paths_of::<SfxRoleDef>()
-        .iter()
-        .filter_map(|key| sfx_role(editor, key))
-        .collect()
-}
-
-pub fn role_of_sfx(editor: &Editor, sfx: &str) -> Option<SfxRole> {
-    let sfx = editor.read::<SfxDef>(sfx)?.ok()?;
-    let reader = editor.reader()?;
-    sfx_role(editor, reader.path_of(sfx.role)?)
-}
-
-fn sfx_role(editor: &Editor, key: &str) -> Option<SfxRole> {
-    Some(SfxRole {
-        key: key.to_owned(),
-        def: (*editor.read::<SfxRoleDef>(key)?.ok()?).clone(),
-    })
-}
-
-pub struct LoudnessVerdict {
-    pub ok: bool,
-    pub loudness: String,
-    pub peak_ok: bool,
-    pub peak: String,
-}
-
-pub fn verdict(loudness: Loudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerdict {
-    let level = loudness.loudest_at(gain);
-    let target = role.loudness.0;
-    let off = level - target;
-    let ok = off.abs() <= 1.0;
-    let loudness_text = if ok {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, at the {} level",
-            role.name
-        )
-    } else if off > 0.0 {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, {off:.1} LU over {target:.0}",
-        )
-    } else {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, {:.1} LU under {target:.0}",
-            -off
-        )
-    };
-    let peak = loudness.peak_dbfs + gain_db(gain);
-    let peak_ok = peak <= PEAK_CEILING_DBFS;
-    let peak_text = if peak_ok {
-        format!("{peak:.1} dBFS, under the {PEAK_CEILING_DBFS:.0} ceiling")
-    } else {
-        format!("{peak:.1} dBFS, over the {PEAK_CEILING_DBFS:.0} ceiling")
-    };
-    LoudnessVerdict {
-        ok,
-        loudness: loudness_text,
-        peak_ok,
-        peak: peak_text,
-    }
 }
 
 pub fn first_sfx(editor: &Editor) -> Option<String> {
@@ -164,29 +94,14 @@ pub fn footstep_of(editor: &Editor, surface: Option<&str>) -> Option<String> {
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let keys = sfx_keys(editor);
-    let roles = sfx_roles(editor);
-    let (search, filter) = {
-        let view = &editor.views.model.view(key);
-        (view.sound_search.clone(), view.sound_role.clone())
-    };
+    let search = editor.views.model.view(key).sound_search.clone();
     let mut search_text = search.clone();
-    let mut new_filter = filter.clone();
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.allocate_ui(Vec2::new(220.0, 26.0), |ui| {
-            widgets::search_box(ui, &mut search_text, "Search sounds", None);
+            input::search(ui, &mut search_text, "Search sounds", None);
         });
-        let options = roles
-            .iter()
-            .map(|role| (Some(role.key.clone()), role.def.name.to_lowercase()))
-            .chain([(None, format!("all · {}", keys.len()))]);
-        for (option, label) in options {
-            let on = filter == option;
-            if widgets::toggle_chip(ui, &label, on).clicked() {
-                new_filter = option;
-            }
-        }
     });
     let mut listed: Vec<(String, Option<Waveform>)> = Vec::new();
     for sfx in keys
@@ -194,11 +109,6 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .filter(|sfx| search.is_empty() || sfx.contains(&search.to_lowercase()))
     {
         if sfx_file(editor, sfx).is_none() {
-            continue;
-        }
-        if let Some(wanted) = &filter
-            && role_of_sfx(editor, sfx).is_none_or(|role| &role.key != wanted)
-        {
             continue;
         }
         listed.push((sfx.clone(), wave_of_sfx(editor, ui.ctx(), sfx)));
@@ -235,13 +145,11 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             if listed.is_empty() {
                 ui.add_space(8.0);
-                widgets::hint(ui, "No sound rows match.");
+                form::hint(ui, "No sound rows match.");
             }
         });
     {
-        let view = editor.views.model.view_mut(key);
-        view.sound_search = search_text;
-        view.sound_role = new_filter;
+        editor.views.model.view_mut(key).sound_search = search_text;
     }
     if let Some(sfx) = play {
         editor.views.sound.play.push(sfx);
@@ -328,12 +236,12 @@ fn sound_row(
     response
 }
 
-pub fn volume_of(editor: &Editor, sfx: &str) -> (String, f32) {
+pub fn volume_of(editor: &Editor, sfx: &str) -> String {
     scalar_text(scalar_of(editor, sfx, |sfx| sfx.volume))
 }
 
 pub fn pitch_of(editor: &Editor, sfx: &str) -> String {
-    scalar_text(scalar_of(editor, sfx, |sfx| sfx.pitch)).0
+    scalar_text(scalar_of(editor, sfx, |sfx| sfx.pitch))
 }
 
 fn scalar_of(editor: &Editor, sfx: &str, field: impl Fn(&SfxDef) -> SfxScalar) -> SfxScalar {
@@ -344,9 +252,9 @@ fn scalar_of(editor: &Editor, sfx: &str, field: impl Fn(&SfxDef) -> SfxScalar) -
         .unwrap_or_default()
 }
 
-fn scalar_text(scalar: SfxScalar) -> (String, f32) {
+fn scalar_text(scalar: SfxScalar) -> String {
     match scalar {
-        SfxScalar::Fixed(fixed) => (format!("{fixed} · the row's"), fixed),
-        SfxScalar::Random { min, max } => (format!("{min} to {max}, at random · the row's"), max),
+        SfxScalar::Fixed(fixed) => format!("{fixed} · the row's"),
+        SfxScalar::Random { min, max } => format!("{min} to {max}, at random · the row's"),
     }
 }

@@ -1,16 +1,21 @@
-use egui::{RichText, Vec2};
 use engine::core::content::{ContentFile, table_of};
 use engine::core::math::{Pos, Rect, Size};
 use engine::core::tiling::GridSize;
 use engine::systems::area::{self, AreaDef, AreaModule, MapSize};
 use engine::systems::script::Place;
+use ui::controls;
+use ui::dialog;
+use ui::egui;
+use ui::egui::{RichText, Vec2};
+use ui::form;
+use ui::theme;
+use ui::words;
 
 use super::grid::GridDraft;
 use super::{nodes, pins, shapes};
 use crate::app::Editor;
-use crate::forms;
 use crate::tabs::file_title;
-use crate::ui::{dialogs, theme, widgets};
+use ui::input::InputField;
 
 pub struct ResizeDialog {
     /// The area or blueprint bundle resized.
@@ -34,8 +39,8 @@ pub fn resize_dialog(
         Some(AreaDef::TABLE) => area::MIN_SIDE,
         _ => 1,
     };
-    crate::ui::dialogs::card(ctx, "resize", 480.0, |ui| {
-        let pressed = dialogs::keys(ui);
+    dialog::card(ctx, "resize", 480.0, |ui| {
+        let pressed = dialog::keys(ui);
         ui.label(
             RichText::new(format!("Resize {}", file_title(&dialog.bundle)))
                 .strong()
@@ -46,22 +51,15 @@ pub fn resize_dialog(
             ("width", &mut dialog.width, old.0),
             ("height", &mut dialog.height, old.1),
         ] {
-            widgets::kv(ui, name, |ui| {
+            form::kv(ui, name, |ui| {
                 ui.scope(|ui| {
-                    ui.set_width(120.0);
                     let id = ui.id().with((name, "resize"));
                     let mut draft = ui
                         .ctx()
                         .data(|d| d.get_temp::<String>(id))
                         .unwrap_or_else(|| value.to_string());
-                    let response = forms::boxed_input(ui, Some(&format!("was {was}")), |ui| {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut draft)
-                                .frame(egui::Frame::NONE)
-                                .font(egui::TextStyle::Monospace)
-                                .desired_width(f32::INFINITY),
-                        )
-                    });
+                    let was = format!("was {was}");
+                    let response = InputField::new(&mut draft).unit(&was).width(120.0).show(ui);
                     if response.changed() {
                         ui.ctx().data_mut(|d| d.insert_temp(id, draft.clone()));
                         if let Ok(parsed) = draft.trim().parse::<u32>() {
@@ -74,7 +72,7 @@ pub fn resize_dialog(
                 });
             });
         }
-        widgets::kv(ui, "anchor", |ui| {
+        form::kv(ui, "anchor", |ui| {
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::splat(4.0);
                 for row in [-1i8, 0, 1] {
@@ -119,10 +117,10 @@ pub fn resize_dialog(
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if widgets::primary(ui, "Resize").clicked() || pressed.enter {
+            if controls::primary(ui, "Resize").clicked() || pressed.confirm {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || pressed.escape {
+            if ui.button("Cancel").clicked() || pressed.cancel {
                 outcome = Some(false);
             }
         });
@@ -153,9 +151,9 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
             _ => "on both sides".to_owned(),
         };
         Some(if delta > 0 {
-            format!("Adds {n} empty {unit}{} {where_}", widgets::plural(n))
+            format!("Adds {n} empty {unit}{} {where_}", words::plural(n))
         } else {
-            format!("Clips {n} {unit}{} {where_}", widgets::plural(n))
+            format!("Clips {n} {unit}{} {where_}", words::plural(n))
         })
     };
     if let Some(text) = side(

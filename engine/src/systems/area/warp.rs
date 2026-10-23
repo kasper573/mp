@@ -17,6 +17,7 @@ use crate::systems::{dialogue, movement, reach};
 #[schemars(extend("x-system" = "area"))]
 pub struct Warp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub to: Fill<Place>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]

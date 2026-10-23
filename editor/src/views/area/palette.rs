@@ -1,17 +1,23 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::ink;
+use ui::input;
+use ui::theme;
 
-use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
 use engine::core::content::{FolderReader, name_of};
 use engine::systems::area::tileset::TilesetDef;
 use strum::VariantArray;
+use ui::egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
 
 use super::AreaSnapshot;
 use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
 use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 use crate::views::tileset::{SheetLayout, SheetRect, TilesetSheet};
 
@@ -54,7 +60,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, area: &AreaSnapsho
             (PaletteLens::Terrains, "terrains"),
         ] {
             let on = lens == value;
-            if widgets::toggle_chip(ui, label, on).clicked() {
+            if chip::toggle(ui, label, on).clicked() {
                 picked = value;
             }
         }
@@ -107,12 +113,12 @@ fn tileset_chips(
     let mut picked: Option<String> = None;
     for key in &own {
         let on = current.as_deref() == Some(key.as_str());
-        if widgets::toggle_chip(ui, key, on).clicked() {
+        if chip::toggle(ui, key, on).clicked() {
             picked = Some((*key).clone());
         }
     }
     if let Some(key) = current.as_ref().filter(|k| !own.contains(k)) {
-        widgets::toggle_chip(ui, key, true);
+        chip::toggle(ui, key, true);
     }
     let id = ui.make_persistent_id((view_key, "other tilesets"));
     if let Some(key) = more_popup(ui, id, &mut view.tileset_search, "Search tilesets", &others) {
@@ -137,13 +143,13 @@ fn more_popup<T: Clone>(
         return None;
     }
     let mut picked = None;
-    let response = widgets::dropdown_chip(ui, format!("+ {}", others.len()));
+    let response = chip::dropdown(ui, format!("+ {}", others.len()));
     egui::Popup::from_toggle_button_response(&response)
         .id(id)
         .width(280.0)
         .show(|ui| {
             ui.set_min_width(240.0);
-            widgets::search_box(ui, search, placeholder, None);
+            input::search(ui, search, placeholder, None);
             let needle = search.to_lowercase();
             egui::ScrollArea::vertical()
                 .max_height(260.0)
@@ -168,7 +174,7 @@ fn tile_sheet(
     tilesets: &[(String, &TilesetDef)],
 ) {
     let Some(tileset_key) = editor.views.area.view(view_key).pick.tileset.clone() else {
-        widgets::hint(ui, "No tileset of this tile size.");
+        form::hint(ui, "No tileset of this tile size.");
         return;
     };
     let Some(def) = tilesets
@@ -330,14 +336,14 @@ fn terrain_chips(
     for (tileset, set) in &own {
         let on = view.terrain.tileset.as_deref() == Some(tileset)
             && view.terrain.set.as_deref() == Some(set);
-        if widgets::toggle_chip(ui, &label(tileset, set), on).clicked() {
+        if chip::toggle(ui, &label(tileset, set), on).clicked() {
             picked = Some((tileset.clone(), set.clone()));
         }
     }
     if let (Some(tileset), Some(set)) = (&view.terrain.tileset, &view.terrain.set)
         && !own.iter().any(|(t, s)| t == tileset && s == set)
     {
-        widgets::toggle_chip(ui, &label(tileset, set), true);
+        chip::toggle(ui, &label(tileset, set), true);
     }
     let id = ui.make_persistent_id((view_key, "other terrain sets"));
     if let Some(pick) = more_popup(
@@ -366,7 +372,7 @@ fn terrain_sheet(
 ) {
     let pick = editor.views.area.view(view_key).terrain.clone();
     let (Some(tileset_key), Some(set)) = (pick.tileset.clone(), pick.set.clone()) else {
-        widgets::hint(ui, "No tileset of this tile size names terrains.");
+        form::hint(ui, "No tileset of this tile size names terrains.");
         return;
     };
     let Some(def) = tilesets
@@ -409,7 +415,7 @@ fn terrain_sheet(
                         let Some(index) = terrains.iter().position(|t| t == terrain) else {
                             continue;
                         };
-                        let color = theme::alpha(terrain_color(index), 110);
+                        let color = ink::wash(terrain_color(index), 0.43);
                         painter.rect_filled(corner.quarter(cell).shrink(0.5), 0.0, color);
                     }
                     painter.rect_stroke(
@@ -456,7 +462,7 @@ fn terrain_sheet(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if let Some(digit) = EditorKey::digit_name(index) {
-                                widgets::key_hint(ui, digit);
+                                controls::key_hint(ui, digit);
                             }
                         });
                     })
@@ -480,5 +486,16 @@ fn terrain_sheet(
 }
 
 pub fn terrain_color(index: usize) -> Color32 {
-    theme::TERRAIN[index % theme::TERRAIN.len()]
+    TERRAIN[index % TERRAIN.len()]
 }
+
+const TERRAIN: [Color32; 8] = [
+    Color32::from_rgb(230, 160, 70),
+    Color32::from_rgb(150, 110, 90),
+    Color32::from_rgb(240, 240, 220),
+    Color32::from_rgb(190, 200, 210),
+    Color32::from_rgb(110, 180, 110),
+    Color32::from_rgb(90, 150, 230),
+    Color32::from_rgb(200, 110, 200),
+    Color32::from_rgb(230, 90, 90),
+];

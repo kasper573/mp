@@ -295,17 +295,8 @@ impl Game {
 
     /// A sound of a moment's silence.
     pub fn sfx(self, name: &str) -> Game {
-        self.row(
-            "sfx_role",
-            "sounds",
-            json!({ "name": "Sounds", "loudness": -28.0 }),
-        )
-        .row(
-            "sfx",
-            name,
-            json!({ "role": path("sfx_role", "sounds"), "volume": 1.0, "pitch": 1.0 }),
-        )
-        .part("sfx", name, &SFX_CLIP.named("", "wav"), wav())
+        self.row("sfx", name, json!({ "volume": 1.0, "pitch": 1.0 }))
+            .part("sfx", name, &SFX_CLIP.named("", "wav"), wav())
     }
 
     /// A babbling voice of silent letters, a character's `voice` module names it by its path.

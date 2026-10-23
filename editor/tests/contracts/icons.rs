@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use ui::egui;
 
 use editor::icons;
 use editor::project::Project;

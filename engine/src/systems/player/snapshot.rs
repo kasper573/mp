@@ -5,7 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentFile, ContentProblem, Loading, NamedContent, RowCheck, id, key_of, serial,
+    Content, ContentFile, ContentProblem, Loading, NamedContent, Nearby, RowCheck, id, key_of,
+    serial,
 };
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
@@ -73,11 +74,32 @@ impl NamedContent for CharacterSnapshot {
 impl ContentFile for CharacterSnapshot {
     const TABLE: &'static str = "test_character";
     const PICKED_FROM_TABLE: bool = true;
+
+    fn fresh(near: &Nearby) -> Result<CharacterSnapshot, String> {
+        Ok(CharacterSnapshot {
+            name: near.name(),
+            class: near.file()?,
+            xp: 0,
+            skills: Vec::new(),
+            hotbar: Vec::new(),
+            basic_attack: None,
+            stats: Stats::default(),
+            bag: Vec::new(),
+            equipment: BTreeMap::new(),
+            known_areas: Vec::new(),
+            quests: Vec::new(),
+            memories: Vec::new(),
+            lines_heard: Vec::new(),
+            shops: Vec::new(),
+            history: Vec::new(),
+            start: CharacterStart::InitialSpawn(AtInitialSpawn::InitialSpawn),
+        })
+    }
 }
 
 impl CharacterSnapshot {
     /// A character as the player row makes it: its class, and its gear already on.
-    pub fn fresh(content: &Content, name: &str, def: &PlayerDef) -> CharacterSnapshot {
+    pub fn of_player(content: &Content, name: &str, def: &PlayerDef) -> CharacterSnapshot {
         let equipment: BTreeMap<EquipmentSlot, ItemId> = def
             .wearing
             .iter()

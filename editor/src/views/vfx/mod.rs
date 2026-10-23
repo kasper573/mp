@@ -8,16 +8,21 @@ pub use params::{ParamSpec, param_fill, params_of, shader_params};
 pub use preview::VfxViews;
 
 use std::sync::Arc;
+use ui::egui;
+use ui::form;
+use ui::sheet;
+use ui::theme;
 
-use egui::{Color32, FontId, Ui, Vec2 as EVec2};
 use engine::core::content::{ContentFile, ContentScope, ErrorPlace, fields_file, rescoped};
 use engine::core::time::Seconds;
 use engine::core::vfx::{ParamFill, VfxDef, VfxLayer, VfxShaderDef, shader_file};
+use ui::egui::{Color32, FontId, Ui, Vec2 as EVec2};
 
 use self::preview::preview;
 use crate::app::Editor;
 use crate::project::ContentEdit;
-use crate::ui::{row_form, theme, widgets};
+use crate::shell::{row_form, widgets};
+use crate::tabs::file_title;
 
 const FORM_WIDTH: f32 = 440.0;
 const COLUMN_GAP: f32 = 16.0;
@@ -62,7 +67,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
         ui.add_space(16.0);
         ui.vertical(|ui| {
-            widgets::section(ui, "preview");
+            sheet::section(ui, "preview");
             preview(
                 editor,
                 ui,
@@ -106,7 +111,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             match &read {
                 Ok(def) => code_pane(editor, ui, def, key, &file, &current),
                 Err(errors) => {
-                    widgets::section(ui, &format!("code · {file}"));
+                    sheet::section(ui, &format!("code · {file}"));
                     widgets::unreadable(ui, key, errors);
                 }
             }
@@ -114,7 +119,7 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.add_space(COLUMN_GAP);
         ui.vertical(|ui| {
             ui.set_width(preview_width);
-            widgets::section(ui, "preview");
+            sheet::section(ui, "preview");
             let Some((def, shader)) = def.zip(
                 editor
                     .loaded()
@@ -169,7 +174,7 @@ fn code_pane(
     let id = egui::Id::new(("shader-code", key));
     let (response, verdict) = shader_code::show(ui, id, &mut text, def, height);
     if response.changed() {
-        let mut edit = ContentEdit::new(format!("Edit shader {key}")).merging();
+        let mut edit = ContentEdit::new(format!("Edit the code of {}", file_title(key))).merging();
         edit.write(file.to_owned(), Arc::from(text.as_bytes()));
         editor.apply(edit);
     }
@@ -207,7 +212,7 @@ fn code_pane(
             ui.scope(|ui| {
                 ui.set_max_width(title_room.max(MIN_TITLE_WIDTH));
                 ui.add(
-                    egui::Label::new(widgets::section_heading(&format!("code · {file} · ")))
+                    egui::Label::new(form::section_heading(&format!("code · {file} · ")))
                         .truncate(),
                 );
             });

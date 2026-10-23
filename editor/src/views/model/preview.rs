@@ -1,14 +1,16 @@
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::core::time::Millis;
 use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
+use ui::chip;
+use ui::egui;
+use ui::egui::Ui;
+use ui::glyph::{self, Mark};
+use ui::theme;
 
 use super::ModelStrip;
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::stage::{self, Posed, PosedActor, Scene};
-use crate::ui::{theme, widgets};
 
 pub struct StripPreview {
     pub playing: bool,
@@ -200,13 +202,13 @@ pub fn controls(
         {
             preview.muted = !preview.muted;
         }
-        if with_speed && widgets::chip(ui, format!("{}×", preview.speed)).clicked() {
+        if with_speed && chip::plain(ui, format!("{}×", preview.speed)).clicked() {
             preview.speeds = (preview.speeds + 1) % SPEEDS.len();
             preview.speed = SPEEDS[preview.speeds];
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if count > 0 {
-                widgets::chip(ui, format!("{} / {count}", index + 1));
+                chip::plain(ui, format!("{} / {count}", index + 1));
             }
         });
     });

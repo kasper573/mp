@@ -10,15 +10,10 @@ path = "src/main.rs"
 
 [dependencies]
 engine = { path = "../engine" }
-design_tokens = { path = "../design_tokens" }
+ui = { path = "../ui" }
 bevy_tilemap = { path = "../bevy/tilemap" }
 bevy = { workspace = true, features = ["x11", "multi_threaded"] }
 bevy_egui.workspace = true
-egui.workspace = true
-egui_dock = "0.21"
-egui-snarl = "0.12"
-egui_ltreeview = "0.9"
-egui_code_editor = "0.4.2"
 bevy_replicon = { workspace = true, features = ["server"] }
 serde.workspace = true
 serde_json.workspace = true
@@ -30,7 +25,6 @@ blake3 = "1"
 notify = "8"
 rfd = "0.17"
 process-wrap = { version = "10", features = ["std"] }
-ebur128 = "0.1"
 include_dir = "0.7"
 image = { version = "0.25", default-features = false, features = ["png", "gif"] }
 png = "0.18"
@@ -40,6 +34,7 @@ rayon.workspace = true
 base64 = "0.23"
 walkdir = "2"
 clap = { version = "4.6.7", features = ["derive"] }
+jiff = "0.2"
 
 [dev-dependencies]
 testkit = { path = "../testkit" }

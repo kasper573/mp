@@ -1,10 +1,7 @@
 //! The parameters a vfx or shader row declares, and the one set of controls that fills them: the
 //! preview's knobs, a shader layer's fills, and a script's values for a vfx.
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Ui};
-use engine::core::content::ContentFile;
+use engine::core::content::{ContentFile, serial};
 use engine::core::math::Rgba;
 use engine::core::vfx::{
     ParamFill, ParamKind, ParamValue, ShaderParam, VfxDef, VfxParam, VfxShaderDef,
@@ -12,10 +9,16 @@ use engine::core::vfx::{
 use engine::field;
 use serde_json::{Map, Value};
 use strum::VariantArray;
+use ui::chip;
+use ui::controls;
+use ui::egui::{Color32, Ui};
+use ui::form;
+use ui::glyph::{self, Mark};
+use ui::theme;
 
 use crate::forms::{self, FormChange, FormCx};
 use crate::project::Project;
-use crate::ui::{theme, widgets};
+use ui::input::{NumberField, SliderField};
 
 const PARAM_INDENT: f32 = 22.0;
 const BOUND_WIDTH: f32 = 64.0;
@@ -71,7 +74,7 @@ pub fn params_of(project: &Project, table: &str, key: &str) -> Vec<ParamSpec> {
 }
 
 /// One knob for a parameter's value, by its kind: a checkbox, a slider within the range or a
-/// drag without one, or a color button. Says whether it moved.
+/// number field without one, or a color button. Says whether it moved.
 pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> bool {
     match spec.kind {
         ParamKind::Bool => {
@@ -87,10 +90,8 @@ pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> b
                 _ => 1.0,
             };
             let moved = match spec.range {
-                Some((min, max)) => controls::slider(ui, &mut amount, min..=max).changed(),
-                None => ui
-                    .add(egui::DragValue::new(&mut amount).speed(0.01))
-                    .changed(),
+                Some((min, max)) => SliderField::new(&mut amount, min..=max).show(ui),
+                None => NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui),
             };
             if moved {
                 *value = ParamValue::Number(tidy(f64::from(amount)) as f32);
@@ -140,7 +141,7 @@ pub fn param_fill(
         match next {
             Some(next) => fills.insert(
                 spec.name.clone(),
-                serde_json::to_value(next).unwrap_or(Value::Null),
+                serial::json_of(&next).unwrap_or(Value::Null),
             ),
             None => fills.remove(&spec.name),
         };
@@ -156,7 +157,7 @@ pub fn param_fill(
         ui.spacing_mut().slider_width = (ui.available_width() - beside).max(MIN_SLIDER);
         match &fill {
             Some(ParamFill::Param { param }) => {
-                widgets::chip(ui, format!("◇ {param}"));
+                chip::plain(ui, format!("◇ {param}"));
             }
             other => {
                 let mut value = match other {
@@ -176,7 +177,7 @@ pub fn param_fill(
                 Some(ParamFill::Param { param }) => format!("◇ {param}"),
                 _ => "value".to_owned(),
             };
-            widgets::combo(ui.id().with(path).with("source"))
+            controls::combo(ui.id().with(path).with("source"))
                 .width(SOURCE_WIDTH)
                 .selected_text(theme::mono(source).size(12.5))
                 .show_ui(ui, |ui| {
@@ -218,7 +219,7 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
 
 fn params(ui: &mut Ui, cx: &mut FormCx, params: &mut Vec<ShaderParam>, path: &str) -> FormChange {
     let mut changed = FormChange::default();
-    widgets::section_count(ui, "params", params.len());
+    form::section_count(ui, "params", params.len());
     let reader = cx.project.reader();
     let mut remove = None;
     for (index, param) in params.iter_mut().enumerate() {
@@ -229,7 +230,7 @@ fn params(ui: &mut Ui, cx: &mut FormCx, params: &mut Vec<ShaderParam>, path: &st
         ui.horizontal(|ui| {
             if kept {
                 ui.label(theme::faint("·")).on_hover_text(forms::KEPT_TIP);
-            } else if widgets::remove_button(ui, "Remove").clicked() {
+            } else if controls::remove(ui, "Remove").clicked() {
                 remove = Some(index);
             }
             let mut picked = param.kind;
@@ -239,7 +240,7 @@ fn params(ui: &mut Ui, cx: &mut FormCx, params: &mut Vec<ShaderParam>, path: &st
                     let name_path = format!("{param_path}{}", field!(ShaderParam, name));
                     changed |= forms::text_of(ui, cx, &mut param.name, &name_path);
                 });
-                widgets::combo(("param-kind", index))
+                controls::combo(("param-kind", index))
                     .width(90.0)
                     .selected_text(theme::mono(kind_name(param.kind)).size(13.0))
                     .show_ui(ui, |ui| {
@@ -333,17 +334,11 @@ fn number_param_fields(
             ("max", &mut param.max, field!(ShaderParam, max)),
         ] {
             ui.label(theme::faint(bound).size(12.0));
-            ui.scope(|ui| {
-                ui.set_width(BOUND_WIDTH);
-                let mut amount = held.unwrap_or_default();
-                let response = forms::boxed_input(ui, None, |ui| {
-                    ui.add(egui::DragValue::new(&mut amount).speed(0.01))
-                });
-                if response.changed() && Some(amount) != *held {
-                    *held = Some(tidy(f64::from(amount)) as f32);
-                    changed |= FormChange::at(&format!("{path}{at}"));
-                }
-            });
+            let mut amount = held.unwrap_or_default();
+            if NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui) {
+                *held = Some(tidy(f64::from(amount)) as f32);
+                changed |= FormChange::at(&format!("{path}{at}"));
+            }
         }
         ui.label(theme::faint("default").size(12.0));
         let range = param.range().filter(|(min, max)| min < max);
@@ -352,14 +347,8 @@ fn number_param_fields(
             _ => 0.0,
         };
         let moved = match range {
-            Some((min, max)) => {
-                let moved = controls::slider(ui, &mut amount, min..=max).changed();
-                ui.label(theme::faint(format!("{:.2}", tidy(f64::from(amount)))).size(12.0));
-                moved
-            }
-            None => ui
-                .add(egui::DragValue::new(&mut amount).speed(0.01))
-                .changed(),
+            Some((min, max)) => SliderField::new(&mut amount, min..=max).show(ui),
+            None => NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui),
         };
         if moved {
             param.default = ParamValue::Number(tidy(f64::from(amount)) as f32);

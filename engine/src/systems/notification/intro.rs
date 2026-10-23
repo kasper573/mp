@@ -1,10 +1,11 @@
 use std::time::Duration;
+use ui::egui;
 
 use bevy::prelude::*;
-use design_tokens::face::Face;
-use egui::emath::TSTransform;
-use egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};
+use ui::egui::emath::TSTransform;
+use ui::egui::{Align, Color32, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
+use ui::face::Face;
 
 use super::rows::{self, Clock, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
@@ -14,6 +15,7 @@ use crate::core::gui;
 use crate::core::math::Rgba;
 use crate::core::text::{self, TextMotion, TextShadow};
 use crate::systems::screen::{ClientScreen, area};
+use ui::paint;
 
 const TITLE_SIZE: f32 = 44.0;
 const LINE_SIZE: f32 = 19.0;
@@ -97,9 +99,7 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
         let line = notification.text.styled();
         let tint = appearance.tint.map_or(Color32::WHITE, Color32::from);
         let title_font = Face::BookBold.id(TITLE_SIZE);
-        let title_size = gui
-            .fonts_mut(|fonts| fonts.layout_no_wrap(title.to_string(), title_font.clone(), tint))
-            .size();
+        let title_size = paint::text_size(gui, title, title_font.clone());
         let room = WIDEST - 2.0 * PADDING.x;
         let line_size = text::measure(
             gui,

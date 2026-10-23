@@ -1,5 +1,6 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 use std::ops::Range;
+use ui::egui;
 
 use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
@@ -180,6 +181,8 @@ impl From<Rgba> for egui::Color32 {
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FrameSize {
+    #[schemars(extend("minimum" = 1))]
     pub width: u32,
+    #[schemars(extend("minimum" = 1))]
     pub height: u32,
 }

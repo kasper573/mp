@@ -8,7 +8,7 @@ use strum::{IntoStaticStr, VariantArray};
 use super::ParamValue;
 use crate::core::content::{
     Bundle, ContentFile, ContentId, ContentProblem, ErrorPlace, FileWriter, Loading, NamedContent,
-    PartSpec, Parts, RowCheck, Shape,
+    Nearby, PartSpec, Parts, RowCheck, Shape,
 };
 use crate::core::math::Rgba;
 
@@ -36,7 +36,7 @@ pub const SHADER_SOURCE: PartSpec = PartSpec::File {
 
 /// Where the WGSL of the shader bundle at `path` lives.
 pub fn shader_file(path: &str) -> String {
-    format!("{path}/shader.wgsl")
+    format!("{path}/{}", SHADER_SOURCE.named("", "wgsl"))
 }
 
 impl Bundle for VfxShaderDef {
@@ -260,6 +260,13 @@ impl NamedContent for VfxShaderDef {
 impl ContentFile for VfxShaderDef {
     const TABLE: &'static str = "vfx_shader";
     const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(near: &Nearby) -> Result<VfxShaderDef, String> {
+        Ok(VfxShaderDef {
+            name: near.name(),
+            params: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);

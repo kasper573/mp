@@ -1,9 +1,0 @@
-{
-  "label": "Open or close the equipment",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "KeyE"
-    }
-  ]
-}

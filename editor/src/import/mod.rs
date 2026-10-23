@@ -17,23 +17,25 @@ pub use tileset_ui::{
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
+use ui::dialog;
+use ui::theme;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Context, Ui};
 use engine::core::content::{ContentFile, fields_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
 use formats::{AnimationExport, DroppedFiles};
 use image::RgbaImage;
 use serde::Deserialize;
+use ui::egui::{Context, Ui};
+use ui::glyph::{self, Mark};
 
 use crate::app::{ChannelInbox, Editor, ModalDialog};
 use crate::project::ContentEdit;
 use crate::rows;
 use crate::scenes::StripName;
+use crate::shell::active_tab;
 use crate::tabs::EditorTab;
 use crate::tabs::shown_path;
-use crate::ui::{active_tab, dialogs, theme};
 use crate::views::model::{ModelPage, strip_of, write_strip};
 
 pub const IMPORT_PART: &str = "/import";
@@ -97,7 +99,7 @@ pub fn show_readings(editor: &mut Editor, ctx: &Context) {
     for job in editor.jobs.reading.iter().filter(|job| job.again.is_none()) {
         let name = names_of(job);
         let mut cancel = false;
-        dialogs::card(ctx, &format!("import-reading-{}", job.id), 360.0, |ui| {
+        dialog::card(ctx, &format!("import-reading-{}", job.id), 360.0, |ui| {
             ui.label(theme::strong(format!("Reading {name}…")));
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -310,13 +312,18 @@ fn pick_files(editor: &mut Editor, target: ImportTarget) {
     if let Some(dir) = art_dir(editor) {
         picker = picker.set_directory(dir);
     }
-    let Some(files) = picker.pick_files() else {
+    let Some(files) = picked_files(picker) else {
         return;
     };
     match formats::sort_out(&files) {
         Ok(dropped) => begin(editor, target, dropped, None),
         Err(reason) => editor.toast(format!("Not imported: {reason}")),
     }
+}
+
+pub fn picked_files(dialog: rfd::FileDialog) -> Option<Vec<PathBuf>> {
+    // The desktop portal answers a cancelled pick with no files rather than with none.
+    dialog.pick_files().filter(|files| !files.is_empty())
 }
 
 pub fn art_dir(editor: &Editor) -> Option<PathBuf> {

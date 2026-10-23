@@ -515,7 +515,6 @@ fn compile_source<'c, V: Vocabulary>(
         locals: source.locals.clone(),
         node: None,
         used_vars: HashSet::new(),
-        read_slots: HashSet::new(),
         stack: stack.to_vec(),
         subject_read: false,
         event_fields: &[],
@@ -875,24 +874,6 @@ fn compile_source<'c, V: Vocabulary>(
             ));
         }
     }
-    for (index, (name, _)) in source.locals.iter().enumerate() {
-        if !cx.read_slots.contains(&Slot::Local(index)) {
-            return Err(fail(
-                "unused local",
-                None,
-                format!("local {name} is never read"),
-            ));
-        }
-    }
-    for (index, (name, _)) in source.state.iter().enumerate() {
-        if !cx.read_slots.contains(&Slot::State(index)) {
-            return Err(fail(
-                "unused state",
-                None,
-                format!("state {name} is never read"),
-            ));
-        }
-    }
     let successors: Vec<Vec<StepIndex>> = steps.iter().map(step_successors).collect();
     let mut reachable = vec![false; names.len()];
     let mut subject_free = vec![false; names.len()];
@@ -1136,7 +1117,6 @@ pub struct Compiler<'c, V: Vocabulary> {
     locals: Vec<(&'c str, ValueType)>,
     node: Option<&'c str>,
     used_vars: HashSet<&'c str>,
-    read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
     subject_read: bool,
     event_fields: &'static [(&'static str, ValueType)],
@@ -1156,7 +1136,6 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             locals: Vec::new(),
             node: None,
             used_vars: HashSet::new(),
-            read_slots: HashSet::new(),
             stack: Vec::new(),
             subject_read: false,
             event_fields: &[],
@@ -1396,14 +1375,12 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                 let (index, ty) = self
                     .local(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("local {name}")))?;
-                self.read_slots.insert(Slot::Local(index));
                 (Box::new(move |_, cx: &FlowCx| cx.locals[index].clone()), ty)
             }
             Expr::State { state: name } => {
                 let (index, ty) = self
                     .state(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("state {name}")))?;
-                self.read_slots.insert(Slot::State(index));
                 (Box::new(move |_, cx: &FlowCx| cx.state[index].clone()), ty)
             }
             Expr::Event { event: name } => {

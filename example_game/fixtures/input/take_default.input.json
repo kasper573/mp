@@ -1,9 +1,0 @@
-{
-  "label": "Give a question its default answer",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "Enter"
-    }
-  ]
-}

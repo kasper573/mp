@@ -12,12 +12,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AudioRef;
+use crate::core::audio::decibels;
 use crate::core::audio::loader::AudioLoader;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
-use crate::core::audio::{Lufs, decibels};
 use crate::core::content::{
-    Bundle, Content, ContentFile, ContentId, FileWriter, NamedContent, PartSpec, Parts, RowCheck,
-    Shape,
+    Bundle, Content, ContentFile, ContentId, FileWriter, Nearby, PartSpec, Parts, Shape,
 };
 use crate::core::math::{Pos, Rng, Size};
 use crate::core::tiling::Tiles;
@@ -60,7 +59,6 @@ pub type SfxId = ContentId<SfxDef>;
 pub struct SfxDef {
     #[serde(skip)]
     pub file: AudioRef,
-    pub role: SfxRoleId,
     pub volume: SfxScalar,
     pub pitch: SfxScalar,
 }
@@ -73,6 +71,14 @@ pub const SFX_CLIP: PartSpec = PartSpec::File {
 impl ContentFile for SfxDef {
     const TABLE: &'static str = "sfx";
     const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(_: &Nearby) -> Result<SfxDef, String> {
+        Ok(SfxDef {
+            file: AudioRef::default(),
+            volume: SfxScalar::default(),
+            pitch: SfxScalar::default(),
+        })
+    }
 }
 
 impl Bundle for SfxDef {
@@ -86,28 +92,6 @@ impl Bundle for SfxDef {
 
     fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
         Ok(())
-    }
-}
-
-pub type SfxRoleId = ContentId<SfxRoleDef>;
-
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
-pub struct SfxRoleDef {
-    pub name: String,
-    pub loudness: Lufs,
-}
-
-impl NamedContent for SfxRoleDef {
-    fn shown_name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl ContentFile for SfxRoleDef {
-    const TABLE: &'static str = "sfx_role";
-
-    fn check(&self, cx: &mut RowCheck) {
-        cx.text("/name", &self.name, 1, 40);
     }
 }
 

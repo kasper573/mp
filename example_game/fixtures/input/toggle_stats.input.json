@@ -1,9 +1,0 @@
-{
-  "label": "Open or close the stats",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "KeyK"
-    }
-  ]
-}

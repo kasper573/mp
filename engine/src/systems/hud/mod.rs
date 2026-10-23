@@ -4,16 +4,21 @@ mod panel;
 pub(crate) use card::{
     Pinned, draw_pinned, forget_pinned, pin, pinned, pinned_rect, raise_pinned, unpin,
 };
-pub(crate) use panel::{GripCorner, WindowFrame, sheet_pose, slip_grip, widget, window};
+pub(crate) use panel::{WindowFrame, sheet_pose, widget, window};
 
 use std::collections::HashSet;
+use ui::drag;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::egui_wants_any_keyboard_input;
-use design_tokens::face::{self, TextRole};
-use design_tokens::{controls, ink, sheet, slip};
-use egui::{Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2};
+use ui::egui::{
+    Align2, Color32, Id, LayerId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, Vec2,
+};
+use ui::face::{self, TextRole};
+use ui::{controls, ink, sheet, slip};
 
 use crate::core::assets::ImageRef;
 use crate::core::content::{Content, Fixture};
@@ -28,6 +33,7 @@ use crate::systems::screen::ClientScreen;
 use crate::systems::settings::{self, UserSettings};
 use crate::systems::skill::{self, HotbarEntry, HotbarSlot, SkillId};
 use crate::systems::{equipment, history, quest, stat, terminal};
+use ui::dialog;
 
 pub(crate) const WIDGET: WindowPx = WindowPx(46.0);
 pub(crate) const TOOLTIP_WIDTH: f32 = 260.0;
@@ -40,7 +46,6 @@ const MARGIN: f32 = 8.0;
 const CARRIED: f32 = 40.0;
 const CONFIRM: &str = "confirm";
 const NOTE: Vec2 = Vec2::new(400.0, 170.0);
-const NOTE_PADDING: f32 = 22.0;
 
 pub struct HudPlugin;
 
@@ -118,22 +123,6 @@ pub(crate) enum Carried {
     },
 }
 
-pub(crate) fn carry(gui: &egui::Context, carried: Carried) {
-    egui::DragAndDrop::set_payload(gui, carried);
-}
-
-pub(crate) fn carried(gui: &egui::Context) -> Option<Carried> {
-    egui::DragAndDrop::payload::<Carried>(gui).map(|carried| *carried)
-}
-
-/// What was let go of over the widget this frame, if anything; taking it leaves nothing for
-/// whatever else lies under the pointer.
-pub(crate) fn dropped(response: &egui::Response) -> Option<Carried> {
-    let carried = *response.dnd_release_payload::<Carried>()?;
-    egui::DragAndDrop::clear_payload(&response.ctx);
-    Some(carried)
-}
-
 pub fn icon(
     ui: &mut Ui,
     images: &mut (impl ImageSource + ?Sized),
@@ -209,7 +198,7 @@ pub(crate) fn tooltip(
     lines: &[String],
     hint: Option<&StyledLine>,
 ) {
-    gui::tooltip(response, |ui| {
+    float::tooltip(response, |ui| {
         ui.set_max_width(TOOLTIP_WIDTH);
         ui.spacing_mut().item_spacing.y = 2.0;
         ui.label(face::bold(title).size(TextRole::Tooltip.size()));
@@ -414,7 +403,7 @@ fn launcher(
         if response.has_focus() {
             controls::focus_ring(painter, rect, 3.0);
         }
-        gui::tooltip(&response, |ui| {
+        float::tooltip(&response, |ui| {
             ui.label(face::bold(title).size(TextRole::Tooltip.size()));
         });
         response
@@ -460,15 +449,12 @@ fn draw_confirm(world: &mut World) {
             }
             let under = ui.painter().add(Shape::Noop);
             let framed = egui::Frame::new()
-                .inner_margin(NOTE_PADDING)
+                .inner_margin(dialog::PADDING)
                 .show(ui, |ui| {
-                    ui.set_width(NOTE.x - 2.0 * NOTE_PADDING);
-                    ui.set_min_height(NOTE.y - 2.0 * NOTE_PADDING);
-                    ui.add(
-                        egui::Label::new(TextRole::NoteTitle.rich(&text.title).color(ink::INK))
-                            .wrap(),
-                    );
-                    ui.add_space(6.0);
+                    let padding = 2.0 * f32::from(dialog::PADDING);
+                    ui.set_width(NOTE.x - padding);
+                    ui.set_min_height(NOTE.y - padding);
+                    dialog::title(ui, &text.title);
                     for line in &text.body {
                         ui.add(egui::Label::new(face::body(line)).wrap());
                     }
@@ -516,7 +502,7 @@ fn draw_carried(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let Some(carried) = carried(&gui) else {
+    let Some(carried) = drag::carried::<Carried>(&gui) else {
         return;
     };
     let content = world.resource::<Content>().clone();
@@ -547,10 +533,10 @@ fn draw_carried(world: &mut World) {
     let Some(image) = gui::image(world, &icon) else {
         return;
     };
-    gui::at_pointer(
+    float::at_pointer(
         &gui,
         Id::new("carried"),
-        Band::Pointer,
+        Band::Pointer.order(),
         -Vec2::splat(CARRIED / 2.0),
         |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
     );

@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::ImageRef;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    ContentFile, ContentId, ContentRegistry, LoadStep, Loading, NamedContent, RowCheck, serial,
+    ContentFile, ContentId, ContentRegistry, LoadStep, Loading, NamedContent, Nearby, RowCheck,
+    serial,
 };
 use crate::core::geometry::{Footprint, Radians};
 use crate::core::math::{FrameSize, Pos, Rgba};
@@ -31,8 +32,14 @@ pub const MAX_PARAMS: usize = 8;
 pub const MAX_LAYERS: usize = 16;
 
 /// How long a layer may run or wait: within a minute, and long enough to be seen.
-pub const SHORTEST_RUN: Seconds = Seconds(0.05);
-pub const LONGEST_RUN: Seconds = Seconds(60.0);
+pub const SHORTEST_RUN: Seconds = Seconds(SHORTEST_RUN_EXACT as f32);
+pub const LONGEST_RUN: Seconds = Seconds(LONGEST_RUN_EXACT as f32);
+// The schema states the bounds as written; an f32 widened to f64 would read 0.0500000007.
+const SHORTEST_RUN_EXACT: f64 = 0.05;
+const LONGEST_RUN_EXACT: f64 = 60.0;
+pub const MAX_FRAME_SIDE: u32 = 1024;
+pub const MAX_FRAMES: u32 = 256;
+pub const MAX_FPS: f32 = 120.0;
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
@@ -75,7 +82,9 @@ pub enum VfxLayer {
     Sprite {
         sheet: ImageRef,
         frame: FrameSize,
+        #[schemars(extend("minimum" = 1, "maximum" = MAX_FRAMES))]
         frames: u32,
+        #[schemars(extend("minimum" = 1.0, "maximum" = MAX_FPS))]
         fps: Hertz,
         #[serde(default, skip_serializing_if = "SpriteAnchor::is_default")]
         anchor: SpriteAnchor,
@@ -96,6 +105,7 @@ pub enum VfxLayer {
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         #[schemars(extend("x-params-of" = "shader"))]
         params: BTreeMap<String, ParamFill>,
+        #[schemars(extend("minimum" = SHORTEST_RUN_EXACT, "maximum" = LONGEST_RUN_EXACT))]
         duration: Seconds,
         #[serde(default, skip_serializing_if = "Seconds::is_zero")]
         delay: Seconds,
@@ -117,6 +127,7 @@ pub enum SpritePlay {
     #[default]
     Once,
     Loop {
+        #[schemars(extend("minimum" = SHORTEST_RUN_EXACT, "maximum" = LONGEST_RUN_EXACT))]
         seconds: Seconds,
     },
 }
@@ -253,6 +264,28 @@ impl NamedContent for VfxDef {
 impl ContentFile for VfxDef {
     const TABLE: &'static str = "vfx";
 
+    fn fresh(near: &Nearby) -> Result<VfxDef, String> {
+        let layer = VfxLayer::Sprite {
+            sheet: near.image()?,
+            frame: FrameSize {
+                width: 1,
+                height: 1,
+            },
+            frames: 1,
+            fps: Hertz(12.0),
+            anchor: SpriteAnchor::default(),
+            scale: 1.0,
+            play: SpritePlay::Once,
+            delay: Seconds(0.0),
+        };
+        Ok(VfxDef {
+            name: near.name(),
+            params: Vec::new(),
+            layers: vec![layer],
+            on_actors_inside: None,
+        })
+    }
+
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
         check.count("/layers", self.layers.len(), 1, MAX_LAYERS, "layers");
@@ -283,10 +316,11 @@ impl ContentFile for VfxDef {
                     play,
                     ..
                 } => {
-                    check.range(at("frame/width"), frame.width, 1, 1024, "pixels");
-                    check.range(at("frame/height"), frame.height, 1, 1024, "pixels");
-                    check.range(at("frames"), *frames, 1, 256, "frames");
-                    check.range(at("fps"), fps.0, 1.0, 120.0, "frames per second");
+                    let side = MAX_FRAME_SIDE;
+                    check.range(at("frame/width"), frame.width, 1, side, "pixels");
+                    check.range(at("frame/height"), frame.height, 1, side, "pixels");
+                    check.range(at("frames"), *frames, 1, MAX_FRAMES, "frames");
+                    check.range(at("fps"), fps.0, 1.0, MAX_FPS, "frames per second");
                     check.range(at("scale"), *scale, 0.1, 10.0, "a scale");
                     if let SpritePlay::Loop { seconds } = play {
                         check_run(check, at("play/seconds"), *seconds);

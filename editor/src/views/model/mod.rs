@@ -10,8 +10,12 @@ pub mod strip;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::theme;
 
-use egui::{Color32, Rect as ERect, Ui, Vec2};
 use engine::core::content::{ContentFile, FolderReader};
 use engine::core::math::Direction;
 use engine::systems::actor::model::SheetFrame;
@@ -20,6 +24,7 @@ use engine::systems::npc::NpcDef;
 use engine::systems::player::PlayerDef;
 use serde::Deserialize;
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
+use ui::egui::{Color32, Rect as ERect, Ui, Vec2};
 
 use crate::app::{BottomTab, Editor};
 use crate::audio::WaveformCache;
@@ -27,9 +32,9 @@ use crate::import;
 use crate::keymap::EditorKey;
 use crate::project::files::content_of;
 use crate::project::{ContentEdit, RowSelection};
+use crate::shell::{row_form, sidebar};
 use crate::tabs::shown_path;
 use crate::thumbs::{self, Thumbnail};
-use crate::ui::{row_form, sidebar, theme, widgets};
 
 #[derive(Default)]
 pub struct ModelViews {
@@ -131,7 +136,6 @@ pub struct ModelView {
     pub face: Option<String>,
     pub hitbox_drag: Option<hitbox::HitboxHandle>,
     pub sound_search: String,
-    pub sound_role: Option<String>,
     pub last_sound: Option<String>,
     pub confirm: Option<strip::StripConfirm>,
     pub removing: Option<FaceRemoval>,
@@ -267,7 +271,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         {
             inspect_parts(editor, ui, &selection);
         } else {
-            sidebar::nothing_selected(ui, "Select a strip, frame or face to inspect it here.");
+            form::nothing_selected(ui, "Select a strip, frame or face to inspect it here.");
         }
     });
     egui::Frame::new()
@@ -305,7 +309,7 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
             (ModelPage::Busts, "busts"),
         ] {
             let on = page == target || (target == ModelPage::Matrix && in_strip);
-            if widgets::mode_chip(ui, label, on).clicked() {
+            if chip::mode(ui, label, on).clicked() {
                 view.page = target;
             }
         }
@@ -314,11 +318,11 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
             ui.label(theme::faint("›"));
             for (target, label) in [(ModelPage::Timing, "timing"), (ModelPage::Cues, "cues")] {
                 let on = page == target;
-                if widgets::toggle_chip(ui, label, on).clicked() {
+                if chip::toggle(ui, label, on).clicked() {
                     view.page = target;
                 }
             }
-            if widgets::keyed_button(ui, "‹ all strips", Some(EditorKey::Cancel), true).clicked()
+            if controls::keyed(ui, "‹ all strips", Some(&EditorKey::Cancel.name()), true).clicked()
             {
                 view.page = ModelPage::Matrix;
             }

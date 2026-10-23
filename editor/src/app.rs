@@ -6,12 +6,13 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Instant, SystemTime};
+use ui::egui;
+use ui::words;
 
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
-use egui_dock::DockState;
 use engine::core::content::{Content, ContentFile, FolderReader, Unreadable, fields_file, version};
 use engine::core::math::Pos;
 use engine::core::tiling::{CellPos, Tiles};
@@ -22,6 +23,7 @@ use engine::systems::frame_rate::{self, FrameCountPlugin, FrameRates};
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
+use ui::egui_dock::DockState;
 
 use crate::forms::{FormCx, FormState};
 use crate::import::{self, ImportJobs, ImportRecords};
@@ -35,9 +37,9 @@ use crate::project::{
 use crate::rows;
 use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
+use crate::shell::{self, row_form};
 use crate::tabs::{self, DockRequest, EditorTab, TabOpening};
 use crate::thumbs::Thumbnail;
-use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
 use crate::views::area::ResizeDialog;
 use crate::views::area::nodes::CopiedNodes;
@@ -106,7 +108,7 @@ fn setup_camera(mut commands: Commands) {
 // egui takes up new fonts as a pass begins, so they must be set before the first pass draws text.
 fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>>) {
     for mut context in &mut contexts {
-        ui::theme::apply(context.get_mut());
+        ui::apply(context.get_mut());
     }
 }
 
@@ -121,7 +123,7 @@ pub struct Editor {
     pub journal: Option<RecoveryJournal>,
     pub dock: DockState<EditorTab>,
     pub panels: DockTabs,
-    pub content_tree: crate::ui::content_tree::ContentTree,
+    pub content_tree: crate::shell::content_tree::ContentTree,
     pub status: StatusBar,
     pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
@@ -733,7 +735,7 @@ impl Editor {
                 if let Some(journal) = &mut self.journal {
                     journal.clear();
                 }
-                self.toast(format!("Saved {count} files"));
+                self.toast(format!("Saved {count} file{}", ui::words::plural(count)));
                 true
             }
             Err(error) => {
@@ -795,7 +797,7 @@ impl Editor {
         self.preview_tab(EditorTab::Asset {
             path: path.to_owned(),
         });
-        crate::ui::content_tree::reveal(self, path);
+        crate::shell::content_tree::reveal(self, path);
     }
 
     /// Opens the content file at `path` in its tab.
@@ -971,7 +973,7 @@ impl Editor {
                         format!(
                             "{} reference{} name{} {}, which isn't there; a file of that name is at {}",
                             step.references,
-                            crate::ui::widgets::plural(step.references),
+                            words::plural(step.references),
                             if step.references == 1 { "s" } else { "" },
                             step.from,
                             step.to
@@ -1038,18 +1040,21 @@ fn editor_ui(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
         let started = Instant::now();
-        ui::show(&mut editor, &ctx);
+        shell::show(&mut editor, &ctx);
         if editor.settings.frame_rate {
             frame_rate::show_meter(
                 &ctx,
                 world.resource::<FrameRates>(),
                 egui::Order::Foreground,
                 egui::Align2::RIGHT_BOTTOM,
-                egui::vec2(-FRAME_RATE_MARGIN, -ui::STATUS_HEIGHT - FRAME_RATE_MARGIN),
+                egui::vec2(
+                    -FRAME_RATE_MARGIN,
+                    -shell::STATUS_HEIGHT - FRAME_RATE_MARGIN,
+                ),
             );
         }
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;
-        let tab = ui::active_tab(&editor).map(|tab| tab.title());
+        let tab = shell::active_tab(&editor).map(|tab| tab.title());
         if let Some(log) = &mut editor.frame_log {
             let entities = world.query::<Entity>().iter(world).count();
             let images = world.resource::<Assets<Image>>().len();

@@ -1,23 +1,25 @@
-use design_tokens::controls;
-use design_tokens::glyph::Mark;
-use egui::Ui;
 use engine::core::math::Pos;
 use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
 use engine::systems::area::object::{ObjectDef, ObjectShape};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SceneryTile};
 use engine::systems::script::Place;
+use ui::controls;
+use ui::egui::Ui;
+use ui::form;
+use ui::glyph::Mark;
+use ui::input;
 
 use super::grid::GridDraft;
 use super::inspect::Followups;
 use super::placement::{self, warp_destinations};
 use super::stamp::object_names;
 use super::{AreaFrame, AreaSnapshot, nodes};
-use crate::forms::{self, FormCx};
+use crate::forms::FormCx;
 use crate::project::Project;
 use crate::tabs::file_title;
-use crate::ui::widgets;
 use crate::{app::Editor, rows};
+use ui::input::InputField;
 
 pub struct PlacedTile {
     pub column: usize,
@@ -172,8 +174,12 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         editor.toast("No walkable cell outside the door to come back to");
         return;
     };
-    if there.grid.nearest_walkable(target_at).is_none() {
-        editor.toast("The destination has no walkable cell");
+    let arrival = target_at.cell();
+    let Some(beside_arrival) = there
+        .grid
+        .nearest_walkable_where(target_at, |cell| cell != arrival)
+    else {
+        editor.toast("The destination has no walkable cell beside the arrival for a door back");
         return;
     };
     let mut names = object_names(area::placed(&content, there_id));
@@ -185,7 +191,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
         &names,
     );
     names.insert(name.clone());
-    let cell = target_at.cell();
+    let cell = beside_arrival.cell();
     let mut door = ObjectDef {
         name: Some(name),
         title: None,
@@ -221,27 +227,17 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
 pub(super) fn scenery_rows(ui: &mut Ui, scenery: &mut Scenery, path: &str) -> bool {
     let (width, height) = (scenery.width(), scenery.height());
     let count = tile_count(scenery);
-    widgets::kv_text(ui, "size", format!("{width} × {height} tiles · {count}"));
+    form::kv_text(ui, "size", format!("{width} × {height} tiles · {count}"));
     let mut changed = false;
-    widgets::kv(ui, "sort", |ui| {
+    form::kv(ui, "sort", |ui| {
         let current = scenery.sort;
         let id = ui.id().with((path, "sort"));
         let shown = current
             .map(|number| number.to_string())
             .unwrap_or_else(|| "flat".to_owned());
-        let typed = forms::drafted(ui, id, &shown, |ui, draft| {
-            forms::boxed_input(
-                ui,
-                Some(&format!("tiles from the top · of {height}")),
-                |ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(draft)
-                            .frame(egui::Frame::NONE)
-                            .font(egui::TextStyle::Monospace)
-                            .desired_width(48.0),
-                    )
-                },
-            )
+        let unit = format!("tiles from the top · of {height}");
+        let typed = input::drafted(ui, id, &shown, |ui, draft| {
+            InputField::new(draft).unit(&unit).show(ui)
         });
         if let Some(typed) = typed {
             let parsed = typed.trim().parse::<f32>().ok();
@@ -252,7 +248,7 @@ pub(super) fn scenery_rows(ui: &mut Ui, scenery: &mut Scenery, path: &str) -> bo
         }
     });
     let blocks = scenery.blocks.len();
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "blocks",
         if blocks == 0 {
@@ -278,7 +274,7 @@ pub(super) fn scenery_extras(
         .unwrap_or(0);
     ui.add_space(4.0);
     if under > 0 {
-        widgets::hint(ui, &format!("{under} cells under it are blocked"));
+        form::hint(ui, &format!("{under} cells under it are blocked"));
         if ui
             .button(format!("Make the {under} blocked cells its own"))
             .clicked()
@@ -287,7 +283,7 @@ pub(super) fn scenery_extras(
                 .push(super::AreaAction::AdoptBlocks(node.to_owned()));
         }
     } else {
-        widgets::hint(ui, "No cells under it are blocked");
+        form::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
         if controls::marked(ui, Mark::Grid, "Make blueprint…").clicked() {

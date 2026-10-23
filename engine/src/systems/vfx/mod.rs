@@ -148,6 +148,7 @@ pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstanc
 pub struct PlayVfx {
     pub vfx: VfxId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub on: Option<Condition>,
     #[serde(default, skip_serializing_if = "VfxTarget::is_place")]
     pub site: VfxTarget,

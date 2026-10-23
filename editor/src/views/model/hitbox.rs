@@ -1,4 +1,3 @@
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::ContentFile;
 use engine::core::render::TILE;
 use engine::core::time::Seconds;
@@ -6,6 +5,10 @@ use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::render::ACTOR_ANCHOR;
 use strum::VariantArray;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::paint;
+use ui::theme;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
@@ -13,7 +16,6 @@ use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::stage::{self, Posed, PosedActor, Scene};
 use crate::tabs::shown_path;
-use crate::ui::{theme, widgets};
 
 const ZOOM: f32 = 4.0;
 const INSET: Vec2 = Vec2::new(400.0, 300.0);
@@ -85,7 +87,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
                 sheet.frame_height as f32 * ZOOM * row.scale(),
             );
             let sprite = sprite_rect(feet, shown);
-            widgets::dashed_rect(
+            paint::dashed_rect(
                 &painter,
                 sprite,
                 egui::Stroke::new(1.0, theme::MUTED),

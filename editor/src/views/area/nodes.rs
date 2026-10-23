@@ -42,16 +42,28 @@ impl SceneBundle {
         path: &str,
         change: impl FnOnce(&mut BlueprintDef),
     ) -> Result<(), String> {
+        self.write_in(edit, &project.reader(), path, change)
+    }
+
+    /// Writes the bundle changed by `change`, its ids those of `reader`'s paths, so it may name
+    /// files the same edit makes.
+    pub fn write_in(
+        &self,
+        edit: &mut ContentEdit,
+        reader: &FolderReader,
+        path: &str,
+        change: impl FnOnce(&mut BlueprintDef),
+    ) -> Result<(), String> {
         match self {
             SceneBundle::Area(area) => {
                 let mut area = (**area).clone();
                 change(&mut area.blueprint);
-                edit.write_content(project, path, &area)?;
+                edit.write_content_in(reader, path, &area)?;
             }
             SceneBundle::Blueprint(blueprint) => {
                 let mut blueprint = (**blueprint).clone();
                 change(&mut blueprint);
-                edit.write_content(project, path, &blueprint)?;
+                edit.write_content_in(reader, path, &blueprint)?;
             }
         }
         Ok(())

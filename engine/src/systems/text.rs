@@ -1,10 +1,10 @@
 use std::ops::Not;
 use std::time::Duration;
 
-use design_tokens::ink::Prose;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
+use ui::ink::Prose;
 
 use crate::core::script::{Expr, Value};
 use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice};
@@ -115,14 +115,6 @@ impl From<Span> for SpanRow {
 }
 
 /// A count of a noun: "1 rank", "3 ranks".
-pub fn counted(count: u32, noun: &str) -> String {
-    if count == 1 {
-        format!("1 {noun}")
-    } else {
-        format!("{count} {noun}s")
-    }
-}
-
 /// A span of time at a glance: whole seconds under a minute, whole minutes from there.
 pub fn duration(span: Seconds) -> String {
     if span.0 >= 60.0 {

@@ -1,77 +1,122 @@
-use engine::core::audio::playback::SfxDef;
-use engine::core::babble::{BabbleBankDef, LETTERS};
-use engine::core::content::{CONFIG_FILE, ContentFile, Shape, content_path};
-use engine::core::vfx::VfxShaderDef;
-use engine::systems::actor::model::ModelDef;
-use engine::systems::area::AreaDef;
-use engine::systems::area::scene::{self, GroundLayer, SCENE_FILE, SceneNode};
-use engine::systems::area::tileset::TilesetDef;
-use engine::systems::registry;
-use include_dir::{Dir, include_dir};
-use serde_json::Value;
+use engine::core::audio::playback::{SFX_CLIP, SfxDef};
+use engine::core::babble::{BABBLE_LETTERS, BabbleBankDef, LETTERS};
+use std::collections::BTreeMap;
 
-use crate::project::{FileBytes, ProjectFiles, json_bytes};
-use crate::schema::{self, SchemaShapes};
+use engine::core::content::files::name_of;
+use engine::core::content::{ContentFile, FolderReader, Nearby};
+use engine::core::script::Arrow;
+use engine::core::vfx::VfxShaderDef;
+use engine::core::vfx::shader::SHADER_SOURCE;
+use engine::systems::actor::model::{MODEL_SPRITES, ModelDef};
+use engine::systems::area::tileset::{TILESET_IMAGE, TilesetDef};
+use engine::systems::item::{ItemDef, ItemKind, ItemModule};
+use engine::systems::script::{Node, RiftEvent, RunnerKind, ScriptDef, ScriptId, ScriptModule};
+use engine::systems::skill::{SkillDef, SkillModule};
+use include_dir::{Dir, include_dir};
+
+use crate::project::{ContentEdit, FileBytes, Project};
+use crate::rows;
 
 static DEFAULTS: Dir = include_dir!("$CARGO_MANIFEST_DIR/defaults");
 
-/// A content file about to be made, whole: its path and every file it is kept in.
-pub struct MadeFile {
-    pub path: String,
-    pub files: Vec<(String, FileBytes)>,
+/// Writes a fresh content file of `table` at `path` into `edit`: what its type holds when a
+/// designer makes one, written as the game writes it; for a bundle the media parts it can't load
+/// without, blank: a clip of short silence, an empty image; and beside it the files it can't load
+/// without: an active skill's script answering used.
+pub fn content_file(
+    edit: &mut ContentEdit,
+    project: &Project,
+    table: &str,
+    path: &str,
+) -> Result<(), String> {
+    let reader = project.reader();
+    let files = reader.fresh(table, path)?;
+    for (part, bytes) in blank_parts(table) {
+        let file = format!("{path}/{part}");
+        if !files.contains_key(&file) {
+            edit.write(file, bytes);
+        }
+    }
+    for (file, bytes) in files {
+        edit.write(file, FileBytes::from(bytes));
+    }
+    if table == SkillDef::TABLE {
+        used_script(edit, project, path)?;
+    }
+    Ok(())
 }
 
-/// A new content file of `table` named `name` in `folder`, holding the type's default fields and,
-/// for a bundle, the parts it can't load without, blank: a clip of short silence, an empty image.
-pub fn content_file(
-    shapes: &SchemaShapes,
-    files: &ProjectFiles,
-    table: &str,
-    folder: &str,
-    name: &str,
-) -> MadeFile {
-    let shape = registry().shape_of(table).unwrap_or(Shape::Json);
-    let path = content_path(folder, name, table, shape);
-    let fields = shapes
-        .table(table)
-        .map(|table| {
-            let nearby = schema::Nearby {
-                files,
-                from: Some(&path),
-            };
-            schema::template(&table.shape, &table.shape, nearby)
-        })
-        .unwrap_or_else(|| Value::Object(Default::default()));
-    let files = match shape {
-        Shape::Json => vec![(path.clone(), json_bytes(&fields))],
-        Shape::Bundle => std::iter::once((CONFIG_FILE.to_owned(), json_bytes(&fields)))
-            .chain(blank_parts(table))
-            .map(|(part, bytes)| (format!("{path}/{part}"), bytes))
-            .collect(),
+fn used_script(edit: &mut ContentEdit, project: &Project, skill: &str) -> Result<(), String> {
+    let (reader, script) = answering_used(edit, project, skill, RunnerKind::Skill)?;
+    let mut row = SkillDef::fresh(&Nearby::new(&reader, skill))?;
+    row.modules.push(SkillModule::Script(ScriptModule {
+        script,
+        values: BTreeMap::new(),
+    }));
+    edit.write_content_in(&reader, skill, &row)?;
+    Ok(())
+}
+
+/// Writes into `edit` a script answering used, run by owners of `runs_on`, beside `owner` and named
+/// after it. Gives what reads the files with it, and its id there.
+pub fn answering_used(
+    edit: &mut ContentEdit,
+    project: &Project,
+    owner: &str,
+    runs_on: RunnerKind,
+) -> Result<(FolderReader, ScriptId), String> {
+    let used = Node::On {
+        event: RiftEvent::Used,
+        next: Arrow::default(),
     };
-    MadeFile { path, files }
+    let (_, reader, script) = rows::new_script(
+        edit,
+        project,
+        owner,
+        &format!("{}_used", name_of(owner)),
+        runs_on,
+        BTreeMap::from([("used".to_owned(), used)]),
+    )?;
+    Ok((reader, script))
+}
+
+/// Whether `item` is usable with no script of its own answering used, which the game refuses.
+pub fn usable_without_used(project: &Project, reader: &FolderReader, item: &ItemDef) -> bool {
+    let answers_used = |module: &ItemModule| {
+        let ItemModule::Script(module) = module else {
+            return false;
+        };
+        reader
+            .path_of(module.script)
+            .and_then(|path| project.read::<ScriptDef>(path).ok())
+            .is_some_and(|script| {
+                script.nodes.values().any(|node| {
+                    matches!(
+                        node,
+                        Node::On {
+                            event: RiftEvent::Used,
+                            ..
+                        }
+                    )
+                })
+            })
+    };
+    matches!(item.kind, ItemKind::Usable) && !item.modules.iter().any(answers_used)
 }
 
 fn blank_parts(table: &str) -> Vec<(String, FileBytes)> {
     let silence = || default("silence.wav");
     match table {
-        SfxDef::TABLE => vec![("clip.wav".to_owned(), silence())],
+        SfxDef::TABLE => vec![(SFX_CLIP.named("", "wav"), silence())],
         BabbleBankDef::TABLE => LETTERS
             .chars()
-            .map(|letter| (format!("letters/{letter}.wav"), silence()))
+            .map(|letter| (BABBLE_LETTERS.named(&letter.to_string(), "wav"), silence()))
             .collect(),
-        TilesetDef::TABLE => vec![("image.png".to_owned(), default("blank.png"))],
-        ModelDef::TABLE => vec![("sprites.png".to_owned(), default("blank.png"))],
-        VfxShaderDef::TABLE => vec![("shader.wgsl".to_owned(), default("shader.wgsl"))],
-        AreaDef::TABLE => vec![(SCENE_FILE.to_owned(), json_bytes(&blank_scene()))],
+        TilesetDef::TABLE => vec![(TILESET_IMAGE.named("", "png"), default("blank.png"))],
+        ModelDef::TABLE => vec![(MODEL_SPRITES.named("", "png"), default("blank.png"))],
+        VfxShaderDef::TABLE => vec![(SHADER_SOURCE.named("", "wgsl"), default("shader.wgsl"))],
         _ => Vec::new(),
     }
-}
-
-/// The scene of a new area: one ground layer to paint.
-fn blank_scene() -> Value {
-    let ground = SceneNode::GroundLayer(GroundLayer::named(GroundLayer::FIRST));
-    scene::write_nodes(&[ground]).expect("a ground layer writes")
 }
 
 fn default(name: &str) -> FileBytes {

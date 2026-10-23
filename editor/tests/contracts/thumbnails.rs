@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use ui::egui;
 
 use editor::project::ProjectFiles;
 use editor::thumbs::Thumbnails;

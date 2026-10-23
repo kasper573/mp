@@ -4,23 +4,25 @@ pub mod loading;
 pub mod sign_in;
 
 use std::time::Duration;
+use ui::egui;
+use ui::float;
 
 use bevy::prelude::*;
 use bevy::winit::{UpdateMode, WinitSettings};
 use connection::{Announce, PendingSession};
-use design_tokens::face::{self, TextRole};
-use design_tokens::{controls, ink, sheet};
-use egui::{TextStyle, Ui};
 use renet2::RenetClient;
+use ui::controls;
+use ui::egui::{TextStyle, Ui};
+use ui::face;
 
-use crate::core::gui::{self, Band};
+use crate::core::gui::Band;
 use crate::core::math::Rng;
 use crate::core::net::auth::Credentials;
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
+use ui::dialog;
 
 const NOTICE_WIDTH: f32 = 356.0;
-const NOTE_PADDING: i8 = 22;
 // The most lines a load shows on its way, so the notice keeps one height as the screens and their
 // lines come and go. Notes and a failure are rare, and grow it instead.
 const NOTICE_LINES: usize = 4;
@@ -145,7 +147,7 @@ pub(crate) fn system_screen<R>(
     let area = egui::Area::new(egui::Id::new(("screen", id)))
         .order(Band::System.order())
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO);
-    let shown = gui::show_anchored(gui, area, |ui| {
+    let shown = float::anchored(gui, area, |ui| {
         ui.vertical_centered(|ui| {
             ui.spacing_mut().item_spacing.y = 16.0;
             add(ui)
@@ -172,17 +174,15 @@ pub(crate) fn system_screen<R>(
 }
 
 pub(crate) fn panel<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
-    sheet::note(ui, egui::Margin::same(NOTE_PADDING), |ui| {
-        ui.set_width(NOTICE_WIDTH);
+    dialog::note(ui, NOTICE_WIDTH, |ui| {
         ui.set_min_height(notice_height(ui));
         ui.vertical_centered(|ui| {
             ui.spacing_mut().item_spacing.y = LINE_GAP;
-            ui.label(TextRole::NoteTitle.rich(title).color(ink::INK));
+            dialog::title(ui, title);
             add(ui)
         })
         .inner
     })
-    .inner
 }
 
 pub(crate) fn note(ui: &mut Ui, text: &str) {

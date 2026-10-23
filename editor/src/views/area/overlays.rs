@@ -1,22 +1,26 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
+use ui::egui;
+use ui::ink;
+use ui::paint;
+use ui::theme;
 
-use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 use engine::core::audio::soundscape::EDGE_FALLOFF;
 use engine::core::math::{Pos, Rect};
 use engine::core::render::TILE;
 use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, TileRect, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaModule, AreaModuleKind, Pictured};
+use ui::egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 
 use super::population::{self, NpcSprite};
 use super::{AreaFrame, AreaTool, nodes, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::keymap::EditorKey;
-use crate::ui::{patterns, theme, widgets};
 use crate::views::navigation::Viewport;
 
+pub(super) const SORT_LINE: Color32 = ui::ink::AZURE;
 const LABEL_GAP: f32 = 2.0;
 const LABEL_SHIFTS: u32 = 3;
 
@@ -30,7 +34,7 @@ pub(super) fn overlay_grid(
     let bounds = Rect::new(Pos::new(-0.5, -0.5), area.size);
     if matches!(frame.pictured, Pictured::Blueprint(_)) {
         let rect = canvas.rect(bounds).expand(1.0);
-        widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::DROP), 6.0, 4.0);
+        paint::dashed_rect(painter, rect, EStroke::new(1.5, theme::DROP), 6.0, 4.0);
         frame.labels.chip(
             rect.right_top() + Vec2::new(6.0, 18.0),
             format!("{} × {} canvas", area.size.width, area.size.height),
@@ -83,10 +87,10 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &ar
         size,
         |cell| !area.grid.walkable(cell.center()),
         |run| {
-            patterns::hatch(
+            paint::hatched(
                 painter,
                 canvas.rect(run),
-                theme::alpha(theme::BLOCKED, 110),
+                ink::wash(theme::BLOCKED, 0.43),
                 canvas.scale(),
             )
         },
@@ -186,7 +190,7 @@ pub(super) fn overlay_modules(
     let selected: HashSet<String> = frame.selected_modules(&parts).into_iter().collect();
     if let Some((bounds, label)) = frame.folder_box(&parts) {
         let rect = canvas.rect(bounds).expand(3.0);
-        widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::ACCENT), 6.0, 4.0);
+        paint::dashed_rect(painter, rect, EStroke::new(1.5, theme::ACCENT), 6.0, 4.0);
         frame
             .labels
             .chip(rect.min + Vec2::new(0.0, -4.0), label, theme::ACCENT);
@@ -221,7 +225,7 @@ pub(super) fn overlay_modules(
                 .is_none()
         {
             let rect = canvas.rect(bounds);
-            widgets::dashed_rect(painter, rect, EStroke::new(1.5, theme::DANGER), 5.0, 3.0);
+            paint::dashed_rect(painter, rect, EStroke::new(1.5, theme::DANGER), 5.0, 3.0);
             frame.labels.chip(
                 rect.min + Vec2::new(0.0, -4.0),
                 format!("{label} doesn't load"),
@@ -239,13 +243,13 @@ pub(super) fn overlay_modules(
         let rect = canvas.rect(bounds);
         let dim = editing.as_ref().is_some_and(|e| *e != node.pointer);
         let alpha = if dim {
-            60
+            0.24
         } else if is_selected {
-            255
+            1.0
         } else {
-            170
+            0.67
         };
-        let color = theme::alpha(color, alpha);
+        let color = ink::wash(color, alpha);
         let width = if is_selected { 2.0 } else { 1.0 };
         match kind {
             AreaModuleKind::Soundscape if shapes::is_ellipse(module) => {
@@ -317,10 +321,10 @@ pub(super) fn overlay_selected_scenery(
         if let Some(cell_index) = cell.index(size)
             && grids.walk[cell_index] == Some(false)
         {
-            patterns::hatch(
+            paint::hatched(
                 painter,
                 canvas.rect(cell.bounds()),
-                theme::alpha(theme::BLOCKED, 140),
+                ink::wash(theme::BLOCKED, 0.55),
                 canvas.scale(),
             );
         }
@@ -328,7 +332,7 @@ pub(super) fn overlay_selected_scenery(
     let at = scenery.at;
     for [dx, dy] in &scenery.blocks {
         let cell = CellPos::new(at.x.round() as i32 + dx, at.y.round() as i32 + dy);
-        patterns::hatch(
+        paint::hatched(
             painter,
             canvas.rect(cell.bounds()),
             Color32::from_rgba_unmultiplied(220, 120, 60, 140),
@@ -342,15 +346,15 @@ pub(super) fn overlay_selected_scenery(
     let b = canvas.to_screen(Pos::new(rect.max().x, line_y));
     painter.add(egui::Shape::dashed_line(
         &[a, b],
-        EStroke::new(2.0, theme::SORT_LINE),
+        EStroke::new(2.0, SORT_LINE),
         8.0,
         5.0,
     ));
     let handle = ERect::from_center_size(b + Vec2::new(10.0, 0.0), Vec2::splat(10.0));
-    painter.rect_filled(handle, 2.0, theme::SORT_LINE);
+    painter.rect_filled(handle, 2.0, SORT_LINE);
     frame
         .labels
-        .chip(a + Vec2::new(4.0, -6.0), "sort line", theme::SORT_LINE);
+        .chip(a + Vec2::new(4.0, -6.0), "sort line", SORT_LINE);
     let grab = ui.interact(
         ERect::from_min_max(a, b).expand2(Vec2::new(16.0, 6.0)),
         ui.id().with((view_key, "sort-line")),
@@ -416,7 +420,7 @@ pub(super) fn overlay_soundscape_reach(
                 6.0,
             ));
         } else {
-            widgets::dashed_rect(painter, rect, EStroke::new(1.0, color), 6.0, 6.0);
+            paint::dashed_rect(painter, rect, EStroke::new(1.0, color), 6.0, 6.0);
         }
         frame.labels.chip(
             rect.left_bottom() + Vec2::new(0.0, 22.0),
@@ -495,7 +499,7 @@ impl AreaLabels {
             let preferred = ERect::from_min_size(label.bottom_left - Vec2::new(0.0, size.y), size);
             let back = free_slot(preferred, &placed);
             placed.push(back);
-            design_tokens::slip::paint(painter, back);
+            ui::slip::paint(painter, back);
             painter.rect_filled(
                 ERect::from_min_size(back.min, Vec2::new(3.0, back.height())),
                 0.0,
@@ -622,7 +626,7 @@ pub(super) fn overlay_sort_lines(painter: &egui::Painter, frame: &AreaFrame, are
         let b = canvas.to_screen(Pos::new(scenery.at.x + width, line.0));
         painter.add(egui::Shape::dashed_line(
             &[a, b],
-            EStroke::new(1.5, theme::SORT_LINE),
+            EStroke::new(1.5, SORT_LINE),
             6.0,
             4.0,
         ));

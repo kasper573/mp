@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use ui::egui;
 
 use editor::audio::{WaveState, WaveformCache};
 use editor::project::{FileBytes, ProjectFiles};

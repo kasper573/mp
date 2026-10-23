@@ -6,20 +6,26 @@ pub mod terrain;
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::menu;
+use ui::theme;
+use ui::words;
 
 use animation::OffsetUnit;
-use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
 use engine::core::content::{ContentFile, FolderReader, fields_file};
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
 use strum::{EnumString, IntoStaticStr, VariantArray};
+use ui::egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
 
 use crate::app::{BottomTab, Editor};
 use crate::import;
 use crate::project::{ContentEdit, RowSelection};
+use crate::shell::{row_form, sidebar};
 use crate::tabs::shown_path;
 use crate::thumbs::{self, Thumbnail};
-use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
 
@@ -69,7 +75,7 @@ impl SurfaceUse {
     pub fn text(&self) -> String {
         format!(
             "{} tiles in {} tilesets",
-            widgets::thousands(self.tiles),
+            words::thousands(self.tiles),
             self.tilesets.len()
         )
     }
@@ -497,9 +503,13 @@ pub fn tile_size(tileset: &TilesetDef) -> Result<u32, String> {
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {
-    if editor.views.tileset.views.contains_key(key) {
-        return;
+    if !editor.views.tileset.views.contains_key(key) {
+        reset_view(editor, key);
     }
+}
+
+/// Starts the view of the tileset at `key` afresh: nothing picked, at its first mode and zoom.
+pub fn reset_view(editor: &mut Editor, key: &str) {
     let surface = sounds::surfaces(editor)
         .into_iter()
         .next()
@@ -531,7 +541,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         {
             inspect_parts(editor, ui, &selection);
         } else {
-            sidebar::nothing_selected(
+            form::nothing_selected(
                 ui,
                 "Select tiles, a terrain or an animation to inspect it here.",
             );
@@ -657,7 +667,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mut import = None;
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            widgets::dropdown_menu(ui, "Import", |ui| {
+            menu::dropdown(ui, "Import", |ui| {
                 if ui.button("Onto this tileset…").clicked() {
                     import = Some(Reimport::Tiles);
                     ui.close();
@@ -669,7 +679,7 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
             });
             ui.add_space(8.0);
             for option in TilesetMode::VARIANTS.iter().rev() {
-                if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
+                if chip::mode(ui, option.label(), *option == mode).clicked() {
                     picked = Some(*option);
                 }
             }
@@ -781,7 +791,7 @@ fn status(editor: &mut Editor, tileset: &OpenTileset) {
             left.push(format!(
                 "{} surfaces · {} tiles have one",
                 sounds::surfaces(editor).len(),
-                widgets::thousands(with_surface)
+                words::thousands(with_surface)
             ));
         }
         TilesetMode::Terrain => {

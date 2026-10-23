@@ -1,24 +1,31 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use ui::egui;
+use ui::form;
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
-use design_tokens::glyph::Mark;
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use engine::core::content::files::{NAME_RULE, valid_name};
 use engine::core::content::{ContentFile, bundle_of};
 use engine::core::script::Node;
 use engine::systems::actor::ModelDef;
-use engine::systems::actor::model::{Expression, GenericExpression, MODEL_BUSTS, ModelModule};
+use engine::systems::actor::model::{
+    Busts, Expression, GenericExpression, MODEL_BUSTS, ModelModule,
+};
 use engine::systems::npc::NpcDef;
 use engine::systems::script::{Line, ScriptDef, Speaker};
 use strum::VariantArray;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::glyph::Mark;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, Project, RowSelection};
+use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection};
 use crate::rows;
 use crate::tabs::shown_path;
 use crate::thumbs;
-use crate::ui::{theme, widgets};
 
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
@@ -100,14 +107,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let faces = faces(row);
     let title = speaker_name(editor, key);
-    widgets::section(ui, &format!("Bust · {title}"));
+    sheet::section(ui, &format!("Bust · {title}"));
     if module_index(row).is_none() {
-        ui.add_space(6.0);
-        widgets::hint(ui, "No bust module: this model never speaks.");
-        editor
-            .status
-            .left
-            .push(format!("{} · no bust", shown_path(key)));
+        no_bust(editor, ui, key);
         return;
     }
     let drops = std::mem::take(&mut editor.views.model.drops);
@@ -142,43 +144,19 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
                     ui.end_row();
                 }
             }
-            let (rect, response) = ui.allocate_exact_size(CARD, Sense::click());
-            let painter = ui.painter_at(rect);
-            painter.rect_filled(rect, 4.0, theme::SELECTION.gamma_multiply(0.5));
-            widgets::dashed_rect(
-                &painter,
-                rect,
-                egui::Stroke::new(1.0, theme::ACCENT),
-                4.0,
-                4.0,
-            );
-            Mark::Plus.paint(
-                &painter,
-                ERect::from_center_size(rect.center() - Vec2::new(0.0, 10.0), Vec2::splat(18.0)),
-                theme::ACCENT,
-            );
-            painter.text(
-                rect.center() + Vec2::new(0.0, 12.0),
-                egui::Align2::CENTER_CENTER,
-                "drop to add an expression",
-                egui::FontId::proportional(12.5),
-                theme::ACCENT,
-            );
-            if response.clicked() {
+            if drop_slot(ui, CARD, "drop to add an expression")
+                .on_hover_text("Drop PNGs here, or click to browse for them")
+                .clicked()
+            {
                 browse = true;
             }
-            response.on_hover_text("Drop a PNG here, or click to browse for one");
             ui.end_row();
         });
     if replace.is_none() && !drops.is_empty() {
         add = drops.clone();
     }
-    if browse
-        && let Some(path) = rfd::FileDialog::new()
-            .add_filter("PNG", &["png"])
-            .pick_file()
-    {
-        add.push(path);
+    if browse {
+        add.extend(browse_faces(key));
     }
     if let Some(face) = pick {
         let view = editor.views.model.view_mut(key);
@@ -188,8 +166,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     if let Some((face, path)) = replace {
         replace_file(editor, key, &face, &path);
     }
-    for path in add {
-        add_expression(editor, key, &faces, &path);
+    if !add.is_empty() {
+        add_faces(editor, key, &faces, &add);
     }
     editor.status.left.push(format!(
         "{} · bust · {} expressions",
@@ -202,6 +180,132 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
         .push("drop PNG files onto slots to add or replace".to_owned());
 }
 
+fn no_bust(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    ui.add_space(6.0);
+    form::hint(
+        ui,
+        &format!(
+            "No bust: this model never speaks. A bust takes a face for each of {}, one size, \
+             each PNG named after its expression; others become the model's own.",
+            generic_names().join(", ")
+        ),
+    );
+    ui.add_space(8.0);
+    let drops = std::mem::take(&mut editor.views.model.drops);
+    let slot = drop_slot(
+        ui,
+        Vec2::new(CARD.x * 2.0 + 12.0, CARD.y),
+        "drop its faces to give it a bust",
+    )
+    .on_hover_text("Drop the faces here, or click to browse for them");
+    let picked = if slot.clicked() {
+        browse_faces(key)
+    } else {
+        drops
+    };
+    if !picked.is_empty() {
+        give(editor, key, &picked);
+    }
+    editor
+        .status
+        .left
+        .push(format!("{} · no bust", shown_path(key)));
+}
+
+/// Gives the model at `key` a bust of the faces in `paths`, in one step: each PNG is the face its
+/// file is named after, and every generic expression needs one.
+pub fn give(editor: &mut Editor, key: &str, paths: &[PathBuf]) {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let Ok(model) = project.read::<ModelDef>(key) else {
+        editor.toast(format!("{} doesn't read yet", shown_path(key)));
+        return;
+    };
+    let mut model = (*model).clone();
+    let mut edit = ContentEdit::new(format!("Give {} a bust", shown_path(key)));
+    let named = match face_writes(&mut edit, key, &[], paths) {
+        Ok(named) => named,
+        Err(error) => {
+            editor.toast(error);
+            return;
+        }
+    };
+    let missing: Vec<String> = generic_names()
+        .into_iter()
+        .filter(|name| !named.contains(name))
+        .collect();
+    if !missing.is_empty() {
+        editor.toast(format!(
+            "A bust needs a face for {} too",
+            missing.join(", ")
+        ));
+        return;
+    }
+    model.modules.push(ModelModule::Bust(Busts::default()));
+    if let Err(error) = edit.write_content(project, key, &model) {
+        editor.toast(error);
+        return;
+    }
+    editor.apply(edit);
+}
+
+/// The faces left in the bundle at `key` once `model` holds no bust, which nothing would read.
+pub fn faces_left(files: &ProjectFiles, key: &str, model: &ModelDef) -> Vec<String> {
+    if model.busts().is_some() {
+        return Vec::new();
+    }
+    files
+        .paths()
+        .filter(|file| {
+            bundle_of(file).is_some_and(|(bundle, part)| bundle == key && MODEL_BUSTS.matches(part))
+        })
+        .cloned()
+        .collect()
+}
+
+fn generic_names() -> Vec<String> {
+    GenericExpression::VARIANTS
+        .iter()
+        .map(|expression| expression.as_ref().to_owned())
+        .collect()
+}
+
+/// The faces picked for the bust of the model at `key`, each a PNG named after its expression.
+pub fn browse_faces(key: &str) -> Vec<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title(format!("The faces of {}", shown_path(key)))
+        .add_filter("PNG", &["png"])
+        .pick_files()
+        .unwrap_or_default()
+}
+
+fn drop_slot(ui: &mut Ui, size: Vec2, text: &str) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 4.0, theme::SELECTION.gamma_multiply(0.5));
+    paint::dashed_rect(
+        &painter,
+        rect,
+        egui::Stroke::new(1.0, theme::ACCENT),
+        4.0,
+        4.0,
+    );
+    Mark::Plus.paint(
+        &painter,
+        ERect::from_center_size(rect.center() - Vec2::new(0.0, 10.0), Vec2::splat(18.0)),
+        theme::ACCENT,
+    );
+    painter.text(
+        rect.center() + Vec2::new(0.0, 12.0),
+        egui::Align2::CENTER_CENTER,
+        text,
+        egui::FontId::proportional(12.5),
+        theme::ACCENT,
+    );
+    response
+}
+
 fn card(
     ui: &mut Ui,
     face: &BustFace,
@@ -211,20 +315,7 @@ fn card(
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(CARD, Sense::click());
     let painter = ui.painter_at(rect);
-    painter.rect(
-        rect,
-        4.0,
-        theme::INPUT,
-        egui::Stroke::new(
-            if selected { 2.0 } else { 1.0 },
-            if selected {
-                theme::ACCENT
-            } else {
-                theme::BORDER
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
+    panel::paint_card(&painter, rect, selected);
     let art = ERect::from_min_max(
         rect.min + Vec2::new(4.0, 4.0),
         rect.right_bottom() - Vec2::new(4.0, 28.0),
@@ -297,36 +388,64 @@ fn replace_file(editor: &mut Editor, key: &str, face: &BustFace, path: &Path) {
     editor.apply(edit);
 }
 
-fn add_expression(editor: &mut Editor, key: &str, faces: &[BustFace], path: &Path) {
-    let bytes = match png_bytes(path) {
-        Ok(bytes) => bytes,
+/// Takes the PNGs at `paths` into the bust as one step: one named after a face the bust has
+/// replaces its picture, any other becomes an expression of the model's own.
+fn add_faces(editor: &mut Editor, key: &str, faces: &[BustFace], paths: &[PathBuf]) {
+    let mut edit = ContentEdit::new(match paths {
+        [path] => format!(
+            "Add {} to {}'s bust",
+            path.file_name().unwrap_or_default().to_string_lossy(),
+            shown_path(key)
+        ),
+        _ => format!("Add {} faces to {}'s bust", paths.len(), shown_path(key)),
+    });
+    let named = match face_writes(&mut edit, key, faces, paths) {
+        Ok(named) => named,
         Err(error) => {
             editor.toast(error);
             return;
         }
     };
-    let stem = path
-        .file_stem()
-        .map(|stem| rows::name_from(&stem.to_string_lossy().replace('-', "_")))
-        .filter(|stem| valid_name(stem))
-        .unwrap_or_else(|| "expression".to_owned());
-    let taken: HashSet<String> = faces.iter().map(|face| face.name.clone()).collect();
-    let name = rows::free_name(&stem, &taken);
-    let face = BustFace {
-        file: face_file(key, &name),
-        name,
-        own: true,
-    };
-    let mut edit = ContentEdit::new(format!(
-        "Add expression {} to {}'s bust",
-        face.name,
-        shown_path(key)
-    ));
-    edit.write(face.file.clone(), bytes.into());
-    if editor.apply(edit) {
-        editor.views.model.view_mut(key).face = Some(face.name.clone());
-        editor.select(RowSelection::parts(ModelDef::TABLE, key, vec![face.part()]));
+    if editor.apply(edit)
+        && let Some(face) = named.last()
+    {
+        editor.views.model.view_mut(key).face = Some(face.clone());
+        let part = MODEL_BUSTS.named(face, "png");
+        editor.select(RowSelection::parts(ModelDef::TABLE, key, vec![part]));
     }
+}
+
+/// Writes each PNG at `paths` as the face its file is named after, numbering a name `faces`
+/// or an earlier path already took. Gives the faces' names in order.
+fn face_writes(
+    edit: &mut ContentEdit,
+    key: &str,
+    faces: &[BustFace],
+    paths: &[PathBuf],
+) -> Result<Vec<String>, String> {
+    let mut written: Vec<String> = Vec::new();
+    for path in paths {
+        let bytes = png_bytes(path)?;
+        let stem = path
+            .file_stem()
+            .map(|stem| rows::name_from(&stem.to_string_lossy().replace('-', "_")))
+            .filter(|stem| valid_name(stem))
+            .unwrap_or_else(|| "expression".to_owned());
+        let name = match faces.iter().find(|face| face.name == stem) {
+            Some(face) if !written.contains(&face.name) => face.name.clone(),
+            _ => {
+                let taken: HashSet<String> = faces
+                    .iter()
+                    .map(|face| face.name.clone())
+                    .chain(written.iter().cloned())
+                    .collect();
+                rows::free_name(&stem, &taken)
+            }
+        };
+        edit.write(face_file(key, &name), bytes.into());
+        written.push(name);
+    }
+    Ok(written)
 }
 
 #[derive(Clone, Debug)]

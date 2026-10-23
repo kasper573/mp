@@ -49,19 +49,21 @@ pub fn paint(
         }
     }
     let mut touched: HashSet<CellPos> = HashSet::new();
-    let corners_of = |cell: CellPos| -> [String; 4] {
-        let current = draft
+    let corners_of = |cell: CellPos| -> Corners {
+        let Some(row) = draft
             .get(layer, cell)
-            .and_then(|index| draft.entry(index).cloned());
-        match current {
-            Some(row) if row.tileset == tileset => def
-                .data(row.tile)
-                .and_then(|data| data.corners.get(set))
-                .cloned()
-                .unwrap_or_else(plain),
-            _ => plain(),
-        }
+            .and_then(|index| draft.entry(index).cloned())
+        else {
+            return Corners::Empty;
+        };
+        (row.tileset == tileset)
+            .then(|| def.data(row.tile))
+            .flatten()
+            .and_then(|data| data.corners.get(set))
+            .cloned()
+            .map_or(Corners::Foreign, Corners::Known)
     };
+    let mut foreign: HashSet<CellPos> = HashSet::new();
     let mut wanted: HashMap<CellPos, [String; 4]> = HashMap::new();
     for (vx, vy) in vertices {
         let around = [
@@ -74,7 +76,16 @@ pub fn paint(
             if cell.index(draft.size).is_none() {
                 continue;
             }
-            let entry = wanted.entry(cell).or_insert_with(|| corners_of(cell));
+            let entry = wanted
+                .entry(cell)
+                .or_insert_with(|| match corners_of(cell) {
+                    Corners::Known(corners) => corners,
+                    Corners::Empty => plain(),
+                    Corners::Foreign => {
+                        foreign.insert(cell);
+                        plain()
+                    }
+                });
             entry[corner] = name.clone();
             touched.insert(cell);
         }
@@ -83,6 +94,9 @@ pub fn paint(
     for cell in touched {
         let corners = &wanted[&cell];
         if corners.iter().all(|c| c == base) {
+            if foreign.contains(&cell) {
+                continue;
+            }
             if draft.set(layer, cell, None) {
                 painted.insert(cell);
             }
@@ -169,4 +183,12 @@ pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSet> {
             })
         })
         .collect()
+}
+
+/// A cell's corners in the brush's set, as its tile says. A foreign tile, of another tileset or
+/// knowing no corners in the set, isn't the set's base: a stroke only leaving base around it keeps it.
+enum Corners {
+    Empty,
+    Known([String; 4]),
+    Foreign,
 }

@@ -20,7 +20,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, serial,
+    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, Nearby, serial,
 };
 use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
@@ -339,6 +339,22 @@ pub struct ItemDef {
 
 impl ContentFile for ItemDef {
     const TABLE: &'static str = "item";
+
+    fn fresh(near: &Nearby) -> Result<ItemDef, String> {
+        let sound = near.file()?;
+        Ok(ItemDef {
+            name: near.name(),
+            icon: near.image()?,
+            sfx: ItemSfx {
+                pickup: sound,
+                trade: sound,
+                drop: sound,
+                on_use: None,
+            },
+            kind: ItemKind::Resource,
+            modules: Vec::new(),
+        })
+    }
 }
 
 impl NamedContent for ItemDef {

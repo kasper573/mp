@@ -1,17 +1,22 @@
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, RichText, Ui, Vec2};
 use engine::core::content::ContentFile;
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::quest::QuestDef;
 use engine::systems::shop::ShopDef;
+use ui::chip;
+use ui::egui;
+use ui::egui::{Align, Layout, RichText, Ui, Vec2};
+use ui::glyph::{self, Mark};
+use ui::menu;
+use ui::sheet;
+use ui::theme;
 
 use super::atlas::AtlasArea;
 use super::filters::{ColorBy, ColorField, MapLens};
 use super::{MapPart, OpenWorldMap, select};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
+use ui::input;
 
 const SEARCH_WIDTH: f32 = 300.0;
 const RESULTS_PER_KIND: usize = 6;
@@ -29,11 +34,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                 if !editor.views.world.search.trim().is_empty() {
                     pick = results(editor, ui, map, &search);
                 }
-                widgets::dropdown_menu(ui, RichText::new("Layers").size(12.5), |ui| {
+                menu::dropdown(ui, RichText::new("Layers").size(12.5), |ui| {
                     ui.set_width(220.0);
                     layer_rows(editor, ui, map);
                 });
-                widgets::dropdown_menu(ui, RichText::new("Color by").size(12.5), |ui| {
+                menu::dropdown(ui, RichText::new("Color by").size(12.5), |ui| {
                     ui.set_width(260.0);
                     if let Some(color) = color_menu(editor, ui) {
                         pick = Some(Pick::Color(color));
@@ -128,58 +133,50 @@ struct SearchResult {
 }
 
 fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> egui::Response {
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(8, 3))
-        .show(ui, |ui| {
-            ui.set_min_width(SEARCH_WIDTH);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
-                let view = &mut editor.views.world;
-                let mut chip = |ui: &mut Ui, text: &str, which: Chip| {
-                    if widgets::chip_closable(ui, text).1 {
-                        *remove = Some(which);
-                    }
-                };
-                for (index, lens) in view.lenses.iter().enumerate() {
-                    chip(ui, &lens.chip(), Chip::Lens(index));
+    ui.scope(|ui| {
+        ui.set_max_width(SEARCH_WIDTH);
+        input::boxed(ui, None, |ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            glyph::show(ui, Mark::Search, 13.0, theme::MUTED);
+            let view = &mut editor.views.world;
+            let mut chip = |ui: &mut Ui, text: &str, which: Chip| {
+                if chip::closable(ui, text).1 {
+                    *remove = Some(which);
                 }
-                if let Some(color) = &view.color {
-                    chip(ui, &color.chip(), Chip::Color);
-                }
-                if let Some(line) = &view.quest_line {
-                    chip(ui, &format!("quest line: {line}"), Chip::Line);
-                }
-                if let Some(route) = &view.route {
-                    chip(
-                        ui,
-                        &format!("route: {} → {}", route.from, route.to),
-                        Chip::Route,
-                    );
-                }
-                let empty = view.lenses.is_empty()
-                    && view.color.is_none()
-                    && view.quest_line.is_none()
-                    && view.route.is_none();
-                let hint = if empty {
-                    "Search areas, npcs, items, quests…"
-                } else {
-                    ""
-                };
-                ui.add(
-                    egui::TextEdit::singleline(&mut view.search)
-                        .frame(egui::Frame::NONE)
-                        .hint_text(hint)
-                        .desired_width(if empty { SEARCH_WIDTH - 30.0 } else { 120.0 })
-                        .font(egui::TextStyle::Body),
-                )
-            })
-            .inner
+            };
+            for (index, lens) in view.lenses.iter().enumerate() {
+                chip(ui, &lens.chip(), Chip::Lens(index));
+            }
+            if let Some(color) = &view.color {
+                chip(ui, &color.chip(), Chip::Color);
+            }
+            if let Some(line) = &view.quest_line {
+                chip(ui, &format!("quest line: {line}"), Chip::Line);
+            }
+            if let Some(route) = &view.route {
+                chip(
+                    ui,
+                    &format!("route: {} → {}", route.from, route.to),
+                    Chip::Route,
+                );
+            }
+            let empty = view.lenses.is_empty()
+                && view.color.is_none()
+                && view.quest_line.is_none()
+                && view.route.is_none();
+            let hint = if empty {
+                "Search areas, npcs, items, quests…"
+            } else {
+                ""
+            };
+            ui.add(
+                input::unframed(egui::TextEdit::singleline(&mut view.search))
+                    .hint_text(theme::muted(hint))
+                    .desired_width(if empty { ui.available_width() } else { 120.0 }),
+            )
         })
-        .inner
+    })
+    .inner
 }
 
 fn results(
@@ -259,12 +256,12 @@ fn results(
         .fixed_pos(search.rect.left_bottom() + Vec2::new(-8.0, 8.0))
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
-            design_tokens::slip::frame().show(ui, |ui| {
+            ui::slip::frame().show(ui, |ui| {
                 ui.set_width(SEARCH_WIDTH + 40.0);
                 let mut last_kind = "";
                 for row in rows.iter().take(RESULTS_SHOWN) {
                     if row.kind != last_kind {
-                        widgets::section(ui, row.kind);
+                        sheet::section(ui, row.kind);
                         last_kind = row.kind;
                     }
                     let response = ui.add(
@@ -331,7 +328,7 @@ fn color_menu(editor: &mut Editor, ui: &mut Ui) -> Option<ColorBy> {
             let mut last_table = None;
             for field in fields {
                 if last_table != Some(field.table) {
-                    widgets::section(ui, field.table.table());
+                    sheet::section(ui, field.table.table());
                     last_table = Some(field.table);
                 }
                 let button = egui::Button::new(theme::mono(field.path_text()).size(12.5))

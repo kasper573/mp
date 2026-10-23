@@ -23,6 +23,7 @@ use crate::systems::text::LineText;
 #[schemars(extend("x-system" = "quest"))]
 pub struct OfferQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -40,6 +41,7 @@ pub struct OfferQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct AcceptQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -54,6 +56,7 @@ pub struct AcceptQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct TurnIn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -72,6 +75,7 @@ pub struct TurnIn {
 #[schemars(extend("x-system" = "quest"))]
 pub struct FailQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -83,6 +87,7 @@ pub struct FailQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct CompleteTask {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     pub task: String,
@@ -95,6 +100,7 @@ pub struct CompleteTask {
 #[schemars(extend("x-system" = "quest"))]
 pub struct Decide {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     pub path: String,

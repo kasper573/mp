@@ -1,7 +1,9 @@
 use bevy::prelude::*;
-use design_tokens::face::TextRole;
-use design_tokens::{controls, ink, sheet};
-use egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::drag;
+use ui::egui;
+use ui::egui::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::face::TextRole;
+use ui::{controls, ink, sheet};
 
 use crate::core::assets::ImageRef;
 use crate::core::content::Content;
@@ -196,7 +198,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         Some(SlotVerdict::Wanted(note)) => (true, false, Some(note.clone())),
         Some(SlotVerdict::Refused(reason)) => (false, true, Some(reason.clone())),
     };
-    let carried = hud::carried(ui.ctx()) == Some(Carried::BagSlot(cell.slot));
+    let carried = drag::carried::<Carried>(ui.ctx()) == Some(Carried::BagSlot(cell.slot));
     let look = SlotLook {
         icon: Some(&def.icon),
         count: filled.stack.count,
@@ -219,7 +221,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         act(world, cell.slot, filled.stack.item, &matched, response.rect);
     }
     if map::drag_started(world, InputAction::CarryItem, &response) {
-        hud::carry(ui.ctx(), Carried::BagSlot(cell.slot));
+        drag::carry(ui.ctx(), Carried::BagSlot(cell.slot));
     }
     let lines: Vec<String> = std::iter::once(card::overview(def))
         .chain(filled.notes.iter().cloned())

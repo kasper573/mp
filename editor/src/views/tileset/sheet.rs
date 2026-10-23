@@ -1,4 +1,3 @@
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
 use engine::core::content::{ContentFile, FolderReader, parent_of};
 use engine::core::math::Pos;
 use engine::systems::area::blueprint::BlueprintDef;
@@ -7,6 +6,14 @@ use engine::systems::area::scene::{ModuleNode, Scene, SceneGrids, SceneNode};
 use engine::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
 use engine::systems::area::{AreaModule, MapSize, Scenery, SceneryTile, Tilemap};
 use strum::VariantArray;
+use ui::dialog;
+use ui::egui;
+use ui::egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
+use ui::form;
+use ui::ink;
+use ui::input;
+use ui::paint;
+use ui::theme;
 
 use super::{
     ANIMATION_PART, OpenTileset, SheetLayout, SheetRect, TileBlueprintDialog, TilesetMode,
@@ -15,11 +22,10 @@ use super::{
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
+use crate::rows;
 use crate::tabs::file_title;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{patterns, theme, widgets};
 use crate::views::model::sounds;
-use crate::{forms, rows};
+use ui::input::InputField;
 
 const WALKABLE: Color32 = Color32::from_rgb(110, 200, 110);
 const BLOCKS: Color32 = Color32::from_rgb(230, 90, 90);
@@ -46,7 +52,7 @@ pub enum TileBrush {
 }
 
 impl TileBrush {
-    fn of(view: &TilesetView) -> Option<TileBrush> {
+    pub fn of(view: &TilesetView) -> Option<TileBrush> {
         match view.mode {
             TilesetMode::Walk => Some(TileBrush::Walk(view.walk)),
             TilesetMode::Surface => Some(TileBrush::Surface(view.surface.clone())),
@@ -146,12 +152,22 @@ pub fn canvas(
                     egui::StrokeKind::Inside,
                 );
             }
-            let (zooming, scroll) =
-                ui.input(|i| (EditorKey::Zoom.held(i), i.smooth_scroll_delta.y));
-            if zooming && scroll != 0.0 && response.hovered() {
+            let (held, scroll, gesture) = ui.input(|i| {
+                (
+                    EditorKey::Zoom.held(i),
+                    i.smooth_scroll_delta.y,
+                    i.zoom_delta(),
+                )
+            });
+            let factor = match (gesture != 1.0, held && scroll != 0.0) {
+                (true, _) => gesture,
+                (false, true) if scroll > 0.0 => 1.25,
+                (false, true) => 0.8,
+                (false, false) => 1.0,
+            };
+            if factor != 1.0 && response.hovered() {
                 let view = editor.views.tileset.view_mut(key);
-                let step = if scroll > 0.0 { 1.25 } else { 0.8 };
-                view.zoom = (view.zoom * step).clamp(0.25, 8.0);
+                view.zoom = (view.zoom * factor).clamp(0.25, 8.0);
             }
             SheetCanvas {
                 layout,
@@ -210,8 +226,8 @@ pub fn draw_selection(editor: &Editor, ui: &Ui, key: &str, canvas: &SheetCanvas)
     };
     let rect = canvas.layout.block_rect(selection);
     let painter = ui.painter_at(canvas.layout.rect.expand(2.0));
-    painter.rect_filled(rect, 0.0, theme::alpha(theme::SELECTION, 30));
-    widgets::dashed_rect(&painter, rect, Stroke::new(2.0, theme::SELECTION), 6.0, 4.0);
+    painter.rect_filled(rect, 0.0, ink::wash(theme::SELECTION, 0.12));
+    paint::dashed_rect(&painter, rect, Stroke::new(2.0, theme::SELECTION), 6.0, 4.0);
 }
 
 pub fn walk_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -251,7 +267,7 @@ pub fn blueprint_dialog(
     let key = tileset.key.as_str();
     let selection = editor.views.tileset.view(key).selection?;
     let mut answer = None;
-    dialogs::card(ctx, "tileset-blueprint", 420.0, |ui| {
+    dialog::card(ctx, "tileset-blueprint", 420.0, |ui| {
         ui.label(
             RichText::new("Make a blueprint from these tiles")
                 .size(16.0)
@@ -268,26 +284,20 @@ pub fn blueprint_dialog(
             selection.y
         )));
         ui.add_space(8.0);
-        widgets::kv(ui, "key", |ui| {
-            let response = forms::boxed_input(ui, None, |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut dialog.name)
-                        .desired_width(240.0)
-                        .font(egui::TextStyle::Monospace),
-                )
-            });
-            widgets::default_focus(ui, &response);
+        form::kv(ui, "key", |ui| {
+            let response = InputField::new(&mut dialog.name).width(240.0).show(ui);
+            input::default_focus(ui, &response);
         });
         if let Some(error) = &dialog.error {
             ui.colored_label(theme::DANGER, error);
         }
         ui.add_space(10.0);
-        answer = dialogs::answer_row(ui, "Make blueprint");
+        answer = dialog::answer_row(ui, "Make blueprint");
     });
     match answer {
         None => Some(dialog),
-        Some(DialogAnswer::Cancel) => None,
-        Some(DialogAnswer::Confirm) => {
+        Some(dialog::Answer::Cancel) => None,
+        Some(dialog::Answer::Confirm) => {
             match make_blueprint(editor, tileset, selection, dialog.name.trim()) {
                 Ok(()) => None,
                 Err(error) => Some(TileBlueprintDialog {
@@ -362,10 +372,12 @@ fn make_blueprint(
 ) -> Result<(), String> {
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     let folder = parent_of(&tileset.key);
-    if let Some(problem) = rows::name_problem(&project.files, folder, name, None) {
+    let path = rows::new_path(&project.files, folder, BlueprintDef::TABLE, name);
+    if let Some(problem) =
+        rows::name_problem(&project.files, folder, name, rows::name_kind(&path), None)
+    {
         return Err(problem);
     }
-    let path = rows::new_path(&project.files, folder, BlueprintDef::TABLE, name);
     let reader = project.reader();
     let id = reader
         .id_of::<TilesetDef>(&tileset.key)
@@ -460,8 +472,8 @@ fn legend_row(
 
 fn walk_mark(painter: &egui::Painter, cell: ERect, walk: Option<Walk>) {
     match walk {
-        Some(Walk::Walkable) => patterns::dots(painter, cell, WALKABLE),
-        Some(Walk::Blocks) => patterns::hatch(painter, cell, BLOCKS, cell.width()),
+        Some(Walk::Walkable) => paint::dotted(painter, cell, WALKABLE),
+        Some(Walk::Blocks) => paint::hatched(painter, cell, BLOCKS, cell.width()),
         None => {}
     }
 }
@@ -469,10 +481,10 @@ fn walk_mark(painter: &egui::Painter, cell: ERect, walk: Option<Walk>) {
 fn surface_mark(painter: &egui::Painter, cell: ERect, index: usize) {
     let color = SURFACE_COLORS[index % SURFACE_COLORS.len()];
     match index % 4 {
-        0 => patterns::dots(painter, cell, color),
-        1 => patterns::hatch(painter, cell, color, cell.width()),
-        2 => patterns::grid_lines(painter, cell, color),
-        _ => patterns::stripes(painter, cell, color),
+        0 => paint::dotted(painter, cell, color),
+        1 => paint::hatched(painter, cell, color, cell.width()),
+        2 => paint::gridded(painter, cell, color),
+        _ => paint::striped(painter, cell, color),
     }
 }
 
