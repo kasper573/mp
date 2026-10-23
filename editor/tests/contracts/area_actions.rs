@@ -197,10 +197,13 @@ fn a_terrain_stroke_turns_the_cells_it_covers_into_its_terrain_and_leaves_other_
             json!({
                 "tile": testkit::TILE,
                 "terrains": { "drift": ["ground", "snow"] },
-                "tiles": { "0": { "corners": { "drift": ["snow", "snow", "snow", "snow"] } } },
+                "tiles": {
+                    "0": { "corners": { "drift": ["snow", "snow", "snow", "snow"] } },
+                    "1": { "corners": { "drift": ["ground", "ground", "ground", "snow"] } },
+                },
             }),
         )
-        .part("tileset", "drift", "image.png", testkit::png(16, 16));
+        .part("tileset", "drift", "image.png", testkit::png(32, 16));
     let mut editor = support::open(game, &scratch);
     let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
     let def = {
@@ -223,7 +226,7 @@ fn a_terrain_stroke_turns_the_cells_it_covers_into_its_terrain_and_leaves_other_
         cells
     };
 
-    for (terrain, snowed) in [(0, 0), (1, 4)] {
+    for (terrain, snowed) in [(0, 0), (1, 5)] {
         let mut draft = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
         let before = tilesets(&draft);
         let brush = TerrainBrush {
@@ -250,6 +253,17 @@ fn a_terrain_stroke_turns_the_cells_it_covers_into_its_terrain_and_leaves_other_
         );
         let drifts = after.iter().filter(|(_, tileset)| *tileset == drift);
         assert_eq!(drifts.count(), snowed, "terrain {terrain}");
+        if terrain == 1 {
+            let above_left = draft
+                .get(0, CellPos::new(1, 1))
+                .and_then(|index| draft.entry(index))
+                .map(|row| row.tile);
+            assert_eq!(
+                above_left,
+                Some(1),
+                "the cell up and left of the stroke is snowed only in its south-east corner"
+            );
+        }
     }
 }
 

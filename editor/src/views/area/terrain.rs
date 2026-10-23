@@ -7,7 +7,7 @@ use engine::systems::area::grid::Flip;
 use engine::systems::area::tileset::TilesetDef;
 
 use super::grid::GridDraft;
-use crate::views::tileset::terrain::MixCompleteness;
+use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 
 pub struct TerrainBrush<'a> {
     pub def: &'a TilesetDef,
@@ -67,10 +67,10 @@ pub fn paint(
     let mut wanted: HashMap<CellPos, [String; 4]> = HashMap::new();
     for (vx, vy) in vertices {
         let around = [
-            (CellPos::new(vx - 1, vy - 1), 2),
-            (CellPos::new(vx, vy - 1), 3),
-            (CellPos::new(vx - 1, vy), 1),
-            (CellPos::new(vx, vy), 0),
+            (CellPos::new(vx - 1, vy - 1), TileCorner::SouthEast),
+            (CellPos::new(vx, vy - 1), TileCorner::SouthWest),
+            (CellPos::new(vx - 1, vy), TileCorner::NorthEast),
+            (CellPos::new(vx, vy), TileCorner::NorthWest),
         ];
         for (cell, corner) in around {
             if cell.index(draft.size).is_none() {
@@ -86,7 +86,7 @@ pub fn paint(
                         plain()
                     }
                 });
-            entry[corner] = name.clone();
+            entry[corner.index()] = name.clone();
             touched.insert(cell);
         }
     }
