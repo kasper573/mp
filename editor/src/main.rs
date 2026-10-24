@@ -1,18 +1,9 @@
 use std::path::PathBuf;
 
-use bevy::asset::AssetApp;
-use bevy::asset::io::AssetSourceId;
-use bevy::prelude::*;
-use bevy::window::{PresentMode, WindowResolution};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
-use editor::app::{EditorLaunch, EditorPlugin};
+use editor::app::EditorLaunch;
 use editor::scenes::SceneStep;
-use engine::core::assets::SyncedFiles;
-use engine::core::audio::playback::SfxPlugin;
-use engine::core::babble::BabblePlugin;
-use engine::core::math::Rng;
-use engine::core::text::StyledTextPlugin;
 use engine::systems::launch;
 use strum::VariantNames;
 
@@ -61,31 +52,7 @@ fn main() {
         user: options.user_folder,
         frame_log: options.frame_log,
     };
-    let files = SyncedFiles::default();
-    let mut app = App::new();
-    app.insert_resource(files.clone())
-        .insert_resource(Rng::from_entropy());
-    AssetApp::register_asset_source(&mut app, AssetSourceId::Default, files.source())
-        .add_plugins(
-            DefaultPlugins
-                .set(bevy::log::LogPlugin {
-                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Rift editor".to_owned(),
-                        resolution: WindowResolution::new(1600, 1000),
-                        present_mode: PresentMode::AutoNoVsync,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(ImagePlugin::default_nearest()),
-        )
-        .add_plugins((SfxPlugin, StyledTextPlugin, BabblePlugin))
-        .add_plugins(EditorPlugin { launch })
-        .run();
+    editor::app::build(launch).run();
 }
 
 fn scene_help() -> String {
