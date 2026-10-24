@@ -235,6 +235,17 @@ pub fn passed_by(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
         .any(|actor| actor.hitbox.inflate(PASSING.0, PASSING.0).contains(tile))
 }
 
+/// Anyone at all can be under the pointer by the time a click lands: who walks may walk onto the
+/// ground, and who stands may set off. Ground picked freely keeps a tile clear of everyone.
+pub fn beside_anyone(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
+    let me = snapshot.me.as_ref().map(|me| me.id);
+    snapshot
+        .actors
+        .iter()
+        .filter(|actor| Some(actor.id) != me)
+        .any(|actor| actor.hitbox.inflate(PASSING.0, PASSING.0).contains(tile))
+}
+
 const PASSING: Tiles = Tiles(1.0);
 
 /// Stepping into a warp takes it.

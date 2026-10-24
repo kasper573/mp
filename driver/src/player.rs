@@ -16,8 +16,8 @@ use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
-    UiTarget, aiming, area_name, at_rest, clickable_point, in_warp, in_world, me_at_rest,
-    object_named, open, passed_by, taken, townsperson, warp_named,
+    UiTarget, aiming, area_name, at_rest, beside_anyone, clickable_point, in_warp, in_world,
+    me_at_rest, object_named, open, passed_by, taken, townsperson, warp_named,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -308,7 +308,10 @@ impl Player {
             .iter()
             .copied()
             .filter(|tile| {
-                grid.region(*tile) == region && !in_warp(&seen, *tile) && !taken(&seen, *tile)
+                grid.region(*tile) == region
+                    && !in_warp(&seen, *tile)
+                    && !taken(&seen, *tile)
+                    && !beside_anyone(&seen, *tile)
             })
             .min_by(|a, b| a.distance_to(spot).total_cmp(&b.distance_to(spot)))
             .expect("ground the player can walk to");
@@ -394,7 +397,11 @@ impl Player {
                 .map(|cell| cell.center())
                 .find(|tile| {
                     open(&seen, *tile)
-                        && !passed_by(&seen, *tile)
+                        && if *tile == target {
+                            !passed_by(&seen, *tile)
+                        } else {
+                            !beside_anyone(&seen, *tile)
+                        }
                         && (!in_warp(&seen, *tile) || *tile == target)
                 })
                 .or_else(|| detour(&seen, grid, target, path.len()));
@@ -543,7 +550,7 @@ impl Player {
     pub fn cast_on(
         &mut self,
         slot: InputAction,
-        pick: impl Fn(&ProbeSnapshot) -> Option<(Entity, Pos<Tiles>)>,
+        pick: impl Fn(&ProbeSnapshot) -> Option<Entity>,
         done: impl Fn(&ProbeSnapshot) -> bool,
     ) {
         let deadline = Deadline::from(&self.desktop, LONG);
@@ -559,10 +566,13 @@ impl Player {
                 self.act(slot);
                 self.wait_until("the skill armed", aiming);
             }
-            let Some((target, at)) = pick(&seen) else {
+            let Some(target) = pick(&seen) else {
                 continue;
             };
-            let Some(point) = clickable_point(&seen, at) else {
+            let Some(body) = seen.actors.iter().find(|actor| actor.id == target) else {
+                continue;
+            };
+            let Some(point) = clickable_point(&seen, body.aim) else {
                 continue;
             };
             let pointed = self.point_at(point);
@@ -947,7 +957,7 @@ fn detour(
         .iter()
         .copied()
         .filter(|tile| {
-            open(snapshot, *tile) && !passed_by(snapshot, *tile) && !in_warp(snapshot, *tile)
+            open(snapshot, *tile) && !beside_anyone(snapshot, *tile) && !in_warp(snapshot, *tile)
         })
         .filter_map(|tile| Some((tile, grid.path(tile.cell(), target.cell())?.len())))
         .filter(|(_, way)| *way < left)
