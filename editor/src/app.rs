@@ -9,20 +9,12 @@ use std::time::{Instant, SystemTime};
 use ui::egui;
 use ui::words;
 
-use bevy::asset::AssetApp;
-use bevy::asset::io::AssetSourceId;
 use bevy::prelude::*;
-use bevy::window::{PresentMode, WindowResolution};
 use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
-use engine::core::assets::SyncedFiles;
-use engine::core::audio::playback::SfxPlugin;
-use engine::core::babble::BabblePlugin;
 use engine::core::content::{Content, ContentFile, FolderReader, Unreadable, fields_file, version};
 use engine::core::math::Pos;
-use engine::core::math::Rng;
-use engine::core::text::StyledTextPlugin;
 use engine::core::tiling::{CellPos, Tiles};
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
@@ -61,35 +53,6 @@ pub struct EditorLaunch {
     pub scene: Option<Vec<SceneStep>>,
     pub user: Option<PathBuf>,
     pub frame_log: Option<PathBuf>,
-}
-
-/// The editor's whole app, opened as `launch` says.
-pub fn build(launch: EditorLaunch) -> App {
-    let files = SyncedFiles::default();
-    let mut app = App::new();
-    app.insert_resource(files.clone())
-        .insert_resource(Rng::from_entropy());
-    AssetApp::register_asset_source(&mut app, AssetSourceId::Default, files.source())
-        .add_plugins(
-            DefaultPlugins
-                .set(bevy::log::LogPlugin {
-                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Rift editor".to_owned(),
-                        resolution: WindowResolution::new(1600, 1000),
-                        present_mode: PresentMode::AutoNoVsync,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(ImagePlugin::default_nearest()),
-        )
-        .add_plugins((SfxPlugin, StyledTextPlugin, BabblePlugin))
-        .add_plugins(EditorPlugin { launch });
-    app
 }
 
 pub struct EditorPlugin {
