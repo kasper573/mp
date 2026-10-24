@@ -763,6 +763,7 @@ fn rename_box(ui: &mut Ui, cx: &RowsCx, renaming: &mut Renaming, width: f32) {
     if !renaming.focused {
         renaming.focused = true;
         response.request_focus();
+        response.scroll_to_me(None);
         let mut edit = egui::TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
         let all = egui::text::CCursorRange::two(
             egui::text::CCursor::new(0),

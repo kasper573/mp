@@ -728,7 +728,7 @@ fn a_tree_taller_than_its_panel_still_has_empty_space_below_its_rows_for_its_men
 }
 
 #[test]
-fn a_row_renamed_in_its_edit_box_is_scrolled_to_wherever_its_new_name_sorts_it() {
+fn a_row_named_in_its_edit_box_shows_the_box_then_scrolls_to_wherever_its_new_name_sorts_it() {
     let scratch = tempfile::tempdir().expect("scratch");
     let game = (0..10).fold(camp(), |game, n| {
         game.asset(&format!("icons/f{n}/cap.png"), png(16, 16))
@@ -744,7 +744,14 @@ fn a_row_renamed_in_its_edit_box_is_scrolled_to_wherever_its_new_name_sorts_it()
             .last()
             .expect("a frame")
     };
-    settle(&mut editor, &mut frames);
+    let opened = settle(&mut editor, &mut frames);
+    let field = opened
+        .rect("folder")
+        .expect("the new folder's edit box drawn");
+    assert!(
+        field.min.y >= 0.0 && field.max.y <= height,
+        "{field:?} {opened:?}"
+    );
 
     for events in [
         key(egui::Key::A, egui::Modifiers::COMMAND),
