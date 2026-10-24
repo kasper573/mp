@@ -114,8 +114,12 @@ pub(super) fn grid_stroke(
 ) {
     let response = frame.response;
     let brush = editor.settings.brush.clone();
+    // A press that moves too little to drag is only a click once let go, when the pointer no
+    // longer says where it was pressed, so the stroke starts on the press itself.
     let pressed = response.drag_started_by(egui::PointerButton::Primary)
-        || response.clicked_by(egui::PointerButton::Primary);
+        || response.clicked_by(egui::PointerButton::Primary)
+        || (response.is_pointer_button_down_on()
+            && response.ctx.input(|i| i.pointer.primary_pressed()));
     let down = response.dragged_by(egui::PointerButton::Primary);
     let released = response.drag_stopped_by(egui::PointerButton::Primary)
         || response.clicked_by(egui::PointerButton::Primary);

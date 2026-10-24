@@ -483,48 +483,81 @@ fn a_door_back_from_a_warps_destination_stands_beside_where_the_warp_lands() {
 
 #[test]
 fn a_quick_drag_of_the_eraser_clears_every_cell_it_crosses_from_where_it_was_pressed() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = support::open(support::game(), &scratch);
-    editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec!["/0".to_owned()]);
-    view(&mut editor).set_tool(AreaTool::Erase);
-    let mut frames = Frames::new(egui::vec2(1600.0, 900.0));
-    let mut show = |editor: &mut Editor, events: Vec<egui::Event>| {
-        frames.run(events, |ui| editor::views::area::show(editor, ui, &area()))
-    };
-    let (from, to) = (egui::pos2(650.0, 450.0), egui::pos2(950.0, 450.0));
-    let press = |at, pressed| egui::Event::PointerButton {
-        pos: at,
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: egui::Modifiers::NONE,
-    };
-    for events in [
-        Vec::new(),
-        Vec::new(),
-        vec![egui::Event::PointerMoved(from)],
-        vec![press(from, true)],
-        vec![egui::Event::PointerMoved(to)],
-        vec![press(to, false)],
-        Vec::new(),
-    ] {
-        show(&mut editor, events);
-    }
-    support::files(&mut editor);
+    for flick in [false, true] {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let mut editor = support::open(support::game(), &scratch);
+        editor.selection = RowSelection::parts(AreaDef::TABLE, &area(), vec!["/0".to_owned()]);
+        view(&mut editor).set_tool(AreaTool::Erase);
+        let mut frames = Frames::new(egui::vec2(1600.0, 900.0));
+        let mut show = |editor: &mut Editor, events: Vec<egui::Event>| {
+            frames.run(events, |ui| editor::views::area::show(editor, ui, &area()));
+        };
+        show(&mut editor, Vec::new());
+        show(&mut editor, Vec::new());
+        let (from, to) = if flick {
+            let edge = cell_edge_after(&mut editor, &mut show, egui::pos2(650.0, 450.0));
+            (edge - egui::vec2(2.0, 0.0), edge + egui::vec2(3.0, 0.0))
+        } else {
+            (egui::pos2(650.0, 450.0), egui::pos2(950.0, 450.0))
+        };
+        let press = |at, pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        for events in [
+            vec![egui::Event::PointerMoved(from)],
+            vec![press(from, true)],
+            vec![egui::Event::PointerMoved(to)],
+            vec![press(to, false)],
+            Vec::new(),
+        ] {
+            show(&mut editor, events);
+        }
+        support::files(&mut editor);
 
-    let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
-    let ground = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
-    let mut cleared: Vec<i32> = ground
-        .cells()
-        .filter(|cell| ground.get(0, *cell).is_none())
-        .map(|cell| cell.x)
-        .collect();
-    cleared.sort();
-    cleared.dedup();
-    assert!(cleared.len() >= 3, "a stroke, not a dab: {cleared:?}");
-    assert!(
-        cleared.windows(2).all(|pair| pair[1] == pair[0] + 1),
-        "no gaps: {cleared:?}"
-    );
+        let snapshot = AreaSnapshot::for_bundle(&mut editor, &area()).expect("the area is open");
+        let ground = GridDraft::own(&editor, &snapshot.bundle).expect("the area's grids");
+        let mut cleared: Vec<i32> = ground
+            .cells()
+            .filter(|cell| ground.get(0, *cell).is_none())
+            .map(|cell| cell.x)
+            .collect();
+        cleared.sort();
+        cleared.dedup();
+        if flick {
+            assert_eq!(
+                cleared.len(),
+                2,
+                "the cell pressed and the one let go over: {cleared:?}"
+            );
+        } else {
+            assert!(cleared.len() >= 3, "a stroke, not a dab: {cleared:?}");
+        }
+        assert!(
+            cleared.windows(2).all(|pair| pair[1] == pair[0] + 1),
+            "no gaps: {cleared:?}"
+        );
+    }
+}
+
+/// The first point right of `from` that the map reads as the next cell over.
+fn cell_edge_after(
+    editor: &mut Editor,
+    show: &mut impl FnMut(&mut Editor, Vec<egui::Event>),
+    from: egui::Pos2,
+) -> egui::Pos2 {
+    let mut cell_at = |editor: &mut Editor, at: egui::Pos2| {
+        show(editor, vec![egui::Event::PointerMoved(at)]);
+        let hover = editor.views.area.hover.as_ref();
+        hover.expect("the pointer is over the map").tile.cell()
+    };
+    let first = cell_at(editor, from);
+    (1..200)
+        .map(|step| from + egui::vec2(step as f32, 0.0))
+        .find(|&at| cell_at(editor, at) != first)
+        .expect("a cell edge within 200 points")
 }
 
 fn hold_a_stroke(editor: &mut Editor) {
