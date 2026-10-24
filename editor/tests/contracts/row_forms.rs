@@ -455,6 +455,33 @@ fn a_script_module_added_to_a_row_runs_a_script_of_its_kind_made_for_it_when_non
 }
 
 #[test]
+fn a_module_typed_into_the_add_module_filter_is_added_by_return() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let game = support::game().item("potion", json!({ "kind": { "type": "resource" } }));
+    let mut editor = support::open(game, &scratch);
+    let potion = path("item", "potion");
+    let mut form = RowFrames::new("item", &potion);
+    form.run(&mut editor, Vec::new());
+    let add = form.run(&mut editor, Vec::new()).at("+ Add module");
+    for events in click(add) {
+        form.run(&mut editor, events);
+    }
+    form.run(&mut editor, vec![egui::Event::Text("bound".to_owned())]);
+    form.run(&mut editor, key(egui::Key::Enter, egui::Modifiers::NONE));
+    form.run(&mut editor, Vec::new());
+
+    let item = editor
+        .read::<ItemDef>(&potion)
+        .expect("a project")
+        .expect("the item reads");
+    assert!(
+        matches!(item.modules.as_slice(), [ItemModule::Bound]),
+        "{} modules",
+        item.modules.len()
+    );
+}
+
+#[test]
 fn a_map_keyed_by_files_shows_each_key_as_its_file_and_typing_never_renames_one() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = support::open(world_with_a_card(), &scratch);
