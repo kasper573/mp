@@ -192,7 +192,7 @@ fn code_pane(
         heading_slot.min,
         EVec2::new(heading_slot.width(), HEADING_HEIGHT),
     );
-    ui.scope_builder(
+    let title = ui.scope_builder(
         egui::UiBuilder::new()
             .max_rect(heading)
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
@@ -209,14 +209,16 @@ fn code_pane(
                     .x
             });
             let title_room = ui.available_width() - status_width - ui.spacing().item_spacing.x;
-            ui.scope(|ui| {
+            let title = ui.scope(|ui| {
                 ui.set_max_width(title_room.max(MIN_TITLE_WIDTH));
                 ui.add(
                     egui::Label::new(form::section_heading(&format!("code · {file} · ")))
                         .truncate(),
-                );
+                )
             });
             ui.add(egui::Label::new(status).truncate());
+            title.inner
         },
     );
+    response.labelled_by(title.inner.id);
 }
