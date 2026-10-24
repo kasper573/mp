@@ -284,9 +284,10 @@ pub fn server_app(
                     (rewards::grant, quest::credit, npc::defeated).chain(),
                     (
                         script::query::take_tick_roster,
-                        (area::object::track, npc::approach)
-                            .chain()
-                            .run_if(on_replication_tick),
+                        area::object::track.run_if(on_replication_tick),
+                        // Every tick, so whoever walks up is near before they can talk: a check
+                        // between replication ticks would let the talk run first.
+                        npc::approach,
                     )
                         .chain(),
                     script::run_tick,
