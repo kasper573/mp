@@ -13,7 +13,7 @@ use engine::core::content::{Content, ContentFile, ContentId, FolderReader, field
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::core::script::ValueType;
-use engine::core::tiling::Tiles;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::core::time::Seconds;
 use engine::field;
 use engine::systems::area::{self, AreaDef};
@@ -1152,13 +1152,12 @@ fn quests(
                                     ui,
                                     &format!("Set up for {}", shown_path(&sheet.path_of(quest))),
                                 );
-                                let giver = giver_of(sheet, parties.as_ref(), quest);
                                 for moment in Moment::all(cx, sheet, quest) {
                                     let hint = moment.hint(
                                         cx,
                                         sheet,
                                         quest,
-                                        giver.map(|party| party.name.as_str()),
+                                        moment.party(sheet, parties.as_ref(), quest),
                                     );
                                     let (rect, response) = ui.allocate_exact_size(
                                         egui::vec2(ui.available_width(), 36.0),
@@ -1273,9 +1272,26 @@ impl Moment {
         }
     }
 
-    fn hint(&self, cx: &FormCx, sheet: &Sheet, quest: QuestId, giver: Option<&str>) -> String {
-        let by = giver
-            .map(|giver| format!("standing by {giver}"))
+    /// Whom the character stands beside at this moment: who offers the quest before it is taken,
+    /// who takes it once it is ready to hand in.
+    fn party<'p>(
+        &self,
+        sheet: &Sheet,
+        parties: Option<&'p (Content, Parties)>,
+        quest: QuestId,
+    ) -> Option<&'p Party> {
+        let (content, parties) = parties?;
+        let quest = content.by_path::<QuestDef>(&sheet.path_of(quest))?;
+        match self {
+            Moment::JustOffered => parties.giver(quest),
+            Moment::ReadyToHandIn | Moment::Decided(_) => parties.turn_in(quest),
+            Moment::ObjectivesMet | Moment::Completed | Moment::Failed => None,
+        }
+    }
+
+    fn hint(&self, cx: &FormCx, sheet: &Sheet, quest: QuestId, party: Option<&Party>) -> String {
+        let by = party
+            .map(|party| format!("standing by {}", party.name))
             .unwrap_or_else(|| "at its start".to_owned());
         let done: Vec<String> = objectives_of(cx, sheet, quest)
             .iter()
@@ -1308,11 +1324,15 @@ fn apply_moment(
     parties: Option<&(Content, Parties)>,
 ) {
     let objectives = objectives_of(cx, sheet, quest);
-    let giver_place = parties.and_then(|(content, _)| {
-        let home = area::residence(content, giver_of(sheet, parties, quest)?.npc?)?;
+    let beside_party = moment.party(sheet, parties, quest).and_then(|party| {
+        let (content, _) = parties?;
+        let home = area::residence(content, party.npc?)?;
+        let beside = area::load(content, home.area)
+            .grid
+            .nearest_walkable_where(home.at, |cell| cell != home.at.cell())?;
         Some(Place {
             area: sheet.now(content, home.area)?,
-            at: home.at,
+            at: beside,
         })
     });
     match &moment {
@@ -1338,11 +1358,7 @@ fn apply_moment(
         Moment::Completed => set_standing(character, quest, Standing::Completed),
         Moment::Failed => set_standing(character, quest, Standing::Failed),
     }
-    if matches!(
-        moment,
-        Moment::JustOffered | Moment::ReadyToHandIn | Moment::Decided(_)
-    ) && let Some(place) = giver_place
-    {
+    if let Some(place) = beside_party {
         character.start = CharacterStart::At(place);
     }
 }

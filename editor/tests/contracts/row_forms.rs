@@ -9,6 +9,8 @@ use editor::views::class::inspect as class_inspect;
 use editor::views::{character, spreadsheet};
 use engine::core::audio::playback::{SfxDef, SfxScalar};
 use engine::core::content::Fixture;
+use engine::core::math::Pos;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::core::vfx::{ParamFill, ParamValue, VfxDef, VfxLayer};
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::class::{AccessRequirement, ClassDef, NodeKey};
@@ -16,10 +18,11 @@ use engine::systems::item::{ItemDef, ItemKind, ItemModule};
 use engine::systems::memory::{MemoryDef, Resets};
 use engine::systems::notification::{NotificationDef, NotificationDefKind};
 use engine::systems::npc::NpcDef;
+use engine::systems::player::snapshot::{CharacterSnapshot, CharacterStart};
 use engine::systems::script::{RunnerKind, ScriptDef, VarValue};
 use engine::systems::skill::{SkillDef, Targeting};
 use engine::systems::stat::StatKind;
-use serde_json::json;
+use serde_json::{Value, json};
 use testkit::{Game, Map, path};
 
 use crate::support::{self, Drawn, Frames, click, key};
@@ -47,6 +50,88 @@ fn a_test_character_shows_where_it_starts_in_an_area_of_any_size() {
         assert!(
             drawn.rect(&format!("{x}, {y}")).is_some(),
             "{width}×{height}: {drawn:?}"
+        );
+    }
+}
+
+#[test]
+fn a_test_character_set_up_for_a_quest_moment_starts_beside_whom_it_is_with() {
+    let (giver, taker) = (Pos::<Tiles>::new(2.0, 2.0), Pos::<Tiles>::new(6.0, 5.0));
+    for (moment, with) in [("just offered", giver), ("ready to hand in", taker)] {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let resident = |npc: &str, at: Pos<Tiles>| json!({ "type": "resident", "npc": path("npc", npc), "at": { "x": at.x, "y": at.y } });
+        let talks = |quest: Value| {
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "quest" },
+                "quest": quest,
+            })
+        };
+        let letter = path("quest", "letter");
+        let game = Game::new()
+            .area(
+                support::AREA,
+                &Map::open(8, 8),
+                json!([resident("giver", giver), resident("taker", taker)]),
+            )
+            .hero(support::AREA, 1.0, 1.0)
+            .script("giver_talk", "npc", talks(json!({ "type": "offer_quest", "quest": letter })))
+            .script("taker_talk", "npc", talks(json!({ "type": "turn_in", "quest": letter })))
+            .npc("giver", 40.0, json!([{ "type": "script", "script": path("script", "giver_talk") }]))
+            .npc("taker", 40.0, json!([{ "type": "script", "script": path("script", "taker_talk") }]))
+            .row(
+                "quest",
+                "letter",
+                json!({
+                    "title": "A Letter",
+                    "category": "Errands",
+                    "blurb": "A letter",
+                    "xp": 10,
+                    "modules": [
+                        { "type": "task", "task": "read", "label": "Read the letter" },
+                        { "type": "hand_over", "text": ["I read it."] },
+                    ],
+                }),
+            )
+            .row(
+                "test_character",
+                "tester",
+                json!({ "name": "Tester", "class": path("class", "hero"), "start": "initial_spawn" }),
+            )
+            .engine_rows()
+            .whole();
+        let mut editor = support::open(game, &scratch);
+        let tester = path("test_character", "tester");
+        let mut frames = Frames::new(egui::vec2(1600.0, 1000.0));
+        let mut draw = |editor: &mut Editor, events: Vec<egui::Event>| {
+            frames.run(events, |ui| character::show(editor, ui, &tester))
+        };
+
+        let quests = draw(&mut editor, Vec::new()).at("Quests");
+        for events in click(quests) {
+            draw(&mut editor, events);
+        }
+        let set_up = draw(&mut editor, Vec::new()).at("Set up for…");
+        for events in click(set_up) {
+            draw(&mut editor, events);
+        }
+        let picked = draw(&mut editor, Vec::new()).at(moment);
+        for events in click(picked) {
+            draw(&mut editor, events);
+        }
+        draw(&mut editor, Vec::new());
+        support::files(&mut editor);
+
+        let character = editor
+            .read::<CharacterSnapshot>(&tester)
+            .expect("a project")
+            .expect("the test character reads");
+        let CharacterStart::At(start) = character.start else {
+            panic!("{moment}: the character starts at a place");
+        };
+        let (cell, beside) = (start.at.cell(), with.cell());
+        assert!(
+            cell != beside && (cell.x - beside.x).abs() <= 1 && (cell.y - beside.y).abs() <= 1,
+            "{moment}: starts on {cell:?}, beside {beside:?}"
         );
     }
 }
