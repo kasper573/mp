@@ -465,6 +465,21 @@ impl Scenery {
     pub fn sort_line(&self) -> Option<Tiles> {
         Some(Tiles(self.bounds().min().y + self.sort?))
     }
+
+    /// The cell under the middle of the tile `[column, row]`, as the scenery is placed and flipped;
+    /// a block names its cell this way.
+    pub fn cell_under(&self, [column, row]: [i32; 2]) -> CellPos {
+        let middle = Pos::new(column as f32 + 0.5, row as f32 + 0.5);
+        (self.at + self.flip.apply(middle).to_vector()).cell()
+    }
+
+    /// Every tile of its grid as `[column, row]`, with the cell under it.
+    pub fn cells(&self) -> impl Iterator<Item = ([i32; 2], CellPos)> + '_ {
+        let (width, height) = (self.width() as i32, self.height() as i32);
+        (0..height)
+            .flat_map(move |row| (0..width).map(move |column| [column, row]))
+            .map(|tile| (tile, self.cell_under(tile)))
+    }
 }
 
 /// The depth each of `scenery` is drawn at in an area `height` tiles tall whose ground ends at

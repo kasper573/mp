@@ -8,7 +8,7 @@ use ui::theme;
 use engine::core::audio::soundscape::EDGE_FALLOFF;
 use engine::core::math::{Pos, Rect};
 use engine::core::render::TILE;
-use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, TileRect, TileSize, Tiles};
+use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, TileSize, Tiles};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaModule, AreaModuleKind, Pictured};
 use ui::egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
@@ -317,7 +317,7 @@ pub(super) fn overlay_selected_scenery(
     let canvas = frame.canvas;
     let grids = area.grids.clone();
     let size = area.size.grid();
-    for cell in rect.tiles() {
+    for (_, cell) in scenery.cells() {
         if let Some(cell_index) = cell.index(size)
             && grids.walk[cell_index] == Some(false)
         {

@@ -1,5 +1,5 @@
 use engine::core::math::Pos;
-use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
+use engine::core::tiling::{Cell, TilePos, Tiles};
 use engine::systems::area::object::{ObjectDef, ObjectShape};
 use engine::systems::area::scene::{ModuleNode, SceneNode};
 use engine::systems::area::{self, AreaDef, AreaModule, Scenery, SceneryTile};
@@ -299,9 +299,8 @@ pub(super) fn blocked_under(project: &Project, bundle: &str, scenery: &Scenery) 
     let draft = GridDraft::own_in(project, bundle)?;
     Some(
         scenery
-            .bounds()
-            .tiles()
-            .filter(|cell| draft.walk_at(*cell) == Some(false))
+            .cells()
+            .filter(|(_, cell)| draft.walk_at(*cell) == Some(false))
             .count(),
     )
 }
@@ -310,16 +309,17 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &AreaSnapshot, node: &str) {
     let Some(AreaModule::Scenery(scenery)) = frame.module(node) else {
         return;
     };
-    let at = scenery.at;
     let Some(mut draft) = GridDraft::own(editor, &frame.bundle) else {
         return;
     };
     let mut adopted = scenery.blocks.clone();
     let mut count = 0;
-    for cell in scenery.bounds().tiles() {
+    for (tile, cell) in scenery.cells() {
         if draft.walk_at(cell) == Some(false) {
             draft.set_walk(cell, None);
-            adopted.push([cell.x - at.x.round() as i32, cell.y - at.y.round() as i32]);
+            if !adopted.contains(&tile) {
+                adopted.push(tile);
+            }
             count += 1;
         }
     }

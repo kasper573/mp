@@ -1,5 +1,5 @@
 use engine::core::content::{ContentFile, FolderReader, parent_of};
-use engine::core::math::Pos;
+use engine::core::tiling::{Cell, CellPos};
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::grid::Flip;
 use engine::systems::area::scene::{ModuleNode, Scene, SceneGrids, SceneNode};
@@ -401,7 +401,7 @@ fn make_blueprint(
         })
         .collect();
     let part = AreaModule::Scenery(Scenery {
-        at: Pos::origin(),
+        at: CellPos::new(0, 0).bounds().min(),
         tileset: id,
         tiles,
         sort: Some(selection.h as f32 - 0.5),

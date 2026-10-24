@@ -127,6 +127,37 @@ fn a_placed_blueprints_forced_walk_cells_merge_into_the_areas() {
 }
 
 #[test]
+fn a_placed_blueprints_scenery_blocks_the_cells_it_names_wherever_it_lands() {
+    for (flip, blocked, open) in [
+        ("none", (6.0, 5.0), [(5.0, 5.0), (6.0, 4.0), (7.0, 5.0)]),
+        (
+            "horizontal",
+            (4.0, 5.0),
+            [(5.0, 5.0), (4.0, 4.0), (3.0, 5.0)],
+        ),
+    ] {
+        let mut hut = scenery(json!([[0, 0], [0, 0]]));
+        hut["at"] = json!({ "x": -0.5, "y": -0.5 });
+        hut["blocks"] = json!([[1, 1]]);
+        let game = game()
+            .row(
+                "tileset",
+                "start_ground",
+                json!({ "tile": testkit::TILE, "tiles": { "0": { "walk": "walkable" } } }),
+            )
+            .remove(&format!("{}/walk.csv", path("area", "start")))
+            .blueprint("hut", (2, 2), json!({}), json!([hut]));
+        let content = placing(game, json!([placement("Hut", "hut", 5.0, 4.0, flip)])).load();
+        let grid = &area::load(&content, start(&content)).grid;
+
+        assert!(!grid.walkable(Pos::new(blocked.0, blocked.1)), "{flip}");
+        for (x, y) in open {
+            assert!(grid.walkable(Pos::new(x, y)), "{flip} {x}, {y}");
+        }
+    }
+}
+
+#[test]
 fn a_placement_painting_a_layer_the_area_lacks_is_refused_at_the_placement() {
     let report = placing(
         rugs(game()).edit_scene("blueprint", "rug", |scene| {
