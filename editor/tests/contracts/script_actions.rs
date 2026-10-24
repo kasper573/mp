@@ -5,9 +5,11 @@ use editor::app::{BottomTab, Editor};
 use editor::project::RowSelection;
 use editor::tabs::EditorTab;
 use editor::views::script::{self, ScriptDoc, ScriptRow};
+use editor::views::spreadsheet;
 use engine::core::script::node::NEXT_EXIT;
 use engine::core::script::{Fill, Node, Target, VariableType};
 use engine::systems::combat::effects::HealBy;
+use engine::systems::npc::NpcDef;
 use engine::systems::script::{RiftEffect, RunnerKind, ScriptDef};
 use serde_json::json;
 use testkit::path;
@@ -33,6 +35,52 @@ fn deleting_several_selected_nodes_deletes_every_one_of_them() {
 
     let names: Vec<String> = read(&editor).nodes.keys().cloned().collect();
     assert_eq!(names, ["start"]);
+}
+
+#[test]
+fn a_closed_script_view_leaves_its_keys_to_the_view_shown_where_it_was() {
+    let scratch = tempfile::tempdir().expect("scratch");
+    let mut editor = open(support::game().npc("wolf", 10.0, json!([])), &scratch);
+    let at = talk();
+    let mut frames = Frames::new(SCREEN);
+    let over = || vec![egui::Event::PointerMoved(egui::pos2(800.0, 400.0))];
+    editor.open_tab(EditorTab::Script(at.clone()));
+    editor.place_tabs();
+    frames.run(over(), |ui| {
+        editor::shell::shortcuts(&mut editor, ui.ctx());
+        script::show(&mut editor, ui, &at);
+    });
+    let tab = editor
+        .dock
+        .find_tab(&EditorTab::Script(at.clone()))
+        .expect("the script's tab");
+    editor.dock.remove_tab(tab);
+
+    let wolf = path("npc", "wolf");
+    let mut sheet = |editor: &mut Editor, events: Vec<egui::Event>| {
+        frames.run(events, |ui| {
+            editor::shell::shortcuts(editor, ui.ctx());
+            spreadsheet::show(editor, ui, "npc");
+        });
+    };
+    sheet(&mut editor, over());
+    editor.views.spreadsheet.state_mut("npc").selected = Some((wolf.clone(), "name".to_owned()));
+    for events in [
+        key(egui::Key::Enter, egui::Modifiers::NONE),
+        key(egui::Key::A, egui::Modifiers::COMMAND),
+        vec![egui::Event::ModifiersChanged(egui::Modifiers::NONE)],
+        vec![egui::Event::Text("Grey wolf".to_owned())],
+        key(egui::Key::Enter, egui::Modifiers::NONE),
+    ] {
+        sheet(&mut editor, events);
+        sheet(&mut editor, Vec::new());
+    }
+
+    let npc = editor
+        .read::<NpcDef>(&wolf)
+        .expect("a project")
+        .expect("the npc reads");
+    assert_eq!(npc.name, "Grey wolf");
 }
 
 #[test]

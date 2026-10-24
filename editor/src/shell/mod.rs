@@ -93,12 +93,10 @@ pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
 /// Acts on the editor's own keys pressed this frame. A field being typed into keeps the keys it
 /// edits with: its own undo and redo, and the script view's keys.
 pub fn shortcuts(editor: &mut Editor, ctx: &Context) {
+    let script_shown = editor.views.script.shown_rect.take();
     if !ctx.text_edit_focused() {
         let script_tab = matches!(active_tab(editor), Some(EditorTab::Script(_)));
-        let script_hovered = editor
-            .views
-            .script
-            .shown_rect
+        let script_hovered = script_shown
             .zip(ctx.pointer_hover_pos())
             .is_some_and(|(rect, pos)| rect.contains(pos));
         if (script_tab || script_hovered) && editor.dialogs.is_empty() {

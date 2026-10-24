@@ -364,6 +364,8 @@ pub struct ScriptViews {
     sessions: Vec<ScriptSession>,
     views: HashMap<ScriptSessionId, ScriptViewState>,
     pub keys: ScriptKeys,
+    /// Where a script view was drawn the frame before, which the next frame's keys are taken for
+    /// while the pointer is over it.
     pub shown_rect: Option<Rect>,
     pub run: Option<run::ScriptRun>,
     setups: HashMap<ScriptSessionId, run::RunSetup>,
