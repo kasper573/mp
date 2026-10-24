@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use ui::egui;
 use ui::theme;
@@ -231,7 +231,9 @@ fn draw(
     let small = FontId::monospace(12.0);
     let x = Cell::new(rect.left() + 14.0 + row.depth as f32 * INDENT);
     let y = rect.center().y;
+    let spoken = RefCell::new(String::new());
     let put = |ui: &Ui, text: &str, font: &FontId, ink: Color32| {
+        spoken.borrow_mut().push_str(text);
         let drawn = ui.painter().text(
             egui::pos2(x.get(), y),
             Align2::LEFT_CENTER,
@@ -305,6 +307,9 @@ fn draw(
             theme::FAINT,
         );
     }
+    let spoken = spoken.into_inner();
+    response
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, spoken.trim()));
     response
 }
 

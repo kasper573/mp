@@ -95,6 +95,14 @@ pub fn resize_dialog(
                                 ),
                                 egui::StrokeKind::Inside,
                             );
+                            response.widget_info(|| {
+                                egui::WidgetInfo::selected(
+                                    egui::WidgetType::RadioButton,
+                                    true,
+                                    picked,
+                                    anchor_name(column, row),
+                                )
+                            });
                             if response.clicked() {
                                 dialog.anchor = (column, row);
                             }
@@ -270,4 +278,23 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         }
     }
     editor.try_apply(edit)
+}
+
+/// The anchor `(column, row)`, -1 to 1 each, as a compass reads it out: "top left", "center".
+fn anchor_name(column: i8, row: i8) -> String {
+    let side = match column {
+        -1 => "left",
+        1 => "right",
+        _ => "",
+    };
+    let edge = match row {
+        -1 => "top",
+        1 => "bottom",
+        _ => "",
+    };
+    match (edge, side) {
+        ("", "") => "center".to_owned(),
+        ("", side) | (side, "") => side.to_owned(),
+        (edge, side) => format!("{edge} {side}"),
+    }
 }

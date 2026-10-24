@@ -210,6 +210,8 @@ pub(super) fn blueprint_card(
             theme::MUTED,
         );
     }
+    response
+        .widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, selected, key));
     response.on_hover_text(key)
 }
 

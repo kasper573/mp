@@ -499,6 +499,9 @@ fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSna
         0 => "none forced".to_owned(),
         n => format!("{n} forced"),
     };
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, format!("Walk, {detail}"))
+    });
     painter.text(
         rect.right_center() - Vec2::new(36.0, 0.0),
         egui::Align2::RIGHT_CENTER,
@@ -519,6 +522,9 @@ fn walk_row(editor: &mut Editor, ui: &mut Ui, view_key: &str, snapshot: &AreaSna
         let button = ui
             .interact(hit, ui.id().with(("walk toggle", index)), Sense::click())
             .on_hover_text(said);
+        button.widget_info(|| {
+            egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, is_on, said)
+        });
         let color = if is_on { theme::TEXT } else { theme::FAINT };
         (if is_on { on } else { off }).paint(
             ui.painter(),

@@ -934,6 +934,9 @@ fn table_body(
         for (column, width) in shown.iter().zip(&widths) {
             let (rect, response) =
                 ui.allocate_exact_size(Vec2::new(*width, header_h), Sense::click());
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &column.title)
+            });
             let painter = ui.painter();
             let sorted = view.sort.as_ref().filter(|(id, _)| *id == column.id);
             let title = match sorted {
@@ -1062,6 +1065,14 @@ fn table_body(
                     }
                     let response =
                         ui.interact(cell, ui.id().with((&row.key, &column.id)), Sense::click());
+                    response.widget_info(|| {
+                        egui::WidgetInfo::selected(
+                            egui::WidgetType::Button,
+                            true,
+                            is_selected,
+                            format!("{}, {}", row.key, column.title),
+                        )
+                    });
                     if response.clicked() || response.double_clicked() {
                         hit = Some(Hit {
                             key: row.key.clone(),
