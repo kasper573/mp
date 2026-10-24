@@ -1,9 +1,10 @@
 use driver::{UiTarget, erred, input_name, input_names, noticed, open_ground_beside};
 use engine::systems::input::gestures::ClickClaim;
 use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
-use crate::shoot::Shoot;
+use crate::shoot::{Shoot, Star};
 
 pub const CHAPTER: Chapter = Chapter {
     name: "conversation",
@@ -60,10 +61,7 @@ fn play(shoot: &mut Shoot) {
     me.caption("While you talk, the map ignores the mouse: a plain pointer, and clicks do nothing");
     me.talk_to("grisha");
     me.come_to_rest();
-    let off_stage = *open_ground_beside(&me.snapshot())
-        .first()
-        .expect("open ground in view beside the conversation");
-    let pointed = me.point_at_tile(off_stage);
+    let pointed = point_off_stage(&mut me);
     assert_eq!(pointed.claim, ClickClaim::Locked);
     me.click();
     me.read_to_choices();
@@ -72,7 +70,7 @@ fn play(shoot: &mut Shoot) {
     );
     me.hover_ui(UiTarget::containing("Driftwood Inn"));
     me.hover_choice("Chat.");
-    me.point_at_tile(off_stage);
+    point_off_stage(&mut me);
     me.caption("Choices branch into a tree: Chat opens a menu of its own");
     for (pick, next) in [("Chat.", "chat"), ("Tell me about this island.", "island")] {
         me.pick(pick);
@@ -135,6 +133,15 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Close the lid.");
     me.conversation_over();
+}
+
+/// Points at open ground beside the conversation, found as the screen stands now: what covers the
+/// map changes as the conversation goes on.
+fn point_off_stage(me: &mut Star) -> ProbeSnapshot {
+    let off_stage = *open_ground_beside(&me.snapshot())
+        .first()
+        .expect("open ground in view beside the conversation");
+    me.point_at_tile(off_stage)
 }
 
 fn spoken_list(names: &[String]) -> String {

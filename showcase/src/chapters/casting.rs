@@ -1,12 +1,15 @@
 use driver::{
-    UiTarget, aiming, beside_other_player, east_of, input_name, npc_is, other_player,
-    other_player_within, pack_ground, played, played_on, status_on_me,
+    UiTarget, aiming, beside_other_player, clickable_point, content, east_of, id, input_name,
+    nearest_npc, npc_is, other_player, other_player_within, pack_ground, played, played_on,
+    status_on_me,
 };
+use engine::core::geometry::Shape;
 use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::core::vfx::VfxSite;
 use engine::systems::input::map::InputAction;
-use engine::systems::probe::ProbeSnapshot;
+use engine::systems::probe::{ProbeBody, ProbeSnapshot};
+use engine::systems::skill::SkillDef;
 
 use crate::chapters::Chapter;
 use crate::shoot::{Shoot, Star};
@@ -40,10 +43,10 @@ fn play(shoot: &mut Shoot) {
     ));
     me.act(InputAction::Hotbar4);
     me.wait_until("Mend armed", aiming);
-    let ally = other_player(&me.snapshot())
-        .expect("the friend in view")
-        .clone();
-    me.point_at_tile(ally.at);
+    let ally = me.wait_for("the friend standing still", |snapshot| {
+        other_player(snapshot).cloned().filter(still)
+    });
+    me.point_at_tile(ally.aim);
     me.hold();
     me.click();
     me.wait_until("the friend mended", |snapshot| {
@@ -69,14 +72,22 @@ fn play(shoot: &mut Shoot) {
     me.caption(
         "Chain Lightning's circle picks out everything hostile inside it, and the bolt runs through each one",
     );
-    aim_then_cast(&mut me, InputAction::Hotbar3, ring, chained_through_several);
+    let crowd = me.wait_for("myconids close enough to chain", |snapshot| {
+        crowd(snapshot, chain_radius())
+    });
+    aim_then_cast(
+        &mut me,
+        InputAction::Hotbar3,
+        crowd,
+        chained_through_several,
+    );
     me.hold();
     me.caption(
         "An area of allies, a rectangle: Sanctuary blesses everyone standing in it, the caster included",
     );
     friend.walk_toward(beside_other_player);
-    let ally = me.wait_for("the friend beside me", |snapshot| {
-        other_player_within(snapshot, 4.5)
+    let ally = me.wait_for("the friend standing beside me", |snapshot| {
+        other_player_within(snapshot, 4.5).filter(still)
     });
     aim_then_cast(&mut me, InputAction::Hotbar5, ally.at, |snapshot| {
         played_on(snapshot, "holy_motes", ally.id)
@@ -85,7 +96,8 @@ fn play(shoot: &mut Shoot) {
     me.caption("And a cone: the armsman's Cleave sweeps the arc in front of him");
     friend.act(InputAction::Hotbar1);
     friend.wait_until("Cleave armed", aiming);
-    friend.point_at_tile(ring);
+    let foe = friend.wait_for("a myconid in the friend's view", foe_in_view);
+    friend.point_at_tile(foe);
     friend.click();
     me.wait_until("the cleave", |snapshot| {
         !played(snapshot, "cleave_swoosh").is_empty()
@@ -110,8 +122,48 @@ fn aim_then_cast(
     me.cast(done);
 }
 
+/// The prey with the most others inside a circle of `radius` around it, once that is at least one
+/// other: the pack fights back after the fireball and runs at the caster, so the circle goes where
+/// it is now rather than where it roams.
+fn crowd(snapshot: &ProbeSnapshot, radius: Tiles) -> Option<Pos<Tiles>> {
+    let prey: Vec<Pos<Tiles>> = snapshot
+        .actors
+        .iter()
+        .filter(|actor| actor.health > 0.0 && npc_is(actor, PREY))
+        .map(|actor| actor.at)
+        .collect();
+    let around = |at: Pos<Tiles>| {
+        prey.iter()
+            .filter(|other| other.distance_to(at) <= radius.0)
+            .count()
+    };
+    prey.iter()
+        .copied()
+        .max_by_key(|at| around(*at))
+        .filter(|at| around(*at) >= 2)
+}
+
+/// A friend aimed at stands where the click lands, rather than walking out from under it.
+fn still(body: &ProbeBody) -> bool {
+    body.resting.is_some()
+}
+
+fn chain_radius() -> Tiles {
+    match id::<SkillDef>("chain_lightning").get(content()).area {
+        Some(Shape::Circle { radius }) => radius,
+        area => panic!("Chain Lightning strikes a circle, not {area:?}"),
+    }
+}
+
 fn chained_through_several(snapshot: &ProbeSnapshot) -> bool {
     played(snapshot, "chain_lightning")
         .iter()
         .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
+}
+
+/// The nearest living prey on the friend's screen: where the pack is now, which the cone sweeps
+/// at, rather than where it roams, which may lie out of the friend's view.
+fn foe_in_view(snapshot: &ProbeSnapshot) -> Option<Pos<Tiles>> {
+    let foe = nearest_npc(snapshot, PREY)?.at;
+    clickable_point(snapshot, foe).map(|_| foe)
 }

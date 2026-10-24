@@ -1,6 +1,7 @@
 use driver::{
-    BUDGET, LONG, Player, aiming, beside_other_player, ground_near, id, npc_is,
-    other_player_within, pack_ground, played, played_on, playing, status_on_me,
+    BUDGET, LONG, Player, aiming, beside_other_player, clickable_point, ground_near, id,
+    nearest_npc, npc_is, other_player_within, pack_ground, played, played_on, playing,
+    status_on_me,
 };
 use engine::core::math::Pos;
 use engine::core::tiling::{TilePos, Tiles};
@@ -75,8 +76,8 @@ fn play(shoot: &mut Shoot) {
         "A rectangle: Sanctuary's light stands in its square, and the blessing it leaves carries motes of its own",
     );
     friend.walk_toward(beside_other_player);
-    let ally = me.wait_for("the friend beside me", |snapshot| {
-        other_player_within(snapshot, 4.5)
+    let ally = me.wait_for("the friend standing beside me", |snapshot| {
+        other_player_within(snapshot, 4.5).filter(|ally| ally.resting.is_some())
     });
     me.cast_at(InputAction::Hotbar5, ally.at, |snapshot| {
         played_on(snapshot, "holy_motes", ally.id)
@@ -87,7 +88,8 @@ fn play(shoot: &mut Shoot) {
     );
     friend.act(InputAction::Hotbar1);
     friend.wait_until("Cleave armed", aiming);
-    friend.point_at_tile(ring);
+    let foe = friend.wait_for("a myconid in the friend's view", foe_in_view);
+    friend.point_at_tile(foe);
     friend.click();
     me.wait_until("the cleave", |snapshot| {
         !played(snapshot, "cleave_swoosh").is_empty()
@@ -155,7 +157,7 @@ fn sunder_nearest(friend: &mut Player) {
             };
             let nearest = |mut among: Vec<&ProbeBody>| {
                 among.sort_by(|a, b| a.at.distance_to(me).total_cmp(&b.at.distance_to(me)));
-                among.first().map(|actor| (actor.id, actor.at))
+                among.first().map(|actor| actor.id)
             };
             let clear = standing()
                 .filter(|actor| (2.5..=5.0).contains(&actor.at.distance_to(me)))
@@ -168,4 +170,11 @@ fn sunder_nearest(friend: &mut Player) {
 
 fn place(at: Pos<Tiles>) -> Place {
     Place { area: id(AREA), at }
+}
+
+/// The nearest living prey on the friend's screen: where the pack is now, which the cone sweeps
+/// at, rather than where it roams, which may lie out of the friend's view.
+fn foe_in_view(snapshot: &ProbeSnapshot) -> Option<Pos<Tiles>> {
+    let foe = nearest_npc(snapshot, PREY)?.at;
+    clickable_point(snapshot, foe).map(|_| foe)
 }

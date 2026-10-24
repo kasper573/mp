@@ -1,6 +1,6 @@
 use driver::{
-    UiTarget, aiming, blocked, content, cooling, holding, input_name, pressed, resident_home,
-    slot_item,
+    UiTarget, aiming, blocked, content, cooling, holding, input_name, open_ground_beside, pressed,
+    resident_home, slot_item,
 };
 use engine::core::math::Offset;
 use engine::systems::input::map::InputAction;
@@ -86,7 +86,10 @@ fn play(shoot: &mut Shoot) {
     me.caption(
         "A skill for one target wants someone under the pointer: Sunder over bare ground is refused",
     );
-    me.point_at_tile(at);
+    let bare = *open_ground_beside(&me.snapshot())
+        .first()
+        .expect("bare ground in view");
+    me.point_at_tile(bare);
     me.act(InputAction::Hotbar3);
     me.wait_until("Sunder refused", |snapshot| {
         pressed(snapshot, 2) == Some(HotbarPress::Denied)
