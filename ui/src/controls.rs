@@ -200,19 +200,20 @@ pub fn key_hint_text(ui: &mut Ui, keys: &str, text: &str) {
 /// A button reading `label`, the `keys` that press it too on a cap beside it.
 pub fn keyed(ui: &mut Ui, label: &str, keys: Option<&str>, enabled: bool) -> Response {
     let ink = if enabled { ink::INK } else { ink::INK3 };
-    let label = ui
+    let text = ui
         .painter()
         .layout_no_wrap(label.to_owned(), Face::BookMedium.id(14.0), ink);
     let cap = keys.map(|keys| key_galley(ui, keys, if enabled { ink::INK2 } else { ink::INK3 }));
     let cap_size = cap.as_ref().map(key_cap_size);
     let width =
-        label.size().x + cap_size.map_or(0.0, |size| size.x + KEYED_GAP) + 2.0 * BUTTON_PADDING.x;
+        text.size().x + cap_size.map_or(0.0, |size| size.x + KEYED_GAP) + 2.0 * BUTTON_PADDING.x;
     let sense = if enabled {
         Sense::click()
     } else {
         Sense::hover()
     };
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, CONTROL_HEIGHT), sense);
+    response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, label));
     let fill = if enabled && response.hovered() {
         ink::ink_wash(0.04)
     } else {
@@ -227,15 +228,15 @@ pub fn keyed(ui: &mut Ui, label: &str, keys: Option<&str>, enabled: bool) -> Res
         StrokeKind::Inside,
     );
     let left = rect.min.x + BUTTON_PADDING.x;
-    let label_width = label.size().x;
+    let text_width = text.size().x;
     painter.galley(
-        Pos2::new(left, rect.center().y - label.size().y / 2.0),
-        label,
+        Pos2::new(left, rect.center().y - text.size().y / 2.0),
+        text,
         ink,
     );
     if let (Some(cap), Some(size)) = (cap, cap_size) {
         let at = Pos2::new(
-            left + label_width + KEYED_GAP,
+            left + text_width + KEYED_GAP,
             rect.center().y - size.y / 2.0,
         );
         let color = if enabled { ink::INK2 } else { ink::INK3 };

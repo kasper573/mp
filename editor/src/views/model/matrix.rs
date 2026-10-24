@@ -82,7 +82,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
                         strips += 1;
                         frames_total += frames.len();
                         let badged = timing.out_of_step(direction);
-                        let response = cell(ui, &sheet, frames.first(), this == strip, badged);
+                        let response = cell(ui, &sheet, frames.first(), this, this == strip, badged);
                         if response.clicked() {
                             pick = Some(this);
                         }
@@ -220,10 +220,14 @@ fn cell(
     ui: &mut Ui,
     sheet: &super::ModelSheet,
     first: Option<&SheetFrame>,
+    strip: ModelStrip,
     selected: bool,
     badged: bool,
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(CELL, CELL + 22.0), Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Button, true, selected, strip.name())
+    });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, theme::INPUT);
     painter.rect_stroke(

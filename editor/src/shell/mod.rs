@@ -592,6 +592,8 @@ impl TabViewer for Viewer<'_> {
     }
 
     fn on_tab_button(&mut self, tab: &mut EditorTab, response: &egui::Response) {
+        response
+            .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tab.title()));
         if response.double_clicked() && self.editor.preview.as_ref() == Some(tab) {
             self.editor.preview = None;
         }

@@ -35,6 +35,20 @@ pub enum HitboxHandle {
 }
 
 impl HitboxHandle {
+    /// What a screen reader calls it.
+    fn name(self) -> &'static str {
+        match self {
+            HitboxHandle::N => "top handle",
+            HitboxHandle::S => "bottom handle",
+            HitboxHandle::E => "right handle",
+            HitboxHandle::W => "left handle",
+            HitboxHandle::Ne => "top right handle",
+            HitboxHandle::Nw => "top left handle",
+            HitboxHandle::Se => "bottom right handle",
+            HitboxHandle::Sw => "bottom left handle",
+        }
+    }
+
     fn horizontal(self) -> bool {
         !matches!(self, HitboxHandle::N | HitboxHandle::S)
     }
@@ -121,6 +135,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
                 if near {
                     hovered_handle = Some(handle);
                 }
+                ui.interact(
+                    ERect::from_center_size(at, Vec2::splat(8.0)),
+                    response.id.with(handle.name()),
+                    Sense::hover(),
+                )
+                .widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, handle.name())
+                });
                 painter.rect(
                     ERect::from_center_size(at, Vec2::splat(8.0)),
                     1.0,

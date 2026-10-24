@@ -287,6 +287,20 @@ pub fn timeline(
         Vec2::new(width + LANE_LABEL, CARD_H + 24.0),
     );
     let (_, response) = ui.allocate_exact_size(rect.size(), Sense::click_and_drag());
+    for (index, frame_rect) in rects.iter().enumerate() {
+        ui.interact(
+            *frame_rect,
+            response.id.with(("frame", index)),
+            Sense::hover(),
+        )
+        .widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::Button,
+                true,
+                format!("frame {}", index + 1),
+            )
+        });
+    }
     let painter = ui.painter_at(rect.expand2(Vec2::new(0.0, 40.0)));
     let selected = editor.views.model.view(key).frames.clone();
     for (index, frame_rect) in rects.iter().enumerate() {
