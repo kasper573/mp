@@ -189,6 +189,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 let selected = candidate == section;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
+                response.widget_info(|| {
+                    egui::WidgetInfo::selected(
+                        egui::WidgetType::SelectableLabel,
+                        true,
+                        selected,
+                        candidate.as_ref(),
+                    )
+                });
                 if selected {
                     paint::row_wash(ui.painter(), rect);
                 } else if response.hovered() {
@@ -1156,6 +1164,13 @@ fn quests(
                                         egui::vec2(ui.available_width(), 36.0),
                                         egui::Sense::click(),
                                     );
+                                    response.widget_info(|| {
+                                        egui::WidgetInfo::labeled(
+                                            egui::WidgetType::Button,
+                                            true,
+                                            moment.label(),
+                                        )
+                                    });
                                     if response.hovered() {
                                         paint::row_wash(ui.painter(), rect);
                                     }
