@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId, NamedContent, Nearby};
 use crate::core::script::{
     Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, Value, ValueType,
 };
@@ -21,8 +21,22 @@ pub struct MemoryDef {
     pub resets: Resets,
 }
 
-impl ContentRow for MemoryDef {
+impl ContentFile for MemoryDef {
     const TABLE: &'static str = "memory";
+
+    fn fresh(near: &Nearby) -> Result<MemoryDef, String> {
+        Ok(MemoryDef {
+            label: near.name(),
+            ty: ValueType::Boolean,
+            resets: Resets::Never,
+        })
+    }
+}
+
+impl NamedContent for MemoryDef {
+    fn shown_name(&self) -> &str {
+        &self.label
+    }
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,6 +152,7 @@ pub fn forget(world: &mut World, player: Entity, key: MemoryId) {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Remember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub memory: MemoryId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -151,6 +166,7 @@ pub struct Remember {
 #[schemars(extend("x-system" = "memory"))]
 pub struct Forget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub memories: Vec<MemoryId>,
@@ -162,9 +178,7 @@ impl EffectDef<RiftScripting> for Remember {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -193,9 +207,7 @@ impl EffectDef<RiftScripting> for Forget {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

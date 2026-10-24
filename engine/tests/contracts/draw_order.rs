@@ -1,7 +1,11 @@
 use std::cmp::Ordering;
 
 use bevy::prelude::*;
-use engine::core::render::{RowDepth, order_rows};
+use engine::core::content::ContentId;
+use engine::core::math::Pos;
+use engine::core::render::{RowDepth, dynamic_z, order_rows};
+use engine::core::tiling::Tiles;
+use engine::systems::area::{self, Flip, Scenery};
 
 const ROW: f32 = 3.5;
 
@@ -23,6 +27,11 @@ fn sprites_sharing_a_row_keep_one_order_as_they_change() {
         "two sprites on one row drew at one depth"
     );
 
+    let depths = |app: &App| [depth(app, first), depth(app, second)];
+    let once = depths(&app);
+    app.update();
+    assert_eq!(depths(&app), once, "ordering again changes nothing");
+
     app.world_mut().entity_mut(first).insert(Reshuffled);
     app.update();
     assert_eq!(drawn_order(&app, first, second), before);
@@ -38,24 +47,46 @@ fn a_deeper_row_draws_in_front() {
 }
 
 #[test]
-fn a_sprite_draws_in_front_of_scenery_on_its_row() {
-    let mut app = rows();
-    let sprite = app.world_mut().spawn(on_row(ROW)).id();
-    app.update();
-    assert!(depth(&app, sprite) > ROW);
+fn scenery_sharing_a_sort_line_draws_in_scene_order_under_who_stands_there() {
+    let height = 10.0;
+    let base = 4.0;
+    let scenery = [
+        standing(2.0),
+        standing(5.0),
+        standing(2.0),
+        lying(),
+        standing(2.0),
+        lying(),
+    ];
+    let depths = area::scenery_depths(&scenery, height, base);
+    let line = dynamic_z(height, base, Tiles(4.0));
+
+    assert!(depths[0] < depths[2] && depths[2] < depths[4]);
+    assert!(depths[4] < line.next_up());
+    assert!(depths[3] < depths[5] && depths[5] < depths[0]);
+    assert!(depths[1] > line);
 }
 
-#[test]
-fn ordering_again_changes_nothing() {
-    let mut app = rows();
-    let sprites: Vec<Entity> = (0..3)
-        .map(|_| app.world_mut().spawn(on_row(ROW)).id())
-        .collect();
-    app.update();
-    let once: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
-    app.update();
-    let twice: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
-    assert_eq!(once, twice);
+fn standing(y: f32) -> Scenery {
+    Scenery {
+        sort: Some(2.0),
+        ..lying_at(y)
+    }
+}
+
+fn lying() -> Scenery {
+    lying_at(1.0)
+}
+
+fn lying_at(y: f32) -> Scenery {
+    Scenery {
+        at: Pos::new(1.0, y),
+        tileset: ContentId::new(0),
+        tiles: vec![vec![None; 2]; 2],
+        sort: None,
+        flip: Flip::None,
+        blocks: Vec::new(),
+    }
 }
 
 fn rows() -> App {

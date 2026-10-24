@@ -25,6 +25,10 @@
 - Game mechanics on the server draw randomness only from their world's `Rng` resource, seeded by the server's `rng_seed` (drawn and logged when unset), so a seeded world plays out alike from run to run. All other randomness stays unseeded: secrets such as sign-in tickets come from the OS, and clients draw as they please. Benchmarks and showcases set a seed; tests run on a random one, and must hold on any.
 - Don't use #[must_use]. Only when clippy recommends it or when it's absolutely critical.
 - Use serde and envy for all json/env serialization and deserialization. No custom parsing code. And use the derive macros, not the imperative APIs.
+- Data crosses JSON only through its Rust type. Code that knows a field's name must hold the type that declares it: never read or write `serde_json::Value` by literal key (`value["field"]`, `.get("field")`, `json!({...})` built in place of a struct), never branch on a serde tag string, never rebuild a type's file layout by hand. An untyped path compiles against whatever the files happen to look like today, so when the type changes it silently reads nothing and writes files the loader refuses.
+- Content is read and written only as its engine type, through the same code the loader uses: `FolderReader` (in the editor `Editor::read::<Row>` and `write_content`), which parses fields, held data and bundle parts, and writes them back the way the game does. Bundle part paths come from the type's `Bundle` and `PartSpec`.
+- `serde_json::Value` is for data whose shape is genuinely unknown at compile time: the schema-driven forms, whose keys come from the JSON Schema they walk, and raw-JSON fallbacks. Needing a field by name there means the code needs the type instead.
+- When a type can't hold what a tool needs (a blueprint's unfilled holes, a draft mid-edit), extend the engine type to hold it (as `Fill<T>` does) rather than dropping to `Value`. `just lint` refuses literal-key JSON access outside the schema-driven forms.
 - Aim for single source of truth (however do not conflate this with DRY. Code duplication is allowed and is not the same thing as SSoT).
 - Any and all public type names must be intuitive and not ambigious if listed alongside other public types. Do not rely on crate namespacing to disambiguate. 
 - A folder may never contain only one file, with the exception of common crate root folders like `src`, `static`, `assets`, `templates`, etc. 
@@ -45,15 +49,17 @@
 - the majority of our game mechanics goes here
 - may depend on other high level systems
 
-The content layer is a game folder (`example_game/` is the example game): `game.json` for the game's settings, one row per file under `tables/<table>/<key>.json` (a row's grids beside it), and `assets/`. A row type implements `ContentRow` (its `TABLE`, and `check` for the rules a schema can't state) and is registered in `systems::registry()`. Loading resolves every key to a `ContentId`, newtyped per table (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Tables stay separate and reference each other only loosely by id, never by embedding another table's rows (a row may still nest its own data). Row types live in core/* or systems/*.
+The content layer is a game folder (`example_game/` is the example game): folders arranged however the game likes, in which every file says what it is by its name, `<name>.<type>.json`, or a bundle folder `<name>.<type>/` holding its parts (an area's scene and grids, a tileset's image). The game's settings are `fixtures/game.config.json`, the engine's own content lives at fixed paths under `fixtures/`, and media and notes sit anywhere. A content type implements `ContentFile` (its `TABLE`, and `check` for the rules a schema can't state), a type with parts also `Bundle`, and is registered in `systems::registry()`. A reference names a file by its path in the game folder; loading resolves every path to a `ContentId`, newtyped per type (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Content files stay separate and reference each other only loosely by path, never by embedding another file's content (a file may still nest its own data). Content types live in core/* or systems/*.
 
 Code must not depend on arbitrary game content, so the same server and client can run any game's data:
-- Code never names a row. A row that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are keys every game's data must provide, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
-- When code needs content for a role, the content says which row plays it: the game's settings (`GameSettings::initial_spawn`), or a role a row picks from a list (an sfx's `role`).
-- Only rows name assets; another game reskins with its own rows and files.
-- Integration tests look rows up by key.
+- Code never names a content file. A file that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are files every game must provide at their place under `fixtures/`, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
+- When code needs content for a role, the content says which file plays it: the game's settings (`GameSettings::initial_spawn`), or the file the role belongs to (a surface's `footstep`).
+- Only content files name media; another game reskins with its own files.
+- Integration tests name content by its path.
 
-2. The design_tokens and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
+2. The ui and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
+
+3. The ui crate is the interface the editor and the game share: its look and every general-purpose egui component (fields, chips, cards, panels, menus, dialogs, floating labels, painted patterns, wording helpers). A component that isn't about one mechanic or one editor view lives there, so the game and the editor never draw the same thing two ways; a crate's own UI code keeps only what is about its domain. The editor and the engine reach egui and its extension crates only through ui's re-exports (`ui::egui`, `ui::egui_dock`, …), so they always build against the versions ui is built on; bevy_egui stays their own dependency, as the host that runs egui inside bevy.
 
 ## Comments
 
@@ -81,8 +87,10 @@ Everything you build gets shown to the user on video, from a player's point of v
 
 ## Tests
 
+- The suite is a set of contracts: each test states a scenario we want to support and asserts it through what a player, a designer or the loader sees and does (a mechanic's outcome, what lands in the files, what a view shows, what the loader accepts or refuses). Never through a helper, an intermediate state or the code's structure, which a refactor must be free to change.
+- Tests are added economically, as entropy is the enemy here as everywhere. A scenario gets one test; its variations are cases of that test, not copies of it. A bug fix earns a test only when it reveals a scenario no test states yet; otherwise it extends the test that owns the scenario, or adds nothing. Never add tests for coverage, one per fix or per function. A test that duplicates another, pins an implementation detail or asserts something trivial is a cost, not a safeguard: delete it.
 - `just test` is unit and integration tests only, each isolated and fast: a test pulls in no more code than the slice of mechanics it verifies. Never start a game server, a client, a window or the docker stack in a test, and never drive one through the `driver` crate; that is the showcase's and the e2e's alone.
-- Tests never read a shipped game (`example_game/`, the editor's templates). A test declares the small game it needs in code with `testkit::Game`, only the rows it reads, and loads it through the real loader; `engine_rows()` and `whole()` exist for the few tests about the whole game contract. Shipped games are checked by `just lint`.
+- Tests never read a shipped game (`example_game/`, the editor's templates). A test declares the small game it needs in code with `testkit::Game`, only the files it reads, and loads it through the real loader; `engine_rows()` and `whole()` exist for the few tests about the whole game contract. Shipped games are checked by `just lint`.
 - Mechanics run in `testkit::Sim`: a bare world holding the test's game, stepped through only the real engine systems the test adds, in the server's order, with the clock advanced by the test rather than waited on. Never reimplement or stub a system to make a test pass. When a mechanic can't be exercised without the whole server or client, it isn't modular enough: refactor it until it can.
 - The Playwright suite (`e2e/`) tests the whole stack from a browser: the website, and whatever else a browser is served. Gameplay gets exactly one smoke test there, that a signed-up player appears in the game.
 

@@ -8,7 +8,6 @@ use engine::systems::combat::{self, Attitude};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::history::{History, HistoryTopic};
 use engine::systems::interact::{self, InteractRequest};
-use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, position};
 use engine::systems::notification::{self, Notification, NotificationKind, NotificationSent};
 use engine::systems::npc::{self, NpcDef, Pack};
@@ -18,34 +17,13 @@ use engine::systems::status::{self, StatusEffectDef};
 use engine::systems::text::LineText;
 use engine::systems::{actor, belongings, class, script, stat, vfx};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 const BESIDE_PIER: Pos<Tiles> = Pos::new(8.0, 6.0);
 const ON_PIER: Pos<Tiles> = Pos::new(10.0, 6.0);
 
 #[test]
-fn stepping_onto_the_pier_narrates_the_gulls_once() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
-    let start = position(&sim.world, player).expect("position");
-
-    movement::relocate(&mut sim.world, player, ON_PIER);
-    sim.run(0.5);
-    assert_eq!(sim.told(1), vec![sim.spoken("gulls")]);
-    assert!(!commands_locked(&sim.world, player));
-
-    sim.later(30.0);
-    sim.forget_notified();
-    movement::relocate(&mut sim.world, player, start);
-    sim.run(0.5);
-    movement::relocate(&mut sim.world, player, ON_PIER);
-    sim.run(0.5);
-    assert_eq!(sim.told(1), Vec::new());
-    assert!(remembered(&sim, player, "heard_gulls"));
-}
-
-#[test]
-fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
+fn stepping_onto_the_pier_narrates_the_gulls_once_even_during_a_conversation() {
     let mut sim = island(&game());
     let player = sim.join(1);
     let talker = sim.npc("talker");
@@ -65,18 +43,22 @@ fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
     movement::relocate(&mut sim.world, player, ON_PIER);
     sim.run(0.5);
     assert_eq!(sim.told(1), Vec::new());
-    assert!(remembered(&sim, player, "heard_gulls"));
+    assert!(sim.remembers(player, "heard_gulls"));
     assert!(sim.conversation(1).is_some());
 }
 
 #[test]
-fn every_notification_is_recorded_when_it_is_raised() {
+fn history_keeps_every_notice_and_refusal_raised_and_never_a_pop() {
     let mut sim = island(&game());
     let player = sim.join(1);
+    sim.run(0.5);
     let gulls = sim.spoken("gulls");
-    notification::notify(&mut sim.world, player, gulls.clone());
     let refused = refusal(&sim);
-    notification::record(&mut sim.world, player, &refused);
+
+    notification::notify(&mut sim.world, player, gulls);
+    notification::notify(&mut sim.world, player, refused);
+    notification::pop(&mut sim.world, player, "Ouch", None, VfxParams::default());
+    sim.tick();
 
     let records = recorded(&sim, player);
     assert!(records.contains(&(
@@ -86,7 +68,8 @@ fn every_notification_is_recorded_when_it_is_raised() {
         1
     )));
     assert!(records.contains(&(HistoryTopic::Error, None, "Needs 10 Gold".to_owned(), 1)));
-    assert_eq!(sim.told(1), vec![gulls]);
+    assert!(!records.iter().any(|(_, _, text, _)| text == "Ouch"));
+    assert_eq!(pops(&mut sim, 1).len(), 1);
 }
 
 #[test]
@@ -130,23 +113,18 @@ fn a_character_speaks_to_players_on_its_errand_from_its_own_body() {
             .iter()
             .any(|notification| matches!(notification.kind, NotificationKind::Speech { .. }))
     );
-}
 
-#[test]
-fn speech_names_no_body_when_the_speaker_is_someone_else() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
+    sim.forget_notified();
     let talker = sim.npc("talker");
-
     let challenge = sim.spoken("challenge");
     notification::notify_from(&mut sim.world, player, Some(talker), challenge);
-
     assert_eq!(
         sim.notified(1)
             .into_iter()
             .map(|sent| sent.actor)
             .collect::<Vec<_>>(),
-        vec![None]
+        vec![None],
+        "a line someone else speaks names no body"
     );
 }
 
@@ -256,7 +234,7 @@ fn a_flood_goes_out_in_a_burst_and_then_at_the_refill_rate() {
 }
 
 #[test]
-fn errors_and_feed_lines_answer_every_action() {
+fn every_refusal_answers_its_action_however_many_come() {
     let mut sim = island(&game());
     let player = sim.join(1);
     let refused = refusal(&sim);
@@ -320,53 +298,40 @@ fn healing_a_level_and_a_status_each_pop_with_their_own_look() {
     assert_eq!(pops(&mut sim, 1), looks);
 }
 
-#[test]
-fn a_pop_is_never_kept_in_history() {
-    let mut sim = island(&game());
-    let player = sim.join(1);
-    sim.run(0.5);
-    let before = recorded(&sim, player);
-
-    notification::pop(&mut sim.world, player, "Ouch", None, VfxParams::default());
-    sim.tick();
-
-    assert_eq!(pops(&mut sim, 1).len(), 1);
-    assert_eq!(recorded(&sim, player), before);
-}
-
 /// An island with a pier the gulls haunt, a forest across the water that greets newcomers, and a
 /// chief who taunts whoever is after his tusks.
 fn game() -> Content {
-    let intro = |key: &str| {
-        json!([{
-            "type": "inline_script",
-            "nodes": {
-                "discovered": { "type": "on", "event": "discovered", "next": "intro" },
-                "intro": { "type": "notify", "notification": key },
-            },
-        }])
-    };
-    let mut island_modules = intro("island_intro");
-    island_modules.as_array_mut().expect("modules").extend([
-        json!({ "type": "resident", "npc": "talker", "at": { "x": 2.0, "y": 2.0 } }),
+    let intro = |notice: &str| {
         json!({
+            "discovered": { "type": "on", "event": "discovered", "next": "intro" },
+            "intro": { "type": "notify", "notification": path("notification", notice) },
+        })
+    };
+    let island_modules = json!([
+        { "type": "script", "script": "island_intro.script.json" },
+        { "type": "resident", "npc": "talker.npc.json", "at": { "x": 2.0, "y": 2.0 } },
+        {
             "type": "object",
             "name": "pier",
             "shape": { "type": "rect", "x": 9.5, "y": 5.5, "w": 2.0, "h": 2.0 },
-            "scripts": [{
-                "type": "inline_script",
-                "nodes": {
-                    "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
-                    "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls", "seconds": 600 }, "no": "remember" },
-                    "remember": { "type": "remember", "memory": "heard_gulls", "next": "gulls" },
-                    "gulls": { "type": "notify", "notification": "gulls" },
-                },
-            }],
-        }),
+            "scripts": [{ "script": "pier_gulls.script.json" }],
+        },
     ]);
     Game::new()
         .area("island", &Map::open(12, 12), island_modules)
-        .area("forest", &Map::open(8, 8), intro("forest_intro"))
+        .script("island_intro", "area", intro("island_intro"))
+        .script(
+            "pier_gulls",
+            "object",
+            json!({
+                "entered": { "type": "on", "event": "entered", "by": "characters", "next": "heard" },
+                "heard": { "type": "if", "test": { "type": "set_within", "memory": "heard_gulls.memory.json", "seconds": 600 }, "no": "remember" },
+                "remember": { "type": "remember", "memory": "heard_gulls.memory.json", "next": "gulls" },
+                "gulls": { "type": "notify", "notification": "gulls.notification.json" },
+            }),
+        )
+        .area("forest", &Map::open(8, 8), json!([{ "type": "script", "script": "forest_intro.script.json" }]))
+        .script("forest_intro", "area", intro("forest_intro"))
         .hero("island", 3.0, 8.0)
         .edit("class", "hero", |hero| {
             hero["levels"] = json!([{ "xp": 0, "skill_points": 1 }, { "xp": 20 }])
@@ -374,39 +339,43 @@ fn game() -> Content {
         .npc(
             "talker",
             40.0,
-            json!([{
-                "type": "inline_script",
-                "nodes": {
-                    "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
-                    "hello": {
-                        "type": "dialogue",
-                        "lines": [{ "by": { "type": "narrator" }, "text": ["Fine weather."] }],
-                        "choices": [{ "label": ["Goodbye."] }],
-                    },
+            json!([{ "type": "script", "script": "talker_talk.script.json" }]),
+        )
+        .script(
+            "talker_talk",
+            "npc",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 3.0, "next": "hello" },
+                "hello": {
+                    "type": "dialogue",
+                    "lines": [{ "by": { "type": "narrator" }, "text": ["Fine weather."] }],
+                    "choices": [{ "label": ["Goodbye."] }],
                 },
-            }]),
+            }),
         )
         .babble("chief")
         .npc(
             "chief",
             40.0,
-            json!([{ "type": "voice", "babble": "chief" }, {
-                "type": "inline_script",
-                "nodes": {
-                    "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
-                    "hunting_me": {
-                        "type": "if",
-                        "test": { "type": "all", "of": [
-                            { "type": "on_quest", "quest": "tusks" },
-                            { "type": "not", "of": { "type": "set_within", "memory": "taunted", "seconds": 120 } },
-                        ] },
-                        "yes": "taunted",
-                    },
-                    "taunted": { "type": "remember", "memory": "taunted", "next": "challenge" },
-                    "challenge": { "type": "notify", "notification": "challenge", "next": "threat" },
-                    "threat": { "type": "notify", "notification": "threat" },
+            json!([{ "type": "voice", "babble": "chief.babble.json" }, { "type": "script", "script": "chief_taunt.script.json" }]),
+        )
+        .script(
+            "chief_taunt",
+            "npc",
+            json!({
+                "came_near": { "type": "on", "event": "came_near", "within": 8.0, "by": "characters", "next": "hunting_me" },
+                "hunting_me": {
+                    "type": "if",
+                    "test": { "type": "all", "of": [
+                        { "type": "on_quest", "quest": "tusks.quest.json" },
+                        { "type": "not", "of": { "type": "set_within", "memory": "taunted.memory.json", "seconds": 120 } },
+                    ] },
+                    "yes": "taunted",
                 },
-            }]),
+                "taunted": { "type": "remember", "memory": "taunted.memory.json", "next": "challenge" },
+                "challenge": { "type": "notify", "notification": "challenge.notification.json", "next": "threat" },
+                "threat": { "type": "notify", "notification": "threat.notification.json" },
+            }),
         )
         .npc("dummy", 40.0, json!([]))
         .item("tusk", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 50 }] }))
@@ -419,8 +388,8 @@ fn game() -> Content {
                 "blurb": "Bring tusks.",
                 "xp": 10,
                 "modules": [
-                    { "type": "hold", "item": "tusk", "count": 5 },
-                    { "type": "hand_in", "items": [{ "item": "tusk", "count": 5 }] },
+                    { "type": "hold", "item": "tusk.item.json", "count": 5 },
+                    { "type": "hand_in", "items": [{ "item": "tusk.item.json", "count": 5 }] },
                     { "type": "hand_over", "text": ["Here are your tusks."] },
                 ],
             }),
@@ -442,24 +411,24 @@ fn game() -> Content {
             "notification",
             "gulls",
             json!({
-                "kind": { "type": "narration", "label": "Gulls", "sfx": "gull_cries" },
+                "kind": { "type": "narration", "label": "Gulls", "sfx": "gull_cries.sfx" },
                 "text": ["Gulls squabble over a fish head."],
             }),
         )
         .row(
             "notification",
             "challenge",
-            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["WHO DARES?!"] }),
+            json!({ "kind": { "type": "speech", "speaker": "chief.npc.json" }, "text": ["WHO DARES?!"] }),
         )
         .row(
             "notification",
             "threat",
-            json!({ "kind": { "type": "speech", "speaker": "chief" }, "text": ["I'll grind your bones!"] }),
+            json!({ "kind": { "type": "speech", "speaker": "chief.npc.json" }, "text": ["I'll grind your bones!"] }),
         )
         .row("notification", "island_intro", intro_row("The island"))
         .row("notification", "forest_intro", intro_row("The forest"))
-        .row("memory", "heard_gulls", json!({ "label": "heard", "type": "boolean", "resets": "never" }))
-        .row("memory", "taunted", json!({ "label": "taunted", "type": "boolean", "resets": "never" }))
+        .memory("heard_gulls", "never")
+        .memory("taunted", "never")
         .sfx("gull_cries")
         .sfx("drums")
         .sfx("ui_refuse")
@@ -489,7 +458,7 @@ fn game() -> Content {
 
 fn intro_row(title: &str) -> serde_json::Value {
     json!({
-        "kind": { "type": "intro", "title": title, "tint": [143, 209, 139, 255], "motion": "pulse", "sfx": "drums" },
+        "kind": { "type": "intro", "title": title, "tint": [143, 209, 139, 255], "motion": "pulse", "sfx": "drums.sfx" },
         "text": ["Pines close in around you."],
         "lasts": 5.0,
     })
@@ -541,10 +510,6 @@ fn travel(from: &mut Sim, player: Entity, to: &mut Sim) -> Entity {
     let arrived = from.cross(player, to, Pos::new(3.0, 3.0));
     to.run(0.5);
     arrived
-}
-
-fn remembered(sim: &Sim, player: Entity, key: &str) -> bool {
-    memory::get(&sim.world, player, sim.id::<MemoryDef>(key)).truthy()
 }
 
 fn refusal(sim: &Sim) -> Notification {

@@ -1,0 +1,12 @@
+{
+  "name": "The silk prince's pavilion",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 16,
+        "height": 14
+      },
+      "tile": 16
+    }
+  }
+}

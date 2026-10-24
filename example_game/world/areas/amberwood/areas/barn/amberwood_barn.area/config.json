@@ -1,0 +1,12 @@
+{
+  "name": "The farm's barn",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 24,
+        "height": 14
+      },
+      "tile": 16
+    }
+  }
+}

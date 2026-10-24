@@ -1,10 +1,14 @@
+pub mod bundle;
 pub mod check;
+pub mod files;
 pub mod fixture;
+pub mod fresh;
 pub mod id;
 pub mod key;
 pub mod load;
 pub mod locate;
 pub mod media;
+pub mod reader;
 pub mod report;
 pub mod serial;
 pub mod store;
@@ -12,67 +16,41 @@ pub mod sync;
 pub mod table;
 pub mod version;
 
+pub use bundle::{Bundle, PartSpec, Parts};
 pub use check::RowCheck;
+pub use files::{
+    CONFIG_FILE, FIXTURES_DIR, GameFile, GameFiles, NOTE_EXTENSION, SETTINGS_FILE, Shape,
+    bundle_of, content_path, fields_file, name_of, numbered, parent_of, table_of, valid_name,
+};
 pub use fixture::Fixture;
-pub use id::{ContentId, ContentScope, with_content};
+pub use fresh::Nearby;
+pub use id::{ContentId, ContentScope, rescoped, with_content};
 pub use key::key_of;
 pub use load::{
-    ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
-    LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
+    BesideFile, BesideName, CheckedFiles, ContentFolder, ContentRegistry, FileHashes, FileWriter,
+    FilesystemFolder, FolderEntry, JsonPart, LoadStep, Loading, MemoryFolder, Reference, Settings,
+    load, pointer_of, valid_key, write,
 };
-pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
-pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
+pub use reader::{FolderReader, Unreadable, WrittenFiles};
+pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport, MISSING_FILE};
+pub use table::{
+    AnyTable, Content, ContentBuilder, ContentFile, ContentNames, MODULES, ModuleRule, ModuleSet,
+    NamedContent, ReadRow, Table,
+};
 pub use version::ContentVersion;
 
-pub const GAME_FILE: &str = "game.json";
-pub const TABLES_DIR: &str = "tables";
-pub const ASSETS_DIR: &str = "assets";
-
-pub fn table_folder(table: &str) -> String {
-    format!("{TABLES_DIR}/{table}")
+/// Whether `file` is media by its extension, fetched and cached on its own rather than read with the
+/// content files.
+pub fn is_media_file(file: &str) -> bool {
+    crate::core::assets::AssetKind::of(file).is_some()
 }
 
-pub fn row_folder(table: &str, key: &str) -> String {
-    format!("{}/{key}", table_folder(table))
-}
-
-pub fn row_file(table: &str, key: &str) -> String {
-    format!("{}.json", row_folder(table, key))
-}
-
-/// The table and key of the row `file` holds, if it is a row file.
-pub fn row_of(file: &str) -> Option<(&str, &str)> {
-    let (table, name) = file
-        .strip_prefix(TABLES_DIR)?
-        .strip_prefix('/')?
-        .split_once('/')?;
-    let key = name
-        .strip_suffix(".json")
-        .filter(|key| !key.contains('/'))?;
-    Some((table, key))
-}
-
-pub fn asset_file(path: &str) -> String {
-    format!("{ASSETS_DIR}/{path}")
-}
-
-pub fn is_asset_file(file: &str) -> bool {
-    file.strip_prefix(ASSETS_DIR)
-        .is_some_and(|rest| rest.starts_with('/'))
-}
-
-pub fn asset_of(file: &str) -> &str {
-    file.strip_prefix(ASSETS_DIR)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .unwrap_or(file)
-}
-
-pub fn named<Row: ContentRow>(
+pub fn named<Row: ContentFile>(
     world: &bevy_ecs::world::World,
-    key: &str,
+    path: &str,
 ) -> Result<ContentId<Row>, String> {
     world
         .resource::<Content>()
-        .by_key::<Row>(key)
-        .ok_or_else(|| format!("`{key}` is not a known {}", Row::TABLE))
+        .by_path::<Row>(path)
+        .ok_or_else(|| format!("`{path}` is not a known {}", Row::TABLE))
 }

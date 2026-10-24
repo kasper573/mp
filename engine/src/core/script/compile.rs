@@ -13,11 +13,11 @@ use super::node::{
 use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, OwnerKindDef, QueryDef, ScriptError,
-    ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
+    Arrow, EffectDef, EventDef, Fill, LineDef, QueryDef, RunnerKindDef, ScriptError, ScriptFault,
+    ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::id::nearest;
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId};
 use crate::core::time::Seconds;
 
 pub type Eval = Box<dyn Fn(&World, &FlowCx) -> Value + Send + Sync>;
@@ -33,13 +33,13 @@ pub enum EffectStep {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerRow<V: Vocabulary> {
-    pub kind: V::OwnerKind,
+    pub kind: V::RunnerKind,
     pub row: u32,
     pub object: Option<u32>,
 }
 
 impl<V: Vocabulary> OwnerRow<V> {
-    pub fn id<Row: ContentRow>(&self) -> ContentId<Row> {
+    pub fn id<Row: ContentFile>(&self) -> ContentId<Row> {
         ContentId::new(self.row)
     }
 }
@@ -71,7 +71,7 @@ pub struct ProcedureId(u64);
 
 pub struct Procedure<V: Vocabulary> {
     pub id: ProcedureId,
-    pub owner: V::OwnerKind,
+    pub owner: V::RunnerKind,
     pub label: String,
     pub names: Vec<String>,
     pub steps: Vec<Step<V>>,
@@ -178,28 +178,22 @@ impl<V: Vocabulary> Procedure<V> {
 }
 
 #[derive(Clone, Copy)]
-pub enum Call<'c, V: Vocabulary> {
-    Shared {
-        script: ScriptId<V>,
-        values: &'c BTreeMap<String, VarValue<V>>,
-    },
-    Inline(&'c InlineScript<V>),
+pub struct Call<'c, V: Vocabulary> {
+    pub script: ScriptId<V>,
+    pub values: &'c BTreeMap<String, VarValue<V>>,
 }
 
 impl<'c, V: Vocabulary> Call<'c, V> {
     pub fn of(module: &'c ScriptModule<V>) -> Call<'c, V> {
-        match module {
-            ScriptModule::Shared { script, values } => Call::Shared {
-                script: *script,
-                values,
-            },
-            ScriptModule::Inline(inline) => Call::Inline(inline),
+        Call {
+            script: module.script,
+            values: &module.values,
         }
     }
 }
 
 pub struct Binding<'c, V: Vocabulary> {
-    pub owner: V::OwnerKind,
+    pub owner: V::RunnerKind,
     pub row: Option<OwnerRow<V>>,
     pub label: String,
     pub call: Call<'c, V>,
@@ -227,7 +221,7 @@ pub struct ModuleError {
 
 pub fn compile_owner<'c, V: Vocabulary>(
     content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     label: &str,
     modules: &[&'c ScriptModule<V>],
 ) -> Result<Vec<Arc<Procedure<V>>>, Vec<ModuleError>> {
@@ -246,7 +240,7 @@ pub fn compile_row<'c, V: Vocabulary>(
 
 fn compile_modules<'c, V: Vocabulary>(
     content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     row: Option<OwnerRow<V>>,
     label: &str,
     modules: &[&'c ScriptModule<V>],
@@ -365,10 +359,8 @@ fn compile_source<'c, V: Vocabulary>(
     binding: &Binding<'c, V>,
     stack: &[ScriptId<V>],
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
-    let shared = match binding.call {
-        Call::Shared { script, .. } => Some(script.key(content).to_owned()),
-        Call::Inline(_) => None,
-    };
+    let Call { script, values } = binding.call;
+    let shared = Some(script.path(content).to_owned());
     let fail = |rule: &'static str, node: Option<&str>, expected: String| ScriptError {
         rule,
         owner: binding.label.clone(),
@@ -383,26 +375,26 @@ fn compile_source<'c, V: Vocabulary>(
         expected,
         script: None,
     };
-    let (source, values, declared) = match binding.call {
-        Call::Shared { script, values } => {
+    let (source, values, declared) = {
+        {
             let def = script.get(content);
             let called = !stack.is_empty();
             if called {
-                if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
+                if def.runs_on != V::RunnerKind::ANY && def.runs_on != binding.owner {
                     return Err(at_call(
-                        "owners of another kind",
+                        "run by another kind",
                         format!(
-                            "script/{} is {}'s, run by {}",
-                            script.key(content),
-                            def.owner.name(),
+                            "{} is {}'s, run by {}",
+                            script.path(content),
+                            def.runs_on.name(),
                             binding.owner.name()
                         ),
                     ));
                 }
-            } else if def.owner != binding.owner {
+            } else if def.runs_on != binding.owner {
                 return Err(at_call(
-                    "owners of another kind",
-                    format!("script/{} is {}'s", script.key(content), def.owner.name()),
+                    "run by another kind",
+                    format!("{} is {}'s", script.path(content), def.runs_on.name()),
                 ));
             }
             (
@@ -410,22 +402,12 @@ fn compile_source<'c, V: Vocabulary>(
                     state: slots(&def.state),
                     locals: slots(&def.locals),
                     nodes: &def.nodes,
-                    label: format!("script/{}", script.key(content)),
+                    label: script.path(content).to_owned(),
                 },
                 Some(values),
                 Some(&def.variables),
             )
         }
-        Call::Inline(inline) => (
-            Source {
-                state: slots(&inline.state),
-                locals: slots(&inline.locals),
-                nodes: &inline.nodes,
-                label: binding.label.clone(),
-            },
-            None,
-            None,
-        ),
     };
     if source.nodes.len() > MAX_NODES {
         return Err(fail(
@@ -533,7 +515,6 @@ fn compile_source<'c, V: Vocabulary>(
         locals: source.locals.clone(),
         node: None,
         used_vars: HashSet::new(),
-        read_slots: HashSet::new(),
         stack: stack.to_vec(),
         subject_read: false,
         event_fields: &[],
@@ -552,7 +533,7 @@ fn compile_source<'c, V: Vocabulary>(
         let step = match node {
             Node::On { event, next } => {
                 let function =
-                    event.is_run() && (binding.owner == V::OwnerKind::ANY || !cx.stack.is_empty());
+                    event.is_run() && (binding.owner == V::RunnerKind::ANY || !cx.stack.is_empty());
                 if !event.owners().contains(&binding.owner) && !function {
                     return Err(node_fail(
                         "event not raised here",
@@ -566,7 +547,7 @@ fn compile_source<'c, V: Vocabulary>(
                 if let Err(fault) = event.check() {
                     return Err(node_fail(fault.rule, fault.expected));
                 }
-                if cx.stack.is_empty() && event.is_run() && binding.owner != V::OwnerKind::ANY {
+                if cx.stack.is_empty() && event.is_run() && binding.owner != V::RunnerKind::ANY {
                     return Err(node_fail(
                         "event not raised here",
                         "run starts only a script another runs".to_owned(),
@@ -686,7 +667,7 @@ fn compile_source<'c, V: Vocabulary>(
                 if cx.stack.contains(script) {
                     return Err(node_fail(
                         "runs itself",
-                        format!("script/{} reaches itself", script.key(content)),
+                        format!("{} reaches itself", script.path(content)),
                     ));
                 }
                 if cx.stack.len() + 1 > MAX_CALL_DEPTH {
@@ -702,8 +683,8 @@ fn compile_source<'c, V: Vocabulary>(
                     &Binding {
                         owner: binding.owner,
                         row: binding.row,
-                        label: format!("{} › script/{}", source.label, script.key(content)),
-                        call: Call::Shared {
+                        label: format!("{} › script/{}", source.label, script.path(content)),
+                        call: Call {
                             script: *script,
                             values,
                         },
@@ -713,7 +694,7 @@ fn compile_source<'c, V: Vocabulary>(
                 let entry = callee.run_entry().ok_or_else(|| {
                     node_fail(
                         "event not raised here",
-                        format!("script/{} has no run node", script.key(content)),
+                        format!("{} has no run node", script.path(content)),
                     )
                 })?;
                 let into = match into {
@@ -728,7 +709,7 @@ fn compile_source<'c, V: Vocabulary>(
                                     format!(
                                         "{local} is {} but script/{} returns {}",
                                         ty.name(),
-                                        script.key(content),
+                                        script.path(content),
                                         returned.name()
                                     ),
                                 ));
@@ -739,7 +720,7 @@ fn compile_source<'c, V: Vocabulary>(
                     None => None,
                 };
                 may_do.absorb(&callee.may_do);
-                may_do.calls.push(script.key(content).to_owned());
+                may_do.calls.push(script.path(content).to_owned());
                 needs_subject[index] |= callee.needs_subject;
                 Step::Run {
                     callee,
@@ -843,7 +824,8 @@ fn compile_source<'c, V: Vocabulary>(
                 }
             }
             Node::Effect(effect) => {
-                if !effect.owners().contains(&binding.owner) && binding.owner != V::OwnerKind::ANY {
+                if !effect.owners().contains(&binding.owner) && binding.owner != V::RunnerKind::ANY
+                {
                     return Err(node_fail(
                         "not for this owner",
                         format!("not for {} owners", binding.owner.name()),
@@ -889,24 +871,6 @@ fn compile_source<'c, V: Vocabulary>(
                 "unused variable",
                 None,
                 format!("{name} is never used"),
-            ));
-        }
-    }
-    for (index, (name, _)) in source.locals.iter().enumerate() {
-        if !cx.read_slots.contains(&Slot::Local(index)) {
-            return Err(fail(
-                "unused local",
-                None,
-                format!("local {name} is never read"),
-            ));
-        }
-    }
-    for (index, (name, _)) in source.state.iter().enumerate() {
-        if !cx.read_slots.contains(&Slot::State(index)) {
-            return Err(fail(
-                "unused state",
-                None,
-                format!("state {name} is never read"),
             ));
         }
     }
@@ -1010,30 +974,10 @@ fn event_fields_by_node<V: Vocabulary>(
 }
 
 fn node_arrows<V: Vocabulary>(node: &Node<V>) -> Vec<&str> {
-    let arrows: Vec<&Arrow> = match node {
-        Node::On { next, .. }
-        | Node::Wait { next, .. }
-        | Node::Set { next, .. }
-        | Node::Run { next, .. } => vec![next],
-        Node::If { yes, no, .. } => vec![yes, no],
-        Node::Random { outputs, .. } => outputs.iter().collect(),
-        Node::Repeat { each, then, .. } => vec![each, then],
-        Node::Return { .. } => Vec::new(),
-        Node::Dialogue(dialogue) => dialogue
-            .choices
-            .iter()
-            .map(|choice| &choice.to)
-            .chain([&dialogue.next, &dialogue.left])
-            .collect(),
-        Node::Effect(effect) => {
-            return effect
-                .outputs()
-                .into_iter()
-                .filter_map(|(_, to)| to.to())
-                .collect();
-        }
-    };
-    arrows.into_iter().filter_map(Arrow::to).collect()
+    node.exits()
+        .into_iter()
+        .filter_map(|(_, arrow)| arrow.to())
+        .collect()
 }
 
 fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
@@ -1165,7 +1109,7 @@ impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Wa
 
 pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
-    owner: V::OwnerKind,
+    owner: V::RunnerKind,
     row: Option<OwnerRow<V>>,
     label: String,
     variables: HashMap<&'c str, (VariableType, Option<Bound<'c, V>>)>,
@@ -1173,7 +1117,6 @@ pub struct Compiler<'c, V: Vocabulary> {
     locals: Vec<(&'c str, ValueType)>,
     node: Option<&'c str>,
     used_vars: HashSet<&'c str>,
-    read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
     subject_read: bool,
     event_fields: &'static [(&'static str, ValueType)],
@@ -1185,7 +1128,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
     pub fn standalone(content: &'c Content) -> Compiler<'c, V> {
         Compiler {
             content,
-            owner: V::OwnerKind::ANY,
+            owner: V::RunnerKind::ANY,
             row: None,
             label: "condition".to_owned(),
             variables: HashMap::new(),
@@ -1193,14 +1136,13 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             locals: Vec::new(),
             node: None,
             used_vars: HashSet::new(),
-            read_slots: HashSet::new(),
             stack: Vec::new(),
             subject_read: false,
             event_fields: &[],
         }
     }
 
-    pub fn owner(&self) -> V::OwnerKind {
+    pub fn owner(&self) -> V::RunnerKind {
         self.owner
     }
 
@@ -1433,14 +1375,12 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
                 let (index, ty) = self
                     .local(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("local {name}")))?;
-                self.read_slots.insert(Slot::Local(index));
                 (Box::new(move |_, cx: &FlowCx| cx.locals[index].clone()), ty)
             }
             Expr::State { state: name } => {
                 let (index, ty) = self
                     .state(name)
                     .ok_or_else(|| ScriptFault::new("unknown variable", format!("state {name}")))?;
-                self.read_slots.insert(Slot::State(index));
                 (Box::new(move |_, cx: &FlowCx| cx.state[index].clone()), ty)
             }
             Expr::Event { event: name } => {

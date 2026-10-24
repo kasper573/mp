@@ -1,0 +1,12 @@
+{
+  "name": "Glimmercap",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 66,
+        "height": 62
+      },
+      "tile": 16
+    }
+  }
+}

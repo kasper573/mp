@@ -1,18 +1,27 @@
 use std::collections::HashSet;
 
-use engine::core::content::TABLES_DIR;
+use engine::core::content::{Content, ContentFile, table_of};
 use engine::core::math::{Pos, Rect, Size};
-use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
-use engine::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteRow};
+use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, TilePos, Tiles};
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::grid::{Flip, LayerGrid, PaletteRow};
+use engine::systems::area::scene;
 
-use crate::project::{ContentEdit, ProjectFiles, text_bytes};
+use super::nodes;
+use crate::app::Editor;
+use crate::project::Project;
+use crate::tabs::shown_path;
 
+/// The grids an area's or a blueprint's bundle keeps, being painted: its palette, its ground
+/// layers in tree order and its forced walk cells. What placed blueprints paint over them is not
+/// in it.
 #[derive(Clone)]
 pub struct GridDraft {
-    pub area: String,
+    pub bundle: String,
     pub size: GridSize,
     pub palette: Vec<PaletteRow>,
-    pub ground: Vec<GroundLayer>,
+    pub ground: Vec<LayerGrid>,
     pub walk: Vec<Option<bool>>,
     touched: HashSet<GridPart>,
 }
@@ -25,15 +34,62 @@ enum GridPart {
 }
 
 impl GridDraft {
-    pub fn of(area: &str, grids: &AreaGrids) -> GridDraft {
+    /// The grids of `blueprint`, the area's or blueprint's at `bundle`.
+    pub fn of(bundle: &str, blueprint: &BlueprintDef) -> GridDraft {
+        let map = &blueprint.map;
+        let grids = &blueprint.scene.grids;
         GridDraft {
-            area: area.to_owned(),
-            size: grids.size,
-            palette: grids.palette_keys.clone(),
-            ground: grids.ground.clone(),
+            bundle: bundle.to_owned(),
+            size: map.size.grid(),
+            palette: grids.palette.clone(),
+            ground: scene::layers(&blueprint.scene.nodes)
+                .into_iter()
+                .map(|layer| LayerGrid {
+                    name: layer.name.clone(),
+                    cells: grids.layer(&layer.name, map),
+                })
+                .collect(),
             walk: grids.walk.clone(),
             touched: HashSet::new(),
         }
+    }
+
+    /// The grids of the area or blueprint at `bundle`, as its files read now.
+    pub fn own(editor: &Editor, bundle: &str) -> Option<GridDraft> {
+        GridDraft::own_in(editor.project.as_ref()?, bundle)
+    }
+
+    /// The grids of the area or blueprint at `bundle` of `project`, as its files read now.
+    pub fn own_in(project: &Project, bundle: &str) -> Option<GridDraft> {
+        Some(GridDraft::of(
+            bundle,
+            nodes::bundle_in(project, bundle)?.blueprint(),
+        ))
+    }
+
+    /// The grids of the area or blueprint at `bundle`, as `content` loaded them.
+    pub fn loaded(content: &Content, bundle: &str) -> Option<GridDraft> {
+        Some(GridDraft::of(bundle, blueprint_of(content, bundle)?))
+    }
+
+    /// Writes these grids into their bundle as one step labelled `label`.
+    pub fn commit(&self, editor: &mut Editor, label: String) -> bool {
+        nodes::change_blueprint(editor, &self.bundle, |blueprint| {
+            self.apply_to(blueprint);
+            Some(label)
+        })
+    }
+
+    /// Puts these grids into `blueprint`, whose scene names the same ground layers.
+    pub fn apply_to(&self, blueprint: &mut BlueprintDef) {
+        let grids = &mut blueprint.scene.grids;
+        grids.palette = self.palette.clone();
+        grids.walk = self.walk.clone();
+        grids.layers = self
+            .ground
+            .iter()
+            .map(|layer| (layer.name.clone(), layer.cells.clone()))
+            .collect();
     }
 
     pub fn index(&self, cell: CellPos) -> Option<usize> {
@@ -105,15 +161,29 @@ impl GridDraft {
         true
     }
 
+    /// The cells joined to `start` that hold what it holds in `layer`.
     pub fn flood(&self, layer: usize, start: CellPos) -> Vec<CellPos> {
-        let Some(ground) = self.ground.get(layer) else {
-            return Vec::new();
-        };
+        match self.ground.get(layer) {
+            Some(ground) => self.flood_by(start, |index| ground.cells[index]),
+            None => Vec::new(),
+        }
+    }
+
+    /// The cells joined to `start` whose walk is forced as its is.
+    pub fn flood_walk(&self, start: CellPos) -> Vec<CellPos> {
+        self.flood_by(start, |index| self.walk[index])
+    }
+
+    pub fn layer_index(&self, name: &str) -> Option<usize> {
+        self.ground.iter().position(|layer| layer.name == name)
+    }
+
+    fn flood_by<T: PartialEq>(&self, start: CellPos, holds: impl Fn(usize) -> T) -> Vec<CellPos> {
         let Some(start_index) = self.index(start) else {
             return Vec::new();
         };
-        let wanted = ground.cells[start_index];
-        let mut seen = vec![false; ground.cells.len()];
+        let wanted = holds(start_index);
+        let mut seen = vec![false; self.walk.len()];
         let mut out = Vec::new();
         let mut stack = vec![start];
         seen[start_index] = true;
@@ -123,7 +193,7 @@ impl GridDraft {
                 let next = cell.step((dx, dy));
                 if let Some(index) = self.index(next)
                     && !seen[index]
-                    && ground.cells[index] == wanted
+                    && holds(index) == wanted
                 {
                     seen[index] = true;
                     stack.push(next);
@@ -134,7 +204,7 @@ impl GridDraft {
     }
 
     pub fn add_layer(&mut self, name: &str) {
-        self.ground.push(GroundLayer {
+        self.ground.push(LayerGrid {
             name: name.to_owned(),
             cells: vec![None; (self.size.width * self.size.height) as usize],
         });
@@ -188,49 +258,49 @@ impl GridDraft {
         self.touched.insert(GridPart::Palette);
     }
 
-    pub fn write_into(&self, edit: &mut ContentEdit) {
-        self.write_parts(edit, |part| self.touched.contains(part));
-    }
-
-    pub fn write_all_into(&self, edit: &mut ContentEdit) {
-        self.write_parts(edit, |_| true);
-    }
-
-    fn write_parts(&self, edit: &mut ContentEdit, wanted: impl Fn(&GridPart) -> bool) {
-        let folder = grid::folder(&self.area);
-        if wanted(&GridPart::Palette) {
-            edit.write(
-                grid::palette_file(&self.area),
-                text_bytes(grid::write_palette(&self.palette)),
-            );
-        }
-        if wanted(&GridPart::Walk) {
-            edit.write(
-                format!("{folder}/{}", grid::WALK_FILE),
-                text_bytes(grid::write_walk(self.size, &self.walk)),
-            );
-        }
-        for layer in &self.ground {
-            if wanted(&GridPart::Layer(layer.name.clone())) {
-                edit.write(
-                    format!("{folder}/{}", grid::layer_file(&layer.name)),
-                    text_bytes(grid::write_layer(self.size, layer)),
-                );
+    /// Makes what a placement of `placed` at `at`, flipped as `flip`, paints this bundle's own:
+    /// its cells into the layers of the same name and its forced walk cells. Answers the names of
+    /// the layers it paints that this bundle has none of.
+    pub fn stamp(&mut self, placed: &GridDraft, at: Pos<Tiles>, flip: Flip) -> Vec<String> {
+        let mut missing = Vec::new();
+        for cell in placed.cells() {
+            let from = placed.index(cell).expect("a cell of the grid");
+            let square = Rect::new(Pos::new(cell.x as f32, cell.y as f32), Size::splat(1.0));
+            let to = flip.place(square, at).origin.cell();
+            for layer in &placed.ground {
+                let Some(row) = layer.cells[from]
+                    .and_then(|tile| placed.entry(tile))
+                    .cloned()
+                else {
+                    continue;
+                };
+                let Some(target) = self.ground.iter().position(|own| own.name == layer.name) else {
+                    if !missing.contains(&layer.name) {
+                        missing.push(layer.name.clone());
+                    }
+                    continue;
+                };
+                let tile = self.intern(&row.tileset, row.tile, row.flip.compose(flip));
+                self.set(target, to, Some(tile));
+            }
+            if let Some(forced) = placed.walk[from] {
+                self.set_walk(to, Some(forced));
             }
         }
+        missing
     }
 
     pub fn resized(&self, size: GridSize, shift: (i32, i32)) -> (GridDraft, usize) {
         let count = (size.width * size.height) as usize;
         let mut clipped = 0;
         let mut out = GridDraft {
-            area: self.area.clone(),
+            bundle: self.bundle.clone(),
             size,
             palette: self.palette.clone(),
             ground: self
                 .ground
                 .iter()
-                .map(|layer| GroundLayer {
+                .map(|layer| LayerGrid {
                     name: layer.name.clone(),
                     cells: vec![None; count],
                 })
@@ -258,17 +328,48 @@ impl GridDraft {
     }
 }
 
-pub fn palettes(files: &ProjectFiles) -> Vec<(String, Vec<PaletteRow>)> {
-    files
-        .paths_under(&format!("{TABLES_DIR}/"))
-        .filter_map(|path| {
-            let area = grid::area_of_palette_file(path)?;
-            let text = files.text(path)?;
-            let file = grid::GridFile { path, text: &text };
-            let rows = grid::read_palette(file, &mut Vec::new())?;
-            Some((area.to_owned(), rows))
+/// The palette of an area or blueprint bundle, by the bundle's path.
+#[derive(Clone, Debug)]
+pub struct BundlePalette {
+    pub bundle: String,
+    pub rows: Vec<PaletteRow>,
+}
+
+/// The palette of every area and blueprint that has one, as its files read now; refused while
+/// any of them doesn't read, as its palette can't be told.
+pub fn palettes(project: &Project) -> Result<Vec<BundlePalette>, String> {
+    let reader = project.reader();
+    let unread = |path: &str| format!("{} doesn't read", shown_path(path));
+    let areas = reader.paths_of::<AreaDef>().iter().map(|path| {
+        let area = project.read::<AreaDef>(path).map_err(|_| unread(path))?;
+        Ok(BundlePalette {
+            bundle: path.clone(),
+            rows: area.blueprint.scene.grids.palette.clone(),
         })
-        .collect()
+    });
+    let blueprints = reader.paths_of::<BlueprintDef>().iter().map(|path| {
+        let blueprint = project
+            .read::<BlueprintDef>(path)
+            .map_err(|_| unread(path))?;
+        Ok(BundlePalette {
+            bundle: path.clone(),
+            rows: blueprint.scene.grids.palette.clone(),
+        })
+    });
+    let palettes: Vec<BundlePalette> = areas.chain(blueprints).collect::<Result<_, String>>()?;
+    Ok(palettes
+        .into_iter()
+        .filter(|palette| !palette.rows.is_empty())
+        .collect())
+}
+
+/// The blueprint an area or blueprint bundle holds, as `content` loaded it.
+pub fn blueprint_of<'c>(content: &'c Content, bundle: &str) -> Option<&'c BlueprintDef> {
+    match table_of(bundle)? {
+        AreaDef::TABLE => Some(&content.by_path::<AreaDef>(bundle)?.get(content).blueprint),
+        BlueprintDef::TABLE => Some(content.by_path::<BlueprintDef>(bundle)?.get(content)),
+        _ => None,
+    }
 }
 
 pub fn brush_cells(center: CellPos, size: u32) -> Vec<CellPos> {

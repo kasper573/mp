@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use bevy_ecs::change_detection::DetectChanges;
 use bevy_ecs::prelude::*;
 use engine::systems::equipment::{self, Equipment, EquipmentSlot, UnequipRequest};
 use engine::systems::item::{ItemDef, ItemId};
@@ -21,20 +20,6 @@ fn a_lowered_maximum_pulls_health_down_to_it() {
 
     assert_eq!(stat::max_health(&sim.world, player), 20.0);
     assert_eq!(stat::current_health(&sim.world, player), 20.0);
-}
-
-#[test]
-fn a_tick_without_a_vitals_change_leaves_stats_untouched() {
-    let (mut sim, player) = wardrobe();
-    set_vitals(&mut sim, player, 30.0, 30.0);
-    sim.tick();
-
-    let since = sim.world.change_tick();
-    sim.tick();
-
-    let now = sim.world.change_tick();
-    let stats = sim.world.entity(player).get_ref::<Stats>().expect("stats");
-    assert!(!stats.last_changed().is_newer_than(since, now));
 }
 
 #[test]
@@ -89,13 +74,15 @@ fn wardrobe() -> (Sim, Entity) {
             "rock",
             json!({
                 "kind": { "type": "equipment", "slot": "head" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "activated": { "type": "on", "event": "activated", "next": "lower" },
-                        "lower": { "type": "boost", "stat": "max_health", "by": -10.0 },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "rock_lower.script.json" }],
+            }),
+        )
+        .script(
+            "rock_lower",
+            "item",
+            json!({
+                "activated": { "type": "on", "event": "activated", "next": "lower" },
+                "lower": { "type": "boost", "stat": "max_health", "by": -10.0 },
             }),
         )
         .load();

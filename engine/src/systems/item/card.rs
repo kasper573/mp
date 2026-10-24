@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::card::{self, Art, Card, CardResponse, Plate};
-use design_tokens::controls::{self, Pill};
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::Kind;
-use design_tokens::ink;
-use design_tokens::sheet::Depth;
-use egui::{Rect, Response, TextureId, Ui};
+use ui::card::{self, Art, Card, CardResponse, Plate};
+use ui::controls::{self, Pill};
+use ui::drag;
+use ui::egui;
+use ui::egui::{Rect, Response, TextureId, Ui};
+use ui::face::{self, TextRole};
+use ui::glyph::Kind;
+use ui::ink;
+use ui::sheet::Depth;
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band, ImageSource};
@@ -260,7 +262,7 @@ fn grants(ui: &mut Ui, world: &mut World, content: &Content, item: ItemId) {
     for (response, granted) in grant_lines(ui, world, content, item) {
         let response = response.interact(egui::Sense::click_and_drag());
         if map::drag_started(world, InputAction::CarryItem, &response) {
-            hud::carry(ui.ctx(), Carried::Skill(granted));
+            drag::carry(ui.ctx(), Carried::Skill(granted));
         } else if map::clicked(world, InputAction::PinToHotbar, &response) {
             skill::bar::pin(world, skill::HotbarEntry::Skill(granted));
         }

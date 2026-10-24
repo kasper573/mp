@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
-use engine::core::content::ContentRow;
+use engine::core::content::{ContentFile, FolderReader};
+use engine::core::math::{Direction, FrameSize};
+use engine::systems::actor::model::{MODEL_SPRITES, SheetFrame};
 use engine::systems::actor::{Action, ModelDef};
 use image::{GenericImage, RgbaImage};
-use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport, MAX_IMAGE_PX};
 use super::records::{ImportMapping, ImportRecord};
-use crate::views::model::{self, FrameCue, ModelStrip, StripFrame, busts};
+use crate::views::model::{self, FrameCue, ModelStrip, busts};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MappingNote {
@@ -47,7 +48,7 @@ pub struct StripPlan {
     pub action: String,
     pub direction: String,
     pub tag: Option<String>,
-    pub before: Vec<StripFrame>,
+    pub before: Vec<SheetFrame>,
     pub lengths: Vec<u32>,
     pub retimed: Option<StripRetiming>,
     pub cues: Vec<CueMove>,
@@ -133,24 +134,18 @@ impl StripPlan {
         }
     }
 
-    pub fn after(&self) -> Vec<StripFrame> {
-        let lengths = self.final_lengths();
-        let mut frames: Vec<StripFrame> = lengths
+    pub fn after(&self, reader: &FolderReader) -> Vec<SheetFrame> {
+        let mut frames: Vec<SheetFrame> = self
+            .final_lengths()
             .iter()
-            .map(|ms| StripFrame {
-                frame: 0,
-                ms: *ms,
-                apex: false,
-                step: false,
-                sound: None,
-            })
+            .map(|ms| model::plain_frame(0, *ms))
             .collect();
         for cue in &self.cues {
             let Some(index) = cue.lands() else {
                 continue;
             };
             if let Some(frame) = frames.get_mut(index) {
-                frame.mark(&cue.cue);
+                model::mark(frame, &cue.cue, reader);
             }
         }
         frames
@@ -310,7 +305,7 @@ fn targets(
     targets
 }
 
-pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String, Vec<String>> {
+pub fn current_frames(row: &ModelDef, sheet: Option<&RgbaImage>) -> BTreeMap<String, Vec<String>> {
     let (Some(sheet), Some(size)) = (sheet, model::frame_size(row)) else {
         return BTreeMap::new();
     };
@@ -330,7 +325,8 @@ pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String
 }
 
 pub fn plan(
-    row: Option<&Value>,
+    row: Option<&ModelDef>,
+    reader: &FolderReader,
     sheet: Option<&RgbaImage>,
     export: &AnimationExport,
     mapping: &BTreeMap<String, Option<String>>,
@@ -384,7 +380,7 @@ pub fn plan(
         let same_count = before.len() == lengths.len();
         let mut cues = Vec::new();
         for (from, frame) in before.iter().enumerate() {
-            for cue in frame.cues() {
+            for cue in model::cues_of(frame, reader) {
                 cues_total += 1;
                 let (to, by_pixels) = if same_count {
                     (Some(from), false)
@@ -440,7 +436,7 @@ pub fn plan(
         missing,
         frame: export.frame,
         trimmed: export.trimmed,
-        keeps_hitbox: row.is_some_and(|row| row.get("hitbox").is_some()),
+        keeps_hitbox: row.is_some(),
         keeps_bust: row.is_some_and(|row| busts::module_index(row).is_some()),
         cues_total,
     }
@@ -461,14 +457,16 @@ fn follow(old: &[String], from: usize, new: &[&str]) -> Option<usize> {
 pub struct BuiltModel {
     pub png: Vec<u8>,
     pub image: String,
-    pub row: Value,
+    pub row: ModelDef,
     pub lengths: BTreeMap<String, Vec<u32>>,
 }
 
+/// `base` with the plan's sheet and strips, and the sheet's image beside it.
 pub fn build(
     plan: &ModelImportPlan,
     export: &AnimationExport,
-    row: Option<&Value>,
+    base: ModelDef,
+    reader: &FolderReader,
     key: &str,
 ) -> Result<BuiltModel, String> {
     plan.ready()?;
@@ -491,7 +489,12 @@ pub fn build(
         ));
     }
     let mut sheet = RgbaImage::new(columns * fw, rows * fh);
-    let mut actions = serde_json::Map::new();
+    let mut row = base;
+    row.sprites.frame_size = FrameSize {
+        width: fw,
+        height: fh,
+    };
+    row.sprites.actions.clear();
     let mut lengths = BTreeMap::new();
     for (row_index, strip) in plan.strips.iter().enumerate() {
         let Some(tag) = &strip.tag else {
@@ -500,7 +503,7 @@ pub fn build(
         let source = export
             .strip(tag)
             .ok_or_else(|| format!("the export has no tag {tag}"))?;
-        let mut frames = strip.after();
+        let mut frames = strip.after(reader);
         for (column, frame) in frames.iter_mut().enumerate() {
             let image = &source.frames[column].image;
             sheet
@@ -509,24 +512,15 @@ pub fn build(
             frame.frame = row_index as u32 * columns + column as u32;
         }
         lengths.insert(strip.name.clone(), model::lengths(&frames));
-        let values = model::frames_json(&frames);
-        actions
-            .entry(strip.action.clone())
-            .or_insert_with(|| Value::Object(serde_json::Map::new()))
-            .as_object_mut()
-            .expect("an object")
-            .insert(strip.direction.clone(), values);
+        let (Ok(action), Ok(direction)) = (
+            strip.action.parse::<Action>(),
+            strip.direction.parse::<Direction>(),
+        ) else {
+            return Err(format!("{} is no strip of a model", pretty(&strip.name)));
+        };
+        model::set_strip(&mut row, ModelStrip { action, direction }, frames);
     }
-    let image = row
-        .and_then(|row| row["sprites"]["image"].as_str())
-        .map(str::to_owned)
-        .unwrap_or_else(|| super::asset_name("models", key));
-    let mut row = row.cloned().unwrap_or_else(|| json!({}));
-    row["sprites"] = json!({
-        "image": image,
-        "frame_size": { "width": fw, "height": fh },
-        "actions": Value::Object(actions),
-    });
+    let image = format!("{key}/{}", MODEL_SPRITES.named("", "png"));
     Ok(BuiltModel {
         png: formats::encode_png(&sheet)?,
         image,

@@ -15,7 +15,7 @@ use crate::systems::movement::{self, Approach};
 use crate::systems::npc::{Home, Npc, Roams};
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
-    Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
+    Condition, EffectCall, FlowKey, Place, Reach, RiftInstances, RiftScripting, RunnerKind, query,
 };
 use crate::systems::{dialogue, reach, skill, stat};
 
@@ -23,13 +23,20 @@ use crate::systems::{dialogue, reach, skill, stat};
 pub struct Priority(pub u8);
 
 impl Priority {
+    pub const LOWEST: u8 = 1;
+    pub const HIGHEST: u8 = 9;
+
     pub fn checked(priority: u8) -> Result<Priority, ScriptFault> {
-        if (1..=9).contains(&priority) {
+        if (Priority::LOWEST..=Priority::HIGHEST).contains(&priority) {
             Ok(Priority(priority))
         } else {
             Err(ScriptFault::new(
                 "out of range",
-                format!("a priority 1 to 9, not {priority}"),
+                format!(
+                    "a priority {} to {}, not {priority}",
+                    Priority::LOWEST,
+                    Priority::HIGHEST
+                ),
             ))
         }
     }
@@ -321,7 +328,9 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Wander {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 8.0))]
     pub leash: Option<Condition>,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -332,7 +341,9 @@ pub struct Wander {
 #[schemars(extend("x-system" = "npc body"))]
 pub struct WalkTo {
     pub to: WalkTarget,
+    #[schemars(extend("default" = 1.0))]
     pub within: Condition,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     /// Taken on getting there.
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -352,6 +363,7 @@ pub struct WalkTo {
 pub enum WalkTarget {
     Place(Place),
     Object(String),
+    #[schemars(extend("default" = {"type": "subject"}))]
     Actor(Condition),
 }
 
@@ -359,8 +371,11 @@ pub enum WalkTarget {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Attack {
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub target: Condition,
+    #[schemars(extend("default" = 1.5))]
     pub within: Condition,
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub defeated: Arrow,
@@ -377,6 +392,7 @@ pub struct Attack {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "npc body"))]
 pub struct Stop {
+    #[schemars(extend("minimum" = Priority::LOWEST, "maximum" = Priority::HIGHEST))]
     pub priority: u8,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -388,6 +404,7 @@ pub struct Stop {
 #[schemars(extend("x-system" = "actor"))]
 pub struct FaceToward {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub toward: FaceTarget,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -398,21 +415,20 @@ pub struct FaceToward {
 #[serde(untagged)]
 pub enum FaceTarget {
     Place(Place),
+    #[schemars(extend("default" = {"type": "subject"}))]
     Actor(Condition),
 }
 
 type Aimed<T> = Box<dyn Fn(&World, &FlowCx) -> Option<T> + Send + Sync>;
 
 impl EffectDef<RiftScripting> for Wander {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -435,19 +451,13 @@ impl EffectDef<RiftScripting> for Wander {
 }
 
 impl EffectDef<RiftScripting> for WalkTo {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            (Outcome::Arrived.name(), &self.arrived),
-            (Outcome::Blocked.name(), &self.blocked),
-            (Outcome::Interrupted.name(), &self.interrupted),
-        ]
-    }
+    crate::outputs!(Outcome::Arrived.name() => arrived, Outcome::Blocked.name() => blocked, Outcome::Interrupted.name() => interrupted);
     fn pauses(&self) -> bool {
         true
     }
@@ -492,19 +502,13 @@ impl EffectDef<RiftScripting> for WalkTo {
 }
 
 impl EffectDef<RiftScripting> for Attack {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            (Outcome::Defeated.name(), &self.defeated),
-            (Outcome::Lost.name(), &self.lost),
-            (Outcome::Interrupted.name(), &self.interrupted),
-        ]
-    }
+    crate::outputs!(Outcome::Defeated.name() => defeated, Outcome::Lost.name() => lost, Outcome::Interrupted.name() => interrupted);
     fn pauses(&self) -> bool {
         true
     }
@@ -539,15 +543,13 @@ impl EffectDef<RiftScripting> for Attack {
 }
 
 impl EffectDef<RiftScripting> for Stop {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         Ok(Box::new(move |world, _, cx| {
@@ -566,9 +568,7 @@ impl EffectDef<RiftScripting> for FaceToward {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(Outcome::Next.name(), &self.next)]
-    }
+    crate::outputs!(Outcome::Next.name() => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{ContentId, ContentRow, Fixture};
+use crate::core::content::{ContentFile, ContentId, Fixture, Nearby};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{AreaId, AreaTag};
@@ -29,8 +29,14 @@ pub struct AttentionDef {
     pub icon: ImageRef,
 }
 
-impl ContentRow for AttentionDef {
+impl ContentFile for AttentionDef {
     const TABLE: &'static str = "attention";
+
+    fn fresh(near: &Nearby) -> Result<AttentionDef, String> {
+        Ok(AttentionDef {
+            icon: near.image()?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
@@ -48,6 +54,7 @@ pub enum AttentionMark {
 
 impl Fixture for AttentionMark {
     type Row = AttentionDef;
+    const FOLDER: Option<&'static str> = Some("attention");
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

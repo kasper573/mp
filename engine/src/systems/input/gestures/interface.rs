@@ -17,7 +17,7 @@ impl Gesture for InterfaceGesture {
     fn drive(&self, _world: &mut World, _claim: Option<ClickClaim>, _start: bool) {}
 
     fn cursor(&self, world: &mut World, _claim: ClickClaim) -> Option<Cursor> {
-        use egui::CursorIcon as Asked;
+        use ui::egui::CursorIcon as Asked;
         let shape = match gui::cursor(world) {
             Asked::PointingHand => CursorShape::Pointer,
             Asked::Grab => CursorShape::Grab,

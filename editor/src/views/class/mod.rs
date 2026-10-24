@@ -1,33 +1,29 @@
 pub mod inspect;
 pub mod tree;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::theme;
 
-use egui::Ui;
-use engine::core::content::{ContentRow, row_file};
-use engine::systems::class::ClassDef;
-use engine::systems::stat::StatKind;
+use engine::core::content::{ContentFile, fields_file};
+use engine::field;
+use engine::systems::class::{ClassDef, ClassLevel, SkillPoints};
+use engine::systems::stat::{StatKind, Stats};
 use serde_json::Value;
+use ui::egui::Ui;
 
 use crate::app::Editor;
 use crate::forms::{FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection};
-use crate::ui::levels::{self, LevelCards};
-use crate::ui::{self, row_form, sidebar, theme, widgets};
+use crate::shell::levels::{self, Level};
+use crate::shell::{self, row_form, sidebar};
+use crate::tabs::shown_path;
 
 pub const TREE_PART: &str = "/tree/";
 
-const LEVELS: LevelCards<StatKind> = LevelCards {
-    name: "Level",
-    fields: &[("xp", 0), ("skill_points", 0)],
-    next: |last| {
-        let xp = last
-            .and_then(|level| level["xp"].as_u64())
-            .map_or(0, |xp| xp + 100);
-        serde_json::json!({ "xp": xp, "stats": {}, "skill_points": 1 })
-    },
-    unit: StatKind::unit,
-};
+const FIRST_LEVEL_UP: u32 = 100;
 
 pub struct ClassViews {
     pub pages: HashMap<String, ClassPage>,
@@ -62,26 +58,27 @@ impl ClassViews {
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    if editor.row_value(ClassDef::TABLE, key).is_none() {
-        ui.label(theme::muted(format!(
-            "{} is gone",
-            row_file(ClassDef::TABLE, key)
-        )));
+    let Some(project) = &editor.project else {
+        return;
+    };
+    if !project.files.contains(&fields_file(key)) {
+        ui.label(theme::muted(format!("{} is gone", fields_file(key))));
         return;
     }
     let page = editor.views.class.page(key);
     let selection = editor.selection.clone();
-    if page == ClassPage::Tree {
-        sidebar::inspector(ui, "class-node", |ui| {
+    match page {
+        ClassPage::Tree => sidebar::inspector(editor, ui, "class", |editor, ui| {
             if selection.keys.first().is_some_and(|k| k == key) && node_of(&selection).is_some() {
                 inspect::show(editor, ui, &selection);
             } else {
-                sidebar::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
+                form::nothing_selected(ui, "Select a skill in the tree to inspect it here.");
             }
-        });
+        }),
+        ClassPage::Levels => {}
     }
     egui::Frame::new()
-        .inner_margin(ui::CONTENT_PADDING)
+        .inner_margin(shell::CONTENT_PADDING)
         .show(ui, |ui| {
             ui.set_min_size(ui.available_size());
             page_body(editor, ui, key, page);
@@ -94,7 +91,7 @@ fn page_body(editor: &mut Editor, ui: &mut Ui, key: &str, page: ClassPage) {
             (ClassPage::Levels, "levels"),
             (ClassPage::Tree, "skill tree"),
         ] {
-            if widgets::mode_chip(ui, label, page == target).clicked() {
+            if chip::mode(ui, label, page == target).clicked() {
                 editor.views.class.pages.insert(key.to_owned(), target);
                 if target == ClassPage::Levels {
                     editor.select(RowSelection::row(ClassDef::TABLE, key));
@@ -131,19 +128,53 @@ pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
     }
 }
 
-pub fn write(editor: &mut Editor, key: &str, label: &str, value: &Value) {
-    let mut edit = ContentEdit::new(format!("{label} · {}/{key}", ClassDef::TABLE));
-    edit.write_json(row_file(ClassDef::TABLE, key), value);
-    editor.apply(edit);
+pub fn edit(key: &str, label: &str) -> ContentEdit {
+    ContentEdit::new(format!("{label} · {}", shown_path(key)))
+}
+
+pub fn write(editor: &mut Editor, key: &str, edit: ContentEdit, class: &ClassDef) {
+    editor.write_content_as(edit, key, class);
 }
 
 pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
-    levels::cards(ui, cx, value, &LEVELS, |index, level| {
-        let xp = level["xp"].as_u64().unwrap_or(0);
-        Some(if index == 0 && xp == 0 {
-            "the start".to_owned()
-        } else {
-            format!("from {xp} xp")
-        })
-    })
+    levels::row_cards(
+        ui,
+        cx,
+        value,
+        field!(ClassDef, levels),
+        class_levels,
+        |index, level| {
+            Some(if index == 0 && level.xp == 0 {
+                "the start".to_owned()
+            } else {
+                format!("from {} xp", level.xp)
+            })
+        },
+    )
+}
+
+fn class_levels(class: &mut ClassDef) -> &mut Vec<ClassLevel> {
+    &mut class.levels
+}
+
+impl Level for ClassLevel {
+    type Stat = StatKind;
+    const NAME: &'static str = "Level";
+    const STATS: &'static str = field!(ClassLevel, stats);
+
+    fn stats(&mut self) -> &mut BTreeMap<StatKind, f32> {
+        &mut self.stats.0
+    }
+
+    fn unit(stat: StatKind) -> Option<&'static str> {
+        stat.unit()
+    }
+
+    fn next(last: Option<&ClassLevel>) -> ClassLevel {
+        ClassLevel {
+            xp: last.map_or(0, |level| level.xp + FIRST_LEVEL_UP),
+            stats: Stats::default(),
+            skill_points: SkillPoints(1),
+        }
+    }
 }

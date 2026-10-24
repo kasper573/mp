@@ -1,20 +1,25 @@
-use egui::{RichText, Vec2};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, table_of};
 use engine::core::math::{Pos, Rect, Size};
-use engine::core::tiling::{GridSize, TileSize};
-use engine::systems::area::{self, AreaDef, AreaModuleKind};
-use serde_json::Value;
+use engine::core::tiling::GridSize;
+use engine::systems::area::{self, AreaDef, AreaModule, MapSize};
+use engine::systems::script::Place;
+use ui::controls;
+use ui::dialog;
+use ui::egui;
+use ui::egui::{RichText, Vec2};
+use ui::form;
+use ui::theme;
+use ui::words;
 
 use super::grid::GridDraft;
-use super::{pins, shapes};
+use super::{nodes, pins, shapes};
 use crate::app::Editor;
-use crate::forms;
-use crate::project::ContentEdit;
-use crate::ui::{dialogs, theme, widgets};
-use crate::value::RowValue;
+use crate::tabs::file_title;
+use ui::input::InputField;
 
 pub struct ResizeDialog {
-    pub area: String,
+    /// The area or blueprint bundle resized.
+    pub bundle: String,
     pub width: u32,
     pub height: u32,
     pub anchor: (i8, i8),
@@ -27,20 +32,17 @@ pub fn resize_dialog(
     mut dialog: ResizeDialog,
 ) -> Option<ResizeDialog> {
     let mut outcome = None;
-    let old = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .and_then(|c| {
-            c.by_key::<AreaDef>(&dialog.area)
-                .map(|id| area::load(&c, id).size)
-        })
-        .map(|size| (size.width as u32, size.height as u32))
+    let old = GridDraft::own(editor, &dialog.bundle)
+        .map(|draft| (draft.size.width, draft.size.height))
         .unwrap_or((dialog.width, dialog.height));
-    crate::ui::dialogs::card(ctx, "resize", 480.0, |ui| {
-        let pressed = dialogs::keys(ui);
+    let smallest = match table_of(&dialog.bundle) {
+        Some(AreaDef::TABLE) => area::MIN_SIDE,
+        _ => 1,
+    };
+    dialog::card(ctx, "resize", 480.0, |ui| {
+        let pressed = dialog::keys(ui);
         ui.label(
-            RichText::new(format!("Resize area/{}", dialog.area))
+            RichText::new(format!("Resize {}", file_title(&dialog.bundle)))
                 .strong()
                 .size(18.0),
         );
@@ -49,26 +51,19 @@ pub fn resize_dialog(
             ("width", &mut dialog.width, old.0),
             ("height", &mut dialog.height, old.1),
         ] {
-            widgets::kv(ui, name, |ui| {
+            form::kv(ui, name, |ui| {
                 ui.scope(|ui| {
-                    ui.set_width(120.0);
                     let id = ui.id().with((name, "resize"));
                     let mut draft = ui
                         .ctx()
                         .data(|d| d.get_temp::<String>(id))
                         .unwrap_or_else(|| value.to_string());
-                    let response = forms::boxed_input(ui, Some(&format!("was {was}")), |ui| {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut draft)
-                                .frame(egui::Frame::NONE)
-                                .font(egui::TextStyle::Monospace)
-                                .desired_width(f32::INFINITY),
-                        )
-                    });
+                    let was = format!("was {was}");
+                    let response = InputField::new(&mut draft).unit(&was).width(120.0).show(ui);
                     if response.changed() {
                         ui.ctx().data_mut(|d| d.insert_temp(id, draft.clone()));
                         if let Ok(parsed) = draft.trim().parse::<u32>() {
-                            *value = parsed.clamp(area::MIN_SIDE, area::MAX_SIDE);
+                            *value = parsed.clamp(smallest, area::MAX_SIDE);
                         }
                     }
                     if response.lost_focus() {
@@ -77,7 +72,7 @@ pub fn resize_dialog(
                 });
             });
         }
-        widgets::kv(ui, "anchor", |ui| {
+        form::kv(ui, "anchor", |ui| {
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::splat(4.0);
                 for row in [-1i8, 0, 1] {
@@ -100,6 +95,14 @@ pub fn resize_dialog(
                                 ),
                                 egui::StrokeKind::Inside,
                             );
+                            response.widget_info(|| {
+                                egui::WidgetInfo::selected(
+                                    egui::WidgetType::RadioButton,
+                                    true,
+                                    picked,
+                                    anchor_name(column, row),
+                                )
+                            });
                             if response.clicked() {
                                 dialog.anchor = (column, row);
                             }
@@ -122,10 +125,10 @@ pub fn resize_dialog(
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if widgets::primary(ui, "Resize").clicked() || pressed.enter {
+            if controls::primary(ui, "Resize").clicked() || pressed.confirm {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || pressed.escape {
+            if ui.button("Cancel").clicked() || pressed.cancel {
                 outcome = Some(false);
             }
         });
@@ -156,9 +159,9 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
             _ => "on both sides".to_owned(),
         };
         Some(if delta > 0 {
-            format!("Adds {n} empty {unit}{} {where_}", widgets::plural(n))
+            format!("Adds {n} empty {unit}{} {where_}", words::plural(n))
         } else {
-            format!("Clips {n} {unit}{} {where_}", widgets::plural(n))
+            format!("Clips {n} {unit}{} {where_}", words::plural(n))
         })
     };
     if let Some(text) = side(
@@ -207,52 +210,52 @@ fn anchor_shift(anchor: i8, old: u32, new: u32) -> i32 {
 }
 
 pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), String> {
-    let content = editor
-        .project
-        .as_ref()
-        .and_then(|p| p.content.clone())
-        .ok_or("the folder does not load")?;
-    let id = content
-        .by_key::<AreaDef>(&dialog.area)
-        .ok_or("the area is gone")?;
-    let area = area::load(&content, id);
-    let old = area.size.grid();
+    let bundle = &dialog.bundle;
+    let draft = GridDraft::own(editor, bundle).ok_or("the bundle is gone")?;
+    let old = draft.size;
     let new = GridSize::new(dialog.width, dialog.height);
     let shift = (
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = GridDraft::of(&dialog.area, &area.grids);
     let (resized, clipped) = draft.resized(new, shift);
-    let mut row = editor
-        .row_value(AreaDef::TABLE, &dialog.area)
-        .ok_or("the area is gone")?;
-    row["map"]["size"]["width"] = Value::from(dialog.width);
-    row["map"]["size"]["height"] = Value::from(dialog.height);
     let (dx, dy) = (shift.0 as f32, shift.1 as f32);
     let bounds = Rect::new(
         Pos::new(-0.5, -0.5),
         Size::new(dialog.width as f32, dialog.height as f32),
     );
+    let in_area = table_of(bundle) == Some(AreaDef::TABLE);
+    let reader = editor.reader().ok_or("no folder is open")?;
     let mut outside = Vec::new();
-    for (index, module) in row["modules"]
-        .as_array_mut()
-        .into_iter()
-        .flatten()
-        .enumerate()
-    {
-        shapes::shift(module, dx, dy);
-        if let Some(b) = shapes::bounds(module, None)
-            && !bounds.contains_rect(&b)
-        {
-            match module.module_kind() {
-                Some(AreaModuleKind::SafeZone)
-                | Some(AreaModuleKind::Soundscape)
-                | Some(AreaModuleKind::Population) => {}
-                _ => outside.push(format!("module {index} ({})", shapes::label(module))),
+    let edit = nodes::blueprint_edit(editor, bundle, |blueprint| {
+        blueprint.map.size = MapSize {
+            width: dialog.width,
+            height: dialog.height,
+        };
+        for module in nodes::modules(&blueprint.scene.nodes) {
+            let node = nodes::module_node_mut(&mut blueprint.scene.nodes, &module.pointer)?;
+            let module = &mut node.module;
+            shapes::shift(module, dx, dy);
+            let keeps_out = matches!(
+                module,
+                AreaModule::SafeZone(_) | AreaModule::Soundscape(_) | AreaModule::Population(_)
+            );
+            if let Some(b) = shapes::bounds(module, None)
+                && in_area
+                && !keeps_out
+                && !bounds.contains_rect(&b)
+            {
+                outside.push(shapes::label(module, reader.as_ref()));
             }
         }
-    }
+        resized.apply_to(blueprint);
+        Some(format!(
+            "Resize {} to {} × {} ({clipped} cells clipped)",
+            file_title(bundle),
+            dialog.width,
+            dialog.height
+        ))
+    });
     if !outside.is_empty() {
         return Err(format!(
             "{} left outside the map: {}",
@@ -260,22 +263,38 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             outside.join(", ")
         ));
     }
-    let mut edit = ContentEdit::new(format!(
-        "Resize {} to {} × {} ({clipped} cells clipped)",
-        dialog.area, dialog.width, dialog.height
-    ));
-    edit.write_json(row_file(AreaDef::TABLE, &dialog.area), &row);
-    resized.write_all_into(&mut edit);
+    let mut edit = edit.ok_or("the bundle doesn't read")?;
     if dx != 0.0 || dy != 0.0 {
-        let files = &editor.project.as_ref().ok_or("no folder")?.files;
-        for arrival in pins::arrivals(editor, &dialog.area) {
-            edit.update_json(files, &arrival.file, |json| {
-                let place = json.pointer_mut(&arrival.pointer)?;
-                place["x"] = serde_json::json!(arrival.at.x + dx);
-                place["y"] = serde_json::json!(arrival.at.y + dy);
-                Some(())
-            });
+        let project = editor.project.as_ref().ok_or("no folder is open")?;
+        for arrival in pins::arrivals(editor, bundle) {
+            edit.update_at(
+                project,
+                &arrival.file,
+                &arrival.pointer,
+                |place: &mut Place| {
+                    place.at = Pos::new(arrival.at.x + dx, arrival.at.y + dy);
+                },
+            )?;
         }
     }
     editor.try_apply(edit)
+}
+
+/// The anchor `(column, row)`, -1 to 1 each, as a compass reads it out: "top left", "center".
+fn anchor_name(column: i8, row: i8) -> String {
+    let side = match column {
+        -1 => "left",
+        1 => "right",
+        _ => "",
+    };
+    let edge = match row {
+        -1 => "top",
+        1 => "bottom",
+        _ => "",
+    };
+    match (edge, side) {
+        ("", "") => "center".to_owned(),
+        ("", side) | (side, "") => side.to_owned(),
+        (edge, side) => format!("{edge} {side}"),
+    }
 }

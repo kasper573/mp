@@ -17,7 +17,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
 use engine::systems::{actor, script, vfx};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim, path};
 
 #[test]
 fn damage_shows_on_the_one_hit_and_the_effect_passes() {
@@ -168,9 +168,9 @@ fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
 }
 
 #[test]
-fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
+fn an_instance_arrives_as_the_server_sent_it_whatever_its_parameters_and_site() {
     let (sim, _) = arena();
-    let sent = VfxInstance {
+    let on_screen = VfxInstance {
         vfx: sim.id("damage_taken"),
         site: VfxSite::Screen,
         params: VfxParams(vec![
@@ -181,15 +181,7 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),
     };
-    let bytes = postcard::to_allocvec(&sent).expect("serializes");
-    let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
-    assert_eq!(received, sent);
-}
-
-#[test]
-fn an_instance_on_an_area_survives_the_wire() {
-    let (sim, _) = arena();
-    let sent = VfxInstance {
+    let on_an_area = VfxInstance {
         vfx: sim.id("swoosh"),
         site: VfxSite::Area(Footprint {
             at: Pos::new(3.0, 4.0),
@@ -200,13 +192,13 @@ fn an_instance_on_an_area_survives_the_wire() {
             },
         }),
         params: VfxParams::default(),
-        heading: Radians(0.25),
-        started: UnixMillis(1_000),
-        until: UnixMillis(2_500),
+        ..on_screen.clone()
     };
-    let bytes = postcard::to_allocvec(&sent).expect("serializes");
-    let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
-    assert_eq!(received, sent);
+    for sent in [on_screen, on_an_area] {
+        let bytes = postcard::to_allocvec(&sent).expect("serializes");
+        let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
+        assert_eq!(received, sent);
+    }
 }
 
 fn arena() -> (Sim, Entity) {
@@ -219,35 +211,50 @@ fn arena() -> (Sim, Entity) {
                 { "xp": 30, "skill_points": 1 },
             ]);
             hero["tree"] = json!({
-                "cleave": { "skill": "cleave", "at": { "x": 0.0, "y": 0.0 } },
-                "fireball": { "skill": "fireball", "at": { "x": 80.0, "y": 0.0 } },
-                "chain": { "skill": "chain", "at": { "x": 160.0, "y": 0.0 } },
+                "cleave": { "skill": "cleave.skill.json", "at": { "x": 0.0, "y": 0.0 } },
+                "fireball": { "skill": "fireball.skill.json", "at": { "x": 80.0, "y": 0.0 } },
+                "chain": { "skill": "chain.skill.json", "at": { "x": 160.0, "y": 0.0 } },
             });
         })
         .row(
             "skill",
             "cleave",
-            area_skill(json!({ "type": "cone", "angle": 90.0, "length": 2.0 }), json!({
-                "sweep": { "type": "vfx", "vfx": "swoosh", "on": { "type": "skill_area" }, "next": "hit" },
+            area_skill(json!({ "type": "cone", "angle": 90.0, "length": 2.0 }), "cleave_sweep"),
+        )
+        .script(
+            "cleave_sweep",
+            "skill",
+            area_nodes(json!({
+                "sweep": { "type": "vfx", "vfx": "swoosh.vfx.json", "on": { "type": "skill_area" }, "next": "hit" },
                 "hit": damage("show"),
-                "show": { "type": "vfx", "vfx": "slash_hit", "on": { "type": "skill_targets" } },
+                "show": { "type": "vfx", "vfx": "slash_hit.vfx.json", "on": { "type": "skill_targets" } },
             }), "sweep"),
         )
         .row(
             "skill",
             "fireball",
-            area_skill(json!({ "type": "circle", "radius": 2.0 }), json!({
-                "blast": { "type": "vfx", "vfx": "blast", "on": { "type": "skill_area" }, "next": "hit" },
+            area_skill(json!({ "type": "circle", "radius": 2.0 }), "fireball_blast"),
+        )
+        .script(
+            "fireball_blast",
+            "skill",
+            area_nodes(json!({
+                "blast": { "type": "vfx", "vfx": "blast.vfx.json", "on": { "type": "skill_area" }, "next": "hit" },
                 "hit": damage_last(),
             }), "blast"),
         )
         .row(
             "skill",
             "chain",
-            area_skill(json!({ "type": "circle", "radius": 3.0 }), json!({
+            area_skill(json!({ "type": "circle", "radius": 3.0 }), "chain_arc"),
+        )
+        .script(
+            "chain_arc",
+            "skill",
+            area_nodes(json!({
                 "arc": {
                     "type": "vfx",
-                    "vfx": "arc",
+                    "vfx": "arc.vfx.json",
                     "on": { "type": "skill_targets" },
                     "site": { "type": "path" },
                     "next": "hit",
@@ -260,7 +267,7 @@ fn arena() -> (Sim, Entity) {
         .vfx("slash_hit")
         .vfx("swoosh")
         .vfx("blast")
-        .edit("vfx", "blast", |blast| blast["on_actors_inside"] = json!("blast"))
+        .edit("vfx", "blast", |blast| blast["on_actors_inside"] = json!(path("vfx", "blast")))
         .vfx("arc")
         .vfx("damage_taken")
         .shader("damage_pop")
@@ -292,10 +299,7 @@ fn arena() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn area_skill(area: Value, mut nodes: Value, first: &str) -> Value {
-    nodes["used"] = json!({ "type": "on", "event": "used", "next": "swing" });
-    nodes["swing"] =
-        json!({ "type": "animate", "action": "attack", "wait": "apex", "next": first });
+fn area_skill(area: Value, script: &str) -> Value {
     json!({
         "name": "Area skill",
         "icon": "icons/skill.png",
@@ -304,8 +308,15 @@ fn area_skill(area: Value, mut nodes: Value, first: &str) -> Value {
         "area": area,
         "cooldown": 6.0,
         "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": path("script", script) }],
     })
+}
+
+fn area_nodes(mut nodes: Value, first: &str) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "swing" });
+    nodes["swing"] =
+        json!({ "type": "animate", "action": "attack", "wait": "apex", "next": first });
+    nodes
 }
 
 fn damage(next: &str) -> Value {
@@ -346,7 +357,7 @@ fn cast(sim: &mut Sim, skill: &str, at: Pos<Tiles>) {
 fn any_shown(world: &mut World, key: &str) -> bool {
     let vfx = world
         .resource::<engine::core::content::Content>()
-        .by_key::<VfxDef>(key)
+        .declared::<VfxDef>(key)
         .expect("a declared vfx");
     world
         .query::<&VfxInstance>()

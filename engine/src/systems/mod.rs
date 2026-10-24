@@ -50,13 +50,13 @@ use skill::Cooldowns;
 use status::{ActiveAspects, Boosts, Statuses};
 
 use crate::core::assets::SyncedFiles;
-use crate::core::audio::playback::{SfxDef, SfxPlugin, SfxRoleDef};
+use crate::core::audio::playback::{SfxDef, SfxPlugin};
 use crate::core::audio::soundscape::SoundscapePlugin;
 use crate::core::babble::BabblePlugin;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
-    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
-    Loading, Settings,
+    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, LoadReport, Loading,
+    MODULES, SETTINGS_FILE, Settings,
 };
 use crate::core::gui::GuiPlugin;
 use crate::core::interpolate::SnapshotPlugin;
@@ -470,6 +470,19 @@ pub fn load_content(
     )
 }
 
+/// Loads a game still being made, through `making_registry`.
+pub fn load_making(
+    folder: std::sync::Arc<dyn ContentFolder>,
+    outcome: &str,
+) -> Result<Content, LoadReport> {
+    crate::core::content::load(
+        making_registry(),
+        folder,
+        crate::core::content::version::build(),
+        outcome,
+    )
+}
+
 pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), LoadReport> {
     let before = world.get_resource::<SyncedContent>();
     if before.is_some_and(|before| before.same_as(&synced)) {
@@ -507,21 +520,25 @@ pub fn registry() -> &'static ContentRegistry {
     static REGISTRY: std::sync::LazyLock<ContentRegistry> = std::sync::LazyLock::new(|| {
         let mut registry = settled_tables();
         registry
-            .fixture::<input::map::InputAction>()
-            .fixture::<attention::AttentionMark>()
-            .fixture::<interface::InterfaceSound>()
-            .fixture::<interface::CursorShape>()
-            .fixture::<interface::InterfaceIcon>()
-            .fixture::<vfx::VfxFixture>()
-            .fixture::<vfx::VfxShaderFixture>()
-            .fixture::<area::world_map::WorldMap>()
+            .require_fixtures()
             .hook(LoadStep::Across, script::check_reached);
         registry
     });
     &REGISTRY
 }
 
-/// Every table a game is made of, and the settings its `game.json` holds: a folder of only some of
+/// A game being made: all a whole game is, but that its quests and shops may still be out of a
+/// player's reach, as one is made before the scripts that offer or open it can name it.
+pub fn making_registry() -> &'static ContentRegistry {
+    static REGISTRY: std::sync::LazyLock<ContentRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = settled_tables();
+        registry.require_fixtures();
+        registry
+    });
+    &REGISTRY
+}
+
+/// Every table a game is made of, and the settings its `game.config.json` holds: a folder of only some of
 /// a game's rows, set up to be played, loads through this.
 pub fn settled_tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
@@ -538,32 +555,48 @@ pub fn tables() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
     registry
-        .row::<SfxDef>()
-        .row::<SfxRoleDef>()
-        .row::<attention::AttentionDef>()
-        .row::<input::map::InputDef>()
-        .row::<interface::CursorDef>()
-        .row::<interface::InterfaceIconDef>()
-        .row::<item::ItemDef>()
+        .fixture::<input::map::InputFixture>()
+        .fixture::<attention::AttentionMark>()
+        .fixture::<interface::InterfaceSound>()
+        .fixture::<interface::CursorShape>()
+        .fixture::<interface::InterfaceIcon>()
+        .fixture::<vfx::VfxFixture>()
+        .fixture::<vfx::VfxShaderFixture>()
+        .fixture::<area::world_map::WorldMap>()
+        .bundle::<SfxDef>()
+        .file::<attention::AttentionDef>()
+        .file::<input::map::InputDef>()
+        .file::<interface::CursorDef>()
+        .file::<interface::InterfaceIconDef>()
+        .file::<item::ItemDef>()
+        .named::<item::ItemDef>()
         .modules::<item::ItemDef>()
-        .row::<class::ClassDef>()
-        .row::<memory::MemoryDef>()
-        .row::<notification::NotificationDef>()
-        .row::<npc::NpcDef>()
+        .file::<class::ClassDef>()
+        .named::<class::ClassDef>()
+        .file::<memory::MemoryDef>()
+        .named::<memory::MemoryDef>()
+        .file::<notification::NotificationDef>()
+        .file::<npc::NpcDef>()
+        .named::<npc::NpcDef>()
         .modules::<npc::NpcDef>()
-        .row::<player::PlayerDef>()
+        .file::<player::PlayerDef>()
         .modules::<player::PlayerDef>()
-        .row::<player::snapshot::CharacterSnapshot>()
-        .row::<quest::QuestDef>()
+        .file::<player::snapshot::CharacterSnapshot>()
+        .named::<player::snapshot::CharacterSnapshot>()
+        .file::<quest::QuestDef>()
+        .named::<quest::QuestDef>()
         .modules::<quest::QuestDef>()
-        .row::<script::ScriptDef>()
-        .row::<shop::ShopDef>()
+        .file::<script::ScriptDef>()
+        .file::<shop::ShopDef>()
+        .named::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
-        .row::<skill::SkillDef>()
+        .file::<skill::SkillDef>()
+        .named::<skill::SkillDef>()
         .modules::<skill::SkillDef>()
-        .row::<status::StatusEffectDef>()
+        .file::<status::StatusEffectDef>()
+        .named::<status::StatusEffectDef>()
         .modules::<status::StatusEffectDef>()
-        .list_kind("modules", "unknown module type", "a module type")
+        .list_kind(MODULES, "unknown module type", "a module type")
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);
     actor::content(&mut registry);
@@ -593,7 +626,7 @@ fn check_settings(loading: &mut Loading) {
     let settings = content.built::<GameSettings>();
     if let Err(problem) = area::check_place(&content, settings.initial_spawn) {
         loading.json_error(
-            GAME_FILE,
+            SETTINGS_FILE,
             "/initial_spawn",
             ContentProblem::new(problem.rule, problem.found, problem.expected)
                 .near(problem.nearest),

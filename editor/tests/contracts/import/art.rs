@@ -1,6 +1,11 @@
-use editor::import::model;
+use std::sync::Arc;
+
+use editor::import::{formats, model};
+use engine::core::content::FolderReader;
+use engine::systems::actor::ModelDef;
 use image::{Rgba, RgbaImage};
 use serde_json::{Value, json};
+use testkit::{Game, path};
 
 /// A frame of the walker's sheet, in pixels.
 pub const FRAME: (u32, u32) = (12, 16);
@@ -21,10 +26,25 @@ pub const PAVED: u32 = 450;
 /// A transparent tile that carries data all the same.
 pub const BLANK_WITH_DATA: u32 = COLUMNS * ROWS - 1;
 
+/// The walker as the game reads it, in a game holding the sound it plays, and what reads that
+/// game.
+pub fn walker() -> (FolderReader, ModelDef) {
+    let sheet = formats::encode_png(&walker_sheet()).expect("a png");
+    let game = Game::new()
+        .sfx("slash03")
+        .row("model", "walker", walker_row())
+        .part("model", "walker", "sprites.png", sheet);
+    let reader = FolderReader::new(game.registry(), Arc::new(game.folder()));
+    let walker = reader
+        .read::<ModelDef>(&path("model", "walker"))
+        .unwrap_or_else(|errors| panic!("the walker reads: {errors:?}"));
+    (reader, walker)
+}
+
 /// A model row of every strip the importer knows, eight frames each laid out a strip a row:
 /// footsteps on the first and fifth frame of its walks and runs, and an attack landing, with a
 /// sound, on the sixth.
-pub fn walker_row() -> Value {
+fn walker_row() -> Value {
     let mut actions = serde_json::Map::new();
     for (row, name) in model::strip_names().iter().enumerate() {
         let (action, direction) = name.split_once('_').expect("action_direction");
@@ -37,7 +57,7 @@ pub fn walker_row() -> Value {
                         frame["ms"] = json!(ATTACK_MS[column as usize]);
                         if column == 5 {
                             frame["apex"] = json!(true);
-                            frame["sound"] = json!("slash03");
+                            frame["sound"] = json!(path("sfx", "slash03"));
                         }
                     }
                     _ => {}
@@ -55,7 +75,6 @@ pub fn walker_row() -> Value {
     json!({
         "hitbox": { "width": 0.8, "height": 1.6 },
         "sprites": {
-            "image": "models/walker.png",
             "frame_size": { "width": FRAME.0, "height": FRAME.1 },
             "actions": actions,
         },
@@ -85,7 +104,7 @@ pub fn tileset_row() -> Value {
     let mut tiles = serde_json::Map::new();
     tiles.insert(
         PAVED.to_string(),
-        json!({ "walk": "blocks", "surface": "sand" }),
+        json!({ "walk": "blocks", "surface": testkit::path("surface", "sand") }),
     );
     tiles.insert(BLANK_WITH_DATA.to_string(), json!({ "walk": "blocks" }));
     let first = COLUMNS + 1;
@@ -95,7 +114,7 @@ pub fn tileset_row() -> Value {
             "animation": (0..4).map(|k| json!({ "tile": first + 9 * k, "ms": 250 })).collect::<Vec<_>>(),
         }),
     );
-    json!({ "image": "tilesets/beach.png", "tile": TILE, "tiles": tiles })
+    json!({ "tile": TILE, "tiles": tiles })
 }
 
 /// A tileset of solid tiles each of its own colour, its last row transparent, and the water's four
@@ -139,8 +158,9 @@ pub fn water(tileset: &RgbaImage) -> Vec<RgbaImage> {
 
 /// A palette painting the paved tile, the water's first frame and another plain tile.
 pub fn island_palette() -> String {
+    let beach = testkit::path("tileset", "beach");
     format!(
-        "tileset,tile,flip\nbeach,{PAVED},\nbeach,{},horizontal\nbeach,3,\n",
+        "tileset,tile,flip\n{beach},{PAVED},\n{beach},{},horizontal\n{beach},3,\n",
         COLUMNS + 1
     )
 }

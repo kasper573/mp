@@ -1,1 +1,0 @@
-../../../editor/templates/new_game/assets/shaders/damage_pop.wgsl

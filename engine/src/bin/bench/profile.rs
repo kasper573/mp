@@ -1,6 +1,6 @@
-//! A fixed workload near the bench's budget crossover, profiled for CPU (a pprof flamegraph and
-//! profile) and allocations. Arguments: `dist` for distributed players, and the folder to write
-//! the profile to (the working directory by default).
+//! A fixed workload near the bench's budget crossover, profiled for allocations here and for CPU by
+//! the `perf record` it runs under, which samples only the measured ticks. Argument: `dist` for
+//! distributed players.
 
 #[path = "play.rs"]
 mod play;
@@ -10,9 +10,9 @@ mod sim;
 use std::alloc::{GlobalAlloc, Layout};
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Instant;
 
@@ -63,6 +63,8 @@ const MEASURE: usize = 400;
 struct Env {
     content_dir: PathBuf,
     no_clients: Option<bool>,
+    perf_control: PathBuf,
+    perf_ack: PathBuf,
 }
 
 fn main() {
@@ -74,11 +76,6 @@ fn main() {
     } else {
         sim::Layout::Congested
     };
-    let out_dir = std::env::args()
-        .skip(1)
-        .find(|arg| arg != "dist")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().expect("cwd"));
     let mut bench = Bench::new(AREAS, layout, &load(&env.content_dir));
     if !env.no_clients.unwrap_or(false) {
         bench.connect();
@@ -91,11 +88,8 @@ fn main() {
     report_aoi(&mut bench.worlds);
     report_changes(&mut bench.worlds);
 
-    let guard = pprof::ProfilerGuardBuilder::default()
-        .frequency(999)
-        .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-        .build()
-        .expect("start pprof profiler");
+    let mut perf = Perf::attach(&env.perf_control, &env.perf_ack);
+    perf.send("enable");
     ALLOCS.store(0, Relaxed);
     BYTES.store(0, Relaxed);
     let started = Instant::now();
@@ -105,22 +99,7 @@ fn main() {
     let elapsed = started.elapsed();
     let allocs = ALLOCS.load(Relaxed);
     let bytes = BYTES.load(Relaxed);
-
-    let report = guard.report().build().expect("build pprof report");
-    print_hotspots(&report);
-    let svg = out_dir.join("flamegraph.svg");
-    report
-        .flamegraph(File::create(&svg).expect("create flamegraph"))
-        .expect("write flamegraph");
-    {
-        use pprof::protos::Message;
-        let profile = report.pprof().expect("pprof profile");
-        let buf = profile.write_to_bytes().expect("encode pprof");
-        File::create(out_dir.join("profile.pb"))
-            .expect("create profile.pb")
-            .write_all(&buf)
-            .expect("write profile.pb");
-    }
+    perf.send("disable");
 
     let ticks = MEASURE as f64;
     let per_tick = elapsed.as_secs_f64() * 1000.0 / ticks;
@@ -138,7 +117,6 @@ fn main() {
     if let Some(hwm) = peak_rss_kib() {
         println!("[profile] peak RSS: {:.1} MiB", hwm as f64 / 1024.0);
     }
-    println!("[profile] flamegraph: {}", svg.display());
 }
 
 /// Quantifies area-of-interest overlap in the (distributed-player) scenario: how many clients see
@@ -204,67 +182,6 @@ fn report_aoi(worlds: &mut [App]) {
     );
 }
 
-fn print_hotspots(report: &pprof::Report) {
-    let mut total = 0i64;
-    let mut self_time: HashMap<String, i64> = HashMap::new();
-    let mut by_system: HashMap<String, i64> = HashMap::new();
-    for (frames, &count) in &report.data {
-        let count = count as i64;
-        total += count;
-        if let Some(leaf) = frames.frames.first().and_then(|group| group.first()) {
-            *self_time.entry(symbol(leaf)).or_default() += count;
-        }
-        let owner = frames
-            .frames
-            .iter()
-            .rev()
-            .flat_map(|group| group.iter().rev())
-            .find_map(|sym| attribute(&symbol(sym)))
-            .unwrap_or_else(|| "other".to_string());
-        *by_system.entry(owner).or_default() += count;
-    }
-    println!("\n[profile] CPU self time by owning system (of {total} samples):");
-    print_ranked(&by_system, total);
-    println!("\n[profile] CPU self time by leaf (top 25):");
-    print_ranked(&self_time, total);
-    println!();
-}
-
-/// The owning system/subsystem for a frame, scanning a stack root-first so the highest-level owner
-/// wins (e.g. astar samples attribute to movement::advance).
-fn attribute(name: &str) -> Option<String> {
-    for prefix in ["engine::systems::", "engine::core::"] {
-        if let Some(rest) = name.strip_prefix(prefix) {
-            let trimmed: String = rest.split('<').next().unwrap_or(rest).to_string();
-            return Some(format!("{prefix}{trimmed}"));
-        }
-    }
-    if name.starts_with("bevy_replicon::") {
-        return Some("bevy_replicon (replication)".to_string());
-    }
-    None
-}
-
-fn symbol(sym: &pprof::Symbol) -> String {
-    let name = sym.name();
-    name.split("::{{closure}}")
-        .next()
-        .unwrap_or(&name)
-        .to_string()
-}
-
-fn print_ranked(map: &HashMap<String, i64>, total: i64) {
-    let mut ranked: Vec<_> = map.iter().collect();
-    ranked.sort_by(|a, b| b.1.cmp(a.1));
-    for (name, &count) in ranked.into_iter().take(25) {
-        println!(
-            "[profile]   {:5.1}%  {}",
-            100.0 * count as f64 / total as f64,
-            name
-        );
-    }
-}
-
 fn peak_rss_kib() -> Option<u64> {
     std::fs::read_to_string("/proc/self/status")
         .ok()
@@ -320,5 +237,30 @@ fn report_changes(worlds: &mut [App]) {
     println!("[changes] replicated entities: {entities}, changed this tick: {changed_entities}");
     for (name, count) in rows.iter().take(20) {
         println!("[changes] {count:>8}  {name}");
+    }
+}
+
+/// The `perf record` this runs under, told through its control fifo when to sample.
+struct Perf {
+    control: File,
+    ack: BufReader<File>,
+}
+
+impl Perf {
+    fn attach(control: &Path, ack: &Path) -> Perf {
+        Perf {
+            control: OpenOptions::new()
+                .write(true)
+                .open(control)
+                .expect("perf's control fifo: run under `just profile`"),
+            ack: BufReader::new(File::open(ack).expect("perf's ack fifo")),
+        }
+    }
+
+    // Answered once perf has acted, so no sample lands on the wrong side of the switch.
+    fn send(&mut self, command: &str) {
+        writeln!(self.control, "{command}").expect("perf takes the command");
+        let mut ack = String::new();
+        self.ack.read_line(&mut ack).expect("perf acknowledges");
     }
 }

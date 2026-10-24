@@ -30,7 +30,7 @@ pub fn register(app: &mut App) {
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
-        .row::<ModelDef>()
+        .bundle::<ModelDef>()
         .modules::<ModelDef>()
         .hook(LoadStep::Files, model::build_all);
 }
@@ -63,6 +63,13 @@ pub enum Action {
     #[serde(rename = "death")]
     #[strum(serialize = "death")]
     Dead,
+}
+
+impl Action {
+    /// Whether the action's strips mark the frame its hit lands on.
+    pub fn takes_apex(self) -> bool {
+        self == Action::Attack
+    }
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

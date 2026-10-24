@@ -2,9 +2,11 @@
 //! a crowd in an area, or the screen), on the stage every preview shares.
 
 use std::collections::{BTreeMap, HashMap};
+use std::mem;
+use ui::chip;
+use ui::egui;
+use ui::theme;
 
-use design_tokens::controls;
-use egui::{Pos2, Stroke, Ui};
 use engine::core::geometry::{Degrees, Footprint, Shape};
 use engine::core::math::Pos;
 use engine::core::render::ToScreen;
@@ -13,23 +15,27 @@ use engine::core::time::Seconds;
 use engine::core::vfx::{ParamValue, VfxLayer, VfxParams};
 use engine::systems::actor::{Action, ModelDef};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
+use ui::controls;
+use ui::egui::{Pos2, Stroke, Ui};
 
 use super::params::{ParamSpec, param_control};
 use crate::app::Editor;
 use crate::stage::{self, Posed, PosedActor, PosedSite, PosedVfx, Scene};
-use crate::ui::{theme, widgets};
+use ui::input::NumberField;
 
 const REST_BETWEEN_PLAYS: f32 = 0.5;
 const SLIDER_SURROUND: f32 = 130.0;
 const MOST_ACTORS: u32 = 100;
 const FIRST_CROWD: u32 = 3;
+const FIELD_WIDTH: f32 = 72.0;
 
-/// The vfx previews: what the open row asked to see, and the values tried for its parameters.
+/// The vfx previews: what the open row asked to see, and the values tried for its parameters in
+/// place of their defaults, which the rest follow as they change.
 pub struct VfxViews {
     target: VfxTarget,
     pub background: bool,
     started: Option<(String, f64)>,
-    pub fills: HashMap<String, BTreeMap<String, ParamValue>>,
+    pub tried: HashMap<String, BTreeMap<String, ParamValue>>,
 }
 
 impl Default for VfxViews {
@@ -38,7 +44,7 @@ impl Default for VfxViews {
             target: VfxTarget::default(),
             background: true,
             started: None,
-            fills: HashMap::new(),
+            tried: HashMap::new(),
         }
     }
 }
@@ -84,7 +90,7 @@ pub fn preview(
         ui.label(theme::muted("the preview plays once the content loads"));
         return;
     };
-    let models: Vec<String> = content.table::<ModelDef>().keys().to_vec();
+    let models: Vec<String> = content.table::<ModelDef>().paths().to_vec();
     let total = layers
         .iter()
         .map(|layer| layer.ends().0)
@@ -100,14 +106,14 @@ pub fn preview(
     ui.horizontal_wrapped(|ui| {
         for &kind in VfxTargetKind::VARIANTS {
             let on = VfxTargetKind::from(&views.target) == kind;
-            if widgets::mode_chip(ui, kind.into(), on).clicked() && !on {
+            if chip::mode(ui, <&str>::from(kind), on).clicked() && !on {
                 views.target = VfxTarget::fresh(kind, &models);
             }
         }
     });
     ui.horizontal_wrapped(|ui| match &mut views.target {
         VfxTarget::Actor { model, action } => {
-            widgets::combo("preview-model")
+            controls::combo("preview-model")
                 .width(160.0)
                 .selected_text(theme::mono(model.as_str()).size(13.0))
                 .show_ui(ui, |ui| {
@@ -157,26 +163,27 @@ pub fn preview(
         ui.checkbox(&mut views.background, "background");
         ui.label(theme::faint(format!("{elapsed:.2} s of {total:.2}")).size(12.0));
     });
-    let fills = views.fills.entry(key.to_owned()).or_default();
-    for spec in specs {
-        fills.entry(spec.name.clone()).or_insert(spec.default);
-    }
+    let tried = views.tried.entry(key.to_owned()).or_default();
     if !specs.is_empty() && ui.button("reset to defaults").clicked() {
-        for spec in specs {
-            fills.insert(spec.name.clone(), spec.default);
-        }
+        tried.clear();
     }
     ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
+    let mut params = Vec::new();
     for spec in specs {
+        let mut value = tried
+            .get(&spec.name)
+            .copied()
+            .filter(|value| mem::discriminant(value) == mem::discriminant(&spec.default))
+            .unwrap_or(spec.default);
         ui.horizontal(|ui| {
             ui.label(theme::muted(&spec.name).monospace().size(12.5));
-            let mut value = fills.get(&spec.name).copied().unwrap_or(spec.default);
             if param_control(ui, spec, &mut value) {
-                fills.insert(spec.name.clone(), value);
+                tried.insert(spec.name.clone(), value);
             }
         });
+        params.push((spec.name.clone(), value));
     }
-    let params = VfxParams(fills.iter().map(|(k, v)| (k.clone(), *v)).collect());
+    let params = VfxParams(params);
     let background = views.background;
     let target = views.target.clone();
     let center = stage::center(&content);
@@ -184,7 +191,7 @@ pub fn preview(
     let mut posed = Posed::default();
     let on = match &target {
         VfxTarget::Actor { model, action } => {
-            let Some(model) = content.by_key::<ModelDef>(model) else {
+            let Some(model) = content.by_path::<ModelDef>(model) else {
                 ui.label(theme::warn("pick a model to play the vfx on"));
                 return;
             };
@@ -282,7 +289,7 @@ impl VfxTarget {
 }
 
 fn action_combo(ui: &mut Ui, action: &mut Action) {
-    widgets::combo("preview-action")
+    controls::combo("preview-action")
         .width(90.0)
         .selected_text(theme::mono(action.as_ref()).size(13.0))
         .show_ui(ui, |ui| {
@@ -293,11 +300,11 @@ fn action_combo(ui: &mut Ui, action: &mut Action) {
 }
 
 fn facing_field(ui: &mut Ui, facing: &mut Degrees) {
-    ui.add(
-        egui::DragValue::new(&mut facing.0)
-            .range(0.0..=360.0)
-            .suffix("°"),
-    );
+    NumberField::new(&mut facing.0)
+        .range(0.0..=360.0)
+        .unit("°")
+        .width(FIELD_WIDTH)
+        .show(ui);
 }
 
 fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
@@ -309,7 +316,7 @@ fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
         Shape::Line { .. } => "line",
     };
     let mut picked = current;
-    widgets::combo("preview-shape")
+    controls::combo("preview-shape")
         .width(80.0)
         .selected_text(theme::mono(current).size(13.0))
         .show_ui(ui, |ui| {
@@ -336,12 +343,10 @@ fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
     }
     let tiles = |ui: &mut Ui, label: &str, value: &mut Tiles| {
         ui.label(theme::faint(label).size(12.0));
-        ui.add(
-            egui::DragValue::new(&mut value.0)
-                .speed(0.1)
-                .range(0.1..=12.0)
-                .fixed_decimals(1),
-        );
+        NumberField::new(&mut value.0)
+            .range(0.1..=12.0)
+            .width(FIELD_WIDTH)
+            .show(ui);
     };
     match shape {
         Shape::Circle { radius } => tiles(ui, "radius", radius),
@@ -351,11 +356,11 @@ fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
         }
         Shape::Cone { angle, length } => {
             ui.label(theme::faint("angle").size(12.0));
-            ui.add(
-                egui::DragValue::new(&mut angle.0)
-                    .range(5.0..=360.0)
-                    .suffix("°"),
-            );
+            NumberField::new(&mut angle.0)
+                .range(5.0..=360.0)
+                .unit("°")
+                .width(FIELD_WIDTH)
+                .show(ui);
             tiles(ui, "length", length);
         }
         Shape::Line { length, width } => {

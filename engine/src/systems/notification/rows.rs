@@ -1,18 +1,19 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::time::Duration;
+use ui::egui;
 
 use bevy::prelude::*;
-use design_tokens::dusk;
-use design_tokens::face::Face;
-use design_tokens::glyph::{self, Mark};
-use design_tokens::ink::Ground;
-use egui::emath::{TSTransform, easing};
-use egui::{
+use serde::{Deserialize, Serialize};
+use ui::dusk;
+use ui::egui::emath::{TSTransform, easing};
+use ui::egui::{
     Align, Align2, Color32, FontId, Id, LayerId, Layout, Order, Rect, RichText, Sense, Ui,
     UiBuilder, Vec2,
 };
-use serde::{Deserialize, Serialize};
+use ui::face::Face;
+use ui::glyph::Mark;
+use ui::ink::Ground;
 
 use super::{NotificationSent, window_visible};
 use crate::core::gui::{self, Band, Tier};
@@ -20,6 +21,8 @@ use crate::core::text::{self, KeyNames, StyledLine, TextLook, TextPiece, TextSha
 use crate::core::time::Seconds;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::screen::ClientScreen;
+use ui::form;
+use ui::paint;
 
 const COUNT_LINGERS: Seconds = Seconds(5.0);
 
@@ -821,9 +824,7 @@ fn label_text(label: &str, replaced: u32) -> String {
 }
 
 fn label_width(gui: &egui::Context, label: &str) -> f32 {
-    gui.fonts_mut(|fonts| fonts.layout_no_wrap(label.to_owned(), label_font(), WHITE))
-        .size()
-        .x
+    paint::text_size(gui, label, label_font()).x
 }
 
 /// The alert's label over a rule, with the cross that closes it; true once the cross is clicked.
@@ -839,21 +840,13 @@ fn alert_title(ui: &mut Ui, label: &str) -> bool {
                 if response.hovered() {
                     ui.painter().rect_filled(rect, 4.0, dusk::HOVER);
                 }
-                glyph::paint(
-                    ui.painter(),
-                    Mark::Cross,
-                    rect.shrink(CLOSE * 0.2),
-                    dusk::TEXT,
-                );
+                Mark::Cross.paint(ui.painter(), rect.shrink(CLOSE * 0.2), dusk::TEXT);
                 response.clicked()
             })
             .inner
         })
         .inner;
-    let rule = ui.available_rect_before_wrap().x_range();
-    let y = ui.cursor().top();
-    ui.painter()
-        .hline(rule, y, egui::Stroke::new(1.0, dusk::BORDER));
+    form::rule_with(ui, egui::Stroke::new(1.0, dusk::BORDER));
     ui.add_space(6.0);
     closed
 }

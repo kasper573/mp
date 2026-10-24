@@ -24,6 +24,7 @@ use crate::systems::visibility::Presence;
 #[schemars(extend("x-system" = "item"))]
 pub struct Items {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub take: Vec<ItemStack>,
@@ -41,6 +42,7 @@ pub struct Items {
 #[schemars(extend("x-system" = "item"))]
 pub struct UseItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub item: ItemId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -55,6 +57,7 @@ pub struct UseItem {
 #[schemars(extend("x-system" = "item"))]
 pub struct Equip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub item: ItemId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -69,6 +72,7 @@ pub struct Equip {
 #[schemars(extend("x-system" = "item"))]
 pub struct Unequip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub slot: EquipmentSlot,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -83,6 +87,7 @@ pub struct Unequip {
 #[schemars(extend("x-system" = "item"))]
 pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub item: ItemId,
     #[schemars(extend("x-count" = true))]
@@ -105,6 +110,7 @@ pub struct SpawnGroundItems {
     #[serde(rename = "for")]
     pub for_whom: GroundItemsFor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 60.0))]
     pub seconds: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -116,6 +122,7 @@ pub struct SpawnGroundItems {
 pub struct ClearGroundItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
+    #[schemars(extend("default" = 3.0))]
     pub within: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -125,7 +132,9 @@ pub struct ClearGroundItems {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[schemars(extend("x-system" = "item"))]
 pub struct MoveItems {
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub from: Condition,
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub to: Condition,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub items: Vec<ItemStack>,
@@ -140,6 +149,7 @@ pub struct MoveItems {
 #[serde(untagged)]
 pub enum Spot {
     Place(Place),
+    #[schemars(extend("default" = {"type": "subject"}))]
     Actor(Condition),
 }
 
@@ -154,9 +164,7 @@ impl EffectDef<RiftScripting> for Items {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -184,9 +192,7 @@ impl EffectDef<RiftScripting> for UseItem {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("used", &self.used), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("used" => used, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -210,9 +216,7 @@ impl EffectDef<RiftScripting> for Equip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -236,9 +240,7 @@ impl EffectDef<RiftScripting> for Unequip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -262,9 +264,7 @@ impl EffectDef<RiftScripting> for DropItems {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -290,9 +290,7 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
     fn needs_subject(&self) -> bool {
         self.for_whom == GroundItemsFor::Subject || self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -333,9 +331,7 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
     fn needs_subject(&self) -> bool {
         self.at.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -373,9 +369,7 @@ impl EffectDef<RiftScripting> for MoveItems {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

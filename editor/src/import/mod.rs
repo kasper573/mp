@@ -17,22 +17,25 @@ pub use tileset_ui::{
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
+use ui::dialog;
+use ui::theme;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Context, Ui};
-use engine::core::content::{ContentRow, asset_file};
+use engine::core::content::{ContentFile, fields_file};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::TilesetDef;
 use formats::{AnimationExport, DroppedFiles};
 use image::RgbaImage;
 use serde::Deserialize;
+use ui::egui::{Context, Ui};
+use ui::glyph::{self, Mark};
 
 use crate::app::{ChannelInbox, Editor, ModalDialog};
 use crate::project::ContentEdit;
 use crate::rows;
 use crate::scenes::StripName;
+use crate::shell::active_tab;
 use crate::tabs::EditorTab;
-use crate::ui::{active_tab, dialogs, theme};
+use crate::tabs::shown_path;
 use crate::views::model::{ModelPage, strip_of, write_strip};
 
 pub const IMPORT_PART: &str = "/import";
@@ -96,7 +99,7 @@ pub fn show_readings(editor: &mut Editor, ctx: &Context) {
     for job in editor.jobs.reading.iter().filter(|job| job.again.is_none()) {
         let name = names_of(job);
         let mut cancel = false;
-        dialogs::card(ctx, &format!("import-reading-{}", job.id), 360.0, |ui| {
+        dialog::card(ctx, &format!("import-reading-{}", job.id), 360.0, |ui| {
             ui.label(theme::strong(format!("Reading {name}…")));
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -241,7 +244,7 @@ fn scripted(editor: &mut Editor) {
             let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
-            let Some(row) = editor.row_value(ModelDef::TABLE, &key) else {
+            let Some(Ok(row)) = editor.read::<ModelDef>(&key) else {
                 return;
             };
             let Some(strip) = strip.strip() else {
@@ -297,11 +300,11 @@ pub fn start_animation(editor: &mut Editor, key: &str) {
 
 fn pick_files(editor: &mut Editor, target: ImportTarget) {
     let title = match &target {
-        ImportTarget::Model(key) => format!("Import onto model/{key}"),
+        ImportTarget::Model(key) => format!("Import onto {}", shown_path(key)),
         ImportTarget::NewModel => "Import a model".to_owned(),
-        ImportTarget::Tileset(key) => format!("Import onto tileset/{key}"),
+        ImportTarget::Tileset(key) => format!("Import onto {}", shown_path(key)),
         ImportTarget::NewTileset => "Import a tileset".to_owned(),
-        ImportTarget::Animation(key) => format!("Import an animation onto tileset/{key}"),
+        ImportTarget::Animation(key) => format!("Import an animation onto {}", shown_path(key)),
     };
     let mut picker = rfd::FileDialog::new()
         .set_title(&title)
@@ -309,13 +312,18 @@ fn pick_files(editor: &mut Editor, target: ImportTarget) {
     if let Some(dir) = art_dir(editor) {
         picker = picker.set_directory(dir);
     }
-    let Some(files) = picker.pick_files() else {
+    let Some(files) = picked_files(picker) else {
         return;
     };
     match formats::sort_out(&files) {
         Ok(dropped) => begin(editor, target, dropped, None),
         Err(reason) => editor.toast(format!("Not imported: {reason}")),
     }
+}
+
+pub fn picked_files(dialog: rfd::FileDialog) -> Option<Vec<PathBuf>> {
+    // The desktop portal answers a cancelled pick with no files rather than with none.
+    dialog.pick_files().filter(|files| !files.is_empty())
 }
 
 pub fn art_dir(editor: &Editor) -> Option<PathBuf> {
@@ -372,7 +380,11 @@ fn start_again(editor: &mut Editor, due: records::DueReimport) {
         (TilesetDef::TABLE, None) => ImportTarget::Tileset(due.key.clone()),
         _ => return,
     };
-    if editor.row_value(&due.table, &due.key).is_none() {
+    let present = editor
+        .project
+        .as_ref()
+        .is_some_and(|project| project.files.contains(&fields_file(&due.key)));
+    if !present {
         editor.imports.forget(&due.table, &due.key);
         return;
     }
@@ -398,31 +410,43 @@ fn names_of(job: &ImportReading) -> String {
     formats::names(&job.dropped.files())
 }
 
+/// Whether `key` names a file of `Row` that is there but doesn't read, saying so: an import onto
+/// it would take it for a new file and lose what it holds.
+fn refuses_unread<Row: ContentFile>(editor: &mut Editor, key: &str) -> bool {
+    let present = editor
+        .project
+        .as_ref()
+        .is_some_and(|project| project.files.contains(&fields_file(key)));
+    if !present || matches!(editor.read::<Row>(key), Some(Ok(_))) {
+        return false;
+    }
+    editor.toast(format!(
+        "Not imported onto {}: it doesn't read; its row on the left shows why",
+        shown_path(key)
+    ));
+    true
+}
+
 fn asset_image(editor: &Editor, path: &str) -> Option<RgbaImage> {
-    let bytes = editor.project.as_ref()?.files.get(&asset_file(path))?;
+    let bytes = editor.project.as_ref()?.files.get(path)?;
     formats::decode_image_bytes(bytes).ok()
 }
 
-fn free_key(editor: &Editor, table: &str, export: &AnimationExport) -> String {
-    let wanted = export
+/// The name a new file made from `export` starts with: the export's own, as a name may hold it,
+/// or the type's.
+fn suggested_name(export: &AnimationExport, table: &str) -> String {
+    export
         .files
         .first()
-        .map(|file| formats::stem(file).replace(['-', ' '], "_").to_lowercase())
-        .unwrap_or_else(|| format!("new_{table}"));
-    match &editor.project {
-        Some(project) => rows::free_key(&project.files, table, &wanted),
-        None => wanted,
-    }
-}
-
-fn asset_name(folder: &str, key: &str) -> String {
-    format!("{folder}/{}.png", key.replace('_', "-"))
+        .map(|file| rows::name_from(&formats::stem(file).replace('-', "_")))
+        .filter(|name| engine::core::content::valid_name(name))
+        .unwrap_or_else(|| table.to_owned())
 }
 
 fn check_line(ui: &mut Ui, ok: bool, text: String) {
     ui.horizontal_wrapped(|ui| {
         if ok {
-            glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+            glyph::show(ui, Mark::Check, 14.0, theme::OK);
         } else {
             glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
         }

@@ -16,7 +16,7 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const DRAUGHT: &str = "icons/potion/green_potion_3.png";
+const DRAUGHT: &str = "shamans_draught";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as(
@@ -78,7 +78,7 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("Cleave's card", |snapshot| {
         snapshot
             .skill_card
-            .is_some_and(|card| card.skill.key(content()) == "cleave")
+            .is_some_and(|card| card.skill.name(content()) == "cleave")
     });
     me.hold();
     me.act(InputAction::Dismiss);
@@ -158,7 +158,7 @@ fn play(shoot: &mut Shoot) {
         "A reset is content's to offer, here a draught. The game always asks first, and Keep is the default",
     );
     me.act(InputAction::ToggleInventory);
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(DRAUGHT));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(DRAUGHT));
     me.wait_until("the question", reset_prompted);
     me.hold();
     me.click_ui(UiTarget::button("Reset"));

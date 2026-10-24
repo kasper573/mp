@@ -7,6 +7,7 @@ use driver::{
 use engine::core::math::Offset;
 use engine::systems::history::HistoryTopic;
 use engine::systems::input::map::InputAction;
+use engine::systems::interface::InterfaceIcon;
 use engine::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
@@ -19,9 +20,8 @@ pub const CHAPTER: Chapter = Chapter {
     play,
 };
 
-const BAG: &str = "icons/equipment/bag.png";
-const HELMET: &str = "icons/equipment/leather_helmet.png";
-const CUTLASS: &str = "icons/weapon_and_tool/golden_sword.png";
+const HELMET: &str = "tribal_helmet";
+const CUTLASS: &str = "corsair_cutlass";
 
 fn play(shoot: &mut Shoot) {
     let player = shoot.join_as("forest_bound", None);
@@ -92,18 +92,18 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);
 
     me.caption("What you can't do is an error, in red at the top: the Tribal Helmet wants level 3");
-    me.click_ui(UiTarget::image(BAG));
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(HELMET));
+    me.click_ui(UiTarget::interface_icon(InterfaceIcon::Bag));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(HELMET));
     me.wait_until("the helmet refused", |snapshot| {
         erred(snapshot, "Tribal Helmet")
     });
     me.caption("Only the latest error shows: the Corsair's Cutlass wants level 3 too");
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(CUTLASS));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(CUTLASS));
     me.wait_until("the cutlass refused over the helmet", |snapshot| {
         erred(snapshot, "Corsair's Cutlass")
     });
     me.caption("Trying again keeps that one error up, with nothing piling on");
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(CUTLASS));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(CUTLASS));
     me.caption("Errors it replaced are kept in history");
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to open", |snapshot| snapshot.history.open);
@@ -179,7 +179,7 @@ fn yelled(snapshot: &ProbeSnapshot, npc: &str) -> bool {
         .notifications
         .bubbles
         .iter()
-        .any(|bubble| bubble.npc.key(content()) == npc)
+        .any(|bubble| bubble.npc.name(content()) == npc)
 }
 
 fn fight_until(me: &mut Player, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) {

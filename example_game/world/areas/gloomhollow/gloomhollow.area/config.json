@@ -1,0 +1,12 @@
+{
+  "name": "Gloomhollow",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 60,
+        "height": 72
+      },
+      "tile": 16
+    }
+  }
+}

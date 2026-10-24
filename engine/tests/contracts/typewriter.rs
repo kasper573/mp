@@ -7,11 +7,17 @@ use engine::core::text::{
 const TEN_PER_SECOND: LettersPerSecond = LettersPerSecond(10.0);
 
 #[test]
-fn characters_appear_at_the_typing_speed() {
+fn characters_appear_at_the_typing_speed_a_key_as_one_and_slow_spans_slower() {
     let line = [span("abcd")];
     assert_eq!(revealed(&line, TEN_PER_SECOND, ms(0)), 0);
     assert_eq!(revealed(&line, TEN_PER_SECOND, ms(250)), 2);
     assert_eq!(reveal_duration(&line, TEN_PER_SECOND), ms(400));
+
+    let keyed = [span("ab"), TextPiece::Key(KeyCap::Input(InputRef(0)))];
+    assert_eq!(revealed(&keyed, TEN_PER_SECOND, ms(300)), 3);
+
+    let slow = [StyledSpan::plain("abcd").slow().into()];
+    assert!(reveal_duration(&slow, TEN_PER_SECOND) > reveal_duration(&line, TEN_PER_SECOND));
 }
 
 #[test]
@@ -20,19 +26,6 @@ fn a_pause_holds_back_what_follows() {
     assert_eq!(revealed(&line, TEN_PER_SECOND, ms(600)), 2);
     assert_eq!(revealed(&line, TEN_PER_SECOND, ms(800)), 3);
     assert_eq!(reveal_duration(&line, TEN_PER_SECOND), ms(900));
-}
-
-#[test]
-fn slow_spans_take_longer_than_plain_ones() {
-    let plain = [span("abcd")];
-    let slow = [StyledSpan::plain("abcd").slow().into()];
-    assert!(reveal_duration(&slow, TEN_PER_SECOND) > reveal_duration(&plain, TEN_PER_SECOND));
-}
-
-#[test]
-fn a_key_reveals_as_one_letter() {
-    let line = [span("ab"), TextPiece::Key(KeyCap::Input(InputRef(0)))];
-    assert_eq!(revealed(&line, TEN_PER_SECOND, ms(300)), 3);
 }
 
 fn span(text: &'static str) -> TextPiece {

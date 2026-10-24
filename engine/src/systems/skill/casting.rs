@@ -18,7 +18,7 @@ use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::effect::{self as effects, Audience};
 use crate::systems::script::{
-    Condition, EffectCall, EventKind, Owner, OwnerKind, Reach, RiftInstances, RiftScripting,
+    Condition, EffectCall, EventKind, Owner, Reach, RiftInstances, RiftScripting, RunnerKind,
     condition, event,
 };
 use crate::systems::{notification, stat};
@@ -44,9 +44,11 @@ pub enum CastAim {
 #[schemars(extend("x-system" = "skill"))]
 pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub skill: SkillId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub at: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -230,7 +232,7 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
         notification::play_sound(world, Some(caster), Some(caster), sfx, Audience::Everyone);
     }
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Skill, skill.raw()),
+        Owner::Row(RunnerKind::Skill, skill.raw()),
         EventKind::Used,
         Some(caster),
         event::used_payload(target.actor(), target.point(), i64::from(rank.0)),
@@ -242,9 +244,7 @@ impl EffectDef<RiftScripting> for UseSkill {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next), (REFUSED, &self.refused)]
-    }
+    crate::outputs!(NEXT => next, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

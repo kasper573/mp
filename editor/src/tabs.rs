@@ -1,16 +1,21 @@
-use egui_dock::DockState;
 use engine::core::content::{
-    ContentRow, Fixture, GAME_FILE, asset_file, row_file, row_folder, table_folder,
+    ContentFile, Fixture, NOTE_EXTENSION, SETTINGS_FILE, fields_file, table_of,
 };
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::AreaDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::systems::input::map::InputDef;
 use engine::systems::player::snapshot::CharacterSnapshot;
 use engine::systems::script::ScriptDef;
+use ui::egui_dock;
+use ui::egui_dock::DockState;
+use ui::glyph::Mark;
 
-use crate::views::script::ScriptOwner;
+use crate::icons::{self, KindIcon};
+use crate::project::files::content_holding;
+use crate::views::script::ScriptRow;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EditorTab {
@@ -19,7 +24,7 @@ pub enum EditorTab {
     Rows { table: String, keys: Vec<String> },
     Area { key: String },
     Blueprint { key: String },
-    Script(ScriptOwner),
+    Script(ScriptRow),
     Model { key: String },
     Tileset { key: String },
     Spreadsheet { table: String },
@@ -51,25 +56,38 @@ impl EditorTab {
             EditorTab::Row { table, .. } if table == CharacterSnapshot::TABLE => {
                 "Test characters".to_owned()
             }
-            EditorTab::Row { table, key } => format!("{table}/{key}"),
+            EditorTab::Row { key, .. }
+            | EditorTab::Area { key }
+            | EditorTab::Blueprint { key }
+            | EditorTab::Model { key }
+            | EditorTab::Tileset { key } => file_title(key).to_owned(),
             EditorTab::Rows { table, keys } => format!("{} {table}s", keys.len()),
-            EditorTab::Area { key } => format!("{}/{key}", AreaDef::TABLE),
-            EditorTab::Blueprint { key } => format!("{}/{key}", BlueprintDef::TABLE),
             EditorTab::Script(owner) => owner.title(),
-            EditorTab::Model { key } => format!("{}/{key}", ModelDef::TABLE),
-            EditorTab::Tileset { key } => format!("{}/{key}", TilesetDef::TABLE),
             EditorTab::Spreadsheet { table } => format!("{table} table"),
             EditorTab::Game => "game".to_owned(),
             EditorTab::Asset { path } => path.rsplit('/').next().unwrap_or(path).to_owned(),
         }
     }
 
+    /// The icon of what the tab shows.
+    pub fn icon(&self) -> KindIcon {
+        match self {
+            EditorTab::Game => Mark::Settings.into(),
+            EditorTab::Spreadsheet { .. } => icons::TABLE,
+            EditorTab::Rows { table, .. } => icons::of_table(table),
+            EditorTab::Asset { path } if path.ends_with(&format!(".{NOTE_EXTENSION}")) => {
+                icons::NOTE
+            }
+            EditorTab::Asset { path } => icons::of_media(path),
+            other => other
+                .row()
+                .map_or(icons::TABLE, |(table, _)| icons::of_table(&table)),
+        }
+    }
+
     pub fn row(&self) -> Option<(String, String)> {
         match self {
-            EditorTab::World => Some((
-                WorldMapDef::TABLE.to_owned(),
-                WorldMap::World.key().to_owned(),
-            )),
+            EditorTab::World => Some((WorldMapDef::TABLE.to_owned(), WorldMap::Game.path())),
             EditorTab::Row { table, key } => Some((table.clone(), key.clone())),
             EditorTab::Rows { .. } => None,
             EditorTab::Area { key } => Some((AreaDef::TABLE.to_owned(), key.clone())),
@@ -84,15 +102,13 @@ impl EditorTab {
     /// Whether `file` holds any of what the tab shows, so changing it changes the tab.
     pub fn shows(&self, file: &str) -> bool {
         match self {
-            EditorTab::Rows { table, keys } => keys.iter().any(|key| holds_row(table, key, file)),
-            EditorTab::Spreadsheet { table } => {
-                file.starts_with(&format!("{}/", table_folder(table)))
-            }
-            EditorTab::Game => file == GAME_FILE,
-            EditorTab::Asset { path } => file == asset_file(path),
-            other => other
-                .row()
-                .is_some_and(|(table, key)| holds_row(&table, &key, file)),
+            EditorTab::Rows { keys, .. } => keys.iter().any(|key| holds(key, file)),
+            EditorTab::Spreadsheet { table } => content_holding(file)
+                .and_then(table_of)
+                .is_some_and(|of| of == table),
+            EditorTab::Game => file == SETTINGS_FILE,
+            EditorTab::Asset { path } => file == path,
+            other => other.row().is_some_and(|(_, key)| holds(&key, file)),
         }
     }
 
@@ -117,10 +133,11 @@ impl EditorTab {
             TilesetDef::TABLE => EditorTab::Tileset {
                 key: key.to_owned(),
             },
-            ScriptDef::TABLE => EditorTab::Script(ScriptOwner::Shared {
-                key: key.to_owned(),
-            }),
+            ScriptDef::TABLE => EditorTab::Script(ScriptRow::new(key)),
             WorldMapDef::TABLE => EditorTab::World,
+            InputDef::TABLE => EditorTab::Spreadsheet {
+                table: table.to_owned(),
+            },
             _ => EditorTab::Row {
                 table: table.to_owned(),
                 key: key.to_owned(),
@@ -200,6 +217,18 @@ pub(crate) fn serve(dock: &mut DockState<EditorTab>, request: DockRequest) {
     }
 }
 
-fn holds_row(table: &str, key: &str, file: &str) -> bool {
-    file == row_file(table, key) || file.starts_with(&format!("{}/", row_folder(table, key)))
+/// Whether `file` is the content file at `path` or one of its parts.
+fn holds(path: &str, file: &str) -> bool {
+    file == fields_file(path) || content_holding(file) == Some(path)
+}
+
+/// How a content file is named on its tab and in lists: its file name, without `.json`.
+pub fn file_title(path: &str) -> &str {
+    shown_path(path.rsplit('/').next().unwrap_or(path))
+}
+
+/// A path as the editor writes it for the user: a content file without the `.json` every one of
+/// them ends in, since its type already says what it is.
+pub fn shown_path(path: &str) -> &str {
+    path.strip_suffix(".json").unwrap_or(path)
 }

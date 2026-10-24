@@ -1,81 +1,115 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use ui::egui;
+use ui::form;
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, TABLES_DIR, asset_file, row_file, row_of};
+use engine::core::content::files::{NAME_RULE, valid_name};
+use engine::core::content::{ContentFile, bundle_of};
+use engine::core::script::Node;
 use engine::systems::actor::ModelDef;
-use engine::systems::actor::model::GenericExpression;
+use engine::systems::actor::model::{
+    Busts, Expression, GenericExpression, MODEL_BUSTS, ModelModule,
+};
 use engine::systems::npc::NpcDef;
-use engine::systems::script::ScriptDef;
-use serde_json::Value;
+use engine::systems::script::{Line, ScriptDef, Speaker};
 use strum::VariantArray;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::glyph::Mark;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, RowSelection};
-use crate::ui::{theme, widgets};
-use crate::{rows, thumbs};
+use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection};
+use crate::rows;
+use crate::tabs::shown_path;
+use crate::thumbs;
 
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
-pub fn generic() -> impl Iterator<Item = &'static str> {
-    GenericExpression::VARIANTS.iter().map(|face| face.as_ref())
-}
-
+/// A face of a model's bust, drawn in a part of its bundle.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BustFace {
     pub name: String,
     pub file: String,
-    pub own: Option<usize>,
-    pub pointer: String,
+    /// Whether the face is the model's own rather than one every bust has.
+    pub own: bool,
 }
 
-pub fn module_index(row: &Value) -> Option<usize> {
-    row["modules"]
-        .as_array()?
+impl BustFace {
+    /// What a selection holds while the face is picked: its part of the bundle.
+    pub fn part(&self) -> String {
+        bundle_of(&self.file).map_or_else(|| self.file.clone(), |(_, part)| part.to_owned())
+    }
+}
+
+pub fn module_index(model: &ModelDef) -> Option<usize> {
+    model
+        .modules
         .iter()
-        .position(|module| module["type"] == "bust")
+        .position(|module| matches!(module, ModelModule::Bust(_)))
 }
 
-pub fn faces(row: &Value) -> Vec<BustFace> {
-    let Some(index) = module_index(row) else {
+/// Every face of the model's bust: the generic ones, then its own.
+pub fn faces(model: &ModelDef) -> Vec<BustFace> {
+    let Some(busts) = model.busts() else {
         return Vec::new();
     };
-    let module = &row["modules"][index];
-    let mut faces: Vec<BustFace> = generic()
-        .map(|name| BustFace {
-            name: name.to_owned(),
-            file: module[name].as_str().unwrap_or_default().to_owned(),
-            own: None,
-            pointer: format!("/modules/{index}/{name}"),
-        })
-        .collect();
-    for (j, own) in module["own"].as_array().into_iter().flatten().enumerate() {
-        faces.push(BustFace {
-            name: own["name"].as_str().unwrap_or_default().to_owned(),
-            file: own["file"].as_str().unwrap_or_default().to_owned(),
-            own: Some(j),
-            pointer: format!("/modules/{index}/own/{j}"),
+    let generic = GenericExpression::VARIANTS
+        .iter()
+        .map(|&expression| BustFace {
+            name: expression.as_ref().to_owned(),
+            file: busts.generic.of(expression).as_str().to_owned(),
+            own: false,
         });
-    }
-    faces
+    let own = busts.own.iter().map(|bust| BustFace {
+        name: bust.name.clone(),
+        file: bust.file.as_str().to_owned(),
+        own: true,
+    });
+    generic.chain(own).collect()
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+/// The name of every face a bust of `model` has: the generic ones, then the model's own.
+pub fn face_names(model: Option<&ModelDef>) -> Vec<String> {
+    let generic = GenericExpression::VARIANTS
+        .iter()
+        .map(|expression| expression.as_ref().to_owned());
+    let own = model
+        .and_then(ModelDef::busts)
+        .into_iter()
+        .flat_map(|busts| busts.own.iter().map(|bust| bust.name.clone()));
+    generic.chain(own).collect()
+}
+
+/// The model the npc at `npc` wears, when both read.
+pub fn model_of_npc(project: &Project, npc: &str) -> Option<Arc<ModelDef>> {
+    let npc = project.read::<NpcDef>(npc).ok()?;
+    project.read_id(npc.model)
+}
+
+/// The part of the model at `key` a bust of `name` is drawn in.
+pub fn face_file(key: &str, name: &str) -> String {
+    format!("{key}/{}", MODEL_BUSTS.named(name, "png"))
+}
+
+/// What the speakers using the model at `key` are called, its path when nobody speaks with it.
+pub fn speaker_name(editor: &Editor, key: &str) -> String {
+    super::users(editor, key)
+        .iter()
+        .find_map(|(_, user)| Some(editor.read::<NpcDef>(user)?.ok()?.name.clone()))
+        .unwrap_or_else(|| shown_path(key).to_owned())
+}
+
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let faces = faces(row);
-    let title = super::users(editor, key)
-        .first()
-        .and_then(|(table, user)| {
-            editor
-                .row_value(table, user)
-                .and_then(|row| row["name"].as_str().map(str::to_owned))
-        })
-        .unwrap_or_else(|| key.to_owned());
-    widgets::section(ui, &format!("Bust · {title}"));
+    let title = speaker_name(editor, key);
+    sheet::section(ui, &format!("Bust · {title}"));
     if module_index(row).is_none() {
-        ui.add_space(6.0);
-        widgets::hint(ui, "No bust module: this model never speaks.");
-        editor.status.left.push(format!("model/{key} · no bust"));
+        no_bust(editor, ui, key);
         return;
     }
     let drops = std::mem::take(&mut editor.views.model.drops);
@@ -110,69 +144,166 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.end_row();
                 }
             }
-            let (rect, response) = ui.allocate_exact_size(CARD, Sense::click());
-            let painter = ui.painter_at(rect);
-            painter.rect_filled(rect, 4.0, theme::SELECTION.gamma_multiply(0.5));
-            widgets::dashed_rect(
-                &painter,
-                rect,
-                egui::Stroke::new(1.0, theme::ACCENT),
-                4.0,
-                4.0,
-            );
-            painter.text(
-                rect.center() - Vec2::new(0.0, 10.0),
-                egui::Align2::CENTER_CENTER,
-                "+",
-                egui::FontId::proportional(20.0),
-                theme::ACCENT,
-            );
-            painter.text(
-                rect.center() + Vec2::new(0.0, 12.0),
-                egui::Align2::CENTER_CENTER,
-                "drop to add an expression",
-                egui::FontId::proportional(12.5),
-                theme::ACCENT,
-            );
-            if response.clicked() {
+            if drop_slot(ui, CARD, "drop to add an expression")
+                .on_hover_text("Drop PNGs here, or click to browse for them")
+                .clicked()
+            {
                 browse = true;
             }
-            response.on_hover_text("Drop a PNG here, or click to browse for one");
             ui.end_row();
         });
     if replace.is_none() && !drops.is_empty() {
         add = drops.clone();
     }
-    if browse
-        && let Some(path) = rfd::FileDialog::new()
-            .add_filter("PNG", &["png"])
-            .pick_file()
-    {
-        add.push(path);
+    if browse {
+        add.extend(browse_faces(key));
     }
     if let Some(face) = pick {
         let view = editor.views.model.view_mut(key);
         view.face = Some(face.name.clone());
-        editor.select(RowSelection::parts(
-            ModelDef::TABLE,
-            key,
-            vec![face.pointer],
-        ));
+        editor.select(RowSelection::parts(ModelDef::TABLE, key, vec![face.part()]));
     }
     if let Some((face, path)) = replace {
         replace_file(editor, key, &face, &path);
     }
-    for path in add {
-        add_expression(editor, key, row, &path);
+    if !add.is_empty() {
+        add_faces(editor, key, &faces, &add);
     }
-    editor
-        .status
-        .left
-        .push(format!("model/{key} · bust · {} expressions", faces.len()));
+    editor.status.left.push(format!(
+        "{} · bust · {} expressions",
+        shown_path(key),
+        faces.len()
+    ));
     editor
         .status
         .left
         .push("drop PNG files onto slots to add or replace".to_owned());
+}
+
+fn no_bust(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    ui.add_space(6.0);
+    form::hint(
+        ui,
+        &format!(
+            "No bust: this model never speaks. A bust takes a face for each of {}, one size, \
+             each PNG named after its expression; others become the model's own.",
+            generic_names().join(", ")
+        ),
+    );
+    ui.add_space(8.0);
+    let drops = std::mem::take(&mut editor.views.model.drops);
+    let slot = drop_slot(
+        ui,
+        Vec2::new(CARD.x * 2.0 + 12.0, CARD.y),
+        "drop its faces to give it a bust",
+    )
+    .on_hover_text("Drop the faces here, or click to browse for them");
+    let picked = if slot.clicked() {
+        browse_faces(key)
+    } else {
+        drops
+    };
+    if !picked.is_empty() {
+        give(editor, key, &picked);
+    }
+    editor
+        .status
+        .left
+        .push(format!("{} · no bust", shown_path(key)));
+}
+
+/// Gives the model at `key` a bust of the faces in `paths`, in one step: each PNG is the face its
+/// file is named after, and every generic expression needs one.
+pub fn give(editor: &mut Editor, key: &str, paths: &[PathBuf]) {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let Ok(model) = project.read::<ModelDef>(key) else {
+        editor.toast(format!("{} doesn't read yet", shown_path(key)));
+        return;
+    };
+    let mut model = (*model).clone();
+    let mut edit = ContentEdit::new(format!("Give {} a bust", shown_path(key)));
+    let named = match face_writes(&mut edit, key, &[], paths) {
+        Ok(named) => named,
+        Err(error) => {
+            editor.toast(error);
+            return;
+        }
+    };
+    let missing: Vec<String> = generic_names()
+        .into_iter()
+        .filter(|name| !named.contains(name))
+        .collect();
+    if !missing.is_empty() {
+        editor.toast(format!(
+            "A bust needs a face for {} too",
+            missing.join(", ")
+        ));
+        return;
+    }
+    model.modules.push(ModelModule::Bust(Busts::default()));
+    if let Err(error) = edit.write_content(project, key, &model) {
+        editor.toast(error);
+        return;
+    }
+    editor.apply(edit);
+}
+
+/// The faces left in the bundle at `key` once `model` holds no bust, which nothing would read.
+pub fn faces_left(files: &ProjectFiles, key: &str, model: &ModelDef) -> Vec<String> {
+    if model.busts().is_some() {
+        return Vec::new();
+    }
+    files
+        .paths()
+        .filter(|file| {
+            bundle_of(file).is_some_and(|(bundle, part)| bundle == key && MODEL_BUSTS.matches(part))
+        })
+        .cloned()
+        .collect()
+}
+
+fn generic_names() -> Vec<String> {
+    GenericExpression::VARIANTS
+        .iter()
+        .map(|expression| expression.as_ref().to_owned())
+        .collect()
+}
+
+/// The faces picked for the bust of the model at `key`, each a PNG named after its expression.
+pub fn browse_faces(key: &str) -> Vec<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title(format!("The faces of {}", shown_path(key)))
+        .add_filter("PNG", &["png"])
+        .pick_files()
+        .unwrap_or_default()
+}
+
+fn drop_slot(ui: &mut Ui, size: Vec2, text: &str) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 4.0, theme::SELECTION.gamma_multiply(0.5));
+    paint::dashed_rect(
+        &painter,
+        rect,
+        egui::Stroke::new(1.0, theme::ACCENT),
+        4.0,
+        4.0,
+    );
+    Mark::Plus.paint(
+        &painter,
+        ERect::from_center_size(rect.center() - Vec2::new(0.0, 10.0), Vec2::splat(18.0)),
+        theme::ACCENT,
+    );
+    painter.text(
+        rect.center() + Vec2::new(0.0, 12.0),
+        egui::Align2::CENTER_CENTER,
+        text,
+        egui::FontId::proportional(12.5),
+        theme::ACCENT,
+    );
+    response
 }
 
 fn card(
@@ -184,20 +315,7 @@ fn card(
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(CARD, Sense::click());
     let painter = ui.painter_at(rect);
-    painter.rect(
-        rect,
-        4.0,
-        theme::INPUT,
-        egui::Stroke::new(
-            if selected { 2.0 } else { 1.0 },
-            if selected {
-                theme::ACCENT
-            } else {
-                theme::BORDER
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
+    panel::paint_card(&painter, rect, selected);
     let art = ERect::from_min_max(
         rect.min + Vec2::new(4.0, 4.0),
         rect.right_bottom() - Vec2::new(4.0, 28.0),
@@ -234,8 +352,8 @@ fn card(
     painter.text(
         egui::pos2(rect.max.x - 8.0, rect.max.y - 14.0),
         egui::Align2::RIGHT_CENTER,
-        if face.own.is_some() {
-            format!("{key} only")
+        if face.own {
+            format!("{} only", shown_path(key))
         } else {
             "generic".to_owned()
         },
@@ -261,229 +379,226 @@ fn replace_file(editor: &mut Editor, key: &str, face: &BustFace, path: &Path) {
             return;
         }
     };
-    let mut edit = ContentEdit::new(format!("Replace {} of {key}'s bust", face.name));
-    edit.write(asset_file(&face.file), bytes.into());
+    let mut edit = ContentEdit::new(format!(
+        "Replace {} of {}'s bust",
+        face.name,
+        shown_path(key)
+    ));
+    edit.write(face.file.to_owned(), bytes.into());
     editor.apply(edit);
 }
 
-fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
-    let bytes = match png_bytes(path) {
-        Ok(bytes) => bytes,
+/// Takes the PNGs at `paths` into the bust as one step: one named after a face the bust has
+/// replaces its picture, any other becomes an expression of the model's own.
+fn add_faces(editor: &mut Editor, key: &str, faces: &[BustFace], paths: &[PathBuf]) {
+    let mut edit = ContentEdit::new(match paths {
+        [path] => format!(
+            "Add {} to {}'s bust",
+            path.file_name().unwrap_or_default().to_string_lossy(),
+            shown_path(key)
+        ),
+        _ => format!("Add {} faces to {}'s bust", paths.len(), shown_path(key)),
+    });
+    let named = match face_writes(&mut edit, key, faces, paths) {
+        Ok(named) => named,
         Err(error) => {
             editor.toast(error);
             return;
         }
     };
-    let Some(index) = module_index(row) else {
-        return;
-    };
-    let stem = path
-        .file_stem()
-        .map(|stem| {
-            stem.to_string_lossy()
-                .to_lowercase()
-                .replace([' ', '-'], "_")
-        })
-        .unwrap_or_else(|| "expression".to_owned());
-    let taken: HashSet<String> = faces(row).into_iter().map(|face| face.name).collect();
-    let name = rows::free_name(&stem, &taken);
-    let file = format!("busts/{key}/{name}.png");
-    let mut changed = row.clone();
-    let own = &mut changed["modules"][index]["own"];
-    if !own.is_array() {
-        *own = Value::Array(Vec::new());
+    if editor.apply(edit)
+        && let Some(face) = named.last()
+    {
+        editor.views.model.view_mut(key).face = Some(face.clone());
+        let part = MODEL_BUSTS.named(face, "png");
+        editor.select(RowSelection::parts(ModelDef::TABLE, key, vec![part]));
     }
-    own.as_array_mut()
-        .expect("an array")
-        .push(serde_json::json!({ "name": name, "file": file }));
-    let mut edit = ContentEdit::new(format!("Add expression {name} to {key}'s bust"));
-    edit.write(asset_file(&file), bytes.into());
-    edit.write_json(row_file(ModelDef::TABLE, key), &changed);
-    if editor.apply(edit) {
-        let view = editor.views.model.view_mut(key);
-        view.face = Some(name.clone());
-        let j = changed["modules"][index]["own"]
-            .as_array()
-            .map_or(0, |own| own.len().saturating_sub(1));
-        editor.select(RowSelection::parts(
-            ModelDef::TABLE,
-            key,
-            vec![format!("/modules/{index}/own/{j}")],
-        ));
+}
+
+/// Writes each PNG at `paths` as the face its file is named after, numbering a name `faces`
+/// or an earlier path already took. Gives the faces' names in order.
+fn face_writes(
+    edit: &mut ContentEdit,
+    key: &str,
+    faces: &[BustFace],
+    paths: &[PathBuf],
+) -> Result<Vec<String>, String> {
+    let mut written: Vec<String> = Vec::new();
+    for path in paths {
+        let bytes = png_bytes(path)?;
+        let stem = path
+            .file_stem()
+            .map(|stem| rows::name_from(&stem.to_string_lossy().replace('-', "_")))
+            .filter(|stem| valid_name(stem))
+            .unwrap_or_else(|| "expression".to_owned());
+        let name = match faces.iter().find(|face| face.name == stem) {
+            Some(face) if !written.contains(&face.name) => face.name.clone(),
+            _ => {
+                let taken: HashSet<String> = faces
+                    .iter()
+                    .map(|face| face.name.clone())
+                    .chain(written.iter().cloned())
+                    .collect();
+                rows::free_name(&stem, &taken)
+            }
+        };
+        edit.write(face_file(key, &name), bytes.into());
+        written.push(name);
     }
+    Ok(written)
 }
 
 #[derive(Clone, Debug)]
 pub struct FaceLine {
-    pub file: String,
+    pub script: String,
     pub node: String,
     pub face: String,
 }
 
+/// Every line of every script spoken by an npc wearing the model at `key` that asks for a face.
 pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
-    let Some(project) = editor.project.as_ref() else {
+    let (Some(reader), Some(speaks)) = (editor.reader(), speaks_with(editor, key)) else {
         return Vec::new();
     };
-    let speakers: Vec<String> = super::users(editor, key)
-        .into_iter()
-        .filter(|(table, _)| table == NpcDef::TABLE)
-        .map(|(_, key)| key)
-        .collect();
     let mut found = Vec::new();
-    let files: Vec<String> = project
-        .files
-        .paths_under(&format!("{TABLES_DIR}/"))
-        .cloned()
-        .collect();
-    for file in files {
-        let Some((table, row_key)) = row_of(&file) else {
+    for path in reader.paths_of::<ScriptDef>() {
+        let Some(Ok(script)) = editor.read::<ScriptDef>(path) else {
             continue;
         };
-        let owners: Vec<String> = match table {
-            NpcDef::TABLE => vec![row_key.to_owned()],
-            ScriptDef::TABLE => project
-                .usages
-                .of_row(ScriptDef::TABLE, row_key)
-                .iter()
-                .filter_map(|usage| row_of(&usage.file))
-                .filter(|(table, _)| *table == NpcDef::TABLE)
-                .map(|(_, key)| key.to_owned())
-                .collect(),
-            _ => Vec::new(),
-        };
-        let Some(row) = project.files.json(&file) else {
-            continue;
-        };
-        let nodes = find_nodes(&row);
-        for (node, value) in nodes {
-            for line in value["lines"].as_array().into_iter().flatten() {
-                let by = &line["by"];
-                let Some(face) = by["face"].as_str() else {
-                    continue;
-                };
-                let speaker: Vec<String> = match by["npc"].as_str() {
-                    Some(npc) => vec![npc.to_owned()],
-                    None => owners.clone(),
-                };
-                if speaker.iter().any(|npc| speakers.contains(npc)) {
-                    found.push(FaceLine {
-                        file: file.clone(),
-                        node: node.clone(),
-                        face: face.to_owned(),
-                    });
-                }
+        for (node, line) in face_lines(&script) {
+            if let Some(face) = &line.face
+                && speaks(line)
+            {
+                found.push(FaceLine {
+                    script: path.clone(),
+                    node: node.clone(),
+                    face: String::from(face.clone()),
+                });
             }
         }
     }
     found
 }
 
-fn find_nodes(row: &Value) -> Vec<(String, Value)> {
-    let mut out = Vec::new();
-    for module in row["modules"].as_array().into_iter().flatten() {
-        if let Some(nodes) = module["nodes"].as_object() {
-            for (name, node) in nodes {
-                if node["type"] == "dialogue" {
-                    out.push((name.clone(), node.clone()));
-                }
-            }
-        }
-    }
-    if let Some(nodes) = row["nodes"].as_object() {
-        for (name, node) in nodes {
-            if node["type"] == "dialogue" {
-                out.push((name.clone(), node.clone()));
-            }
-        }
-    }
-    out
+fn face_lines(script: &ScriptDef) -> impl Iterator<Item = (&String, &Line)> {
+    script.nodes.iter().flat_map(|(name, node)| {
+        let lines = match node {
+            Node::Dialogue(dialogue) => dialogue.lines.as_slice(),
+            _ => &[],
+        };
+        lines.iter().map(move |line| (name, line))
+    })
+}
+
+/// Whether a line is spoken by an npc wearing the model at `key`.
+fn speaks_with(editor: &Editor, key: &str) -> Option<impl Fn(&Line) -> bool + use<>> {
+    let reader = editor.reader()?;
+    let speakers: Vec<String> = super::users(editor, key)
+        .into_iter()
+        .filter(|(table, _)| table == NpcDef::TABLE)
+        .map(|(_, key)| key)
+        .collect();
+    Some(move |line: &Line| match line.by {
+        Speaker::Npc(npc) => reader
+            .path_of(npc)
+            .is_some_and(|npc| speakers.iter().any(|speaker| speaker == npc)),
+        _ => false,
+    })
 }
 
 pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -> bool {
-    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
+    let Some(Ok(model)) = editor.read::<ModelDef>(key) else {
         return false;
     };
-    let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
+    if !face.own {
         return false;
-    };
-    if faces(&row).iter().any(|other| other.name == new_name) {
+    }
+    if !valid_name(new_name) {
+        editor.toast(format!("A face's name is {NAME_RULE}"));
+        return false;
+    }
+    if faces(&model).iter().any(|face| face.name == new_name) {
         editor.toast(format!("{new_name} is already a face of this model"));
         return false;
     }
-    row["modules"][index]["own"][j]["name"] = Value::String(new_name.to_owned());
-    let mut edit = retarget_face(
+    let Some(bytes) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.files.get(&face.file).cloned())
+    else {
+        return false;
+    };
+    let Some(mut edit) = retarget_face(
         editor,
         key,
         &face.name,
         new_name,
-        format!("Rename face {} of {key} to {new_name}", face.name),
-    );
-    edit.write_json(row_file(ModelDef::TABLE, key), &row);
+        format!(
+            "Rename face {} of {} to {new_name}",
+            face.name,
+            shown_path(key)
+        ),
+    ) else {
+        return false;
+    };
+    edit.remove(face.file.clone());
+    edit.write(face_file(key, new_name), bytes);
     editor.apply(edit)
 }
 
 pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str) -> bool {
-    let Some(mut row) = editor.row_value(ModelDef::TABLE, key) else {
+    if !face.own {
         return false;
-    };
-    let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
-        return false;
-    };
-    if let Some(own) = row["modules"][index]["own"].as_array_mut()
-        && j < own.len()
-    {
-        own.remove(j);
     }
-    let mut edit = retarget_face(
+    let Some(mut edit) = retarget_face(
         editor,
         key,
         &face.name,
         replacement,
-        format!("Remove face {} of {key}", face.name),
-    );
-    edit.write_json(row_file(ModelDef::TABLE, key), &row);
-    edit.remove(asset_file(&face.file));
+        format!("Remove face {} of {}", face.name, shown_path(key)),
+    ) else {
+        return false;
+    };
+    edit.remove(face.file.clone());
     editor.apply(edit)
 }
 
-fn retarget_face(editor: &Editor, key: &str, from: &str, to: &str, label: String) -> ContentEdit {
-    let mut edit = ContentEdit::new(label);
-    let mut files: Vec<String> = lines(editor, key)
-        .iter()
+/// An edit giving every line that asks the model at `key` for face `from` face `to` instead.
+fn retarget_face(
+    editor: &mut Editor,
+    key: &str,
+    from: &str,
+    to: &str,
+    label: String,
+) -> Option<ContentEdit> {
+    let mut scripts: Vec<String> = lines(editor, key)
+        .into_iter()
         .filter(|line| line.face == from)
-        .map(|line| line.file.clone())
+        .map(|line| line.script)
         .collect();
-    files.sort();
-    files.dedup();
-    for file in files {
-        let Some(mut value) = editor
-            .project
-            .as_ref()
-            .and_then(|p| p.files.json_owned(&file))
-        else {
-            continue;
-        };
-        rewrite_faces(&mut value, from, to);
-        edit.write_json(file, &value);
-    }
-    edit
-}
-
-fn rewrite_faces(value: &mut Value, from: &str, to: &str) {
-    match value {
-        Value::Object(map) => {
-            if map.get("face").and_then(Value::as_str) == Some(from) {
-                map.insert("face".to_owned(), Value::String(to.to_owned()));
-            }
-            for child in map.values_mut() {
-                rewrite_faces(child, from, to);
+    scripts.sort();
+    scripts.dedup();
+    let speaks = speaks_with(editor, key)?;
+    let (from, to) = (
+        Expression::from(from.to_owned()),
+        Expression::from(to.to_owned()),
+    );
+    let mut edit = ContentEdit::new(label);
+    for path in scripts {
+        let mut script = (*editor.read::<ScriptDef>(&path)?.ok()?).clone();
+        for node in script.nodes.values_mut() {
+            if let Node::Dialogue(dialogue) = node {
+                for line in &mut dialogue.lines {
+                    if line.face.as_ref() == Some(&from) && speaks(line) {
+                        line.face = Some(to.clone());
+                    }
+                }
             }
         }
-        Value::Array(items) => {
-            for child in items {
-                rewrite_faces(child, from, to);
-            }
+        if let Err(reason) = edit.write_content(editor.project.as_ref()?, &path, &script) {
+            editor.toast(reason);
+            return None;
         }
-        _ => {}
     }
+    Some(edit)
 }

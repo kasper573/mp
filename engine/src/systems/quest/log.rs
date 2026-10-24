@@ -1,10 +1,11 @@
 use bevy::prelude::*;
-use design_tokens::controls::{self, Pill, RowLook};
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{card, ink, sheet};
-use egui::{Align, Label, Layout, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use strum::IntoStaticStr;
+use ui::controls::{self, Pill, RowLook};
+use ui::egui;
+use ui::egui::{Align, Label, Layout, Pos2, Rect, Sense, Ui, Vec2};
+use ui::face::{self, TextRole};
+use ui::glyph::{self, Mark};
+use ui::{card, ink, sheet};
 
 use super::card::{
     Countdown, QuestCardLook, Standing, caption, inspectable, objective_row, picks, reward_chips,
@@ -25,6 +26,8 @@ use crate::systems::item::{Inventory, ItemModuleKind, ItemStack};
 use crate::systems::player::session;
 use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
+use ui::paint;
+use ui::panel::{self, Edge};
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
 const QUESTS_PAGE_WIDTH: f32 = 320.0;
@@ -183,11 +186,11 @@ fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
         Pos2::new(list_rect.max.x + DETAIL_PADDING, room.min.y),
         room.max,
     );
-    ui.painter().vline(
-        list_rect.max.x + DETAIL_PADDING / 2.0,
-        room.y_range(),
-        Stroke::new(1.0, ink::ink_wash(0.35)),
+    let parted = Rect::from_min_max(
+        room.min,
+        Pos2::new(list_rect.max.x + DETAIL_PADDING / 2.0, room.max.y),
     );
+    panel::divide(ui, parted, Edge::Right);
     ui.scope_builder(egui::UiBuilder::new().max_rect(list_rect), |ui| {
         let area = egui::ScrollArea::vertical()
             .id_salt(("quest list", page.tab.title()))
@@ -461,16 +464,8 @@ fn timer(ui: &mut Ui, content: &Content, page: &Page, quest: QuestId) {
                 .size(TextRole::CardBody.size())
                 .color(ink::OCHRE),
         );
-        let (rect, _) = ui.allocate_exact_size(TIMER_BAR, Sense::hover());
         let share = time_left(content, &page.log, quest, page.now);
-        let y = rect.center().y;
-        ui.painter()
-            .hline(rect.x_range(), y, Stroke::new(1.0, ink::ink_wash(0.35)));
-        ui.painter().hline(
-            rect.min.x..=rect.min.x + rect.width() * share,
-            y,
-            Stroke::new(TIMER_BAR.y, ink::OCHRE),
-        );
+        paint::progress_line(ui, TIMER_BAR, share, ink::OCHRE);
     });
 }
 

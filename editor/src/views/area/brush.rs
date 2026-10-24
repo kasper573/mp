@@ -1,18 +1,22 @@
 use std::collections::HashSet;
+use ui::egui;
+use ui::ink;
+use ui::paint;
+use ui::theme;
 
-use egui::{Color32, Stroke as EStroke, Vec2};
 use engine::core::math::{Pos, Rect, Rng, Size};
-use engine::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
+use engine::core::tiling::{Cell, CellPos, TilePos, TileSize};
 use engine::systems::area::tileset::TilesetDef;
 use engine::systems::area::{self, Flip};
 use engine::systems::script::Place;
+use ui::egui::{Color32, Stroke as EStroke, Vec2};
 
-use super::{AreaFrame, AreaTool, grid, pins, select, terrain};
+use super::{
+    AreaFrame, AreaSnapshot, AreaTool, Armed, grid, nodes, overlays, pins, select, terrain,
+};
 use crate::app::{Editor, PlacePick};
 use crate::keymap::EditorKey;
-use crate::project::ContentEdit;
 use crate::thumbs;
-use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
 
@@ -66,8 +70,13 @@ pub struct TerrainPick {
 pub struct BrushStroke {
     pub draft: grid::GridDraft,
     pub kind: BrushStrokeKind,
+    /// The layer of the draft the stroke paints.
+    pub layer: usize,
     pub cells: HashSet<CellPos>,
     pub anchor: CellPos,
+    /// The cell the brush was last applied at, from which the next one draws a line, so a drag
+    /// faster than a cell a frame leaves no gaps.
+    pub last: CellPos,
     pub rng: Rng,
 }
 
@@ -75,8 +84,26 @@ pub struct BrushStroke {
 pub enum BrushStrokeKind {
     Paint,
     Erase,
-    Walk,
+    /// Forces walk cells to a value, or hands them back to their tiles.
+    Walk(Option<bool>),
     Terrain,
+}
+
+/// The layer of `draft` the brushes paint: the one the selection arms, unless it is hidden or
+/// locked.
+pub fn target_layer(
+    editor: &Editor,
+    snapshot: &AreaSnapshot,
+    draft: &grid::GridDraft,
+) -> Option<usize> {
+    match super::armed(editor, snapshot) {
+        Armed::Layer { pointer, name }
+            if !snapshot.flags.hidden(&pointer) && !snapshot.flags.locked(&pointer) =>
+        {
+            draft.layer_index(&name)
+        }
+        _ => None,
+    }
 }
 
 pub(super) fn grid_stroke(
@@ -87,8 +114,12 @@ pub(super) fn grid_stroke(
 ) {
     let response = frame.response;
     let brush = editor.settings.brush.clone();
+    // A press that moves too little to drag is only a click once let go, when the pointer no
+    // longer says where it was pressed, so the stroke starts on the press itself.
     let pressed = response.drag_started_by(egui::PointerButton::Primary)
-        || response.clicked_by(egui::PointerButton::Primary);
+        || response.clicked_by(egui::PointerButton::Primary)
+        || (response.is_pointer_button_down_on()
+            && response.ctx.input(|i| i.pointer.primary_pressed()));
     let down = response.dragged_by(egui::PointerButton::Primary);
     let released = response.drag_stopped_by(egui::PointerButton::Primary)
         || response.clicked_by(egui::PointerButton::Primary);
@@ -99,21 +130,47 @@ pub(super) fn grid_stroke(
         return;
     };
     if pressed && editor.views.area.view(view_key).stroke().is_none() {
-        let grids = frame.area().grids.clone();
-        let draft = grid::GridDraft::of(&frame.area_key, &grids);
+        let Some(draft) = grid::GridDraft::own(editor, &frame.bundle) else {
+            return;
+        };
+        let start = response
+            .ctx
+            .input(|i| i.pointer.press_origin())
+            .map_or(cell, |origin| frame.canvas.to_tile(origin).cell());
+        let layer = match kind {
+            BrushStrokeKind::Walk(_) => 0,
+            _ => match target_layer(editor, frame, &draft) {
+                Some(layer) => layer,
+                None => return,
+            },
+        };
         let seed = stroke_seed(editor.frame, cell);
         let view = editor.views.area.view_mut(view_key);
         view.skipped = None;
         view.set_stroke(BrushStroke {
             draft,
             kind,
+            layer,
             cells: HashSet::new(),
-            anchor: cell,
+            anchor: start,
+            last: start,
             rng: Rng::new(seed),
         });
+        apply_brush(editor, view_key, frame, start, &brush);
     }
     if pressed || down {
-        apply_brush(editor, view_key, frame, cell, &brush);
+        let last = editor
+            .views
+            .area
+            .view(view_key)
+            .stroke()
+            .map(|stroke| stroke.last);
+        for step in last.map(|last| cells_after(last, cell)).unwrap_or_default() {
+            apply_brush(editor, view_key, frame, step, &brush);
+        }
+        if let Some(stroke) = editor.views.area.view_mut(view_key).stroke_mut() {
+            stroke.last = cell;
+        }
     }
     if released {
         finish_stroke(editor, view_key, frame);
@@ -129,17 +186,16 @@ pub(super) fn apply_brush(
 ) {
     let content = frame.content.clone();
     let view = editor.views.area.view_mut(view_key);
-    let layer = view.layer;
-    let walk_value = view.walk_value;
     let pick = view.pick.clone();
     let terrain = view.terrain.clone();
     let Some(stroke) = view.stroke_mut() else {
         return;
     };
+    let layer = stroke.layer;
     match stroke.kind {
-        BrushStrokeKind::Walk => {
+        BrushStrokeKind::Walk(value) => {
             for cell in grid::brush_cells(center, brush.size) {
-                if stroke.draft.set_walk(cell, walk_value) {
+                if stroke.draft.set_walk(cell, value) {
                     stroke.cells.insert(cell);
                 }
             }
@@ -186,7 +242,7 @@ pub(super) fn apply_brush(
                 return;
             };
             let Some(def) = content
-                .by_key::<TilesetDef>(&tileset)
+                .by_path::<TilesetDef>(&tileset)
                 .map(|id| id.get(&content))
             else {
                 return;
@@ -224,66 +280,67 @@ pub(super) fn finish_stroke(editor: &mut Editor, view_key: &str, frame: &AreaFra
     let layer_name = stroke
         .draft
         .layer_names()
-        .get(view.layer)
+        .get(stroke.layer)
         .cloned()
         .unwrap_or_default();
     let label = match stroke.kind {
         BrushStrokeKind::Paint => format!(
             "Paint {} cells of {layer_name} in {}",
             stroke.cells.len(),
-            frame.area_key
+            frame.bundle
         ),
         BrushStrokeKind::Erase => format!(
             "Erase {} cells of {layer_name} in {}",
             stroke.cells.len(),
-            frame.area_key
+            frame.bundle
         ),
-        BrushStrokeKind::Walk => format!(
+        BrushStrokeKind::Walk(_) => format!(
             "Walk grid: {} cells in {}",
             stroke.cells.len(),
-            frame.area_key
+            frame.bundle
         ),
         BrushStrokeKind::Terrain => format!(
             "Terrain: {} cells of {layer_name} in {}",
             stroke.cells.len(),
-            frame.area_key
+            frame.bundle
         ),
     };
     let mut draft = stroke.draft;
     if stroke.kind == BrushStrokeKind::Erase {
         draft.compact_palette();
     }
-    let mut edit = ContentEdit::new(label);
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    draft.commit(editor, label);
 }
 
 pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell: CellPos) {
     let view = editor.views.area.view(view_key);
-    let layer = view.layer;
     let pick = view.pick.clone();
-    let walk_overlay = view.walk_overlay;
+    let walking = view.armed == Armed::Walk;
     let walk_value = view.walk_value;
     let brush = editor.settings.brush.clone();
-    let grids = frame.area().grids.clone();
-    let mut draft = grid::GridDraft::of(&frame.area_key, &grids);
-    let cells = draft.flood(layer, cell);
+    let Some(mut draft) = grid::GridDraft::own(editor, &frame.bundle) else {
+        return;
+    };
+    let layer = target_layer(editor, frame, &draft);
+    let cells = match layer {
+        Some(layer) => draft.flood(layer, cell),
+        None if walking => draft.flood_walk(cell),
+        None => return,
+    };
     if cells.is_empty() {
         return;
     }
     let count = cells.len();
-    if walk_overlay {
+    let Some(layer) = layer else {
         for cell in cells {
             draft.set_walk(cell, walk_value);
         }
-        let mut edit = ContentEdit::new(format!(
-            "Walk grid: fill {count} cells in {}",
-            frame.area_key
-        ));
-        draft.write_into(&mut edit);
-        editor.apply(edit);
+        draft.commit(
+            editor,
+            format!("Walk grid: fill {count} cells in {}", frame.bundle),
+        );
         return;
-    }
+    };
     let Some(tileset) = pick.tileset.clone() else {
         editor.toast("Pick a tile first");
         return;
@@ -305,12 +362,10 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
         draft.set(layer, c, Some(entry));
     }
     let layer_name = draft.layer_names().get(layer).cloned().unwrap_or_default();
-    let mut edit = ContentEdit::new(format!(
-        "Fill {count} cells of {layer_name} in {}",
-        frame.area_key
-    ));
-    draft.write_into(&mut edit);
-    editor.apply(edit);
+    draft.commit(
+        editor,
+        format!("Fill {count} cells of {layer_name} in {}", frame.bundle),
+    );
 }
 
 pub(super) fn eyedrop(
@@ -320,12 +375,14 @@ pub(super) fn eyedrop(
     cell: CellPos,
     topmost: bool,
 ) {
-    let grids = frame.area().grids.clone();
-    let view = editor.views.area.view_mut(view_key);
-    let layers: Vec<usize> = if topmost {
-        (0..grids.ground.len()).rev().collect()
-    } else {
-        vec![view.layer]
+    let grids = frame.picture.ground.clone();
+    let armed = match super::armed(editor, frame) {
+        Armed::Layer { name, .. } => grids.ground.iter().position(|layer| layer.name == name),
+        _ => None,
+    };
+    let layers: Vec<usize> = match armed {
+        Some(layer) if !topmost => vec![layer],
+        _ => (0..grids.ground.len()).rev().collect(),
     };
     for layer in layers {
         let Some(index) = cell.index(grids.size) else {
@@ -339,16 +396,30 @@ pub(super) fn eyedrop(
         else {
             continue;
         };
+        let name = grids.ground[layer].name.clone();
+        let mut pointer = None;
+        nodes::walk(frame.nodes(), &mut |at, node| {
+            if nodes::layer_name(node) == Some(name.as_str()) {
+                pointer = Some(at.to_owned());
+            }
+        });
+        let view = editor.views.area.view_mut(view_key);
         view.pick = TilePick {
             tileset: Some(entry.tileset.clone()),
             block: vec![vec![entry.tile]],
             random: Vec::new(),
             anchor: None,
         };
-        view.layer = layer;
+        view.set_tool(AreaTool::Paint);
+        if let Some(pointer) = pointer {
+            view.armed = Armed::Layer {
+                pointer: pointer.clone(),
+                name,
+            };
+            nodes::select(editor, &frame.bundle, vec![pointer]);
+        }
         editor.settings.brush.flip_x = entry.flip.horizontal();
         editor.settings.brush.flip_y = entry.flip.vertical();
-        view.set_tool(AreaTool::Paint);
         return;
     }
     editor.toast("Nothing on that layer here");
@@ -363,24 +434,25 @@ pub(super) fn pick_place(
 ) {
     let canvas = frame.canvas;
     let area = frame.area();
-    let warps = pins::warp_objects(&frame.content, frame.area_id);
-    let visible = canvas.visible();
-    for cell in area.size.grid().cells() {
-        let bounds = cell.bounds();
-        if !visible.intersects(&bounds) {
-            continue;
-        }
-        let valid =
-            area.grid.walkable(cell.center()) && !warps.iter().any(|shape| shape.covers_cell(cell));
-        if !valid {
-            patterns::hatch(
+    let Some(area_id) = frame.area_id() else {
+        return;
+    };
+    let warps = pins::warp_objects(&frame.content, area_id);
+    overlays::cell_runs(
+        canvas,
+        area.size.grid(),
+        |cell| {
+            !area.grid.walkable(cell.center()) || warps.iter().any(|shape| shape.covers_cell(cell))
+        },
+        |run| {
+            paint::hatched(
                 painter,
-                canvas.rect(bounds),
-                theme::alpha(theme::BLOCKED, 90),
+                canvas.rect(run),
+                ink::wash(theme::BLOCKED, 0.35),
                 canvas.scale(),
-            );
-        }
-    }
+            )
+        },
+    );
     pins::draw_arrivals(editor, painter, frame);
     let text = format!(
         "Pick a place for {} {} · click a cell, {} click any point · {} cancels",
@@ -408,15 +480,12 @@ pub(super) fn pick_place(
     if !frame.response.clicked() {
         return;
     }
-    let place = Place {
-        area: frame.area_id,
-        at,
-    };
+    let place = Place { area: area_id, at };
     if let Err(problem) = area::check_place(&frame.content, place) {
         editor.toast(format!("{}: {}", problem.rule, problem.expected));
         return;
     }
-    pins::commit_pick(editor, &frame.area_key, at);
+    pins::commit_pick(editor, &frame.bundle, at);
 }
 
 pub(super) fn paint_preview(
@@ -433,7 +502,7 @@ pub(super) fn paint_preview(
     };
     let Some(def) = frame
         .content
-        .by_key::<TilesetDef>(&tileset)
+        .by_path::<TilesetDef>(&tileset)
         .map(|id| id.get(&frame.content))
     else {
         return;
@@ -485,4 +554,19 @@ fn stroke_seed(frame: u64, cell: CellPos) -> u64 {
     frame
         .wrapping_mul(6364136223846793005)
         .wrapping_add((cell.x as i64).wrapping_mul(31).wrapping_add(cell.y as i64) as u64)
+}
+
+/// The cells of the line from `from` to `to`, `to` last and `from` left out: what a brush dragged
+/// between them crosses.
+fn cells_after(from: CellPos, to: CellPos) -> Vec<CellPos> {
+    let steps = (to.x - from.x).abs().max((to.y - from.y).abs());
+    (1..=steps)
+        .map(|step| {
+            let t = step as f32 / steps as f32;
+            CellPos::new(
+                from.x + ((to.x - from.x) as f32 * t).round() as i32,
+                from.y + ((to.y - from.y) as f32 * t).round() as i32,
+            )
+        })
+        .collect()
 }

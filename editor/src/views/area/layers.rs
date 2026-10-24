@@ -1,315 +1,287 @@
-use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, load, row_file};
-use engine::systems::area::{self, AreaDef, AreaId};
-use serde_json::Value;
+use std::collections::BTreeSet;
+use ui::words;
 
-use super::grid;
-use crate::app::{ConfirmAction, ConfirmDialog, Editor, ModalDialog, RenameDialog, RenameTarget};
-use crate::project::ContentEdit;
-use crate::rows;
-use crate::ui::{theme, widgets};
+use engine::core::content::{ContentFile, numbered, table_of, valid_name};
+use engine::systems::area::AreaDef;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::scene::{GroundLayer, SCENE_FILE, SceneNode};
 
-const WIDTH: f32 = 190.0;
+use super::grid::GridDraft;
+use super::nodes;
+use crate::app::Editor;
+use crate::project::{ContentEdit, Project};
+use crate::tabs::file_title;
 
-pub fn popover(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: &Content,
-    area_id: AreaId,
-    canvas: ERect,
-) {
-    let area_key = area_id.key(content).to_owned();
-    let Some(row) = editor.row_value(AreaDef::TABLE, &area_key) else {
-        return;
-    };
-    let layers: Vec<String> = row["map"]["ground"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str().map(str::to_owned))
-        .collect();
-    let (blueprints, scenery) = {
-        let placed = area::placed(content, area_id);
-        let blueprints = area::placements(content, area_id)
-            .iter()
-            .filter(|p| p.chain.len() <= 1)
-            .count();
-        let scenery = placed
-            .iter()
-            .filter(|p| p.chain.is_empty() && matches!(p.module, area::AreaModule::Scenery(_)))
-            .count();
-        (blueprints, scenery)
-    };
-    let mut action: Option<LayerAction> = None;
-    let rect = ERect::from_min_size(
-        Pos2::new(canvas.max.x - WIDTH - 16.0, canvas.min.y + 12.0),
-        Vec2::new(WIDTH, 0.0),
-    );
-    let mut panel = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(ERect::from_min_size(
-                rect.min,
-                Vec2::new(WIDTH, canvas.height() - 24.0),
-            ))
-            .layout(egui::Layout::top_down(egui::Align::Min)),
-    );
-    design_tokens::slip::show(&mut panel, |ui| {
-        ui.set_width(WIDTH - 20.0);
-        ui.spacing_mut().item_spacing.y = 2.0;
-        ui.label(
-            RichText::new("LAYERS")
-                .size(11.0)
-                .color(theme::MUTED)
-                .family(theme::medium()),
-        );
-        widgets::section(ui, "Ground · under everyone");
-        let active = editor
-            .views
-            .area
-            .view(view_key)
-            .layer
-            .min(layers.len().saturating_sub(1));
-        let view = editor.views.area.view_mut(view_key);
-        for (index, name) in layers.iter().enumerate() {
-            let hidden = view.hidden_ground.contains(name);
-            let response = eye_row(ui, name, !hidden, index == active, None);
-            if response.eye.clicked() {
-                if hidden {
-                    view.hidden_ground.remove(name);
-                } else {
-                    view.hidden_ground.insert(name.clone());
-                }
-            }
-            if response.row.clicked() {
-                action = Some(LayerAction::Pick(index));
-            }
-            response.row.context_menu(|ui| {
-                if ui.button("Rename…").clicked() {
-                    action = Some(LayerAction::Rename(index));
-                    ui.close();
-                }
-                if index + 1 < layers.len() && ui.button("Move up").clicked() {
-                    action = Some(LayerAction::Swap(index, index + 1));
-                    ui.close();
-                }
-                if index > 0 && ui.button("Move down").clicked() {
-                    action = Some(LayerAction::Swap(index, index - 1));
-                    ui.close();
-                }
-                if layers.len() > 1 && ui.button("Delete…").clicked() {
-                    action = Some(LayerAction::Delete(index));
-                    ui.close();
-                }
-            });
-        }
-        if ui
-            .add(egui::Label::new(theme::faint("+ layer").size(12.5)).sense(Sense::click()))
-            .clicked()
-        {
-            action = Some(LayerAction::Add);
-        }
-        widgets::section(ui, "Placed on the ground");
-        let response = eye_row(
-            ui,
-            "blueprints",
-            view.show_blueprints,
-            false,
-            Some(blueprints),
-        );
-        if response.eye.clicked() || response.row.clicked() {
-            view.show_blueprints = !view.show_blueprints;
-        }
-        let response = eye_row(ui, "scenery", view.show_scenery, false, Some(scenery));
-        if response.eye.clicked() || response.row.clicked() {
-            view.show_scenery = !view.show_scenery;
-        }
-        widgets::section(ui, "Overlays");
-        for (name, flag) in [
-            ("modules", &mut view.overlay_modules),
-            ("walk", &mut view.walk_overlay),
-            ("surfaces", &mut view.overlay_surfaces),
-            ("sort lines", &mut view.overlay_sort_lines),
-        ] {
-            let response = eye_row(ui, name, *flag, false, None);
-            if response.eye.clicked() || response.row.clicked() {
-                *flag = !*flag;
-            }
-        }
+/// Adds a ground layer at the end of `folder` of `bundle`'s scene, named apart from every layer
+/// there, and selects it; answers its pointer.
+pub fn add(editor: &mut Editor, bundle: &str, folder: &str) -> Option<String> {
+    let name = free_name("layer", &names(&nodes::scene_of(editor, bundle)));
+    let mut made = Vec::new();
+    nodes::change_scene(editor, bundle, |scene| {
+        let layer = SceneNode::GroundLayer(GroundLayer::named(name.clone()));
+        made = nodes::SceneTree::new(scene).append(folder, vec![layer]);
+        Some(format!("Add ground layer {name}"))
     });
-    let Some(action) = action else {
+    let pointer = made.first()?.clone();
+    nodes::select(editor, bundle, vec![pointer.clone()]);
+    Some(pointer)
+}
+
+/// Copies the layer at `pointer` right after it, its cells too, under a free name.
+/// Gives every ground layer in `node` a name no layer among `taken` has, adding it to `taken`;
+/// answers each layer's name before and after, for its cells to go with it.
+pub fn rename_copied(node: &mut SceneNode, taken: &mut Vec<String>) -> Vec<(String, String)> {
+    match node {
+        SceneNode::Folder(folder) => folder
+            .children
+            .iter_mut()
+            .flat_map(|child| rename_copied(child, taken))
+            .collect(),
+        SceneNode::GroundLayer(layer) => {
+            let fresh = free_name(&layer.name, taken);
+            taken.push(fresh.clone());
+            vec![(std::mem::replace(&mut layer.name, fresh.clone()), fresh)]
+        }
+        SceneNode::Module(_) => Vec::new(),
+    }
+}
+
+/// `node` without the ground layers it holds, at any depth.
+pub fn without_layers(mut node: SceneNode) -> SceneNode {
+    if let SceneNode::Folder(folder) = &mut node {
+        folder.children = std::mem::take(&mut folder.children)
+            .into_iter()
+            .filter(|child| !nodes::is_layer(child))
+            .map(without_layers)
+            .collect();
+    }
+    node
+}
+
+pub fn duplicate(editor: &mut Editor, bundle: &str, pointer: &str) {
+    let mut made = Vec::new();
+    let applied = nodes::change_blueprint(editor, bundle, |blueprint| {
+        let scene = &mut blueprint.scene;
+        let name = nodes::layer_name(nodes::node(&scene.nodes, pointer)?)?.to_owned();
+        let fresh = free_name(&name, &names(&scene.nodes));
+        made = nodes::SceneTree::new(&mut scene.nodes).duplicate(&[pointer.to_owned()], |node| {
+            let mut copy = node.clone();
+            if let SceneNode::GroundLayer(layer) = &mut copy {
+                layer.name = fresh.clone();
+            }
+            copy
+        });
+        if let Some(cells) = scene.grids.layers.get(&name).cloned() {
+            scene.grids.layers.insert(fresh.clone(), cells);
+        }
+        Some(format!("Duplicate ground layer {name} as {fresh}"))
+    });
+    if applied {
+        nodes::select(editor, bundle, made);
+    }
+}
+
+/// Clears every forced walk cell of `bundle` in one step, handing each back to its tiles.
+pub fn clear_forced(editor: &mut Editor, bundle: &str) {
+    let Some(mut draft) = GridDraft::own(editor, bundle) else {
         return;
     };
-    match action {
-        LayerAction::Pick(index) => {
-            editor.views.area.view_mut(view_key).layer = index;
-        }
-        LayerAction::Add => {
-            let name = rows::free_name("layer", &layers.iter().cloned().collect());
-            let mut row = row.clone();
-            let mut layers = layers.clone();
-            layers.push(name.clone());
-            row["map"]["ground"] = serde_json::json!(layers);
-            let grids = area::load(content, area_id).grids.clone();
-            let mut draft = grid::GridDraft::of(&area_key, &grids);
-            draft.add_layer(&name);
-            let mut edit = ContentEdit::new(format!("Add layer {name} to {area_key}"));
-            edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
-            draft.write_into(&mut edit);
-            if editor.apply(edit) {
-                editor.views.area.view_mut(view_key).layer = layers.len();
-            }
-        }
-        LayerAction::Rename(index) => {
-            let name = layers[index].clone();
-            editor.dialogs.push(ModalDialog::Rename(RenameDialog {
-                target: RenameTarget::Layer {
-                    area: area_key.to_owned(),
-                    layer: name.clone(),
-                },
-                draft: name,
-                error: None,
-            }));
-        }
-        LayerAction::Swap(a, b) => {
-            let mut row = row.clone();
-            let mut layers = layers.clone();
-            layers.swap(a, b);
-            row["map"]["ground"] = serde_json::json!(layers);
-            let mut edit = ContentEdit::new(format!("Reorder layers of {area_key}"));
-            edit.write_json(row_file(AreaDef::TABLE, &area_key), &row);
-            if editor.apply(edit) {
-                editor.views.area.view_mut(view_key).layer = b;
-            }
-        }
-        LayerAction::Delete(index) => {
-            let name = layers[index].clone();
-            editor.dialogs.push(ModalDialog::Confirm(ConfirmDialog {
-                title: format!("Delete layer {name}?"),
-                body: format!("Every tile of {name} in {area_key} goes with it. One undo step."),
-                label: "Delete layer".to_owned(),
-                compare: None,
-                action: ConfirmAction::RemoveLayer {
-                    area: area_key.clone(),
-                    layer: name,
-                },
-            }));
-        }
+    let cells: Vec<_> = draft.cells().collect();
+    let mut cleared = 0;
+    for cell in cells {
+        cleared += usize::from(draft.set_walk(cell, None));
     }
-}
-
-struct EyeRow {
-    eye: egui::Response,
-    row: egui::Response,
-}
-
-fn eye_row(ui: &mut Ui, name: &str, shown: bool, active: bool, count: Option<usize>) -> EyeRow {
-    let full = ui.available_width();
-    let (rect, row) = ui.allocate_exact_size(Vec2::new(full, 20.0), Sense::click());
-    ui.painter().add(design_tokens::controls::row_marks(
-        rect,
-        row.hovered(),
-        active,
-    ));
-    let eye_rect = ERect::from_min_size(rect.min + Vec2::new(4.0, 2.0), Vec2::splat(16.0));
-    let eye = ui.interact(eye_rect, row.id.with("eye"), Sense::click());
-    let ink = if shown { theme::TEXT } else { theme::FAINT };
-    draw_eye(ui.painter(), eye_rect.center(), shown, ink);
-    ui.painter().text(
-        rect.min + Vec2::new(26.0, 10.0),
-        egui::Align2::LEFT_CENTER,
-        name,
-        egui::FontId::monospace(13.0),
-        ink,
-    );
-    if let Some(count) = count {
-        ui.painter().text(
-            rect.right_center() - Vec2::new(6.0, 0.0),
-            egui::Align2::RIGHT_CENTER,
-            count.to_string(),
-            egui::FontId::monospace(12.0),
-            theme::MUTED,
-        );
+    if cleared == 0 {
+        editor.toast("No walk cell is forced");
+        return;
     }
-    EyeRow { eye, row }
+    nodes::change_blueprint(editor, bundle, |blueprint| {
+        draft.apply_to(blueprint);
+        Some(format!(
+            "Clear {cleared} forced walk cells in {}",
+            file_title(bundle)
+        ))
+    });
 }
 
-fn draw_eye(painter: &egui::Painter, c: Pos2, open: bool, ink: Color32) {
-    let stroke = egui::Stroke::new(1.3, ink);
-    let points: Vec<Pos2> = (0..=12)
-        .map(|i| {
-            let t = i as f32 / 12.0 * std::f32::consts::PI;
-            Pos2::new(c.x - 6.0 + 12.0 * i as f32 / 12.0, c.y - 3.5 * t.sin())
-        })
-        .collect();
-    painter.add(egui::Shape::line(points.clone(), stroke));
-    let lower: Vec<Pos2> = points
+/// Renames the layer `old` of `bundle` to `new`, and in every area and blueprint joined to it
+/// through placements, in both directions and at any depth, since placed cells land in the layer of
+/// the same name: as one step.
+pub fn rename(editor: &mut Editor, bundle: &str, old: &str, new: &str) -> Result<(), String> {
+    if !valid_name(new) {
+        return Err(format!(
+            "{new} can't name a layer: lowercase letters, digits, _ and - only"
+        ));
+    }
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let joined = joined(project, bundle, old);
+    if let Some(clash) = joined
         .iter()
-        .map(|p| Pos2::new(p.x, 2.0 * c.y - p.y))
-        .collect();
-    painter.add(egui::Shape::line(lower, stroke));
-    if open {
-        painter.circle_filled(c, 2.0, ink);
-    } else {
-        painter.line_segment([c + Vec2::new(-6.0, 5.0), c + Vec2::new(6.0, -5.0)], stroke);
-    }
-}
-
-pub fn rename_layer(
-    editor: &mut Editor,
-    area_key: &str,
-    from: &str,
-    to: &str,
-) -> Result<(), String> {
-    let Some(mut row) = editor.row_value(AreaDef::TABLE, area_key) else {
-        return Err("the area is gone".to_owned());
-    };
-    let layers = row["map"]["ground"].as_array_mut().ok_or("no layers")?;
-    if layers
-        .iter()
-        .any(|l| l.as_str().is_some_and(|l| l.eq_ignore_ascii_case(to)))
+        .find(|other| names(&scene(project, other)).contains(&new.to_owned()))
     {
-        return Err(format!("{to} is already a layer"));
+        return Err(format!(
+            "{} already has a layer named {new}",
+            file_title(clash)
+        ));
     }
-    if to == "palette" || to == "walk" || !load::valid_key(to) {
-        return Err("a layer name is a key that isn't palette or walk".to_owned());
+    let mut edit = ContentEdit::new(format!("Rename ground layer {old} to {new}"));
+    for other in &joined {
+        let Some(read) = nodes::bundle_in(project, other) else {
+            continue;
+        };
+        read.write(&mut edit, project, other, |blueprint| {
+            rename_in(blueprint, old, new)
+        })?;
     }
-    for layer in layers.iter_mut() {
-        if layer.as_str() == Some(from) {
-            *layer = Value::String(to.to_owned());
-        }
-    }
-    let project = editor.project.as_ref().ok_or("no folder")?;
-    let folder = area::grid::folder(area_key);
-    let old = format!("{folder}/{}", area::grid::layer_file(from));
-    let bytes = project
-        .files
-        .get(&old)
-        .cloned()
-        .ok_or("the layer file is gone")?;
-    let mut edit = ContentEdit::new(format!("Rename layer {from} of {area_key} to {to}"));
-    edit.write_json(row_file(AreaDef::TABLE, area_key), &row);
-    edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
-    edit.remove(old);
+    let others: Vec<String> = joined
+        .iter()
+        .filter(|other| *other != bundle)
+        .map(|other| file_title(other).to_owned())
+        .collect();
     editor.try_apply(edit)?;
-    for view in editor
-        .views
-        .area
-        .views
-        .values_mut()
-        .filter(|view| view.area == area_key)
-    {
-        if view.hidden_ground.remove(from) {
-            view.hidden_ground.insert(to.to_owned());
-        }
-    }
+    let said = match others.as_slice() {
+        [] => format!("Renamed the layer {old} to {new}"),
+        others => format!(
+            "Renamed the layer {old} to {new} in {} and in {}, which paint{} into it; Ctrl Z undoes {}",
+            file_title(bundle),
+            others.join(", "),
+            if others.len() == 1 { "s" } else { "" },
+            if others.len() == 1 { "both" } else { "all" },
+        ),
+    };
+    editor.toast(said);
     Ok(())
 }
 
-enum LayerAction {
-    Pick(usize),
-    Add,
-    Rename(usize),
-    Swap(usize, usize),
-    Delete(usize),
+/// Takes the layer named `name` out of `blueprint`'s scene: its node and its cells.
+pub fn delete_in(blueprint: &mut BlueprintDef, name: &str) {
+    let mut found = Vec::new();
+    nodes::walk(&blueprint.scene.nodes, &mut |pointer, node| {
+        if nodes::layer_name(node) == Some(name) {
+            found.push(pointer.to_owned());
+        }
+    });
+    nodes::SceneTree::new(&mut blueprint.scene.nodes).remove(&found);
+    blueprint.scene.grids.layers.remove(name);
+}
+
+/// How many bundles a rename of the layer `name` of `bundle` would reach besides it.
+pub fn joined_count(project: &Project, bundle: &str, name: &str) -> usize {
+    joined(project, bundle, name).len().saturating_sub(1)
+}
+
+/// `bundle` and every area or blueprint with a layer named `name` joined to it through placements:
+/// what one places at any depth, and what places it at any depth.
+fn joined(project: &Project, bundle: &str, name: &str) -> BTreeSet<String> {
+    let has = |bundle: &str| {
+        names(&scene(project, bundle))
+            .iter()
+            .any(|layer| layer == name)
+    };
+    let mut found: BTreeSet<String> = BTreeSet::from([bundle.to_owned()]);
+    let mut queue = vec![bundle.to_owned()];
+    while let Some(at) = queue.pop() {
+        let reached = placed_by(project, &at)
+            .into_iter()
+            .chain(placing(project, &at));
+        for other in reached {
+            if has(&other) && found.insert(other.clone()) {
+                queue.push(other);
+            }
+        }
+    }
+    found
+}
+
+/// Every blueprint `bundle` places, at any depth.
+fn placed_by(project: &Project, bundle: &str) -> BTreeSet<String> {
+    let mut seen = BTreeSet::new();
+    let mut queue = vec![bundle.to_owned()];
+    while let Some(at) = queue.pop() {
+        let Some(read) = nodes::bundle_in(project, &at) else {
+            continue;
+        };
+        let reader = project.reader();
+        for module in nodes::modules(read.nodes()) {
+            if let engine::systems::area::AreaModule::Blueprint(placement) = module.module()
+                && let Some(blueprint) = reader.path_of(placement.blueprint)
+                && seen.insert(blueprint.to_owned())
+            {
+                queue.push(blueprint.to_owned());
+            }
+        }
+    }
+    seen
+}
+
+/// Every area and blueprint that places `bundle`, at any depth.
+fn placing(project: &Project, bundle: &str) -> BTreeSet<String> {
+    let mut seen = BTreeSet::new();
+    let mut queue = vec![bundle.to_owned()];
+    while let Some(at) = queue.pop() {
+        for usage in project.usages.of_content(&at) {
+            let Some(owner) = usage.file.strip_suffix(&format!("/{SCENE_FILE}")) else {
+                continue;
+            };
+            let bundle = matches!(table_of(owner), Some(AreaDef::TABLE | BlueprintDef::TABLE));
+            if bundle && seen.insert(owner.to_owned()) {
+                queue.push(owner.to_owned());
+            }
+        }
+    }
+    seen
+}
+
+fn scene(project: &Project, bundle: &str) -> Vec<SceneNode> {
+    nodes::bundle_in(project, bundle).map_or_else(Vec::new, |read| read.nodes().to_vec())
+}
+
+/// The names of the ground layers of `scene`, in tree order.
+pub fn names(scene: &[SceneNode]) -> Vec<String> {
+    engine::systems::area::scene::layers(scene)
+        .into_iter()
+        .map(|layer| layer.name.clone())
+        .collect()
+}
+
+/// `base`, or `base (1)`, `base (2)`, the next free number, among `taken`.
+fn free_name(base: &str, taken: &[String]) -> String {
+    let base = numbered(base).map_or(base, |(base, _)| base);
+    if !taken.iter().any(|name| name == base) {
+        return base.to_owned();
+    }
+    (1..)
+        .map(|n| format!("{base} ({n})"))
+        .find(|name| !taken.contains(name))
+        .expect("a free number")
+}
+
+/// How many cells a layer of `draft` holds.
+pub fn cell_count(draft: &GridDraft, name: &str) -> usize {
+    draft.layer_index(name).map_or(0, |layer| {
+        draft.ground[layer].cells.iter().flatten().count()
+    })
+}
+
+pub fn cells_said(count: usize) -> String {
+    format!("{count} cell{}", words::plural(count))
+}
+
+fn rename_in(blueprint: &mut BlueprintDef, old: &str, new: &str) {
+    let mut found = Vec::new();
+    nodes::walk(&blueprint.scene.nodes, &mut |pointer, node| {
+        if nodes::layer_name(node) == Some(old) {
+            found.push(pointer.to_owned());
+        }
+    });
+    for pointer in found {
+        if let Some(SceneNode::GroundLayer(layer)) =
+            nodes::node_mut(&mut blueprint.scene.nodes, &pointer)
+        {
+            layer.name = new.to_owned();
+        }
+    }
+    if let Some(cells) = blueprint.scene.grids.layers.remove(old) {
+        blueprint.scene.grids.layers.insert(new.to_owned(), cells);
+    }
 }

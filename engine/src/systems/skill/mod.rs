@@ -27,8 +27,8 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck,
-    serial,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
+    Nearby, RowCheck, serial,
 };
 use crate::core::geometry::{Footprint, Shape};
 use crate::core::math::Pos;
@@ -44,7 +44,7 @@ use crate::systems::npc::{Npc, NpcDef};
 use crate::systems::script::event::{USED_POINT, USED_RANK, USED_TARGET};
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
-    Condition, EventKind, OwnerKind, OwnerRow, RiftScripts, ScriptModule, ScriptedRow,
+    Condition, EventKind, OwnerRow, RiftScripts, RunnerKind, ScriptModule, ScriptedRow,
 };
 use crate::systems::stat::{self, StatKind};
 
@@ -86,6 +86,7 @@ pub struct SkillDef {
     pub sfx: Option<SfxId>,
     pub target: Targeting,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 4.0))]
     pub range: Option<Tiles>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area: Option<Shape>,
@@ -102,8 +103,30 @@ pub struct SkillDef {
     pub modules: Vec<SkillModule>,
 }
 
-impl ContentRow for SkillDef {
+impl ContentFile for SkillDef {
     const TABLE: &'static str = "skill";
+
+    fn fresh(near: &Nearby) -> Result<SkillDef, String> {
+        let first = SkillLevel {
+            cost: SkillPoints(1),
+            stats: BTreeMap::new(),
+        };
+        Ok(SkillDef {
+            name: near.name(),
+            icon: near.image()?,
+            kind: SkillKind::Active,
+            sfx: None,
+            target: Targeting::SingleEnemy,
+            range: None,
+            area: None,
+            cooldown: Seconds(0.0),
+            requires: None,
+            cost: Vec::new(),
+            basic_attack: false,
+            levels: vec![first],
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
@@ -194,11 +217,21 @@ impl ContentRow for SkillDef {
     }
 }
 
+impl NamedContent for SkillDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
+}
+
 impl ModuleSet for SkillDef {
     type Module = SkillModule;
 
     fn modules(&self) -> &[SkillModule] {
         &self.modules
+    }
+
+    fn modules_mut(&mut self) -> &mut Vec<SkillModule> {
+        &mut self.modules
     }
 
     fn rule(_: &SkillModule) -> ModuleRule {
@@ -207,7 +240,7 @@ impl ModuleSet for SkillDef {
 }
 
 impl ScriptedRow for SkillDef {
-    const OWNER: OwnerKind = OwnerKind::Skill;
+    const OWNER: RunnerKind = RunnerKind::Skill;
 
     fn script(module: &SkillModule) -> Option<&ScriptModule> {
         match module {
@@ -219,7 +252,6 @@ impl ScriptedRow for SkillDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SkillModule {
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 
@@ -562,7 +594,7 @@ pub fn check_rank(
             format!(
                 "1 to {}, the ranks of {}",
                 def.rank_count(),
-                skill.key(content)
+                skill.path(content)
             ),
         );
     }
@@ -776,7 +808,7 @@ pub fn check_all(loading: &mut Loading) {
         loading.row_error(
             id,
             "/modules",
-            ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
+            ContentProblem::new(rule, format!("skill/{}", id.path(&content)), expected),
         );
     }
 }

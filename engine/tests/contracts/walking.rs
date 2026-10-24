@@ -10,15 +10,6 @@ use testkit::{Game, Map, Sim};
 const TICKS: usize = 240;
 
 #[test]
-fn asking_again_for_the_tile_a_walk_heads_to_changes_nothing() {
-    let once = Walk::start().toward(Offset::new(8.0, 0.0)).trail();
-    let mut walk = Walk::start().toward(Offset::new(8.0, 0.0));
-    let again = walk.trail_while(|walk| walk.ask(Offset::new(8.0, 0.0)));
-
-    assert_eq!(again, once);
-}
-
-#[test]
 fn asking_for_a_tile_further_along_the_line_walks_on_as_if_asked_for_it_at_first() {
     for end in [
         Offset::new(8.0, 0.0),
@@ -40,7 +31,7 @@ fn asking_for_a_tile_further_along_the_line_walks_on_as_if_asked_for_it_at_first
 }
 
 #[test]
-fn asking_for_every_tile_along_a_walk_as_it_goes_walks_it_as_one() {
+fn asking_again_or_for_every_tile_along_a_walk_as_it_goes_walks_it_as_one() {
     let straight = [
         Offset::new(8.0, 0.0),
         Offset::new(0.0, -8.0),
@@ -52,6 +43,9 @@ fn asking_for_every_tile_along_a_walk_as_it_goes_walks_it_as_one() {
         Offset::new(5.0, -6.0),
     ];
     for end in straight {
+        let once = Walk::start().toward(end).trail();
+        let again = Walk::start().toward(end).trail_while(|walk| walk.ask(end));
+        assert_eq!(again, once, "asking again toward {end:?}");
         for ahead in 1..=3 {
             let once = Walk::start().toward(end).trail();
             assert_eq!(spam(&once, ahead), once, "{ahead} ahead toward {end:?}");

@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::path::Path;
@@ -6,7 +5,9 @@ use std::time::Duration;
 
 use walkdir::WalkDir;
 
-use super::files::{FileBytes, ProjectFiles};
+use engine::core::content::parent_of;
+
+use super::files::{DiskHashes, FileBytes, ProjectFiles, folder_entry, is_folder};
 
 pub struct SaveOutcome {
     pub written: Vec<String>,
@@ -22,7 +23,7 @@ pub struct SaveError {
 pub fn save(
     root: &Path,
     files: &ProjectFiles,
-    disk: &mut BTreeMap<String, String>,
+    disk: &mut DiskHashes,
 ) -> Result<SaveOutcome, SaveError> {
     let mut done = SaveOutcome {
         written: Vec::new(),
@@ -30,22 +31,26 @@ pub fn save(
     };
     let mut new_files = Vec::new();
     let mut changed = Vec::new();
-    for (path, bytes) in files.iter() {
+    for path in files.entries() {
+        let bytes = files.get(path).expect("an entry of the files");
         match disk.get(path) {
             None => new_files.push((path, bytes)),
-            Some(known) if Some(known.as_str()) != files.hash_of(path) => {
-                changed.push((path, bytes))
-            }
+            Some(known) if Some(known) != files.hash_of(path) => changed.push((path, bytes)),
             _ => {}
         }
     }
     let removals: Vec<String> = disk
-        .keys()
+        .paths()
         .filter(|path| !files.contains(path))
         .cloned()
         .collect();
     for (path, bytes) in new_files.into_iter().chain(changed) {
-        if let Err(reason) = write_atomic(root, path, bytes) {
+        let written = if is_folder(path) {
+            std::fs::create_dir_all(root.join(path)).map_err(|error| error.to_string())
+        } else {
+            write_atomic(root, path, bytes)
+        };
+        if let Err(reason) = written {
             return Err(SaveError {
                 file: path.clone(),
                 reason,
@@ -58,9 +63,16 @@ pub fn save(
         done.written.push(path.clone());
     }
     for path in removals {
-        match std::fs::remove_file(root.join(&path)) {
-            Ok(()) => {}
-            Err(error) if error.kind() == ErrorKind::NotFound => {}
+        let removed = if is_folder(&path) {
+            Ok(())
+        } else {
+            std::fs::remove_file(root.join(&path))
+        };
+        match removed {
+            Ok(()) => remove_emptied_folders(root, files, &path),
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                remove_emptied_folders(root, files, &path)
+            }
             Err(error) => {
                 return Err(SaveError {
                     file: path,
@@ -73,6 +85,22 @@ pub fn save(
         done.removed.push(path);
     }
     Ok(done)
+}
+
+/// Removes the folders above `path` that the files no longer hold anything in, as the editor
+/// shows them.
+fn remove_emptied_folders(root: &Path, files: &ProjectFiles, path: &str) {
+    let mut folder = match path.strip_suffix('/') {
+        Some(folder) => folder,
+        None => parent_of(path),
+    };
+    while !folder.is_empty() {
+        let kept = files.paths_under(&folder_entry(folder)).next().is_some();
+        if kept || std::fs::remove_dir(root.join(folder)).is_err() {
+            return;
+        }
+        folder = parent_of(folder);
+    }
 }
 
 pub fn clean_leftovers(root: &Path) {

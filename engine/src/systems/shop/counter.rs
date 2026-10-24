@@ -1,9 +1,11 @@
 use bevy::prelude::*;
-use design_tokens::controls::{self, RowLook};
-use design_tokens::face::{self, TextRole};
-use design_tokens::sheet::{self, Depth};
-use design_tokens::{card, ink};
-use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
+use ui::controls::{self, RowLook};
+use ui::drag;
+use ui::egui;
+use ui::egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
+use ui::face::{self, TextRole};
+use ui::sheet::{self, Depth};
+use ui::{card, ink};
 
 use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::content::Content;
@@ -127,7 +129,7 @@ fn show_counter(ui: &mut Ui, world: &mut World, _width: f32, _most: f32) {
         return;
     };
     let shown = ui.scope(|ui| counter(ui, world, &shelf)).response;
-    if let Some(Carried::BagSlot(slot)) = hud::dropped(&shown) {
+    if let Some(Carried::BagSlot(slot)) = drag::dropped::<Carried>(&shown) {
         request_sale(world, slot);
     }
 }

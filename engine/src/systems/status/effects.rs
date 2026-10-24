@@ -10,7 +10,7 @@ use crate::core::script::{
 use crate::core::time::Seconds;
 use crate::systems::item::ItemId;
 use crate::systems::script::{
-    Condition, EffectCall, OwnerKind, OwnerRow, Reach, RiftScripting, RiftScripts,
+    Condition, EffectCall, OwnerRow, Reach, RiftScripting, RiftScripts, RunnerKind,
     effect as effects,
 };
 use crate::systems::skill::{SkillId, SkillKind};
@@ -21,11 +21,14 @@ use crate::systems::stat::{Stat, StatKind};
 #[schemars(extend("x-system" = "status"))]
 pub struct ApplyStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub effect: StatusEffectId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 1.0))]
     pub power: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = 10.0))]
     pub seconds: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -36,6 +39,7 @@ pub struct ApplyStatus {
 #[schemars(extend("x-system" = "status"))]
 pub struct RemoveStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect: Option<StatusEffectId>,
@@ -51,6 +55,7 @@ pub struct RemoveStatus {
 #[schemars(extend("x-system" = "status"))]
 pub struct Boost {
     pub stat: StatKind,
+    #[schemars(extend("default" = 1.0))]
     pub by: Condition,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub next: Arrow,
@@ -60,9 +65,7 @@ impl EffectDef<RiftScripting> for ApplyStatus {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -93,9 +96,7 @@ impl EffectDef<RiftScripting> for RemoveStatus {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -125,9 +126,7 @@ impl EffectDef<RiftScripting> for Boost {
     fn needs_subject(&self) -> bool {
         true
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -170,9 +169,9 @@ fn source_of(cx: &Compiler<RiftScripting>) -> Result<AspectSource, ScriptFault> 
         return Err(ScriptFault::new("boost without an aspect", expected));
     };
     match row.kind {
-        OwnerKind::StatusEffect => Ok(AspectSource::Status(row.id())),
-        OwnerKind::Item => Ok(AspectSource::Item(row.id())),
-        OwnerKind::Skill => {
+        RunnerKind::StatusEffect => Ok(AspectSource::Status(row.id())),
+        RunnerKind::Item => Ok(AspectSource::Item(row.id())),
+        RunnerKind::Skill => {
             let skill: SkillId = row.id();
             if skill.get(cx.content).kind == SkillKind::Passive {
                 Ok(AspectSource::Skill(skill))

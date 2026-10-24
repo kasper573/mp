@@ -1,0 +1,12 @@
+{
+  "name": "The potter's house",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 23,
+        "height": 14
+      },
+      "tile": 16
+    }
+  }
+}

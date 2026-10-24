@@ -1,54 +1,86 @@
+use crate::tabs::file_title;
+use engine::core::content::ContentFile;
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
-use serde_json::Value;
+use engine::core::tiling::{CellPos, Tiles};
+use engine::systems::area::AreaModuleKind;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::scene::{ModuleNode, SceneNode};
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::ScriptDef;
 
-use super::placement::replace_with;
-use super::{AreaFrame, modules, shapes};
+use super::{AreaFrame, modules, nodes, shapes};
 use crate::app::{BottomTab, Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::schema;
-use crate::value::RowValue;
 use crate::views::sound;
 
-pub fn pick_then_add(
-    editor: &mut Editor,
-    frame: &AreaFrame,
-    module: Value,
-    table: &str,
-    field: &str,
-) {
+/// The type of file a module of `kind` names, picked when one is added: whose npc, which blueprint.
+pub fn named_table(kind: AreaModuleKind) -> Option<&'static str> {
+    match kind {
+        AreaModuleKind::Population | AreaModuleKind::Resident => Some(NpcDef::TABLE),
+        AreaModuleKind::Blueprint => Some(BlueprintDef::TABLE),
+        AreaModuleKind::Script => Some(ScriptDef::TABLE),
+        AreaModuleKind::Scenery => Some(TilesetDef::TABLE),
+        AreaModuleKind::Object | AreaModuleKind::SafeZone | AreaModuleKind::Soundscape => None,
+    }
+}
+
+/// Asks which file a new module of `kind` names, then adds it at `at`, or area-wide without one, to
+/// `bundle`'s insertion folder.
+pub fn pick_then_add(editor: &mut Editor, bundle: &str, kind: AreaModuleKind, at: Option<CellPos>) {
+    let Some(table) = named_table(kind) else {
+        return;
+    };
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
-        title: format!(
-            "Pick a {table} for the new {}",
-            schema::title(module.kind_or("module"))
-        ),
+        title: format!("Pick a {table} for the new {}", schema::title(kind.tag())),
         table: table.to_owned(),
         search: String::new(),
         picked: None,
         options: Vec::new(),
         then: PickRowThen::AddModule {
-            area: frame.area_key.clone(),
-            module,
-            field: field.to_owned(),
+            area: bundle.to_owned(),
+            kind,
+            at,
         },
     }));
 }
 
-pub fn picked_row(editor: &mut Editor, then: PickRowThen, picked: &str) {
-    match then {
-        PickRowThen::AddModule {
-            area,
-            mut module,
-            field,
-        } => {
-            module[field] = Value::String(picked.to_owned());
-            let label = format!("Add {} to {area}", shapes::label(&module));
-            modules::append_modules(editor, &area, vec![module], &label);
+/// Adds a module of `kind` at `at`, or area-wide without one, to `area`, naming the file at
+/// `picked`.
+pub fn add_picked(
+    editor: &mut Editor,
+    area: &str,
+    kind: AreaModuleKind,
+    at: Option<CellPos>,
+    picked: &str,
+) {
+    let Some(reader) = editor.reader() else {
+        return;
+    };
+    let module = match modules::module_template(&reader, area, kind, at, Some(picked)) {
+        Ok(module) => module,
+        Err(why) => {
+            editor.toast(why);
+            return;
         }
-        PickRowThen::ReplaceBlueprint { area, index } => replace_with(editor, &area, index, picked),
-    }
+    };
+    let label = format!(
+        "Add {} to {}",
+        shapes::label(&module, reader.as_ref()),
+        file_title(area)
+    );
+    nodes::add(
+        editor,
+        area,
+        vec![SceneNode::Module(ModuleNode::new(module))],
+        &label,
+    );
 }
 
 pub fn listen(editor: &mut Editor, frame: &AreaFrame, tile: Pos<Tiles>) {
-    sound::listen(editor, &frame.content, frame.area_id, tile);
+    let Some(area) = frame.area_id() else {
+        return;
+    };
+    sound::listen(editor, &frame.content, area, tile);
     editor.panels.bottom = BottomTab::Listen;
 }

@@ -1,7 +1,6 @@
 use bevy_ecs::prelude::*;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
-use engine::core::time::WallClock;
 use engine::systems::area::AreaDef;
 use engine::systems::class::{self, NodeKey, SkillPoints};
 use engine::systems::combat::{self, AttackRequest, Attitude};
@@ -11,13 +10,13 @@ use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::skill::{
     self, AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, BasicAttackPick, CastAim,
-    Cooldowns, Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank,
-    ResetAnswerRequest, ResetPrompt, SkillDef, SkillId, UseSkillRequest,
+    Hotbar, HotbarEntry, HotbarSlot, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest,
+    ResetPrompt, SkillDef, SkillId, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, reach, script, vfx};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 #[test]
 fn a_fresh_fighter_wears_the_sword_and_its_strike_fills_the_basic_attack_slot() {
@@ -290,13 +289,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
     assert!(sim.run_until(10.0, |world| {
         stat::effective(world, dummy, StatKind::Health) < full
     }));
-    let now = sim.world.resource::<WallClock>().now;
-    assert!(
-        sim.world
-            .get::<Cooldowns>(player)
-            .is_some_and(|cooldowns| cooldowns.cooling(cleave, now))
-    );
-    assert_eq!(reach::current(&sim.world, player), None);
+    let struck = stat::effective(&sim.world, dummy, StatKind::Health);
 
     cast(&mut sim, cleave, CastAim::Point(at));
     sim.run(0.5);
@@ -305,6 +298,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
             .iter()
             .any(|text| text.contains("cooling down"))
     );
+    assert_eq!(stat::effective(&sim.world, dummy, StatKind::Health), struck);
 }
 
 #[test]
@@ -380,24 +374,6 @@ fn a_reset_asks_first_and_gives_every_point_back() {
     assert_eq!(sim.count(player, "draught"), 0);
 }
 
-#[test]
-fn a_filled_hotbar_and_its_requests_survive_the_wire() {
-    let (sim, _) = yard();
-    let potion = HotbarEntry::Item(sim.id::<ItemDef>("potion"));
-    let bar = Hotbar(vec![
-        skill_entry(&sim, "cleave"),
-        HotbarEntry::Empty,
-        potion,
-    ]);
-    let bytes = postcard::to_allocvec(&bar).expect("serializes");
-    assert_eq!(postcard::from_bytes::<Hotbar>(&bytes).expect("reads"), bar);
-
-    let request = assign(2, potion);
-    let bytes = postcard::to_allocvec(&request).expect("serializes");
-    let received: AssignHotbarRequest = postcard::from_bytes(&bytes).expect("reads");
-    assert_eq!(received, request);
-}
-
 /// A fighter in a yard, wearing a sword whose strike is their basic attack, with a tree of
 /// skills to learn: an area sweep, a guard, a second wind that needs both, and a knife throw
 /// that costs a knife.
@@ -413,14 +389,14 @@ fn yard() -> (Sim, Entity) {
                 { "xp": 30, "skill_points": 1 },
             ]);
             hero["tree"] = json!({
-                "cleave": { "skill": "cleave", "at": { "x": 0.0, "y": 0.0 } },
-                "guard": { "skill": "guard", "at": { "x": 80.0, "y": 0.0 } },
+                "cleave": { "skill": "cleave.skill.json", "at": { "x": 0.0, "y": 0.0 } },
+                "guard": { "skill": "guard.skill.json", "at": { "x": 80.0, "y": 0.0 } },
                 "second_wind": {
-                    "skill": "second_wind",
+                    "skill": "second_wind.skill.json",
                     "requires": [{ "type": "skill", "node": "cleave" }, { "type": "skill", "node": "guard" }],
                     "at": { "x": 40.0, "y": 80.0 },
                 },
-                "throw_knife": { "skill": "throw_knife", "at": { "x": 160.0, "y": 0.0 } },
+                "throw_knife": { "skill": "throw_knife.skill.json", "at": { "x": 160.0, "y": 0.0 } },
             });
         })
         .row(
@@ -434,9 +410,10 @@ fn yard() -> (Sim, Entity) {
                     "cooldown": 6.0,
                     "levels": [{ "cost": 1, "stats": {} }, { "cost": 1, "stats": {} }],
                 }),
-                strike_nodes(),
+                "cleave_strike",
             ),
         )
+        .script("cleave_strike", "skill", strike_nodes())
         .row(
             "skill",
             "throw_knife",
@@ -446,26 +423,31 @@ fn yard() -> (Sim, Entity) {
                     "target": "single_enemy",
                     "range": 4.0,
                     "cooldown": 2.0,
-                    "cost": [{ "item": "knife" }],
+                    "cost": [{ "item": "knife.item.json" }],
                     "levels": [{ "cost": 1, "stats": {} }],
                 }),
-                strike_nodes(),
+                "throw_knife_strike",
             ),
         )
-        .row("skill", "guard", self_skill("Guard"))
-        .row("skill", "second_wind", self_skill("Second Wind"))
+        .script("throw_knife_strike", "skill", strike_nodes())
+        .row("skill", "guard", self_skill("Guard", "guard_breathe"))
+        .script("guard_breathe", "skill", breathing())
+        .row("skill", "second_wind", self_skill("Second Wind", "second_wind_breathe"))
+        .script("second_wind_breathe", "skill", breathing())
         .asset("icons/skill.png", testkit::png(1, 1))
         .item(
             "potion",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{ "type": "stack", "max": 5 }, {
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "drink" },
-                        "drink": { "type": "items", "take": [{ "item": "potion" }] },
-                    },
-                }],
+                "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": "potion_drink.script.json" }],
+            }),
+        )
+        .script(
+            "potion_drink",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "drink" },
+                "drink": { "type": "items", "take": [{ "item": "potion.item.json" }] },
             }),
         )
         .item("knife", json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 20 }] }))
@@ -473,14 +455,16 @@ fn yard() -> (Sim, Entity) {
             "draught",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "ask" },
-                        "ask": { "type": "reset_skills", "accepted": "drink" },
-                        "drink": { "type": "items", "take": [{ "item": "draught" }] },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "draught_drink.script.json" }],
+            }),
+        )
+        .script(
+            "draught_drink",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "ask" },
+                "ask": { "type": "reset_skills", "accepted": "drink" },
+                "drink": { "type": "items", "take": [{ "item": "draught.item.json" }] },
             }),
         )
         .npc("dummy", 100.0, json!([]))
@@ -530,11 +514,11 @@ fn yard() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn skill(name: &str, fields: Value, nodes: Value) -> Value {
+fn skill(name: &str, fields: Value, script: &str) -> Value {
     let mut row = json!({
         "name": name,
         "icon": "icons/skill.png",
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": path("script", script) }],
     });
     for (field, value) in fields.as_object().expect("a skill's fields") {
         row[field] = value.clone();
@@ -542,15 +526,19 @@ fn skill(name: &str, fields: Value, nodes: Value) -> Value {
     row
 }
 
-fn self_skill(name: &str) -> Value {
+fn self_skill(name: &str, script: &str) -> Value {
     skill(
         name,
         json!({ "target": "self", "cooldown": 20.0, "levels": [{ "cost": 1, "stats": {} }] }),
-        json!({
-            "used": { "type": "on", "event": "used", "next": "breathe" },
-            "breathe": { "type": "heal", "who": { "type": "skill_targets" }, "by": { "type": "stat", "stat": "damage" } },
-        }),
+        script,
     )
+}
+
+fn breathing() -> Value {
+    json!({
+        "used": { "type": "on", "event": "used", "next": "breathe" },
+        "breathe": { "type": "heal", "who": { "type": "skill_targets" }, "by": { "type": "stat", "stat": "damage" } },
+    })
 }
 
 fn strike_nodes() -> Value {

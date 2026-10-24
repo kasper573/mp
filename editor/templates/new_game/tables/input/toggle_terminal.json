@@ -1,9 +1,0 @@
-{
-  "label": "Open or close the terminal",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "KeyC"
-    }
-  ]
-}

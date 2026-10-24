@@ -1,14 +1,18 @@
-use egui::{Color32, Sense, Ui, Vec2};
-use serde_json::Value;
+use engine::systems::actor::ModelDef;
+use ui::chip;
+use ui::egui;
+use ui::egui::{Color32, Sense, Ui, Vec2};
+use ui::form;
+use ui::panel;
+use ui::theme;
 
 use super::{ModelStrip, strip::DraggedFrame, strip_of};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
 
 const CELL: f32 = 76.0;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let view = editor.views.model.view(key);
@@ -33,17 +37,17 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(8.0);
-        widgets::chip_colored(ui, &sheet.image, theme::ACCENT_SOFT, theme::TEXT);
+        chip::colored(ui, &sheet.image, theme::ACCENT_SOFT, theme::TEXT);
         if let Some(first) = current.first() {
             let line = first.frame / sheet.columns.max(1);
-            widgets::chip(
+            chip::plain(
                 ui,
-                &format!("row {} · {}", line + 1, strips_starting_in_row(first.frame)),
+                format!("row {} · {}", line + 1, strips_starting_in_row(first.frame)),
             );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(8.0);
-            widgets::hint(
+            form::hint(
                 ui,
                 &format!(
                     "drag frames into the timeline, or select and press {}",
@@ -73,24 +77,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                                     let (rect, response) =
                                         ui.allocate_exact_size(Vec2::splat(CELL), Sense::click());
                                     let painter = ui.painter_at(rect);
-                                    painter.rect(
-                                        rect,
-                                        2.0,
-                                        if is_used {
-                                            theme::ACCENT_SOFT
-                                        } else {
-                                            theme::INPUT
-                                        },
-                                        egui::Stroke::new(
-                                            if is_picked { 2.0 } else { 1.0 },
-                                            if is_picked {
-                                                Color32::WHITE
-                                            } else {
-                                                theme::BORDER
-                                            },
-                                        ),
-                                        egui::StrokeKind::Inside,
-                                    );
+                                    panel::paint_card(&painter, rect, is_used);
+                                    if is_picked {
+                                        painter.rect_stroke(
+                                            rect,
+                                            2.0,
+                                            egui::Stroke::new(2.0, Color32::WHITE),
+                                            egui::StrokeKind::Inside,
+                                        );
+                                    }
                                     sheet.draw(&painter, rect.shrink(4.0), frame, Color32::WHITE);
                                     response
                                 },

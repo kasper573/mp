@@ -8,9 +8,10 @@ mod mirror;
 
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
+use ui::egui;
+use ui::theme;
 
 use bevy::prelude::*;
-use egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 use engine::core::content::Content;
 use engine::core::geometry::{Footprint, Radians};
 use engine::core::math::{Direction, Pos, Rgba};
@@ -25,14 +26,15 @@ use engine::systems::actor::{Action, ModelId};
 use engine::systems::item::ItemId;
 use engine::systems::skill::SkillId;
 use engine::systems::status::StatusEffectId;
+use ui::egui::{Color32, Pos2, Ui, Vec2 as EVec2};
 
 use self::live::LiveWorld;
 use self::mirror::{ActorPose, Site, Source, Stage, VfxPose};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::thumbs;
-use crate::ui::theme;
-use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes, SceneryOf};
+
+use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, AreaScenes};
 
 pub const SIZE: [u32; 2] = [384, 288];
 pub const ZOOM: f32 = 2.0;
@@ -197,13 +199,7 @@ pub fn show(
         let scene_key = ground_key(key);
         editor.views.area.requests.push(AreaSceneRequest {
             key: scene_key.clone(),
-            spec: AreaSceneSpec {
-                ground: spawn.area.key(&content).to_owned(),
-                scenery: SceneryOf::Area,
-                hidden_ground: Vec::new(),
-                show_blueprints: true,
-                show_scenery: true,
-            },
+            spec: AreaSceneSpec::area(spawn.area.path(&content)),
             width: (rect.width() * ppp) as u32,
             height: (rect.height() * ppp) as u32,
             center: spawn.at,
@@ -212,7 +208,7 @@ pub fn show(
             live: true,
         });
         painter.rect_filled(rect, 4.0, theme::CANVAS);
-        if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
+        if let Some(scene) = editor.views.area.scenes.by_path.get(&scene_key) {
             painter.image(scene.texture, rect, scene.uv(), Color32::WHITE);
         }
     } else {
@@ -384,7 +380,7 @@ fn behind(scenes: &AreaScenes, request: &Request) -> Option<SiteTexture> {
     if !request.ground {
         return None;
     }
-    let scene = scenes.by_key.get(&ground_key(&request.key))?;
+    let scene = scenes.by_path.get(&ground_key(&request.key))?;
     let uv = scene.uv();
     Some(SiteTexture {
         image: scene.image.clone(),

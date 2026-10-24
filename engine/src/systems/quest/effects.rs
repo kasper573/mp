@@ -23,6 +23,7 @@ use crate::systems::text::LineText;
 #[schemars(extend("x-system" = "quest"))]
 pub struct OfferQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -40,6 +41,7 @@ pub struct OfferQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct AcceptQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -54,6 +56,7 @@ pub struct AcceptQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct TurnIn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -72,6 +75,7 @@ pub struct TurnIn {
 #[schemars(extend("x-system" = "quest"))]
 pub struct FailQuest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -83,6 +87,7 @@ pub struct FailQuest {
 #[schemars(extend("x-system" = "quest"))]
 pub struct CompleteTask {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     pub task: String,
@@ -95,6 +100,7 @@ pub struct CompleteTask {
 #[schemars(extend("x-system" = "quest"))]
 pub struct Decide {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub quest: QuestId,
     pub path: String,
@@ -110,13 +116,7 @@ impl EffectDef<RiftScripting> for OfferQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            ("accepted", &self.accepted),
-            ("declined", &self.declined),
-            (REFUSED, &self.refused),
-        ]
-    }
+    crate::outputs!("accepted" => accepted, "declined" => declined, REFUSED => refused);
     fn pauses(&self) -> bool {
         true
     }
@@ -161,9 +161,7 @@ impl EffectDef<RiftScripting> for AcceptQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -187,13 +185,7 @@ impl EffectDef<RiftScripting> for TurnIn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![
-            ("done", &self.done),
-            (REFUSED, &self.refused),
-            ("cancelled", &self.cancelled),
-        ]
-    }
+    crate::outputs!("done" => done, REFUSED => refused, "cancelled" => cancelled);
     fn pauses(&self) -> bool {
         true
     }
@@ -244,9 +236,7 @@ impl EffectDef<RiftScripting> for FailQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -269,9 +259,7 @@ impl EffectDef<RiftScripting> for CompleteTask {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -286,7 +274,7 @@ impl EffectDef<RiftScripting> for CompleteTask {
             .ok_or_else(|| {
                 ScriptFault::new(
                     "unknown task",
-                    format!("{} has no task {task}", quest.key(cx.content)),
+                    format!("{} has no task {task}", quest.path(cx.content)),
                 )
             })?;
         Ok(Box::new(move |world, _, cx| {
@@ -305,9 +293,7 @@ impl EffectDef<RiftScripting> for Decide {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -321,7 +307,7 @@ impl EffectDef<RiftScripting> for Decide {
         if !known {
             return Err(ScriptFault::new(
                 "unknown path",
-                format!("{} has no path {path:?}", quest.key(cx.content)),
+                format!("{} has no path {path:?}", quest.path(cx.content)),
             ));
         }
         Ok(Box::new(move |world, _, cx| {

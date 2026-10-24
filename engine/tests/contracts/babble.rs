@@ -10,7 +10,7 @@ use engine::core::audio::playback::{HushVoice, PlayClip, SfxPlace};
 use engine::core::babble::{BabbleId, BabblePlugin, BabbleRank, Babbling};
 use engine::core::content::Content;
 use engine::core::text::{LettersPerSecond, StyledLine, StyledTextPlugin, Typewriter};
-use testkit::Game;
+use testkit::{Declared, Game};
 
 const FRAME: Duration = Duration::from_millis(50);
 const TEN_PER_SECOND: LettersPerSecond = LettersPerSecond(10.0);
@@ -189,6 +189,6 @@ fn voices() -> Content {
 fn bram(app: &App) -> BabbleId {
     app.world()
         .resource::<Content>()
-        .by_key("bram")
+        .declared("bram")
         .expect("bram babbles")
 }

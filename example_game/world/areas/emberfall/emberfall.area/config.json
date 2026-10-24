@@ -1,0 +1,12 @@
+{
+  "name": "Emberfall",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 86,
+        "height": 60
+      },
+      "tile": 16
+    }
+  }
+}

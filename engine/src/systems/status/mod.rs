@@ -15,10 +15,12 @@ use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck};
+use crate::core::content::{
+    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, Nearby, RowCheck,
+};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::core::vfx::VfxId;
-use crate::systems::script::{OwnerKind, ScriptModule, ScriptedRow};
+use crate::systems::script::{RunnerKind, ScriptModule, ScriptedRow};
 
 pub type StatusEffectId = ContentId<StatusEffectDef>;
 
@@ -81,7 +83,6 @@ pub struct Phased<T> {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StatusModule {
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 
@@ -231,12 +232,30 @@ impl<T> Phased<T> {
     }
 }
 
-impl ContentRow for StatusEffectDef {
+impl ContentFile for StatusEffectDef {
     const TABLE: &'static str = "status_effect";
+
+    fn fresh(near: &Nearby) -> Result<StatusEffectDef, String> {
+        Ok(StatusEffectDef {
+            name: near.name(),
+            icon: near.image()?,
+            category: StatusCategory::Buff,
+            description: String::new(),
+            vfx: Phased::default(),
+            sfx: Phased::default(),
+            modules: Vec::new(),
+        })
+    }
 
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
         check.text("/description", &self.description, 0, 200);
+    }
+}
+
+impl NamedContent for StatusEffectDef {
+    fn shown_name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -247,13 +266,17 @@ impl ModuleSet for StatusEffectDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<StatusModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &StatusModule) -> ModuleRule {
         ModuleRule::AnyNumber
     }
 }
 
 impl ScriptedRow for StatusEffectDef {
-    const OWNER: OwnerKind = OwnerKind::StatusEffect;
+    const OWNER: RunnerKind = RunnerKind::StatusEffect;
 
     fn script(module: &StatusModule) -> Option<&ScriptModule> {
         match module {

@@ -3,8 +3,9 @@ use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_replicon::prelude::RepliconChannels;
 use bevy_replicon_renet2::RenetChannelsExt;
-use design_tokens::ink;
 use renet2::{ConnectionConfig, RenetClient};
+use ui::egui;
+use ui::ink;
 
 use super::sign_in::SignInFailure;
 use super::{ClientScreen, Notice, Retry, notice_screen};

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use engine::core::content::Content;
-use engine::systems::area::AreaModule;
+use engine::systems::area::{self, AreaModule};
 use engine::systems::{GameSettings, step_areas};
 use serde::Deserialize;
 
@@ -157,13 +157,8 @@ fn step(bench: &mut Bench) {
 }
 
 fn npcs_per_area(content: &Content) -> usize {
-    let area = content
-        .built::<GameSettings>()
-        .initial_spawn
-        .area
-        .get(content);
-    area.modules
-        .iter()
+    let area = content.built::<GameSettings>().initial_spawn.area;
+    area::modules(content, area)
         .map(|module| match module {
             AreaModule::Population(population) => population.count as usize,
             AreaModule::Resident(_) => 1,

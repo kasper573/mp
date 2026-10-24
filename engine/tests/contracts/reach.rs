@@ -3,13 +3,15 @@ use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
 use engine::systems::area::{AreaDef, AreaTag};
+use engine::systems::combat::{self, AttackRequest, Attitude};
 use engine::systems::item::{self, DroppedItem, Inventory, ItemDef, PickupRequest, Reservation};
 use engine::systems::movement::{self, MoveRequest, MoveSeq, Position, position};
 use engine::systems::npc::{self, NpcDef, Pack};
-use engine::systems::reach::{self, ReachAct, ReachTarget, Tether};
-use engine::systems::skill::SkillDef;
+use engine::systems::reach;
+use engine::systems::stat::{self, StatKind};
+use engine::systems::{actor, skill};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {
@@ -48,50 +50,24 @@ fn walking_away_cancels_the_intent() {
 }
 
 #[test]
-fn an_actor_holds_one_intent_at_a_time() {
+fn a_new_order_replaces_the_one_in_progress() {
     let mut sim = yard();
     let player = sim.join(1);
     let at = position(&sim.world, player).expect("position");
-    let brute = brute(&mut sim, at);
-    let bone = drop_bone(&mut sim, at);
-    let strike = sim.id::<SkillDef>("strike");
-    let world = &mut sim.world;
+    let brute = brute(&mut sim, at + Offset::new(6.0, 0.0));
+    let full = stat::effective(&sim.world, brute, StatKind::Health);
+    let bone = drop_bone(&mut sim, at + Offset::new(-1.0, 0.0));
 
-    reach::intend(
-        world,
-        player,
-        ReachTarget::Actor(brute),
-        ReachAct::Cast {
-            skill: strike,
-            repeat: true,
-        },
-    );
-    reach::intend(world, player, ReachTarget::Actor(bone), ReachAct::Pickup);
+    let conn = sim.conn(1);
+    sim.send(conn, AttackRequest { target: brute });
+    sim.run(0.3);
+    assert_eq!(reach::attacking(&sim.world, player), Some(brute));
+    sim.send(conn, PickupRequest { target: bone });
 
-    assert_eq!(reach::attacking(world, player), None);
-    assert_eq!(reach::intent(world, player, ReachAct::Pickup), Some(bone));
-}
-
-#[test]
-fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
-    let mut sim = yard();
-    let player = sim.join(1);
-    let anchor = position(&sim.world, player).expect("position");
-    let far = anchor + Offset::new(6.0, 0.0);
-    let brute = brute(&mut sim, far);
-    let world = &mut sim.world;
-    let tether = Tether::around(world, player, Tiles(2.0), Some(brute)).expect("tether");
-
-    assert!(tether.holds(world, player));
-
-    world.get_mut::<Position>(player).expect("position").pos = far;
-    assert!(!tether.holds(world, player));
-
-    world.get_mut::<Position>(player).expect("position").pos = anchor;
-    assert!(tether.holds(world, player));
-
-    world.despawn(brute);
-    assert!(!tether.holds(world, player));
+    assert!(sim.run_until(10.0, |world| bones(world, player) == 2));
+    sim.run(3.0);
+    assert_eq!(reach::attacking(&sim.world, player), None);
+    assert_eq!(stat::effective(&sim.world, brute, StatKind::Health), full);
 }
 
 fn yard() -> Sim {
@@ -99,6 +75,7 @@ fn yard() -> Sim {
         .area("yard", &Map::open(13, 5), json!([]))
         .hero("yard", 2.0, 2.0)
         .sword()
+        .wearing(&["sword"])
         .npc("brute", 25.0, json!([]))
         .item(
             "bone",
@@ -109,15 +86,30 @@ fn yard() -> Sim {
     sim.serve("yard")
         .accept::<MoveRequest>()
         .accept::<PickupRequest>()
-        .add((movement::move_request, item::pickup_request))
-        .add((movement::advance, item::pickups));
+        .accept::<AttackRequest>()
+        .add((
+            movement::move_request,
+            item::pickup_request,
+            combat::request,
+            actor::playing::progress,
+            skill::casting::casts,
+        ))
+        .add((movement::advance, item::pickups))
+        .add((
+            stat::settle_health,
+            combat::defeats,
+            skill::hotbar::settle_basic_attack,
+            actor::settle,
+        ));
     sim
 }
 
 fn brute(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
     let area = sim.id::<AreaDef>("yard");
     let brute = sim.id::<NpcDef>("brute");
-    npc::spawn(&mut sim.world, brute, at, area, Pack(u32::MAX))
+    let brute = npc::spawn(&mut sim.world, brute, at, area, Pack(u32::MAX));
+    sim.world.entity_mut(brute).insert(Attitude::Hostile);
+    brute
 }
 
 fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
@@ -141,7 +133,7 @@ fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
 
 fn bones(world: &World, player: Entity) -> u32 {
     let content = world.resource::<engine::core::content::Content>();
-    let bone = content.by_key::<ItemDef>("bone").expect("bones");
+    let bone = content.declared::<ItemDef>("bone").expect("bones");
     world
         .get::<Inventory>(player)
         .map_or(0, |inventory| inventory.count(bone))

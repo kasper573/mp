@@ -1,13 +1,14 @@
 use std::collections::BTreeSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::LazyLock;
+use ui::egui;
+use ui::ink;
+use ui::theme;
 
-use egui::{Stroke, Ui};
-use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
 use engine::core::content::ErrorPlace;
 use engine::core::vfx::{ShaderError, VfxShaderDef, prelude_names};
-
-use crate::ui::theme;
+use ui::egui::{Stroke, Ui};
+use ui::egui_code_editor::{CodeEditor, ColorTheme, Syntax};
 
 /// The code of a shader as the designer types it: WGSL highlighted, each line numbered, and the
 /// first thing naga refuses marked on its line. Returns the draft shown and its verdict.
@@ -46,7 +47,7 @@ pub fn show(
             egui::pos2(output.text_clip_rect.max.x, text.max.y),
         );
         let painter = ui.painter();
-        painter.rect_filled(marked, 0.0, theme::alpha(theme::BLOCKED, 40));
+        painter.rect_filled(marked, 0.0, ink::wash(theme::BLOCKED, 0.16));
         painter.line_segment(
             [marked.left_bottom(), marked.right_bottom()],
             Stroke::new(1.5, theme::BLOCKED),

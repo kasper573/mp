@@ -1,11 +1,14 @@
-use egui::{Rect as ERect, Vec2};
 use engine::core::tiling::{Cell, TilePos};
-use engine::systems::area;
+use engine::systems::area::{self, Pictured};
+use ui::egui;
+use ui::egui::{Rect as ERect, Vec2};
+use ui::theme;
+use ui::words;
 
-use super::{AreaFrame, AreaTool, placement};
+use super::{AreaFrame, AreaTool, Armed, placement};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
+use crate::tabs::file_title;
 
 pub(super) fn status_bar(
     editor: &mut Editor,
@@ -13,35 +16,45 @@ pub(super) fn status_bar(
     view_key: &str,
     frame: &AreaFrame,
 ) {
+    let armed = super::armed(editor, frame);
     let view = editor.views.area.view(view_key);
     let mut left: Vec<String> = Vec::new();
     if let Some(place) = frame.in_place.last() {
         let parts = part_count(frame, &place.blueprint);
-        let picked = placement::selected_part_indices(editor, &place.blueprint);
-        match picked.as_slice() {
-            [one] => left.push(format!("{} · part {} of {parts}", place.blueprint, one + 1)),
-            _ => left.push(format!("{} · {parts} parts", place.blueprint)),
+        let picked = placement::selected_in_place(editor, &place.blueprint).len();
+        let title = file_title(&place.blueprint);
+        match picked {
+            0 => left.push(format!("{title} · {parts} parts")),
+            picked => left.push(format!("{title} · {picked} of {parts} parts selected")),
         }
         left.push(format!(
             "double-click a part to open it · {} goes up one level",
             EditorKey::Cancel.name()
         ));
-    } else if let Some(blueprint) = &view.blueprint {
+    } else if let Pictured::Blueprint(_) = frame.pictured {
+        let blueprint = &frame.bundle;
         let parts = part_count(frame, blueprint);
         left.push(format!(
-            "blueprint/{blueprint} · {parts} part{}",
-            widgets::plural(parts)
+            "{} · {parts} part{}",
+            file_title(blueprint),
+            words::plural(parts)
         ));
         left.push(
             placement::placement_count(&frame.content, blueprint)
                 .trim_end_matches('.')
                 .to_lowercase(),
         );
-        left.push("S stamps it".to_owned());
+    }
+    if let Some(said) = frame.flags.said() {
+        let name = match &frame.def {
+            super::nodes::SceneBundle::Area(area) => area.name.clone(),
+            super::nodes::SceneBundle::Blueprint(_) => file_title(&frame.bundle).to_owned(),
+        };
+        left.push(format!("{said} in {name}"));
     }
     if let Some(tile) = frame.pointer_tile {
         let cell = tile.cell();
-        if view.walk_overlay && view.tool == AreaTool::Paint {
+        if armed == Armed::Walk && view.tool.paints() {
             left.push(format!("cell {}, {}", cell.x, cell.y));
             if frame.in_map(tile) {
                 let area = frame.area();
@@ -76,13 +89,10 @@ pub(super) fn status_bar(
                 AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper
             ) && let Some(tileset) = &view.pick.tileset
             {
-                let layer = frame
-                    .area()
-                    .grids
-                    .ground
-                    .get(view.layer)
-                    .map(|l| l.name.clone())
-                    .unwrap_or_default();
+                let layer = match &armed {
+                    Armed::Layer { name, .. } => name.clone(),
+                    _ => String::new(),
+                };
                 let picked = view
                     .pick
                     .block
@@ -99,7 +109,7 @@ pub(super) fn status_bar(
                     "blocked".to_owned()
                 };
                 if let Some(surface) = area.footstep_at(cell) {
-                    what.push_str(&format!(" · {}", surface.key(&frame.content)));
+                    what.push_str(&format!(" · {}", file_title(surface.path(&frame.content))));
                 }
                 left.push(what);
             }
@@ -135,11 +145,12 @@ pub(super) fn status_bar(
             && visible.max().x >= size.width
             && visible.max().y >= size.height
     };
-    if whole_map_visible && view.in_place.is_empty() && view.blueprint.is_none() {
+    let quiet = view.in_place.is_empty() && view.show_only.is_none() && !view.tool.paints();
+    if whole_map_visible && quiet && matches!(frame.pictured, Pictured::Area(_)) {
         let size = frame.size();
         let text = format!(
-            "area/{} · {} × {} · zoom {}%",
-            frame.area_key,
+            "{} · {} × {} · zoom {}%",
+            frame.bundle,
             size.width,
             size.height,
             (zoom * 100.0).round()
@@ -147,7 +158,7 @@ pub(super) fn status_bar(
         let galley = painter.layout_no_wrap(text, egui::FontId::monospace(12.0), theme::TEXT);
         let at = frame.canvas.screen.min + Vec2::new(16.0, 12.0);
         let back = ERect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0));
-        design_tokens::slip::paint(painter, back);
+        ui::slip::paint(painter, back);
         painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT);
     }
 }
@@ -155,6 +166,8 @@ pub(super) fn status_bar(
 fn part_count(frame: &AreaFrame, blueprint: &str) -> usize {
     frame
         .content
-        .by_key::<area::blueprint::BlueprintDef>(blueprint)
-        .map_or(0, |id| id.get(&frame.content).parts.len())
+        .by_path::<area::blueprint::BlueprintDef>(blueprint)
+        .map_or(0, |id| {
+            super::nodes::modules(&id.get(&frame.content).scene.nodes).len()
+        })
 }

@@ -7,11 +7,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::ink::Prose;
-use egui::Color32;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
+use ui::egui::Color32;
+use ui::ink::Prose;
 
 const SLOW_PACE: f32 = 2.5;
 

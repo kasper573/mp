@@ -1,41 +1,59 @@
-use std::collections::BTreeMap;
+use std::sync::Arc;
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::menu;
+use ui::paint;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentFile, ContentId, FolderReader, fields_file};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
+use engine::core::script::ValueType;
+use engine::core::tiling::{TilePos, Tiles};
 use engine::core::time::Seconds;
-use engine::systems::GameSettings;
+use engine::field;
 use engine::systems::area::{self, AreaDef};
-use engine::systems::class::{ClassDef, SkillTree};
-use engine::systems::item::ItemDef;
+use engine::systems::class::{ClassDef, NodeKey, SkillTree};
+use engine::systems::equipment::EquipmentSlot;
+use engine::systems::item::{ItemDef, ItemKind, ItemStack};
 use engine::systems::memory::MemoryDef;
-use engine::systems::player::snapshot::{CharacterSnapshot, QuestState};
-use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
-use engine::systems::script::RiftScripts;
-use engine::systems::skill::{HOTBAR_SLOTS, Rank, SkillDef};
+use engine::systems::player::snapshot::{
+    AtInitialSpawn, CharacterSnapshot, CharacterStart, MemoryValue, QuestState, SnapshotMemory,
+    SnapshotQuest, SnapshotSkill, SnapshotSlot,
+};
+use engine::systems::quest::{
+    Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestModule, QuestResult,
+};
+use engine::systems::script::condition as script_condition;
+use engine::systems::script::{Place, RiftScripts};
+use engine::systems::skill::{HOTBAR_SLOTS, HotbarEntry, HotbarSlot, Rank, SkillDef};
 use engine::systems::stat::StatKind;
 use serde::Deserialize;
-use serde_json::{Map, Value};
 use strum::{AsRefStr, VariantArray};
+use ui::controls;
+use ui::egui::{Align, Layout, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
-use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use super::area::scene::{AreaSceneRequest, AreaSceneSpec};
 use crate::app::{Editor, PlacePick};
 use crate::forms::{self, FormAction, FormChange, FormCx};
 use crate::project::ContentEdit;
-use crate::tabs::EditorTab;
-use crate::ui::browser::BrowserAction;
-use crate::ui::{row_form, theme, widgets};
-use crate::value::RowValue;
+use crate::shell::browser::BrowserAction;
+use crate::shell::{row_form, widgets};
+use crate::tabs::{EditorTab, file_title, shown_path};
 use crate::views::area::AreaViews;
-use crate::{condition, picker, play, schema, stage};
+use crate::{picker, play, stage};
+use ui::input::{InputField, NumberField};
 
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;
 const MAP: Vec2 = Vec2::new(272.0, 96.0);
 const SLOT_WIDTH: f32 = 90.0;
+const MEMORY_WIDTH: f32 = 140.0;
 const HOTBAR_COLUMN: f32 = 440.0;
 
 #[derive(Default)]
@@ -50,7 +68,6 @@ pub struct CharacterView {
 pub enum CharacterSection {
     #[default]
     Identity,
-    #[strum(serialize = "Stats and effects")]
     Stats,
     Bag,
     Equipment,
@@ -96,29 +113,50 @@ impl CharacterSection {
     }
 }
 
+/// What a section of the character editor reads beside the character itself.
+struct Sheet<'a> {
+    reader: &'a FolderReader,
+    key: &'a str,
+}
+
+impl Sheet<'_> {
+    fn path_of<Row: ContentFile>(&self, id: ContentId<Row>) -> String {
+        self.reader.path_of(id).unwrap_or_default().to_owned()
+    }
+
+    fn read<Row: ContentFile>(&self, cx: &FormCx, id: ContentId<Row>) -> Option<Arc<Row>> {
+        cx.project.read::<Row>(self.reader.path_of(id)?).ok()
+    }
+
+    /// The id the content loaded last gave a file, as the files stand now.
+    fn now<Row: ContentFile>(
+        &self,
+        loaded: &Content,
+        id: ContentId<Row>,
+    ) -> Option<ContentId<Row>> {
+        self.reader.id_of(id.path(loaded))
+    }
+}
+
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let file = row_file(CharacterSnapshot::TABLE, key);
-    let Some(mut value) = editor.row_value(CharacterSnapshot::TABLE, key) else {
-        ui.label(theme::muted(format!("{file} is gone")));
+    let (Some(character), Some(reader)) = (
+        super::read_shown::<CharacterSnapshot>(editor, ui, key),
+        editor.reader(),
+    ) else {
         return;
+    };
+    let mut character = (*character).clone();
+    let sheet = Sheet {
+        reader: &reader,
+        key,
     };
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of(CharacterSnapshot::TABLE);
     let section = editor.views.character.section;
-    let characters: Vec<String> = editor
-        .project
-        .as_ref()
-        .map(|project| {
-            project
-                .files
-                .keys_of(CharacterSnapshot::TABLE)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default();
+    let characters = reader.paths_of::<CharacterSnapshot>().to_vec();
     let mut switch: Option<String> = None;
     let mut changed = FormChange::default();
-    let mut label = format!("Edit {}/{key}", CharacterSnapshot::TABLE);
+    let mut label = String::new();
     let mut actions = Vec::new();
     let mut pick: Option<PlacePick> = None;
     ui.horizontal_top(|ui| {
@@ -126,11 +164,18 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             ui.set_width(NAV);
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                ui.label(theme::faint(key.to_uppercase()).monospace().size(11.5));
-                ui.menu_button(theme::faint("other…"), |ui| {
+                ui.label(
+                    theme::faint(shown_path(key).to_uppercase())
+                        .monospace()
+                        .size(11.5),
+                );
+                menu::dropdown(ui, theme::faint("other…"), |ui| {
                     for other in &characters {
                         if ui
-                            .selectable_label(other == key, theme::mono(other).size(12.5))
+                            .selectable_label(
+                                other == key,
+                                theme::mono(shown_path(other)).size(12.5),
+                            )
                             .clicked()
                         {
                             switch = Some(other.clone());
@@ -144,8 +189,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 let selected = candidate == section;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
+                response.widget_info(|| {
+                    egui::WidgetInfo::selected(
+                        egui::WidgetType::SelectableLabel,
+                        true,
+                        selected,
+                        candidate.as_ref(),
+                    )
+                });
                 if selected {
-                    ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+                    paint::row_wash(ui.painter(), rect);
                 } else if response.hovered() {
                     ui.painter().rect_filled(rect, 4.0, theme::RAISED);
                 }
@@ -163,8 +216,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
         ui.add_space(14.0);
         let preview_width = stage::preview_width(ui.available_width() / 3.0);
+        let middle = ui.available_width() - preview_width - 16.0;
+        let columns = if middle >= 2.0 * (COLUMN + 32.0) {
+            egui::Layout::left_to_right(egui::Align::Min)
+        } else {
+            egui::Layout::top_down(egui::Align::Min)
+        };
         ui.vertical(|ui| {
-            ui.set_width(ui.available_width() - preview_width - 16.0);
+            ui.set_width(middle);
             let Editor {
                 project,
                 form,
@@ -174,71 +233,82 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             } = editor;
             let project = project.as_ref().expect("a project");
             let mut cx = FormCx::new(project, root, shapes, form, &mut actions)
-                .owned_by(CharacterSnapshot::TABLE, Some(key));
+                .editing(CharacterSnapshot::TABLE, Some(key));
+            let character = &mut character;
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
-                ui.horizontal_top(|ui| {
+                ui.with_layout(columns, |ui| {
                     for column in [left, right] {
                         ui.vertical(|ui| {
                             ui.set_width(COLUMN + 16.0);
+                            ui.set_max_width(COLUMN + 16.0);
                             for card in column {
                                 let result = match card {
-                                    CharacterSection::Identity => identity(ui, &mut cx, &mut value),
-                                    CharacterSection::Stats => generic(
+                                    CharacterSection::Identity => {
+                                        identity(ui, &mut cx, &sheet, character)
+                                    }
+                                    CharacterSection::Stats => section_of(
                                         ui,
                                         &mut cx,
-                                        root,
-                                        &mut value,
-                                        &[("stats", "Stats"), ("effects", "Effects")],
+                                        "Stats",
+                                        &mut character.stats,
+                                        field!(CharacterSnapshot, stats),
                                     ),
-                                    CharacterSection::Bag => bag(ui, &mut cx, &mut value),
+                                    CharacterSection::Bag => bag(ui, &mut cx, &sheet, character),
                                     CharacterSection::Equipment => {
-                                        equipment(ui, &mut cx, &mut value)
+                                        equipment(ui, &mut cx, &sheet, character)
                                     }
-                                    CharacterSection::Skills => skills(ui, &mut cx, &mut value),
-                                    CharacterSection::Hotbar => hotbar(ui, &mut cx, &mut value),
+                                    CharacterSection::Skills => {
+                                        skills(ui, &mut cx, &sheet, character)
+                                    }
+                                    CharacterSection::Hotbar => hotbar(ui, &mut cx, character),
                                     CharacterSection::Start => start(
                                         ui,
                                         &mut cx,
-                                        &mut value,
-                                        key,
+                                        &sheet,
+                                        character,
                                         &mut views.area,
                                         &mut pick,
                                         project.generation,
                                     ),
                                     CharacterSection::AreasKnown => {
-                                        areas_known(ui, &mut cx, &mut value)
+                                        areas_known(ui, &sheet, character)
                                     }
                                     CharacterSection::Quests => quests(
                                         ui,
                                         &mut cx,
-                                        &mut value,
+                                        &sheet,
+                                        character,
                                         &mut views.character,
                                         &mut label,
                                     ),
-                                    CharacterSection::Memories => {
-                                        memories(ui, &mut cx, &mut value, &mut views.character)
-                                    }
-                                    CharacterSection::LinesHeard => generic(
+                                    CharacterSection::Memories => memories(
                                         ui,
                                         &mut cx,
-                                        root,
-                                        &mut value,
-                                        &[("lines_heard", "Lines heard")],
+                                        &sheet,
+                                        character,
+                                        &mut views.character,
                                     ),
-                                    CharacterSection::Shops => generic(
+                                    CharacterSection::LinesHeard => section_of(
                                         ui,
                                         &mut cx,
-                                        root,
-                                        &mut value,
-                                        &[("shops", "Shops")],
+                                        "Lines heard",
+                                        &mut character.lines_heard,
+                                        field!(CharacterSnapshot, lines_heard),
                                     ),
-                                    CharacterSection::History => generic(
+                                    CharacterSection::Shops => section_of(
                                         ui,
                                         &mut cx,
-                                        root,
-                                        &mut value,
-                                        &[("history", "History")],
+                                        "Shops",
+                                        &mut character.shops,
+                                        field!(CharacterSnapshot, shops),
+                                    ),
+                                    CharacterSection::History => section_of(
+                                        ui,
+                                        &mut cx,
+                                        "History",
+                                        &mut character.history,
+                                        field!(CharacterSnapshot, history),
                                     ),
                                 };
                                 changed |= result;
@@ -252,12 +322,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         });
         ui.vertical(|ui| {
             ui.set_width(preview_width);
-            widgets::section(ui, "preview");
+            sheet::section(ui, "preview");
             row_form::preview::show(editor, ui, CharacterSnapshot::TABLE, key);
         });
     });
     editor.status.left.push(format!(
-        "test character {key} › {}",
+        "test character {} › {}",
+        shown_path(key),
         section.as_ref().to_lowercase()
     ));
     editor.status.left.push(match section {
@@ -282,10 +353,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         }
         editor.pick = Some(request);
     }
-    if changed.is_some() {
-        let mut edit = ContentEdit::new(label);
-        edit.write_json(&file, &value);
-        editor.apply(edit);
+    if let Some(what) = changed.0 {
+        if label.is_empty() {
+            label = format!("Edit {} {}", shown_path(key), what.trim_start_matches('/'));
+        }
+        // A drag edits a field every frame; those frames are one step to undo.
+        editor.write_content_as(ContentEdit::new(label).merging(), key, &character);
     }
     for action in actions {
         row_form::act(editor, action, CharacterSnapshot::TABLE, key);
@@ -295,195 +368,170 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
 }
 
-fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn identity(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
+) -> FormChange {
     let mut changed = FormChange::default();
-    let classes: Vec<String> = cx
-        .files
-        .keys_of(ClassDef::TABLE)
-        .map(str::to_owned)
-        .collect();
-    let xp = value["xp"].as_u64().unwrap_or(0) as u32;
-    let level = level_of(cx, value.text("class"), xp);
+    let classes = sheet.reader.paths_of::<ClassDef>();
+    let level = level_of(cx, sheet, character);
     card(ui, "Identity", |ui| {
-        widgets::kv(ui, "name", |ui| {
-            changed |= forms::text(ui, cx, &mut value["name"], "/name");
+        form::kv(ui, "name", |ui| {
+            changed |= forms::of_type(ui, cx, &mut character.name, field!(CharacterSnapshot, name));
         });
-        widgets::kv(ui, "class", |ui| {
-            let current = value.text("class").to_owned();
+        form::kv(ui, "class", |ui| {
+            let current = sheet.path_of(character.class);
             let mut picked = current.clone();
-            widgets::combo("character-class")
+            controls::combo("character-class")
                 .width(ui.available_width() - 8.0)
-                .selected_text(theme::mono(&current).size(13.0))
+                .truncate()
+                .selected_text(theme::mono(shown_path(&current)).size(13.0))
                 .show_ui(ui, |ui| {
-                    for class in &classes {
-                        ui.selectable_value(&mut picked, class.clone(), class);
+                    for class in classes {
+                        ui.selectable_value(&mut picked, class.clone(), shown_path(class));
                     }
                 });
-            if picked != current {
-                value["class"] = Value::String(picked);
-                changed = FormChange::at("/class");
+            if picked != current
+                && let Some(class) = sheet.reader.id_of(&picked)
+            {
+                character.class = class;
+                changed = FormChange::at(field!(CharacterSnapshot, class));
             }
         });
-        widgets::kv(ui, "xp", |ui| {
-            let mut draft = xp;
-            let response = forms::boxed_input(ui, Some(&format!("level {level}")), |ui| {
-                ui.add(egui::DragValue::new(&mut draft).speed(1.0))
-            });
-            if response.changed() && draft != xp {
-                value["xp"] = Value::from(draft);
-                changed = FormChange::at("/xp");
+        form::kv(ui, "xp", |ui| {
+            let level = format!("level {level}");
+            if NumberField::new(&mut character.xp).unit(&level).show(ui) {
+                changed = FormChange::at(field!(CharacterSnapshot, xp));
             }
         });
     });
     changed
 }
 
-fn generic(
-    ui: &mut Ui,
-    cx: &mut FormCx,
-    root: &Value,
-    value: &mut Value,
-    fields: &[(&str, &str)],
-) -> FormChange {
+/// A card of the form of one part of the character, drawn from its type.
+fn section_of<T>(ui: &mut Ui, cx: &mut FormCx, title: &str, part: &mut T, path: &str) -> FormChange
+where
+    T: schemars::JsonSchema + serde::Serialize + serde::de::DeserializeOwned + 'static,
+{
     let mut changed = FormChange::default();
-    for (field, title) in fields {
-        let Some(schema) = schema::properties(root)
-            .into_iter()
-            .find(|(name, _)| name == field)
-            .map(|(_, schema)| schema)
-        else {
-            continue;
-        };
-        card(ui, title, |ui| {
-            if value.get(*field).is_none_or(Value::is_null) {
-                value[*field] = schema::template(cx.root, schema);
-            }
-            changed |= forms::value(ui, cx, schema, &mut value[*field], &format!("/{field}"));
-        });
-    }
+    card(ui, title, |ui| {
+        changed = forms::of_type(ui, cx, part, path);
+    });
     changed
 }
 
-fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn bag(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
+) -> FormChange {
     let mut changed = FormChange::default();
-    if !value["bag"].is_array() {
-        value["bag"] = Value::Array(Vec::new());
-    }
-    let items: Vec<String> = cx
-        .files
-        .keys_of(ItemDef::TABLE)
-        .map(str::to_owned)
-        .collect();
-    let count = value["bag"].as_array().map_or(0, Vec::len);
+    let first_item = sheet
+        .reader
+        .paths_of::<ItemDef>()
+        .first()
+        .and_then(|item| sheet.reader.id_of::<ItemDef>(item));
     let mut remove = None;
     card(ui, "Bag", |ui| {
-        for index in 0..count {
-            let path = format!("/bag/{index}");
-            let stack = &mut value["bag"][index];
-            let item_key = stack.text("item").to_owned();
-            let cap = stack_max(cx, &item_key);
+        for (index, stack) in character.bag.iter_mut().enumerate() {
+            let path = format!("{}/{index}", field!(CharacterSnapshot, bag));
             ui.horizontal(|ui| {
-                if ui
-                    .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                    .on_hover_text("Remove")
-                    .clicked()
-                {
+                if controls::remove(ui, "Remove").clicked() {
                     remove = Some(index);
                 }
-                let mut key = item_key.clone();
+                let mut picked = false;
                 ui.scope(|ui| {
                     ui.set_width(200.0);
-                    if picker::row(ui, cx, ItemDef::TABLE, &mut key, &format!("{path}/item")) {
-                        stack["item"] = Value::String(key);
-                        changed = FormChange::at(&path);
-                    }
+                    let item = format!("{path}{}", field!(ItemStack, item));
+                    picked = picker::content(ui, cx, &mut stack.item, &item);
                 });
-                let held = stack["count"].as_u64().unwrap_or(1) as u32;
-                let mut draft = held;
-                let response =
-                    forms::boxed_input(ui, cap.map(|cap| format!("/{cap}")).as_deref(), |ui| {
-                        ui.add(
-                            egui::DragValue::new(&mut draft)
-                                .speed(0.2)
-                                .range(1..=cap.unwrap_or(999)),
-                        )
-                    });
-                if response.changed() && draft != held {
-                    stack["count"] = Value::from(draft);
+                let cap = sheet
+                    .read(cx, stack.item)
+                    .map_or(1, |item| item.stack_max());
+                if picked {
+                    stack.count = stack.count.clamp(1, cap);
+                    changed = FormChange::at(&path);
+                }
+                let of = format!("/{cap}");
+                if NumberField::new(&mut stack.count)
+                    .range(1..=cap)
+                    .unit(&of)
+                    .show(ui)
+                {
                     changed = FormChange::at(&path);
                 }
             });
         }
-        if count == 0 {
+        if character.bag.is_empty() {
             ui.label(theme::muted("empty").size(13.0));
         }
         if ui.button("+ item").clicked()
-            && let Some(first) = items.first()
-            && let Some(list) = value["bag"].as_array_mut()
+            && let Some(item) = first_item
         {
-            list.push(serde_json::json!({ "item": first, "count": 1 }));
-            changed = FormChange::at("/bag");
+            character.bag.push(ItemStack { item, count: 1 });
+            changed = FormChange::at(field!(CharacterSnapshot, bag));
         }
     });
-    if let Some(index) = remove
-        && let Some(list) = value["bag"].as_array_mut()
-    {
-        list.remove(index);
-        changed = FormChange::at("/bag");
+    if let Some(index) = remove {
+        character.bag.remove(index);
+        changed = FormChange::at(field!(CharacterSnapshot, bag));
     }
     changed
 }
 
-fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn equipment(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
+) -> FormChange {
     let mut changed = FormChange::default();
-    let slots = ["weapon", "offhand", "head"];
-    let fitting: BTreeMap<&str, Vec<String>> = slots
-        .iter()
-        .map(|slot| {
-            let items = cx
-                .files
-                .keys_of(ItemDef::TABLE)
-                .filter_map(|key| {
-                    let row = cx.files.json(&row_file(ItemDef::TABLE, key))?;
-                    (row["kind"]["type"] == "equipment"
-                        && row["kind"]["slot"].as_str() == Some(slot))
-                    .then(|| key.to_owned())
+    let fits = |slot: EquipmentSlot| -> Vec<String> {
+        sheet
+            .reader
+            .paths_of::<ItemDef>()
+            .iter()
+            .filter(|item| {
+                cx.project.read::<ItemDef>(item).is_ok_and(|item| {
+                    matches!(item.kind, ItemKind::Equipment { slot: fits, .. } if fits == slot)
                 })
-                .collect();
-            (*slot, items)
-        })
+            })
+            .cloned()
+            .collect()
+    };
+    let fitting: Vec<(EquipmentSlot, Vec<String>)> = EquipmentSlot::VARIANTS
+        .iter()
+        .map(|&slot| (slot, fits(slot)))
         .collect();
     card(ui, "Equipment", |ui| {
-        for slot in slots {
-            let current = value["equipment"][slot].as_str().map(str::to_owned);
-            widgets::kv(ui, slot, |ui| {
+        for (slot, fitting) in &fitting {
+            let current = character
+                .equipment
+                .get(slot)
+                .map(|&item| sheet.path_of(item));
+            form::kv(ui, slot.label(), |ui| {
                 let mut picked = current.clone();
-                widgets::combo(("equipment", slot))
+                controls::combo(("equipment", slot.label()))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
-                        Some(item) => theme::mono(format!("item/ {item}")).size(13.0),
+                        Some(item) => theme::mono(shown_path(item)).size(13.0),
                         None => theme::muted("empty").size(13.0),
                     })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut picked, None, "empty");
-                        for item in fitting.get(slot).into_iter().flatten() {
-                            ui.selectable_value(&mut picked, Some(item.clone()), item);
+                        for item in fitting {
+                            ui.selectable_value(&mut picked, Some(item.clone()), shown_path(item));
                         }
                     });
                 if picked != current {
-                    if !value["equipment"].is_object() {
-                        value["equipment"] = Value::Object(Map::new());
-                    }
-                    match picked {
-                        Some(item) => value["equipment"][slot] = Value::String(item),
-                        None => {
-                            value["equipment"].remove_field(slot);
-                        }
-                    }
-                    if value["equipment"].as_object().is_some_and(Map::is_empty) {
-                        value.remove_field("equipment");
-                    }
-                    changed = FormChange::at("/equipment");
+                    match picked.and_then(|item| sheet.reader.id_of::<ItemDef>(&item)) {
+                        Some(item) => character.equipment.insert(*slot, item),
+                        None => character.equipment.remove(slot),
+                    };
+                    changed = FormChange::at(field!(CharacterSnapshot, equipment));
                 }
             });
         }
@@ -492,80 +540,74 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     changed
 }
 
-fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn skills(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
+) -> FormChange {
     let mut changed = FormChange::default();
-    if !value["skills"].is_array() {
-        value["skills"] = Value::Array(Vec::new());
-    }
-    let xp = value["xp"].as_u64().unwrap_or(0) as u32;
-    let class = class_def(cx, value.text("class"));
+    let class = sheet.read(cx, character.class);
     let tree = class
         .as_ref()
-        .map_or_else(SkillTree::default, |(_, def)| def.tree.clone());
+        .map_or_else(SkillTree::default, |class| class.tree.clone());
     let granted = class
         .as_ref()
-        .map_or(0, |(_, def)| def.granted_points(xp).0);
-    let count = value["skills"].as_array().map_or(0, Vec::len);
+        .map_or(0, |class| class.granted_points(character.xp).0);
     let mut remove = None;
     let mut spent = 0;
     card(ui, "Skills", |ui| {
-        for index in 0..count {
-            let path = format!("/skills/{index}");
-            let learned = &mut value["skills"][index];
-            let node = learned.text("node").to_owned();
-            let skill = class
+        for (index, learned) in character.skills.iter_mut().enumerate() {
+            let path = format!("{}/{index}", field!(CharacterSnapshot, skills));
+            let skill = tree
+                .node(learned.node.0.as_str())
+                .and_then(|node| sheet.read(cx, node.skill));
+            let ranks = skill.as_ref().map_or(1, |skill| skill.rank_count());
+            spent += skill
                 .as_ref()
-                .zip(tree.node(node.as_str()))
-                .map(|((content, _), node)| node.skill.get(content));
-            let ranks = skill.map_or(1, |skill| skill.rank_count());
-            let held = learned["rank"].as_u64().unwrap_or(1) as u8;
-            spent += skill.map_or(0, |skill| skill.cost_to(Rank(held)).0);
+                .map_or(0, |skill| skill.cost_to(learned.rank).0);
             ui.horizontal(|ui| {
-                if ui
-                    .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                    .on_hover_text("Forget")
-                    .clicked()
-                {
+                if controls::remove(ui, "Forget").clicked() {
                     remove = Some(index);
                 }
-                let mut picked = node.clone();
-                widgets::combo(("learned-node", index))
+                let mut picked = learned.node.clone();
+                controls::combo(("learned-node", index))
                     .width(170.0)
-                    .selected_text(if node.is_empty() {
-                        theme::muted("pick a node…")
-                    } else {
-                        theme::mono(&node).size(13.0)
-                    })
+                    .selected_text(theme::mono(learned.node.as_str()).size(13.0))
                     .show_ui(ui, |ui| {
-                        for key in tree.0.keys() {
-                            ui.selectable_value(&mut picked, key.to_string(), key.as_str());
+                        for node in tree.0.keys() {
+                            ui.selectable_value(&mut picked, node.clone(), node.as_str());
                         }
                     });
-                if picked != node {
-                    learned["node"] = Value::String(picked);
+                if picked != learned.node {
+                    learned.node = picked;
                     changed = FormChange::at(&path);
                 }
-                let mut draft = held.min(ranks);
-                let response = forms::boxed_input(ui, Some(&format!("of {ranks}")), |ui| {
-                    ui.add(egui::DragValue::new(&mut draft).range(1..=ranks))
-                });
-                if (response.changed() || draft != held) && draft != held {
-                    learned["rank"] = Value::from(draft);
+                let mut draft = learned.rank.0.min(ranks);
+                let of = format!("of {ranks}");
+                let typed = NumberField::new(&mut draft)
+                    .range(1..=ranks)
+                    .unit(&of)
+                    .show(ui);
+                if draft != learned.rank.0 && (typed || draft < learned.rank.0) {
+                    learned.rank = Rank(draft);
                     changed = FormChange::at(&path);
                 }
             });
         }
-        if count == 0 {
+        if character.skills.is_empty() {
             ui.label(theme::muted("nothing learned").size(13.0));
         }
         if tree.is_empty() {
             ui.label(theme::faint("the class has no tree to learn from").size(12.0));
         } else if ui.button("+ skill").clicked()
-            && let Some(first) = tree.0.keys().next()
-            && let Some(list) = value["skills"].as_array_mut()
+            && let Some(node) = tree.0.keys().next()
         {
-            list.push(serde_json::json!({ "node": first.as_str(), "rank": 1 }));
-            changed = FormChange::at("/skills");
+            character.skills.push(SnapshotSkill {
+                node: NodeKey(node.0.clone()),
+                rank: Rank::FIRST,
+            });
+            changed = FormChange::at(field!(CharacterSnapshot, skills));
         }
         let line = format!("{spent} of {granted} points spent");
         if spent > granted {
@@ -576,227 +618,185 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             ui.label(theme::faint(line).size(12.0));
         }
     });
-    if let Some(index) = remove
-        && let Some(list) = value["skills"].as_array_mut()
-    {
-        list.remove(index);
-        changed = FormChange::at("/skills");
-    }
-    if value["skills"].as_array().is_some_and(Vec::is_empty) {
-        value.remove_field("skills");
+    if let Some(index) = remove {
+        character.skills.remove(index);
+        changed = FormChange::at(field!(CharacterSnapshot, skills));
     }
     changed
 }
 
-fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn hotbar(ui: &mut Ui, cx: &mut FormCx, character: &mut CharacterSnapshot) -> FormChange {
     let mut changed = FormChange::default();
-    if !value["hotbar"].is_array() {
-        value["hotbar"] = Value::Array(Vec::new());
-    }
-    let count = value["hotbar"].as_array().map_or(0, Vec::len);
     let mut remove = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(HOTBAR_COLUMN);
-        widgets::card_title(ui, "Hotbar");
-        widgets::kv(ui, "basic attack", |ui| {
-            let mut skill = value.text("basic_attack").to_owned();
-            if picker::row(ui, cx, SkillDef::TABLE, &mut skill, "/basic_attack") {
-                if skill.is_empty() {
-                    value.remove_field("basic_attack");
-                } else {
-                    value["basic_attack"] = Value::String(skill);
-                }
-                changed = FormChange::at("/basic_attack");
+        panel::title(ui, "Hotbar");
+        form::kv(ui, "basic attack", |ui| {
+            let path = field!(CharacterSnapshot, basic_attack);
+            if picker::maybe_content(ui, cx, &mut character.basic_attack, path) {
+                changed = FormChange::at(path);
             }
         });
         ui.label(theme::faint("empty, a worn weapon that grants one fills it").size(12.0));
-        widgets::section(ui, "slots");
-        for index in 0..count {
-            let path = format!("/hotbar/{index}");
-            let entry = &mut value["hotbar"][index];
-            let (kind, held) = match &entry["entry"] {
-                Value::Object(fields) if fields.contains_key("item") => (
-                    "item",
-                    fields["item"].as_str().unwrap_or_default().to_owned(),
-                ),
-                Value::Object(fields) => (
-                    "skill",
-                    fields["skill"].as_str().unwrap_or_default().to_owned(),
-                ),
-                _ => ("skill", String::new()),
-            };
+        sheet::section(ui, "slots");
+        for (index, entry) in character.hotbar.iter_mut().enumerate() {
+            let path = format!("{}/{index}", field!(CharacterSnapshot, hotbar));
             ui.horizontal(|ui| {
-                if ui
-                    .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                    .on_hover_text("Empty the slot")
-                    .clicked()
-                {
+                if controls::remove(ui, "Empty the slot").clicked() {
                     remove = Some(index);
                 }
-                let slot = entry["slot"].as_u64().unwrap_or(0) as u32;
-                let mut draft = slot;
-                let response = ui
-                    .allocate_ui_with_layout(
-                        egui::vec2(SLOT_WIDTH, ui.spacing().interact_size.y),
-                        Layout::left_to_right(Align::Center),
-                        |ui| {
-                            ui.set_width(SLOT_WIDTH);
-                            forms::boxed_input(ui, Some("slot"), |ui| {
-                                ui.add(egui::DragValue::new(&mut draft).range(0..=HOTBAR_SLOTS - 1))
-                            })
-                        },
-                    )
-                    .inner;
-                if response.changed() && draft != slot {
-                    entry["slot"] = Value::from(draft);
+                let mut draft = entry.slot.0;
+                let typed = NumberField::new(&mut draft)
+                    .range(0..=HOTBAR_SLOTS - 1)
+                    .unit("slot")
+                    .width(SLOT_WIDTH)
+                    .show(ui);
+                if typed && draft != entry.slot.0 {
+                    entry.slot = HotbarSlot(draft);
                     changed = FormChange::at(&path);
                 }
-                let mut table = kind.to_owned();
-                let mut key = held.clone();
                 ui.scope(|ui| {
                     ui.set_width(ui.available_width());
-                    if picker::row_among(
-                        ui,
-                        cx,
-                        &["skill", "item"],
-                        &mut table,
-                        &mut key,
-                        &format!("{path}/entry"),
-                    ) {
-                        entry["entry"] = serde_json::json!({ table: key });
+                    let at = format!("{path}{}", field!(SnapshotSlot, entry));
+                    if hotbar_entry(ui, cx, &mut entry.entry, &at) {
                         changed = FormChange::at(&path);
                     }
                 });
             });
         }
-        if count == 0 {
+        if character.hotbar.is_empty() {
             ui.label(theme::muted("empty").size(13.0));
         }
-        if ui.button("+ slot").clicked()
-            && let Some(list) = value["hotbar"].as_array_mut()
-        {
-            let next = list
+        if ui.button("+ slot").clicked() {
+            let next = character
+                .hotbar
                 .iter()
-                .filter_map(|slot| slot["slot"].as_u64())
+                .map(|slot| slot.slot.0 + 1)
                 .max()
-                .map_or(0, |slot| slot + 1);
-            list.push(serde_json::json!({ "slot": next, "entry": { "skill": "" } }));
-            changed = FormChange::at("/hotbar");
+                .unwrap_or(0);
+            character.hotbar.push(SnapshotSlot {
+                slot: HotbarSlot(next),
+                entry: HotbarEntry::Empty,
+            });
+            changed = FormChange::at(field!(CharacterSnapshot, hotbar));
         }
     });
-    if let Some(index) = remove
-        && let Some(list) = value["hotbar"].as_array_mut()
-    {
-        list.remove(index);
-        changed = FormChange::at("/hotbar");
-    }
-    if value["hotbar"].as_array().is_some_and(Vec::is_empty) {
-        value.remove_field("hotbar");
+    if let Some(index) = remove {
+        character.hotbar.remove(index);
+        changed = FormChange::at(field!(CharacterSnapshot, hotbar));
     }
     changed
 }
 
-/// The character's class as the content last loaded knows it, with that content.
-fn class_def(cx: &FormCx, class: &str) -> Option<(Content, ClassDef)> {
-    let content = cx.content.clone()?;
-    let def = content.by_key::<ClassDef>(class)?.get(&content).clone();
-    Some((content, def))
+/// A field picking what a hotbar slot holds: a skill or an item, either of the files there.
+fn hotbar_entry(ui: &mut Ui, cx: &mut FormCx, entry: &mut HotbarEntry, path: &str) -> bool {
+    let reader = cx.project.reader();
+    let (mut table, mut key) = match *entry {
+        HotbarEntry::Empty => (SkillDef::TABLE.to_owned(), String::new()),
+        HotbarEntry::Skill(skill) => (
+            SkillDef::TABLE.to_owned(),
+            reader.path_of(skill).unwrap_or_default().to_owned(),
+        ),
+        HotbarEntry::Item(item) => (
+            ItemDef::TABLE.to_owned(),
+            reader.path_of(item).unwrap_or_default().to_owned(),
+        ),
+    };
+    if !picker::row_among(
+        ui,
+        cx,
+        &[SkillDef::TABLE, ItemDef::TABLE],
+        &mut table,
+        &mut key,
+        path,
+    ) {
+        return false;
+    }
+    let picked = match table.as_str() {
+        SkillDef::TABLE => reader.id_of(&key).map(HotbarEntry::Skill),
+        ItemDef::TABLE => reader.id_of(&key).map(HotbarEntry::Item),
+        _ => None,
+    };
+    *entry = picked.unwrap_or(HotbarEntry::Empty);
+    true
 }
 
 fn start(
     ui: &mut Ui,
     cx: &mut FormCx,
-    value: &mut Value,
-    key: &str,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
     area: &mut AreaViews,
     pick: &mut Option<PlacePick>,
     generation: u64,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let scene_key = format!("character:{key}");
-    let file = row_file(CharacterSnapshot::TABLE, key);
+    let scene_key = format!("character:{}", sheet.key);
     let texture = area
         .scenes
-        .by_key
+        .by_path
         .get(&scene_key)
         .map(|scene| (scene.texture, scene.uv()));
-    let spawn = cx.content.clone().map(|content| {
-        let place = &content.built::<GameSettings>().initial_spawn;
-        (place.area.key(&content).to_owned(), place.at)
-    });
-    let at_spawn = value["start"].as_str() == Some("initial_spawn");
-    let (area_key, at) = if at_spawn {
-        spawn.clone().unwrap_or_default()
-    } else {
+    let spawn = cx.project.settings().ok().map(|settings| {
         (
-            value["start"].text("area").to_owned(),
-            Pos::new(
-                value["start"]["x"].as_f64().unwrap_or(0.0) as f32,
-                value["start"]["y"].as_f64().unwrap_or(0.0) as f32,
-            ),
+            sheet.path_of(settings.initial_spawn.area),
+            settings.initial_spawn.at,
         )
+    });
+    let path = field!(CharacterSnapshot, start);
+    let (at_spawn, area_key, at) = match character.start {
+        CharacterStart::InitialSpawn(_) => {
+            let (area, at) = spawn.clone().unwrap_or_default();
+            (true, area, at)
+        }
+        CharacterStart::At(place) => (false, sheet.path_of(place.area), place.at),
     };
     card(ui, "Start", |ui| {
-        widgets::kv(ui, "area", |ui| {
+        form::kv(ui, "area", |ui| {
             if at_spawn {
-                ui.label(theme::mono(format!("area/ {area_key}")).size(13.0));
-                ui.label(theme::faint("· the initial spawn").size(12.0));
-            } else {
-                let mut draft = area_key.clone();
-                if picker::row(ui, cx, AreaDef::TABLE, &mut draft, "/start/area") {
-                    value["start"]["area"] = Value::String(draft);
-                    changed = FormChange::at("/start");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(theme::faint("· the initial spawn").size(12.0));
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add(
+                            egui::Label::new(theme::mono(shown_path(&area_key)).size(13.0))
+                                .truncate(),
+                        );
+                    });
+                });
+            } else if let CharacterStart::At(place) = &mut character.start {
+                let area = format!("{path}{}", field!(Place, area));
+                if picker::content(ui, cx, &mut place.area, &area) {
+                    changed = FormChange::at(path);
                 }
             }
         });
-        widgets::kv(ui, "at", |ui| {
+        form::kv(ui, "at", |ui| {
             if at_spawn {
                 ui.label(theme::mono(format!("{}, {}", at.x, at.y)).size(13.0));
                 ui.label(theme::faint("tiles").size(12.0));
-            } else {
+            } else if let CharacterStart::At(place) = &mut character.start {
                 let (mut x, mut y) = (at.x, at.y);
-                let response = forms::boxed_input(ui, Some("tiles"), |ui| {
-                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        let a = ui.add(egui::DragValue::new(&mut x).speed(0.5).fixed_decimals(1));
-                        ui.label(theme::faint(","));
-                        let b = ui.add(egui::DragValue::new(&mut y).speed(0.5).fixed_decimals(1));
-                        a | b
-                    })
-                    .inner
-                });
-                if response.changed() && (x != at.x || y != at.y) {
-                    value["start"]["x"] = Value::from(x as f64);
-                    value["start"]["y"] = Value::from(y as f64);
-                    changed = FormChange::at("/start");
+                if NumberField::of([&mut x, &mut y]).unit("tiles").show(ui) {
+                    place.at = Pos::new(x, y);
+                    changed = FormChange::at(path);
                 }
             }
         });
         if let Some(content) = cx.content.clone()
-            && let Some(area_id) = content.by_key::<AreaDef>(&area_key)
+            && let Some(area_id) = content.by_path::<AreaDef>(&area_key)
         {
             let size = area::load(&content, area_id).size;
             let (rect, _) = ui.allocate_exact_size(MAP, egui::Sense::hover());
             let ppp = ui.ctx().pixels_per_point();
             let px_per_tile = 8.0;
-            let center = Pos::new(
-                at.x.clamp(
-                    MAP.x / px_per_tile / 2.0,
-                    size.width - MAP.x / px_per_tile / 2.0,
-                ),
-                at.y.clamp(
-                    MAP.y / px_per_tile / 2.0,
-                    size.height - MAP.y / px_per_tile / 2.0,
-                ),
+            let half = MAP / px_per_tile / 2.0;
+            let center = Pos::<Tiles>::new(
+                kept_in_view(at.x, half.x, size.width),
+                kept_in_view(at.y, half.y, size.height),
             );
             area.requests.push(AreaSceneRequest {
                 key: scene_key.clone(),
-                spec: AreaSceneSpec {
-                    ground: area_key.clone(),
-                    scenery: SceneryOf::Area,
-                    hidden_ground: Vec::new(),
-                    show_blueprints: true,
-                    show_scenery: true,
-                },
+                spec: AreaSceneSpec::area(&area_key),
                 width: (MAP.x * ppp) as u32,
                 height: (MAP.y * ppp) as u32,
                 center,
@@ -828,13 +828,13 @@ fn start(
         }
         ui.horizontal(|ui| {
             if controls::marked(ui, Mark::Pin, "Pick on the map").clicked() {
-                if at_spawn {
-                    value["start"] = serde_json::json!({ "area": area_key, "x": at.x, "y": at.y });
-                    changed = FormChange::at("/start");
+                if at_spawn && let Some(area) = sheet.reader.id_of::<AreaDef>(&area_key) {
+                    character.start = CharacterStart::At(Place { area, at });
+                    changed = FormChange::at(path);
                 }
                 *pick = Some(PlacePick {
-                    file: file.clone(),
-                    pointer: "/start".to_owned(),
+                    file: fields_file(sheet.key),
+                    pointer: path.to_owned(),
                     area: Some(area_key.clone()),
                 });
             }
@@ -842,75 +842,66 @@ fn start(
                 .add_enabled(!at_spawn, egui::Button::new("Use the initial spawn"))
                 .clicked()
             {
-                value["start"] = Value::String("initial_spawn".to_owned());
-                changed = FormChange::at("/start");
+                character.start = CharacterStart::InitialSpawn(AtInitialSpawn::InitialSpawn);
+                changed = FormChange::at(path);
             }
         });
     });
     changed
 }
 
-fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+fn areas_known(ui: &mut Ui, sheet: &Sheet, character: &mut CharacterSnapshot) -> FormChange {
     let mut changed = FormChange::default();
-    let known: Vec<String> = value["known_areas"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str().map(str::to_owned))
+    let unknown: Vec<&String> = sheet
+        .reader
+        .paths_of::<AreaDef>()
+        .iter()
+        .filter(|area| {
+            sheet
+                .reader
+                .id_of::<AreaDef>(area)
+                .is_some_and(|area| !character.known_areas.contains(&area))
+        })
         .collect();
-    let all: Vec<String> = cx
-        .files
-        .keys_of(AreaDef::TABLE)
-        .map(str::to_owned)
-        .filter(|key| !known.contains(key))
-        .collect();
-    let mut remove: Option<String> = None;
-    let mut add: Option<String> = None;
+    let mut remove = None;
+    let mut add = None;
     card(ui, "Areas known", |ui| {
         ui.horizontal_wrapped(|ui| {
-            for area in &known {
-                let (_, closed) = widgets::chip_closable(ui, &format!("area/{area}"));
+            for (index, &area) in character.known_areas.iter().enumerate() {
+                let (_, closed) = chip::closable(ui, shown_path(&sheet.path_of(area)));
                 if closed {
-                    remove = Some(area.clone());
+                    remove = Some(index);
                 }
             }
-            if known.is_empty() {
+            if character.known_areas.is_empty() {
                 ui.label(
                     theme::muted("only the start's area · the map shows nothing else").size(13.0),
                 );
             }
         });
-        let response = ui.button("+ area");
+        let response = controls::dropdown(ui, "+ area");
         egui::Popup::from_toggle_button_response(&response).show(|ui| {
             egui::ScrollArea::vertical()
                 .max_height(240.0)
                 .show(ui, |ui| {
-                    for area in &all {
+                    for area in &unknown {
                         if ui
-                            .selectable_label(false, theme::mono(area).size(12.5))
+                            .selectable_label(false, theme::mono(shown_path(area)).size(12.5))
                             .clicked()
                         {
-                            add = Some(area.clone());
+                            add = sheet.reader.id_of::<AreaDef>(area);
                         }
                     }
                 });
         });
     });
-    if remove.is_some() || add.is_some() {
-        let mut list: Vec<Value> = known
-            .iter()
-            .filter(|area| remove.as_ref() != Some(area))
-            .map(|area| Value::String(area.clone()))
-            .collect();
-        if let Some(area) = add {
-            list.push(Value::String(area));
-        }
-        if list.is_empty() {
-            value.remove_field("known_areas");
-        } else {
-            value["known_areas"] = Value::Array(list);
-        }
-        changed = FormChange::at("/known_areas");
+    if let Some(index) = remove {
+        character.known_areas.remove(index);
+        changed = FormChange::at(field!(CharacterSnapshot, known_areas));
+    }
+    if let Some(area) = add {
+        character.known_areas.push(area);
+        changed = FormChange::at(field!(CharacterSnapshot, known_areas));
     }
     changed
 }
@@ -944,12 +935,12 @@ impl Standing {
         }
     }
 
-    fn of(state: &Value) -> Standing {
-        match QuestState::deserialize(state) {
-            Ok(QuestState::Active) => Standing::Active,
-            Ok(QuestState::Completed) => Standing::Completed,
-            Ok(QuestState::Failed) => Standing::Failed,
-            Err(_) => Standing::NotTaken,
+    fn of(state: Option<QuestState>) -> Standing {
+        match state {
+            Some(QuestState::Active) => Standing::Active,
+            Some(QuestState::Completed) => Standing::Completed,
+            Some(QuestState::Failed) => Standing::Failed,
+            None => Standing::NotTaken,
         }
     }
 
@@ -966,34 +957,30 @@ impl Standing {
 struct ObjectiveLine {
     label: String,
     subject: String,
-    held: Option<String>,
+    held: Option<ContentId<ItemDef>>,
     max: u32,
 }
 
-fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
-    let Some(content) = cx.content.clone() else {
+fn objectives_of(cx: &FormCx, sheet: &Sheet, quest: QuestId) -> Vec<ObjectiveLine> {
+    let Some(def) = sheet.read(cx, quest) else {
         return Vec::new();
     };
-    let Some(id) = content.by_key::<QuestDef>(quest) else {
-        return Vec::new();
-    };
-    id.get(&content)
-        .objectives()
+    def.objectives()
         .map(|objective| match objective {
             Objective::Hold(stack) => {
-                let item = stack.item.key(&content).to_owned();
+                let item = sheet.path_of(stack.item);
                 ObjectiveLine {
-                    label: format!("hold {item}"),
-                    subject: item.clone(),
-                    held: Some(item),
+                    label: format!("hold {}", shown_path(&item)),
+                    subject: shown_path(&item).to_owned(),
+                    held: Some(stack.item),
                     max: stack.count,
                 }
             }
             Objective::Defeat { npc, count } => {
-                let npc = npc.key(&content).to_owned();
+                let npc = sheet.path_of(*npc);
                 ObjectiveLine {
-                    label: format!("defeat {npc}"),
-                    subject: npc,
+                    label: format!("defeat {}", shown_path(&npc)),
+                    subject: shown_path(&npc).to_owned(),
                     held: None,
                     max: *count,
                 }
@@ -1005,10 +992,10 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
                 max: 1,
             },
             Objective::Deliver { item } => {
-                let item = item.key(&content).to_owned();
+                let item = sheet.path_of(*item);
                 ObjectiveLine {
-                    label: format!("deliver {item}"),
-                    subject: item,
+                    label: format!("deliver {}", shown_path(&item)),
+                    subject: shown_path(&item).to_owned(),
                     held: None,
                     max: 1,
                 }
@@ -1020,93 +1007,85 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
 fn quests(
     ui: &mut Ui,
     cx: &mut FormCx,
-    value: &mut Value,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
     view: &mut CharacterView,
     label: &mut String,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let all: Vec<String> = cx
-        .files
-        .keys_of(QuestDef::TABLE)
-        .map(str::to_owned)
+    let all: Vec<QuestId> = sheet
+        .reader
+        .paths_of::<QuestDef>()
+        .iter()
+        .filter_map(|quest| sheet.reader.id_of(quest))
         .collect();
-    let in_log: Vec<String> = value["quests"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|q| q["quest"].as_str().map(str::to_owned))
-        .collect();
+    let in_log: Vec<QuestId> = character.quests.iter().map(|entry| entry.quest).collect();
     let parties = cx
         .content
         .as_ref()
         .filter(|content| content.has_built::<RiftScripts>())
-        .map(|content| Parties::of(content, content.built::<RiftScripts>()));
-    let mut order: Vec<String> = in_log.clone();
-    let rest: Vec<String> = all
+        .map(|content| {
+            (
+                content.clone(),
+                Parties::of(content, content.built::<RiftScripts>()),
+            )
+        });
+    let mut order = in_log.clone();
+    let rest: Vec<QuestId> = all
         .iter()
-        .filter(|key| !in_log.contains(key))
-        .cloned()
+        .filter(|quest| !in_log.contains(quest))
+        .copied()
         .collect();
     let hidden = if view.more_quests {
         0
     } else {
         rest.len().saturating_sub(3)
     };
-    order.extend(rest.iter().take(rest.len() - hidden).cloned());
-    let mut setup: Option<(String, Moment)> = None;
+    order.extend(rest.iter().take(rest.len() - hidden).copied());
+    let mut setup: Option<(QuestId, Moment)> = None;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(COLUMN);
-            widgets::section_count(ui, "Quests", all.len());
-            for quest in &order {
-                let entry_index = value["quests"]
-                    .as_array()
-                    .and_then(|list| list.iter().position(|q| q["quest"].as_str() == Some(quest)));
-                let standing = Standing::of(
-                    entry_index.map_or(&Value::Null, |i| &value["quests"][i]["state"]),
-                );
+            form::section_count(ui, "Quests", all.len());
+            for &quest in &order {
+                let path = sheet.path_of(quest);
+                let entry = character
+                    .quests
+                    .iter()
+                    .position(|entry| entry.quest == quest);
+                let standing = Standing::of(entry.map(|index| character.quests[index].state));
                 let giver =
-                    cx.content
-                        .as_ref()
-                        .zip(parties.as_ref())
-                        .and_then(|(content, parties)| {
-                            content
-                                .by_key::<QuestDef>(quest)
-                                .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
-                        });
-                let requires = cx
-                    .files
-                    .json(&row_file(QuestDef::TABLE, quest))
-                    .and_then(|row| {
-                        row["modules"].as_array().and_then(|modules| {
-                            modules
-                                .iter()
-                                .find(|m| m["type"] == "requires")
-                                .map(|m| condition::summary(&m["condition"]))
-                        })
-                    });
+                    giver_of(sheet, parties.as_ref(), quest).map(|party| party.name.clone());
+                let requires = sheet.read(cx, quest).and_then(|def| {
+                    def.modules.iter().find_map(|module| match module {
+                        QuestModule::Requires { condition } => {
+                            Some(script_condition::describe(cx.project, condition))
+                        }
+                        _ => None,
+                    })
+                });
                 let subtitle = match standing {
                     Standing::NotTaken => requires
-                        .map(|r| format!("needs {r}"))
-                        .or_else(|| giver.clone().map(|g| format!("offered by {g}")))
+                        .map(|requires| format!("needs {requires}"))
+                        .or_else(|| giver.clone().map(|giver| format!("offered by {giver}")))
                         .unwrap_or_default(),
                     _ => giver
                         .clone()
-                        .map(|g| format!("from {g}"))
+                        .map(|giver| format!("from {giver}"))
                         .unwrap_or_default(),
                 };
-                widgets::card_frame(standing == Standing::Active).show(ui, |ui| {
+                panel::card(standing == Standing::Active).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label(theme::mono(quest).size(13.0));
+                            ui.label(theme::mono(shown_path(&path)).size(13.0));
                             if !subtitle.is_empty() {
                                 ui.label(theme::faint(subtitle).size(12.0));
                             }
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            widgets::combo(("quest-state", quest))
+                            controls::combo(("quest-state", &path))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
                                     for &option in Standing::VARIANTS {
@@ -1114,48 +1093,29 @@ fn quests(
                                     }
                                 });
                             if picked != standing {
-                                set_standing(value, quest, picked);
-                                changed = FormChange::at("/quests");
+                                set_standing(character, quest, picked);
+                                changed = FormChange::at(field!(CharacterSnapshot, quests));
                             }
                         });
                     });
                     if standing == Standing::Active
-                        && let Some(index) = entry_index
+                        && let Some(index) = entry
+                        && let Some(entry) = character.quests.get_mut(index)
                     {
-                        let objectives = objectives_of(cx, quest);
+                        let objectives = objectives_of(cx, sheet, quest);
                         for (i, objective) in objectives.iter().enumerate() {
-                            widgets::kv(ui, &objective.label, |ui| {
-                                let held = value["quests"][index]["progress"][i]
-                                    .as_u64()
-                                    .unwrap_or(0) as u32;
+                            form::kv(ui, &objective.label, |ui| {
+                                let held = entry.progress.get(i).copied().unwrap_or(0);
                                 let mut draft = held;
-                                let response = forms::boxed_input(
-                                    ui,
-                                    Some(&format!("/ {}", objective.max)),
-                                    |ui| {
-                                        ui.add(
-                                            egui::DragValue::new(&mut draft)
-                                                .speed(0.2)
-                                                .range(0..=objective.max),
-                                        )
-                                    },
-                                );
-                                if response.changed() && draft != held {
-                                    let progress = value["quests"][index]["progress"]
-                                        .as_array()
-                                        .cloned()
-                                        .unwrap_or_default();
-                                    let mut progress: Vec<u32> = (0..objectives.len())
-                                        .map(|j| {
-                                            progress.get(j).and_then(Value::as_u64).unwrap_or(0)
-                                                as u32
-                                        })
-                                        .collect();
-                                    progress[i] = draft;
-                                    value["quests"][index]["progress"] = Value::Array(
-                                        progress.into_iter().map(Value::from).collect(),
-                                    );
-                                    changed = FormChange::at("/quests");
+                                let of = format!("/ {}", objective.max);
+                                if NumberField::new(&mut draft)
+                                    .range(0..=objective.max)
+                                    .unit(&of)
+                                    .show(ui)
+                                {
+                                    entry.progress.resize(objectives.len(), 0);
+                                    entry.progress[i] = draft;
+                                    changed = FormChange::at(field!(CharacterSnapshot, quests));
                                 }
                             });
                         }
@@ -1175,33 +1135,43 @@ fn quests(
                 view.more_quests = true;
             }
             ui.add_space(6.0);
-            let response = controls::marked(ui, Mark::ChevronDown, "Set up for…");
+            let response = controls::dropdown(ui, "Set up for…");
             egui::Popup::from_toggle_button_response(&response)
                 .width(300.0)
                 .show(|ui| {
                     egui::ScrollArea::vertical()
                         .max_height(420.0)
                         .show(ui, |ui| {
-                            let subjects: Vec<String> = if in_log.is_empty() {
-                                all.iter().take(3).cloned().collect()
+                            let subjects: Vec<QuestId> = if in_log.is_empty() {
+                                all.iter().take(3).copied().collect()
                             } else {
                                 in_log.clone()
                             };
-                            for quest in &subjects {
-                                widgets::section(ui, &format!("Set up for {quest}"));
-                                let giver = giver_of(cx, parties.as_ref(), quest);
-                                for moment in Moment::all(cx, quest) {
+                            for &quest in &subjects {
+                                sheet::section(
+                                    ui,
+                                    &format!("Set up for {}", shown_path(&sheet.path_of(quest))),
+                                );
+                                for moment in Moment::all(cx, sheet, quest) {
                                     let hint = moment.hint(
                                         cx,
+                                        sheet,
                                         quest,
-                                        giver.map(|party| party.name.as_str()),
+                                        moment.party(sheet, parties.as_ref(), quest),
                                     );
                                     let (rect, response) = ui.allocate_exact_size(
                                         egui::vec2(ui.available_width(), 36.0),
                                         egui::Sense::click(),
                                     );
+                                    response.widget_info(|| {
+                                        egui::WidgetInfo::labeled(
+                                            egui::WidgetType::Button,
+                                            true,
+                                            moment.label(),
+                                        )
+                                    });
                                     if response.hovered() {
-                                        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+                                        paint::row_wash(ui.painter(), rect);
                                     }
                                     ui.painter().text(
                                         rect.left_top() + egui::vec2(8.0, 4.0),
@@ -1218,7 +1188,7 @@ fn quests(
                                         theme::FAINT,
                                     );
                                     if response.clicked() {
-                                        setup = Some((quest.clone(), moment));
+                                        setup = Some((quest, moment));
                                         ui.close();
                                     }
                                 }
@@ -1229,33 +1199,37 @@ fn quests(
     });
     if let Some((quest, moment)) = setup {
         *label = format!(
-            "Set up {} for {quest} · {}",
-            cx.owner_key.clone().unwrap_or_default(),
+            "Set up {} for {} · {}",
+            shown_path(sheet.key),
+            shown_path(&sheet.path_of(quest)),
             moment.label()
         );
-        apply_moment(cx, value, &quest, moment, parties.as_ref());
-        changed = FormChange::at("/quests");
+        apply_moment(cx, sheet, character, quest, moment, parties.as_ref());
+        changed = FormChange::at(field!(CharacterSnapshot, quests));
     }
     changed
 }
 
-fn giver_of<'p>(cx: &FormCx, parties: Option<&'p Parties>, quest: &str) -> Option<&'p Party> {
-    let content = cx.content.clone()?;
-    let id = content.by_key::<QuestDef>(quest)?;
-    parties?.giver(id)
+/// Who offers `quest`, as the content loaded last knows it.
+fn giver_of<'p>(
+    sheet: &Sheet,
+    parties: Option<&'p (Content, Parties)>,
+    quest: QuestId,
+) -> Option<&'p Party> {
+    let (content, parties) = parties?;
+    parties.giver(content.by_path::<QuestDef>(&sheet.path_of(quest))?)
 }
 
-fn set_standing(value: &mut Value, quest: &str, standing: Standing) {
-    if !value["quests"].is_array() {
-        value["quests"] = Value::Array(Vec::new());
-    }
-    let list = value["quests"].as_array_mut().expect("quests");
-    list.retain(|q| q["quest"].as_str() != Some(quest));
+fn set_standing(character: &mut CharacterSnapshot, quest: QuestId, standing: Standing) {
+    character.quests.retain(|entry| entry.quest != quest);
     if let Some(state) = standing.state() {
-        list.push(serde_json::json!({ "quest": quest, "state": state }));
-    }
-    if list.is_empty() {
-        value.remove_field("quests");
+        character.quests.push(SnapshotQuest {
+            quest,
+            state,
+            progress: Vec::new(),
+            left: None,
+            decided: None,
+        });
     }
 }
 
@@ -1270,12 +1244,10 @@ enum Moment {
 }
 
 impl Moment {
-    fn all(cx: &FormCx, quest: &str) -> Vec<Moment> {
+    fn all(cx: &FormCx, sheet: &Sheet, quest: QuestId) -> Vec<Moment> {
         let mut moments = vec![Moment::JustOffered, Moment::ObjectivesMet];
-        if let Some(content) = cx.content.clone()
-            && let Some(id) = content.by_key::<QuestDef>(quest)
-        {
-            for objective in id.get(&content).objectives() {
+        if let Some(def) = sheet.read(cx, quest) {
+            for objective in def.objectives() {
                 if let Objective::Decide { paths, .. } = objective {
                     moments.extend(
                         paths
@@ -1300,14 +1272,31 @@ impl Moment {
         }
     }
 
-    fn hint(&self, cx: &FormCx, quest: &str, giver: Option<&str>) -> String {
-        let by = giver
-            .map(|g| format!("standing by {g}"))
+    /// Whom the character stands beside at this moment: who offers the quest before it is taken,
+    /// who takes it once it is ready to hand in.
+    fn party<'p>(
+        &self,
+        sheet: &Sheet,
+        parties: Option<&'p (Content, Parties)>,
+        quest: QuestId,
+    ) -> Option<&'p Party> {
+        let (content, parties) = parties?;
+        let quest = content.by_path::<QuestDef>(&sheet.path_of(quest))?;
+        match self {
+            Moment::JustOffered => parties.giver(quest),
+            Moment::ReadyToHandIn | Moment::Decided(_) => parties.turn_in(quest),
+            Moment::ObjectivesMet | Moment::Completed | Moment::Failed => None,
+        }
+    }
+
+    fn hint(&self, cx: &FormCx, sheet: &Sheet, quest: QuestId, party: Option<&Party>) -> String {
+        let by = party
+            .map(|party| format!("standing by {}", party.name))
             .unwrap_or_else(|| "at its start".to_owned());
-        let done: Vec<String> = objectives_of(cx, quest)
+        let done: Vec<String> = objectives_of(cx, sheet, quest)
             .iter()
-            .filter(|o| o.max > 0)
-            .map(|o| format!("{} {}", o.max, o.subject))
+            .filter(|objective| objective.max > 0)
+            .map(|objective| format!("{} {}", objective.max, objective.subject))
             .collect();
         match self {
             Moment::JustOffered => format!("{by}, quest not taken"),
@@ -1328,90 +1317,82 @@ impl Moment {
 
 fn apply_moment(
     cx: &FormCx,
-    value: &mut Value,
-    quest: &str,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
+    quest: QuestId,
     moment: Moment,
-    parties: Option<&Parties>,
+    parties: Option<&(Content, Parties)>,
 ) {
-    let objectives = objectives_of(cx, quest);
-    let giver_place = cx.content.as_ref().and_then(|content| {
-        let home = area::residence(content, giver_of(cx, parties, quest)?.npc?)?;
-        Some((home.area.key(content).to_owned(), home.at))
+    let objectives = objectives_of(cx, sheet, quest);
+    let beside_party = moment.party(sheet, parties, quest).and_then(|party| {
+        let (content, _) = parties?;
+        let home = area::residence(content, party.npc?)?;
+        let beside = area::load(content, home.area)
+            .grid
+            .nearest_walkable_where(home.at, |cell| cell != home.at.cell())?;
+        Some(Place {
+            area: sheet.now(content, home.area)?,
+            at: beside,
+        })
     });
     match &moment {
-        Moment::JustOffered => set_standing(value, quest, Standing::NotTaken),
+        Moment::JustOffered => set_standing(character, quest, Standing::NotTaken),
         Moment::ObjectivesMet | Moment::ReadyToHandIn | Moment::Decided(_) => {
-            set_standing(value, quest, Standing::Active);
-            if let Some(entry) = value["quests"]
-                .as_array_mut()
-                .and_then(|list| list.iter_mut().find(|q| q["quest"].as_str() == Some(quest)))
+            set_standing(character, quest, Standing::Active);
+            if let Some(entry) = character
+                .quests
+                .iter_mut()
+                .find(|entry| entry.quest == quest)
             {
-                entry["progress"] =
-                    Value::Array(objectives.iter().map(|o| Value::from(o.max)).collect());
+                entry.progress = objectives.iter().map(|objective| objective.max).collect();
                 if let Moment::Decided(choice) = &moment {
-                    entry["decided"] = Value::String(choice.clone());
+                    entry.decided = Some(choice.clone());
                 }
             }
             for objective in &objectives {
-                if let Some(item) = &objective.held {
-                    give(value, item, objective.max);
+                if let Some(item) = objective.held {
+                    give(character, item, objective.max);
                 }
             }
         }
-        Moment::Completed => set_standing(value, quest, Standing::Completed),
-        Moment::Failed => set_standing(value, quest, Standing::Failed),
+        Moment::Completed => set_standing(character, quest, Standing::Completed),
+        Moment::Failed => set_standing(character, quest, Standing::Failed),
     }
-    if matches!(
-        moment,
-        Moment::JustOffered | Moment::ReadyToHandIn | Moment::Decided(_)
-    ) && let Some((area, at)) = giver_place
-    {
-        value["start"] = serde_json::json!({ "area": area, "x": at.x, "y": at.y });
+    if let Some(place) = beside_party {
+        character.start = CharacterStart::At(place);
     }
 }
 
-fn give(value: &mut Value, item: &str, count: u32) {
-    if !value["bag"].is_array() {
-        value["bag"] = Value::Array(Vec::new());
-    }
-    let list = value["bag"].as_array_mut().expect("bag");
-    match list
-        .iter_mut()
-        .find(|stack| stack["item"].as_str() == Some(item))
-    {
-        Some(stack) => {
-            let held = stack["count"].as_u64().unwrap_or(1) as u32;
-            stack["count"] = Value::from(held.max(count));
-        }
-        None => list.push(serde_json::json!({ "item": item, "count": count })),
+fn give(character: &mut CharacterSnapshot, item: ContentId<ItemDef>, count: u32) {
+    match character.bag.iter_mut().find(|stack| stack.item == item) {
+        Some(stack) => stack.count = stack.count.max(count),
+        None => character.bag.push(ItemStack { item, count }),
     }
 }
 
 fn memories(
     ui: &mut Ui,
     cx: &mut FormCx,
-    value: &mut Value,
+    sheet: &Sheet,
+    character: &mut CharacterSnapshot,
     view: &mut CharacterView,
 ) -> FormChange {
     let mut changed = FormChange::default();
-    let defs: Vec<MemoryEntry> = cx
-        .files
-        .keys_of(MemoryDef::TABLE)
-        .filter_map(|key| {
-            let row = cx.files.json(&row_file(MemoryDef::TABLE, key))?;
-            Some(MemoryEntry {
-                key: key.to_owned(),
-                ty: row.kind_or("boolean").to_owned(),
-                label: row.text("label").to_owned(),
-            })
-        })
+    let defs: Vec<(String, Arc<MemoryDef>)> = sheet
+        .reader
+        .paths_of::<MemoryDef>()
+        .iter()
+        .filter_map(|key| Some((key.clone(), cx.project.read::<MemoryDef>(key).ok()?)))
         .collect();
-    let set: Vec<Value> = value["memories"].as_array().cloned().unwrap_or_default();
-    let is_set = |def: &&MemoryEntry| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
-    let mut order: Vec<&MemoryEntry> = defs.iter().filter(is_set).collect();
-    order.extend(defs.iter().filter(|def| !is_set(def)));
-    let mut updates: Vec<(String, Option<Value>)> = Vec::new();
-    widgets::section_count(ui, "Memories", defs.len());
+    let held = |key: &str| {
+        let id = sheet.reader.id_of::<MemoryDef>(key)?;
+        character.memories.iter().find(|memory| memory.memory == id)
+    };
+    let mut order: Vec<&(String, Arc<MemoryDef>)> =
+        defs.iter().filter(|(key, _)| held(key).is_some()).collect();
+    order.extend(defs.iter().filter(|(key, _)| held(key).is_none()));
+    let mut updates: Vec<(String, Option<MemoryValue>)> = Vec::new();
+    form::section_count(ui, "Memories", defs.len());
     let hidden = if view.more_memories {
         0
     } else {
@@ -1426,58 +1407,63 @@ fn memories(
             ui.label("");
             ui.label(theme::faint("LAST SET").size(11.0).monospace());
             ui.end_row();
-            for MemoryEntry { key, ty, label } in order.iter().take(order.len() - hidden) {
-                let entry = set.iter().find(|m| m["memory"].as_str() == Some(key));
-                ui.label(theme::mono(key).size(13.0)).on_hover_text(label);
-                match ty.as_str() {
-                    "boolean" => {
-                        let mut on = entry.and_then(|m| m["value"].as_bool()).unwrap_or(false);
+            for (key, def) in order.iter().take(order.len() - hidden) {
+                let entry = held(key);
+                ui.label(theme::mono(shown_path(key)).size(13.0))
+                    .on_hover_text(&def.label);
+                let value = entry.map(|entry| &entry.value);
+                match def.ty {
+                    ValueType::Boolean => {
+                        let mut on = matches!(value, Some(MemoryValue::Bool(true)));
                         if ui.checkbox(&mut on, "").changed() {
-                            updates.push((key.clone(), Some(Value::Bool(on))));
+                            updates.push((key.clone(), Some(MemoryValue::Bool(on))));
                         }
                     }
-                    "text" => {
-                        let mut text = entry
-                            .and_then(|m| m["value"].as_str())
-                            .unwrap_or("")
-                            .to_owned();
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut text)
-                                .desired_width(100.0)
-                                .font(egui::TextStyle::Monospace),
-                        );
-                        if response.lost_focus() && response.changed() {
-                            updates.push((key.clone(), Some(Value::String(text))));
+                    ValueType::Text => {
+                        let text = match value {
+                            Some(MemoryValue::Text(text)) => text.as_str(),
+                            _ => "",
+                        };
+                        let id = ui.id().with(("memory", key));
+                        if let Some(typed) = input::drafted(ui, id, text, |ui, draft| {
+                            InputField::new(draft).width(MEMORY_WIDTH).show(ui)
+                        }) {
+                            updates.push((key.clone(), Some(MemoryValue::Text(typed))));
+                        }
+                    }
+                    ValueType::Integer => {
+                        let mut count = match value {
+                            Some(MemoryValue::Int(count)) => *count,
+                            Some(MemoryValue::Num(number)) => *number as i64,
+                            _ => 0,
+                        };
+                        if NumberField::new(&mut count)
+                            .unit("times")
+                            .width(MEMORY_WIDTH)
+                            .show(ui)
+                        {
+                            updates.push((key.clone(), Some(MemoryValue::Int(count))));
                         }
                     }
                     _ => {
-                        let held = entry.and_then(|m| m["value"].as_f64()).unwrap_or(0.0);
-                        let mut draft = held;
-                        let response = forms::boxed_input(ui, Some("times"), |ui| {
-                            ui.add(
-                                egui::DragValue::new(&mut draft)
-                                    .speed(0.2)
-                                    .fixed_decimals(if ty == "integer" { 0 } else { 1 }),
-                            )
-                        });
-                        if response.changed() && draft != held {
-                            updates.push((
-                                key.clone(),
-                                Some(if ty == "integer" {
-                                    Value::from(draft as i64)
-                                } else {
-                                    Value::from(draft)
-                                }),
-                            ));
+                        let mut number = match value {
+                            Some(MemoryValue::Int(count)) => *count as f64,
+                            Some(MemoryValue::Num(number)) => *number,
+                            _ => 0.0,
+                        };
+                        if NumberField::new(&mut number)
+                            .unit("times")
+                            .width(MEMORY_WIDTH)
+                            .show(ui)
+                        {
+                            updates.push((key.clone(), Some(MemoryValue::Num(number))));
                         }
                     }
                 }
-                let ago = entry.and_then(|m| m["ago"].as_f64());
                 ui.label(
-                    theme::muted(ago.map_or_else(
-                        || "never".to_owned(),
-                        |seconds| widgets::ago(Seconds(seconds as f32)),
-                    ))
+                    theme::muted(
+                        entry.map_or_else(|| "never".to_owned(), |entry| widgets::ago(entry.ago)),
+                    )
                     .size(12.5)
                     .monospace(),
                 );
@@ -1501,105 +1487,101 @@ fn memories(
     {
         view.more_memories = true;
     }
-    if !updates.is_empty() {
-        let mut list = set.clone();
-        for (key, update) in updates {
-            list.retain(|m| m["memory"].as_str() != Some(&key));
-            if let Some(new) = update {
-                list.push(serde_json::json!({ "memory": key, "value": new, "ago": 0 }));
-            }
+    for (key, update) in updates {
+        let Some(memory) = sheet.reader.id_of::<MemoryDef>(&key) else {
+            continue;
+        };
+        character.memories.retain(|held| held.memory != memory);
+        if let Some(value) = update {
+            character.memories.push(SnapshotMemory {
+                memory,
+                value,
+                ago: Seconds(0.0),
+            });
         }
-        if list.is_empty() {
-            value.remove_field("memories");
-        } else {
-            value["memories"] = Value::Array(list);
-        }
-        changed = FormChange::at("/memories");
+        changed = FormChange::at(field!(CharacterSnapshot, memories));
     }
     changed
 }
 
-struct MemoryEntry {
-    key: String,
-    ty: String,
-    label: String,
-}
-
 fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(COLUMN);
-        widgets::card_title(ui, title);
+        panel::title(ui, title);
         body(ui);
     });
 }
 
-fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
-    let row = cx.files.json(&row_file(ItemDef::TABLE, item))?;
-    row["modules"]
-        .as_array()?
-        .iter()
-        .find(|m| m["type"] == "stack")
-        .and_then(|m| m["max"].as_u64())
-        .map(|max| max as u32)
-}
-
-pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
-    class_def(cx, class).map_or(0, |(_, def)| def.level_at(xp))
+fn level_of(cx: &FormCx, sheet: &Sheet, character: &CharacterSnapshot) -> u32 {
+    sheet
+        .read(cx, character.class)
+        .map_or(0, |class| class.level_at(character.xp))
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(CharacterSnapshot::TABLE, key) else {
+    let (Some(Ok(character)), Some(reader), Some(project)) = (
+        editor.read::<CharacterSnapshot>(key),
+        editor.reader(),
+        editor.project.as_ref(),
+    ) else {
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
+    let Ok(settings) = project.settings() else {
         return;
     };
-    let xp = row["xp"].as_u64().unwrap_or(0) as u32;
-    let class = row.text("class");
-    let def = content
-        .by_key::<ClassDef>(class)
-        .map(|id| id.get(&content).clone());
-    let tiers = def.as_ref().map_or(&[][..], |def| def.levels.as_slice());
-    let level = def.as_ref().map_or(0, |def| def.level_at(xp));
+    let read = |path: Option<&str>| project.read::<ClassDef>(path?).ok();
+    let class = read(reader.path_of(character.class));
+    let xp = character.xp;
+    let tiers = class
+        .as_ref()
+        .map_or(&[][..], |class| class.levels.as_slice());
+    let level = class.as_ref().map_or(0, |class| class.level_at(xp));
     let next = tiers
         .iter()
         .find(|tier| tier.xp > xp)
         .map(|tier| format!(" · {xp} of {} xp to {}", tier.xp, level + 1))
         .unwrap_or_else(|| format!(" · {xp} xp · top tier"));
-    let settings = content.built::<GameSettings>();
-    let base = settings.player.get(&content).stats.get(StatKind::MaxHealth);
+    let base = reader
+        .path_of(settings.player)
+        .and_then(|player| {
+            project
+                .read::<engine::systems::player::PlayerDef>(player)
+                .ok()
+        })
+        .map_or(0.0, |player| player.stats.get(StatKind::MaxHealth));
     let from_tiers: f32 = tiers
         .iter()
         .filter(|tier| tier.xp <= xp)
         .map(|tier| tier.stats.get(StatKind::MaxHealth))
         .sum();
-    let own = row["stats"]["max_health"].as_f64().map(|v| v as f32);
-    let health = own.unwrap_or(base + from_tiers);
-    let starts = match &row["start"] {
-        Value::Object(place) => format!(
-            "{} · {}, {}",
-            place.text_or("area", "?"),
-            place["x"].as_f64().unwrap_or(0.0),
-            place["y"].as_f64().unwrap_or(0.0)
-        ),
-        _ => format!(
+    let health = character
+        .stats
+        .0
+        .get(&StatKind::MaxHealth)
+        .copied()
+        .unwrap_or(base + from_tiers);
+    let path_of = |area| shown_path(reader.path_of(area).unwrap_or_default()).to_owned();
+    let starts = match character.start {
+        CharacterStart::At(place) => {
+            format!("{} · {}, {}", path_of(place.area), place.at.x, place.at.y)
+        }
+        CharacterStart::InitialSpawn(_) => format!(
             "{} · the initial spawn",
-            settings.initial_spawn.area.key(&content)
+            path_of(settings.initial_spawn.area)
         ),
     };
-    widgets::kv_text(ui, "level", format!("{level}{next}"));
-    let granted = def.as_ref().map_or(0, |def| def.granted_points(xp).0);
-    let spent: u32 = row["skills"]
-        .as_array()
-        .into_iter()
-        .flatten()
+    form::kv_text(ui, "level", format!("{level}{next}"));
+    let granted = class.as_ref().map_or(0, |class| class.granted_points(xp).0);
+    let spent: u32 = character
+        .skills
+        .iter()
         .filter_map(|learned| {
-            let node = def.as_ref()?.tree.node(learned.text("node"))?;
-            let rank = learned["rank"].as_u64().unwrap_or(1) as u8;
-            Some(node.skill.get(&content).cost_to(Rank(rank)).0)
+            let node = class.as_ref()?.tree.node(learned.node.0.as_str())?;
+            let skill = project.read::<SkillDef>(reader.path_of(node.skill)?).ok()?;
+            Some(skill.cost_to(learned.rank).0)
         })
         .sum();
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "skill points",
         format!(
@@ -1607,17 +1589,19 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             granted.saturating_sub(spent)
         ),
     );
-    widgets::kv_text(ui, "health", format!("{} of {}", health, health));
-    widgets::kv_text(ui, "starts", starts);
-    widgets::kv_code(ui, "file", row_file(CharacterSnapshot::TABLE, key));
+    form::kv_text(ui, "health", format!("{} of {}", health, health));
+    form::kv_text(ui, "starts", starts);
+    form::kv_code(ui, "file", shown_path(key));
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        if controls::marked_primary(ui, Mark::Play, format!("Play as {key}")).clicked() {
+    ui.horizontal_wrapped(|ui| {
+        if controls::marked_primary(ui, Mark::Play, format!("Play as {}", file_title(key)))
+            .clicked()
+        {
             editor.play.character = Some(key.to_owned());
             editor.settings.last_play = Some(key.to_owned());
             play::start(editor, None);
         }
-        if controls::marked(ui, Mark::Fork, "Duplicate").clicked() {
+        if controls::marked(ui, Mark::Duplicate, "Duplicate").clicked() {
             row_form::act(
                 editor,
                 FormAction::RowAction(BrowserAction::Duplicate),
@@ -1626,4 +1610,14 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             );
         }
     });
+}
+
+/// Where along an area `extent` tiles long a view reaching `half` tiles each way centres on `at`
+/// without showing past the area's edges, or the area's middle when the view is the longer.
+fn kept_in_view(at: f32, half: f32, extent: f32) -> f32 {
+    if extent <= 2.0 * half {
+        extent / 2.0
+    } else {
+        at.clamp(half, extent - half)
+    }
 }

@@ -11,7 +11,7 @@ use engine::systems::npc::{self, NpcDef};
 use engine::systems::script::{self, Speaker};
 use engine::systems::shop::{self, SaleQuote, SaleVerdict, ShopDef, ShopRequest, ShopView};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path, said};
 
 #[test]
 fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
@@ -21,7 +21,6 @@ fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
 
     let opened = browse(&mut sim, 1, "merchant");
     assert_eq!(opened.shop, sim.id::<ShopDef>("wares"));
-    assert_eq!(sim.conversation(1).expect("browsing").node, "wares");
 
     let conn = sim.conn(1);
     let offer = offer_of(&sim, "wares", "potion");
@@ -97,10 +96,10 @@ fn a_collector_pays_in_his_own_currency_and_buyback_costs_exactly_what_he_paid()
 
     let opened = browse(&mut sim, 1, "collector");
     assert_eq!(opened.shop, sim.id::<ShopDef>("exchange"));
-    let now = sim
-        .conversation(1)
-        .expect("a shop without reactions still keeps its conversation");
-    assert_eq!(now.node, "counter");
+    assert!(
+        sim.conversation(1).is_some(),
+        "a shop without reactions still keeps its conversation"
+    );
 
     let conn = sim.conn(1);
     let tusk = sim.slot_of(player, "tusk");
@@ -159,20 +158,7 @@ fn the_view_quotes_what_each_bag_item_fetches_or_why_it_does_not_sell() {
 }
 
 #[test]
-fn walking_out_of_reach_closes_the_shop() {
-    let mut sim = market();
-    let player = sim.join(1);
-    browse(&mut sim, 1, "collector");
-    let at = position(&sim.world, player).expect("position");
-
-    movement::relocate(&mut sim.world, player, at + Offset::new(0.0, 8.0));
-    sim.tick();
-
-    assert!(shown(&sim, player).is_none());
-}
-
-#[test]
-fn leaving_the_conversation_closes_the_shop() {
+fn leaving_the_conversation_or_walking_out_of_reach_closes_the_shop() {
     let mut sim = market();
     let player = sim.join(1);
     browse(&mut sim, 1, "merchant");
@@ -180,6 +166,13 @@ fn leaving_the_conversation_closes_the_shop() {
     sim.leave(1);
 
     assert!(sim.conversation(1).is_none());
+    assert!(shown(&sim, player).is_none());
+
+    browse(&mut sim, 1, "collector");
+    let at = position(&sim.world, player).expect("position");
+    movement::relocate(&mut sim.world, player, at + Offset::new(0.0, 8.0));
+    sim.tick();
+
     assert!(shown(&sim, player).is_none());
 }
 
@@ -202,10 +195,10 @@ fn a_map_object_can_keep_a_shop() {
         shown(&sim, player).map(|opened| opened.shop),
         Some(sim.id::<ShopDef>("box"))
     );
-    let now = sim
-        .conversation(1)
-        .expect("the box keeps its shop inside a conversation");
-    assert_eq!(now.node, "note");
+    assert!(
+        sim.conversation(1).is_some(),
+        "the box keeps its shop inside a conversation"
+    );
 
     let offer = offer_of(&sim, "box", "steak");
     sim.send(conn, ShopRequest::Buy { offer });
@@ -215,77 +208,79 @@ fn a_map_object_can_keep_a_shop() {
 }
 
 fn market() -> Sim {
-    let stacked =
-        || json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] });
     let content = Game::new()
         .area(
             "market",
             &Map::open(15, 15),
             json!([
-                { "type": "resident", "npc": "merchant", "at": { "x": 4.0, "y": 4.0 } },
-                { "type": "resident", "npc": "collector", "at": { "x": 10.0, "y": 4.0 } },
+                { "type": "resident", "npc": "merchant.npc.json", "at": { "x": 4.0, "y": 4.0 } },
+                { "type": "resident", "npc": "collector.npc.json", "at": { "x": 10.0, "y": 4.0 } },
                 {
                     "type": "object",
                     "name": "box",
-                    "label": "Honesty box",
+                    "title": "Honesty box",
                     "shape": { "type": "point", "x": 7.0, "y": 10.0 },
                     "look": "objects/box.png",
-                    "scripts": [{
-                        "type": "inline_script",
-                        "nodes": {
-                            "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
-                            "note": said("Pay what's written.", "shop"),
-                            "shop": { "type": "open_shop", "shop": "box" },
-                        },
-                    }],
+                    "scripts": [{ "script": "box_use.script.json" }],
                 },
             ]),
+        )
+        .script(
+            "box_use",
+            "object",
+            json!({
+                "interacted": { "type": "on", "event": "interacted", "verb": "use", "reach": 1.5, "next": "note" },
+                "note": said("Pay what's written.", "shop"),
+                "shop": { "type": "open_shop", "shop": "box.shop.json" },
+            }),
         )
         .asset("objects/box.png", testkit::png(1, 1))
         .hero("market", 7.0, 7.0)
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 100_000 }] }))
-        .item("potion", stacked())
-        .item("tonic", stacked())
-        .item("wing", stacked())
-        .item("bone", stacked())
-        .item("token", stacked())
-        .item("tusk", stacked())
-        .item("steak", stacked())
-        .npc(
-            "merchant",
-            40.0,
-            json!([keeper("Show me your wares.", "wares", "wares")]),
+        .resource("potion", 1000)
+        .resource("tonic", 1000)
+        .resource("wing", 1000)
+        .resource("bone", 1000)
+        .resource("token", 1000)
+        .resource("tusk", 1000)
+        .resource("steak", 1000)
+        .npc("merchant", 40.0, json!([{ "type": "script", "script": "merchant_talk.script.json" }]))
+        .script(
+            "merchant_talk",
+            "npc",
+            keeper("Show me your wares.", "wares", "wares"),
         )
-        .npc(
-            "collector",
-            40.0,
-            json!([keeper("I've brought bones.", "counter", "exchange")]),
+        .npc("collector", 40.0, json!([{ "type": "script", "script": "collector_talk.script.json" }]))
+        .script(
+            "collector_talk",
+            "npc",
+            keeper("I've brought bones.", "counter", "exchange"),
         )
         .row(
             "shop",
             "wares",
             json!({
                 "title": "Wares",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [
                     {
                         "type": "sells",
-                        "item": "potion",
-                        "price": [{ "item": "gold", "count": 6 }],
+                        "item": "potion.item.json",
+                        "price": [{ "item": "gold.item.json", "count": 6 }],
                         "stock": { "type": "unlimited" },
                     },
                     {
                         "type": "sells",
-                        "item": "tonic",
-                        "price": [{ "item": "gold", "count": 10 }, { "item": "wing", "count": 2 }],
+                        "item": "tonic.item.json",
+                        "price": [{ "item": "gold.item.json", "count": 10 }, { "item": "wing.item.json", "count": 2 }],
                         "stock": { "type": "limited", "count": 3, "restock": 600.0 },
                     },
                     {
                         "type": "reactions",
-                        "bought": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["A fine choice."] }],
-                        "sold": [{ "by": { "type": "npc", "npc": "merchant" }, "text": ["It'll do."] }],
+                        "bought": [{ "by": { "type": "npc", "npc": "merchant.npc.json" }, "text": ["A fine choice."] }],
+                        "sold": [{ "by": { "type": "npc", "npc": "merchant.npc.json" }, "text": ["It'll do."] }],
                         "cant_afford": [{
-                            "by": { "type": "npc", "npc": "merchant" },
+                            "by": { "type": "npc", "npc": "merchant.npc.json" },
                             "text": ["Come back when your purse is heavier."],
                         }],
                     },
@@ -297,15 +292,15 @@ fn market() -> Sim {
             "exchange",
             json!({
                 "title": "Exchange",
-                "mark": "collector",
+                "mark": "collector.attention.json",
                 "modules": [
                     {
                         "type": "sells",
-                        "item": "tonic",
-                        "price": [{ "item": "token", "count": 3 }],
+                        "item": "tonic.item.json",
+                        "price": [{ "item": "token.item.json", "count": 3 }],
                         "stock": { "type": "unlimited" },
                     },
-                    { "type": "buys", "what": { "type": "item", "item": "bone" }, "pays": [{ "item": "token" }] },
+                    { "type": "buys", "what": { "type": "item", "item": "bone.item.json" }, "pays": [{ "item": "token.item.json" }] },
                 ],
             }),
         )
@@ -314,11 +309,11 @@ fn market() -> Sim {
             "box",
             json!({
                 "title": "Honesty box",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [{
                     "type": "sells",
-                    "item": "steak",
-                    "price": [{ "item": "gold", "count": 3 }],
+                    "item": "steak.item.json",
+                    "price": [{ "item": "gold.item.json", "count": 3 }],
                     "stock": { "type": "limited", "count": 5, "restock": 1800.0 },
                 }],
             }),
@@ -362,18 +357,10 @@ fn keeper(ask: &str, browsing: &str, shop: &str) -> Value {
             "lines": [{ "by": { "type": "narrator" }, "text": ["Welcome."] }],
             "choices": [{ "label": [ask], "to": browsing }, { "label": ["Goodbye."] }],
         },
-        "shop": { "type": "open_shop", "shop": shop },
+        "shop": { "type": "open_shop", "shop": path("shop", shop) },
     });
     nodes[browsing] = said("Take your time.", "shop");
-    json!({ "type": "inline_script", "nodes": nodes })
-}
-
-fn said(text: &str, next: &str) -> Value {
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "next": next,
-    })
+    nodes
 }
 
 fn browse(sim: &mut Sim, client: u32, keeper: &str) -> ShopView {

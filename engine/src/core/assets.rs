@@ -42,8 +42,7 @@ impl AssetKind {
 
 macro_rules! asset_ref {
     ($name:ident, $kind:ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
-        #[serde(transparent)]
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
         pub struct $name(String);
 
         impl $name {
@@ -52,7 +51,7 @@ macro_rules! asset_ref {
             }
 
             pub fn path(&self) -> String {
-                crate::core::content::asset_file(&self.0)
+                self.0.clone()
             }
 
             pub fn as_str(&self) -> &str {
@@ -74,6 +73,12 @@ macro_rules! asset_ref {
 
             fn inline_schema() -> bool {
                 true
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(&crate::core::content::id::written_path(&self.0))
             }
         }
 

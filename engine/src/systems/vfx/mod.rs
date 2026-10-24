@@ -24,7 +24,7 @@ use crate::systems::area::{AreaObject, AreaTag};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::PlayedBy;
 use crate::systems::script::query::TickRoster;
-use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting, RunnerKind};
 use crate::systems::skill::{self, SkillDef};
 use crate::systems::visibility::Presence;
 
@@ -148,6 +148,7 @@ pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstanc
 pub struct PlayVfx {
     pub vfx: VfxId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub on: Option<Condition>,
     #[serde(default, skip_serializing_if = "VfxTarget::is_place")]
     pub site: VfxTarget,
@@ -175,9 +176,7 @@ impl EffectDef<RiftScripting> for PlayVfx {
     fn needs_subject(&self) -> bool {
         self.on.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -231,7 +230,7 @@ impl EffectDef<RiftScripting> for PlayVfx {
         let (vfx, target) = (self.vfx, self.site.clone());
         let cast = cx
             .owner_row()
-            .filter(|row| row.kind == OwnerKind::Skill)
+            .filter(|row| row.kind == RunnerKind::Skill)
             .map(|row| row.id::<SkillDef>());
         Ok(Box::new(move |world, _, cx| {
             let filled = VfxParams(

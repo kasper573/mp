@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
-use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::content::{Content, ContentFile, ContentId, Fixture, Loading, Nearby, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::{Pos, Rgba};
 use crate::core::script::{Arrow, Compiler, EffectDef, EffectStep, NEXT, ScriptFault, ValueType};
@@ -328,8 +328,19 @@ pub enum NotificationDefKind {
     },
 }
 
-impl ContentRow for NotificationDef {
+impl ContentFile for NotificationDef {
     const TABLE: &'static str = "notification";
+
+    fn fresh(near: &Nearby) -> Result<NotificationDef, String> {
+        Ok(NotificationDef {
+            kind: NotificationDefKind::Narration {
+                label: near.name(),
+                sfx: None,
+            },
+            text: Vec::new(),
+            lasts: None,
+        })
+    }
 }
 
 impl NotificationDef {
@@ -383,6 +394,7 @@ impl From<&NotificationDefKind> for NotificationKind {
 #[schemars(extend("x-system" = "notification"))]
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub notification: NotificationId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -393,9 +405,7 @@ impl EffectDef<RiftScripting> for Notify {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
@@ -493,7 +503,7 @@ pub fn check_all(loading: &mut Loading) {
             check.error(
                 "/kind/speaker",
                 "needs a voice",
-                speaker.key(&content),
+                speaker.path(&content),
                 "an npc with a voice module",
             );
         }

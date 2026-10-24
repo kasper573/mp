@@ -1,0 +1,16 @@
+{
+  "name": "Well Off",
+  "class": "characters/class/fighter.class.json",
+  "xp": 40,
+  "basic_attack": "items-and-skills/skill/slash.skill.json",
+  "bag": [
+    {
+      "item": "items-and-skills/item/gold.item.json",
+      "count": 300
+    }
+  ],
+  "equipment": {
+    "weapon": "items-and-skills/item/iron_sword.item.json"
+  },
+  "start": "initial_spawn"
+}

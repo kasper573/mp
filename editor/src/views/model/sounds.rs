@@ -1,27 +1,28 @@
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::audio::playback::{SfxDef, SfxRoleDef, SfxScalar};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::audio::playback::{SfxDef, SfxScalar};
 use engine::systems::actor::ModelDef;
 use engine::systems::area::tileset::SurfaceDef;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::Mark;
+use ui::input;
+use ui::theme;
 
 use crate::app::Editor;
-use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
+use crate::audio::Waveform;
 use crate::project::ContentEdit;
-use crate::ui::{theme, widgets};
 
-pub const PEAK_CEILING_DBFS: f64 = -12.0;
-
-pub fn wave_of_sfx(editor: &mut Editor, sfx: &str) -> Option<Waveform> {
+pub fn wave_of_sfx(editor: &mut Editor, ctx: &egui::Context, sfx: &str) -> Option<Waveform> {
     let path = sfx_file(editor, sfx)?;
     let Editor { project, views, .. } = editor;
     let project = project.as_ref()?;
-    views.model.bank.wave(&project.files, &path)
+    views.model.bank.wave(ctx, &project.files, &path)
 }
 
+/// The clip the sfx at `sfx` plays.
 pub fn sfx_file(editor: &Editor, sfx: &str) -> Option<String> {
-    editor
-        .row_value(SfxDef::TABLE, sfx)
-        .and_then(|row| row["file"].as_str().map(str::to_owned))
+    let sfx = editor.read::<SfxDef>(sfx)?.ok()?;
+    Some(sfx.file.as_str().to_owned())
 }
 
 pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], color: Color32) {
@@ -47,92 +48,15 @@ pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], color: Colo
     ));
 }
 
-pub struct SfxRole {
-    pub key: String,
-    pub def: SfxRoleDef,
-}
-
-pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
-    let Some(project) = editor.project.as_ref() else {
-        return Vec::new();
-    };
-    let mut keys: Vec<&str> = project.files.keys_of(SfxRoleDef::TABLE).collect();
-    keys.sort_unstable();
-    keys.into_iter()
-        .filter_map(|key| sfx_role(editor, key))
-        .collect()
-}
-
-pub fn role_of_sfx(editor: &Editor, sfx: &str) -> Option<SfxRole> {
-    let row = editor.row_value(SfxDef::TABLE, sfx)?;
-    sfx_role(editor, row["role"].as_str()?)
-}
-
-fn sfx_role(editor: &Editor, key: &str) -> Option<SfxRole> {
-    let row = editor.row_value(SfxRoleDef::TABLE, key)?;
-    Some(SfxRole {
-        key: key.to_owned(),
-        def: serde_json::from_value(row).ok()?,
-    })
-}
-
-pub struct LoudnessVerdict {
-    pub ok: bool,
-    pub loudness: String,
-    pub peak_ok: bool,
-    pub peak: String,
-}
-
-pub fn verdict(loudness: Loudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerdict {
-    let level = loudness.loudest_at(gain);
-    let target = role.loudness.0;
-    let off = level - target;
-    let ok = off.abs() <= 1.0;
-    let loudness_text = if ok {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, at the {} level",
-            role.name
-        )
-    } else if off > 0.0 {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, {off:.1} LU over {target:.0}",
-        )
-    } else {
-        format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, {:.1} LU under {target:.0}",
-            -off
-        )
-    };
-    let peak = loudness.peak_dbfs + gain_db(gain);
-    let peak_ok = peak <= PEAK_CEILING_DBFS;
-    let peak_text = if peak_ok {
-        format!("{peak:.1} dBFS, under the {PEAK_CEILING_DBFS:.0} ceiling")
-    } else {
-        format!("{peak:.1} dBFS, over the {PEAK_CEILING_DBFS:.0} ceiling")
-    };
-    LoudnessVerdict {
-        ok,
-        loudness: loudness_text,
-        peak_ok,
-        peak: peak_text,
-    }
-}
-
 pub fn first_sfx(editor: &Editor) -> Option<String> {
     sfx_keys(editor).into_iter().next()
 }
 
 pub fn sfx_keys(editor: &Editor) -> Vec<String> {
-    let Some(project) = editor.project.as_ref() else {
-        return Vec::new();
-    };
-    let mut keys: Vec<String> = project
-        .files
-        .keys_of(SfxDef::TABLE)
-        .map(str::to_owned)
-        .collect();
-    keys.sort();
-    keys
+    editor
+        .reader()
+        .map(|reader| reader.paths_of::<SfxDef>().to_vec())
+        .unwrap_or_default()
 }
 
 pub struct FootstepSurface {
@@ -142,18 +66,18 @@ pub struct FootstepSurface {
 }
 
 pub fn surfaces(editor: &Editor) -> Vec<FootstepSurface> {
-    let Some(project) = editor.project.as_ref() else {
+    let Some(reader) = editor.reader() else {
         return Vec::new();
     };
-    let mut keys: Vec<&str> = project.files.keys_of(SurfaceDef::TABLE).collect();
-    keys.sort_unstable();
-    keys.into_iter()
+    reader
+        .paths_of::<SurfaceDef>()
+        .iter()
         .filter_map(|key| {
-            let row = project.files.json(&row_file(SurfaceDef::TABLE, key))?;
+            let surface = editor.read::<SurfaceDef>(key)?.ok()?;
             Some(FootstepSurface {
-                key: key.to_owned(),
-                name: row["name"].as_str().unwrap_or(key).to_owned(),
-                footstep: row["footstep"].as_str()?.to_owned(),
+                name: surface.name.clone(),
+                key: key.clone(),
+                footstep: reader.path_of(surface.footstep)?.to_owned(),
             })
         })
         .collect()
@@ -170,29 +94,14 @@ pub fn footstep_of(editor: &Editor, surface: Option<&str>) -> Option<String> {
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let keys = sfx_keys(editor);
-    let roles = sfx_roles(editor);
-    let (search, filter) = {
-        let view = &editor.views.model.view(key);
-        (view.sound_search.clone(), view.sound_role.clone())
-    };
+    let search = editor.views.model.view(key).sound_search.clone();
     let mut search_text = search.clone();
-    let mut new_filter = filter.clone();
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.allocate_ui(Vec2::new(220.0, 26.0), |ui| {
-            widgets::search_box(ui, &mut search_text, "Search sounds", None);
+            input::search(ui, &mut search_text, "Search sounds", None);
         });
-        let options = roles
-            .iter()
-            .map(|role| (Some(role.key.clone()), role.def.name.to_lowercase()))
-            .chain([(None, format!("all · {}", keys.len()))]);
-        for (option, label) in options {
-            let on = filter == option;
-            if widgets::toggle_chip(ui, &label, on).clicked() {
-                new_filter = option;
-            }
-        }
     });
     let mut listed: Vec<(String, Option<Waveform>)> = Vec::new();
     for sfx in keys
@@ -202,20 +111,16 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         if sfx_file(editor, sfx).is_none() {
             continue;
         }
-        if let Some(wanted) = &filter
-            && role_of_sfx(editor, sfx).is_none_or(|role| &role.key != wanted)
-        {
-            continue;
-        }
-        listed.push((sfx.clone(), wave_of_sfx(editor, sfx)));
+        listed.push((sfx.clone(), wave_of_sfx(editor, ui.ctx(), sfx)));
     }
     let view = editor.views.model.view(key);
     let (selected_cue, strip) = (view.cue, view.strip);
     let current_sound = selected_cue
         .filter(|(_, kind)| *kind == super::FrameCueKind::Sound)
         .and_then(|(index, _)| {
-            let row = editor.row_value(ModelDef::TABLE, key)?;
-            super::strip_of(&row, strip).get(index)?.sound.clone()
+            let model = editor.read::<ModelDef>(key)?.ok()?;
+            let sound = super::strip_of(&model, strip).get(index)?.sound?;
+            Some(editor.reader()?.path_of(sound)?.to_owned())
         });
     let mut play = None;
     let mut choose = None;
@@ -240,13 +145,11 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             if listed.is_empty() {
                 ui.add_space(8.0);
-                widgets::hint(ui, "No sound rows match.");
+                form::hint(ui, "No sound rows match.");
             }
         });
     {
-        let view = editor.views.model.view_mut(key);
-        view.sound_search = search_text;
-        view.sound_role = new_filter;
+        editor.views.model.view_mut(key).sound_search = search_text;
     }
     if let Some(sfx) = play {
         editor.views.sound.play.push(sfx);
@@ -255,11 +158,14 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let view = editor.views.model.view_mut(key);
         view.last_sound = Some(sfx.clone());
         if let Some((index, super::FrameCueKind::Sound)) = selected_cue
-            && let Some(row) = editor.row_value(ModelDef::TABLE, key)
+            && let Some(Ok(model)) = editor.read::<ModelDef>(key)
+            && let Some(id) = editor
+                .reader()
+                .and_then(|reader| reader.id_of::<SfxDef>(&sfx))
         {
-            let mut frames = super::strip_of(&row, strip);
+            let mut frames = super::strip_of(&model, strip);
             if let Some(frame) = frames.get_mut(index) {
-                frame.sound = Some(sfx.clone());
+                frame.sound = Some(id);
                 let label = format!(
                     "Sound {sfx} on frame {} of {} of {key}",
                     index + 1,
@@ -295,11 +201,9 @@ fn sound_row(
         egui::Stroke::new(1.0, theme::BORDER),
         egui::StrokeKind::Inside,
     );
-    painter.text(
-        button.center(),
-        egui::Align2::CENTER_CENTER,
-        "▶",
-        egui::FontId::proportional(11.0),
+    Mark::Play.paint(
+        &painter,
+        ERect::from_center_size(button.center(), Vec2::splat(12.0)),
         theme::TEXT,
     );
     if ui
@@ -332,24 +236,25 @@ fn sound_row(
     response
 }
 
-pub fn volume_of(editor: &Editor, sfx: &str) -> (String, f32) {
-    scalar_text(scalar_of(editor, sfx, "volume"))
+pub fn volume_of(editor: &Editor, sfx: &str) -> String {
+    scalar_text(scalar_of(editor, sfx, |sfx| sfx.volume))
 }
 
 pub fn pitch_of(editor: &Editor, sfx: &str) -> String {
-    scalar_text(scalar_of(editor, sfx, "pitch")).0
+    scalar_text(scalar_of(editor, sfx, |sfx| sfx.pitch))
 }
 
-fn scalar_of(editor: &Editor, sfx: &str, field: &str) -> SfxScalar {
+fn scalar_of(editor: &Editor, sfx: &str, field: impl Fn(&SfxDef) -> SfxScalar) -> SfxScalar {
     editor
-        .row_value(SfxDef::TABLE, sfx)
-        .and_then(|row| serde_json::from_value(row[field].clone()).ok())
+        .read::<SfxDef>(sfx)
+        .and_then(Result::ok)
+        .map(|sfx| field(&sfx))
         .unwrap_or_default()
 }
 
-fn scalar_text(scalar: SfxScalar) -> (String, f32) {
+fn scalar_text(scalar: SfxScalar) -> String {
     match scalar {
-        SfxScalar::Fixed(fixed) => (format!("{fixed} · the row's"), fixed),
-        SfxScalar::Random { min, max } => (format!("{min} to {max}, at random · the row's"), max),
+        SfxScalar::Fixed(fixed) => format!("{fixed} · the row's"),
+        SfxScalar::Random { min, max } => format!("{min} to {max}, at random · the row's"),
     }
 }

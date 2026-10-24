@@ -2,20 +2,26 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 
+use engine::core::audio::playback::SFX_CLIP;
+use engine::core::babble::BABBLE_LETTERS;
 use engine::core::content::{
-    Content, ContentRegistry, GAME_FILE, LoadReport, MemoryFolder, asset_file, row_file,
-    row_folder, version,
+    CONFIG_FILE, Content, ContentFile, ContentId, ContentRegistry, LoadReport, MemoryFolder,
+    SETTINGS_FILE, Shape, content_path, name_of, table_of, version,
 };
 use engine::core::math::Direction;
+use engine::core::vfx::shader::SHADER_SOURCE;
 use engine::systems::actor::Action;
+use engine::systems::actor::model::{MODEL_BUSTS, MODEL_SPRITES};
+use engine::systems::area::scene::{LAYERS, PALETTE, SCENE, WALK};
+use engine::systems::area::tileset::TILESET_IMAGE;
 use serde_json::{Value, json};
 use strum::VariantArray;
 
 use crate::art::{png, wav};
 
-/// A game folder held in memory, of only the rows a test declares, loaded by the engine's own loader
-/// against every table a game is made of. A row the test leaves out is simply absent, so a test that
-/// leans on more than it declares fails loudly at load or where the engine reads the row.
+/// A game folder held in memory, of only the files a test declares, loaded by the engine's own
+/// loader against every type a game is made of. A file the test leaves out is simply absent, so a
+/// test that leans on more than it declares fails loudly at load or where the engine reads it.
 pub struct Game {
     files: BTreeMap<String, Arc<[u8]>>,
     settings: Option<Value>,
@@ -26,9 +32,41 @@ pub struct Game {
 static TABLES: LazyLock<ContentRegistry> = LazyLock::new(engine::systems::tables);
 static SETTLED_TABLES: LazyLock<ContentRegistry> = LazyLock::new(engine::systems::settled_tables);
 
+/// Looks up the files a test declared by the names it declared them under.
+pub trait Declared {
+    /// The file of `Row`'s type declared as `name`.
+    fn declared<Row: ContentFile>(&self, name: &str) -> Option<ContentId<Row>>;
+}
+
+impl Declared for Content {
+    fn declared<Row: ContentFile>(&self, name: &str) -> Option<ContentId<Row>> {
+        self.by_path::<Row>(&path(Row::TABLE, name))
+    }
+}
+
+/// The size in pixels of the tiles of every area and blueprint a test declares.
+pub const TILE: u32 = 16;
+
 /// An area's ground as text, one string per row: `.` walkable, `#` blocked.
 #[derive(Clone)]
 pub struct Map(pub Vec<String>);
+
+/// The path of the file of type `table` a test declares as `name`: the fixture of that name where
+/// the engine has one, and otherwise `<name>.<table>.json`, or the bundle `<name>.<table>`, at the
+/// top of the game folder.
+pub fn path(table: &str, name: &str) -> String {
+    let registry = engine::systems::registry();
+    if let Some(fixture) = registry
+        .fixture_paths()
+        .find(|path| table_of(path) == Some(table) && name_of(path) == name)
+    {
+        return fixture.to_owned();
+    }
+    let shape = registry
+        .shape_of(table)
+        .unwrap_or_else(|| panic!("no content type `{table}`"));
+    content_path("", name, table, shape)
+}
 
 impl Game {
     pub fn new() -> Game {
@@ -37,18 +75,35 @@ impl Game {
             settings: None,
             whole: false,
         };
-        game.put(GAME_FILE, b"{}".to_vec());
+        game.put(SETTINGS_FILE, b"{}".to_vec());
         game
     }
 
-    pub fn row(mut self, table: &str, key: &str, row: Value) -> Game {
-        self.put(&row_file(table, key), json_bytes(&row));
+    /// The file of type `table` named `name`, of `fields`: the file itself, or a bundle's config.
+    pub fn row(mut self, table: &str, name: &str, fields: Value) -> Game {
+        let file = fields_path(table, name);
+        self.put(&file, json_bytes(&fields));
         self
     }
 
-    /// A file under the folder's `assets/`.
+    /// A part of the bundle of type `table` named `name`, at `part` inside it.
+    pub fn part(mut self, table: &str, name: &str, part: &str, bytes: impl Into<Vec<u8>>) -> Game {
+        self.put(&format!("{}/{part}", path(table, name)), bytes.into());
+        self
+    }
+
+    /// A script file of `nodes`, run by a `runs_on`, that a script module names by its path.
+    pub fn script(self, name: &str, runs_on: &str, nodes: Value) -> Game {
+        self.row(
+            "script",
+            name,
+            json!({ "runs_on": runs_on, "nodes": nodes }),
+        )
+    }
+
+    /// A media file at `path` in the folder, which content names by that path.
     pub fn asset(mut self, path: &str, bytes: Vec<u8>) -> Game {
-        self.put(&asset_file(path), bytes);
+        self.put(path, bytes);
         self
     }
 
@@ -65,8 +120,8 @@ impl Game {
         self
     }
 
-    /// The game's own settings, read from `game.json`, at the content version this build reads
-    /// unless they name one.
+    /// The game's own settings, read from `fixtures/game.config.json`, at the content version this
+    /// build reads unless they name one.
     pub fn settings(mut self, settings: Value) -> Game {
         self.settings = Some(settings);
         self
@@ -78,7 +133,7 @@ impl Game {
         self
     }
 
-    /// A playable character (its model, class and player row) and settings that start every new
+    /// A playable character (its model, class and player file) and settings that start every new
     /// character at `x`, `y` in `area`.
     pub fn hero(self, area: &str, x: f32, y: f32) -> Game {
         self.model("hero", 2.0, json!([]))
@@ -96,15 +151,15 @@ impl Game {
                 "player",
                 "hero",
                 json!({
-                    "model": "hero",
-                    "class": "hero",
+                    "model": path("model", "hero"),
+                    "class": path("class", "hero"),
                     "stats": stats(30.0),
                 }),
             )
             .settings(json!({
                 "name": "Test",
-                "initial_spawn": { "area": area, "x": x, "y": y },
-                "player": "hero",
+                "initial_spawn": { "area": path("area", area), "x": x, "y": y },
+                "player": path("player", "hero"),
             }))
     }
 
@@ -120,151 +175,176 @@ impl Game {
                 "target": "single_enemy",
                 "basic_attack": true,
                 "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "swing" },
-                        "swing": { "type": "animate", "action": "attack", "wait": "apex", "next": "hit" },
-                        "hit": {
-                            "type": "damage",
-                            "who": { "type": "skill_targets" },
-                            "by": { "type": "stat", "stat": "damage" },
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": path("script", "strike") }],
+            }),
+        )
+        .script(
+            "strike",
+            "skill",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "swing" },
+                "swing": { "type": "animate", "action": "attack", "wait": "apex", "next": "hit" },
+                "hit": {
+                    "type": "damage",
+                    "who": { "type": "skill_targets" },
+                    "by": { "type": "stat", "stat": "damage" },
+                },
             }),
         )
         .asset("icons/strike.png", png(1, 1))
         .item(
             "sword",
-            json!({ "kind": { "type": "equipment", "slot": "weapon", "grants": ["strike"] } }),
+            json!({ "kind": {
+                "type": "equipment",
+                "slot": "weapon",
+                "grants": [path("skill", "strike")],
+            } }),
         )
     }
 
-    /// An item of `fields`, named after its key, with an icon and a quiet sound for every way it
+    /// A memory of whether something happened, labelled with its name and forgotten as `resets`
+    /// says (`never`, `daily` or `leaving_area`).
+    pub fn memory(self, name: &str, resets: &str) -> Game {
+        self.row(
+            "memory",
+            name,
+            json!({ "label": name, "type": "boolean", "resets": resets }),
+        )
+    }
+
+    /// A resource item that stacks up to `max` in a bag slot.
+    pub fn resource(self, name: &str, max: u32) -> Game {
+        self.item(
+            name,
+            json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": max }] }),
+        )
+    }
+
+    /// An item of `fields`, named after its file, with an icon and a quiet sound for every way it
     /// changes hands.
-    pub fn item(self, key: &str, fields: Value) -> Game {
-        let icon = format!("icons/{key}.png");
+    pub fn item(self, name: &str, fields: Value) -> Game {
+        let icon = format!("icons/{name}.png");
+        let sfx = path("sfx", "item");
         let mut row = json!({
-            "name": key,
+            "name": name,
             "icon": icon,
-            "sfx": { "pickup": "item", "trade": "item", "drop": "item" },
+            "sfx": { "pickup": sfx, "trade": sfx, "drop": sfx },
         });
         for (field, value) in fields.as_object().expect("an item's fields") {
             row[field] = value.clone();
         }
         self.sfx("item")
-            .row("item", key, row)
+            .row("item", name, row)
             .asset(&icon, png(1, 1))
     }
 
-    /// Every new character starts wearing `items`.
+    /// Every new character starts wearing `items`, the items declared under those names.
     pub fn wearing(self, items: &[&str]) -> Game {
+        let items: Vec<String> = items.iter().map(|item| path("item", item)).collect();
         self.edit("player", "hero", |hero| hero["wearing"] = json!(items))
     }
 
-    /// Changes a row declared before.
-    pub fn edit(mut self, table: &str, key: &str, change: impl FnOnce(&mut Value)) -> Game {
-        let path = row_file(table, key);
+    /// Changes the fields of a file declared before.
+    pub fn edit(mut self, table: &str, name: &str, change: impl FnOnce(&mut Value)) -> Game {
+        let file = fields_path(table, name);
         let bytes = self
             .files
-            .get(&path)
-            .unwrap_or_else(|| panic!("no {table} row `{key}` declared"));
-        let mut row: Value = serde_json::from_slice(bytes).expect("a declared row is json");
+            .get(&file)
+            .unwrap_or_else(|| panic!("no {table} `{name}` declared"));
+        let mut row: Value = serde_json::from_slice(bytes).expect("a declared file is json");
         change(&mut row);
-        self.put(&path, json_bytes(&row));
+        self.put(&file, json_bytes(&row));
         self
     }
 
-    /// A character of `health`, drawn with a model of its own under the same key, that does only
-    /// what its `modules` make it do.
-    pub fn npc(self, key: &str, health: f32, modules: Value) -> Game {
-        self.model(key, 1.5, json!([])).row(
+    /// A character of `health`, drawn with a model of its own of the same name, that does only what
+    /// its `modules` make it do.
+    pub fn npc(self, name: &str, health: f32, modules: Value) -> Game {
+        self.model(name, 1.5, json!([])).row(
             "npc",
-            key,
-            json!({ "name": key, "model": key, "stats": stats(health), "modules": modules }),
+            name,
+            json!({
+                "name": name,
+                "model": path("model", name),
+                "stats": stats(health),
+                "modules": modules,
+            }),
         )
     }
 
-    /// Gives the model under `key` a bust for every generic expression, so its lines can show a
+    /// Gives the model named `name` a bust for every generic expression, so its lines can show a
     /// face.
-    pub fn busts(self, key: &str) -> Game {
+    pub fn busts(self, name: &str) -> Game {
         const EXPRESSIONS: [&str; 6] =
             ["neutral", "happy", "sad", "angry", "surprised", "thinking"];
-        let mut bust = json!({ "type": "bust" });
-        let mut game = self;
-        for expression in EXPRESSIONS {
-            let file = format!("busts/{key}/{expression}.png");
-            bust[expression] = json!(file);
-            game = game.asset(&file, png(4, 4));
-        }
-        game.edit("model", key, |model| {
+        let game = EXPRESSIONS.iter().fold(self, |game, expression| {
+            game.part(
+                "model",
+                name,
+                &MODEL_BUSTS.named(expression, "png"),
+                png(4, 4),
+            )
+        });
+        game.edit("model", name, |model| {
             model["modules"]
                 .as_array_mut()
                 .expect("a model's modules")
-                .push(bust)
+                .push(json!({ "type": "bust" }))
         })
     }
 
     /// A sound of a moment's silence.
-    pub fn sfx(self, key: &str) -> Game {
-        let file = format!("audio/{key}.wav");
-        self.row(
-            "sfx_role",
-            "sounds",
-            json!({ "name": "Sounds", "loudness": -28.0 }),
-        )
-        .row(
-            "sfx",
-            key,
-            json!({ "file": file, "role": "sounds", "volume": 1.0, "pitch": 1.0 }),
-        )
-        .asset(&file, wav())
+    pub fn sfx(self, name: &str) -> Game {
+        self.row("sfx", name, json!({ "volume": 1.0, "pitch": 1.0 }))
+            .part("sfx", name, &SFX_CLIP.named("", "wav"), wav())
     }
 
-    /// A babbling voice of silent letters, a character's `voice` module names it by `key`.
-    pub fn babble(self, key: &str) -> Game {
-        let letters = format!("audio/babble/{key}");
+    /// A babbling voice of silent letters, a character's `voice` module names it by its path.
+    pub fn babble(self, name: &str) -> Game {
         let game = self
-            .row(
-                "babble_bank",
-                key,
-                json!({ "letters": letters, "volume": 0.22 }),
-            )
+            .row("babble_bank", name, json!({ "volume": 0.22 }))
             .row(
                 "babble",
-                key,
-                json!({ "babble_bank": key, "pitch": 1.0, "range": 1.5, "pace": 12.0 }),
+                name,
+                json!({
+                    "babble_bank": path("babble_bank", name),
+                    "pitch": 1.0,
+                    "range": 1.5,
+                    "pace": 12.0,
+                }),
             );
         ('a'..='z').fold(game, |game, letter| {
-            game.asset(&format!("{letters}/{letter}.wav"), wav())
+            let letter = BABBLE_LETTERS.named(&letter.to_string(), "wav");
+            game.part("babble_bank", name, &letter, wav())
         })
     }
 
     /// An attention mark of a plain icon.
-    pub fn mark(self, key: &str) -> Game {
-        let icon = format!("icons/marks/{key}.png");
-        self.row("attention", key, json!({ "icon": icon }))
+    pub fn mark(self, name: &str) -> Game {
+        let icon = format!("icons/marks/{name}.png");
+        self.row("attention", name, json!({ "icon": icon }))
             .asset(&icon, png(1, 1))
     }
 
     /// A visual effect shader that draws nothing, of no parameters.
-    pub fn shader(self, key: &str) -> Game {
-        self.row("vfx_shader", key, json!({ "name": key, "params": [] }))
-            .asset(
-                &format!("shaders/{key}.wgsl"),
+    pub fn shader(self, name: &str) -> Game {
+        self.row("vfx_shader", name, json!({ "name": name, "params": [] }))
+            .part(
+                "vfx_shader",
+                name,
+                &SHADER_SOURCE.named("", "wgsl"),
                 b"fn vfx(uv: vec2<f32>) -> vec4<f32> {\n    return vec4<f32>(0.0);\n}\n".to_vec(),
             )
     }
 
     /// A visual effect of one transparent frame, shown for a second.
-    pub fn vfx(self, key: &str) -> Game {
-        let sheet = format!("vfx/{key}.png");
+    pub fn vfx(self, name: &str) -> Game {
+        let sheet = format!("vfx/{name}.png");
         self.row(
             "vfx",
-            key,
+            name,
             json!({
-                "name": key,
+                "name": name,
                 "layers": [{
                     "type": "sprite",
                     "sheet": sheet,
@@ -279,8 +359,7 @@ impl Game {
 
     /// A model of one transparent frame, a tile wide and `height` tall, shown 100 ms a step for every
     /// action and heading; an attack lands on its second step, of three.
-    pub fn model(self, key: &str, height: f32, modules: Value) -> Game {
-        let image = format!("models/{key}.png");
+    pub fn model(self, name: &str, height: f32, modules: Value) -> Game {
         let step = json!({ "frame": 0, "ms": 100 });
         let apex = json!({ "frame": 0, "ms": 100, "apex": true });
         let actions: serde_json::Map<String, Value> = Action::VARIANTS
@@ -299,24 +378,61 @@ impl Game {
             .collect();
         self.row(
             "model",
-            key,
+            name,
             json!({
                 "hitbox": { "width": 1.0, "height": height },
                 "sprites": {
-                    "image": image,
                     "frame_size": { "width": 1, "height": 1 },
                     "actions": actions,
                 },
                 "modules": modules,
             }),
         )
-        .asset(&image, png(1, 1))
+        .part("model", name, &MODEL_SPRITES.named("", "png"), png(1, 1))
     }
 
-    /// An area of `map`'s ground, with `modules` placed on it, drawn with one plain tile.
-    pub fn area(mut self, key: &str, map: &Map, modules: Value) -> Game {
-        const TILE: u32 = 16;
-        let tileset = format!("{key}_ground");
+    /// A blueprint `width` × `height` tiles, of `variables`, whose scene holds `nodes`.
+    pub fn blueprint(
+        self,
+        name: &str,
+        (width, height): (u32, u32),
+        variables: Value,
+        nodes: Value,
+    ) -> Game {
+        let mut fields = json!({
+            "map": { "size": { "width": width, "height": height }, "tile": TILE },
+        });
+        if variables
+            .as_object()
+            .is_some_and(|variables| !variables.is_empty())
+        {
+            fields["variables"] = variables;
+        }
+        self.row("blueprint", name, fields).part(
+            "blueprint",
+            name,
+            &SCENE.named("", "json"),
+            json_bytes(&nodes),
+        )
+    }
+
+    /// Changes the scene of the area or blueprint named `name`, declared before.
+    pub fn edit_scene(mut self, table: &str, name: &str, change: impl FnOnce(&mut Value)) -> Game {
+        let file = format!("{}/{}", path(table, name), SCENE.named("", "json"));
+        let bytes = self
+            .files
+            .get(&file)
+            .unwrap_or_else(|| panic!("no {table} `{name}` declared"));
+        let mut scene: Value = serde_json::from_slice(bytes).expect("a declared scene is json");
+        change(&mut scene);
+        self.put(&file, json_bytes(&scene));
+        self
+    }
+
+    /// An area of `map`'s ground, painted in one ground layer with one plain tile, with `modules`
+    /// after it in its scene.
+    pub fn area(self, name: &str, map: &Map, modules: Value) -> Game {
+        let tileset = format!("{name}_ground");
         let (width, height) = map.size();
         let ground = vec![vec!["0"; width]; height];
         let walk: Vec<Vec<&str>> = map
@@ -328,41 +444,52 @@ impl Game {
                     .collect()
             })
             .collect();
-        self.put(
-            &format!("{}/palette.csv", row_folder("area", key)),
-            format!("tileset,tile,flip\n{tileset},0,\n").into_bytes(),
+        let mut scene = vec![json!({ "type": "ground_layer", "name": "ground" })];
+        scene.extend(
+            modules
+                .as_array()
+                .expect("an area's modules")
+                .iter()
+                .cloned(),
         );
-        self.put(
-            &format!("{}/ground.csv", row_folder("area", key)),
-            csv(&ground),
-        );
-        self.put(&format!("{}/walk.csv", row_folder("area", key)), csv(&walk));
-        self.row(
-            "tileset",
-            &tileset,
-            json!({ "image": format!("tilesets/{tileset}.png"), "tile": TILE, "tiles": {} }),
-        )
-        .asset(&format!("tilesets/{tileset}.png"), png(TILE, TILE))
-        .row(
-            "area",
-            key,
-            json!({
-                "name": key,
-                "map": {
-                    "size": { "width": width, "height": height },
-                    "tile": TILE,
-                    "ground": ["ground"],
-                },
-                "modules": modules,
-            }),
-        )
+        self.row("tileset", &tileset, json!({ "tile": TILE, "tiles": {} }))
+            .part(
+                "tileset",
+                &tileset,
+                &TILESET_IMAGE.named("", "png"),
+                png(TILE, TILE),
+            )
+            .row(
+                "area",
+                name,
+                json!({
+                    "name": name,
+                    "blueprint": {
+                        "map": { "size": { "width": width, "height": height }, "tile": TILE },
+                    },
+                }),
+            )
+            .part(
+                "area",
+                name,
+                &SCENE.named("", "json"),
+                json_bytes(&json!(scene)),
+            )
+            .part(
+                "area",
+                name,
+                &PALETTE.named("", "csv"),
+                format!("tileset,tile,flip\n{},0,\n", path("tileset", &tileset)),
+            )
+            .part("area", name, &LAYERS.named("ground", "csv"), csv(&ground))
+            .part("area", name, &WALK.named("", "csv"), csv(&walk))
     }
 
     pub fn load(self) -> Content {
         self.try_load().unwrap_or_else(|report| panic!("{report}"))
     }
 
-    /// Holds the game to everything a whole game must provide besides what it declares: every row
+    /// Holds the game to everything a whole game must provide besides what it declares: every file
     /// the engine itself requires, and every quest and shop within a player's reach.
     pub fn whole(mut self) -> Game {
         self.whole = true;
@@ -378,8 +505,8 @@ impl Game {
         )
     }
 
-    /// What the game is held to: a whole game's every table, settings and required row, or, unless
-    /// it is whole, only the tables of the rows declared, with the settings if there are any.
+    /// What the game is held to: a whole game's every type, settings and fixture, or, unless it is
+    /// whole, only the types of the files declared, with the settings if there are any.
     pub fn registry(&self) -> &'static ContentRegistry {
         match (self.whole, &self.settings) {
             (true, _) => engine::systems::registry(),
@@ -397,7 +524,7 @@ impl Game {
         }
     }
 
-    /// The folder of every file declared, and of `game.json` holding the settings.
+    /// The folder of every file declared, and of the settings file holding the settings.
     pub fn folder(&self) -> MemoryFolder {
         let mut files = self.files.clone();
         if let Some(settings) = &self.settings {
@@ -405,7 +532,7 @@ impl Game {
             if settings.get("content_version").is_none() {
                 settings["content_version"] = json!(self.registry().version().0);
             }
-            files.insert(GAME_FILE.to_owned(), json_bytes(&settings).into());
+            files.insert(SETTINGS_FILE.to_owned(), json_bytes(&settings).into());
         }
         MemoryFolder {
             name: "test game".to_owned(),
@@ -415,6 +542,15 @@ impl Game {
 
     fn put(&mut self, path: &str, bytes: Vec<u8>) {
         self.files.insert(path.to_owned(), bytes.into());
+    }
+}
+
+/// The file holding the fields of the file of type `table` named `name`.
+fn fields_path(table: &str, name: &str) -> String {
+    let file = path(table, name);
+    match engine::systems::registry().shape_of(table) {
+        Some(Shape::Bundle) => format!("{file}/{CONFIG_FILE}"),
+        _ => file,
     }
 }
 

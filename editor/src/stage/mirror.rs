@@ -3,13 +3,14 @@
 //! requested of it.
 
 use std::collections::{HashMap, HashSet};
+use ui::egui;
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::prelude::*;
 use bevy::shader::Shader;
 use bevy_egui::EguiUserTextures;
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, fields_file};
 use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
@@ -223,14 +224,16 @@ impl Stage {
         }
         for pose in &frame.actors {
             let model = ActorModel::get(frame.content, pose.model);
+            let image = scene::image_handle(scenes, frame.files, model.sheet().as_str(), world);
             let entity = match self.actors.get(&pose.source) {
                 Some(staged) => staged.entity,
                 None => {
-                    let image =
-                        scene::image_handle(scenes, frame.files, model.sheet().as_str(), world);
                     let entity = world
                         .spawn((
-                            Sprite { image, ..default() },
+                            Sprite {
+                                image: image.clone(),
+                                ..default()
+                            },
                             ACTOR_ANCHOR,
                             Transform::default(),
                             RowDepth::default(),
@@ -257,6 +260,9 @@ impl Stage {
             };
             let mut staged = world.entity_mut(entity);
             if let Some(mut sprite) = staged.get_mut::<Sprite>() {
+                if sprite.image != image {
+                    sprite.image = image;
+                }
                 draw_actor_frame(
                     &mut sprite,
                     model,
@@ -349,7 +355,7 @@ impl Stage {
             let mut compiled: HashMap<String, Handle<Shader>> = HashMap::new();
             for layer in &pose.layers {
                 if let VfxLayer::Shader { shader, .. } = layer {
-                    let key = shader.key(frame.content).to_owned();
+                    let key = shader.path(frame.content).to_owned();
                     match self.compile(world, &key, frame.files, &frame.drafts) {
                         Ok(handle) => {
                             compiled.insert(key, handle);
@@ -370,7 +376,7 @@ impl Stage {
                     content,
                     screen_layer: &self.layer,
                 },
-                &|shader| compiled.get(shader.key(content)).cloned(),
+                &|shader| compiled.get(shader.path(content)).cloned(),
                 &mut overdrawn,
             );
         }
@@ -428,10 +434,10 @@ impl Stage {
         drafts: &HashMap<String, String>,
     ) -> Result<Handle<Shader>, String> {
         let row = files
-            .json(&row_file(VfxShaderDef::TABLE, key))
+            .json(&fields_file(key))
             .ok_or_else(|| format!("no shader row {key}"))?;
-        let def: VfxShaderDef = serde_json::from_value((*row).clone())
-            .map_err(|_| format!("{}/{key} does not parse", VfxShaderDef::TABLE))?;
+        let def: VfxShaderDef =
+            serde_json::from_value((*row).clone()).map_err(|_| format!("{key} does not parse"))?;
         let source = drafts
             .get(key)
             .cloned()

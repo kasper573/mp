@@ -1,13 +1,16 @@
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::core::time::Millis;
+use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
+use ui::chip;
+use ui::egui;
+use ui::egui::Ui;
+use ui::glyph::{self, Mark};
+use ui::theme;
 
-use super::{ModelStrip, StripFrame};
+use super::ModelStrip;
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::stage::{self, Posed, PosedActor, Scene};
-use crate::ui::{theme, widgets};
 
 pub struct StripPreview {
     pub playing: bool,
@@ -36,7 +39,7 @@ pub struct PreviewTick {
     pub passed: Vec<usize>,
 }
 
-pub fn index_at(frames: &[StripFrame], position: f32, holds: bool) -> usize {
+pub fn index_at(frames: &[SheetFrame], position: f32, holds: bool) -> usize {
     let total = super::total_ms(frames).max(1) as f32;
     let position = if holds {
         position.min(total - 1.0)
@@ -56,7 +59,7 @@ pub fn index_at(frames: &[StripFrame], position: f32, holds: bool) -> usize {
 pub fn tick(
     preview: &mut StripPreview,
     dt: f32,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     action: Action,
 ) -> PreviewTick {
     let total = super::total_ms(frames).max(1) as f32;
@@ -107,7 +110,7 @@ pub fn restart(preview: &mut StripPreview) {
     preview.playing = true;
 }
 
-pub fn fire(editor: &mut Editor, key: &str, frames: &[StripFrame], passed: &[usize]) {
+pub fn fire(editor: &mut Editor, key: &str, frames: &[SheetFrame], passed: &[usize]) {
     let muted = editor
         .views
         .model
@@ -128,8 +131,11 @@ pub fn fire(editor: &mut Editor, key: &str, frames: &[StripFrame], passed: &[usi
         let Some(frame) = frames.get(*index) else {
             continue;
         };
-        if let Some(sound) = &frame.sound {
-            editor.views.sound.play.push(sound.clone());
+        if let Some(sound) = frame.sound
+            && let Some(reader) = editor.reader()
+            && let Some(sound) = reader.path_of(sound)
+        {
+            editor.views.sound.play.push(sound.to_owned());
         }
         if frame.step && !stepped {
             stepped = true;
@@ -145,7 +151,7 @@ pub fn draw(editor: &mut Editor, ui: &mut Ui, key: &str, strip: ModelStrip, at: 
     let Some(content) = editor.loaded() else {
         return;
     };
-    let Some(model) = content.by_key::<ModelDef>(key) else {
+    let Some(model) = content.by_path::<ModelDef>(key) else {
         return;
     };
     let posed = Posed {
@@ -196,19 +202,19 @@ pub fn controls(
         {
             preview.muted = !preview.muted;
         }
-        if with_speed && widgets::chip(ui, &format!("{}×", preview.speed)).clicked() {
+        if with_speed && chip::plain(ui, format!("{}×", preview.speed)).clicked() {
             preview.speeds = (preview.speeds + 1) % SPEEDS.len();
             preview.speed = SPEEDS[preview.speeds];
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if count > 0 {
-                widgets::chip(ui, &format!("{} / {count}", index + 1));
+                chip::plain(ui, format!("{} / {count}", index + 1));
             }
         });
     });
 }
 
-pub fn keys(ui: &Ui, preview: &mut StripPreview, frames: &[StripFrame]) {
+pub fn keys(ui: &Ui, preview: &mut StripPreview, frames: &[SheetFrame]) {
     if !super::keyboard_free(ui) {
         return;
     }

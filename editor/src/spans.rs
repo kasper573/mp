@@ -1,52 +1,51 @@
 use std::collections::HashMap;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::menu;
+use ui::theme;
 
-use design_tokens::ink::{self, Ground};
-use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
-use egui::{Color32, FontId, RichText, Stroke, Ui};
-use engine::core::content::ContentRow;
+use engine::core::script::Expr;
 use engine::core::text::{TextMotion, TextVoice};
-use engine::systems::input::map::InputDef;
-use engine::systems::text::Ink;
-use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use engine::core::time::Millis;
+use engine::systems::input::map::InputAction;
+use engine::systems::text::{Fx, Ink, Span};
 use strum::VariantArray;
+use ui::egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
+use ui::egui::{Color32, FontId, RichText, Stroke, Ui};
+use ui::ink::{self, Ground};
 
-use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
-use crate::forms::{self, FormChange, FormCx, committed};
+use crate::forms::{self, FormChange, FormCx};
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
-use crate::{condition, picker};
+use ui::input;
+use ui::input::NumberField;
+use ui::input::committed;
 
-fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
-    T::VARIANTS
-        .iter()
-        .map(|variant| (*variant).into())
-        .collect()
-}
 const VALUE_TOKEN: &str = "⟨value⟩";
 const INPUT_TOKEN: &str = "⟨input⟩";
+const PAUSE: Millis = Millis(400.0);
+const PAUSE_WIDTH: f32 = 96.0;
 
 pub struct SpanLineEdit {
-    pub spans: Option<Value>,
+    pub spans: Option<Vec<Span>>,
     pub entered: bool,
+    pub response: egui::Response,
 }
 
-pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) -> SpanLineEdit {
-    let stored = spans_of(spans);
-    let draft_spans: Value = draft_of(ui, id)
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_else(|| stored.clone());
-    let plain_before = plain(&draft_spans);
+pub fn line(ui: &mut Ui, stored: &[Span], id: egui::Id, font: FontId, hint: &str) -> SpanLineEdit {
+    let draft: Option<Vec<Span>> = ui.ctx().data(|d| d.get_temp(id));
+    let mut dirty = draft.is_some();
+    let mut spans_now = draft.unwrap_or_else(|| stored.to_vec());
+    let plain_before = plain(&spans_now);
     let mut text = plain_before.clone();
     let selection_id = id.with("selection");
     let selection: Option<(usize, usize)> = ui.ctx().data(|d| d.get_temp(selection_id));
-    let mut spans_now = draft_spans.clone();
-    let mut changed = false;
     if let Some((start, end)) = selection.filter(|(a, b)| a != b)
         && let Some(styled) = toolbar(ui, &spans_now, (start, end))
     {
         spans_now = styled;
-        changed = true;
+        dirty = true;
     }
     let job_spans = spans_now.clone();
     let font_for_layout = font.clone();
@@ -96,13 +95,13 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
     let enter = ui.input(|i| EditorKey::Confirm.pressed(i));
     let mut entered = false;
     if response.changed() {
-        let typed = text.trim_end_matches('\n').to_owned();
+        let typed = text.replace('\n', "");
         if typed != text && enter {
             entered = true;
         }
         if let Some(retyped) = retype(&spans_now, &plain_before, &typed) {
             spans_now = retyped;
-            changed = true;
+            dirty = true;
         } else {
             ui.ctx().request_repaint();
         }
@@ -116,79 +115,70 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
             ))));
         state.store(ui.ctx(), response.id);
     }
-    if changed {
-        set_draft(
-            ui,
-            id,
-            &serde_json::to_string(&spans_now).unwrap_or_default(),
-        );
+    if dirty {
+        ui.ctx().data_mut(|d| d.insert_temp(id, spans_now.clone()));
     }
+    let forget = |ui: &Ui| ui.ctx().data_mut(|d| d.remove_temp::<Vec<Span>>(id));
     let escape = ui.input(|i| EditorKey::Cancel.pressed(i));
     if escape && focused {
-        clear_draft(ui, id);
+        forget(ui);
         return SpanLineEdit {
             spans: None,
             entered: false,
+            response: response.response,
         };
     }
     if entered || committed(ui, &response) {
-        clear_draft(ui, id);
-        if spans_now != stored {
+        forget(ui);
+        if dirty {
             return SpanLineEdit {
                 spans: Some(spans_now),
                 entered,
+                response: response.response,
             };
         }
     }
     SpanLineEdit {
         spans: None,
         entered,
+        response: response.response,
     }
 }
 
-pub fn plain(spans: &Value) -> String {
-    spans_of(spans)
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(token)
-        .collect()
+pub fn plain(spans: &[Span]) -> String {
+    spans.iter().map(token).collect()
 }
 
-pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) -> LayoutJob {
+pub fn layout_job(spans: &[Span], font: FontId, ink: Color32, wrap_width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = wrap_width;
-    for span in spans_of(spans).as_array().into_iter().flatten() {
+    for span in spans {
         let mut format = TextFormat::simple(font.clone(), ink);
         match span {
-            span if is_atom(span) => {
+            Span::Value { .. } | Span::Input(_) => {
                 format.color = theme::CODE;
                 format.background = theme::INPUT;
             }
-            Value::Object(map) => {
-                if let Some(ink) = map.get("ink") {
-                    format.color = Ink::deserialize(ink)
-                        .map_or(theme::TEXT, |ink| ink.prose().on(Ground::Paper));
-                }
-                if map.contains_key("voice") || map.contains_key("motion") {
-                    format.background = ink::gold_wash(0.2);
-                }
-                if map.get("slow").and_then(Value::as_bool).unwrap_or(false) {
-                    format.underline = Stroke::new(1.0, format.color);
-                }
-                if map.contains_key("pause_after") {
-                    format.strikethrough = Stroke::NONE;
-                    format.italics = true;
+            Span::Text { fx, .. } => {
+                for fx in fx {
+                    match fx {
+                        Fx::Ink(ink) => format.color = ink.prose().on(Ground::Paper),
+                        Fx::Voice(_) | Fx::Motion(_) => format.background = ink::gold_wash(0.2),
+                        Fx::Slow => format.underline = Stroke::new(1.0, format.color),
+                        Fx::PauseAfter(_) => {
+                            format.strikethrough = Stroke::NONE;
+                            format.italics = true;
+                        }
+                    }
                 }
             }
-            _ => {}
         }
         job.append(&token(span), 0.0, format);
     }
     job
 }
 
-pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
+pub fn retype(spans: &[Span], before: &str, after: &str) -> Option<Vec<Span>> {
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = after.chars().collect();
     let prefix = old
@@ -216,92 +206,101 @@ pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
     Some(cells.spans())
 }
 
-fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<Value> {
+fn toolbar(ui: &mut Ui, spans: &[Span], range: (usize, usize)) -> Option<Vec<Span>> {
     let mut outcome = None;
-    egui::Frame::new()
-        .fill(theme::RAISED)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(4.0)
-        .inner_margin(egui::Margin::symmetric(4, 2))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
-                for (field, options) in [
-                    ("ink", names::<Ink>()),
-                    ("voice", names::<TextVoice>()),
-                    ("motion", names::<TextMotion>()),
-                ] {
-                    ui.menu_button(RichText::new(field).size(12.0), |ui| {
-                        for option in options {
-                            if ui.button(option).clicked() {
-                                outcome = Some(restyle(spans, (start, end), |map| {
-                                    map.insert(field.to_owned(), Value::String(option.to_owned()));
-                                }));
-                                ui.close();
-                            }
-                        }
-                        if ui.button(format!("no {field}")).clicked() {
-                            outcome = Some(restyle(spans, (start, end), |map| {
-                                map.remove(field);
-                            }));
-                            ui.close();
-                        }
-                    });
-                }
-                if ui
-                    .add(egui::Button::new(RichText::new("slow").size(12.0)))
-                    .clicked()
-                {
-                    outcome = Some(restyle(spans, (start, end), |map| {
-                        if map.get("slow").and_then(Value::as_bool).unwrap_or(false) {
-                            map.remove("slow");
-                        } else {
-                            map.insert("slow".to_owned(), Value::Bool(true));
-                        }
-                    }));
-                }
-                if ui
-                    .add(egui::Button::new(RichText::new("pause").size(12.0)))
-                    .on_hover_text("A 400 ms pause after the span")
-                    .clicked()
-                {
-                    outcome = Some(restyle(spans, (start, end), |map| {
-                        if map.contains_key("pause_after") {
-                            map.remove("pause_after");
-                        } else {
-                            map.insert("pause_after".to_owned(), Value::from(400));
-                        }
-                    }));
-                }
-                if ui
-                    .add(egui::Button::new(RichText::new("value").size(12.0)))
-                    .on_hover_text("Replace the selection with a value span showing an expression")
-                    .clicked()
-                {
-                    outcome = with_value(spans, (start, end));
-                }
-                ui.label(theme::faint(format!("{} chars", end - start)).size(11.0));
-            });
-        });
+    chip::holding(ui, theme::RAISED, theme::BORDER, |ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let mut styled = |kind: FxKind, to: Option<Fx>| {
+            outcome = Some(restyle(spans, range, |fx| kind.set(fx, to)));
+        };
+        fx_menu(ui, FxKind::Ink, Ink::VARIANTS, Fx::Ink, &mut styled);
+        fx_menu(
+            ui,
+            FxKind::Voice,
+            TextVoice::VARIANTS,
+            Fx::Voice,
+            &mut styled,
+        );
+        fx_menu(
+            ui,
+            FxKind::Motion,
+            TextMotion::VARIANTS,
+            Fx::Motion,
+            &mut styled,
+        );
+        if ui
+            .add(egui::Button::new(RichText::new("slow").size(12.0)))
+            .clicked()
+        {
+            outcome = Some(restyle(spans, range, |fx| {
+                FxKind::Slow.toggle(fx, Fx::Slow)
+            }));
+        }
+        if ui
+            .add(egui::Button::new(RichText::new("pause").size(12.0)))
+            .on_hover_text("A 400 ms pause after the span")
+            .clicked()
+        {
+            outcome = Some(restyle(spans, range, |fx| {
+                FxKind::PauseAfter.toggle(fx, Fx::PauseAfter(PAUSE))
+            }));
+        }
+        if ui
+            .add(egui::Button::new(RichText::new("value").size(12.0)))
+            .on_hover_text("Replace the selection with a value span showing an expression")
+            .clicked()
+        {
+            outcome = with_value(spans, range);
+        }
+        ui.label(theme::faint(format!("{} chars", range.1 - range.0)).size(11.0));
+    });
     outcome
 }
 
+fn fx_menu<T: Copy + Into<&'static str>>(
+    ui: &mut Ui,
+    kind: FxKind,
+    options: &[T],
+    wrap: fn(T) -> Fx,
+    styled: &mut impl FnMut(FxKind, Option<Fx>),
+) {
+    let field = kind.name();
+    menu::dropdown(ui, RichText::new(field).size(12.0), |ui| {
+        for &option in options {
+            if ui.button(option.into()).clicked() {
+                styled(kind, Some(wrap(option)));
+                ui.close();
+            }
+        }
+        if ui.button(format!("no {field}")).clicked() {
+            styled(kind, None);
+            ui.close();
+        }
+    });
+}
+
 /// The line with the selection between `start` and `end` replaced by a value span.
-pub fn with_value(spans: &Value, (start, end): (usize, usize)) -> Option<Value> {
+pub fn with_value(spans: &[Span], (start, end): (usize, usize)) -> Option<Vec<Span>> {
     let mut cells = Cells::of(spans);
     if cells.cuts_atom(start) || cells.cuts_atom(end) {
         return None;
     }
     cells.cells.drain(start..end);
-    cells.insert_atom(start, json!({ "value": 0 }));
+    cells.insert_atom(
+        start,
+        Span::Value {
+            value: Box::new(Expr::Int(0)),
+            fx: Vec::new(),
+        },
+    );
     Some(cells.spans())
 }
 
 pub fn restyle(
-    spans: &Value,
+    spans: &[Span],
     (start, end): (usize, usize),
-    apply: impl Fn(&mut Map<String, Value>),
-) -> Value {
+    apply: impl Fn(&mut Vec<Fx>),
+) -> Vec<Span> {
     let Cells {
         mut runs,
         mut cells,
@@ -321,270 +320,218 @@ pub fn restyle(
     Cells { runs, cells }.spans()
 }
 
-pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+/// One span as a form edits it: its text or what it shows, and its effects.
+pub fn edit(ui: &mut Ui, cx: &mut FormCx, span: &mut Span, path: &str) -> FormChange {
     let mut changed = FormChange::default();
-    ui.vertical(|ui| {
-        if let Some(text) = value.as_str().map(str::to_owned) {
-            let mut draft_value = Value::String(text);
-            if forms::text(ui, cx, &mut draft_value, path).is_some() {
-                *value = draft_value;
-                changed = FormChange::at(path);
-            }
-            ui.horizontal(|ui| {
-                if ui
-                    .small_button("style…")
-                    .on_hover_text("Give the span an ink, a voice or a motion")
-                    .clicked()
-                {
-                    let mut styled = Map::new();
-                    styled.insert("text".to_owned(), value.clone());
-                    *value = Value::Object(styled);
-                    changed = FormChange::at(path);
-                }
-            });
-            return;
-        }
-        let mut back_to_plain = false;
-        let Some(object) = value.as_object_mut() else {
-            ui.label(RichText::new("—").weak());
-            return;
-        };
-        if object.contains_key("input") {
-            let mut input = object["input"].as_str().unwrap_or_default().to_owned();
+    ui.vertical(|ui| match span {
+        Span::Input(action) => {
             ui.horizontal(|ui| {
                 ui.label("key of");
-                if picker::row(
-                    ui,
-                    cx,
-                    InputDef::TABLE,
-                    &mut input,
-                    &format!("{path}/input"),
-                ) {
-                    object.insert("input".to_owned(), Value::String(input));
+                let mut picked = *action;
+                controls::combo(ui.id().with(path).with("input"))
+                    .selected_text(<&str>::from(*action))
+                    .show_ui(ui, |ui| {
+                        for &option in InputAction::VARIANTS {
+                            ui.selectable_value(&mut picked, option, <&str>::from(option));
+                        }
+                    });
+                if picked != *action {
+                    *action = picked;
                     changed = FormChange::at(path);
                 }
             });
-            return;
         }
-        if object.contains_key("value") {
+        Span::Value { value, fx } => {
             ui.label(RichText::new("value").weak());
-            let mut inner = object["value"].clone();
-            let schema = serde_json::json!({ "x-condition": true });
-            if condition::edit(ui, cx, &schema, &mut inner, &format!("{path}/value")).is_some() {
-                object.insert("value".to_owned(), inner);
-                changed = FormChange::at(path);
-            }
-            return;
+            changed |= forms::of_type(ui, cx, &mut **value, &format!("{path}/value"));
+            changed |= effects(ui, fx, path);
         }
-        let mut text = object
-            .get("text")
-            .cloned()
-            .unwrap_or(Value::String(String::new()));
-        if forms::text(ui, cx, &mut text, &format!("{path}/text")).is_some() {
-            object.insert("text".to_owned(), text);
-            changed = FormChange::at(path);
-        }
-        ui.horizontal_wrapped(|ui| {
-            for (field, options) in [
-                ("ink", names::<Ink>()),
-                ("voice", names::<TextVoice>()),
-                ("motion", names::<TextMotion>()),
-            ] {
-                let current = object
-                    .get(field)
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_owned();
-                let mut picked = current.clone();
-                widgets::combo(ui.id().with(path).with(field))
-                    .selected_text(if current.is_empty() {
-                        field.to_owned()
-                    } else {
-                        current.clone()
-                    })
-                    .width(90.0)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut picked, String::new(), format!("no {field}"));
-                        for option in options {
-                            ui.selectable_value(&mut picked, option.to_owned(), option);
-                        }
-                    });
-                if picked != current {
-                    if picked.is_empty() {
-                        object.remove(field);
-                    } else {
-                        object.insert(field.to_owned(), Value::String(picked));
-                    }
-                    changed = FormChange::at(path);
-                }
-            }
-            let mut slow = object.get("slow").and_then(Value::as_bool).unwrap_or(false);
-            if ui.checkbox(&mut slow, "slow").changed() {
-                if slow {
-                    object.insert("slow".to_owned(), Value::Bool(true));
-                } else {
-                    object.remove("slow");
-                }
-                changed = FormChange::at(path);
-            }
-            let id = ui.id().with(path).with("pause");
-            let current = object
-                .get("pause_after")
-                .and_then(Value::as_f64)
-                .unwrap_or(0.0);
-            let mut draft: f64 = draft_of(ui, id)
-                .and_then(|t| t.parse().ok())
-                .unwrap_or(current);
-            ui.label("pause ms");
-            let response = ui.add(
-                egui::DragValue::new(&mut draft)
-                    .range(0.0..=10_000.0)
-                    .speed(10.0),
-            );
-            if response.changed() {
-                set_draft(ui, id, &draft.to_string());
-            }
-            if (response.drag_stopped() || committed(ui, &response))
-                && take_draft(ui, id).is_some()
-                && draft != current
-            {
-                if draft <= 0.0 {
-                    object.remove("pause_after");
-                } else {
-                    object.insert("pause_after".to_owned(), Value::from(draft));
-                }
-                changed = FormChange::at(path);
-            }
-            if object.len() == 1
-                && ui
-                    .small_button("plain")
-                    .on_hover_text("Back to a plain string")
-                    .clicked()
-            {
-                back_to_plain = true;
-            }
-        });
-        if back_to_plain {
-            let plain = object.get("text").cloned().unwrap_or_default();
-            *value = plain;
-            changed = FormChange::at(path);
+        Span::Text { text, fx } => {
+            changed |= forms::text_of(ui, cx, text, &format!("{path}/text"));
+            changed |= effects(ui, fx, path);
         }
     });
     changed
 }
 
-pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+/// A line of spans as a form edits it: typed in place, with the expression of each value span
+/// below it.
+pub fn line_field(ui: &mut Ui, cx: &mut FormCx, spans: &mut Vec<Span>, path: &str) -> FormChange {
     let id = ui.id().with(path).with("line");
     let mut changed = FormChange::default();
-    forms::boxed_input(ui, None, |ui| {
-        let edit = line(ui, value, id, FontId::proportional(13.5), "…");
-        if let Some(spans) = edit.spans {
-            *value = spans;
+    input::boxed(ui, None, |ui| {
+        let edit = line(ui, spans, id, input::font(ui), "…");
+        if let Some(typed) = edit.spans {
+            *spans = typed;
             changed = FormChange::at(path);
         }
-        ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
+        edit.response
     });
-    let count = value.as_array().map_or(0, Vec::len);
-    for index in 0..count {
-        if value[index].get("value").is_none() {
+    for (index, span) in spans.iter_mut().enumerate() {
+        let Span::Value { value, .. } = span else {
             continue;
-        }
-        let mut inner = value[index]["value"].clone();
-        let schema = serde_json::json!({ "x-condition": true });
-        widgets::kv(ui, "value", |ui| {
-            if condition::edit(
-                ui,
-                cx,
-                &schema,
-                &mut inner,
-                &format!("{path}/{index}/value"),
-            )
-            .is_some()
-            {
-                value[index]["value"] = inner.clone();
-                changed = FormChange::at(path);
-            }
+        };
+        form::kv(ui, "value", |ui| {
+            changed |= forms::of_type(ui, cx, &mut **value, &format!("{path}/{index}/value"));
         });
     }
     changed
 }
 
-fn spans_of(value: &Value) -> Value {
-    match value {
-        Value::Array(_) => value.clone(),
-        Value::String(text) => Value::Array(vec![Value::String(text.clone())]),
-        Value::Null => Value::Array(vec![Value::String(String::new())]),
-        other => Value::Array(vec![other.clone()]),
-    }
-}
-
-fn token(span: &Value) -> String {
-    match span {
-        Value::String(text) => text.clone(),
-        Value::Object(map) => {
-            if let Some(text) = map.get("text").and_then(Value::as_str) {
-                text.to_owned()
-            } else if map.contains_key("value") {
-                VALUE_TOKEN.to_owned()
-            } else if map.contains_key("input") {
-                INPUT_TOKEN.to_owned()
-            } else {
-                String::new()
-            }
+fn effects(ui: &mut Ui, fx: &mut Vec<Fx>, path: &str) -> FormChange {
+    let mut changed = FormChange::default();
+    ui.horizontal_wrapped(|ui| {
+        changed |= fx_combo(ui, fx, path, FxKind::Ink, Ink::VARIANTS, Fx::Ink);
+        changed |= fx_combo(ui, fx, path, FxKind::Voice, TextVoice::VARIANTS, Fx::Voice);
+        changed |= fx_combo(
+            ui,
+            fx,
+            path,
+            FxKind::Motion,
+            TextMotion::VARIANTS,
+            Fx::Motion,
+        );
+        let mut slow = FxKind::Slow.of(fx).is_some();
+        if ui.checkbox(&mut slow, "slow").changed() {
+            FxKind::Slow.set(fx, slow.then_some(Fx::Slow));
+            changed = FormChange::at(path);
         }
-        _ => String::new(),
+        let mut pause = match FxKind::PauseAfter.of(fx) {
+            Some(Fx::PauseAfter(pause)) => pause.0,
+            _ => 0.0,
+        };
+        ui.label("pause");
+        if NumberField::new(&mut pause)
+            .range(0.0..=10_000.0)
+            .unit("ms")
+            .width(PAUSE_WIDTH)
+            .show(ui)
+        {
+            let pause = (pause > 0.0).then_some(Fx::PauseAfter(Millis(pause)));
+            FxKind::PauseAfter.set(fx, pause);
+            changed = FormChange::at(path);
+        }
+    });
+    changed
+}
+
+fn fx_combo<T: Copy + PartialEq + Into<&'static str>>(
+    ui: &mut Ui,
+    fx: &mut Vec<Fx>,
+    path: &str,
+    kind: FxKind,
+    options: &[T],
+    wrap: fn(T) -> Fx,
+) -> FormChange {
+    let field = kind.name();
+    let current = options
+        .iter()
+        .copied()
+        .find(|option| kind.of(fx) == Some(wrap(*option)));
+    let mut picked = current;
+    controls::combo(ui.id().with(path).with(field))
+        .selected_text(current.map_or(field, Into::into))
+        .width(90.0)
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut picked, None, format!("no {field}"));
+            for &option in options {
+                ui.selectable_value(&mut picked, Some(option), option.into());
+            }
+        });
+    if picked == current {
+        return FormChange::default();
+    }
+    kind.set(fx, picked.map(wrap));
+    FormChange::at(path)
+}
+
+/// Which of a span's effects an effect is, each held at most once.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FxKind {
+    Ink,
+    Voice,
+    Motion,
+    Slow,
+    PauseAfter,
+}
+
+impl FxKind {
+    fn of_fx(fx: &Fx) -> FxKind {
+        match fx {
+            Fx::Ink(_) => FxKind::Ink,
+            Fx::Voice(_) => FxKind::Voice,
+            Fx::Motion(_) => FxKind::Motion,
+            Fx::Slow => FxKind::Slow,
+            Fx::PauseAfter(_) => FxKind::PauseAfter,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            FxKind::Ink => "ink",
+            FxKind::Voice => "voice",
+            FxKind::Motion => "motion",
+            FxKind::Slow => "slow",
+            FxKind::PauseAfter => "pause",
+        }
+    }
+
+    fn of(self, fx: &[Fx]) -> Option<Fx> {
+        fx.iter().copied().find(|held| FxKind::of_fx(held) == self)
+    }
+
+    fn set(self, fx: &mut Vec<Fx>, to: Option<Fx>) {
+        fx.retain(|held| FxKind::of_fx(held) != self);
+        fx.extend(to);
+    }
+
+    fn toggle(self, fx: &mut Vec<Fx>, on: Fx) {
+        let to = self.of(fx).is_none().then_some(on);
+        self.set(fx, to);
     }
 }
 
-fn normalise(span: Value) -> Value {
+fn token(span: &Span) -> String {
     match span {
-        Value::Object(map) if map.len() == 1 && map.contains_key("text") => map["text"].clone(),
-        other => other,
+        Span::Text { text, .. } => text.clone(),
+        Span::Value { .. } => VALUE_TOKEN.to_owned(),
+        Span::Input(_) => INPUT_TOKEN.to_owned(),
     }
 }
 
-fn is_atom(span: &Value) -> bool {
-    span.as_object()
-        .is_some_and(|map| map.contains_key("value") || map.contains_key("input"))
-}
-
-/// A line cut into the characters its plain text shows: a character keeps the run of style it
+/// A line cut into the characters its plain text shows: a character keeps the run of effects it
 /// was written in, and a value or input span sits whole on the first cell of its token.
 struct Cells {
-    runs: Vec<Map<String, Value>>,
+    runs: Vec<Vec<Fx>>,
     cells: Vec<Cell>,
 }
 
 #[derive(Clone)]
 enum Cell {
     Char(char, usize),
-    Atom(Value),
+    Atom(Span),
     WithinAtom,
 }
 
 impl Cells {
-    fn of(spans: &Value) -> Cells {
+    fn of(spans: &[Span]) -> Cells {
         let mut cells = Cells {
             runs: Vec::new(),
             cells: Vec::new(),
         };
-        for span in spans_of(spans).as_array().into_iter().flatten() {
-            if is_atom(span) {
+        for span in spans {
+            let Span::Text { text, fx } = span else {
                 cells.insert_atom(cells.cells.len(), span.clone());
                 continue;
-            }
-            let mut style = span.as_object().cloned().unwrap_or_default();
-            style.remove("text");
-            cells.runs.push(style);
+            };
+            cells.runs.push(fx.clone());
             let run = cells.runs.len() - 1;
-            cells
-                .cells
-                .extend(token(span).chars().map(|c| Cell::Char(c, run)));
+            cells.cells.extend(text.chars().map(|c| Cell::Char(c, run)));
         }
         cells
     }
 
-    fn insert_atom(&mut self, at: usize, span: Value) {
+    fn insert_atom(&mut self, at: usize, span: Span) {
         let width = token(&span).chars().count();
         let cells = std::iter::once(Cell::Atom(span)).chain(std::iter::repeat_n(
             Cell::WithinAtom,
@@ -607,13 +554,13 @@ impl Cells {
         neighbour(at.checked_sub(1))
             .or(neighbour(Some(at)))
             .unwrap_or_else(|| {
-                self.runs.push(Map::new());
+                self.runs.push(Vec::new());
                 self.runs.len() - 1
             })
     }
 
-    fn spans(&self) -> Value {
-        let mut spans: Vec<Value> = Vec::new();
+    fn spans(&self) -> Vec<Span> {
+        let mut spans: Vec<Span> = Vec::new();
         let mut run: Option<(usize, String)> = None;
         for cell in &self.cells {
             match cell {
@@ -632,22 +579,29 @@ impl Cells {
             }
         }
         spans.extend(run.map(|run| self.span_of(run)));
-        let mut merged: Vec<Value> = Vec::new();
+        let mut merged: Vec<Span> = Vec::new();
         for span in spans {
-            match (merged.last_mut(), &span) {
-                (Some(Value::String(last)), Value::String(next)) => last.push_str(next),
-                _ => merged.push(span),
+            match (merged.last_mut(), span) {
+                (
+                    Some(Span::Text {
+                        text: last,
+                        fx: before,
+                    }),
+                    Span::Text { text: next, fx },
+                ) if *before == fx => last.push_str(&next),
+                (_, span) => merged.push(span),
             }
         }
         if merged.is_empty() {
-            merged.push(Value::String(String::new()));
+            merged.push(engine::systems::text::plain(""));
         }
-        Value::Array(merged)
+        merged
     }
 
-    fn span_of(&self, (run, text): (usize, String)) -> Value {
-        let mut span = Map::from_iter([("text".to_owned(), Value::String(text))]);
-        span.extend(self.runs[run].clone());
-        normalise(Value::Object(span))
+    fn span_of(&self, (run, text): (usize, String)) -> Span {
+        Span::Text {
+            text,
+            fx: self.runs[run].clone(),
+        }
     }
 }

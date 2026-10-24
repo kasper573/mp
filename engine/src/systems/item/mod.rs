@@ -19,7 +19,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
+use crate::core::content::{
+    Content, ContentFile, ContentId, ModuleRule, ModuleSet, NamedContent, Nearby, serial,
+};
 use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
@@ -30,7 +32,7 @@ use crate::systems::npc::Npc;
 use crate::systems::player::{ClientId, PlayedBy, Players, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
-    Condition, EventKind, Owner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
+    Condition, EventKind, Owner, RiftInstances, RunnerKind, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
@@ -335,8 +337,30 @@ pub struct ItemDef {
     pub modules: Vec<ItemModule>,
 }
 
-impl ContentRow for ItemDef {
+impl ContentFile for ItemDef {
     const TABLE: &'static str = "item";
+
+    fn fresh(near: &Nearby) -> Result<ItemDef, String> {
+        let sound = near.file()?;
+        Ok(ItemDef {
+            name: near.name(),
+            icon: near.image()?,
+            sfx: ItemSfx {
+                pickup: sound,
+                trade: sound,
+                drop: sound,
+                on_use: None,
+            },
+            kind: ItemKind::Resource,
+            modules: Vec::new(),
+        })
+    }
+}
+
+impl NamedContent for ItemDef {
+    fn shown_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ModuleSet for ItemDef {
@@ -346,13 +370,17 @@ impl ModuleSet for ItemDef {
         &self.modules
     }
 
+    fn modules_mut(&mut self) -> &mut Vec<ItemModule> {
+        &mut self.modules
+    }
+
     fn rule(_: &ItemModule) -> ModuleRule {
         ModuleRule::AtMostOne
     }
 }
 
 impl ScriptedRow for ItemDef {
-    const OWNER: OwnerKind = OwnerKind::Item;
+    const OWNER: RunnerKind = RunnerKind::Item;
 
     fn script(module: &ItemModule) -> Option<&ScriptModule> {
         match module {
@@ -371,7 +399,6 @@ pub enum ItemModule {
     QuestItem,
     Bound,
     Currency,
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 
@@ -515,7 +542,7 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
 
 pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Item, item.raw()),
+        Owner::Row(RunnerKind::Item, item.raw()),
         kind,
         Some(actor),
         Vec::new(),

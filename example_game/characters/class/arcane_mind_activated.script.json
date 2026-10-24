@@ -1,0 +1,19 @@
+{
+  "runs_on": "skill",
+  "nodes": {
+    "activated": {
+      "type": "on",
+      "event": "activated",
+      "next": "sharpen"
+    },
+    "sharpen": {
+      "type": "boost",
+      "stat": "damage",
+      "by": {
+        "type": "skill_stat",
+        "skill": "characters/class/arcane_mind.skill.json",
+        "stat": "power"
+      }
+    }
+  }
+}

@@ -1,8 +1,9 @@
-use egui::{Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
 use engine::core::tiling::TilePos;
 use engine::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
 use engine::systems::area::{self, AreaId};
 use engine::systems::script::Place;
+use ui::egui::{Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
+use ui::menu;
 
 use super::canvas::{MapCanvas, corners};
 use super::{
@@ -13,7 +14,7 @@ use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::play;
 use crate::project::ContentEdit;
-use crate::ui::widgets;
+use crate::shell::widgets;
 use crate::views::{area as area_view, navigation};
 
 const SNAP_PX: f32 = 8.0;
@@ -354,7 +355,7 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
             play::start(editor, Some(place));
             ui.close();
         }
-        ui.menu_button("Play here as…", |ui| {
+        menu::submenu(ui, "Play here as…", |ui| {
             for test in play::test_characters(editor) {
                 if ui
                     .button(format!("{} · level {}", test.key, test.level))
@@ -681,8 +682,8 @@ fn snapped(
                             shift,
                             note: format!(
                                 "{} snapped {how} {}",
-                                atlas.key(*mover),
-                                atlas.key(*other)
+                                atlas.file_name(*mover),
+                                atlas.file_name(*other)
                             ),
                         });
                     }

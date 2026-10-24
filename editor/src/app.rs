@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -5,20 +6,24 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Instant, SystemTime};
+use ui::egui;
+use ui::words;
 
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
-use egui_dock::DockState;
-use engine::core::content::{Content, row_file, version};
+use engine::core::content::{Content, ContentFile, FolderReader, Unreadable, fields_file, version};
 use engine::core::math::Pos;
-use engine::core::tiling::Tiles;
+use engine::core::tiling::{CellPos, Tiles};
 use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 use engine::systems;
+use engine::systems::area::AreaModuleKind;
+use engine::systems::frame_rate::{self, FrameCountPlugin, FrameRates};
 use serde::Deserialize;
 use serde_json::Value;
 use strum::IntoStaticStr;
+use ui::egui_dock::DockState;
 
 use crate::forms::{FormCx, FormState};
 use crate::import::{self, ImportJobs, ImportRecords};
@@ -32,13 +37,13 @@ use crate::project::{
 use crate::rows;
 use crate::scenes::{self, SceneStep};
 use crate::schema::SchemaShapes;
+use crate::shell::{self, row_form};
 use crate::tabs::{self, DockRequest, EditorTab, TabOpening};
 use crate::thumbs::Thumbnail;
-use crate::ui::{self, row_form};
 use crate::user::{BrushSettings, EditorSettings, UserFolder};
-use crate::views::area::{MakeBlueprintDialog, ResizeDialog};
-use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
-use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
+use crate::views::area::ResizeDialog;
+use crate::views::area::nodes::CopiedNodes;
+use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptRow};
 use crate::views::world::ArrangeDialog;
 use crate::views::{self, EditorCamera, EditorViews};
 
@@ -74,6 +79,7 @@ impl Plugin for EditorPlugin {
         }
         app.add_plugins((
             EguiPlugin::default(),
+            FrameCountPlugin,
             bevy_tilemap::TilemapPlugin,
             bevy::sprite_render::Material2dPlugin::<VfxMaterial>::default(),
         ))
@@ -93,6 +99,8 @@ impl Plugin for EditorPlugin {
     }
 }
 
+const FRAME_RATE_MARGIN: f32 = 8.0;
+
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, PrimaryEguiContext, EditorCamera));
 }
@@ -100,7 +108,7 @@ fn setup_camera(mut commands: Commands) {
 // egui takes up new fonts as a pass begins, so they must be set before the first pass draws text.
 fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>>) {
     for mut context in &mut contexts {
-        ui::theme::apply(context.get_mut());
+        ui::apply(context.get_mut());
     }
 }
 
@@ -115,6 +123,7 @@ pub struct Editor {
     pub journal: Option<RecoveryJournal>,
     pub dock: DockState<EditorTab>,
     pub panels: DockTabs,
+    pub content_tree: crate::shell::content_tree::ContentTree,
     pub status: StatusBar,
     pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
@@ -123,6 +132,8 @@ pub struct Editor {
     pub output: OutputLog,
     pub dialogs: Vec<ModalDialog>,
     pub toast: Option<(String, Instant)>,
+    /// Text to put on the system clipboard on the next frame.
+    pub copied: Option<String>,
     pub start: StartScreen,
     pub open_tabs: Vec<(EditorTab, TabOpening)>,
     pub preview: Option<EditorTab>,
@@ -174,15 +185,7 @@ impl OutputLog {
 
 #[derive(Default)]
 pub struct DockTabs {
-    pub left: LeftTab,
     pub bottom: BottomTab,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LeftTab {
-    #[default]
-    Content,
-    Assets,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, IntoStaticStr)]
@@ -236,21 +239,17 @@ pub struct PlacePick {
 
 pub enum ModalDialog {
     NewGame(NewGameDialog),
-    NewRow(NewRowDialog),
     Confirm(ConfirmDialog),
     Conflicts(Vec<FileConflict>),
-    Rename(RenameDialog),
     Delete(DeleteDialog),
+    FindUnused(FindUnusedDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
-    MakeBlueprint(MakeBlueprintDialog),
     Resize(ResizeDialog),
     Arrange(ArrangeDialog),
     Import(Box<import::ImportDialog>),
     PickRow(PickRowDialog),
-    MakeShared(MakeSharedDialog),
-    MakeInline(MakeInlineDialog),
     RenameNode(RenameNodeDialog),
     LinkNode(LinkNodeDialog),
 }
@@ -265,22 +264,73 @@ pub struct PickRowDialog {
 }
 
 pub enum PickRowThen {
+    /// Adds a module of `kind` at `at` to `area`, naming the picked file.
     AddModule {
         area: String,
-        module: Value,
-        field: String,
+        kind: AreaModuleKind,
+        at: Option<CellPos>,
     },
     ReplaceBlueprint {
         area: String,
-        index: usize,
+        node: String,
+    },
+    NewFile {
+        folder: String,
+    },
+    MoveInto {
+        paths: Vec<String>,
+    },
+    /// Moves rows of a scene graph into the folder picked, by its labels.
+    MoveNodes {
+        bundle: String,
+        ids: Vec<String>,
+        folders: Vec<(String, String)>,
     },
 }
 
+impl PickRowThen {
+    /// The file the picked row is written into, when it is one.
+    pub fn editing(&self) -> Option<&str> {
+        match self {
+            PickRowThen::AddModule { area, .. } | PickRowThen::ReplaceBlueprint { area, .. } => {
+                Some(area)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// What was copied last: nodes of a scene, or modules of a row's list.
 #[derive(Clone)]
-pub struct Clipboard {
+pub enum Clipboard {
+    Scene(SceneClip),
+    Modules(ModuleClip),
+}
+
+/// Nodes copied out of the scene of the area or blueprint `from`, moved so what they cover starts
+/// at the map's top-left; `origin` is where it started.
+#[derive(Clone)]
+pub struct SceneClip {
+    pub from: String,
+    pub nodes: CopiedNodes,
+    pub count: usize,
+    pub origin: Pos<Tiles>,
+}
+
+/// Modules copied out of the list of the row `from`.
+#[derive(Clone)]
+pub struct ModuleClip {
     pub from: String,
     pub modules: Vec<Value>,
-    pub origin: Option<Pos<Tiles>>,
+}
+
+impl Clipboard {
+    pub fn scene(&self) -> Option<&SceneClip> {
+        match self {
+            Clipboard::Scene(clip) => Some(clip),
+            Clipboard::Modules(_) => None,
+        }
+    }
 }
 
 pub struct NewGameDialog {
@@ -294,14 +344,6 @@ pub struct NewGameDialog {
 pub enum NewGameSource {
     Template(String),
     Copy(PathBuf),
-}
-
-pub struct NewRowDialog {
-    pub table: String,
-    pub key: String,
-    pub value: Value,
-    pub error: Option<String>,
-    pub into: Option<(String, String)>,
 }
 
 pub struct ConfirmDialog {
@@ -326,12 +368,8 @@ pub enum ConfirmAction {
         index: usize,
         module: Value,
     },
-    RemoveLayer {
-        area: String,
-        layer: String,
-    },
     DeleteScriptNodes {
-        owner: ScriptOwner,
+        script: ScriptRow,
         names: Vec<String>,
     },
 }
@@ -340,26 +378,24 @@ impl ConfirmAction {
     pub fn destroys(&self) -> bool {
         match self {
             ConfirmAction::ReplaceModule { .. } => false,
-            ConfirmAction::RemoveLayer { .. } | ConfirmAction::DeleteScriptNodes { .. } => true,
+            ConfirmAction::DeleteScriptNodes { .. } => true,
         }
     }
 }
 
-pub struct RenameDialog {
-    pub target: RenameTarget,
-    pub draft: String,
+pub struct DeleteDialog {
+    /// The files and folders picked to delete.
+    pub paths: Vec<String>,
+    /// Every content file and media file that goes with them.
+    pub gone: Vec<String>,
+    pub groups: Vec<rows::UsageGroup>,
     pub error: Option<String>,
 }
 
-pub enum RenameTarget {
-    Row { table: String, key: String },
-    Layer { area: String, layer: String },
-}
-
-pub struct DeleteDialog {
-    pub table: String,
-    pub keys: Vec<String>,
-    pub groups: Vec<rows::UsageGroup>,
+pub struct FindUnusedDialog {
+    /// What is left out of the deletion; everything else found is in it.
+    pub unticked: BTreeSet<crate::unused::UnusedItem>,
+    pub open: BTreeSet<String>,
     pub error: Option<String>,
 }
 
@@ -386,6 +422,7 @@ impl Editor {
             journal: None,
             dock: DockState::new(Vec::new()),
             panels: DockTabs::default(),
+            content_tree: Default::default(),
             status: StatusBar::default(),
             last_refusal: None,
             history_focus: None,
@@ -394,6 +431,7 @@ impl Editor {
             output: OutputLog::default(),
             dialogs: Vec::new(),
             toast: None,
+            copied: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
             preview: None,
@@ -419,6 +457,12 @@ impl Editor {
         let text = text.into();
         self.say(text.clone());
         self.toast = Some((text, Instant::now()));
+    }
+
+    pub fn copy_text(&mut self, text: impl Into<String>) {
+        let text = text.into();
+        self.toast(format!("Copied {text}"));
+        self.copied = Some(text);
     }
 
     pub fn save_settings(&self) {
@@ -485,10 +529,39 @@ impl Editor {
                             None => edit.remove(change.file),
                         };
                     }
-                    if let Err(refusal) = project.apply(edit, EditViewpoint::default()) {
-                        self.say(format!("The journal did not apply: {}", refusal.sentence()));
-                    } else {
-                        self.say(format!("Recovered {} unsaved rows", recovered.len()));
+                    let changed: Vec<&str> = recovered
+                        .iter()
+                        .filter(|file| file.changed_on_disk(project.disk_hash(&file.path)))
+                        .map(|file| file.path.as_str())
+                        .collect();
+                    let applied = project
+                        .apply(edit, EditViewpoint::default())
+                        .and_then(|()| {
+                            project.settle();
+                            match project.take_refused() {
+                                Some(refused) => Err(Box::new(refused.refusal)),
+                                None => Ok(()),
+                            }
+                        });
+                    match applied {
+                        Err(refusal) => {
+                            let kept = RecoveryJournal::set_aside(&self.user, folder)
+                                .map_or(String::new(), |aside| {
+                                    format!("; it is kept at {}", aside.display())
+                                });
+                            self.toast(format!(
+                                "The journal did not apply: {}{kept}",
+                                refusal.sentence()
+                            ));
+                        }
+                        Ok(()) if !changed.is_empty() => self.toast(format!(
+                            "Recovered {} unsaved rows; {} changed on disk since, and saving \
+                             replaces what is there: {}",
+                            recovered.len(),
+                            changed.len(),
+                            changed.join(", ")
+                        )),
+                        Ok(()) => self.say(format!("Recovered {} unsaved rows", recovered.len())),
                     }
                 }
                 match (&project.report, project.last_load) {
@@ -662,7 +735,7 @@ impl Editor {
                 if let Some(journal) = &mut self.journal {
                     journal.clear();
                 }
-                self.toast(format!("Saved {count} files"));
+                self.toast(format!("Saved {count} file{}", ui::words::plural(count)));
                 true
             }
             Err(error) => {
@@ -718,6 +791,23 @@ impl Editor {
         self.selection = selection;
     }
 
+    /// Shows the media file at `path` in a preview tab, and in the content tree.
+    pub fn open_media(&mut self, path: &str) {
+        self.select(RowSelection::row("asset", path));
+        self.preview_tab(EditorTab::Asset {
+            path: path.to_owned(),
+        });
+        crate::shell::content_tree::reveal(self, path);
+    }
+
+    /// Opens the content file at `path` in its tab.
+    pub fn open_path(&mut self, path: &str) {
+        if let Some(table) = engine::core::content::table_of(path) {
+            let table = table.to_owned();
+            self.open_row(&table, path);
+        }
+    }
+
     pub fn open_row(&mut self, table: &str, key: &str) {
         self.select(RowSelection::row(table, key));
         self.open_tab(EditorTab::for_row(table, key));
@@ -734,12 +824,45 @@ impl Editor {
             .is_some_and(|project| !project.unsaved().is_empty())
     }
 
-    pub fn row(&self, table: &str, key: &str) -> Option<Arc<Value>> {
-        self.project.as_ref()?.files.json(&row_file(table, key))
+    /// The content file at `path` as the game reads it, as the editor holds it now; `None` without
+    /// a project.
+    pub fn read<Row: ContentFile>(&self, path: &str) -> Option<Result<Arc<Row>, Arc<Unreadable>>> {
+        Some(self.project.as_ref()?.read::<Row>(path))
     }
 
-    pub fn row_value(&self, table: &str, key: &str) -> Option<Value> {
-        self.row(table, key).map(|row| (*row).clone())
+    /// What reads the project's files as they stand now; `None` without a project.
+    pub fn reader(&self) -> Option<Arc<FolderReader>> {
+        Some(self.project.as_ref()?.reader())
+    }
+
+    /// Writes `row` as the content file at `path`, as one History step labelled `label`.
+    pub fn write_content<Row: ContentFile>(&mut self, label: &str, path: &str, row: &Row) -> bool {
+        self.write_content_as(ContentEdit::new(label), path, row)
+    }
+
+    /// Writes `row` as the content file at `path` as part of `edit`, merging or amending as it
+    /// says.
+    pub fn write_content_as<Row: ContentFile>(
+        &mut self,
+        mut edit: ContentEdit,
+        path: &str,
+        row: &Row,
+    ) -> bool {
+        let Some(project) = &self.project else {
+            return false;
+        };
+        if let Err(reason) = edit.write_content(project, path, row) {
+            self.toast(format!("{}: {reason}", edit.label));
+            return false;
+        }
+        self.apply(edit)
+    }
+
+    /// The fields of the content file at `path` as raw JSON, as the editor holds them now: for
+    /// the forms that walk a file by its type's schema, which know no field by name. Code that
+    /// names a field reads the file as its type with `read`.
+    pub fn fields_json(&self, path: &str) -> Option<Value> {
+        self.project.as_ref()?.files.json_owned(&fields_file(path))
     }
 
     pub fn thumb(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {
@@ -789,8 +912,7 @@ impl Editor {
                 ..
             } = self;
             let project = project.as_ref()?;
-            let mut cx =
-                FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, key);
+            let mut cx = FormCx::new(project, root, shapes, form, &mut actions).editing(table, key);
             show(&mut cx)
         };
         for action in actions {
@@ -806,6 +928,16 @@ impl Editor {
         if project.poll() {
             self.views.content_changed();
         }
+        self.take_refused();
+    }
+
+    /// Says why the last load took back an edit, when it did.
+    fn take_refused(&mut self) {
+        let Some(refused) = self.project.as_mut().and_then(Project::take_refused) else {
+            return;
+        };
+        self.views.content_changed();
+        self.refused(&refused.label, &refused.refusal);
     }
 
     fn poll_outside(&mut self) {
@@ -828,18 +960,35 @@ impl Editor {
         };
         let outcome = project.outside_changes(changed);
         if !outcome.taken.is_empty() {
-            let loads = project.loads();
-            let text = if loads {
+            let moved = project.moved_outside.clone();
+            let text = if project.loads() {
                 format!(
-                    "{} rows changed on disk and were reloaded",
+                    "{} files changed on disk and were reloaded",
                     outcome.taken.len()
                 )
+            } else if !moved.is_empty() && !project.broken_on_disk() {
+                for step in &moved {
+                    self.output.say(
+                        "editor",
+                        format!(
+                            "{} reference{} name{} {}, which isn't there; a file of that name is at {}",
+                            step.references,
+                            words::plural(step.references),
+                            if step.references == 1 { "s" } else { "" },
+                            step.from,
+                            step.to
+                        ),
+                    );
+                }
+                self.panels.bottom = BottomTab::Output;
+                crate::moves::moved_outside_summary(&moved, &project.files.index())
             } else {
                 format!(
-                    "{} files changed on disk and the folder no longer loads: read-only until it does",
+                    "{} files changed on disk and the folder no longer loads",
                     outcome.taken.len()
                 )
             };
+            let text = crate::views::area::drop_gone(self).unwrap_or(text);
             self.toast(text);
             self.views.content_changed();
         }
@@ -871,11 +1020,7 @@ impl Editor {
             files: unsaved
                 .iter()
                 .map(|path| {
-                    RecoveryJournalFile::of(
-                        path,
-                        project.disk.get(path).map(String::as_str),
-                        project.files.get(path),
-                    )
+                    RecoveryJournalFile::of(path, project.disk_hash(path), project.files.get(path))
                 })
                 .collect(),
         };
@@ -895,9 +1040,21 @@ fn editor_ui(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
         let started = Instant::now();
-        ui::show(&mut editor, &ctx);
+        shell::show(&mut editor, &ctx);
+        if editor.settings.frame_rate {
+            frame_rate::show_meter(
+                &ctx,
+                world.resource::<FrameRates>(),
+                egui::Order::Foreground,
+                egui::Align2::RIGHT_BOTTOM,
+                egui::vec2(
+                    -FRAME_RATE_MARGIN,
+                    -shell::STATUS_HEIGHT - FRAME_RATE_MARGIN,
+                ),
+            );
+        }
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;
-        let tab = ui::active_tab(&editor).map(|tab| tab.title());
+        let tab = shell::active_tab(&editor).map(|tab| tab.title());
         if let Some(log) = &mut editor.frame_log {
             let entities = world.query::<Entity>().iter(world).count();
             let images = world.resource::<Assets<Image>>().len();

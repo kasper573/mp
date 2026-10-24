@@ -1,0 +1,42 @@
+{
+  "runs_on": "skill",
+  "nodes": {
+    "hit": {
+      "type": "damage",
+      "who": {
+        "type": "skill_targets"
+      },
+      "by": {
+        "type": "multiply",
+        "a": {
+          "type": "stat",
+          "stat": "damage"
+        },
+        "b": {
+          "type": "skill_stat",
+          "skill": "items-and-skills/item/shoot.skill.json",
+          "stat": "power"
+        }
+      },
+      "next": "show"
+    },
+    "show": {
+      "type": "vfx",
+      "vfx": "vfx/arrow_hit.vfx.json",
+      "on": {
+        "type": "skill_targets"
+      }
+    },
+    "swing": {
+      "type": "animate",
+      "action": "attack",
+      "wait": "apex",
+      "next": "hit"
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "swing"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Talker",
+  "class": "characters/class/fighter.class.json",
+  "bag": [
+    {
+      "item": "items-and-skills/item/gold.item.json",
+      "count": 12
+    }
+  ],
+  "start": "initial_spawn"
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Shopper",
+  "class": "characters/class/fighter.class.json",
+  "bag": [
+    {
+      "item": "items-and-skills/item/gold.item.json",
+      "count": 40
+    },
+    {
+      "item": "items-and-skills/item/orc_tusk.item.json",
+      "count": 2
+    },
+    {
+      "item": "items-and-skills/item/bone.item.json",
+      "count": 4
+    },
+    {
+      "item": "items-and-skills/item/rusty_sword.item.json"
+    }
+  ],
+  "start": "initial_spawn"
+}

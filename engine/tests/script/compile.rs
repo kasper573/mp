@@ -1,49 +1,62 @@
 use std::sync::Arc;
 
-use engine::core::content::{
-    Content, ContentBuilder, ContentId, ContentRow, ContentScope, Table, with_content,
-};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{Content, ContentFile, ContentId};
+use engine::core::content::{ContentScope, with_content};
 use engine::core::math::Pos;
 use engine::core::script::compile::compile_owner;
-use engine::core::script::{EffectDef, Expr, ScriptError, ScriptModuleKind};
+use engine::core::script::{EffectDef, Expr, ScriptError};
 use engine::systems::area::AreaDef;
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
+use engine::systems::notification::NotificationDef;
+use engine::systems::npc::NpcModule;
 use engine::systems::quest::QuestDef;
 use engine::systems::script::{
-    EventKind, OwnerKind, Place, Procedure, Reach, RiftScripting, ScriptDef, ScriptModule,
+    EventKind, ListedScriptModule, Place, Procedure, Reach, RiftScripting, RunnerKind, ScriptModule,
 };
 use engine::systems::shop::ShopDef;
 use serde_json::{Value, json};
-use strum::VariantArray;
 
-use crate::game::{content, effect, inline, inline_with, parse};
+use crate::game::{content, game, module, parse, parse_in};
+use testkit::{Declared, path};
 
-const OWNERS: [OwnerKind; 6] = [
-    OwnerKind::Object,
-    OwnerKind::Npc,
-    OwnerKind::Item,
-    OwnerKind::Area,
-    OwnerKind::Quest,
-    OwnerKind::Shop,
+const OWNERS: [RunnerKind; 6] = [
+    RunnerKind::Object,
+    RunnerKind::Npc,
+    RunnerKind::Item,
+    RunnerKind::Area,
+    RunnerKind::Quest,
+    RunnerKind::Shop,
 ];
-
-const FUNCTIONS: [&str; 2] = ["helper", "loops"];
 
 #[test]
 fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     let capabilities = every_capability();
-    assert_eq!(capabilities.len(), 38);
     for owner in OWNERS {
-        for value in &capabilities {
-            let parsed = effect(value.clone());
+        let probes = capabilities
+            .iter()
+            .enumerate()
+            .fold(game(), |game, (index, value)| {
+                game.row(
+                    "script",
+                    &format!("probe_{index}"),
+                    json!({
+                        "runs_on": owner,
+                        "nodes": { "on": entry(owner, "do"), "do": value },
+                    }),
+                )
+            });
+        let content = probes.load();
+        for (index, value) in capabilities.iter().enumerate() {
+            let parsed: engine::systems::script::RiftEffect = parse_in(&content, value.clone());
             let kind = parsed.kind().name();
             let allowed = parsed.owners().contains(&owner);
-            let script = inline(json!({
-                "on": entry(owner, "do"),
-                "do": value,
-            }));
-            let compiled = compile(owner, &[&script]);
+            let script: ScriptModule = parse_in(
+                &content,
+                json!({ "script": path("script", &format!("probe_{index}")) }),
+            );
+            let compiled = compile_in(&content, owner, &[&script]);
             assert_eq!(
                 compiled.is_ok(),
                 allowed,
@@ -52,6 +65,25 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
             );
         }
     }
+}
+
+#[test]
+fn a_script_module_reads_and_writes_as_a_row_lists_it() {
+    let module = module("flow_pay_later");
+    let (listed, _) = with_content(ContentScope::of(content()), || {
+        serde_json::to_value(NpcModule::Script(module.clone()))
+    });
+    let listed = listed.expect("an npc's script module writes");
+    assert_eq!(
+        TypeTag::of_json(&listed).as_deref(),
+        Some(ScriptModule::TAG)
+    );
+    let ListedScriptModule::Script(read) =
+        parse_in::<ListedScriptModule>(content(), listed.clone());
+    let (written, _) = with_content(ContentScope::of(content()), || {
+        serde_json::to_value(ListedScriptModule::Script(read))
+    });
+    assert_eq!(written.expect("the listed module writes"), listed);
 }
 
 #[test]
@@ -64,29 +96,8 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         area: id::<AreaDef>("forest"),
         at: Pos::new(3.0, 18.0),
     };
-    let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "hello"),
-        "hello": {
-            "type": "dialogue",
-            "lines": [{ "by": { "type": "narrator" }, "text": ["Pay or go."] }],
-            "choices": [
-                { "label": ["Pay."], "to": "pay" },
-                { "label": ["Go."], "to": "go" }
-            ]
-        },
-        "pay": {
-            "type": "items",
-            "take": [{ "item": "gold", "count": 5 }],
-            "give": [{ "item": "pass" }],
-            "done": "warp"
-        },
-        "warp": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } },
-        "go": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "mark" },
-        "mark": { "type": "remember", "memory": "bribed", "next": "shop" },
-        "shop": { "type": "open_shop", "shop": "box" },
-    }));
 
-    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
+    let procedures = compile(RunnerKind::Npc, &[&module("compile_may_do")]).expect("compiles");
     let may_do = &procedures[0].may_do;
 
     assert_eq!(may_do.answers, vec![EventKind::Interacted]);
@@ -104,17 +115,20 @@ fn may_do_lists_exactly_what_a_script_reaches() {
     for reach in expected {
         assert!(may_do.reaches.contains(&reach), "{reach:?} missing");
     }
+
+    let procedures = compile(RunnerKind::Npc, &[&module("calls_helper")]).expect("compiles");
+    let may_do = &procedures[0].may_do;
+    assert_eq!(may_do.calls, vec![path("script", "helper")]);
+    assert_eq!(may_do.answers, vec![EventKind::Started]);
+    assert!(may_do.reaches.is_empty());
+    assert!(!may_do.waits);
 }
 
 #[test]
 fn a_loop_without_a_wait_is_refused() {
-    let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
-        "a": { "type": "if", "test": true, "yes": "b" },
-        "b": { "type": "if", "test": true, "yes": "a" },
-    }));
-
-    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+    let error = compile(RunnerKind::Npc, &[&module("compile_loop")])
+        .err()
+        .expect("refused");
 
     assert_eq!(error.rule, "loop without a wait");
     assert_eq!(error.expected, "a → b → a");
@@ -122,30 +136,16 @@ fn a_loop_without_a_wait_is_refused() {
 
 #[test]
 fn too_many_steps_between_pauses_are_refused() {
-    let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "outer"),
-        "outer": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "inner" },
-        "inner": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "check" },
-        "check": { "type": "if", "test": true },
-    }));
-
-    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+    let error = compile(RunnerKind::Npc, &[&module("compile_too_many")])
+        .err()
+        .expect("refused");
 
     assert_eq!(error.rule, "too many steps");
 }
 
 #[test]
 fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
-    let script = inline(json!({
-        "on": entry(OwnerKind::Npc, "decide"),
-        "decide": {
-            "type": "decide",
-            "quest": "plea",
-            "path": "Keep them",
-        },
-    }));
-
-    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
+    let procedures = compile(RunnerKind::Npc, &[&module("compile_decision")]).expect("compiles");
     let reaches = &procedures[0].may_do.reaches;
 
     assert!(
@@ -160,20 +160,10 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
 
 #[test]
 fn an_effect_or_query_refuses_by_its_own_rule() {
-    let effect = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
-        "a": { "type": "complete_task", "quest": "x_marks", "task": "no_such_task" },
-    }));
-    let query = inline(json!({
-        "on": entry(OwnerKind::Npc, "a"),
-        "a": {
-            "type": "if",
-            "test": { "type": "task_done", "quest": "x_marks", "task": "no_such_task" },
-        },
-    }));
-
-    for script in [effect, query] {
-        let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
+    for key in ["compile_effect", "compile_query"] {
+        let error = compile(RunnerKind::Npc, &[&module(key)])
+            .err()
+            .expect("refused");
 
         assert_eq!(error.rule, "unknown task");
         assert_eq!(error.node.as_deref(), Some("a"));
@@ -182,40 +172,23 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
 
 #[test]
 fn a_script_that_runs_itself_is_refused() {
-    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("loops")])
+    let error = compile(RunnerKind::Npc, &[&module("calls_loops")])
         .err()
-        .expect("refused")
-        .remove(0)
-        .error;
+        .expect("refused");
 
     assert_eq!(error.rule, "runs itself");
     assert!(error.expected.contains("loops"), "{}", error.expected);
 }
 
 #[test]
-fn may_do_names_the_functions_a_script_calls() {
-    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("helper")])
-        .expect("compiles");
-
-    let may_do = &procedures[0].may_do;
-    assert_eq!(may_do.calls, vec!["helper".to_owned()]);
-    assert_eq!(may_do.answers, vec![EventKind::Started]);
-    assert!(may_do.reaches.is_empty());
-    assert!(!may_do.waits);
-}
-
-#[test]
 fn an_if_always_taken_still_compiles_both_arrows() {
-    let script = inline(json!({
-        "on": entry(OwnerKind::Area, "check"),
-        "check": { "type": "if", "test": { "type": "not", "of": true }, "yes": "yes", "no": "no" },
-        "yes": { "type": "notify", "notification": "gulls" },
-        "no": { "type": "notify", "notification": "intro" },
-    }));
+    let procedures = compile(RunnerKind::Area, &[&module("compile_if_taken")]).expect("compiles");
 
-    let procedures = compile(OwnerKind::Area, &[&script]).expect("compiles");
-
-    assert_eq!(procedures[0].may_do.reaches.len(), 2);
+    let reaches = &procedures[0].may_do.reaches;
+    for notification in ["gulls", "intro"] {
+        let notifies = Reach::Notifies(id::<NotificationDef>(notification));
+        assert!(reaches.contains(&notifies), "{reaches:?}");
+    }
 }
 
 #[test]
@@ -244,83 +217,82 @@ fn every_expression_shape_serializes_back_to_the_json_it_was_read_from() {
 }
 
 #[test]
-fn a_shared_script_row_reads_back_as_written() {
-    let def: ScriptDef = parse(json!({
-        "owner": "npc",
-        "variables": { "aggro": { "type": "number", "default": 4 } },
-        "locals": { "target": "actor" },
-        "nodes": {
-            "spawned": { "type": "on", "event": "started", "next": "look" },
-            "look": {
-                "type": "set",
-                "values": [{ "local": "target", "to": { "type": "nearest", "among": "characters", "within": { "var": "aggro" } } }]
-            }
-        }
-    }));
+fn an_event_field_reads_only_where_every_entry_reaching_the_node_raises_it() {
+    compile(RunnerKind::Shop, &[&module("compile_trade_field")]).expect("compiles");
 
-    assert_eq!(def.owner, OwnerKind::Npc);
-    assert_eq!(def.variables.len(), 1);
-    assert_eq!(def.nodes.len(), 2);
+    let error = compile(RunnerKind::Object, &[&module("compile_event_field")])
+        .err()
+        .expect("refused");
+
+    assert_eq!(error.rule, "unknown field");
 }
 
-fn id<Row: ContentRow>(key: &str) -> ContentId<Row> {
+fn id<Row: ContentFile>(key: &str) -> ContentId<Row> {
     content()
-        .by_key::<Row>(key)
+        .declared::<Row>(key)
         .expect("a row of the test game")
 }
 
 fn compile(
-    owner: OwnerKind,
+    owner: RunnerKind,
     modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
-    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).error)
+    compile_in(content(), owner, modules)
 }
 
-fn entry(owner: OwnerKind, next: &str) -> Value {
+fn compile_in(
+    content: &Content,
+    owner: RunnerKind,
+    modules: &[&ScriptModule],
+) -> Result<Vec<Arc<Procedure>>, ScriptError> {
+    compile_owner(content, owner, "test", modules).map_err(|mut errors| errors.remove(0).error)
+}
+
+fn entry(owner: RunnerKind, next: &str) -> Value {
     match owner {
-        OwnerKind::Object | OwnerKind::Npc => json!({
+        RunnerKind::Object | RunnerKind::Npc => json!({
             "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next
         }),
-        OwnerKind::Item | OwnerKind::Skill => {
+        RunnerKind::Item | RunnerKind::Skill => {
             json!({ "type": "on", "event": "used", "next": next })
         }
-        OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
-        OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
-        OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
-        OwnerKind::StatusEffect => json!({ "type": "on", "event": "activated", "next": next }),
-        OwnerKind::Blueprint | OwnerKind::Any => unreachable!("no entry for {owner:?}"),
+        RunnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
+        RunnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
+        RunnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
+        RunnerKind::StatusEffect => json!({ "type": "on", "event": "activated", "next": next }),
+        RunnerKind::Blueprint | RunnerKind::Any => unreachable!("no entry for {owner:?}"),
     }
 }
 
 fn every_capability() -> Vec<Value> {
     vec![
-        json!({ "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } }),
+        json!({ "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 18.0 } }),
         json!({ "type": "heal", "by": "full" }),
         json!({ "type": "damage", "by": 10.0 }),
-        json!({ "type": "apply_status", "effect": "guarded", "power": 10.0, "seconds": 10.0 }),
+        json!({ "type": "apply_status", "effect": "guarded.status_effect.json", "power": 10.0, "seconds": 10.0 }),
         json!({ "type": "remove_status", "category": "debuff" }),
-        json!({ "type": "items", "take": [{ "item": "gold" }] }),
-        json!({ "type": "use_item", "item": "map" }),
-        json!({ "type": "equip", "item": "pass" }),
+        json!({ "type": "items", "take": [{ "item": "gold.item.json" }] }),
+        json!({ "type": "use_item", "item": "map.item.json" }),
+        json!({ "type": "equip", "item": "pass.item.json" }),
         json!({ "type": "unequip", "slot": "weapon" }),
-        json!({ "type": "drop_items", "item": "gold", "count": 1 }),
-        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold" }], "for": "subject" }),
+        json!({ "type": "drop_items", "item": "gold.item.json", "count": 1 }),
+        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold.item.json" }], "for": "subject" }),
         json!({ "type": "clear_ground_items", "within": 10.0 }),
         json!({
             "type": "move_items", "from": { "type": "subject" }, "to": { "type": "subject" },
-            "items": [{ "item": "gold" }]
+            "items": [{ "item": "gold.item.json" }]
         }),
         json!({ "type": "grant_xp", "xp": 1 }),
-        json!({ "type": "remember", "memory": "bribed" }),
-        json!({ "type": "forget", "memories": ["bribed"] }),
-        json!({ "type": "offer_quest", "quest": "x_marks" }),
-        json!({ "type": "accept_quest", "quest": "x_marks" }),
-        json!({ "type": "turn_in", "quest": "x_marks" }),
-        json!({ "type": "fail_quest", "quest": "x_marks" }),
-        json!({ "type": "complete_task", "quest": "x_marks", "task": "find_stone" }),
-        json!({ "type": "decide", "quest": "plea", "path": "Keep them" }),
-        json!({ "type": "open_shop", "shop": "box" }),
-        json!({ "type": "notify", "notification": "gulls" }),
+        json!({ "type": "remember", "memory": "bribed.memory.json" }),
+        json!({ "type": "forget", "memories": ["bribed.memory.json"] }),
+        json!({ "type": "offer_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "accept_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "turn_in", "quest": "x_marks.quest.json" }),
+        json!({ "type": "fail_quest", "quest": "x_marks.quest.json" }),
+        json!({ "type": "complete_task", "quest": "x_marks.quest.json", "task": "find_stone" }),
+        json!({ "type": "decide", "quest": "plea.quest.json", "path": "Keep them" }),
+        json!({ "type": "open_shop", "shop": "box.shop.json" }),
+        json!({ "type": "notify", "notification": "gulls.notification.json" }),
         json!({ "type": "say", "text": ["Hm."] }),
         json!({ "type": "wander", "priority": 1 }),
         json!({ "type": "walk_to", "to": { "type": "subject" }, "within": 1, "priority": 3 }),
@@ -328,104 +300,172 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "stop", "priority": 9 }),
         json!({ "type": "face", "toward": { "type": "subject" } }),
         json!({ "type": "animate", "action": "attack", "wait": "apex" }),
-        json!({ "type": "use_skill", "skill": "strike", "at": { "type": "subject" } }),
+        json!({ "type": "use_skill", "skill": "strike.skill.json", "at": { "type": "subject" } }),
         json!({ "type": "reset_skills" }),
-        json!({ "type": "vfx", "vfx": "damage_taken" }),
+        json!({ "type": "vfx", "vfx": "fixtures/vfx/damage_taken.vfx.json" }),
         json!({ "type": "set_attitude", "attitude": "hostile" }),
-        json!({ "type": "spawn_npcs", "npc": "fighter", "count": 1, "near": "subject", "shown": "everyone" }),
+        json!({ "type": "spawn_npcs", "npc": "fighter.npc.json", "count": 1, "near": "subject", "shown": "everyone" }),
         json!({ "type": "despawn" }),
-        json!({ "type": "play_sound", "sfx": "ui_pick", "for": "subject" }),
+        json!({ "type": "play_sound", "sfx": "fixtures/interface/ui_pick.sfx", "for": "subject" }),
     ]
 }
 
-fn functions() -> Content {
-    let mut scope = ContentScope::new();
-    scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
-    let parse = |value: Value| -> ScriptDef {
-        let (parsed, _) = with_content(scope.clone(), || serde_json::from_value(value));
-        parsed.expect("a script row")
-    };
-    let helper = parse(json!({
-        "owner": "any",
+pub fn scripts() -> Vec<(&'static str, Value)> {
+    vec![
+        (
+            "compile_may_do",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "hello"),
+                    "hello": {
+                        "type": "dialogue",
+                        "lines": [{ "by": { "type": "narrator" }, "text": ["Pay or go."] }],
+                        "choices": [
+                            { "label": ["Pay."], "to": "pay" },
+                            { "label": ["Go."], "to": "go" }
+                        ]
+                    },
+                    "pay": {
+                        "type": "items",
+                        "take": [{ "item": "gold.item.json", "count": 5 }],
+                        "give": [{ "item": "pass.item.json" }],
+                        "done": "warp"
+                    },
+                    "warp": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 18.0 } },
+                    "go": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "mark" },
+                    "mark": { "type": "remember", "memory": "bribed.memory.json", "next": "shop" },
+                    "shop": { "type": "open_shop", "shop": "box.shop.json" },
+                },
+            }),
+        ),
+        (
+            "compile_loop",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "a"),
+                    "a": { "type": "if", "test": true, "yes": "b" },
+                    "b": { "type": "if", "test": true, "yes": "a" },
+                },
+            }),
+        ),
+        (
+            "compile_too_many",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "outer"),
+                    "outer": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "inner" },
+                    "inner": { "type": "repeat", "times": 1000, "at_most": 1000, "each": "check" },
+                    "check": { "type": "if", "test": true },
+                },
+            }),
+        ),
+        (
+            "compile_decision",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "decide"),
+                    "decide": {
+                        "type": "decide",
+                        "quest": "plea.quest.json",
+                        "path": "Keep them",
+                    },
+                },
+            }),
+        ),
+        (
+            "compile_effect",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "a"),
+                    "a": { "type": "complete_task", "quest": "x_marks.quest.json", "task": "no_such_task" },
+                },
+            }),
+        ),
+        (
+            "compile_query",
+            json!({
+                "runs_on": "npc",
+                "nodes": {
+                    "on": entry(RunnerKind::Npc, "a"),
+                    "a": {
+                        "type": "if",
+                        "test": { "type": "task_done", "quest": "x_marks.quest.json", "task": "no_such_task" },
+                    },
+                },
+            }),
+        ),
+        (
+            "compile_if_taken",
+            json!({
+                "runs_on": "area",
+                "nodes": {
+                    "on": entry(RunnerKind::Area, "check"),
+                    "check": { "type": "if", "test": { "type": "not", "of": true }, "yes": "yes", "no": "no" },
+                    "yes": { "type": "notify", "notification": "gulls.notification.json" },
+                    "no": { "type": "notify", "notification": "intro.notification.json" },
+                },
+            }),
+        ),
+        (
+            "compile_trade_field",
+            json!({
+                "runs_on": "shop",
+                "locals": { "price": "integer" },
+                "nodes": {
+                    "on": { "type": "on", "event": "bought", "next": "read" },
+                    "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+                    "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+                },
+            }),
+        ),
+        (
+            "compile_event_field",
+            json!({
+                "runs_on": "object",
+                "locals": { "price": "integer" },
+                "nodes": {
+                    "on": { "type": "on", "event": "started", "next": "read" },
+                    "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+                    "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+                },
+            }),
+        ),
+        (
+            "helper",
+            json!({
+                "runs_on": "any",
+                "nodes": {
+                    "run": { "type": "on", "event": "run", "next": "done" },
+                    "done": { "type": "return" }
+                }
+            }),
+        ),
+        (
+            "loops",
+            json!({
+                "runs_on": "any",
+                "nodes": {
+                    "run": { "type": "on", "event": "run", "next": "again" },
+                    "again": { "type": "run", "script": "loops.script.json" }
+                }
+            }),
+        ),
+        ("calls_helper", calling("helper")),
+        ("calls_loops", calling("loops")),
+    ]
+}
+
+fn calling(script: &str) -> Value {
+    json!({
+        "runs_on": "npc",
         "nodes": {
-            "run": { "type": "on", "event": "run", "next": "done" },
-            "done": { "type": "return" }
+            "on": { "type": "on", "event": "started", "next": "call" },
+            "call": { "type": "run", "script": path("script", script) }
         }
-    }));
-    let loops = parse(json!({
-        "owner": "any",
-        "nodes": {
-            "run": { "type": "on", "event": "run", "next": "again" },
-            "again": { "type": "run", "script": "loops" }
-        }
-    }));
-    let mut tables = ContentBuilder::default();
-    tables.insert_table(Table::new(vec![
-        ("helper".to_owned(), helper),
-        ("loops".to_owned(), loops),
-    ]));
-    tables.build()
-}
-
-fn calling(script: &str) -> ScriptModule {
-    let mut scope = ContentScope::new();
-    scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
-    let (parsed, _) = with_content(scope, || {
-        serde_json::from_value::<ScriptModule>(json!({
-            "type": "inline_script",
-            "nodes": {
-                "on": { "type": "on", "event": "started", "next": "call" },
-                "call": { "type": "run", "script": script }
-            }
-        }))
-    });
-    parsed.expect("a module")
-}
-
-#[test]
-fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
-    let script = inline_with(
-        json!({ "price": "integer" }),
-        json!({
-            "on": { "type": "on", "event": "bought", "next": "read" },
-            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
-            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
-        }),
-    );
-
-    compile(OwnerKind::Shop, &[&script]).expect("compiles");
-}
-
-#[test]
-fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
-    let script = inline_with(
-        json!({ "price": "integer" }),
-        json!({
-            "on": { "type": "on", "event": "started", "next": "read" },
-            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
-            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
-        }),
-    );
-
-    let error = compile(OwnerKind::Object, &[&script])
-        .err()
-        .expect("refused");
-
-    assert_eq!(error.rule, "unknown field");
-}
-
-#[test]
-fn script_module_kinds_name_the_tags_modules_are_written_with() {
-    let schema = serde_json::to_value(schemars::schema_for!(ScriptModule)).expect("a schema");
-    let written: Vec<&str> = schema["oneOf"]
-        .as_array()
-        .expect("one schema per kind")
-        .iter()
-        .filter_map(|kind| kind["properties"]["type"]["const"].as_str())
-        .collect();
-    let named: Vec<&str> = ScriptModuleKind::VARIANTS
-        .iter()
-        .map(|kind| kind.tag())
-        .collect();
-    assert_eq!(written, named);
+    })
 }

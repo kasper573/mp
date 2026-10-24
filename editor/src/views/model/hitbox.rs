@@ -1,19 +1,21 @@
-use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::render::TILE;
 use engine::core::time::Seconds;
 use engine::systems::GameSettings;
 use engine::systems::actor::ModelDef;
 use engine::systems::actor::render::ACTOR_ANCHOR;
-use serde_json::Value;
 use strum::VariantArray;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use ui::paint;
+use ui::theme;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::stage::{self, Posed, PosedActor, Scene};
-use crate::ui::{theme, widgets};
+use crate::tabs::shown_path;
 
 const ZOOM: f32 = 4.0;
 const INSET: Vec2 = Vec2::new(400.0, 300.0);
@@ -33,6 +35,20 @@ pub enum HitboxHandle {
 }
 
 impl HitboxHandle {
+    /// What a screen reader calls it.
+    fn name(self) -> &'static str {
+        match self {
+            HitboxHandle::N => "top handle",
+            HitboxHandle::S => "bottom handle",
+            HitboxHandle::E => "right handle",
+            HitboxHandle::W => "left handle",
+            HitboxHandle::Ne => "top right handle",
+            HitboxHandle::Nw => "top left handle",
+            HitboxHandle::Se => "bottom right handle",
+            HitboxHandle::Sw => "bottom left handle",
+        }
+    }
+
     fn horizontal(self) -> bool {
         !matches!(self, HitboxHandle::N | HitboxHandle::S)
     }
@@ -55,33 +71,14 @@ impl HitboxHandle {
     }
 }
 
-pub fn scale_of(row: &Value) -> f32 {
-    row["modules"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|module| module["type"] == "scale")
-        .and_then(|module| module["factor"].as_f64())
-        .map_or(1.0, |factor| factor as f32)
-}
-
-pub fn airborne(row: &Value) -> bool {
-    row["modules"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .any(|module| module["type"] == "airborne")
-}
-
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let model = RowSelection::row(ModelDef::TABLE, key);
     if editor.selection != model {
         editor.select(model);
     }
-    let width = row["hitbox"]["width"].as_f64().unwrap_or(1.0) as f32;
-    let height = row["hitbox"]["height"].as_f64().unwrap_or(1.0) as f32;
+    let (width, height) = (row.hitbox.width, row.hitbox.height);
     let frame = strip_of(row, ModelStrip::default())
         .first()
         .map(|frame| frame.frame);
@@ -100,11 +97,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             );
             draw_grid(&painter, rect, feet, tile);
             let shown = Vec2::new(
-                sheet.frame_width as f32 * ZOOM * scale_of(row),
-                sheet.frame_height as f32 * ZOOM * scale_of(row),
+                sheet.frame_width as f32 * ZOOM * row.scale(),
+                sheet.frame_height as f32 * ZOOM * row.scale(),
             );
             let sprite = sprite_rect(feet, shown);
-            widgets::dashed_rect(
+            paint::dashed_rect(
                 &painter,
                 sprite,
                 egui::Stroke::new(1.0, theme::MUTED),
@@ -138,6 +135,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 if near {
                     hovered_handle = Some(handle);
                 }
+                ui.interact(
+                    ERect::from_center_size(at, Vec2::splat(8.0)),
+                    response.id.with(handle.name()),
+                    Sense::hover(),
+                )
+                .widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, handle.name())
+                });
                 painter.rect(
                     ERect::from_center_size(at, Vec2::splat(8.0)),
                     1.0,
@@ -176,13 +181,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 new_height = (new_height / step).round() * step;
                 if (new_width - width).abs() > 1e-3 || (new_height - height).abs() > 1e-3 {
                     let mut changed = row.clone();
-                    changed["hitbox"]["width"] = round(new_width);
-                    changed["hitbox"]["height"] = round(new_height);
-                    super::write_row(
-                        editor,
+                    changed.hitbox.width = round(new_width);
+                    changed.hitbox.height = round(new_height);
+                    editor.write_content_as(
+                        ContentEdit::new(format!("Resize hitbox of {}", shown_path(key))).merging(),
                         key,
                         &changed,
-                        ContentEdit::new(format!("Resize hitbox of {key}")).merging(),
                     );
                 }
             }
@@ -207,18 +211,18 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             inset(editor, ui, key, row);
         });
     });
-    editor.status.left.push(format!("model/{key}"));
+    editor.status.left.push(shown_path(key).to_owned());
     editor.status.left.push(format!(
         "drag the hitbox handles · {} snaps to quarter tiles",
         EditorKey::FineStep.name()
     ));
 }
 
-fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let Some(content) = editor.loaded() else {
         return;
     };
-    let Some(model) = content.by_key::<ModelDef>(key) else {
+    let Some(model) = content.by_path::<ModelDef>(key) else {
         return;
     };
     let center = stage::center(&content);
@@ -250,7 +254,7 @@ fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ) else {
         return;
     };
-    if airborne(row) {
+    if row.airborne() {
         let rect = shown.rect;
         let from = rect.left_bottom() + Vec2::new(20.0, -20.0);
         let to = rect.right_top() + Vec2::new(-20.0, 20.0);
@@ -301,6 +305,6 @@ fn draw_grid(painter: &egui::Painter, rect: ERect, feet: egui::Pos2, tile: f32) 
     }
 }
 
-fn round(value: f32) -> Value {
-    serde_json::json!((value * 100.0).round() / 100.0)
+fn round(value: f32) -> f32 {
+    (value * 100.0).round() / 100.0
 }

@@ -67,13 +67,29 @@ impl Sim {
 
     /// The character of the npc row under `key`.
     pub fn npc(&mut self, key: &str) -> Entity {
+        self.npcs(key)
+            .first()
+            .copied()
+            .unwrap_or_else(|| panic!("no `{key}` in the area"))
+    }
+
+    /// Every character of the npc row under `key`.
+    pub fn npcs(&mut self, key: &str) -> Vec<Entity> {
         let def = self.id::<NpcDef>(key);
         let mut npcs = self.world.query::<(Entity, &Npc)>();
         npcs.iter(&self.world)
-            .find(|(_, npc)| npc.def == def)
+            .filter(|(_, npc)| npc.def == def)
             .map(|(entity, _)| entity)
-            .unwrap_or_else(|| panic!("no `{key}` in the area"))
+            .collect()
     }
+}
+
+pub fn lines(conversation: &Conversation) -> Vec<String> {
+    conversation
+        .lines
+        .iter()
+        .map(|line| line.text.plain_words())
+        .collect()
 }
 
 pub fn labels(conversation: &Conversation) -> Vec<String> {

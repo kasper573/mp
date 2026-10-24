@@ -1,0 +1,22 @@
+{
+  "name": "Arrow",
+  "icon": "assets/icons/weapon_and_tool/arrow.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_blade.sfx",
+    "trade": "sound-and-voice/sfx/trade_blade.sfx",
+    "drop": "sound-and-voice/sfx/block01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Fletched with gull feathers."
+    },
+    {
+      "type": "stack",
+      "max": 50
+    }
+  ]
+}

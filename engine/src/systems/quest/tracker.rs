@@ -1,8 +1,8 @@
 use bevy::prelude::*;
-use design_tokens::face::{self, TextRole};
-use design_tokens::glyph::{self, Mark};
-use design_tokens::{ink, sheet, slip};
-use egui::{Align, Color32, Label, Layout, Pos2, Rect, Ui};
+use ui::egui::{Align, Color32, Label, Layout, Pos2, Rect, Ui};
+use ui::face::{self, TextRole};
+use ui::glyph::{self, Mark};
+use ui::{ink, sheet, slip};
 
 use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};

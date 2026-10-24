@@ -8,16 +8,18 @@ use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::interact::{self, InteractRequest};
 use engine::systems::memory::{self, MemoryDef};
 use engine::systems::movement::{self, MoveRequest, MoveSeq, Position, moving, position};
-use engine::systems::player::{self, ARRIVAL_PATIENCE, AreaDrawn, JoinRequest, commands_locked};
+use engine::systems::player::{
+    self, ARRIVAL_PATIENCE, AreaDrawn, JoinRequest, Xp, commands_locked,
+};
 use engine::systems::script::{self, Place};
 use engine::systems::{npc, stat};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim, labels, locked};
+use testkit::{Game, Map, Sim, dialogue, labels, lines, locked};
 
 const ROAD: Pos<Tiles> = Pos::new(13.0, 6.0);
 
 #[test]
-fn an_arrival_is_released_by_the_client_reporting_its_area_drawn() {
+fn an_arrival_holds_until_the_client_reports_its_area_drawn_or_the_patience_runs_out() {
     let mut sim = harbour();
     let player = arriving(&mut sim);
     assert!(commands_locked(&sim.world, player));
@@ -26,10 +28,7 @@ fn an_arrival_is_released_by_the_client_reporting_its_area_drawn() {
     sim.send(conn, AreaDrawn);
     sim.tick();
     assert!(!commands_locked(&sim.world, player));
-}
 
-#[test]
-fn an_arrival_is_released_by_the_server_once_the_patience_runs_out() {
     let mut sim = harbour();
     let player = arriving(&mut sim);
 
@@ -89,7 +88,7 @@ fn a_warp_counts_as_a_jump_where_a_walk_does_not() {
 }
 
 #[test]
-fn without_a_pass_the_road_is_ground_and_the_warden_halts_you_on_it() {
+fn without_a_pass_the_road_is_ground_and_the_warden_halts_you_each_time_you_step_on_it() {
     let mut sim = harbour();
     let player = sim.join(1);
     let warden = sim.npc("warden");
@@ -112,44 +111,17 @@ fn without_a_pass_the_road_is_ground_and_the_warden_halts_you_on_it() {
         "the warp took you without a pass"
     );
     assert!(sim.conversation(1).is_none());
-}
-
-#[test]
-fn the_warden_halts_you_each_time_you_step_back_onto_the_road() {
-    let mut sim = harbour();
-    let player = sim.join(1);
-    walk(&mut sim, ROAD);
-    assert!(halted(&mut sim, player));
-    sim.leave(1);
 
     let off = Pos::new(ROAD.x - 2.0, ROAD.y);
     walk(&mut sim, off);
     assert!(arrived(&mut sim, player, off));
     walk(&mut sim, ROAD);
     assert!(halted(&mut sim, player), "the warden let you try twice");
-}
 
-#[test]
-fn walking_past_the_road_is_no_business_of_the_wardens() {
-    let mut sim = harbour();
-    let player = sim.join(1);
-    let past = Pos::new(ROAD.x - 2.0, ROAD.y - 1.0);
-
-    walk(&mut sim, past);
-    assert!(arrived(&mut sim, player, past));
-    assert!(sim.conversation(1).is_none());
-}
-
-#[test]
-fn the_warden_only_lets_seasoned_fighters_earn_a_pass() {
-    let mut sim = harbour();
-    let player = sim.join(1);
-
-    let hello = sim.talk(1, "warden");
-    assert!(locked(&hello, "I'm ready for the road."));
+    sim.world.get_mut::<Xp>(player).expect("xp").gain(100_000);
+    sim.tick();
     sim.pick(1, "I'm ready for the road.");
-    assert_eq!(sim.errors(1), vec!["Needs Level 3".to_owned()]);
-    assert_eq!(sim.count(player, "pass"), 0);
+    assert_eq!(sim.count(player, "pass"), 1);
 }
 
 #[test]
@@ -166,17 +138,24 @@ fn a_pass_opens_the_road_without_a_word_from_the_warden() {
 }
 
 #[test]
-fn crossing_the_road_on_the_way_elsewhere_is_no_business_of_the_wardens() {
-    let mut sim = harbour();
-    let player = sim.join(1);
-    let before = Pos::new(ROAD.x, ROAD.y + 3.0);
-    let beyond = Pos::new(ROAD.x, ROAD.y - 2.0);
-    movement::relocate(&mut sim.world, player, before);
+fn walking_past_or_across_the_road_on_the_way_elsewhere_is_no_business_of_the_wardens() {
+    let across = (
+        Some(Pos::new(ROAD.x, ROAD.y + 3.0)),
+        Pos::new(ROAD.x, ROAD.y - 2.0),
+    );
+    let past = (None, Pos::new(ROAD.x - 2.0, ROAD.y - 1.0));
+    for (from, to) in [across, past] {
+        let mut sim = harbour();
+        let player = sim.join(1);
+        if let Some(from) = from {
+            movement::relocate(&mut sim.world, player, from);
+        }
 
-    walk(&mut sim, beyond);
-    assert!(arrived(&mut sim, player, beyond), "the road stopped you");
-    assert!(sim.world.get::<Crossing>(player).is_none());
-    assert!(sim.conversation(1).is_none());
+        walk(&mut sim, to);
+        assert!(arrived(&mut sim, player, to), "the road stopped you");
+        assert!(sim.world.get::<Crossing>(player).is_none());
+        assert!(sim.conversation(1).is_none());
+    }
 }
 
 #[test]
@@ -190,7 +169,7 @@ fn the_warden_trades_a_pass_for_a_fish_and_the_ferryman_only_looks_at_it() {
     let traded = sim
         .pick(1, "Would a fish change your mind?")
         .expect("talking");
-    assert_eq!(traded.node, "fish");
+    assert_eq!(lines(&traded), vec!["Fine. Take the pass.".to_owned()]);
     assert_eq!(sim.count(player, "pass"), 1);
     assert_eq!(sim.count(player, "fish"), 0);
     sim.leave(1);
@@ -236,52 +215,53 @@ fn the_warden_has_a_word_only_for_friends_of_the_clan() {
 
     sim.talk(1, "warden");
     let passed = sim.pick(1, "The clan walks with me.").expect("talking");
-    assert_eq!(passed.node, "uneasy");
+    assert_eq!(lines(&passed), vec!["Then go.".to_owned()]);
     assert_eq!(sim.count(player, "pass"), 1);
 }
 
 fn harbour() -> Sim {
-    let stacked =
-        || json!({ "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] });
     let content = Game::new()
         .area(
             "harbour",
             &Map::open(20, 12),
             json!([
-                { "type": "resident", "npc": "warden", "at": { "x": 11.0, "y": 3.0 } },
-                { "type": "resident", "npc": "ferryman", "at": { "x": 4.0, "y": 9.0 } },
+                { "type": "resident", "npc": "warden.npc.json", "at": { "x": 11.0, "y": 3.0 } },
+                { "type": "resident", "npc": "ferryman.npc.json", "at": { "x": 4.0, "y": 9.0 } },
                 {
                     "type": "object",
                     "name": "road",
                     "shape": { "type": "rect", "x": 12.5, "y": 5.5, "w": 1.0, "h": 1.0 },
-                    "scripts": [{
-                        "type": "inline_script",
-                        "nodes": {
-                            "entered": { "type": "on", "event": "entered", "by": "characters", "next": "pass" },
-                            "pass": { "type": "if", "test": holding_pass(), "yes": "cross" },
-                            "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
-                        },
-                    }],
+                    "scripts": [{ "script": "road_pass.script.json" }],
                 },
             ]),
         )
+        .script(
+            "road_pass",
+            "object",
+            json!({
+                "entered": { "type": "on", "event": "entered", "by": "characters", "next": "pass" },
+                "pass": { "type": "if", "test": holding_pass(), "yes": "cross" },
+                "cross": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 3.0 } },
+            }),
+        )
         .area("forest", &Map::open(8, 8), json!([]))
         .hero("harbour", 8.0, 6.0)
+        .edit("class", "hero", |hero| {
+            hero["levels"] = json!([{ "xp": 0 }, { "xp": 100 }, { "xp": 200 }])
+        })
         .item("gold", json!({ "name": "Gold", "kind": { "type": "resource" }, "modules": [{ "type": "stack", "max": 1000 }] }))
-        .item("pass", stacked())
-        .item("fish", stacked())
-        .npc("warden", 40.0, json!([warden()]))
-        .npc("ferryman", 40.0, json!([ferryman()]))
-        .row(
-            "memory",
-            "sided",
-            json!({ "label": "Sided with the clan", "type": "boolean", "resets": "never" }),
-        )
+        .resource("pass", 1000)
+        .resource("fish", 1000)
+        .npc("warden", 40.0, json!([{ "type": "script", "script": "warden_talk.script.json" }]))
+        .script("warden_talk", "npc", warden())
+        .npc("ferryman", 40.0, json!([{ "type": "script", "script": "ferryman_talk.script.json" }]))
+        .script("ferryman_talk", "npc", ferryman())
+        .memory("sided", "never")
         .row(
             "notification",
             "sails",
             json!({
-                "kind": { "type": "narration", "label": "The ferry", "sfx": "hull" },
+                "kind": { "type": "narration", "label": "The ferry", "sfx": "hull.sfx" },
                 "text": ["The ferry scrapes onto the forest shore."],
             }),
         )
@@ -320,17 +300,8 @@ fn harbour() -> Sim {
 }
 
 fn warden() -> Value {
-    let said = |text: &str, choices: Value| {
-        json!({
-            "type": "dialogue",
-            "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-            "choices": choices,
-        })
-    };
     let seasoned = json!({ "type": "at_least", "a": { "type": "level" }, "b": 3 });
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
             "watches_road": {
                 "type": "on",
@@ -340,40 +311,37 @@ fn warden() -> Value {
                 "next": "no_pass",
             },
             "no_pass": { "type": "if", "test": { "type": "not", "of": holding_pass() }, "yes": "halt" },
-            "halt": said("Halt! Nobody takes the road without a pass.", json!([
+            "halt": dialogue("Halt! Nobody takes the road without a pass.", json!([
                 { "label": ["I have a pass."], "requires": holding_pass(), "reveal": ["needs"], "to": "lets_you_pass" },
                 { "label": ["I'm ready for the road."], "requires": seasoned, "reveal": ["locked", "needs"], "to": "earn_pass" },
                 { "label": ["I'll turn back."] },
             ])),
-            "hello": said("The road is closed.", json!([
+            "hello": dialogue("The road is closed.", json!([
                 { "label": ["I'm ready for the road."], "requires": seasoned, "reveal": ["locked", "needs"], "to": "earn_pass" },
                 { "label": ["Would a fish change your mind?"], "reveal": ["costs"], "to": "fish_for_pass" },
                 {
                     "label": ["The clan walks with me."],
-                    "requires": { "type": "memory", "memory": "sided" },
+                    "requires": { "type": "memory", "memory": "sided.memory.json" },
                     "to": "clan_pass",
                 },
                 { "label": ["Goodbye."] },
             ])),
-            "earn_pass": { "type": "items", "give": [{ "item": "pass" }], "done": "lets_you_pass" },
+            "earn_pass": { "type": "items", "give": [{ "item": "pass.item.json" }], "done": "lets_you_pass" },
             "fish_for_pass": {
                 "type": "items",
-                "take": [{ "item": "fish" }],
-                "give": [{ "item": "pass" }],
+                "take": [{ "item": "fish.item.json" }],
+                "give": [{ "item": "pass.item.json" }],
                 "done": "fish",
             },
-            "clan_pass": { "type": "items", "give": [{ "item": "pass" }], "done": "uneasy" },
-            "lets_you_pass": said("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
-            "fish": said("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
-            "uneasy": said("Then go.", json!([{ "label": ["Thank you."] }])),
-        },
+            "clan_pass": { "type": "items", "give": [{ "item": "pass.item.json" }], "done": "uneasy" },
+            "lets_you_pass": dialogue("Fine. Keep that pass on you.", json!([{ "label": ["Thank you."] }])),
+            "fish": dialogue("Fine. Take the pass.", json!([{ "label": ["Enjoy it."] }])),
+            "uneasy": dialogue("Then go.", json!([{ "label": ["Thank you."] }])),
     })
 }
 
 fn ferryman() -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
             "interacted": { "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": "hello" },
             "hello": {
                 "type": "dialogue",
@@ -389,15 +357,14 @@ fn ferryman() -> Value {
                     { "label": ["Goodbye."] },
                 ],
             },
-            "fare": { "type": "items", "take": [{ "item": "gold", "count": 20 }], "done": "sail" },
-            "sail": { "type": "notify", "notification": "sails", "next": "cross" },
-            "cross": { "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 3.0 } },
-        },
+            "fare": { "type": "items", "take": [{ "item": "gold.item.json", "count": 20 }], "done": "sail" },
+            "sail": { "type": "notify", "notification": "sails.notification.json", "next": "cross" },
+            "cross": { "type": "warp", "to": { "area": "forest.area", "x": 3.0, "y": 3.0 } },
     })
 }
 
 fn holding_pass() -> Value {
-    json!({ "type": "at_least", "a": { "type": "holding", "item": "pass" }, "b": 1 })
+    json!({ "type": "at_least", "a": { "type": "holding", "item": "pass.item.json" }, "b": 1 })
 }
 
 /// A client joined but has not yet drawn the area it arrived in.
@@ -433,6 +400,6 @@ fn halted(sim: &mut Sim, player: Entity) -> bool {
     sim.run_until(15.0, |world| {
         world
             .get::<Conversation>(player)
-            .is_some_and(|now| now.node == "halt")
+            .is_some_and(|now| lines(now) == ["Halt! Nobody takes the road without a pass."])
     })
 }

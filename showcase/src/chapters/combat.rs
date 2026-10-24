@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
 use driver::{
-    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding,
+    Player, UiTarget, WaitBudget, area_name, area_named, carried, clickable_point, holding,
     input_name, nearest_npc, npc_is, resident_home, surrounded_by,
 };
 use engine::core::math::{Offset, Pos};
@@ -65,13 +65,13 @@ fn play(shoot: &mut Shoot) {
     ));
     me.act(InputAction::ToggleInventory);
     me.find_ui("Inventory");
-    me.find_ui(UiTarget::image(GREATER_POTION));
+    me.find_ui(UiTarget::item(GREATER_POTION));
     let potions = holding(&me.snapshot(), "greater_health_potion");
     me.caption(&format!(
         "{} a potion to drink it",
         input_name(InputAction::UseItem)
     ));
-    me.act_on_ui(InputAction::UseItem, UiTarget::image(GREATER_POTION));
+    me.act_on_ui(InputAction::UseItem, UiTarget::item(GREATER_POTION));
     me.wait_until("the potion drunk", |snapshot| {
         holding(snapshot, "greater_health_potion") < potions
     });
@@ -95,7 +95,7 @@ fn play(shoot: &mut Shoot) {
     me.hold();
 }
 
-const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
+const GREATER_POTION: &str = "greater_health_potion";
 
 // They fight whoever comes near, so a few at once close in, given a while to wander into sight.
 const PACK: &str = "glow_moth";
@@ -223,7 +223,7 @@ fn nearest_prey(snapshot: &ProbeSnapshot) -> Option<&ProbeBody> {
 }
 
 fn safe(snapshot: &ProbeSnapshot, at: Pos<Tiles>) -> bool {
-    area_key(snapshot).is_some_and(|area| area_named(area).safe(at))
+    area_name(snapshot).is_some_and(|area| area_named(area).safe(at))
 }
 
 fn safe_here(snapshot: &ProbeSnapshot) -> bool {
@@ -233,7 +233,7 @@ fn safe_here(snapshot: &ProbeSnapshot) -> bool {
 // The ground in town nearest the player, a couple of tiles in from every edge.
 fn in_town(snapshot: &ProbeSnapshot) -> Pos<Tiles> {
     let me = snapshot.me.as_ref().expect("the player").at;
-    let area = area_named(area_key(snapshot).expect("an area"));
+    let area = area_named(area_name(snapshot).expect("an area"));
     let grid = &area.grid;
     let deep = |at: Pos<Tiles>| {
         [(-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)]

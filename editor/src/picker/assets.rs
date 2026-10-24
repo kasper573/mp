@@ -1,13 +1,11 @@
-use design_tokens::glyph::{self, Mark};
-use egui::Ui;
 use engine::core::assets::AssetKind;
-use engine::core::content::{ASSETS_DIR, asset_file, asset_of};
 
-use super::{Candidate, Category, Dragged, Pick, PickSource};
+use super::{Candidate, Category, Dragged, Pick, PickLayout, PickSource};
 use crate::forms::FormCx;
-use crate::ui::theme;
+use crate::icons::{self, KindIcon};
+use crate::moves::file_name;
 
-/// Files under the assets folder of one kind.
+/// Media files of one kind, wherever they sit outside a bundle.
 pub struct AssetSource {
     kind: AssetKind,
 }
@@ -32,20 +30,21 @@ impl PickSource for AssetSource {
     }
 
     fn candidates(&self, cx: &FormCx) -> Vec<Candidate> {
-        cx.files
-            .paths_under(&format!("{ASSETS_DIR}/"))
-            .map(|file| asset_of(file))
+        let index = cx.files.index();
+        index
+            .media
+            .iter()
             .filter(|path| AssetKind::of(path) == Some(self.kind))
-            .map(|path| Candidate {
-                pick: Pick::new(self.spoken(), path),
-                category: self.spoken().to_owned(),
-                name: String::new(),
-                hint: path
-                    .rsplit_once('/')
-                    .map(|(folder, _)| folder)
-                    .unwrap_or("")
-                    .to_owned(),
-                blocked: None,
+            .map(|path| {
+                let (nearness, hint) = cx.seen_from_here(path);
+                Candidate {
+                    pick: Pick::new(self.spoken(), path),
+                    category: self.spoken().to_owned(),
+                    name: String::new(),
+                    hint,
+                    blocked: None,
+                    nearness,
+                }
             })
             .collect()
     }
@@ -53,7 +52,7 @@ impl PickSource for AssetSource {
     fn accepts(&self, _cx: &FormCx, dragged: &Dragged) -> Result<Pick, String> {
         let Dragged::Asset(path) = dragged else {
             return Err(format!(
-                "this field takes {} files, not rows",
+                "this field takes {} files, not content files",
                 self.spoken()
             ));
         };
@@ -67,35 +66,29 @@ impl PickSource for AssetSource {
     }
 
     fn shown(&self, pick: &Pick) -> (String, String) {
-        (format!("{ASSETS_DIR}/"), pick.key.clone())
-    }
-
-    fn thumbnail(&self, ui: &mut Ui, cx: &mut FormCx, pick: &Pick, size: f32) {
-        match AssetKind::of(&pick.key) {
-            Some(AssetKind::Image) => {
-                let ctx = ui.ctx().clone();
-                if let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &pick.key) {
-                    let [w, h] = thumb.size;
-                    let scale = (size / h.max(1) as f32)
-                        .min(size / w.max(1) as f32)
-                        .min(1.0);
-                    ui.add(egui::Image::from_texture((
-                        thumb.texture.id(),
-                        egui::vec2(w as f32 * scale, h as f32 * scale),
-                    )));
-                }
-            }
-            Some(AssetKind::Audio) => {
-                glyph::show(ui, Mark::Note, 13.0, theme::MUTED);
-            }
-            Some(AssetKind::Font) => {
-                ui.label(theme::muted("A"));
-            }
-            None => {}
+        match pick.key.rsplit_once('/') {
+            Some((folder, file)) => (format!("{folder}/"), file.to_owned()),
+            None => (String::new(), pick.key.clone()),
         }
     }
 
-    fn footer(&self, _cx: &FormCx, pick: &Pick) -> String {
-        asset_file(&pick.key)
+    fn short(&self, pick: &Pick) -> String {
+        file_name(&pick.key).to_owned()
+    }
+
+    fn icon(&self, pick: &Pick) -> KindIcon {
+        icons::of_media(&pick.key)
+    }
+
+    fn describe(&self, cx: &FormCx, pick: &Pick) -> String {
+        let uses = cx.usages.of_media(&pick.key).len();
+        format!("used by {uses}")
+    }
+
+    fn layout(&self) -> PickLayout {
+        match self.kind {
+            AssetKind::Image => PickLayout::Grid,
+            _ => PickLayout::List,
+        }
     }
 }

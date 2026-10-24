@@ -11,6 +11,7 @@ use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::player::{ClientId, PlayedBy, Players};
 use crate::systems::text::LineText;
 use crate::systems::visibility;
+use ui::words;
 
 pub const KEPT: usize = 500;
 const MERGE_WITHIN: Seconds = Seconds(10.0);
@@ -135,7 +136,7 @@ impl HistoryEntry {
 impl RecordTally {
     pub fn line(self, text: &str) -> String {
         match self {
-            RecordTally::Change(change) => format!("{} {text}", signed(change)),
+            RecordTally::Change(change) => format!("{} {text}", words::signed(f64::from(change))),
             RecordTally::Progress { have, need } => format!("{text} {have}/{need}"),
         }
     }
@@ -237,13 +238,5 @@ pub fn backfill(
             .map(|history| history.records().cloned().collect())
             .unwrap_or_default();
         visibility::send_to(world, conn, HistoryNews::Backfill { subject, records });
-    }
-}
-
-pub fn signed(change: i32) -> String {
-    if change > 0 {
-        format!("+{change}")
-    } else {
-        format!("\u{2212}{}", change.unsigned_abs())
     }
 }

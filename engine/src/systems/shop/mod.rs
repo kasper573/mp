@@ -8,7 +8,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
+    Content, ContentFile, ContentId, ContentProblem, Loading, ModuleRule, ModuleSet, NamedContent,
+    Nearby, serial,
 };
 use crate::core::script::{Answer, Arrow, Compiler, EffectDef, EffectStep, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -18,8 +19,8 @@ use crate::systems::item::{
 };
 use crate::systems::player::sender_player;
 use crate::systems::script::{
-    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, OwnerKind, Reach, RiftEvent,
-    RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition, effect as effects,
+    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner, Reach, RiftEvent, RiftInstances,
+    RiftScripting, RunnerKind, ScriptModule, ScriptedRow, condition, effect as effects,
 };
 use crate::systems::{dialogue, drain_requests, notification};
 
@@ -41,8 +42,22 @@ pub struct ShopDef {
     pub modules: Vec<ShopModule>,
 }
 
-impl ContentRow for ShopDef {
+impl NamedContent for ShopDef {
+    fn shown_name(&self) -> &str {
+        &self.title
+    }
+}
+
+impl ContentFile for ShopDef {
     const TABLE: &'static str = "shop";
+
+    fn fresh(near: &Nearby) -> Result<ShopDef, String> {
+        Ok(ShopDef {
+            title: near.name(),
+            mark: near.file()?,
+            modules: Vec::new(),
+        })
+    }
 }
 
 impl ModuleSet for ShopDef {
@@ -50,6 +65,10 @@ impl ModuleSet for ShopDef {
 
     fn modules(&self) -> &[ShopModule] {
         &self.modules
+    }
+
+    fn modules_mut(&mut self) -> &mut Vec<ShopModule> {
+        &mut self.modules
     }
 
     fn rule(module: &ShopModule) -> ModuleRule {
@@ -63,7 +82,7 @@ impl ModuleSet for ShopDef {
 }
 
 impl ScriptedRow for ShopDef {
-    const OWNER: OwnerKind = OwnerKind::Shop;
+    const OWNER: RunnerKind = RunnerKind::Shop;
 
     fn script(module: &ShopModule) -> Option<&ScriptModule> {
         match module {
@@ -79,7 +98,6 @@ pub enum ShopModule {
     Sells(ShopOffer),
     Buys(ShopBuys),
     Reactions(ShopReactions),
-    #[serde(untagged)]
     Script(ScriptModule),
 }
 
@@ -191,6 +209,7 @@ pub struct ShopReactions {
 #[schemars(extend("x-system" = "shop"))]
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub shop: ShopId,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -201,9 +220,7 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("closed", &self.closed)]
-    }
+    crate::outputs!("closed" => closed);
     fn pauses(&self) -> bool {
         true
     }
@@ -432,8 +449,8 @@ pub fn check_all(loading: &mut Loading) {
                             "shop loses money",
                             format!(
                                 "{}: {} buys {} for {}, sold for {}",
-                                offer.item.key(&content),
-                                buyer.key(&content),
+                                offer.item.path(&content),
+                                buyer.path(&content),
                                 offer.count,
                                 stacks_text(&content, pays, offer.count),
                                 stacks_text(&content, &offer.price, 1)
@@ -454,7 +471,7 @@ fn stacks_text(content: &Content, stacks: &[ItemStack], times: u32) -> String {
             format!(
                 "{} {}",
                 stack.count.saturating_mul(times),
-                stack.item.key(content)
+                stack.item.path(content)
             )
         })
         .collect();
@@ -516,7 +533,7 @@ pub(crate) fn marks(
 
 fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Shop, shop.raw()),
+        Owner::Row(RunnerKind::Shop, shop.raw()),
         kind,
         Some(player),
         vec![

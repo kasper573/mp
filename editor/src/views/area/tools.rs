@@ -1,25 +1,26 @@
-use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::ContentRow;
 use engine::core::math::{Offset, Rect};
 use engine::core::tiling::{Cell, TilePos, Tiles};
-use engine::systems::area::{AreaDef, AreaModuleKind};
+use engine::systems::area::{AreaModule, AreaModuleKind};
 use strum::VariantArray;
+use ui::egui;
+use ui::egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
+use ui::paint;
+use ui::theme;
+use ui::words;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
-use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
+use super::modules::{context_menu_at, open_add_menu, show_add_menu};
 use super::select::{
     copy_selection, delete_selection, duplicate_selection, move_selection, paste_anchor,
-    paste_in_place, select_input, selected_indices, snapped_delta, start_paste,
+    paste_in_place, select_input, selected_nodes, snapped_delta, start_paste,
 };
 use super::{
-    AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, placement, scenery, shapes,
-    stamp,
+    AreaDrag, AreaFrame, AreaTool, Armed, MAX_ZOOM, MIN_ZOOM, blueprint, grid, nodes, placement,
+    shapes, stamp,
 };
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor};
 use crate::keymap::EditorKey;
-use crate::project::RowSelection;
-use crate::ui::{theme, widgets};
-use crate::value::RowValue;
+use crate::tabs::file_title;
 use crate::views::navigation::{self, Viewport};
 
 pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
@@ -39,7 +40,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                 egui::StrokeKind::Inside,
             );
         } else if response.hovered() {
-            painter.rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+            paint::row_wash(painter, rect);
         }
         tool_icon(
             painter,
@@ -63,8 +64,20 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         }
         ui.add_space(2.0);
     }
-    if let Some(bottom) = switched.and_then(AreaTool::bottom_tab) {
+    if let Some(tool) = switched {
+        took(editor, view_key, tool);
+    }
+}
+
+/// What taking a tool brings along: its bottom tab, and for a brush, a layer to paint into.
+fn took(editor: &mut Editor, view_key: &str, tool: AreaTool) {
+    if let Some(bottom) = tool.bottom_tab() {
         editor.panels.bottom = bottom;
+    }
+    let walking = editor.views.area.view(view_key).armed == Armed::Walk;
+    let walk_brush = matches!(tool, AreaTool::Paint | AreaTool::Fill | AreaTool::Erase);
+    if tool.paints() && !(walking && walk_brush) {
+        super::arm_a_layer(editor, view_key);
     }
 }
 
@@ -159,15 +172,22 @@ pub fn input(
         );
         return;
     }
-    let tool = editor.views.area.view(view_key).tool;
-    let walk_overlay = editor.views.area.view(view_key).walk_overlay;
+    let view = editor.views.area.view(view_key);
+    let tool = view.tool;
+    let walking = view.armed == Armed::Walk;
+    let walk_locked = walking && view.walk_locked;
+    let walk_value = view.walk_value;
     if response.secondary_clicked() {
         context_menu_at(editor, view_key, frame);
     }
     match tool {
         AreaTool::Select => select_input(editor, ui, view_key, frame, modifiers),
-        AreaTool::Paint if walk_overlay => {
-            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk)
+        _ if walk_locked && tool.paints() => {}
+        AreaTool::Paint if walking => {
+            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk(walk_value))
+        }
+        AreaTool::Erase if walking => {
+            grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk(None))
         }
         AreaTool::Paint => grid_stroke(editor, view_key, frame, BrushStrokeKind::Paint),
         AreaTool::Erase => grid_stroke(editor, view_key, frame, BrushStrokeKind::Erase),
@@ -197,8 +217,15 @@ pub fn input(
             if response.clicked()
                 && let Some(tile) = frame.pointer_tile
             {
-                editor.views.area.view_mut(view_key).cursor_cell = Some(tile.cell());
-                open_add_menu(ui, editor, view_key, frame, tile);
+                let view = editor.views.area.view_mut(view_key);
+                view.cursor_cell = Some(tile.cell());
+                match view.placing.take() {
+                    Some(kind) => {
+                        view.set_tool(AreaTool::Select);
+                        super::modules::add_module(editor, view_key, frame, kind, tile);
+                    }
+                    None => open_add_menu(ui, editor, view_key, frame, tile),
+                }
             }
         }
     }
@@ -225,8 +252,8 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             if let Some(tile) = frame.pointer_tile {
                 let alt = painter.ctx().input(|i| EditorKey::Unsnapped.held(i));
                 let (dx, dy) = snapped_delta(*from, tile, alt);
-                for index in selected_indices(editor, &frame.area_key) {
-                    if let Some(bounds) = frame.module_bounds(index) {
+                for node in selected_nodes(editor, frame) {
+                    if let Some(bounds) = frame.module_bounds(&node) {
                         let moved = bounds.translate(Offset::new(dx, dy));
                         painter.rect_stroke(
                             canvas.rect(moved),
@@ -256,24 +283,22 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     {
         let at = paste_anchor(tile);
         let mut whole: Option<Rect<Tiles>> = None;
-        for module in &ghost.modules {
-            let mut placed = module.clone();
+        let ghosts = nodes::modules(&ghost.nodes);
+        for module in &ghosts {
+            let mut placed = module.module().clone();
             shapes::shift(&mut placed, at.x, at.y);
             if let Some(bounds) = shapes::bounds(&placed, None) {
-                let color = super::overlays::module_color(module.module_kind());
+                let kind = placed.kind();
+                let color = super::overlays::module_color(Some(kind));
                 let rect = canvas.rect(bounds);
-                widgets::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+                paint::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
                 if matches!(
-                    module.module_kind(),
-                    Some(
-                        AreaModuleKind::Population
-                            | AreaModuleKind::Resident
-                            | AreaModuleKind::Object
-                    )
+                    kind,
+                    AreaModuleKind::Population | AreaModuleKind::Resident | AreaModuleKind::Object
                 ) {
                     frame.labels.chip(
                         rect.min + Vec2::new(0.0, -4.0),
-                        shapes::label(module),
+                        shapes::label(&placed, frame.reader.as_ref()),
                         color,
                     );
                 }
@@ -282,7 +307,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         }
         if let Some(whole) = whole {
             let rect = canvas.rect(whole);
-            widgets::dashed_rect(
+            paint::dashed_rect(
                 painter,
                 rect,
                 EStroke::new(1.0, Color32::from_rgba_unmultiplied(255, 120, 160, 160)),
@@ -290,24 +315,20 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                 6.0,
             );
         }
-        let from = editor
-            .clipboard
-            .as_ref()
-            .map(|clip| format!(" from area/{}", clip.from))
-            .unwrap_or_default();
         frame.labels.chip(
             canvas.to_screen(tile) + Vec2::new(16.0, 8.0),
             format!(
-                "{} module{}{from}",
-                ghost.modules.len(),
-                crate::ui::widgets::plural(ghost.modules.len())
+                "{} module{} from {}",
+                ghosts.len(),
+                words::plural(ghosts.len()),
+                file_title(&ghost.clip.from)
             ),
             Color32::WHITE,
         );
         editor
             .status
             .left
-            .push(format!("pasting into area/{}", frame.area_key));
+            .push(format!("pasting into area/{}", frame.bundle));
         editor.status.left.push(format!(
             "click or {} places · {} cancels",
             EditorKey::Confirm.name(),
@@ -322,22 +343,40 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     let Some(cell) = frame.pointer_cell() else {
         return;
     };
+    let walking = view.armed == Armed::Walk;
+    let covered = match &view.armed {
+        Armed::Layer { name, .. } if view.tool.paints() => frame.covering(cell, name),
+        _ => None,
+    };
+    if let Some(placement) = &covered {
+        under_placement_tip(frame, placement, &view.armed);
+    }
     match view.tool {
         AreaTool::Paint | AreaTool::Erase => {
             let cells = grid::brush_cells(cell, brush.size);
             if let Some(rect) = grid::rect_of_cells(&cells) {
-                let color = if view.tool == AreaTool::Erase || view.walk_overlay {
+                let color = if view.tool == AreaTool::Erase || walking {
                     Color32::from_rgb(255, 120, 120)
                 } else {
                     accent
                 };
-                painter.rect_stroke(
-                    canvas.rect(rect),
-                    0.0,
-                    EStroke::new(1.5, color),
-                    egui::StrokeKind::Inside,
-                );
-                if view.tool == AreaTool::Paint && !view.walk_overlay {
+                if covered.is_some() {
+                    paint::dashed_rect(
+                        painter,
+                        canvas.rect(rect),
+                        EStroke::new(1.5, color),
+                        5.0,
+                        3.0,
+                    );
+                } else {
+                    painter.rect_stroke(
+                        canvas.rect(rect),
+                        0.0,
+                        EStroke::new(1.5, color),
+                        egui::StrokeKind::Inside,
+                    );
+                }
+                if view.tool == AreaTool::Paint && !walking {
                     paint_preview(editor, painter, view_key, frame, &cells);
                 }
             }
@@ -353,6 +392,17 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                     egui::StrokeKind::Inside,
                 );
             }
+        }
+        AreaTool::Module if view.placing.is_some() => {
+            let kind = view.placing.expect("a kind being placed");
+            let color = super::overlays::module_color(Some(kind));
+            let rect = canvas.rect(super::modules::template_bounds(kind, cell));
+            paint::dashed_rect(painter, rect, EStroke::new(1.5, color), 6.0, 4.0);
+            frame.labels.chip(
+                rect.min + Vec2::new(0.0, -4.0),
+                format!("new {}", kind.tag().replace('_', " ")),
+                color,
+            );
         }
         AreaTool::Fill | AreaTool::Eyedropper | AreaTool::Module => {
             painter.rect_stroke(
@@ -400,14 +450,11 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         for &tool in AreaTool::VARIANTS {
             if pressed(tool.key()) {
                 view.set_tool(tool);
-                switched = tool.bottom_tab();
+                switched = Some(tool);
             }
         }
         if pressed(EditorKey::WalkOverlay) {
             view.walk_overlay = !view.walk_overlay;
-        }
-        if pressed(EditorKey::Layers) {
-            view.layers_open = Some(!view.layers_shown());
         }
         if view.tool == AreaTool::Terrain
             && let Some(index) = EditorKey::Pick.digit(&input)
@@ -415,8 +462,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             view.terrain.terrain = index;
         }
     }
-    if let Some(bottom) = switched {
-        editor.panels.bottom = bottom;
+    if let Some(tool) = switched {
+        took(editor, view_key, tool);
     }
     let view_tool = editor.views.area.view(view_key).tool;
     let flip_across = pressed(EditorKey::FlipHorizontal);
@@ -434,17 +481,16 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             }
             AreaTool::Stamp => stamp::flip_stamp(editor, view_key, horizontal),
             _ => {
-                let indices = selected_indices(editor, &frame.area_key);
-                if !indices.is_empty() {
-                    change_modules(editor, &frame.area_key, |modules| {
-                        for &index in &indices {
-                            shapes::flip_field(modules.get_mut(index)?, horizontal);
+                let flipped = selected_nodes(editor, frame);
+                if !flipped.is_empty() {
+                    nodes::change_scene(editor, &frame.bundle, |scene| {
+                        for node in &flipped {
+                            shapes::flip_field(
+                                &mut nodes::module_node_mut(scene, node)?.module,
+                                horizontal,
+                            );
                         }
-                        Some(format!(
-                            "Flip {} modules in {}",
-                            indices.len(),
-                            frame.area_key
-                        ))
+                        Some(format!("Flip {} modules", flipped.len()))
                     });
                 }
             }
@@ -452,17 +498,20 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     }
     if pressed(EditorKey::Cancel) {
         let view = editor.views.area.view_mut(view_key);
-        if !view.cancel_gesture() && view.paste.take().is_none() {
+        if !view.cancel_gesture() && view.paste.take().is_none() && view.show_only.take().is_none()
+        {
             view.in_place.pop();
             editor.selection.parts.clear();
         }
         return;
     }
-    if pressed(EditorKey::Confirm) {
-        let indices = selected_indices(editor, &frame.area_key);
-        if indices.len() == 1 && frame.modules[indices[0]].is_module(AreaModuleKind::Blueprint) {
-            placement::edit_in_place(editor, view_key, frame, indices[0]);
-        }
+    if pressed(EditorKey::Confirm)
+        && let [node] = selected_nodes(editor, frame).as_slice()
+        && frame
+            .module(node)
+            .is_some_and(|module| matches!(module, AreaModule::Blueprint(_)))
+    {
+        placement::edit_in_place(editor, view_key, frame, node);
     }
     if pressed(EditorKey::Delete) {
         delete_selection(editor, frame);
@@ -479,9 +528,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     });
     if copied || pressed(EditorKey::Copy) {
         copy_selection(editor, frame);
-        if let Some(clip) = &editor.clipboard {
-            ui.ctx()
-                .copy_text(serde_json::to_string_pretty(&clip.modules).unwrap_or_default());
+        if let Some(clip) = editor.clipboard.as_ref().and_then(Clipboard::scene) {
+            ui.ctx().copy_text(clip.nodes.text());
         }
     }
     if pressed(EditorKey::PasteInPlace) {
@@ -492,8 +540,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     if pressed(EditorKey::Duplicate) {
         duplicate_selection(editor, frame);
     }
-    if pressed(EditorKey::JoinScenery) {
-        scenery::join_scenery(editor, frame);
+    if pressed(EditorKey::SelectAll) {
+        super::select::select_all(editor, frame);
     }
     if pressed(EditorKey::MakeBlueprint) {
         blueprint::make_blueprint_from_selection(editor, frame);
@@ -504,7 +552,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         } else {
             1.0
         };
-        if !editor.selection.parts.is_empty() && editor.selection.table == AreaDef::TABLE {
+        if !editor.selection.parts.is_empty() {
             move_selection(editor, frame, x as f32 * step, y as f32 * step);
         } else {
             let view = editor.views.area.view_mut(view_key);
@@ -517,11 +565,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     {
         let tile = cursor.center();
         if let Some(hit) = frame.hit(tile) {
-            editor.selection = RowSelection {
-                table: AreaDef::TABLE.to_owned(),
-                keys: vec![frame.area_key.clone()],
-                parts: vec![super::module_part(hit)],
-            };
+            nodes::select(editor, &frame.bundle, vec![hit]);
         }
     }
     if pressed(EditorKey::ContextMenu) {
@@ -533,4 +577,29 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
         super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }
+}
+
+/// Says that the cell under the brush shows what a placement paints, so a stroke on the bundle's
+/// own cells there won't show.
+fn under_placement_tip(frame: &AreaFrame, placement: &str, armed: &Armed) {
+    let Armed::Layer { name, .. } = armed else {
+        return;
+    };
+    let label = frame
+        .module(placement)
+        .map(|module| shapes::label(module, frame.reader.as_ref()))
+        .unwrap_or_default();
+    if let Some(bounds) = frame.module_bounds(placement) {
+        paint::dashed_rect(
+            &frame.response.ctx.layer_painter(frame.response.layer_id),
+            frame.canvas.rect(bounds),
+            EStroke::new(1.0, theme::DROP),
+            4.0,
+            3.0,
+        );
+    }
+    frame.response.clone().on_hover_text_at_pointer(format!(
+        "This cell shows {label}'s {name}: the stroke paints the {name} beneath it. \
+         Double-click {label} in the scene to edit it in place instead."
+    ));
 }

@@ -13,13 +13,15 @@ use engine::systems::interact::{self, InteractRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::script::{
-    self, EventKind, Owner, OwnerKind, Procedure, RiftEffect, RiftInstances, ScriptModule,
+    self, EventKind, Owner, Procedure, RiftInstances, RunnerKind, ScriptModule,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::{actor, skill};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
+
+use crate::{compile, flow};
 
 /// The rows every script under test names, loaded once a process.
 pub fn content() -> &'static Content {
@@ -29,7 +31,11 @@ pub fn content() -> &'static Content {
 
 /// Reads a value as the loader would, with every row key resolved against the test game.
 pub fn parse<T: DeserializeOwned>(value: Value) -> T {
-    let (result, scope) = with_content(ContentScope::of(content()), || {
+    parse_in(content(), value)
+}
+
+pub fn parse_in<T: DeserializeOwned>(content: &Content, value: Value) -> T {
+    let (result, scope) = with_content(ContentScope::of(content), || {
         serde_json::from_value::<T>(value.clone())
     });
     let problems: Vec<_> = scope.leaves().iter().filter_map(Leaf::reported).collect();
@@ -37,16 +43,9 @@ pub fn parse<T: DeserializeOwned>(value: Value) -> T {
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 
-pub fn inline(nodes: Value) -> ScriptModule {
-    parse(json!({ "type": "inline_script", "nodes": nodes }))
-}
-
-pub fn inline_with(locals: Value, nodes: Value) -> ScriptModule {
-    parse(json!({ "type": "inline_script", "locals": locals, "nodes": nodes }))
-}
-
-pub fn effect(value: Value) -> RiftEffect {
-    parse(value)
+/// The module that runs the test game's script declared as `name`.
+pub fn module(name: &str) -> ScriptModule {
+    parse(json!({ "script": path("script", name) }))
 }
 
 /// A fighter alone in the middle of a field, where the test game's characters can be set loose.
@@ -96,7 +95,7 @@ pub fn spawn(sim: &mut Sim, key: &str, near: Entity, offset: Offset<Tiles>, pack
 /// A plain fighter beside `beside`, running only `modules`.
 pub fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[&ScriptModule]) -> (Entity, Owner) {
     let npc = spawn(sim, "fighter", beside, Offset::new(1.0, 0.0), u32::MAX);
-    let owner = Owner::Entity(OwnerKind::Npc, npc);
+    let owner = Owner::Entity(RunnerKind::Npc, npc);
     let procedures = compiled("test/npc", modules);
     let mut instances = sim.world.resource_mut::<RiftInstances>();
     instances.remove_owner(owner);
@@ -107,20 +106,20 @@ pub fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[&ScriptModule]) ->
 }
 
 pub fn compiled(name: &str, modules: &[&ScriptModule]) -> Vec<Arc<Procedure>> {
-    compile_owner(content(), OwnerKind::Npc, name, modules).expect("compiles")
+    compile_owner(content(), RunnerKind::Npc, name, modules).expect("compiles")
 }
 
 pub fn health(sim: &Sim, who: Entity) -> f32 {
     stat::effective(&sim.world, who, StatKind::Health)
 }
 
-fn game() -> Game {
-    let fighter = |script: &str| json!([{ "type": "shared_script", "script": script, "values": { "aggro": 4.0 } }]);
-    Game::new()
+pub fn game() -> Game {
+    let fighter = |script: &str| json!([{ "type": "script", "script": path("script", script), "values": { "aggro": 4.0 } }]);
+    let game = Game::new()
         .area(
             "field",
             &Map::open(32, 32),
-            json!([{ "type": "resident", "npc": "stroller", "at": { "x": 26.0, "y": 4.0 } }]),
+            json!([{ "type": "resident", "npc": "stroller.npc.json", "at": { "x": 26.0, "y": 4.0 } }]),
         )
         .area("forest", &Map::open(8, 20), json!([]))
         .hero("field", 8.0, 8.0)
@@ -130,21 +129,24 @@ fn game() -> Game {
         .npc("hunter", 30.0, fighter("hunts"))
         .npc("guard", 30.0, fighter("defends"))
         .npc("chief", 30.0, fighter("protects"))
-        .npc("bat", 30.0, json!([{ "type": "shared_script", "script": "flees" }]))
-        .npc("stroller", 30.0, json!([{ "type": "shared_script", "script": "strolls" }]))
+        .npc("bat", 30.0, json!([{ "type": "script", "script": "flees.script.json" }]))
+        .npc("stroller", 30.0, json!([{ "type": "script", "script": "strolls.script.json" }]))
+        .npc("brawler", 30.0, fighter("brawls"))
         .edit("npc", "fighter", striking)
         .edit("npc", "hunter", striking)
         .edit("npc", "guard", striking)
         .edit("npc", "chief", striking)
         .edit("npc", "bat", striking)
+        .edit("npc", "brawler", striking)
         .row("script", "hunts", fights_nearest("characters"))
         .row("script", "defends", fights_nearest("attackers"))
         .row("script", "protects", fights_nearest("pack_attackers"))
+        .row("script", "brawls", fights_nearest("npcs"))
         .row(
             "script",
             "flees",
             json!({
-                "owner": "npc",
+                "runs_on": "npc",
                 "nodes": {
                     "spawned": { "type": "on", "event": "started", "next": "hostile" },
                     "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "roam" },
@@ -157,7 +159,7 @@ fn game() -> Game {
             "script",
             "strolls",
             json!({
-                "owner": "npc",
+                "runs_on": "npc",
                 "nodes": {
                     "spawned": { "type": "on", "event": "started", "next": "roam" },
                     "roam": { "type": "wander", "leash": 3, "priority": 1, "next": "rest" },
@@ -171,18 +173,20 @@ fn game() -> Game {
             "map",
             json!({
                 "kind": { "type": "usable" },
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "look" },
-                        "look": { "type": "notify", "notification": "gulls" },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "map_read.script.json" }],
             }),
         )
-        .row("memory", "bribed", remembered("Bribed"))
-        .row("memory", "sided", remembered("Sided"))
-        .row("memory", "looted", remembered("Looted"))
+        .script(
+            "map_read",
+            "item",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "look" },
+                "look": { "type": "notify", "notification": "gulls.notification.json" },
+            }),
+        )
+        .memory("bribed", "never")
+        .memory("sided", "never")
+        .memory("looted", "never")
         .row(
             "status_effect",
             "guarded",
@@ -233,11 +237,11 @@ fn game() -> Game {
             "box",
             json!({
                 "title": "Honesty box",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [{
                     "type": "sells",
-                    "item": "pass",
-                    "price": [{ "item": "gold", "count": 3 }],
+                    "item": "pass.item.json",
+                    "price": [{ "item": "gold.item.json", "count": 3 }],
                     "stock": { "type": "unlimited" },
                 }],
             }),
@@ -254,13 +258,17 @@ fn game() -> Game {
         .shader("damage_pop")
         .vfx("healed")
         .shader("heal_pop")
-        .vfx("defeated")
+        .vfx("defeated");
+    [flow::scripts(), compile::scripts()]
+        .into_iter()
+        .flatten()
+        .fold(game, |game, (key, row)| game.row("script", key, row))
 }
 
 /// A temperament that fights the nearest of `among` within its aggro, and roams while none is.
 fn fights_nearest(among: &str) -> Value {
     json!({
-        "owner": "npc",
+        "runs_on": "npc",
         "variables": { "aggro": { "type": "number" } },
         "locals": { "target": "actor" },
         "nodes": {
@@ -293,13 +301,9 @@ fn fights_nearest(among: &str) -> Value {
 }
 
 fn striking(npc: &mut Value) {
-    npc["basic_attack"] = json!("strike");
-}
-
-fn remembered(label: &str) -> Value {
-    json!({ "label": label, "type": "boolean", "resets": "never" })
+    npc["basic_attack"] = json!("strike.skill.json");
 }
 
 fn narration(text: &str) -> Value {
-    json!({ "kind": { "type": "narration", "label": "Shore", "sfx": "waves" }, "text": [text] })
+    json!({ "kind": { "type": "narration", "label": "Shore", "sfx": "waves.sfx" }, "text": [text] })
 }

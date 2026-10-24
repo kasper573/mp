@@ -1,0 +1,12 @@
+{
+  "name": "The fire shrine",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 18,
+        "height": 15
+      },
+      "tile": 16
+    }
+  }
+}

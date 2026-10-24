@@ -1,6 +1,6 @@
-use egui::os::OperatingSystem;
-use egui::{InputState, Key, KeyboardShortcut, ModifierNames, Modifiers};
 use strum::VariantArray;
+use ui::egui::os::OperatingSystem;
+use ui::egui::{InputState, Key, KeyboardShortcut, ModifierNames, Modifiers};
 
 /// Every input the editor answers to. Handlers ask a key whether it was pressed or is held, and
 /// every hint, menu and the key sheet names it, so a key is bound in one place only.
@@ -13,11 +13,14 @@ pub enum EditorKey {
     CloseTab,
     Quit,
     KeySheet,
+    FrameRate,
     PlayFromStart,
     PlayHere,
     StopPlay,
     PlayedCharacter,
     Rename,
+    NewAgain,
+    CopyPath,
     Usages,
     Duplicate,
     Delete,
@@ -37,6 +40,8 @@ pub enum EditorKey {
     Pan,
     Zoom,
     ContextMenu,
+    FirstLine,
+    LastLine,
     SelectTool,
     PaintTool,
     TerrainTool,
@@ -50,13 +55,23 @@ pub enum EditorKey {
     FlipHorizontal,
     FlipVertical,
     WalkOverlay,
-    Layers,
     SelectAtCursor,
     PasteInPlace,
-    JoinScenery,
     MakeBlueprint,
     Listen,
     Topmost,
+    FilterScene,
+    OpenBlueprint,
+    Group,
+    Ungroup,
+    NewFolder,
+    Reorder,
+    Cut,
+    Hide,
+    Lock,
+    ShowOnly,
+    ShowEverything,
+    UnlockEverything,
     Shrink,
     Grow,
     Pin,
@@ -86,6 +101,7 @@ pub enum EditorKey {
 pub enum KeyScope {
     Everywhere,
     Area,
+    SceneGraph,
     WorldMap,
     Model,
     Script,
@@ -97,6 +113,7 @@ impl KeyScope {
         match self {
             KeyScope::Everywhere => "Everywhere",
             KeyScope::Area => "Area view",
+            KeyScope::SceneGraph => "Scene graph",
             KeyScope::WorldMap => "World map",
             KeyScope::Model => "Model",
             KeyScope::Script => "Script",
@@ -215,15 +232,18 @@ impl EditorKey {
     pub fn scope(self) -> KeyScope {
         use EditorKey::*;
         match self {
-            Search | Save | Undo | Redo | CloseTab | Quit | KeySheet | PlayFromStart | PlayHere
-            | StopPlay | PlayedCharacter | Rename | Usages | Duplicate | Delete | Confirm
-            | NewLine | OpenInNewTab | Cancel | Move | Pick | Copy | Paste | SelectAll
-            | ToggleSelection | ExtendSelection | FineStep | Unsnapped | Pan | Zoom
-            | ContextMenu => KeyScope::Everywhere,
+            Search | Save | Undo | Redo | CloseTab | Quit | KeySheet | FrameRate
+            | PlayFromStart | PlayHere | StopPlay | PlayedCharacter | Rename | NewAgain
+            | CopyPath | Usages | Duplicate | Delete | Confirm | NewLine | OpenInNewTab
+            | Cancel | Move | Pick | Copy | Paste | SelectAll | ToggleSelection
+            | ExtendSelection | FineStep | Unsnapped | Pan | Zoom | ContextMenu | FirstLine
+            | LastLine => KeyScope::Everywhere,
             SelectTool | PaintTool | TerrainTool | FillTool | EraseTool | EyedropperTool
             | StampTool | ModuleTool | BrushSmaller | BrushBigger | FlipHorizontal
-            | FlipVertical | WalkOverlay | Layers | SelectAtCursor | PasteInPlace | JoinScenery
-            | MakeBlueprint | Listen | Topmost => KeyScope::Area,
+            | FlipVertical | WalkOverlay | SelectAtCursor | PasteInPlace | MakeBlueprint
+            | Listen | Topmost => KeyScope::Area,
+            FilterScene | OpenBlueprint | Group | Ungroup | NewFolder | Reorder | Cut | Hide
+            | Lock | ShowOnly | ShowEverything | UnlockEverything => KeyScope::SceneGraph,
             Shrink | Grow | Pin | Route => KeyScope::WorldMap,
             PlayPause | PreviousFrame | NextFrame | Mute | ApexCue | SoundCue | StepCue
             | InsertFrame | FrameShorter | FrameLonger | FrameEarlier | FrameLater => {
@@ -244,11 +264,14 @@ impl EditorKey {
             CloseTab => "close the tab",
             Quit => "quit",
             KeySheet => "this sheet",
+            FrameRate => "show or hide the frame rate",
             PlayFromStart => "play from its own start",
             PlayHere => "play here",
             StopPlay => "stop playing",
             PlayedCharacter => "open the test character being played",
-            Rename => "rename the selected row's key or node",
+            Rename => "rename the selected file, folder or node",
+            NewAgain => "make the type made last again, in the content tree's folder",
+            CopyPath => "copy the selected file's path",
             Usages => "show usages",
             Duplicate => "duplicate the selection",
             Delete => "delete the selection, after showing usages",
@@ -268,6 +291,8 @@ impl EditorKey {
             Pan => "held while dragging: pan",
             Zoom => "held while scrolling: zoom a tileset sheet",
             ContextMenu => "the menu at the cursor",
+            FirstLine => "the first line of a list",
+            LastLine => "the last line of a list",
             SelectTool => "select",
             PaintTool => "paint",
             TerrainTool => "terrain",
@@ -281,13 +306,23 @@ impl EditorKey {
             FlipHorizontal => "flip across",
             FlipVertical => "flip upside down",
             WalkOverlay => "walk overlay",
-            Layers => "layers",
             SelectAtCursor => "select what is under the keyboard cursor",
             PasteInPlace => "paste at the same tiles",
-            JoinScenery => "join tiles into one scenery",
             MakeBlueprint => "make a blueprint of the selection",
             Listen => "held while clicking: listen at a spot",
             Topmost => "held with the eyedropper: the topmost layer",
+            FilterScene => "filter the scene",
+            OpenBlueprint => "open a placement's blueprint",
+            Group => "group into a new folder",
+            Ungroup => "ungroup",
+            NewFolder => "new folder here",
+            Reorder => "move up or down among its siblings",
+            Cut => "cut, to paste into the selected folder",
+            Hide => "hide or show",
+            Lock => "lock or unlock",
+            ShowOnly => "held clicking an eye: show only this; again to restore",
+            ShowEverything => "show everything",
+            UnlockEverything => "unlock everything",
             Shrink => "selected cards 10% smaller",
             Grow => "selected cards 10% bigger",
             Pin => "pin · unpin",
@@ -329,21 +364,24 @@ impl EditorKey {
             CloseTab => press(command, Key::W),
             Quit => press(command, Key::Q),
             KeySheet => press(plain, Key::F1),
+            FrameRate => press(plain, Key::F3),
             PlayFromStart => press(plain, Key::F5),
             PlayHere => press(plain, Key::F6),
             StopPlay => press(Modifiers::SHIFT, Key::F5),
             PlayedCharacter => press(command, Key::T),
             Rename => press(plain, Key::F2),
+            NewAgain => press(command, Key::N),
+            CopyPath => press(command | Modifiers::SHIFT, Key::C),
             Usages => press(Modifiers::SHIFT, Key::F12),
             Duplicate | FillDown => press(command, Key::D),
             Delete => Binding::Press(vec![
                 KeyboardShortcut::new(plain, Key::Delete),
                 KeyboardShortcut::new(plain, Key::Backspace),
             ]),
-            Confirm => press(plain, Key::Enter),
+            Confirm => Binding::Press(vec![ui::keys::CONFIRM]),
             NewLine => press(Modifiers::SHIFT, Key::Enter),
-            OpenInNewTab | AddChoice => press(command, Key::Enter),
-            Cancel => press(plain, Key::Escape),
+            OpenInNewTab | AddChoice | OpenBlueprint => press(command, Key::Enter),
+            Cancel => Binding::Press(vec![ui::keys::CANCEL]),
             Move => Binding::Arrows(plain),
             Pick => Binding::Digits,
             Copy => press(command, Key::C),
@@ -354,6 +392,8 @@ impl EditorKey {
             Unsnapped | Listen | Topmost | Route => Binding::Hold(Modifiers::ALT),
             Pan => Binding::HoldKey(Key::Space),
             ContextMenu => press(Modifiers::SHIFT, Key::F10),
+            FirstLine => press(plain, Key::Home),
+            LastLine => press(plain, Key::End),
             SelectTool => press(plain, Key::V),
             PaintTool => press(plain, Key::B),
             TerrainTool => press(plain, Key::T),
@@ -367,10 +407,19 @@ impl EditorKey {
             FlipHorizontal => press(plain, Key::X),
             FlipVertical => press(plain, Key::Y),
             WalkOverlay => press(plain, Key::W),
-            Layers => press(plain, Key::L),
+            FilterScene => press(command, Key::F),
+            Group => press(command, Key::G),
+            Ungroup => press(command | Modifiers::SHIFT, Key::G),
+            NewFolder => press(command | Modifiers::SHIFT, Key::N),
+            Reorder => Binding::Arrows(command),
+            Cut => press(command, Key::X),
+            Hide => press(command | Modifiers::SHIFT, Key::H),
+            Lock => press(command | Modifiers::SHIFT, Key::L),
+            ShowOnly => Binding::Hold(Modifiers::ALT),
+            ShowEverything => press(Modifiers::ALT | Modifiers::SHIFT, Key::H),
+            UnlockEverything => press(Modifiers::ALT | Modifiers::SHIFT, Key::L),
             SelectAtCursor | PlayPause => press(plain, Key::Space),
             PasteInPlace => press(command | Modifiers::SHIFT, Key::V),
-            JoinScenery => press(command, Key::G),
             MakeBlueprint => press(command | Modifiers::ALT, Key::B),
             Shrink => press(plain, Key::Minus),
             Grow => Binding::Press(vec![

@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use ui::egui;
 
 use bevy::prelude::*;
-use design_tokens::ink;
-use design_tokens::motion::{Clock, SheetPose};
-use design_tokens::sheet::{self, Depth, Sheet};
-use egui::{Color32, Id, LayerId, Order, Pos2, Rect, Sense, Stroke, Ui, UiBuilder, Vec2};
+use ui::egui::{Color32, Id, LayerId, Order, Pos2, Rect, Sense, Ui, Vec2};
+use ui::motion::{Clock, SheetPose};
+use ui::panel;
+use ui::sheet::{self, Depth, Sheet};
 
 use super::WindowsDrawn;
 use crate::core::gui::{self, Band, Tier};
@@ -126,12 +127,12 @@ pub(crate) fn window<R>(
                 });
             }
             if let Some(cross) = parts.cross
-                && close_button(ui, id, cross).clicked()
+                && panel::close_button(ui, id, cross).clicked()
             {
                 *open = false;
             }
-            let grip = parts.curl.map(|curl| corner_grip(ui, id, curl));
-            let inner = body(ui, parts.body, |ui| add(ui, world));
+            let grip = parts.curl.map(|curl| panel::corner_grip(ui, id, curl));
+            let inner = panel::body(ui, parts.body, |ui| add(ui, world));
             (handle, grip, inner)
         });
     let (handle, grip, inner) = shown.inner;
@@ -354,87 +355,6 @@ fn snapped(world: &World, rect: Rect, grip: Grip) -> Rect {
         ),
     }
 }
-
-fn close_button(ui: &mut Ui, id: Id, rect: Rect) -> egui::Response {
-    let response = ui.interact(rect, id.with("close"), Sense::click());
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), "Close")
-    });
-    sheet::cross(ui.painter(), rect, response.hovered());
-    response
-}
-
-fn body<R>(ui: &mut Ui, rect: Rect, add: impl FnOnce(&mut Ui) -> R) -> R {
-    ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
-        ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-        ui.set_min_size(rect.size());
-        add(ui)
-    })
-    .inner
-}
-
-/// Which corner a resize grip sits in: the bottom right unless there is no room to pull there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GripCorner {
-    BottomRight,
-    TopRight,
-}
-
-fn corner_grip(ui: &mut Ui, id: Id, curl: Rect) -> egui::Response {
-    let response = ui
-        .interact(curl, id.with("grip"), Sense::drag())
-        .on_hover_cursor(egui::CursorIcon::ResizeNwSe);
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::ResizeHandle, ui.is_enabled(), "Resize")
-    });
-    response
-}
-
-pub(crate) fn slip_grip(ui: &mut Ui, id: Id, slip: Rect, at: GripCorner) -> egui::Response {
-    let size = GRIP;
-    let (corner, cursor) = match at {
-        GripCorner::BottomRight => (
-            Rect::from_min_max(slip.max - Vec2::splat(size), slip.max),
-            egui::CursorIcon::ResizeNwSe,
-        ),
-        GripCorner::TopRight => (
-            Rect::from_min_max(
-                Pos2::new(slip.max.x - size, slip.min.y),
-                Pos2::new(slip.max.x, slip.min.y + size),
-            ),
-            egui::CursorIcon::ResizeNeSw,
-        ),
-    };
-    let response = ui
-        .interact(corner, id.with("grip"), Sense::drag())
-        .on_hover_cursor(cursor);
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::ResizeHandle, ui.is_enabled(), "Resize")
-    });
-    let color = if response.hovered() || response.dragged() {
-        ink::INK
-    } else {
-        ink::INK3
-    };
-    let (tip, down) = match at {
-        GripCorner::BottomRight => (corner.max - Vec2::splat(3.0), -1.0),
-        GripCorner::TopRight => (corner.right_top() + Vec2::new(-3.0, 3.0), 1.0),
-    };
-    let mut reach = 3.0;
-    while reach <= size - 3.0 {
-        ui.painter().line_segment(
-            [
-                tip - Vec2::new(reach, 0.0),
-                tip + Vec2::new(0.0, down * reach),
-            ],
-            Stroke::new(1.0, color),
-        );
-        reach += 4.0;
-    }
-    response
-}
-
-const GRIP: f32 = 14.0;
 
 fn drawn_size(gui: &egui::Context, id: Id) -> Vec2 {
     gui.memory(|memory| memory.area_rect(id))

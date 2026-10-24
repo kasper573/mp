@@ -1,21 +1,27 @@
-use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::audio::playback::SfxDef;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
 use engine::systems::actor::ModelDef;
-use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES};
-use serde_json::Value;
+use engine::systems::actor::model::{MAX_FRAME_MS, MAX_STRIP_FRAMES, SheetFrame};
 use strum::VariantArray;
+use ui::chip;
+use ui::controls;
+use ui::dialog;
+use ui::drag;
+use ui::egui;
+use ui::egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::Mark;
+use ui::paint;
+use ui::panel;
+use ui::theme;
 
 use super::{
-    FrameCueKind, ModelPage, ModelStrip, StripFrame, action_timing, play_rule, starts_at, strip_of,
-    total_ms,
+    FrameCueKind, ModelPage, ModelStrip, action_timing, play_rule, starts_at, strip_of, total_ms,
 };
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{patterns, theme, widgets};
 use crate::{import, stage};
 
 const CARD_H: f32 = 128.0;
@@ -50,21 +56,20 @@ pub enum StripConfirm {
     Cues,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DraggedFrame(pub u32);
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let strip = editor.views.model.view(key).strip;
     let frames = strip_of(row, strip);
     header(editor, ui, key, row, strip);
     keys(editor, ui, key, &frames, &sheet);
-    let frames = strip_of(
-        &editor
-            .row_value(ModelDef::TABLE, key)
-            .unwrap_or(row.clone()),
-        strip,
-    );
+    let frames = match editor.read::<ModelDef>(key) {
+        Some(Ok(model)) => strip_of(&model, strip),
+        _ => frames,
+    };
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
         let view = editor.views.model.view_mut(key);
@@ -122,10 +127,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .clicked()
                     && let Some(lengths) = recorded
                 {
-                    let reverted: Vec<StripFrame> = frames
+                    let reverted: Vec<SheetFrame> = frames
                         .iter()
                         .zip(lengths)
-                        .map(|(frame, ms)| StripFrame {
+                        .map(|(frame, ms)| SheetFrame {
                             ms,
                             ..frame.clone()
                         })
@@ -175,7 +180,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .push("stored as ms per frame".to_owned());
 }
 
-pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: ModelStrip) {
+pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef, strip: ModelStrip) {
     let timing = action_timing(row, strip.action);
     let mut pick = None;
     ui.horizontal(|ui| {
@@ -194,7 +199,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
             } else {
                 direction.as_ref().to_owned()
             };
-            let response = widgets::mode_chip(ui, &text, on);
+            let response = chip::mode(ui, &text, on);
             if marked {
                 response
                     .clone()
@@ -207,7 +212,7 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let page = editor.views.model.view(key).page;
             if page == ModelPage::Cues {
-                if widgets::primary(ui, "▶ Play with sound").clicked() {
+                if controls::marked_primary(ui, Mark::Play, "Play with sound").clicked() {
                     let view = editor.views.model.view_mut(key);
                     view.preview.muted = false;
                     super::preview::restart(&mut view.preview);
@@ -256,7 +261,7 @@ pub fn timeline(
     ui: &mut Ui,
     key: &str,
     sheet: &super::ModelSheet,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     was: Option<u32>,
 ) -> TimelineLayout {
@@ -282,6 +287,20 @@ pub fn timeline(
         Vec2::new(width + LANE_LABEL, CARD_H + 24.0),
     );
     let (_, response) = ui.allocate_exact_size(rect.size(), Sense::click_and_drag());
+    for (index, frame_rect) in rects.iter().enumerate() {
+        ui.interact(
+            *frame_rect,
+            response.id.with(("frame", index)),
+            Sense::hover(),
+        )
+        .widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::Button,
+                true,
+                format!("frame {}", index + 1),
+            )
+        });
+    }
     let painter = ui.painter_at(rect.expand2(Vec2::new(0.0, 40.0)));
     let selected = editor.views.model.view(key).frames.clone();
     for (index, frame_rect) in rects.iter().enumerate() {
@@ -340,16 +359,23 @@ pub fn timeline(
             3.0,
         ));
         let label = format!("was {was} ms");
-        let galley = painter.layout_no_wrap(label, egui::FontId::monospace(11.0), theme::TEXT);
-        let chip_size = galley.size() + Vec2::new(10.0, 4.0);
-        let chip_x = if x + 4.0 + chip_size.x > rect.max.x {
-            x - 4.0 - chip_size.x
+        let room = rect.max.x - x - 4.0;
+        let fits =
+            room > paint::text_size(ui.ctx(), &label, egui::FontId::proportional(11.0)).x + 10.0;
+        let (at, anchor) = if fits {
+            (egui::pos2(x + 4.0, top - 22.0), egui::Align2::LEFT_TOP)
         } else {
-            x + 4.0
+            (egui::pos2(x - 4.0, top - 22.0), egui::Align2::RIGHT_TOP)
         };
-        let chip = ERect::from_min_size(egui::pos2(chip_x, top - 22.0), chip_size);
-        painter.rect_filled(chip, 3.0, theme::RAISED);
-        painter.galley(chip.min + Vec2::new(5.0, 2.0), galley, theme::TEXT);
+        chip::floating(
+            &painter,
+            at,
+            anchor,
+            &label,
+            theme::RAISED,
+            theme::TEXT,
+            11.0,
+        );
     }
     let layout = TimelineLayout {
         rect,
@@ -374,7 +400,7 @@ fn interact(
     key: &str,
     response: &egui::Response,
     layout: &TimelineLayout,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
 ) {
     let (extend, toggle) = ui.input(|i| {
@@ -457,7 +483,7 @@ fn interact(
         view.preview.playing = false;
         view.preview.position = super::starts_at(frames, index) as f32;
     }
-    if let Some(payload) = response.dnd_release_payload::<DraggedFrame>()
+    if let Some(payload) = drag::dropped::<DraggedFrame>(response)
         && let Some(pos) = response.interact_pointer_pos()
     {
         let at = layout
@@ -494,7 +520,7 @@ fn interact(
 pub fn insert_frame(
     editor: &mut Editor,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     at: usize,
     sheet_frame: u32,
@@ -507,16 +533,7 @@ pub fn insert_frame(
     let ms = frames
         .get(at.saturating_sub(1))
         .map_or(100, |frame| frame.ms);
-    added.insert(
-        at.min(frames.len()),
-        StripFrame {
-            frame: sheet_frame,
-            ms,
-            apex: false,
-            step: false,
-            sound: None,
-        },
-    );
+    added.insert(at.min(frames.len()), super::plain_frame(sheet_frame, ms));
     if super::write_strip(
         editor,
         key,
@@ -537,19 +554,26 @@ pub fn lanes(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     layout: &TimelineLayout,
     strip: ModelStrip,
     with_waves: bool,
 ) {
     let has_steps = frames.iter().any(|frame| frame.step);
     let page = editor.views.model.view(key).page;
-    let kinds: Vec<FrameCueKind> = if page == ModelPage::Cues || has_steps {
-        vec![FrameCueKind::Apex, FrameCueKind::Sound, FrameCueKind::Step]
-    } else {
-        vec![FrameCueKind::Apex, FrameCueKind::Sound]
-    };
+    let has_apex = strip.action.takes_apex() || frames.iter().any(|frame| frame.apex);
+    let kinds: Vec<FrameCueKind> = [
+        (FrameCueKind::Apex, has_apex),
+        (FrameCueKind::Sound, true),
+        (FrameCueKind::Step, page == ModelPage::Cues || has_steps),
+    ]
+    .into_iter()
+    .filter_map(|(kind, shown)| shown.then_some(kind))
+    .collect();
     let selected_cue = editor.views.model.view(key).cue;
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     let lane_w = layout.width;
     let mut set = None;
     let mut select = None;
@@ -577,13 +601,7 @@ pub fn lanes(
             ui.id().with(("lane", key, kind.key())),
             Sense::click(),
         );
-        painter.rect(
-            lane,
-            3.0,
-            theme::INPUT,
-            egui::Stroke::new(1.0, theme::BORDER),
-            egui::StrokeKind::Inside,
-        );
+        panel::paint_well(&painter, lane);
         painter.line_segment(
             [
                 egui::pos2(strip_end, lane.min.y),
@@ -609,10 +627,10 @@ pub fn lanes(
                     );
                 }
                 FrameCueKind::Sound => {
-                    if let Some(sound) = &frame.sound {
+                    if let Some(sound) = frame.sound.and_then(|sound| reader.path_of(sound)) {
                         any = true;
                         if with_waves {
-                            let wave = super::sounds::wave_of_sfx(editor, sound);
+                            let wave = super::sounds::wave_of_sfx(editor, ui.ctx(), sound);
                             if let Some(wave) = wave {
                                 let w = wave.ms as f32 * layout.px_per_ms;
                                 let wave_rect = ERect::from_min_size(
@@ -628,7 +646,7 @@ pub fn lanes(
                             }
                         }
                         let galley = painter.layout_no_wrap(
-                            sound.to_string(),
+                            crate::tabs::shown_path(sound).to_owned(),
                             egui::FontId::monospace(11.0),
                             theme::TEXT,
                         );
@@ -679,7 +697,7 @@ pub fn lanes(
             && let Some(index) = layout.frame_at(pos.x)
         {
             let frame = &frames[index];
-            if frame.has(kind) {
+            if super::has_cue(frame, kind) {
                 select = Some((index, kind));
             } else {
                 set = Some((index, kind));
@@ -705,11 +723,15 @@ pub fn lanes(
 pub fn set_cue(
     editor: &mut Editor,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     strip: ModelStrip,
     index: usize,
     kind: FrameCueKind,
 ) {
+    if kind == FrameCueKind::Apex && !strip.action.takes_apex() {
+        editor.toast(format!("{} lands no hit to put an apex on", strip.name()));
+        return;
+    }
     let mut cued = frames.to_vec();
     let label = match kind {
         FrameCueKind::Apex => {
@@ -731,7 +753,17 @@ pub fn set_cue(
                 editor.toast("No sound rows to pick from");
                 return;
             };
-            cued[index].sound = Some(sound.clone());
+            let Some(id) = editor
+                .reader()
+                .and_then(|reader| reader.id_of::<SfxDef>(&sound))
+            else {
+                editor.toast(format!(
+                    "{} is no sound any more",
+                    crate::tabs::shown_path(&sound)
+                ));
+                return;
+            };
+            cued[index].sound = Some(id);
             format!(
                 "Sound {sound} on frame {} of {} of {key}",
                 index + 1,
@@ -753,7 +785,7 @@ pub fn set_cue(
     };
     if super::write_strip(editor, key, strip, &cued, ContentEdit::new(label)) {
         let view = editor.views.model.view_mut(key);
-        let present = cued[index].has(kind);
+        let present = super::has_cue(&cued[index], kind);
         view.cue = present.then_some((index, kind));
         view.frames = vec![index];
         if present {
@@ -793,11 +825,11 @@ pub fn frame_card(
     painter: &egui::Painter,
     rect: ERect,
     sheet: &super::ModelSheet,
-    frame: &StripFrame,
+    frame: &SheetFrame,
     index: usize,
     selected: bool,
 ) {
-    patterns::paint_card(painter, rect, selected);
+    panel::paint_card(painter, rect, selected);
     let art = ERect::from_min_max(
         rect.min + Vec2::new(2.0, 4.0),
         rect.right_bottom() - Vec2::new(2.0, 44.0),
@@ -819,24 +851,28 @@ pub fn frame_card(
     );
 }
 
-fn rides(ui: &mut Ui, frames: &[StripFrame]) {
+fn rides(ui: &mut Ui, frames: &[SheetFrame]) {
     let cued: Vec<(usize, u32)> = frames
         .iter()
         .enumerate()
-        .filter(|(_, frame)| !frame.cues().is_empty())
+        .filter(|(_, frame)| {
+            FrameCueKind::VARIANTS
+                .iter()
+                .any(|&kind| super::has_cue(frame, kind))
+        })
         .map(|(index, _)| (index, super::starts_at(frames, index)))
         .collect();
     ui.add_space(4.0);
     ui.vertical_centered(|ui| {
         if cued.is_empty() {
-            widgets::hint(ui, "no cues on this strip");
+            form::hint(ui, "no cues on this strip");
         } else {
             let text = cued
                 .iter()
                 .map(|(index, at)| format!("frame {}, now at {at} ms", index + 1))
                 .collect::<Vec<_>>()
                 .join(" · ");
-            widgets::hint(ui, &format!("cues ride on {text}"));
+            form::hint(ui, &format!("cues ride on {text}"));
         }
     });
 }
@@ -896,7 +932,7 @@ pub fn keys(
     editor: &mut Editor,
     ui: &Ui,
     key: &str,
-    frames: &[StripFrame],
+    frames: &[SheetFrame],
     sheet: &super::ModelSheet,
 ) {
     if !super::keyboard_free(ui) {
@@ -1037,12 +1073,19 @@ pub fn keys(
         }
         let mut sorted = selected.clone();
         sorted.sort_unstable();
+        let Some(reader) = editor.reader() else {
+            return;
+        };
         let cues: Vec<String> = sorted
             .iter()
             .filter_map(|index| frames.get(*index))
-            .flat_map(|frame| frame.cues().into_iter().map(|cue| cue.label()))
+            .flat_map(|frame| {
+                super::cues_of(frame, &reader)
+                    .into_iter()
+                    .map(|cue| cue.label())
+            })
             .collect();
-        let kept: Vec<StripFrame> = frames
+        let kept: Vec<SheetFrame> = frames
             .iter()
             .enumerate()
             .filter(|(index, _)| !sorted.contains(index))
@@ -1142,7 +1185,7 @@ pub fn confirm(
     editor: &mut Editor,
     ctx: &egui::Context,
     key: &str,
-    row: &Value,
+    row: &ModelDef,
     strip: ModelStrip,
 ) {
     let Some(what) = editor.views.model.view(key).confirm else {
@@ -1165,7 +1208,7 @@ pub fn confirm(
         StripConfirm::Cues => ("Copy cues to the other directions", "cues"),
     };
     let mut answer = None;
-    dialogs::card(ctx, "model-confirm", 420.0, |ui| {
+    dialog::card(ctx, "model-confirm", 420.0, |ui| {
         ui.label(RichText::new(title).size(16.0).strong());
         ui.add_space(6.0);
         ui.label(format!(
@@ -1181,13 +1224,13 @@ pub fn confirm(
             )));
         }
         ui.add_space(10.0);
-        answer = dialogs::answer_row(ui, &format!("Apply to {others} directions"));
+        answer = dialog::answer_row(ui, &format!("Apply to {others} directions"));
     });
     let Some(answer) = answer else {
         return;
     };
     editor.views.model.view_mut(key).confirm = None;
-    if answer == DialogAnswer::Cancel {
+    if answer == dialog::Answer::Cancel {
         return;
     }
     let mut changed = row.clone();
@@ -1199,24 +1242,23 @@ pub fn confirm(
         if other.len() != source.len() {
             continue;
         }
-        let merged: Vec<StripFrame> = other
+        let merged: Vec<SheetFrame> = other
             .iter()
             .zip(&source)
             .map(|(frame, from)| match what {
-                StripConfirm::Timing => StripFrame {
+                StripConfirm::Timing => SheetFrame {
                     ms: from.ms,
                     ..frame.clone()
                 },
-                StripConfirm::Cues => StripFrame {
+                StripConfirm::Cues => SheetFrame {
                     apex: from.apex,
                     step: from.step,
-                    sound: from.sound.clone(),
+                    sound: from.sound,
                     ..frame.clone()
                 },
             })
             .collect();
-        changed["sprites"]["actions"][strip.action.as_ref()][direction.as_ref()] =
-            super::frames_json(&merged);
+        super::set_strip(&mut changed, others_of(direction), merged);
     }
     let label = match what {
         StripConfirm::Timing => format!(
@@ -1228,5 +1270,5 @@ pub fn confirm(
             strip.name()
         ),
     };
-    super::write_row(editor, key, &changed, ContentEdit::new(label));
+    editor.write_content_as(ContentEdit::new(label), key, &changed);
 }

@@ -1,29 +1,34 @@
 use engine::core::content::Content;
+use engine::core::math::Pos;
 use engine::core::script::Value;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
-use engine::systems::area::AreaDef;
-use engine::systems::area::transition::{self, Crossing};
 use engine::systems::memory::{self, Memory, MemoryDef, MemoryId};
-use engine::systems::movement::position;
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 const HOUR: u64 = 3_600_000;
 
 #[test]
-fn a_memory_reads_as_zero_until_set_and_again_once_forgotten() {
-    let content = memories().load();
-    let bribed = id(&content, "bribed");
-    let clock = at(100 * HOUR);
-    let mut memory = Memory::default();
-    assert_eq!(memory.get(&content, bribed, clock), Value::Bool(false));
-    memory.set(&content, bribed, Value::Bool(true), clock);
-    assert_eq!(
-        memory.get(&content, bribed, later(clock, 1e7)),
-        Value::Bool(true)
+fn a_memory_reads_its_default_until_set_and_again_once_forgotten() {
+    let mut sim = Sim::new(
+        memories()
+            .area("village", &Map::open(5, 5), json!([]))
+            .hero("village", 2.0, 2.0)
+            .load(),
     );
-    memory.forget(bribed);
-    assert_eq!(memory.get(&content, bribed, clock), Value::Bool(false));
+    sim.serve("village");
+    let player = sim.join(1);
+    let [bribed, visits] = [sim.id::<MemoryDef>("bribed"), sim.id::<MemoryDef>("visits")];
+
+    assert_eq!(memory::get(&sim.world, player, bribed), Value::Bool(false));
+    assert_eq!(memory::get(&sim.world, player, visits), Value::Int(0));
+    memory::set(&mut sim.world, player, bribed, Value::Bool(true));
+    memory::set(&mut sim.world, player, visits, Value::Int(3));
+    sim.later(1e7);
+    assert_eq!(memory::get(&sim.world, player, bribed), Value::Bool(true));
+    assert_eq!(memory::get(&sim.world, player, visits), Value::Int(3));
+    memory::forget(&mut sim.world, player, bribed);
+    assert_eq!(memory::get(&sim.world, player, bribed), Value::Bool(false));
 }
 
 #[test]
@@ -39,17 +44,6 @@ fn a_memory_keeps_the_time_it_was_last_set() {
 }
 
 #[test]
-fn integer_memories_hold_a_count() {
-    let content = memories().load();
-    let visits = id(&content, "visits");
-    let start = at(100 * HOUR);
-    let mut memory = Memory::default();
-    assert_eq!(memory.get(&content, visits, start), Value::Int(0));
-    memory.set(&content, visits, Value::Int(3), start);
-    assert_eq!(memory.get(&content, visits, start), Value::Int(3));
-}
-
-#[test]
 fn daily_memories_end_at_the_reset_hour() {
     let content = memories().load();
     let looted = id(&content, "looted");
@@ -62,55 +56,33 @@ fn daily_memories_end_at_the_reset_hour() {
 
 #[test]
 fn leaving_an_area_forgets_what_only_lasts_there() {
-    let mut sim = Sim::new(
-        memories()
-            .area("village", &Map::open(5, 5), json!([]))
-            .area("forest", &Map::open(5, 5), json!([]))
-            .hero("village", 2.0, 2.0)
-            .load(),
+    let content = memories()
+        .area("village", &Map::open(5, 5), json!([]))
+        .area("forest", &Map::open(5, 5), json!([]))
+        .hero("village", 2.0, 2.0)
+        .load();
+    let mut village = Sim::new(content.clone());
+    village.serve("village");
+    let mut forest = Sim::new(content);
+    forest.serve("forest");
+    let player = village.join(1);
+    let [fighting, grudge] = [
+        village.id::<MemoryDef>("fighting"),
+        village.id::<MemoryDef>("grudge"),
+    ];
+    memory::set(&mut village.world, player, fighting, Value::Bool(true));
+    memory::set(&mut village.world, player, grudge, Value::Bool(true));
+
+    let player = village.cross(player, &mut forest, Pos::new(2.0, 2.0));
+
+    assert_eq!(
+        memory::get(&forest.world, player, fighting),
+        Value::Bool(false)
     );
-    sim.serve("village");
-    let player = sim.join(1);
-    let content = sim.world.resource::<Content>().clone();
-    let [fighting, grudge] = [id(&content, "fighting"), id(&content, "grudge")];
-    let clock = *sim.world.resource::<WallClock>();
-    let dest = position(&sim.world, player).expect("position");
-    let mut memory = Memory::default();
-    memory.set(&content, fighting, Value::Bool(true), clock);
-    memory.set(&content, grudge, Value::Bool(true), clock);
-    let forest = sim.id::<AreaDef>("forest");
-    sim.world.entity_mut(player).insert((
-        memory,
-        Crossing {
-            dest_area: forest,
-            dest,
-        },
-    ));
-
-    let travelers = transition::departing(&mut sim.world);
-
-    let carried = &travelers[0].state.memory;
-    assert!(!carried.is_set(&content, fighting, clock));
-    assert!(carried.is_set(&content, grudge, clock));
-}
-
-#[test]
-fn the_world_reads_and_writes_a_players_memory() {
-    let mut sim = Sim::new(
-        memories()
-            .area("village", &Map::open(5, 5), json!([]))
-            .hero("village", 2.0, 2.0)
-            .load(),
+    assert_eq!(
+        memory::get(&forest.world, player, grudge),
+        Value::Bool(true)
     );
-    sim.serve("village");
-    let player = sim.join(1);
-    let sided = sim.id::<MemoryDef>("bribed");
-
-    assert_eq!(memory::get(&sim.world, player, sided), Value::Bool(false));
-    memory::set(&mut sim.world, player, sided, Value::Bool(true));
-    assert_eq!(memory::get(&sim.world, player, sided), Value::Bool(true));
-    memory::forget(&mut sim.world, player, sided);
-    assert_eq!(memory::get(&sim.world, player, sided), Value::Bool(false));
 }
 
 fn memories() -> Game {
@@ -129,7 +101,9 @@ fn memories() -> Game {
 }
 
 fn id(content: &Content, key: &str) -> MemoryId {
-    content.by_key::<MemoryDef>(key).expect("a declared memory")
+    content
+        .declared::<MemoryDef>(key)
+        .expect("a declared memory")
 }
 
 fn at(millis: u64) -> WallClock {

@@ -11,13 +11,13 @@ use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumDiscriminants, EnumString};
 
 use crate::core::assets::ImageRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentId, ContentProblem, ContentRow, Fixture, Loading, ModuleRule, ModuleSet,
-    RowCheck,
+    Content, ContentFile, ContentId, ContentProblem, Fixture, Loading, ModuleRule, ModuleSet,
+    NamedContent, Nearby, RowCheck,
 };
 use crate::core::math::{Percent, Rng};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
@@ -36,7 +36,7 @@ use crate::systems::player::{PlayedBy, player_requests};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition::{self, CompiledCondition};
 use crate::systems::script::{
-    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftInstances, RiftScripts,
+    self, Condition, EventKind, Owner, OwnerRow, Reach, RiftInstances, RiftScripts, RunnerKind,
     ScriptModule, ScriptedRow,
 };
 use crate::systems::text::{LineText, Span};
@@ -64,8 +64,33 @@ pub struct QuestDef {
     pub modules: Vec<QuestModule>,
 }
 
-impl ContentRow for QuestDef {
+impl ContentFile for QuestDef {
     const TABLE: &'static str = "quest";
+
+    fn fresh(near: &Nearby) -> Result<QuestDef, String> {
+        Ok(QuestDef {
+            title: near.name(),
+            category: String::new(),
+            blurb: String::new(),
+            xp: 0,
+            reveal: Vec::new(),
+            modules: vec![
+                QuestModule::Objective(Objective::Task {
+                    task: "task".to_owned(),
+                    label: "See it through".to_owned(),
+                }),
+                QuestModule::HandOver {
+                    text: vec![crate::systems::text::plain("It's done.")],
+                },
+            ],
+        })
+    }
+}
+
+impl NamedContent for QuestDef {
+    fn shown_name(&self) -> &str {
+        &self.title
+    }
 }
 
 impl ModuleSet for QuestDef {
@@ -73,6 +98,10 @@ impl ModuleSet for QuestDef {
 
     fn modules(&self) -> &[QuestModule] {
         &self.modules
+    }
+
+    fn modules_mut(&mut self) -> &mut Vec<QuestModule> {
+        &mut self.modules
     }
 
     fn rule(module: &QuestModule) -> ModuleRule {
@@ -86,7 +115,7 @@ impl ModuleSet for QuestDef {
 }
 
 impl ScriptedRow for QuestDef {
-    const OWNER: OwnerKind = OwnerKind::Quest;
+    const OWNER: RunnerKind = RunnerKind::Quest;
 
     fn script(module: &QuestModule) -> Option<&ScriptModule> {
         match module {
@@ -125,10 +154,9 @@ pub enum QuestModule {
         seconds: Seconds,
     },
     Drop(QuestDrop),
+    Script(ScriptModule),
     #[serde(untagged)]
     Objective(Objective),
-    #[serde(untagged)]
-    Script(ScriptModule),
 }
 
 impl QuestDef {
@@ -377,7 +405,7 @@ impl QuestDef {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[strum_discriminants(
     name(ObjectiveKind),
-    derive(EnumString, IntoStaticStr, VariantArray),
+    derive(EnumString),
     strum(serialize_all = "snake_case")
 )]
 pub enum Objective {
@@ -403,10 +431,6 @@ impl ObjectiveKind {
     /// The kind of objective a `type` tag names, when it names one.
     pub fn of(tag: &str) -> Option<ObjectiveKind> {
         tag.parse().ok()
-    }
-
-    pub fn tag(self) -> &'static str {
-        self.into()
     }
 }
 
@@ -534,7 +558,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
         })
     };
     Some(match owner.kind {
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let npc: NpcId = owner.id();
             if !placed(npc) {
                 return None;
@@ -545,17 +569,17 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
                 npc: Some(npc),
             }
         }
-        OwnerKind::Object => {
+        RunnerKind::Object => {
             let area: AreaId = owner.id();
             let (_, object) = area::objects(area::placed(content, area))
                 .find(|(index, _)| Some(*index) == owner.object)?;
             Party {
-                name: object.label.clone().or_else(|| object.name.clone())?,
+                name: object.title.clone().or_else(|| object.name.clone())?,
                 item: None,
                 npc: None,
             }
         }
-        OwnerKind::Item => {
+        RunnerKind::Item => {
             let item: ItemId = owner.id();
             Party {
                 name: item.get(content).name.to_owned(),
@@ -896,7 +920,7 @@ pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
 
 fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Quest, quest.raw()),
+        Owner::Row(RunnerKind::Quest, quest.raw()),
         kind,
         Some(player),
         Vec::new(),
@@ -952,7 +976,7 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
     for (id, quest) in loading.rows::<QuestDef>(&content) {
-        let key = id.key(&content);
+        let key = id.path(&content);
         let mut check = RowCheck::default();
         let item_rows = |stacks: &[ItemStack]| -> Vec<ItemId> {
             stacks
@@ -979,7 +1003,7 @@ pub fn check_all(loading: &mut Loading) {
                             check.error(
                                 format!("/modules/{index}/items/{at}/item"),
                                 "not a quest item",
-                                format!("grants {}", item.key(&content)),
+                                format!("grants {}", item.path(&content)),
                                 "an item with quest_item",
                             );
                         }
@@ -992,7 +1016,7 @@ pub fn check_all(loading: &mut Loading) {
                     check.error(
                         format!("/modules/{index}/item"),
                         "not a quest item",
-                        format!("drops {}", drop.item.key(&content)),
+                        format!("drops {}", drop.item.path(&content)),
                         "an item with quest_item",
                     );
                 }
@@ -1063,7 +1087,7 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
         };
     }
     for (id, _) in loading.rows::<QuestDef>(&content) {
-        let key = id.key(&content);
+        let key = id.path(&content);
         let found = parties.get(id);
         let givers = found.is_some_and(|found| !found.givers.is_empty());
         let turn_ins = found.is_some_and(|found| !found.turn_ins.is_empty());

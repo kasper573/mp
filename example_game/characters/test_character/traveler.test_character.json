@@ -1,0 +1,11 @@
+{
+  "name": "Traveler",
+  "class": "characters/class/fighter.class.json",
+  "bag": [
+    {
+      "item": "items-and-skills/item/gold.item.json",
+      "count": 20
+    }
+  ],
+  "start": "initial_spawn"
+}

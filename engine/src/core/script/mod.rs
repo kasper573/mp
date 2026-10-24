@@ -10,7 +10,7 @@ pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, S
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, check_reveals_unique};
 pub use expr::{Expr, ExprKind};
 pub use may_do::MayDo;
-pub use node::{Assignment, Node, NodeKind, Target};
+pub use node::{Assignment, Exit, Node, NodeKind, Target};
 pub use run::{
     Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
     Owner, Pause, TraceStep,
@@ -24,9 +24,9 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use strum::{EnumDiscriminants, EnumString, IntoStaticStr, VariantArray};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentFile, ContentId, Nearby};
 
 /// The output an effect takes when nothing else is said.
 pub const NEXT: &str = "next";
@@ -46,11 +46,16 @@ impl Arrow {
     pub fn is_none(&self) -> bool {
         self.0.is_none()
     }
+
+    /// Points the arrow at the node named `to`, or at nothing.
+    pub fn point(&mut self, to: Option<&str>) {
+        self.0 = to.map(str::to_owned);
+    }
 }
 
 /// What kind of thing owns a script, which decides the events raised for it and the effects it
 /// may use.
-pub trait OwnerKindDef:
+pub trait RunnerKindDef:
     Copy
     + Eq
     + std::hash::Hash
@@ -73,7 +78,7 @@ pub trait OwnerKindDef:
 pub trait Vocabulary:
     Copy + Eq + std::hash::Hash + fmt::Debug + Sized + Send + Sync + 'static
 {
-    type OwnerKind: OwnerKindDef;
+    type RunnerKind: RunnerKindDef;
     type Event: EventDef<Self>
         + Clone
         + Serialize
@@ -136,7 +141,7 @@ pub trait EventDef<V: Vocabulary>: Clone {
     type Kind: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 'static;
 
     fn kind(&self) -> Self::Kind;
-    fn owners(&self) -> &'static [V::OwnerKind];
+    fn owners(&self) -> &'static [V::RunnerKind];
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
     fn fields(&self) -> &'static [(&'static str, ValueType)];
@@ -167,11 +172,12 @@ pub trait QueryDef<V: Vocabulary> {
 }
 
 pub trait EffectDef<V: Vocabulary> {
-    fn owners(&self) -> &'static [V::OwnerKind] {
-        V::OwnerKind::VARIANTS
+    fn owners(&self) -> &'static [V::RunnerKind] {
+        V::RunnerKind::VARIANTS
     }
     fn needs_subject(&self) -> bool;
     fn outputs(&self) -> Vec<(&'static str, &Arrow)>;
+    fn outputs_mut(&mut self) -> Vec<(&'static str, &mut Arrow)>;
     fn pauses(&self) -> bool {
         false
     }
@@ -186,7 +192,7 @@ pub trait EffectDef<V: Vocabulary> {
 #[serde(bound = "", deny_unknown_fields)]
 #[schemars(bound = "")]
 pub struct ScriptDef<V: Vocabulary> {
-    pub owner: V::OwnerKind,
+    pub runs_on: V::RunnerKind,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variables: BTreeMap<String, Variable<V>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -196,52 +202,49 @@ pub struct ScriptDef<V: Vocabulary> {
     pub nodes: BTreeMap<String, Node<V>>,
 }
 
-impl<V: Vocabulary> ContentRow for ScriptDef<V> {
+impl<V: Vocabulary> ScriptDef<V> {
+    /// A script with no nodes yet, run by owners of `kind`.
+    pub fn running_on(kind: V::RunnerKind) -> ScriptDef<V> {
+        ScriptDef {
+            runs_on: kind,
+            variables: BTreeMap::new(),
+            state: BTreeMap::new(),
+            locals: BTreeMap::new(),
+            nodes: BTreeMap::new(),
+        }
+    }
+}
+
+impl<V: Vocabulary> ContentFile for ScriptDef<V> {
     const TABLE: &'static str = "script";
+
+    fn fresh(_: &Nearby) -> Result<ScriptDef<V>, String> {
+        Ok(ScriptDef::running_on(V::RunnerKind::ANY))
+    }
 }
 
 pub type ScriptId<V> = ContentId<ScriptDef<V>>;
 
+/// A script row run by the row holding the module, with values for the script's variables.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(bound = "", deny_unknown_fields)]
 #[schemars(bound = "")]
-pub struct InlineScript<V: Vocabulary> {
+pub struct ScriptModule<V: Vocabulary> {
+    pub script: ScriptId<V>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub state: BTreeMap<String, ValueType>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub locals: BTreeMap<String, ValueType>,
-    pub nodes: BTreeMap<String, Node<V>>,
+    pub values: BTreeMap<String, VarValue<V>>,
 }
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize, EnumDiscriminants)]
-#[serde(tag = "type", rename_all = "snake_case", bound = "")]
-#[schemars(bound = "")]
-#[strum_discriminants(
-    name(ScriptModuleKind),
-    derive(EnumString, IntoStaticStr, VariantArray)
-)]
-pub enum ScriptModule<V: Vocabulary> {
-    #[serde(rename = "shared_script")]
-    #[strum_discriminants(strum(serialize = "shared_script"))]
-    Shared {
-        script: ScriptId<V>,
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-        values: BTreeMap<String, VarValue<V>>,
-    },
-    #[serde(rename = "inline_script")]
-    #[strum_discriminants(strum(serialize = "inline_script"))]
-    Inline(InlineScript<V>),
+impl<V: Vocabulary> ScriptModule<V> {
+    /// The `type` a script module is tagged with in a row's list of modules.
+    pub const TAG: &'static str = "script";
 }
 
-impl ScriptModuleKind {
-    /// The kind of script module a `type` tag names, when it names one.
-    pub fn of(tag: &str) -> Option<ScriptModuleKind> {
-        tag.parse().ok()
-    }
-
-    pub fn tag(self) -> &'static str {
-        self.into()
-    }
+/// A script module as a row lists it among its modules, tagged with its `type`.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "", tag = "type", rename_all = "snake_case")]
+pub enum ListedScriptModule<V: Vocabulary> {
+    Script(ScriptModule<V>),
 }
 
 #[derive(

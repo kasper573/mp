@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use design_tokens::ink;
-use egui::Stroke;
+use ui::egui;
+use ui::egui::Stroke;
+use ui::ink;
 
 use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};

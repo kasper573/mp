@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use ui::egui;
+use ui::float;
 
 use bevy::diagnostic::FrameCount;
 use bevy::input::ButtonState;
@@ -42,7 +44,7 @@ use crate::systems::script::{OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
 use crate::systems::skill::{self, Rank, SkillId, bar::SlotReport};
 use crate::systems::stat::{StatKind, Stats};
-use crate::systems::status::{self, StatusCategory};
+use crate::systems::status::{self, StatusCategory, StatusEffectId};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
 pub trait ProbeChannel {
@@ -170,7 +172,7 @@ pub struct ProbeBody {
 pub struct ProbeObject {
     pub id: Entity,
     pub name: Option<String>,
-    pub label: Option<String>,
+    pub title: Option<String>,
     pub at: Pos<Tiles>,
     pub aim: Pos<Tiles>,
     pub hitbox: Rect<Tiles>,
@@ -306,7 +308,7 @@ pub struct ProbeSkillCard {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ProbeStatus {
-    pub effect: String,
+    pub effect: StatusEffectId,
     pub category: StatusCategory,
     pub left: Option<Seconds>,
 }
@@ -621,7 +623,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .0
                     .iter()
                     .map(|held| ProbeStatus {
-                        effect: held.effect.key(&content).to_owned(),
+                        effect: held.effect,
                         category: held.effect.get(&content).category,
                         left: held.until.zip(now).map(|(until, now)| until.since(now)),
                     })
@@ -707,7 +709,7 @@ fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
         .map(|learned| learned.0.iter().map(|(k, r)| (k.to_string(), *r)).collect())
         .unwrap_or_default();
     Some(ProbeSkills {
-        class: class.key(content).to_owned(),
+        class: class.path(content).to_owned(),
         level: crate::systems::class::level(world, me),
         to_spend: crate::systems::class::points_to_spend(world, me).0,
         learned,
@@ -860,7 +862,7 @@ fn objects(world: &mut World, area: Option<AreaId>) -> Vec<ProbeObject> {
             let seen = ProbeObject {
                 id: entity,
                 name: object.name.clone(),
-                label: object.label.clone(),
+                title: object.title.clone(),
                 at: at.pos,
                 aim: hitbox.center(),
                 hitbox,
@@ -1020,7 +1022,7 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 editable,
                 button: role == accesskit::Role::Button,
                 focused: tree.focus == *id,
-                click_through: gui::layer_at(&gui, rect.center()) != Some(widget.layer_id),
+                click_through: float::layer_at(&gui, rect.center()) != Some(widget.layer_id),
                 in_world: world_layers.contains(widget.layer_id),
                 slider,
                 rect: window_rect(rect),

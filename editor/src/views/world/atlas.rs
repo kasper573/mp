@@ -2,24 +2,24 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use engine::core::content::id::LeafKind;
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{Content, ContentFile, fields_file, name_of};
 use engine::core::math::{Pos, Size};
 use engine::core::script::Expr;
 use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
-use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, ObjectShape};
 use engine::systems::item::ItemDef;
 use engine::systems::memory::MemoryDef;
 use engine::systems::npc::{self, NpcDef, NpcId};
 use engine::systems::quest::{Objective, QuestDef, QuestId};
 use engine::systems::script::{
-    Condition, OwnerKind, OwnerRow, Reach, RiftQuery, RiftScripts, ScriptDef, condition,
+    Condition, OwnerRow, Reach, RiftQuery, RiftScripts, RunnerKind, ScriptDef, condition,
 };
 use engine::systems::shop::ShopDef;
 use strum::VariantArray;
 
 use crate::project::ProjectFiles;
+use crate::tabs::shown_path;
 use crate::usages::ContentUsages;
 
 pub struct WorldAtlas {
@@ -72,7 +72,7 @@ pub struct AtlasWarp {
 
 pub struct AtlasOwner {
     pub area: AreaId,
-    pub kind: OwnerKind,
+    pub kind: RunnerKind,
     pub name: String,
     pub label: String,
     pub at: Option<Pos<Tiles>>,
@@ -82,7 +82,7 @@ pub struct AtlasOwner {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OpenTarget {
-    Area { key: String, module: Option<usize> },
+    Area { key: String, module: Option<String> },
     Row { table: &'static str, key: String },
 }
 
@@ -306,6 +306,11 @@ impl WorldAtlas {
         &self.areas[&id].key
     }
 
+    /// What a card is called on the map: its file's name, without the folders holding it.
+    pub fn file_name(&self, id: AreaId) -> &str {
+        name_of(self.key(id))
+    }
+
     pub fn size(&self, id: AreaId) -> Size<Tiles> {
         self.areas[&id].size
     }
@@ -418,15 +423,27 @@ impl WorldAtlas {
                 let link = &info.after[0];
                 let label = match &link.how {
                     QuestLinkHow::During => {
-                        format!("while {} is open, {giver} offers {}", link.quest, info.key)
+                        format!(
+                            "while {} is open, {giver} offers {}",
+                            name_of(&link.quest),
+                            name_of(&info.key)
+                        )
                     }
                     QuestLinkHow::Memory(memory) => {
-                        format!("after {memory}, {giver} offers {}", info.key)
+                        format!(
+                            "after {}, {giver} offers {}",
+                            name_of(memory),
+                            name_of(&info.key)
+                        )
                     }
                     QuestLinkHow::Failed => {
-                        format!("failing {}, {giver} offers {}", link.quest, info.key)
+                        format!(
+                            "failing {}, {giver} offers {}",
+                            name_of(&link.quest),
+                            name_of(&info.key)
+                        )
                     }
-                    QuestLinkHow::Done => format!("{giver} offers {}", info.key),
+                    QuestLinkHow::Done => format!("{giver} offers {}", name_of(&info.key)),
                 };
                 let offered = info
                     .steps
@@ -448,8 +465,10 @@ impl WorldAtlas {
                 number += 1;
                 let label = match &step.kind {
                     QuestStepKind::Offered => match &info.requires {
-                        Some(requires) => format!("{giver} offers {} · {requires}", info.key),
-                        None => format!("{giver} offers {}", info.key),
+                        Some(requires) => {
+                            format!("{giver} offers {} · {requires}", name_of(&info.key))
+                        }
+                        None => format!("{giver} offers {}", name_of(&info.key)),
                     },
                     QuestStepKind::TurnedIn => {
                         format!("hand in to {}", step.who.as_deref().unwrap_or(giver))
@@ -481,13 +500,13 @@ impl WorldAtlas {
     }
 
     fn add_owners(&mut self, content: &Content, scripts: &RiftScripts, id: AreaId) {
-        let key = id.key(content);
+        let key = id.path(content);
         let placed = area::placed(content, id);
         let mut seeds = vec![AtlasOwner {
             area: id,
-            kind: OwnerKind::Area,
-            name: key.to_owned(),
-            label: format!("area/{key}"),
+            kind: RunnerKind::Area,
+            name: name_of(key).to_owned(),
+            label: shown_path(key).to_owned(),
             at: None,
             reaches: Vec::new(),
             opens: OpenTarget::Area {
@@ -496,7 +515,7 @@ impl WorldAtlas {
             },
         }];
         let mut rows = vec![OwnerRow {
-            kind: OwnerKind::Area,
+            kind: RunnerKind::Area,
             row: id.raw(),
             object: None,
         }];
@@ -504,12 +523,12 @@ impl WorldAtlas {
             let name = object
                 .name
                 .clone()
-                .or_else(|| object.label.clone())
+                .or_else(|| object.title.clone())
                 .unwrap_or_else(|| format!("object {index}"));
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Object,
-                label: format!("area/{key} › {name}"),
+                kind: RunnerKind::Object,
+                label: format!("{} › {name}", name_of(key)),
                 name,
                 at: Some(match object.shape {
                     ObjectShape::Point(at) => at,
@@ -518,11 +537,11 @@ impl WorldAtlas {
                 reaches: Vec::new(),
                 opens: OpenTarget::Area {
                     key: key.to_owned(),
-                    module: Some(placed[index as usize].origin),
+                    module: Some(placed[index as usize].origin.clone()),
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Object,
+                kind: RunnerKind::Object,
                 row: id.raw(),
                 object: Some(index),
             });
@@ -531,21 +550,21 @@ impl WorldAtlas {
             if placement.scripts.is_empty() {
                 continue;
             }
-            let blueprint = placement.blueprint.key(content);
+            let blueprint = placement.blueprint.path(content);
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Blueprint,
-                name: blueprint.to_owned(),
-                label: format!("blueprint/{blueprint} in {key} {ordinal}"),
+                kind: RunnerKind::Blueprint,
+                name: name_of(blueprint).to_owned(),
+                label: format!("{} in {} {ordinal}", name_of(blueprint), name_of(key)),
                 at: Some(placement.at),
                 reaches: Vec::new(),
                 opens: OpenTarget::Area {
                     key: key.to_owned(),
-                    module: Some(placement.origin),
+                    module: Some(placement.origin.clone()),
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Blueprint,
+                kind: RunnerKind::Blueprint,
                 row: id.raw(),
                 object: Some(ordinal as u32),
             });
@@ -562,12 +581,12 @@ impl WorldAtlas {
             if !seen.insert(npc) {
                 continue;
             }
-            let npc_key = npc.key(content);
+            let npc_key = npc.path(content);
             seeds.push(AtlasOwner {
                 area: id,
-                kind: OwnerKind::Npc,
+                kind: RunnerKind::Npc,
                 name: npc.get(content).name.clone(),
-                label: format!("npc/{npc_key}"),
+                label: shown_path(npc_key).to_owned(),
                 at,
                 reaches: Vec::new(),
                 opens: OpenTarget::Row {
@@ -576,7 +595,7 @@ impl WorldAtlas {
                 },
             });
             rows.push(OwnerRow {
-                kind: OwnerKind::Npc,
+                kind: RunnerKind::Npc,
                 row: npc.raw(),
                 object: None,
             });
@@ -644,7 +663,7 @@ impl WorldAtlas {
             {
                 found.push((
                     ItemDef::TABLE,
-                    loot.item.key(content).to_owned(),
+                    loot.item.path(content).to_owned(),
                     source(AtlasSourceKind::Drop, key, &opens),
                 ));
             }
@@ -652,12 +671,12 @@ impl WorldAtlas {
                 for drop in quest.get(content).drops().filter(|drop| drop.from == *npc) {
                     found.push((
                         ItemDef::TABLE,
-                        drop.item.key(content).to_owned(),
+                        drop.item.path(content).to_owned(),
                         source(AtlasSourceKind::Drop, key, &opens),
                     ));
                 }
             }
-            for usage in usages.in_file(&row_file(NpcDef::TABLE, key)) {
+            for usage in usages.in_file(&fields_file(key)) {
                 if usage.kind == LeafKind::Row(ScriptDef::TABLE) {
                     found.push((
                         ScriptDef::TABLE,
@@ -673,21 +692,21 @@ impl WorldAtlas {
                 match reach {
                     Reach::Warp(place) => found.push((
                         AreaDef::TABLE,
-                        place.area.key(content).to_owned(),
+                        place.area.path(content).to_owned(),
                         by(AtlasSourceKind::Warp),
                     )),
                     Reach::Spawns(npc) => found.push((
                         NpcDef::TABLE,
-                        npc.key(content).to_owned(),
+                        npc.path(content).to_owned(),
                         by(AtlasSourceKind::Spawns),
                     )),
                     Reach::Gives(item) | Reach::Drops(item) => found.push((
                         ItemDef::TABLE,
-                        item.key(content).to_owned(),
+                        item.path(content).to_owned(),
                         by(AtlasSourceKind::Gives),
                     )),
                     Reach::OpensShop(shop) => {
-                        let shop_key = shop.key(content);
+                        let shop_key = shop.path(content);
                         let opens = OpenTarget::Row {
                             table: ShopDef::TABLE,
                             key: shop_key.to_owned(),
@@ -695,7 +714,7 @@ impl WorldAtlas {
                         for offer in shop.get(content).sells() {
                             found.push((
                                 ItemDef::TABLE,
-                                offer.item.key(content).to_owned(),
+                                offer.item.path(content).to_owned(),
                                 source(AtlasSourceKind::Sells, shop_key, &opens),
                             ));
                         }
@@ -707,7 +726,7 @@ impl WorldAtlas {
                     }
                     Reach::Remembers(memory) => found.push((
                         MemoryDef::TABLE,
-                        memory.key(content).to_owned(),
+                        memory.path(content).to_owned(),
                         by(AtlasSourceKind::Remembers),
                     )),
                     _ => {}
@@ -721,7 +740,7 @@ impl WorldAtlas {
                     Reach::Decides(quest) => (AtlasSourceKind::Decides, quest),
                     _ => continue,
                 };
-                let quest_key = quest.key(content);
+                let quest_key = quest.path(content);
                 found.push((QuestDef::TABLE, quest_key.to_owned(), by(kind)));
                 if matches!(kind, AtlasSourceKind::Offers | AtlasSourceKind::TurnsIn) {
                     let def = quest.get(content);
@@ -737,7 +756,7 @@ impl WorldAtlas {
                     {
                         found.push((
                             ItemDef::TABLE,
-                            stack.item.key(content).to_owned(),
+                            stack.item.path(content).to_owned(),
                             source(AtlasSourceKind::Quest, quest_key, &opens),
                         ));
                     }
@@ -751,11 +770,11 @@ impl WorldAtlas {
             QuestDef::TABLE,
             ShopDef::TABLE,
         ];
-        let mut files = vec![row_file(AreaDef::TABLE, &info.key)];
+        let mut files = vec![fields_file(&info.key)];
         files.extend(
             area::placements(content, id)
                 .iter()
-                .map(|placement| row_file(BlueprintDef::TABLE, placement.blueprint.key(content))),
+                .map(|placement| fields_file(placement.blueprint.path(content))),
         );
         for file in &files {
             for usage in usages.in_file(file) {
@@ -787,7 +806,7 @@ impl WorldAtlas {
     fn build_quests(&mut self, content: &Content) {
         let mut quests: Vec<AtlasQuest> = Vec::new();
         for id in content.ids::<QuestDef>() {
-            let key = id.key(content).to_owned();
+            let key = id.path(content).to_owned();
             let def = id.get(content);
             let mut steps = Vec::new();
             let offering = |reach: &Reach| matches!(reach, Reach::Offers(quest) | Reach::Accepts(quest) if *quest == id);
@@ -814,15 +833,15 @@ impl WorldAtlas {
                             })
                             .map(|(area, _)| *area)
                             .collect();
-                        (counted("defeat", *count, npc.key(content)), areas)
+                        (counted("defeat", *count, npc.path(content)), areas)
                     }
                     Objective::Hold(stack) => (
-                        counted("hold", stack.count, stack.item.key(content)),
-                        self.areas_finding(ItemDef::TABLE, stack.item.key(content)),
+                        counted("hold", stack.count, stack.item.path(content)),
+                        self.areas_finding(ItemDef::TABLE, stack.item.path(content)),
                     ),
                     Objective::Deliver { item } => (
-                        counted("deliver", 1, item.key(content)),
-                        self.areas_finding(ItemDef::TABLE, item.key(content)),
+                        counted("deliver", 1, item.path(content)),
+                        self.areas_finding(ItemDef::TABLE, item.path(content)),
                     ),
                     Objective::Task { label, .. } => (
                         label.clone(),
@@ -912,7 +931,7 @@ impl WorldAtlas {
         }
         let mut after: Vec<QuestLink> = Vec::new();
         let mut link = |quest: QuestId, how: QuestLinkHow| {
-            let quest = quest.key(content).to_owned();
+            let quest = quest.path(content).to_owned();
             if !after.iter().any(|known| known.quest == quest) {
                 after.push(QuestLink { quest, how });
             }
@@ -939,7 +958,10 @@ impl WorldAtlas {
                             | Reach::Decides(other) = reach
                                 && *other != id
                             {
-                                link(*other, QuestLinkHow::Memory(memory.key(content).to_owned()));
+                                link(
+                                    *other,
+                                    QuestLinkHow::Memory(memory.path(content).to_owned()),
+                                );
                             }
                         }
                     }
@@ -1006,19 +1028,16 @@ impl AtlasArea {
 type RowName = (String, String);
 
 fn area_info(content: &Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
-    let key = id.key(content).to_owned();
+    let key = id.path(content).to_owned();
     let def = id.get(content);
     let loaded = area::load(content, id);
     let placed = area::placed(content, id);
     let mut text = files
-        .json(&row_file(AreaDef::TABLE, &key))
+        .json(&fields_file(&key))
         .map(|row| row.to_string().to_lowercase())
         .unwrap_or_default();
     for placement in area::placements(content, id) {
-        if let Some(row) = files.json(&row_file(
-            BlueprintDef::TABLE,
-            placement.blueprint.key(content),
-        )) {
+        if let Some(row) = files.json(&fields_file(placement.blueprint.path(content))) {
             text.push(' ');
             text.push_str(&row.to_string().to_lowercase());
         }
@@ -1029,13 +1048,13 @@ fn area_info(content: &Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
         match &flattened.module {
             AreaModule::Resident(resident) => residents.push(PlacedNpc {
                 npc: resident.npc,
-                key: resident.npc.key(content).to_owned(),
+                key: resident.npc.path(content).to_owned(),
                 at: resident.at,
                 count: 1,
             }),
             AreaModule::Population(population) => populations.push(PlacedNpc {
                 npc: population.npc,
-                key: population.npc.key(content).to_owned(),
+                key: population.npc.path(content).to_owned(),
                 at: population
                     .roams
                     .map_or_else(|| loaded.center(), |roams| roams.center()),
@@ -1048,11 +1067,9 @@ fn area_info(content: &Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
         key,
         name: def.name.clone(),
         size: loaded.size,
-        modules: def
-            .modules
+        modules: placed
             .iter()
-            .chain(placed.iter().map(|flattened| &flattened.module))
-            .map(AreaModule::kind)
+            .map(|flattened| flattened.module.kind())
             .collect(),
         text,
         residents,
@@ -1076,7 +1093,7 @@ fn positive_queries<'a>(condition: &'a Condition, out: &mut Vec<&'a RiftQuery>) 
 
 fn counted(verb: &str, count: u32, what: &str) -> String {
     match count {
-        1 => format!("{verb} {what}"),
-        _ => format!("{verb} {count} {what}"),
+        1 => format!("{verb} {}", name_of(what)),
+        _ => format!("{verb} {count} {}", name_of(what)),
     }
 }

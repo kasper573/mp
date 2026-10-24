@@ -1,42 +1,66 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::VariantArray;
 
 use super::check::RowCheck;
+use super::files::{content_path, fixture_dir};
+use super::fresh::Nearby;
 use super::id::ContentId;
-use super::table::{Content, ContentRow};
+use super::locate::unescape;
+use super::serial::TypeTag;
+use super::table::{Content, ContentFile};
 
+/// Content code reads by name, which every game provides at the path the fixture's declaration
+/// builds: `fixtures/<FOLDER>/<variant>.<type>`, as one file or a bundle by its type's shape.
 pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
-    type Row: ContentRow;
-    /// Whether the fixtures are every row of their table, which content adds none of its own to.
+    type Row: ContentFile;
+    /// The folder under `fixtures/` of the system that declares the fixture, or `None` for
+    /// `fixtures/` itself.
+    const FOLDER: Option<&'static str>;
+    /// Whether the fixtures are every file of their type, which content adds none of its own to.
     const WHOLE_TABLE: bool = false;
 
-    fn key(self) -> &'static str {
+    fn name(self) -> &'static str {
         self.into()
     }
 
+    fn path(self) -> String {
+        content_path(
+            &fixture_dir(Self::FOLDER),
+            self.name(),
+            Self::Row::TABLE,
+            Self::Row::SHAPE,
+        )
+    }
+
     fn id(self, content: &Content) -> ContentId<Self::Row> {
-        content
-            .table::<Self::Row>()
-            .id_of(self.key())
-            .unwrap_or_else(|| {
-                panic!(
-                    "fixture {}/{} is checked at load",
-                    Self::Row::TABLE,
-                    self.key()
-                )
-            })
+        *content
+            .built::<FixtureIds<Self>>()
+            .0
+            .get(self.name())
+            .unwrap_or_else(|| panic!("no fixture at {} in this game", self.path()))
     }
 
     fn get(self, content: &Content) -> &Self::Row {
         self.id(content).get(content)
     }
 
-    /// The parts of the fixture's row the engine reads beyond the row being there.
+    /// The parts of the fixture's file the engine reads beyond the file being there.
     fn locks(self) -> Vec<FixtureLock> {
         Vec::new()
     }
+
+    /// What the fixture's file holds when a designer makes it where it is missing: its type's
+    /// fresh file, holding whatever its locks keep.
+    fn fresh(self, near: &Nearby) -> Result<Self::Row, String> {
+        Self::Row::fresh(near)
+    }
 }
+
+/// Where each fixture of `F` resolved at load, so reading one costs no path to build.
+pub struct FixtureIds<F: Fixture>(pub HashMap<&'static str, ContentId<F::Row>>);
 
 /// A part of a fixture's row the engine reads: content tunes its values, but never removes or
 /// reshapes it, so the engine finds what it reads in every game.
@@ -50,6 +74,23 @@ pub enum FixtureLock {
 }
 
 impl FixtureLock {
+    /// A lock on the list at `list` keeping an entry that carries `entry`'s fields at `fields` as
+    /// `entry` has them.
+    pub fn entry<T: Serialize>(list: &str, entry: &T, fields: &[&str]) -> FixtureLock {
+        let whole = serde_json::to_value(entry).unwrap_or_default();
+        let carried = fields
+            .iter()
+            .filter_map(|field| {
+                let value = whole.pointer(field)?.clone();
+                Some((unescape(field.strip_prefix('/')?), value))
+            })
+            .collect();
+        FixtureLock::Entry {
+            list: list.to_owned(),
+            entry: Value::Object(carried),
+        }
+    }
+
     /// Whether `held`, an entry of the list at `list`, is one this lock keeps.
     pub fn keeps(&self, list: &str, held: &Value) -> bool {
         matches!(self, FixtureLock::Entry { list: locked, entry } if locked == list && carries(held, entry))
@@ -93,8 +134,8 @@ impl FixtureLock {
             }
             FixtureLock::Variants { list, variants } => {
                 for (index, held) in entries(row, list) {
-                    let variant = held.get("type").and_then(Value::as_str).unwrap_or_default();
-                    if !variants.iter().any(|known| known == variant) {
+                    let variant = TypeTag::of_json(held).unwrap_or_default();
+                    if !variants.contains(&variant) {
                         check.error(
                             format!("{list}/{index}"),
                             "variant the engine never reads",

@@ -1,0 +1,12 @@
+{
+  "name": "The jarl's longhouse",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 20,
+        "height": 16
+      },
+      "tile": 16
+    }
+  }
+}

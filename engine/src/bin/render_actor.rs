@@ -201,12 +201,19 @@ fn select_models(content: &Content, names: &str) -> Vec<ModelId> {
         .into_iter()
         .map(|name| {
             let key = name.replace(['-', ' '], "_").to_lowercase();
-            models.id_of(&key).unwrap_or_else(|| {
-                fail(&format!(
-                    "no actor named `{name}`; actors: {}",
-                    models.keys().join(", ")
-                ))
-            })
+            models
+                .ids()
+                .find(|id| id.name(content) == key)
+                .unwrap_or_else(|| {
+                    fail(&format!(
+                        "no actor named `{name}`; actors: {}",
+                        models
+                            .ids()
+                            .map(|id| id.name(content))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ))
+                })
         })
         .collect()
 }
@@ -395,7 +402,7 @@ fn advance(
     for (id, sheet) in &reel.sheets {
         match assets.load_state(sheet) {
             LoadState::Loaded => {}
-            LoadState::Failed(error) => fail(&format!("{} sheet: {error}", id.key(&content))),
+            LoadState::Failed(error) => fail(&format!("{} sheet: {error}", id.path(&content))),
             _ => return,
         }
     }
@@ -417,7 +424,7 @@ fn advance(
     let loop_number = frame / clip.frames_per_loop + 1;
     let label = format!(
         "{} - {}   loop {loop_number}/{}",
-        clip.model.key(&content),
+        clip.model.path(&content),
         clip.action.as_ref(),
         clip.loops
     );

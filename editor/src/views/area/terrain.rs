@@ -7,7 +7,7 @@ use engine::systems::area::grid::Flip;
 use engine::systems::area::tileset::TilesetDef;
 
 use super::grid::GridDraft;
-use crate::views::tileset::terrain::MixCompleteness;
+use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 
 pub struct TerrainBrush<'a> {
     pub def: &'a TilesetDef,
@@ -49,33 +49,44 @@ pub fn paint(
         }
     }
     let mut touched: HashSet<CellPos> = HashSet::new();
-    let corners_of = |cell: CellPos| -> [String; 4] {
-        let current = draft
+    let corners_of = |cell: CellPos| -> Corners {
+        let Some(row) = draft
             .get(layer, cell)
-            .and_then(|index| draft.entry(index).cloned());
-        match current {
-            Some(row) if row.tileset == tileset => def
-                .data(row.tile)
-                .and_then(|data| data.corners.get(set))
-                .cloned()
-                .unwrap_or_else(plain),
-            _ => plain(),
-        }
+            .and_then(|index| draft.entry(index).cloned())
+        else {
+            return Corners::Empty;
+        };
+        (row.tileset == tileset)
+            .then(|| def.data(row.tile))
+            .flatten()
+            .and_then(|data| data.corners.get(set))
+            .cloned()
+            .map_or(Corners::Foreign, Corners::Known)
     };
+    let mut foreign: HashSet<CellPos> = HashSet::new();
     let mut wanted: HashMap<CellPos, [String; 4]> = HashMap::new();
     for (vx, vy) in vertices {
         let around = [
-            (CellPos::new(vx - 1, vy - 1), 2),
-            (CellPos::new(vx, vy - 1), 3),
-            (CellPos::new(vx - 1, vy), 1),
-            (CellPos::new(vx, vy), 0),
+            (CellPos::new(vx - 1, vy - 1), TileCorner::SouthEast),
+            (CellPos::new(vx, vy - 1), TileCorner::SouthWest),
+            (CellPos::new(vx - 1, vy), TileCorner::NorthEast),
+            (CellPos::new(vx, vy), TileCorner::NorthWest),
         ];
         for (cell, corner) in around {
             if cell.index(draft.size).is_none() {
                 continue;
             }
-            let entry = wanted.entry(cell).or_insert_with(|| corners_of(cell));
-            entry[corner] = name.clone();
+            let entry = wanted
+                .entry(cell)
+                .or_insert_with(|| match corners_of(cell) {
+                    Corners::Known(corners) => corners,
+                    Corners::Empty => plain(),
+                    Corners::Foreign => {
+                        foreign.insert(cell);
+                        plain()
+                    }
+                });
+            entry[corner.index()] = name.clone();
             touched.insert(cell);
         }
     }
@@ -83,6 +94,9 @@ pub fn paint(
     for cell in touched {
         let corners = &wanted[&cell];
         if corners.iter().all(|c| c == base) {
+            if foreign.contains(&cell) {
+                continue;
+            }
             if draft.set(layer, cell, None) {
                 painted.insert(cell);
             }
@@ -139,31 +153,42 @@ pub fn repaint(
     (changed, kept)
 }
 
-pub struct TerrainSetCoverage {
+pub struct TerrainSet {
     pub tileset: String,
     pub set: String,
     pub terrains: Vec<String>,
-    pub have: usize,
-    pub total: usize,
 }
 
-pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSetCoverage> {
+impl TerrainSet {
+    /// How many of the set's mixes have a tile.
+    pub fn coverage(&self, content: &Content) -> MixCompleteness {
+        content
+            .by_path::<TilesetDef>(&self.tileset)
+            .map(|id| MixCompleteness::of(id.get(content), &self.set))
+            .unwrap_or_default()
+    }
+}
+
+pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSet> {
     content
         .table::<TilesetDef>()
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
         .flat_map(|(id, def)| {
-            let tileset = id.key(content).to_owned();
-            def.terrains.iter().map(move |(set, terrains)| {
-                let mixes = MixCompleteness::of(def, set);
-                TerrainSetCoverage {
-                    tileset: tileset.clone(),
-                    set: set.clone(),
-                    terrains: terrains.clone(),
-                    have: mixes.have,
-                    total: mixes.total,
-                }
+            let tileset = id.path(content).to_owned();
+            def.terrains.iter().map(move |(set, terrains)| TerrainSet {
+                tileset: tileset.clone(),
+                set: set.clone(),
+                terrains: terrains.clone(),
             })
         })
         .collect()
+}
+
+/// A cell's corners in the brush's set, as its tile says. A foreign tile, of another tileset or
+/// knowing no corners in the set, isn't the set's base: a stroke only leaving base around it keeps it.
+enum Corners {
+    Empty,
+    Known([String; 4]),
+    Foreign,
 }

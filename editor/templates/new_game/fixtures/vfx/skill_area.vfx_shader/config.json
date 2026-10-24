@@ -1,0 +1,10 @@
+{
+  "name": "skill_area",
+  "params": [
+    {
+      "name": "hostile",
+      "kind": "bool",
+      "default": false
+    }
+  ]
+}

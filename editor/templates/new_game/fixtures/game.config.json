@@ -1,0 +1,10 @@
+{
+  "name": "New Game",
+  "content_version": "a04d24ad",
+  "initial_spawn": {
+    "area": "start.area",
+    "x": 8.0,
+    "y": 6.0
+  },
+  "player": "hero.player.json"
+}

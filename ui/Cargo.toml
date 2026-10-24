@@ -1,0 +1,21 @@
+[package]
+name = "ui"
+version.workspace = true
+edition.workspace = true
+description = "The interface the editor and the game share: its look (parchment sheets, playing cards, inks, faces) and every general-purpose egui component built on it"
+repository = "https://github.com/kasper573/rift"
+authors = ["kasper573"]
+
+[dependencies]
+ab_glyph = "0.2"
+egui.workspace = true
+egui_code_editor = "0.4.2"
+egui_dock = "0.21"
+egui_ltreeview = "0.9"
+egui-snarl = "0.12"
+egui-phosphor = { version = "0.14", default-features = false, features = ["regular", "fill"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+strum = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

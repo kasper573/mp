@@ -1,0 +1,47 @@
+{
+  "name": "Archer",
+  "class": "characters/class/hunter.class.json",
+  "xp": 90,
+  "skills": [
+    {
+      "node": "aimed_shot",
+      "rank": 1
+    },
+    {
+      "node": "quickstep",
+      "rank": 1
+    }
+  ],
+  "hotbar": [
+    {
+      "slot": 0,
+      "entry": {
+        "skill": "characters/class/aimed_shot.skill.json"
+      }
+    },
+    {
+      "slot": 1,
+      "entry": {
+        "skill": "characters/class/quickstep.skill.json"
+      }
+    }
+  ],
+  "basic_attack": "items-and-skills/item/shoot.skill.json",
+  "bag": [
+    {
+      "item": "items-and-skills/item/arrow.item.json",
+      "count": 30
+    },
+    {
+      "item": "items-and-skills/item/bandage.item.json",
+      "count": 3
+    },
+    {
+      "item": "world/areas/island/npcs/oak_staff.item.json"
+    }
+  ],
+  "equipment": {
+    "weapon": "items-and-skills/item/bow.item.json"
+  },
+  "start": "initial_spawn"
+}

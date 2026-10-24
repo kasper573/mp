@@ -1,7 +1,8 @@
 use bevy::prelude::*;
-use design_tokens::ink;
-use egui::load::SizedTexture;
-use egui::{Color32, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::egui;
+use ui::egui::load::SizedTexture;
+use ui::egui::{Color32, Sense, Stroke, StrokeKind, Ui, Vec2};
+use ui::ink;
 
 use super::{StatusCategory, StatusInstance, Statuses};
 use crate::core::content::Content;

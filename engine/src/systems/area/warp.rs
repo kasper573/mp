@@ -17,6 +17,7 @@ use crate::systems::{dialogue, movement, reach};
 #[schemars(extend("x-system" = "area"))]
 pub struct Warp {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     pub to: Fill<Place>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
@@ -27,9 +28,7 @@ impl EffectDef<RiftScripting> for Warp {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

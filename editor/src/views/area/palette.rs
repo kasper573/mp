@@ -1,15 +1,23 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+use ui::chip;
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::ink;
+use ui::input;
+use ui::theme;
 
-use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
-use engine::core::content::Content;
+use engine::core::content::{FolderReader, name_of};
 use engine::systems::area::tileset::TilesetDef;
-use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
+use ui::egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
 
+use super::AreaSnapshot;
 use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
+use crate::tabs::shown_path;
 use crate::views::tileset::terrain::{MixCompleteness, TileCorner};
 use crate::views::tileset::{SheetLayout, SheetRect, TilesetSheet};
 
@@ -20,15 +28,23 @@ pub enum PaletteLens {
     Terrains,
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content, area_id: AreaId) {
-    let tile_px = area::load(content, area_id).tile;
-    let tilesets: Vec<(String, &TilesetDef)> = content
-        .table::<TilesetDef>()
+pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, area: &AreaSnapshot) {
+    let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let tile_px = area.area().tile;
+    let reader = project.reader();
+    let read: Vec<(String, Arc<TilesetDef>)> = reader
+        .paths_of::<TilesetDef>()
         .iter()
+        .filter_map(|path| Some((path.clone(), project.read::<TilesetDef>(path).ok()?)))
         .filter(|(_, def)| def.tile == tile_px)
-        .map(|(id, def)| (id.key(content).to_owned(), def))
         .collect();
-    let used = area::load(content, area_id).grids.tilesets();
+    let tilesets: Vec<(String, &TilesetDef)> = read
+        .iter()
+        .map(|(path, def)| (path.clone(), def.as_ref()))
+        .collect();
+    let used = area.picture.ground.tilesets();
     let view = editor.views.area.view(view_key);
     let stored = view.palette_lens;
     let lens = if view.tool == super::AreaTool::Terrain {
@@ -44,7 +60,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content,
             (PaletteLens::Terrains, "terrains"),
         ] {
             let on = lens == value;
-            if widgets::toggle_chip(ui, label, on).clicked() {
+            if chip::toggle(ui, label, on).clicked() {
                 picked = value;
             }
         }
@@ -57,7 +73,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content,
     editor.views.area.view_mut(view_key).palette_lens = picked;
     ui.add_space(6.0);
     match lens {
-        PaletteLens::Tiles => tile_sheet(editor, ui, view_key, content, &tilesets),
+        PaletteLens::Tiles => tile_sheet(editor, ui, view_key, &reader, &tilesets),
         PaletteLens::Terrains => terrain_sheet(editor, ui, view_key, &tilesets),
     }
 }
@@ -83,22 +99,26 @@ fn tileset_chips(
         .map(|k| (k.clone(), k.clone()))
         .collect();
     others.sort();
-    if view.pick.tileset.is_none() {
-        view.pick.tileset = own
-            .first()
-            .map(|k| (*k).clone())
-            .or_else(|| others.first().map(|(k, _)| k.clone()));
+    let listed = |key: &String| tilesets.iter().any(|(listed, _)| listed == key);
+    if !view.pick.tileset.as_ref().is_some_and(listed) {
+        view.pick = TilePick {
+            tileset: own
+                .first()
+                .map(|k| (*k).clone())
+                .or_else(|| others.first().map(|(k, _)| k.clone())),
+            ..TilePick::default()
+        };
     }
     let current = view.pick.tileset.clone();
     let mut picked: Option<String> = None;
     for key in &own {
         let on = current.as_deref() == Some(key.as_str());
-        if widgets::toggle_chip(ui, key, on).clicked() {
+        if chip::toggle(ui, key, on).clicked() {
             picked = Some((*key).clone());
         }
     }
     if let Some(key) = current.as_ref().filter(|k| !own.contains(k)) {
-        widgets::toggle_chip(ui, key, true);
+        chip::toggle(ui, key, true);
     }
     let id = ui.make_persistent_id((view_key, "other tilesets"));
     if let Some(key) = more_popup(ui, id, &mut view.tileset_search, "Search tilesets", &others) {
@@ -123,13 +143,13 @@ fn more_popup<T: Clone>(
         return None;
     }
     let mut picked = None;
-    let response = widgets::chip(ui, &format!("+ {}", others.len()));
+    let response = chip::dropdown(ui, format!("+ {}", others.len()));
     egui::Popup::from_toggle_button_response(&response)
         .id(id)
         .width(280.0)
         .show(|ui| {
             ui.set_min_width(240.0);
-            widgets::search_box(ui, search, placeholder, None);
+            input::search(ui, search, placeholder, None);
             let needle = search.to_lowercase();
             egui::ScrollArea::vertical()
                 .max_height(260.0)
@@ -150,11 +170,11 @@ fn tile_sheet(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: &Content,
+    reader: &FolderReader,
     tilesets: &[(String, &TilesetDef)],
 ) {
     let Some(tileset_key) = editor.views.area.view(view_key).pick.tileset.clone() else {
-        widgets::hint(ui, "No tileset of this tile size.");
+        form::hint(ui, "No tileset of this tile size.");
         return;
     };
     let Some(def) = tilesets
@@ -237,13 +257,14 @@ fn tile_sheet(
                     EStroke::new(1.0, Color32::WHITE),
                     egui::StrokeKind::Inside,
                 );
-                let mut info = format!("{tileset_key} #{tile}");
+                let mut info = format!("{} #{tile}", name_of(&tileset_key));
                 if let Some(data) = def.data(tile) {
                     if let Some(walk) = data.walk {
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
                     }
-                    if let Some(surface) = data.surface {
-                        info.push_str(&format!(" · {}", surface.key(content)));
+                    if let Some(surface) = data.surface.and_then(|surface| reader.path_of(surface))
+                    {
+                        info.push_str(&format!(" · {}", shown_path(surface)));
                     }
                     if !data.animation.is_empty() {
                         info.push_str(&format!(" · {} frames", data.animation.len()));
@@ -288,7 +309,11 @@ fn terrain_chips(
 ) {
     let sets = terrain_sets(tilesets, used);
     let view = editor.views.area.view_mut(view_key);
-    if view.terrain.set.is_none()
+    let listed = |tileset: &Option<String>, set: &Option<String>| {
+        sets.iter()
+            .any(|(t, s)| tileset.as_ref() == Some(t) && set.as_ref() == Some(s))
+    };
+    if !listed(&view.terrain.tileset, &view.terrain.set)
         && let Some((tileset, set)) = sets.first()
     {
         view.terrain = TerrainPick {
@@ -311,14 +336,14 @@ fn terrain_chips(
     for (tileset, set) in &own {
         let on = view.terrain.tileset.as_deref() == Some(tileset)
             && view.terrain.set.as_deref() == Some(set);
-        if widgets::toggle_chip(ui, &label(tileset, set), on).clicked() {
+        if chip::toggle(ui, &label(tileset, set), on).clicked() {
             picked = Some((tileset.clone(), set.clone()));
         }
     }
     if let (Some(tileset), Some(set)) = (&view.terrain.tileset, &view.terrain.set)
         && !own.iter().any(|(t, s)| t == tileset && s == set)
     {
-        widgets::toggle_chip(ui, &label(tileset, set), true);
+        chip::toggle(ui, &label(tileset, set), true);
     }
     let id = ui.make_persistent_id((view_key, "other terrain sets"));
     if let Some(pick) = more_popup(
@@ -347,7 +372,7 @@ fn terrain_sheet(
 ) {
     let pick = editor.views.area.view(view_key).terrain.clone();
     let (Some(tileset_key), Some(set)) = (pick.tileset.clone(), pick.set.clone()) else {
-        widgets::hint(ui, "No tileset of this tile size names terrains.");
+        form::hint(ui, "No tileset of this tile size names terrains.");
         return;
     };
     let Some(def) = tilesets
@@ -390,7 +415,7 @@ fn terrain_sheet(
                         let Some(index) = terrains.iter().position(|t| t == terrain) else {
                             continue;
                         };
-                        let color = theme::alpha(terrain_color(index), 110);
+                        let color = ink::wash(terrain_color(index), 0.43);
                         painter.rect_filled(corner.quarter(cell).shrink(0.5), 0.0, color);
                     }
                     painter.rect_stroke(
@@ -404,8 +429,10 @@ fn terrain_sheet(
                     let cell = layout.clamped_cell(&sheet, p);
                     let tile = cell.y * columns + cell.x;
                     let status = match corners.get(&tile) {
-                        Some(mix) => format!("{tileset_key} #{tile} · {}", mix.join(" ")),
-                        None => format!("{tileset_key} #{tile} · not in {set}"),
+                        Some(mix) => {
+                            format!("{} #{tile} · {}", name_of(&tileset_key), mix.join(" "))
+                        }
+                        None => format!("{} #{tile} · not in {set}", name_of(&tileset_key)),
                     };
                     editor.status.left.push(status);
                 }
@@ -435,7 +462,7 @@ fn terrain_sheet(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if let Some(digit) = EditorKey::digit_name(index) {
-                                widgets::key_hint(ui, digit);
+                                controls::key_hint(ui, digit);
                             }
                         });
                     })
@@ -459,5 +486,16 @@ fn terrain_sheet(
 }
 
 pub fn terrain_color(index: usize) -> Color32 {
-    theme::TERRAIN[index % theme::TERRAIN.len()]
+    TERRAIN[index % TERRAIN.len()]
 }
+
+const TERRAIN: [Color32; 8] = [
+    Color32::from_rgb(230, 160, 70),
+    Color32::from_rgb(150, 110, 90),
+    Color32::from_rgb(240, 240, 220),
+    Color32::from_rgb(190, 200, 210),
+    Color32::from_rgb(110, 180, 110),
+    Color32::from_rgb(90, 150, 230),
+    Color32::from_rgb(200, 110, 200),
+    Color32::from_rgb(230, 90, 90),
+];

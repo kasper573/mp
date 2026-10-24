@@ -3,17 +3,22 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ContentProblem, ContentRow, Fixture, Loading, RowCheck, serial};
+use crate::core::content::locate::escape;
+use crate::core::content::{
+    ContentFile, ContentProblem, Fixture, Loading, Nearby, RowCheck, serial,
+};
 use crate::core::math::Pos;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
 #[strum(serialize_all = "snake_case")]
 pub enum WorldMap {
-    World,
+    Game,
 }
 
 impl Fixture for WorldMap {
     type Row = WorldMapDef;
+    const FOLDER: Option<&'static str> = None;
+    const WHOLE_TABLE: bool = true;
 }
 
 pub const MIN_SIZE: u32 = 10;
@@ -24,6 +29,7 @@ pub const MAX_NOTE: usize = 280;
 #[serde(deny_unknown_fields)]
 pub struct WorldMapDef {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(extend("propertyNames" = { "type": "string", "x-table": super::AreaDef::TABLE }))]
     pub cards: BTreeMap<super::AreaId, AreaCard>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub regions: Vec<Region>,
@@ -31,8 +37,12 @@ pub struct WorldMapDef {
     pub notes: Vec<Note>,
 }
 
-impl ContentRow for WorldMapDef {
+impl ContentFile for WorldMapDef {
     const TABLE: &'static str = "world_map";
+
+    fn fresh(_: &Nearby) -> Result<WorldMapDef, String> {
+        Ok(WorldMapDef::default())
+    }
 
     fn check(&self, cx: &mut RowCheck) {
         let mut placed: Vec<&super::AreaId> = Vec::new();
@@ -116,7 +126,7 @@ pub fn check_all(loading: &mut Loading) {
             if !(MIN_SIZE..=MAX_SIZE).contains(&card.size) {
                 loading.row_error(
                     id,
-                    &format!("/cards/{}/size", area.key(&content)),
+                    &format!("/cards/{}/size", escape(area.path(&content))),
                     ContentProblem::new(
                         "out of range",
                         card.size,
@@ -124,22 +134,6 @@ pub fn check_all(loading: &mut Loading) {
                     ),
                 );
             }
-        }
-    }
-    let only = WorldMap::World.key();
-    for id in content.ids::<WorldMapDef>() {
-        let key = id.key(&content);
-        if key != only {
-            loading.row_error(
-                id,
-                "",
-                ContentProblem::new(
-                    "wrong key",
-                    format!("world_map/{key}"),
-                    format!("one world_map row, the {only} fixture"),
-                )
-                .near(Some(format!("{only:?}"))),
-            );
         }
     }
 }

@@ -1,0 +1,21 @@
+{
+  "name": "Road Pass",
+  "icon": "assets/icons/misc/scroll.png",
+  "sfx": {
+    "pickup": "sound-and-voice/sfx/pickup_paper.sfx",
+    "trade": "sound-and-voice/sfx/trade_paper.sfx",
+    "drop": "sound-and-voice/sfx/landing01.sfx"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Stamped by Ilsa herself. It opens the forest road, and Bram's ferry besides."
+    },
+    {
+      "type": "bound"
+    }
+  ]
+}

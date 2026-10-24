@@ -6,7 +6,7 @@ use engine::core::time::UnixMillis;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::ui::widgets;
+use crate::shell::widgets;
 
 // Per-user state stays outside content folders, so it never ships with a game.
 #[derive(Clone, Debug)]
@@ -107,6 +107,33 @@ pub struct EditorSettings {
     pub listeners: BTreeMap<String, [f32; 2]>,
     pub views: BTreeMap<String, SpreadsheetView>,
     pub last_play: Option<String>,
+    /// By project folder, how its content tree is shown.
+    pub content_trees: BTreeMap<String, TreeView>,
+    /// By project folder and bundle, how a scene graph is shown.
+    pub scene_trees: BTreeMap<String, TreeView>,
+    /// Whether the area and blueprint boxes above a scene graph are folded to one line.
+    pub boxes_folded: bool,
+    /// Whether the meter of frames drawn a second shows.
+    pub frame_rate: bool,
+}
+
+/// How a tree is shown: the folders open, by path, and the kinds of rows left out.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct TreeView {
+    pub open: std::collections::BTreeSet<String>,
+    pub hidden_kinds: std::collections::BTreeSet<String>,
+    pub hide_empty_folders: bool,
+}
+
+impl TreeView {
+    /// Keeps open the folders that moved, where they went.
+    pub fn moved(&mut self, moved: &dyn Fn(&str) -> Option<String>) {
+        self.open = std::mem::take(&mut self.open)
+            .into_iter()
+            .map(|path| moved(&path).unwrap_or(path))
+            .collect();
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

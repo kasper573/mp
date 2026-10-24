@@ -1,9 +1,0 @@
-{
-  "label": "Show or hide the conversation so far",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "KeyH"
-    }
-  ]
-}

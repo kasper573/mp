@@ -1,9 +1,0 @@
-{
-  "label": "Pick the seventh choice",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "Digit7"
-    }
-  ]
-}

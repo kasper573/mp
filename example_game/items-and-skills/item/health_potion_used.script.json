@@ -1,0 +1,23 @@
+{
+  "runs_on": "item",
+  "nodes": {
+    "drink": {
+      "type": "items",
+      "take": [
+        {
+          "item": "items-and-skills/item/health_potion.item.json"
+        }
+      ],
+      "done": "mend"
+    },
+    "mend": {
+      "type": "heal",
+      "by": 10.0
+    },
+    "used": {
+      "type": "on",
+      "event": "used",
+      "next": "drink"
+    }
+  }
+}

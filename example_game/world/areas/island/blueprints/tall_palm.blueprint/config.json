@@ -1,0 +1,9 @@
+{
+  "map": {
+    "size": {
+      "width": 5,
+      "height": 6
+    },
+    "tile": 16
+  }
+}

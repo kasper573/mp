@@ -1,19 +1,24 @@
 //! The parameters a vfx or shader row declares, and the one set of controls that fills them: the
 //! preview's knobs, a shader layer's fills, and a script's values for a vfx.
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Ui};
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::{ContentFile, serial};
 use engine::core::math::Rgba;
 use engine::core::vfx::{
     ParamFill, ParamKind, ParamValue, ShaderParam, VfxDef, VfxParam, VfxShaderDef,
 };
+use engine::field;
 use serde_json::{Map, Value};
+use strum::VariantArray;
+use ui::chip;
+use ui::controls;
+use ui::egui::{Color32, Ui};
+use ui::form;
+use ui::glyph::{self, Mark};
+use ui::theme;
 
 use crate::forms::{self, FormChange, FormCx};
-use crate::project::ProjectFiles;
-use crate::ui::{theme, widgets};
+use crate::project::Project;
+use ui::input::{NumberField, SliderField};
 
 const PARAM_INDENT: f32 = 22.0;
 const BOUND_WIDTH: f32 = 64.0;
@@ -53,28 +58,23 @@ impl From<&VfxParam> for ParamSpec {
     }
 }
 
-/// The parameters the row `table/key` declares, each as far as it parses, so a row being worked
-/// on still shows the ones that are whole.
-pub fn params_of(files: &ProjectFiles, table: &str, key: &str) -> Vec<ParamSpec> {
-    let Some(row) = files.json(&row_file(table, key)) else {
-        return Vec::new();
-    };
-    let declared = row["params"].as_array().into_iter().flatten();
+/// The parameters the row `table/key` declares, when it reads.
+pub fn params_of(project: &Project, table: &str, key: &str) -> Vec<ParamSpec> {
     match table {
-        VfxShaderDef::TABLE => declared
-            .filter_map(|param| serde_json::from_value::<ShaderParam>(param.clone()).ok())
-            .map(|param| ParamSpec::from(&param))
-            .collect(),
-        VfxDef::TABLE => declared
-            .filter_map(|param| serde_json::from_value::<VfxParam>(param.clone()).ok())
-            .map(|param| ParamSpec::from(&param))
-            .collect(),
+        VfxShaderDef::TABLE => project.read::<VfxShaderDef>(key).map_or_else(
+            |_| Vec::new(),
+            |shader| shader.params.iter().map(ParamSpec::from).collect(),
+        ),
+        VfxDef::TABLE => project.read::<VfxDef>(key).map_or_else(
+            |_| Vec::new(),
+            |vfx| vfx.params.iter().map(ParamSpec::from).collect(),
+        ),
         _ => Vec::new(),
     }
 }
 
 /// One knob for a parameter's value, by its kind: a checkbox, a slider within the range or a
-/// drag without one, or a color button. Says whether it moved.
+/// number field without one, or a color button. Says whether it moved.
 pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> bool {
     match spec.kind {
         ParamKind::Bool => {
@@ -90,10 +90,8 @@ pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> b
                 _ => 1.0,
             };
             let moved = match spec.range {
-                Some((min, max)) => controls::slider(ui, &mut amount, min..=max).changed(),
-                None => ui
-                    .add(egui::DragValue::new(&mut amount).speed(0.01))
-                    .changed(),
+                Some((min, max)) => SliderField::new(&mut amount, min..=max).show(ui),
+                None => NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui),
             };
             if moved {
                 *value = ParamValue::Number(tidy(f64::from(amount)) as f32);
@@ -128,9 +126,9 @@ pub fn param_fill(
     let fill = fills
         .get(&spec.name)
         .and_then(|fill| serde_json::from_value::<ParamFill>(fill.clone()).ok());
-    let bindable: Vec<String> = match (&cx.owner_table, &cx.owner_key) {
+    let bindable: Vec<String> = match (&cx.row_table, &cx.row_key) {
         (Some(table), Some(key)) if table == VfxDef::TABLE => {
-            params_of(cx.files, VfxDef::TABLE, key)
+            params_of(cx.project, VfxDef::TABLE, key)
                 .into_iter()
                 .filter(|own| own.kind == spec.kind)
                 .map(|own| own.name)
@@ -143,7 +141,7 @@ pub fn param_fill(
         match next {
             Some(next) => fills.insert(
                 spec.name.clone(),
-                serde_json::to_value(next).unwrap_or(Value::Null),
+                serial::json_of(&next).unwrap_or(Value::Null),
             ),
             None => fills.remove(&spec.name),
         };
@@ -159,7 +157,7 @@ pub fn param_fill(
         ui.spacing_mut().slider_width = (ui.available_width() - beside).max(MIN_SLIDER);
         match &fill {
             Some(ParamFill::Param { param }) => {
-                widgets::chip(ui, &format!("◇ {param}"));
+                chip::plain(ui, format!("◇ {param}"));
             }
             other => {
                 let mut value = match other {
@@ -179,7 +177,7 @@ pub fn param_fill(
                 Some(ParamFill::Param { param }) => format!("◇ {param}"),
                 _ => "value".to_owned(),
             };
-            widgets::combo(ui.id().with(path).with("source"))
+            controls::combo(ui.id().with(path).with("source"))
                 .width(SOURCE_WIDTH)
                 .selected_text(theme::mono(source).size(12.5))
                 .show_ui(ui, |ui| {
@@ -210,162 +208,159 @@ pub fn param_fill(
     changed
 }
 
-/// The parameters a shader row declares: each a name, a kind, a default, and for a number its
+/// The parameters of the shader row `value`: each a name, a kind, a default, and for a number its
 /// range.
 pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let path = field!(VfxShaderDef, params);
+    forms::of_row(ui, cx, value, path, |ui, cx, shader: &mut VfxShaderDef| {
+        params(ui, cx, &mut shader.params, path)
+    })
+}
+
+fn params(ui: &mut Ui, cx: &mut FormCx, params: &mut Vec<ShaderParam>, path: &str) -> FormChange {
     let mut changed = FormChange::default();
-    if !value["params"].is_array() {
-        value["params"] = Value::Array(Vec::new());
-    }
-    let count = value["params"].as_array().map_or(0, Vec::len);
-    widgets::section_count(ui, "params", count);
+    form::section_count(ui, "params", params.len());
+    let reader = cx.project.reader();
     let mut remove = None;
-    for index in 0..count {
-        let path = format!("/params/{index}");
-        let param = &mut value["params"][index];
-        let kind = param["kind"].as_str().unwrap_or("number").to_owned();
-        let kept = cx.locks.iter().any(|lock| lock.keeps("/params", param));
+    for (index, param) in params.iter_mut().enumerate() {
+        let param_path = format!("{path}/{index}");
+        let kept = reader
+            .to_json(&*param)
+            .is_ok_and(|held| cx.locks.iter().any(|lock| lock.keeps(path, &held)));
         ui.horizontal(|ui| {
             if kept {
                 ui.label(theme::faint("·")).on_hover_text(forms::KEPT_TIP);
-            } else if ui
-                .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                .on_hover_text("Remove")
-                .clicked()
-            {
+            } else if controls::remove(ui, "Remove").clicked() {
                 remove = Some(index);
             }
-            let mut picked = kind.clone();
+            let mut picked = param.kind;
             ui.add_enabled_ui(!kept, |ui| {
                 ui.scope(|ui| {
                     ui.set_width(120.0);
-                    changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
+                    let name_path = format!("{param_path}{}", field!(ShaderParam, name));
+                    changed |= forms::text_of(ui, cx, &mut param.name, &name_path);
                 });
-                widgets::combo(("param-kind", index))
+                controls::combo(("param-kind", index))
                     .width(90.0)
-                    .selected_text(theme::mono(&kind).size(13.0))
+                    .selected_text(theme::mono(kind_name(param.kind)).size(13.0))
                     .show_ui(ui, |ui| {
-                        for kind in ["number", "bool", "color"] {
-                            ui.selectable_value(&mut picked, kind.to_owned(), kind);
+                        for &kind in ParamKind::VARIANTS {
+                            ui.selectable_value(&mut picked, kind, kind_name(kind));
                         }
                     });
             });
-            if picked != kind {
-                param["kind"] = Value::String(picked.clone());
-                let fields = param.as_object_mut().expect("object");
-                fields.remove("min");
-                fields.remove("max");
-                match picked.as_str() {
-                    "color" => {
-                        fields.insert(
-                            "default".to_owned(),
-                            serde_json::json!([255, 255, 255, 255]),
-                        );
-                    }
-                    "bool" => {
-                        fields.insert("default".to_owned(), Value::Bool(false));
-                    }
-                    _ => {
-                        fields.insert("default".to_owned(), Value::from(0.0));
-                        fields.insert("min".to_owned(), Value::from(0.0));
-                        fields.insert("max".to_owned(), Value::from(1.0));
-                    }
-                }
-                changed = FormChange::at(&path);
+            if picked != param.kind {
+                *param = fresh_param(std::mem::take(&mut param.name), picked);
+                changed = FormChange::at(&param_path);
             }
-            match picked.as_str() {
-                "color" => {
-                    changed |= forms::color(ui, &mut param["default"], &format!("{path}/default"));
-                }
-                "bool" => {
-                    let mut flag = param["default"].as_bool().unwrap_or(false);
-                    if ui.checkbox(&mut flag, "").changed() {
-                        param["default"] = Value::Bool(flag);
-                        changed |= FormChange::at(&format!("{path}/default"));
+            let default_path = format!("{param_path}{}", field!(ShaderParam, default));
+            match &mut param.default {
+                ParamValue::Color(color) => {
+                    let mut shown = Color32::from(*color);
+                    if ui.color_edit_button_srgba(&mut shown).changed() {
+                        *color = Rgba::from(shown.to_srgba_unmultiplied());
+                        changed |= FormChange::at(&default_path);
                     }
                 }
-                _ => {}
+                ParamValue::Bool(flag) => {
+                    if ui.checkbox(flag, "").changed() {
+                        changed |= FormChange::at(&default_path);
+                    }
+                }
+                ParamValue::Number(_) => {}
             }
         });
-        forms::error_line(ui, cx, &format!("{path}/name"));
-        if kind == "number" {
-            changed |= number_param_fields(ui, cx, param, &path);
+        forms::error_line(
+            ui,
+            cx,
+            &format!("{param_path}{}", field!(ShaderParam, name)),
+        );
+        if param.kind == ParamKind::Number {
+            changed |= number_param_fields(ui, cx, param, &param_path);
         }
     }
     if let Some(index) = remove {
-        value["params"].as_array_mut().expect("array").remove(index);
-        changed = FormChange::at("/params");
+        params.remove(index);
+        changed = FormChange::at(path);
     }
-    forms::error_line(ui, cx, "/params");
+    forms::error_line(ui, cx, path);
     if ui.button("+ param").clicked() {
-        let taken: Vec<&str> = value["params"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|param| param["name"].as_str())
-            .collect();
         let name = (1..)
             .map(|n| format!("param_{n}"))
-            .find(|name| !taken.contains(&name.as_str()))
+            .find(|name| params.iter().all(|param| param.name != *name))
             .unwrap_or_default();
-        value["params"]
-            .as_array_mut()
-            .expect("array")
-            .push(serde_json::json!({
-                "name": name, "kind": "number", "default": 1.0, "min": 0.0, "max": 2.0
-            }));
-        changed = FormChange::at("/params");
-    }
-    if value["params"].as_array().is_some_and(Vec::is_empty) {
-        value.as_object_mut().expect("object").remove("params");
+        params.push(ShaderParam {
+            default: ParamValue::Number(1.0),
+            max: Some(2.0),
+            ..fresh_param(name, ParamKind::Number)
+        });
+        changed = FormChange::at(path);
     }
     changed
 }
 
-fn number_param_fields(ui: &mut Ui, cx: &mut FormCx, param: &mut Value, path: &str) -> FormChange {
+/// A parameter of `kind` as one is first declared: a number from 0 to 1, a white color, a flag
+/// left off.
+fn fresh_param(name: String, kind: ParamKind) -> ShaderParam {
+    let number = kind == ParamKind::Number;
+    ShaderParam {
+        name,
+        kind,
+        default: match kind {
+            ParamKind::Number => ParamValue::Number(0.0),
+            ParamKind::Bool => ParamValue::Bool(false),
+            ParamKind::Color => ParamValue::Color(Rgba::WHITE),
+        },
+        min: number.then_some(0.0),
+        max: number.then_some(1.0),
+    }
+}
+
+fn kind_name(kind: ParamKind) -> &'static str {
+    kind.into()
+}
+
+fn number_param_fields(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    param: &mut ShaderParam,
+    path: &str,
+) -> FormChange {
     let mut changed = FormChange::default();
-    let schema = serde_json::json!({ "type": "number" });
     ui.horizontal(|ui| {
         ui.add_space(PARAM_INDENT);
-        for bound in ["min", "max"] {
+        for (bound, held, at) in [
+            ("min", &mut param.min, field!(ShaderParam, min)),
+            ("max", &mut param.max, field!(ShaderParam, max)),
+        ] {
             ui.label(theme::faint(bound).size(12.0));
-            ui.scope(|ui| {
-                ui.set_width(BOUND_WIDTH);
-                changed |= forms::number(
-                    ui,
-                    cx,
-                    &schema,
-                    &mut param[bound],
-                    &format!("{path}/{bound}"),
-                    false,
-                );
-            });
+            let mut amount = held.unwrap_or_default();
+            if NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui) {
+                *held = Some(tidy(f64::from(amount)) as f32);
+                changed |= FormChange::at(&format!("{path}{at}"));
+            }
         }
         ui.label(theme::faint("default").size(12.0));
-        let range = param["min"]
-            .as_f64()
-            .zip(param["max"].as_f64())
-            .filter(|(min, max)| min < max);
-        let mut amount = param["default"].as_f64().unwrap_or_default();
+        let range = param.range().filter(|(min, max)| min < max);
+        let mut amount = match param.default {
+            ParamValue::Number(number) => number,
+            _ => 0.0,
+        };
         let moved = match range {
-            Some((min, max)) => {
-                let mut shown = amount as f32;
-                let moved = controls::slider(ui, &mut shown, min as f32..=max as f32).changed();
-                ui.label(theme::faint(format!("{:.2}", tidy(f64::from(shown)))).size(12.0));
-                amount = f64::from(shown);
-                moved
-            }
-            None => ui
-                .add(egui::DragValue::new(&mut amount).speed(0.01))
-                .changed(),
+            Some((min, max)) => SliderField::new(&mut amount, min..=max).show(ui),
+            None => NumberField::new(&mut amount).width(BOUND_WIDTH).show(ui),
         };
         if moved {
-            param["default"] = Value::from(tidy(amount));
-            changed |= FormChange::at(&format!("{path}/default"));
+            param.default = ParamValue::Number(tidy(f64::from(amount)) as f32);
+            changed |= FormChange::at(&format!("{path}{}", field!(ShaderParam, default)));
         }
     });
-    for bound in ["min", "max", "default"] {
-        forms::error_line(ui, cx, &format!("{path}/{bound}"));
+    for at in [
+        field!(ShaderParam, min),
+        field!(ShaderParam, max),
+        field!(ShaderParam, default),
+    ] {
+        forms::error_line(ui, cx, &format!("{path}{at}"));
     }
     changed
 }

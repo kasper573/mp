@@ -1,36 +1,40 @@
-use egui::{Sense, Ui, Vec2};
 use engine::core::math::Pos;
 use engine::core::render::TILE;
 use engine::systems::area;
 use engine::systems::script::Place;
-use serde_json::Value;
+use ui::controls;
+use ui::egui;
+use ui::egui::{Sense, Ui, Vec2};
+use ui::form;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use super::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use super::scene::{AreaSceneRequest, AreaSceneSpec};
 use super::{pins, select};
-use crate::app::Editor;
+use crate::app::{Clipboard, Editor};
 use crate::forms;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
 use crate::views::navigation;
 
 pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
-    let Some(clip) = &editor.clipboard else {
+    let Some(clip) = editor.clipboard.as_ref().and_then(Clipboard::scene) else {
         return;
     };
-    let modules = clip.modules.clone();
     ui.label(
         theme::muted(format!(
-            "clipboard · {} module{}",
-            modules.len(),
-            widgets::plural(modules.len())
+            "clipboard · {} row{}",
+            clip.count,
+            words::plural(clip.count)
         ))
         .monospace()
         .size(13.0),
     );
     ui.add_space(4.0);
-    let text = serde_json::to_string_pretty(&Value::Array(modules)).unwrap_or_default();
+    let text = clip.nodes.text();
     let shown: String = text.lines().take(40).collect::<Vec<_>>().join("\n");
-    widgets::code_block(ui, &shown);
+    panel::code_block(ui, &shown);
     if text.lines().count() > 40 {
         ui.label(theme::faint("…").size(12.5));
     }
@@ -49,17 +53,16 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     };
     let generation = project.generation;
     let mut area_key = pick.area.clone().or_else(|| {
-        project.files.json(&pick.file)?.pointer(&pick.pointer)?["area"]
-            .as_str()
-            .map(str::to_owned)
+        let place = project.value_at::<Place>(&pick.file, &pick.pointer)?;
+        project.reader().path_of(place.area).map(str::to_owned)
     });
     let mut areas: Vec<String> = content
         .ids::<area::AreaDef>()
-        .map(|id| id.key(&content).to_owned())
+        .map(|id| id.path(&content).to_owned())
         .collect();
     areas.sort();
-    widgets::section(ui, "Pick a place");
-    widgets::combo("pick-area")
+    sheet::section(ui, "Pick a place");
+    controls::combo("pick-area")
         .width(ui.available_width())
         .selected_text(theme::mono(
             area_key
@@ -84,7 +87,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let Some(area_key) = area_key else {
         return;
     };
-    let Some(area_id) = content.by_key::<area::AreaDef>(&area_key) else {
+    let Some(area_id) = content.by_path::<area::AreaDef>(&area_key) else {
         return;
     };
     let area = area::load(&content, area_id);
@@ -101,13 +104,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let view_key = format!("pick:{area_key}");
     editor.views.area.requests.push(AreaSceneRequest {
         key: view_key.clone(),
-        spec: AreaSceneSpec {
-            ground: area_key.clone(),
-            scenery: SceneryOf::Area,
-            hidden_ground: Vec::new(),
-            show_blueprints: true,
-            show_scenery: true,
-        },
+        spec: AreaSceneSpec::area(&area_key),
         width: (rect.width() * ppp).round().max(1.0) as u32,
         height: (rect.height() * ppp).round().max(1.0) as u32,
         center,
@@ -117,7 +114,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, theme::INPUT);
-    if let Some(scene) = editor.views.area.scenes.by_key.get(&view_key) {
+    if let Some(scene) = editor.views.area.scenes.by_path.get(&view_key) {
         painter.image(scene.texture, rect, scene.uv(), egui::Color32::WHITE);
     }
     let canvas = navigation::Viewport {
@@ -175,7 +172,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
             pins::commit_pick(editor, &area_key, at);
         }
     }
-    widgets::hint(
+    form::hint(
         ui,
         &format!(
             "Click a cell for its centre, {} click for any point, in 1/16 tiles. {} keeps the old place.",

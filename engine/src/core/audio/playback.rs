@@ -12,10 +12,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AudioRef;
+use crate::core::audio::decibels;
 use crate::core::audio::loader::AudioLoader;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
-use crate::core::audio::{Lufs, decibels};
-use crate::core::content::{Content, ContentId, ContentRow, RowCheck};
+use crate::core::content::{
+    Bundle, Content, ContentFile, ContentId, FileWriter, Nearby, PartSpec, Parts, Shape,
+};
 use crate::core::math::{Pos, Rng, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds};
@@ -55,29 +57,41 @@ pub type SfxId = ContentId<SfxDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
+    #[serde(skip)]
     pub file: AudioRef,
-    pub role: SfxRoleId,
     pub volume: SfxScalar,
     pub pitch: SfxScalar,
 }
 
-impl ContentRow for SfxDef {
+pub const SFX_CLIP: PartSpec = PartSpec::File {
+    name: "clip",
+    exts: &["wav", "flac"],
+};
+
+impl ContentFile for SfxDef {
     const TABLE: &'static str = "sfx";
+    const SHAPE: Shape = Shape::Bundle;
+
+    fn fresh(_: &Nearby) -> Result<SfxDef, String> {
+        Ok(SfxDef {
+            file: AudioRef::default(),
+            volume: SfxScalar::default(),
+            pitch: SfxScalar::default(),
+        })
+    }
 }
 
-pub type SfxRoleId = ContentId<SfxRoleDef>;
+impl Bundle for SfxDef {
+    const PARTS: &'static [PartSpec] = &[SFX_CLIP];
 
-#[derive(JsonSchema, Clone, Serialize, Deserialize)]
-pub struct SfxRoleDef {
-    pub name: String,
-    pub loudness: Lufs,
-}
+    fn read_parts(&mut self, parts: &mut Parts) {
+        if let Some(clip) = parts.required(SFX_CLIP) {
+            self.file = AudioRef::new(parts.path(clip));
+        }
+    }
 
-impl ContentRow for SfxRoleDef {
-    const TABLE: &'static str = "sfx_role";
-
-    fn check(&self, cx: &mut RowCheck) {
-        cx.text("/name", &self.name, 1, 40);
+    fn write_parts(&self, _: &str, _: &mut FileWriter) -> std::io::Result<()> {
+        Ok(())
     }
 }
 

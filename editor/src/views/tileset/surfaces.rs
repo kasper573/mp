@@ -1,16 +1,26 @@
-use egui::{RichText, Sense, Ui, Vec2};
 use engine::core::audio::playback::SfxDef;
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{ContentFile, parent_of};
 use engine::systems::area::tileset::SurfaceDef;
+use ui::chip;
+use ui::controls;
+use ui::dialog;
+use ui::egui;
+use ui::egui::{RichText, Sense, Ui, Vec2};
+use ui::form;
+use ui::glyph::Mark;
+use ui::input;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
-use crate::audio::Waveform;
 use crate::project::ContentEdit;
-use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{row_form, theme, widgets};
+use crate::shell::row_form;
+use crate::tabs::shown_path;
 use crate::views::model::sounds;
-use crate::{forms, picker, rows, value};
+use crate::{picker, rows};
+use ui::input::InputField;
 
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
@@ -25,10 +35,9 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.spacing_mut().item_spacing = Vec2::new(10.0, 10.0);
         for surface in &surfaces {
             let on = brush.as_deref() == Some(surface.key.as_str());
-            let wave = sounds::wave_of_sfx(editor, &surface.footstep);
-            let level = footstep_level(editor, &surface.footstep, wave.as_ref());
+            let wave = sounds::wave_of_sfx(editor, ui.ctx(), &surface.footstep);
             let used = editor.views.tileset.surface_use(&surface.key);
-            let response = widgets::card_frame(on)
+            let response = panel::card(on)
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
                         ui.set_width(CARD.x);
@@ -38,7 +47,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    if widgets::chip(ui, "▶").clicked() {
+                                    if chip::plain(ui, Mark::Play.text(12.0)).clicked() {
                                         play = Some(surface.footstep.clone());
                                     }
                                 },
@@ -50,9 +59,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::WARN);
                         }
                         ui.label(theme::muted(used.text()).size(12.0));
-                        ui.label(
-                            theme::faint(format!("{} · {level}", surface.footstep)).size(11.5),
-                        );
+                        ui.label(theme::faint(&surface.footstep).size(11.5));
                     });
                 })
                 .response
@@ -82,28 +89,23 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
-    let Some(content) = editor.loaded() else {
+    let (Some(Ok(def)), Some(reader)) = (editor.read::<SurfaceDef>(surface), editor.reader())
+    else {
         return;
     };
-    let Some(id) = content.by_key::<SurfaceDef>(surface) else {
-        return;
-    };
-    let def = id.get(&content);
-    let footstep = def.footstep.key(&content).to_owned();
-    widgets::section(ui, &format!("surface/{surface}"));
+    let footstep = reader.path_of(def.footstep).unwrap_or_default().to_owned();
+    sheet::section(ui, shown_path(surface));
     let mut renamed = None;
     let mut new_footstep = None;
     let mut play = false;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, &def.name, "", |_| {});
+        panel::header(ui, &def.name, "", |_| {});
         ui.add_space(4.0);
-        widgets::kv(ui, "name", |ui| {
+        form::kv(ui, "name", |ui| {
             let id = ui.id().with(("surface-name", surface));
-            let typed = forms::drafted(ui, id, &def.name, |ui, draft| {
-                forms::boxed_input(ui, None, |ui| {
-                    ui.add(egui::TextEdit::singleline(draft).desired_width(160.0))
-                })
+            let typed = input::drafted(ui, id, &def.name, |ui, draft| {
+                InputField::new(draft).show(ui)
             });
             if let Some(typed) = typed
                 && !typed.trim().is_empty()
@@ -112,8 +114,8 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
                 renamed = Some(typed.trim().to_owned());
             }
         });
-        widgets::kv(ui, "footstep", |ui| {
-            play = widgets::chip(ui, "▶").clicked();
+        form::kv(ui, "footstep", |ui| {
+            play = chip::plain(ui, Mark::Play.text(12.0)).clicked();
             let mut picked = footstep.clone();
             let changed = row_form::with_row_form(editor, SurfaceDef::TABLE, surface, |cx| {
                 picker::row(ui, cx, SfxDef::TABLE, &mut picked, "/footstep")
@@ -123,25 +125,13 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             }
         });
     });
-    let wave = sounds::wave_of_sfx(editor, &footstep);
+    let wave = sounds::wave_of_sfx(editor, ui.ctx(), &footstep);
     let (rect, _) =
         ui.allocate_exact_size(Vec2::new(ui.available_width() - 8.0, 36.0), Sense::hover());
     if let Some(wave) = &wave {
         sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::WARN);
     }
-    let (_, gain) = sounds::volume_of(editor, &footstep);
-    let role = sounds::role_of_sfx(editor, &footstep);
-    match (wave.as_ref().and_then(|wave| wave.loudness), role) {
-        (Some(loudness), Some(role)) => {
-            let verdict = sounds::verdict(loudness, gain, &role.def);
-            widgets::kv(ui, "loudness", |ui| {
-                widgets::verdict(ui, verdict.ok, &verdict.loudness);
-            });
-        }
-        (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
-        (_, None) => widgets::kv_text(ui, "loudness", "no role to measure against"),
-    }
-    widgets::kv_text(
+    form::kv_text(
         ui,
         "used on",
         editor.views.tileset.surface_use(surface).text(),
@@ -153,19 +143,19 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         let label = format!("Name surface {surface} {name}");
         let def = SurfaceDef {
             name,
-            ..def.clone()
+            ..SurfaceDef::clone(&def)
         };
-        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
+        editor.write_content(&label, surface, &def);
     }
     if let Some(footstep) = new_footstep
-        && let Some(sfx) = content.by_key::<SfxDef>(&footstep)
+        && let Some(sfx) = reader.id_of::<SfxDef>(&footstep)
     {
         let label = format!("Footstep {footstep} for surface {surface}");
         let def = SurfaceDef {
             footstep: sfx,
-            ..def.clone()
+            ..SurfaceDef::clone(&def)
         };
-        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
+        editor.write_content(&label, surface, &def);
     }
 }
 
@@ -177,21 +167,19 @@ pub fn new_surface_dialog(
 ) -> Option<NewSurfaceDialog> {
     let footsteps = sounds::sfx_keys(editor);
     let mut answer = None;
-    dialogs::card(ctx, "new-surface", 400.0, |ui| {
+    dialog::card(ctx, "new-surface", 400.0, |ui| {
         ui.label(RichText::new("New surface").size(16.0).strong());
         ui.add_space(6.0);
         ui.label(theme::muted(
             "A name and a footstep: every tile painted with it sounds like this.",
         ));
         ui.add_space(8.0);
-        widgets::kv(ui, "name", |ui| {
-            let response = forms::boxed_input(ui, None, |ui| {
-                ui.add(egui::TextEdit::singleline(&mut dialog.name).desired_width(200.0))
-            });
-            widgets::default_focus(ui, &response);
+        form::kv(ui, "name", |ui| {
+            let response = InputField::new(&mut dialog.name).width(200.0).show(ui);
+            input::default_focus(ui, &response);
         });
-        widgets::kv(ui, "footstep", |ui| {
-            widgets::combo("new-surface-footstep")
+        form::kv(ui, "footstep", |ui| {
+            controls::combo("new-surface-footstep")
                 .selected_text(theme::mono(&dialog.footstep))
                 .width(200.0)
                 .show_ui(ui, |ui| {
@@ -204,12 +192,12 @@ pub fn new_surface_dialog(
             ui.colored_label(theme::DANGER, error);
         }
         ui.add_space(10.0);
-        answer = dialogs::answer_row(ui, "Add surface");
+        answer = dialog::answer_row(ui, "Add surface");
     });
     match answer {
         None => Some(dialog),
-        Some(DialogAnswer::Cancel) => None,
-        Some(DialogAnswer::Confirm) => match add_surface(editor, tileset, &dialog) {
+        Some(dialog::Answer::Cancel) => None,
+        Some(dialog::Answer::Confirm) => match add_surface(editor, tileset, &dialog) {
             Ok(()) => None,
             Err(error) => Some(NewSurfaceDialog {
                 error: Some(error),
@@ -224,44 +212,26 @@ fn add_surface(
     tileset: &str,
     dialog: &NewSurfaceDialog,
 ) -> Result<(), String> {
-    let key = rows::key_from_name(&dialog.name);
+    let name = rows::name_from(&dialog.name);
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    if let Some(problem) = rows::key_problem(&project.files, SurfaceDef::TABLE, &key) {
+    let folder = parent_of(tileset);
+    let key = rows::new_path(&project.files, folder, SurfaceDef::TABLE, &name);
+    if let Some(problem) =
+        rows::name_problem(&project.files, folder, &name, rows::name_kind(&key), None)
+    {
         return Err(problem);
     }
-    let content = editor.loaded().ok_or("the folder does not load")?;
-    let footstep = content
-        .by_key::<SfxDef>(&dialog.footstep)
+    let reader = project.reader();
+    let footstep = reader
+        .id_of::<SfxDef>(&dialog.footstep)
         .ok_or("pick a footstep")?;
     let def = SurfaceDef {
         name: dialog.name.trim().to_owned(),
         footstep,
     };
-    let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
-    let mut edit = ContentEdit::new(format!("New surface {key}"));
-    edit.write_json(row_file(SurfaceDef::TABLE, &key), &json);
+    let mut edit = ContentEdit::new(format!("New surface {name}"));
+    edit.write_content_in(&reader, &key, &def)?;
     editor.try_apply(edit)?;
     editor.views.tileset.view_mut(tileset).surface = Some(key);
     Ok(())
-}
-
-fn write_surface(
-    editor: &mut Editor,
-    content: &Content,
-    key: &str,
-    def: &SurfaceDef,
-    mut edit: ContentEdit,
-) {
-    if let Some(json) = value::untyped(content, def) {
-        edit.write_json(row_file(SurfaceDef::TABLE, key), &json);
-        editor.apply(edit);
-    }
-}
-
-fn footstep_level(editor: &Editor, footstep: &str, wave: Option<&Waveform>) -> String {
-    let (_, gain) = sounds::volume_of(editor, footstep);
-    wave.and_then(|wave| wave.loudness).map_or_else(
-        || "not measured".to_owned(),
-        |loudness| format!("{:.1} LUFS", loudness.loudest_at(gain)),
-    )
 }

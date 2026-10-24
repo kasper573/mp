@@ -1,0 +1,12 @@
+{
+  "name": "The crossroads inn",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 40,
+        "height": 22
+      },
+      "tile": 16
+    }
+  }
+}

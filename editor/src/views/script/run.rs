@@ -1,19 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 use std::time::Duration;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::menu;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
 
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
 use bevy::time::TimeUpdateStrategy;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{RichText, Ui};
-use engine::core::content::{Content, ContentRow, row_file, row_of};
+use engine::core::content::{Content, ContentFile, ContentScope, FolderReader};
 use engine::core::math::Pos;
-use engine::core::script::{
-    FlowSteering, NodeKind, OwnerKindDef, Pause, Value as ScriptValue, ValueType,
-};
+use engine::core::script::{FlowSteering, Pause, RunnerKindDef, Value as ScriptValue, ValueType};
 use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
@@ -31,28 +33,34 @@ use engine::systems::quest::{
     ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
 };
 use engine::systems::script::{
-    EventKind, FlowKey, FlowTrace, Owner, OwnerKind, Place, Reach, RiftInstances, RiftScripts,
-    TraceStep,
+    EventKind, FlowKey, FlowTrace, Node, Owner, Place, Reach, RiftInstances, RiftScripts,
+    RunnerKind, TraceStep,
 };
 use engine::systems::{self, GameSettings, TICK_HZ};
 use strum::VariantArray;
+use ui::controls;
+use ui::egui::{RichText, Ui};
+use ui::glyph::{self, Mark};
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
 use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::project::{ProjectFiles, RowSelection, catalogue_of};
+use crate::project::RowSelection;
+use crate::project::files::content_of;
+use crate::shell::widgets;
 use crate::stage::live;
 use crate::tabs::EditorTab;
-use crate::ui::{theme, widgets};
-use crate::value;
+use crate::tabs::shown_path;
 use crate::views::character::Standing;
+use ui::input::{InputField, NumberField};
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;
 // Every run of a script plays out alike.
 const RUN_SEED: u64 = 1;
+const COUNT_WIDTH: f32 = 80.0;
 
 #[derive(Clone, Debug)]
 pub struct RunSetup {
@@ -130,12 +138,12 @@ struct Watched {
 
 pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let bound = bindings(editor, doc);
-    let owner_key = doc.owner.clone();
-    let mut setup: RunSetup = editor.views.script.setup_of(&owner_key);
+    let row_key = doc.at.clone();
+    let mut setup: RunSetup = editor.views.script.setup_of(&row_key);
     let events: Vec<String> = doc
         .nodes()
         .values()
-        .filter_map(nodes::event_of)
+        .filter_map(nodes::event_name)
         .map(str::to_owned)
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -146,8 +154,10 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let randoms: Vec<(String, usize)> = doc
         .nodes()
         .iter()
-        .filter(|(_, node)| nodes::kind_of(node) == NodeKind::Random)
-        .map(|(name, node)| (name.clone(), node["weights"].as_array().map_or(0, Vec::len)))
+        .filter_map(|(name, node)| match node {
+            Node::Random { weights, .. } => Some((name.clone(), weights.len())),
+            _ => None,
+        })
         .collect();
     let characters: Vec<(String, String)> = editor
         .project
@@ -156,12 +166,12 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|content| {
             content
                 .ids::<CharacterSnapshot>()
-                .map(|id| (id.key(&content).to_owned(), id.get(&content).name.clone()))
+                .map(|id| (id.path(&content).to_owned(), id.get(&content).name.clone()))
                 .collect()
         })
         .unwrap_or_default();
-    let running = editor.views.script.run_of(&doc.owner).is_some();
-    let mut start = editor.views.script.take_fire(&doc.owner);
+    let running = editor.views.script.run_of(&doc.at).is_some();
+    let mut start = editor.views.script.take_fire(&doc.at);
     let mut stop = false;
     let mut open_owner: Option<String> = None;
     let mut step = false;
@@ -169,13 +179,15 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         ui.spacing_mut().item_spacing.x = 8.0;
         let can_fire = !bound.is_empty() && !events.is_empty();
         if ui
-            .add_enabled_ui(can_fire, |ui| widgets::primary(ui, "▶ Fire"))
+            .add_enabled_ui(can_fire, |ui| {
+                controls::marked_primary(ui, Mark::Play, "Fire")
+            })
             .inner
             .clicked()
         {
             start = true;
         }
-        widgets::combo(("run-event", doc.owner.slug()))
+        controls::combo(("run-event", doc.at.slug()))
             .selected_text(theme::mono(&setup.event).size(13.0))
             .show_ui(ui, |ui| {
                 for event in &events {
@@ -191,10 +203,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 let owner = &bound[0];
                 let response = ui
                     .horizontal(|ui| {
-                        egui::Frame::new()
-                            .fill(theme::ACCENT_SOFT)
-                            .stroke(egui::Stroke::new(1.0, theme::ACCENT))
-                            .corner_radius(4.0)
+                        panel::card(true)
                             .inner_margin(egui::Margin::symmetric(6, 2))
                             .show(ui, |ui| {
                                 widgets::badge(ui, owner.row.kind.name());
@@ -212,7 +221,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             }
             _ => {
-                widgets::combo(("run-owner", doc.owner.slug()))
+                controls::combo(("run-owner", doc.at.slug()))
                     .selected_text(
                         theme::mono(
                             bound
@@ -230,7 +239,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         ui.label(theme::muted("by").size(13.0));
-        widgets::combo(("run-character", doc.owner.slug()))
+        controls::combo(("run-character", doc.at.slug()))
             .selected_text(
                 theme::mono(
                     setup
@@ -248,7 +257,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     ui.selectable_value(
                         &mut setup.character,
                         Some(key.clone()),
-                        format!("{name} · test_character/{key}"),
+                        format!("{name} · {}", shown_path(key)),
                     );
                 }
             });
@@ -257,37 +266,35 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 start = true;
             }
             if ui
-                .button("Step ▶")
+                .button(("Step", Mark::CaretRight.text(12.0)))
                 .on_hover_text("One tick at a time")
                 .clicked()
             {
                 step = true;
             }
             if ui
-                .button("■ Stop")
+                .button((Mark::Stop.text(12.0), "Stop"))
                 .on_hover_text(EditorKey::Cancel.name())
                 .clicked()
             {
                 stop = true;
             }
         }
-        ui.menu_button(theme::faint("…"), |ui| {
+        ui.menu_button(Mark::More.text(16.0).color(theme::FAINT), |ui| {
             ui.set_min_width(220.0);
             ui.horizontal(|ui| {
                 ui.label(theme::muted("clock"));
-                ui.add(
-                    egui::DragValue::new(&mut setup.hour)
-                        .range(0.0..=23.99)
-                        .speed(0.25)
-                        .suffix(" h UTC"),
-                );
+                NumberField::new(&mut setup.hour)
+                    .range(0.0..=23.99)
+                    .unit("h UTC")
+                    .show(ui);
             });
             ui.checkbox(&mut setup.step, "pause at every node");
             for (name, outputs) in &randoms {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted(format!("{name} takes")));
                     let pick = setup.random.get(name).copied();
-                    widgets::combo(("run-random", doc.owner.slug(), name))
+                    controls::combo(("run-random", doc.at.slug(), name))
                         .selected_text(pick.map_or("its weights".to_owned(), |index| {
                             format!("output {}", index + 1)
                         }))
@@ -314,9 +321,9 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         });
     });
-    editor.views.script.set_setup(&owner_key, setup.clone());
+    editor.views.script.set_setup(&row_key, setup.clone());
     if let Some(file) = open_owner
-        && let Some((table, key)) = row_of(&file)
+        && let Some((table, key)) = content_of(&file)
     {
         editor.open_row(table, key);
     }
@@ -340,23 +347,26 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             editor.views.script.run = Some(run);
         }
     }
-    let cards: Vec<NodeCard> = doc
-        .nodes()
-        .iter()
-        .map(|(name, node)| NodeCard {
-            name: name.clone(),
-            title: super::graph::card_title(name, node),
-            detail: nodes::summary(node, catalogue_of(editor.project.as_ref())),
-        })
-        .collect();
+    let cards: Vec<NodeCard> = match editor.project.as_ref() {
+        Some(project) => doc
+            .nodes()
+            .iter()
+            .map(|(name, node)| NodeCard {
+                name: name.clone(),
+                title: super::graph::card_title(name, node),
+                detail: nodes::summary(node, &doc.text(project)),
+            })
+            .collect(),
+        None => Vec::new(),
+    };
     let owner_label = bound
         .get(setup.owner)
         .or(bound.first())
         .map(|b| b.label.clone())
         .unwrap_or_default();
-    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
+    let Some(run) = editor.views.script.run_of_mut(&row_key) else {
         if bound.is_empty() {
-            widgets::hint(
+            form::hint(
                 ui,
                 "Run needs an owner: name this script from an npc, object, item, quest, shop or area first.",
             );
@@ -380,7 +390,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut skip = false;
     let mut resume = false;
     egui::ScrollArea::vertical()
-        .id_salt(("run-trace", doc.owner.slug()))
+        .id_salt(("run-trace", doc.at.slug()))
         .stick_to_bottom(true)
         .show(ui, |ui| {
             let mut row_number = 0;
@@ -434,7 +444,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     }
                     ui.add(egui::Label::new(theme::muted(detail).monospace().size(12.5)).wrap());
                 });
-                widgets::rule(ui);
+                form::rule(ui);
             }
             ui.add_space(4.0);
             ui.horizontal(|ui| {
@@ -444,7 +454,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                     skip = true;
                 }
                 if matches!(run.state, ScriptRunState::Stepping | ScriptRunState::Paused { .. })
-                    && ui.button("▶ Run on").clicked()
+                    && ui.button((Mark::Play.text(12.0), "Run on")).clicked()
                 {
                     resume = true;
                 }
@@ -473,7 +483,7 @@ struct NodeCard {
 }
 
 pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let owner = doc.owner.clone();
+    let owner = doc.at.clone();
     let Some(run) = editor.views.script.run_of_mut(&owner) else {
         return;
     };
@@ -501,7 +511,7 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .fixed_pos(egui::pos2(rect.max.x - width - 16.0, rect.max.y - 16.0))
         .pivot(egui::Align2::LEFT_BOTTOM)
         .show(ui.ctx(), |ui| {
-            design_tokens::slip::show(ui, |ui| {
+            ui::slip::show(ui, |ui| {
                 ui.set_width(width);
                 ui.label(
                     RichText::new("CONVERSATION · the client's box")
@@ -578,24 +588,24 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
 }
 
 pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
-    let owner_key = doc.owner.clone();
-    if editor.views.script.run_of(&owner_key).is_none() {
+    let row_key = doc.at.clone();
+    if editor.views.script.run_of(&row_key).is_none() {
         return false;
     }
     let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return false;
     };
     let bound = bindings(editor, doc);
-    let setup = editor.views.script.setup_of(&owner_key);
+    let setup = editor.views.script.setup_of(&row_key);
     let reaches: Vec<Reach> = bound
         .get(setup.owner)
         .or(bound.first())
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
-    let read_memories = NodeReads::of(&content, doc.nodes()).memories;
-    let state_names = inspect::names_of(&doc.script["state"]);
+    let read_memories = NodeReads::of(&doc.reader, doc.nodes()).memories;
+    let state_names = inspect::names_of(&doc.script.state);
     let mut open: Option<EditorTab> = None;
-    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
+    let Some(run) = editor.views.script.run_of_mut(&row_key) else {
         return false;
     };
     let label = run.label.split(" · ").next().unwrap_or("").to_owned();
@@ -617,12 +627,12 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
             .map(|node| format!("at {node}"))
             .unwrap_or_default(),
     };
-    widgets::section(ui, "Owner");
-    widgets::card_frame(false).show(ui, |ui| {
+    sheet::section(ui, "Owner");
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &label);
-        widgets::kv_text(ui, "state", state_names);
-        widgets::kv_text(
+        panel::title(ui, &label);
+        form::kv_text(ui, "state", state_names);
+        form::kv_text(
             ui,
             "flows",
             if flows == 0 {
@@ -632,7 +642,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
             },
         );
     });
-    widgets::section(ui, "Pretend subject");
+    sheet::section(ui, "Pretend subject");
     character_card(ui, run, &content, &mut open);
     memories_card(ui, run, &content, &read_memories);
     quests_card(ui, run, &content, &reaches, &mut open);
@@ -663,18 +673,18 @@ fn character_card(
     let classes: Vec<(ClassId, String)> = content
         .table::<ClassDef>()
         .ids()
-        .map(|id| (id, id.key(content).to_owned()))
+        .map(|id| (id, id.path(content).to_owned()))
         .collect();
     let tiers = class
         .map(|class| class.get(content).levels.len())
         .unwrap_or(0);
-    let area_key = run.area.key(content).to_owned();
-    widgets::card_frame(false).show(ui, |ui| {
+    let area_key = run.area.path(content).to_owned();
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &name);
-        widgets::kv(ui, "level", |ui| {
+        panel::title(ui, &name);
+        form::kv(ui, "level", |ui| {
             let mut picked = level;
-            widgets::combo("run-level")
+            controls::combo("run-level")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(level.to_string()))
                 .show_ui(ui, |ui| {
@@ -691,12 +701,12 @@ fn character_card(
                 }
             }
         });
-        widgets::kv(ui, "class", |ui| {
+        form::kv(ui, "class", |ui| {
             let current = class
-                .map(|class| class.key(content).to_owned())
+                .map(|class| class.path(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
             let mut picked = class;
-            widgets::combo("run-class")
+            controls::combo("run-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current))
                 .show_ui(ui, |ui| {
@@ -711,8 +721,8 @@ fn character_card(
                 held.def = def;
             }
         });
-        widgets::kv(ui, "area", |ui| {
-            if widgets::keyed_button(ui, &format!("area/ {area_key}"), None, true)
+        form::kv(ui, "area", |ui| {
+            if controls::keyed(ui, &format!("area/ {area_key}"), None, true)
                 .on_hover_text("Open the area the run plays in")
                 .clicked()
             {
@@ -729,7 +739,12 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
     let set: Vec<String> = run
         .world()
         .get::<Memory>(subject)
-        .map(|memory| memory.keys().map(|id| id.key(content).to_owned()).collect())
+        .map(|memory| {
+            memory
+                .keys()
+                .map(|id| id.path(content).to_owned())
+                .collect()
+        })
         .unwrap_or_default();
     let mut shown: Vec<String> = read.to_vec();
     for key in set.iter().chain(&run.watched.memories) {
@@ -737,22 +752,22 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
             shown.push(key.clone());
         }
     }
-    let all: Vec<String> = content.table::<MemoryDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<MemoryDef>().paths().to_vec();
     let mut add: Option<String> = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "memories");
+        panel::title(ui, "memories");
         if shown.is_empty() {
             ui.label(theme::muted("none set · unset reads as zero").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<MemoryDef>(key) else {
+            let Some(id) = content.by_path::<MemoryDef>(key) else {
                 continue;
             };
             let ty = id.get(content).ty;
             let is_set = set.contains(key);
             let value = memory::get(run.world(), subject, id);
-            widgets::kv(ui, key, |ui| {
+            form::kv(ui, shown_path(key), |ui| {
                 let mut changed = None;
                 match (ty, value) {
                     (ValueType::Boolean, value) => {
@@ -765,18 +780,29 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
                         }
                     }
                     (ValueType::Text, value) => {
-                        let mut text = match value {
+                        let text = match value {
                             ScriptValue::Text(text) => text,
                             _ => String::new(),
                         };
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut text)
-                                .hint_text(if is_set { "" } else { "unset" })
-                                .desired_width(ui.available_width() - 8.0)
-                                .font(egui::TextStyle::Monospace),
-                        );
-                        if response.lost_focus() && response.changed() {
-                            changed = Some(ScriptValue::Text(text));
+                        let draft_id = ui.id().with(("run-memory", key));
+                        if let Some(typed) = input::drafted(ui, draft_id, &text, |ui, draft| {
+                            let field = InputField::new(draft);
+                            if is_set { field } else { field.hint("unset") }.show(ui)
+                        }) {
+                            changed = Some(ScriptValue::Text(typed));
+                        }
+                    }
+                    (ValueType::Integer, value) => {
+                        let mut count = match value {
+                            ScriptValue::Int(int) => int,
+                            ScriptValue::Num(num) => num as i64,
+                            _ => 0,
+                        };
+                        if !is_set {
+                            ui.label(theme::muted("unset").size(13.0));
+                        }
+                        if NumberField::new(&mut count).show(ui) {
+                            changed = Some(ScriptValue::Int(count));
                         }
                     }
                     (_, value) => {
@@ -788,13 +814,8 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
                         if !is_set {
                             ui.label(theme::muted("unset").size(13.0));
                         }
-                        let response = ui.add(egui::DragValue::new(&mut number).speed(1.0));
-                        if response.changed() {
-                            changed = Some(if ty == ValueType::Integer {
-                                ScriptValue::Int(number as i64)
-                            } else {
-                                ScriptValue::Num(number)
-                            });
+                        if NumberField::new(&mut number).show(ui) {
+                            changed = Some(ScriptValue::Num(number));
                         }
                     }
                 }
@@ -839,7 +860,7 @@ fn quests_card(
             | Reach::TurnsIn(q)
             | Reach::Completes(q)
             | Reach::Decides(q)
-            | Reach::Fails(q) => Some(q.key(content).to_owned()),
+            | Reach::Fails(q) => Some(q.path(content).to_owned()),
             _ => None,
         })
         .collect();
@@ -847,33 +868,37 @@ fn quests_card(
     for key in log
         .active
         .iter()
-        .map(|a| a.quest.key(content).to_owned())
-        .chain(log.finished.iter().map(|f| f.quest.key(content).to_owned()))
+        .map(|a| a.quest.path(content).to_owned())
+        .chain(
+            log.finished
+                .iter()
+                .map(|f| f.quest.path(content).to_owned()),
+        )
         .chain(run.watched.quests.iter().cloned())
     {
         if !shown.contains(&key) {
             shown.push(key);
         }
     }
-    let all: Vec<String> = content.table::<QuestDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<QuestDef>().paths().to_vec();
     let mut add: Option<String> = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "quests");
+        panel::title(ui, "quests");
         if shown.is_empty() {
             ui.label(theme::muted("none taken").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<QuestDef>(key) else {
+            let Some(id) = content.by_path::<QuestDef>(key) else {
                 continue;
             };
             let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("quest/ {key}"), None, true).clicked() {
+                if controls::keyed(ui, shown_path(key), None, true).clicked() {
                     *open = Some(EditorTab::for_row(QuestDef::TABLE, key));
                 }
                 let mut picked = standing;
-                widgets::combo(("run-quest", key))
+                controls::combo(("run-quest", key))
                     .selected_text(theme::mono(run_label(standing)))
                     .show_ui(ui, |ui| {
                         for &option in Standing::VARIANTS {
@@ -908,30 +933,30 @@ fn bag_card(
     let mut shown: Vec<String> = reaches
         .iter()
         .filter_map(|reach| match reach {
-            Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.key(content).to_owned()),
+            Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.path(content).to_owned()),
             _ => None,
         })
         .collect();
     shown.dedup();
     for key in held
         .iter()
-        .map(|stack| stack.item.key(content).to_owned())
+        .map(|stack| stack.item.path(content).to_owned())
         .chain(run.watched.items.iter().cloned())
     {
         if !shown.contains(&key) {
             shown.push(key);
         }
     }
-    let all: Vec<String> = content.table::<ItemDef>().keys().to_vec();
+    let all: Vec<String> = content.table::<ItemDef>().paths().to_vec();
     let mut add: Option<String> = None;
-    widgets::card_frame(false).show(ui, |ui| {
+    panel::card(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "bag");
+        panel::title(ui, "bag");
         if shown.is_empty() {
             ui.label(theme::muted("empty").size(13.0));
         }
         for key in &shown {
-            let Some(id) = content.by_key::<ItemDef>(key) else {
+            let Some(id) = content.by_path::<ItemDef>(key) else {
                 continue;
             };
             let count = held
@@ -940,14 +965,14 @@ fn bag_card(
                 .map(|stack| stack.count)
                 .sum::<u32>();
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("item/ {key}"), None, true).clicked() {
+                if controls::keyed(ui, shown_path(key), None, true).clicked() {
                     *open = Some(EditorTab::for_row(ItemDef::TABLE, key));
                 }
                 let mut picked = count;
-                if ui
-                    .add(egui::DragValue::new(&mut picked).speed(0.1).range(0..=999))
-                    .changed()
-                    && picked != count
+                if NumberField::new(&mut picked)
+                    .range(0..=999)
+                    .width(COUNT_WIDTH)
+                    .show(ui)
                     && let Some(mut bag) = run.world_mut().get_mut::<Inventory>(subject)
                 {
                     bag.set_count(id, picked);
@@ -963,8 +988,7 @@ fn bag_card(
 
 fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Option<String> {
     let mut add = None;
-    let response = ui.add(egui::Button::new(theme::muted(label).size(12.5)));
-    egui::Popup::from_toggle_button_response(&response).show(|ui| {
+    menu::dropdown(ui, theme::muted(label).size(12.5), |ui| {
         ui.set_min_width(180.0);
         egui::ScrollArea::vertical()
             .max_height(240.0)
@@ -973,7 +997,7 @@ fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Opti
                 for key in all.iter().filter(|key| !shown.contains(key)) {
                     any = true;
                     if ui
-                        .selectable_label(false, theme::mono(key).size(12.5))
+                        .selectable_label(false, theme::mono(shown_path(key)).size(12.5))
                         .clicked()
                     {
                         add = Some(key.clone());
@@ -1024,16 +1048,12 @@ fn set_quest_standing(
 fn branch_taken(doc: &ScriptDoc, node: &str, next: Option<&RunLogLine>) -> Option<String> {
     let next = next?.node()?;
     let source = doc.nodes().get(node)?;
-    match nodes::kind_of(source) {
-        NodeKind::If => ["yes", "no"]
+    match source {
+        Node::If { .. } | Node::Random { .. } => source
+            .exits()
             .into_iter()
-            .find(|arrow| source[arrow].as_str() == Some(next))
-            .map(str::to_owned),
-        NodeKind::Random => source["outputs"]
-            .as_array()?
-            .iter()
-            .position(|arrow| arrow.as_str() == Some(next))
-            .map(|index| format!("output {}", index + 1)),
+            .find(|(_, arrow)| arrow.to() == Some(next))
+            .map(|(exit, _)| nodes::exit_label(exit)),
         _ => None,
     }
 }
@@ -1044,7 +1064,7 @@ fn start_run(
     owner: &ScriptBinding,
     setup: &RunSetup,
 ) -> Result<ScriptRun, String> {
-    let doc_session = editor.views.script.session(&doc.owner);
+    let doc_session = editor.views.script.session(&doc.at);
     let project = editor.project.as_ref().ok_or("no project")?;
     let content = project.content.clone().ok_or("the folder does not load")?;
     let generation = project.generation;
@@ -1056,7 +1076,7 @@ fn start_run(
     let mut world = live::sandbox(&content, area_id, RUN_SEED, clock);
     world.insert_resource(FlowTrace::default());
     world.insert_resource(FlowSteering::default());
-    let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.files)?;
+    let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.reader())?;
     let area = area::load(&content, area_id);
     let at = area
         .grid
@@ -1108,7 +1128,7 @@ fn start_run(
         |_| true,
     );
     run.log.push(RunLogLine::Note(format!(
-        "▶ {} raised on {}",
+        "{} raised on {}",
         setup.event, owner.label
     )));
     Ok(run)
@@ -1117,22 +1137,22 @@ fn start_run(
 fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(AreaId, Pos<Tiles>)> {
     let spawn = content.built::<GameSettings>().initial_spawn;
     match owner.row.kind {
-        OwnerKind::Area | OwnerKind::Object | OwnerKind::Blueprint => {
+        RunnerKind::Area | RunnerKind::Object | RunnerKind::Blueprint => {
             let area: AreaId = owner.row.id();
             let placed = area::placed(content, area);
             let near = match (owner.row.kind, owner.row.object) {
-                (OwnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
+                (RunnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
                     AreaModule::Object(object) => object.shape.bounds().center(),
                     _ => area::load(content, area).center(),
                 },
-                (OwnerKind::Blueprint, Some(ordinal)) => {
+                (RunnerKind::Blueprint, Some(ordinal)) => {
                     area::placements(content, area).get(ordinal as usize)?.at
                 }
                 _ => area::load(content, area).center(),
             };
             Some((area, near))
         }
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let home = area::residence(content, owner.row.id()).unwrap_or(spawn);
             Some((home.area, home.at))
         }
@@ -1147,8 +1167,8 @@ fn locate_owner(
     at: Pos<Tiles>,
 ) -> Result<Owner, String> {
     Ok(match owner.row.kind {
-        OwnerKind::Area => Owner::Row(OwnerKind::Area, area_id.raw()),
-        OwnerKind::Object => {
+        RunnerKind::Area => Owner::Row(RunnerKind::Area, area_id.raw()),
+        RunnerKind::Object => {
             let index = owner.row.object.ok_or("an object without an index")?;
             let entity = world
                 .query::<(Entity, &AreaObject)>()
@@ -1156,9 +1176,9 @@ fn locate_owner(
                 .find(|(_, object)| object.index == index)
                 .map(|(entity, _)| entity)
                 .ok_or("the object is not in its area")?;
-            Owner::Entity(OwnerKind::Object, entity)
+            Owner::Entity(RunnerKind::Object, entity)
         }
-        OwnerKind::Npc => {
+        RunnerKind::Npc => {
             let def: NpcId = owner.row.id();
             let found = world
                 .query::<(Entity, &Npc)>()
@@ -1172,10 +1192,10 @@ fn locate_owner(
                     npc::spawn(world, def, at, area_id, pack)
                 }
             };
-            Owner::Entity(OwnerKind::Npc, entity)
+            Owner::Entity(RunnerKind::Npc, entity)
         }
-        OwnerKind::Blueprint => {
-            Owner::Row(OwnerKind::Blueprint, owner.row.object.unwrap_or_default())
+        RunnerKind::Blueprint => {
+            Owner::Row(RunnerKind::Blueprint, owner.row.object.unwrap_or_default())
         }
         kind => Owner::Row(kind, owner.row.row),
     })
@@ -1184,20 +1204,19 @@ fn locate_owner(
 fn snapshot_for(
     content: &Content,
     key: Option<&str>,
-    files: &ProjectFiles,
+    reader: &FolderReader,
 ) -> Result<CharacterSnapshot, String> {
     let Some(key) = key else {
         let settings = content.built::<GameSettings>();
-        return Ok(CharacterSnapshot::fresh(
+        return Ok(CharacterSnapshot::of_player(
             content,
             "Tester",
             settings.player.get(content),
         ));
     };
-    let json = files
-        .json_owned(&row_file(CharacterSnapshot::TABLE, key))
-        .ok_or_else(|| format!("no test character {key}"))?;
-    value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
+    reader
+        .read_in(key, &ContentScope::of(content))
+        .map_err(|_| format!("test character {} does not read", shown_path(key)))
 }
 
 impl ScriptRun {

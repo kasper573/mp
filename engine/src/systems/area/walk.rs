@@ -135,10 +135,10 @@ fn scenery_tiles(scenery: &Scenery) -> impl Iterator<Item = (u32, Rect<Tiles>)> 
 }
 
 fn scenery_blocks(scenery: &Scenery) -> impl Iterator<Item = CellPos> + '_ {
-    scenery.blocks.iter().map(move |[x, y]| {
-        let center = Pos::new(*x as f32 + 0.5, *y as f32 + 0.5);
-        (scenery.at + scenery.flip.apply(center).to_vector()).cell()
-    })
+    scenery
+        .blocks
+        .iter()
+        .map(|&block| scenery.cell_under(block))
 }
 
 fn cell_overlap(rect: &Rect<Tiles>, cell: CellPos) -> f32 {

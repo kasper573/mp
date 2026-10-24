@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use engine::core::content::Content;
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
@@ -9,7 +10,7 @@ use engine::systems::area::AreaDef;
 use engine::systems::class::NodeKey;
 use engine::systems::combat::{self, Attitude};
 use engine::systems::equipment::{self, EquipmentSlot, UnequipRequest};
-use engine::systems::item::{self, Inventory, ItemDef, UseItemRequest};
+use engine::systems::item::{self, Inventory, ItemDef, ItemStack, UseItemRequest};
 use engine::systems::movement::{self, position};
 use engine::systems::npc::{self, NpcDef, Pack};
 use engine::systems::skill::{
@@ -20,7 +21,7 @@ use engine::systems::stat::{self, StatKind};
 use engine::systems::status::{self, StatusCategory, StatusEffectDef, Statuses};
 use engine::systems::{actor, script, vfx};
 use serde_json::{Value, json};
-use testkit::{Game, Map, Sim};
+use testkit::{Game, Map, Sim, path};
 
 #[test]
 fn a_status_holds_its_boost_until_its_time_runs_out() {
@@ -76,7 +77,7 @@ fn a_cleanse_takes_only_the_category_it_names() {
 }
 
 #[test]
-fn a_status_on_an_interval_strikes_every_period_while_it_holds() {
+fn a_status_on_an_interval_strikes_or_heals_every_period_while_it_holds() {
     let (mut sim, player) = clinic();
     let full = stat::current_health(&sim.world, player);
     let poisoned = sim.id::<StatusEffectDef>("poisoned");
@@ -95,6 +96,23 @@ fn a_status_on_an_interval_strikes_every_period_while_it_holds() {
     let bitten = stat::current_health(&sim.world, player);
     sim.later(2.0);
     assert_eq!(stat::current_health(&sim.world, player), bitten);
+
+    let at = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
+    let dummy = dummy(&mut sim, at);
+    stat::apply_damage(&mut sim.world, dummy, 20.0);
+    let hurt = stat::current_health(&sim.world, dummy);
+    let sanctified = sim.id::<StatusEffectDef>("sanctified");
+    status::apply(&mut sim.world, dummy, sanctified, 3.0, Some(Seconds(9.0)));
+    sim.run(0.5);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt);
+    sim.later(2.0);
+    assert_eq!(
+        stat::current_health(&sim.world, dummy),
+        hurt + 3.0,
+        "a status of positive power heals each period"
+    );
+    sim.later(2.0);
+    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 6.0);
 }
 
 #[test]
@@ -135,10 +153,12 @@ fn a_carried_charm_boosts_only_while_it_is_carried() {
     );
 
     let wing = sim.id::<ItemDef>("wing");
+    let content = sim.world.resource::<Content>().clone();
     sim.world
         .get_mut::<Inventory>(player)
         .expect("bag")
-        .set_count(wing, 0);
+        .exchange(&content, &[ItemStack::new(wing, 1)], &[])
+        .expect("the wing is handed over");
     sim.run(0.5);
     assert_eq!(
         stat::effective(&sim.world, player, StatKind::MovementSpeed),
@@ -211,57 +231,34 @@ fn a_status_plays_its_vfx_coming_staying_and_going() {
 }
 
 #[test]
-fn an_interval_status_can_heal_as_well_as_harm() {
-    let (mut sim, player) = clinic();
-    let at = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
-    let dummy = dummy(&mut sim, at);
-    stat::apply_damage(&mut sim.world, dummy, 20.0);
-    let hurt = stat::current_health(&sim.world, dummy);
-    let sanctified = sim.id::<StatusEffectDef>("sanctified");
-
-    status::apply(&mut sim.world, dummy, sanctified, 3.0, Some(Seconds(9.0)));
-    sim.run(0.5);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt);
-    sim.later(2.0);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 3.0);
-    sim.later(2.0);
-    assert_eq!(stat::current_health(&sim.world, dummy), hurt + 6.0);
-}
-
-#[test]
 fn an_area_skill_leaves_its_status_on_everyone_it_hit() {
     let (mut sim, player) = clinic();
     knows_fireball(&mut sim, player);
     let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
     let near = dummy(&mut sim, aimed);
     let far = dummy(&mut sim, aimed + Offset::new(1.0, 0.0));
-    sim.run(0.5);
-    let burning = sim.id::<StatusEffectDef>("burning");
-
-    cast_fireball(&mut sim, aimed);
-    assert!(sim.run_until(10.0, |world| {
-        status::has(world, near, burning) && status::has(world, far, burning)
-    }));
-    sim.run(0.5);
-    assert!(playing(&mut sim, "embers", near));
-    assert!(playing(&mut sim, "embers", far));
-}
-
-#[test]
-fn an_area_skill_leaves_its_status_on_a_monster_running_its_own_script() {
-    let (mut sim, player) = clinic();
-    knows_fireball(&mut sim, player);
-    let aimed = position(&sim.world, player).expect("position") + Offset::new(3.0, 0.0);
     let area = sim.id::<AreaDef>("clinic");
     let roamer = sim.id::<NpcDef>("roamer");
-    let monster = npc::spawn(&mut sim.world, roamer, aimed, area, Pack(7));
+    let scripted = npc::spawn(
+        &mut sim.world,
+        roamer,
+        aimed + Offset::new(0.0, 1.0),
+        area,
+        Pack(7),
+    );
     sim.run(0.5);
     let burning = sim.id::<StatusEffectDef>("burning");
 
     cast_fireball(&mut sim, aimed);
-    assert!(sim.run_until(10.0, |world| status::has(world, monster, burning)));
+    let hit = [near, far, scripted];
+    assert!(sim.run_until(10.0, |world| {
+        hit.iter()
+            .all(|target| status::has(world, *target, burning))
+    }));
     sim.run(0.5);
-    assert!(playing(&mut sim, "embers", monster));
+    for target in hit {
+        assert!(playing(&mut sim, "embers", target));
+    }
 }
 
 fn clinic() -> (Sim, Entity) {
@@ -270,64 +267,75 @@ fn clinic() -> (Sim, Entity) {
         .hero("clinic", 4.0, 4.0)
         .edit("class", "hero", |hero| {
             hero["tree"] = json!({
-                "toughness": { "skill": "toughness", "at": { "x": 0.0, "y": 0.0 } },
-                "fireball": { "skill": "fireball", "at": { "x": 80.0, "y": 0.0 } },
+                "toughness": { "skill": "toughness.skill.json", "at": { "x": 0.0, "y": 0.0 } },
+                "fireball": { "skill": "fireball.skill.json", "at": { "x": 80.0, "y": 0.0 } },
             });
         })
-        .row("status_effect", "guarded", effect("buff", json!({ "on_activate": "guard_up" }), boost_by_power()))
+        .row("status_effect", "guarded", effect("buff", json!({ "on_activate": "guard_up.vfx.json" }), "guarded_boost"))
+        .script("guarded_boost", "status_effect", boost_by_power())
         .row(
             "status_effect",
             "warded",
             effect(
                 "buff",
-                json!({ "on_activate": "ward_up", "during": "ward_bubble", "on_expire": "ward_break" }),
-                boost_by_power(),
+                json!({ "on_activate": "ward_up.vfx.json", "during": "ward_bubble.vfx.json", "on_expire": "ward_break.vfx.json" }),
+                "warded_boost",
             ),
         )
+        .script("warded_boost", "status_effect", boost_by_power())
         .row(
             "status_effect",
             "poisoned",
-            effect("debuff", json!({ "during": "poison_bubbles" }), every(2.0, "damage")),
+            effect("debuff", json!({ "during": "poison_bubbles.vfx.json" }), "poisoned_damage"),
         )
+        .script("poisoned_damage", "status_effect", every(2.0, "damage"))
         .row(
             "status_effect",
             "sanctified",
-            effect("buff", json!({ "during": "holy_motes" }), every(2.0, "heal")),
+            effect("buff", json!({ "during": "holy_motes.vfx.json" }), "sanctified_heal"),
         )
+        .script("sanctified_heal", "status_effect", every(2.0, "heal"))
         .row(
             "status_effect",
             "burning",
-            effect("debuff", json!({ "during": "embers" }), every(1.0, "damage")),
+            effect("debuff", json!({ "during": "embers.vfx.json" }), "burning_damage"),
         )
+        .script("burning_damage", "status_effect", every(1.0, "damage"))
         .asset("icons/status.png", testkit::png(1, 1))
-        .item(
-            "antidote",
-            usable(json!({
-                "drink": { "type": "items", "take": [{ "item": "antidote" }], "done": "cleanse" },
+        .item("antidote", usable("antidote_drink"))
+        .script(
+            "antidote_drink",
+            "item",
+            drinking(json!({
+                "drink": { "type": "items", "take": [{ "item": "antidote.item.json" }], "done": "cleanse" },
                 "cleanse": { "type": "remove_status", "category": "debuff" },
             })),
         )
-        .item(
-            "bog_water",
-            usable(json!({
-                "drink": { "type": "items", "take": [{ "item": "bog_water" }], "done": "sicken" },
-                "sicken": { "type": "apply_status", "effect": "poisoned", "power": 2.0, "seconds": 12.0 },
+        .item("bog_water", usable("bog_water_drink"))
+        .script(
+            "bog_water_drink",
+            "item",
+            drinking(json!({
+                "drink": { "type": "items", "take": [{ "item": "bog_water.item.json" }], "done": "sicken" },
+                "sicken": { "type": "apply_status", "effect": "poisoned.status_effect.json", "power": 2.0, "seconds": 12.0 },
             })),
         )
         .item(
             "wing",
             json!({
                 "kind": { "type": "resource" },
-                "modules": [{ "type": "stack", "max": 50 }, boosting("movement_speed", 0.5)],
+                "modules": [{ "type": "stack", "max": 50 }, { "type": "script", "script": "wing_boost.script.json" }],
             }),
         )
+        .script("wing_boost", "item", boosting("movement_speed", 0.5))
         .item(
             "blade",
             json!({
                 "kind": { "type": "equipment", "slot": "weapon" },
-                "modules": [boosting("damage", 4.0)],
+                "modules": [{ "type": "script", "script": "blade_boost.script.json" }],
             }),
         )
+        .script("blade_boost", "item", boosting("damage", 4.0))
         .row(
             "skill",
             "toughness",
@@ -337,17 +345,19 @@ fn clinic() -> (Sim, Entity) {
                 "kind": "passive",
                 "target": "self",
                 "levels": [{ "cost": 1, "stats": { "power": 6.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "activated": { "type": "on", "event": "activated", "next": "harden" },
-                        "harden": {
-                            "type": "boost",
-                            "stat": "max_health",
-                            "by": { "type": "skill_stat", "skill": "toughness", "stat": "power" },
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "toughness_harden.script.json" }],
+            }),
+        )
+        .script(
+            "toughness_harden",
+            "skill",
+            json!({
+                "activated": { "type": "on", "event": "activated", "next": "harden" },
+                "harden": {
+                    "type": "boost",
+                    "stat": "max_health",
+                    "by": { "type": "skill_stat", "skill": "toughness.skill.json", "stat": "power" },
+                },
             }),
         )
         .row(
@@ -360,34 +370,34 @@ fn clinic() -> (Sim, Entity) {
                 "range": 6.0,
                 "area": { "type": "circle", "radius": 2.0 },
                 "levels": [{ "cost": 1, "stats": { "power": 1.0 } }],
-                "modules": [{
-                    "type": "inline_script",
-                    "nodes": {
-                        "used": { "type": "on", "event": "used", "next": "cast" },
-                        "cast": { "type": "animate", "action": "attack", "wait": "apex", "next": "burn" },
-                        "burn": {
-                            "type": "apply_status",
-                            "who": { "type": "skill_targets" },
-                            "effect": "burning",
-                            "power": 1.0,
-                            "seconds": 6.0,
-                        },
-                    },
-                }],
+                "modules": [{ "type": "script", "script": "fireball_burn.script.json" }],
+            }),
+        )
+        .script(
+            "fireball_burn",
+            "skill",
+            json!({
+                "used": { "type": "on", "event": "used", "next": "cast" },
+                "cast": { "type": "animate", "action": "attack", "wait": "apex", "next": "burn" },
+                "burn": {
+                    "type": "apply_status",
+                    "who": { "type": "skill_targets" },
+                    "effect": "burning.status_effect.json",
+                    "power": 1.0,
+                    "seconds": 6.0,
+                },
             }),
         )
         .npc("dummy", 100.0, json!([]))
-        .npc(
-            "roamer",
-            100.0,
-            json!([{
-                "type": "inline_script",
-                "nodes": {
-                    "spawned": { "type": "on", "event": "started", "next": "hostile" },
-                    "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "rest" },
-                    "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
-                },
-            }]),
+        .npc("roamer", 100.0, json!([{ "type": "script", "script": "roamer_rest.script.json" }]))
+        .script(
+            "roamer_rest",
+            "npc",
+            json!({
+                "spawned": { "type": "on", "event": "started", "next": "hostile" },
+                "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "rest" },
+                "rest": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "rest" },
+            }),
         )
         .vfx("guard_up")
         .vfx("ward_up")
@@ -433,14 +443,14 @@ fn clinic() -> (Sim, Entity) {
     (sim, player)
 }
 
-fn effect(category: &str, vfx: Value, nodes: Value) -> Value {
+fn effect(category: &str, vfx: Value, script: &str) -> Value {
     json!({
         "name": "Effect",
         "icon": "icons/status.png",
         "category": category,
         "description": "An effect.",
         "vfx": vfx,
-        "modules": [{ "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "script", "script": path("script", script) }],
     })
 }
 
@@ -458,21 +468,22 @@ fn every(seconds: f32, act: &str) -> Value {
     })
 }
 
-fn usable(mut nodes: Value) -> Value {
-    nodes["used"] = json!({ "type": "on", "event": "used", "next": "drink" });
+fn usable(script: &str) -> Value {
     json!({
         "kind": { "type": "usable" },
-        "modules": [{ "type": "stack", "max": 5 }, { "type": "inline_script", "nodes": nodes }],
+        "modules": [{ "type": "stack", "max": 5 }, { "type": "script", "script": path("script", script) }],
     })
+}
+
+fn drinking(mut nodes: Value) -> Value {
+    nodes["used"] = json!({ "type": "on", "event": "used", "next": "drink" });
+    nodes
 }
 
 fn boosting(stat: &str, by: f32) -> Value {
     json!({
-        "type": "inline_script",
-        "nodes": {
-            "activated": { "type": "on", "event": "activated", "next": "boost" },
-            "boost": { "type": "boost", "stat": stat, "by": by },
-        },
+        "activated": { "type": "on", "event": "activated", "next": "boost" },
+        "boost": { "type": "boost", "stat": stat, "by": by },
     })
 }
 

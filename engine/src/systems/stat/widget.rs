@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use design_tokens::{face, sheet};
-use egui::{Ui, Vec2};
+use ui::egui;
+use ui::egui::{Ui, Vec2};
+use ui::{face, sheet};
 
 use crate::core::content::Content;
 use crate::systems::hud::HudWindow;

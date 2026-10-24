@@ -1,28 +1,29 @@
 use std::collections::BTreeMap;
+use ui::chip;
+use ui::egui;
+use ui::theme;
 
-use design_tokens::controls;
-use design_tokens::glyph::{self, Mark};
-use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::core::math::Direction;
 use engine::core::time::Millis;
+use engine::systems::actor::model::SheetFrame;
 use engine::systems::actor::{Action, ModelDef};
-use serde_json::Value;
 use strum::VariantArray;
+use ui::controls;
+use ui::egui::{Color32, Sense, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
-use super::{
-    ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, starts_at, strip_of,
-};
+use super::{ModelPage, ModelStrip, action_timing, play_rule, shifted, starts_at, strip_of};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
-use crate::ui::{theme, widgets};
+use crate::tabs::shown_path;
 use crate::{import, stage};
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
 const PREVIEW_GAP: f32 = 12.0;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let timings: BTreeMap<Action, super::ActionTiming> = Action::VARIANTS
@@ -81,7 +82,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                         strips += 1;
                         frames_total += frames.len();
                         let badged = timing.out_of_step(direction);
-                        let response = cell(ui, &sheet, frames.first(), this == strip, badged);
+                        let response = cell(ui, &sheet, frames.first(), this, this == strip, badged);
                         if response.clicked() {
                             pick = Some(this);
                         }
@@ -105,18 +106,18 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             let out_of_step: usize = timings.values().map(super::ActionTiming::stragglers).sum();
             ui.horizontal(|ui| {
                 if out_of_step == 0 {
-                    glyph::show(ui, Mark::Tick, 14.0, theme::OK);
+                    glyph::show(ui, Mark::Check, 14.0, theme::OK);
                     ui.label(theme::muted(format!(
                         "{strips} strips · {frames_total} frames · all match"
                     )));
                 } else {
-                    ui.label(RichText::new("!").color(theme::WARN).strong());
+                    glyph::show(ui, Mark::Warning, 14.0, theme::WARN);
                     ui.label(theme::muted(format!(
                         "{strips} strips · {frames_total} frames · {out_of_step} out of step with their action"
                     )));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if controls::marked(ui, Mark::Page, "Import onto this model…").clicked() {
+                    if controls::marked(ui, Mark::File, "Import onto this model…").clicked() {
                         import::start_for_model(editor, key);
                     }
                 });
@@ -171,7 +172,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     editor
         .status
         .left
-        .push(format!("model/{key} · {}", strip.name()));
+        .push(format!("{} · {}", shown_path(key), strip.name()));
     editor.status.left.push(
         format!(
             "{} plays · {} and {} step frames · {} move in the matrix · {} opens the strip",
@@ -218,11 +219,15 @@ fn header(ui: &mut Ui) {
 fn cell(
     ui: &mut Ui,
     sheet: &super::ModelSheet,
-    first: Option<&StripFrame>,
+    first: Option<&SheetFrame>,
+    strip: ModelStrip,
     selected: bool,
     badged: bool,
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(CELL, CELL + 22.0), Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Button, true, selected, strip.name())
+    });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, theme::INPUT);
     painter.rect_stroke(
@@ -235,16 +240,7 @@ fn cell(
         sheet.draw(&painter, rect.shrink(6.0), first.frame, Color32::WHITE);
     }
     if badged {
-        let badge =
-            ERect::from_center_size(rect.right_top() + Vec2::new(-9.0, 9.0), Vec2::splat(12.0));
-        painter.circle_filled(badge.center(), 6.0, theme::WARN);
-        painter.text(
-            badge.center(),
-            egui::Align2::CENTER_CENTER,
-            "!",
-            egui::FontId::proportional(10.0),
-            Color32::BLACK,
-        );
+        glyph::alert(&painter, rect.right_top() + Vec2::new(-10.0, 10.0), 7.0);
     }
     if selected || response.hovered() {
         painter.rect_stroke(
@@ -290,12 +286,15 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
     }
 }
 
-pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
+pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &ModelDef) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
     let view = editor.views.model.view(key);
     let (strip, selected) = (view.strip, view.frames.clone());
     let frames = strip_of(row, strip);
+    let Some(reader) = editor.reader() else {
+        return;
+    };
     let total = super::total_ms(&frames).max(1);
     ui.add_space(6.0);
     let visible = (ui.clip_rect().right() - ui.cursor().left()).max(200.0);
@@ -313,12 +312,12 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.set_min_height(22.0);
                     ui.spacing_mut().item_spacing.x = 2.0;
                     ui.horizontal(|ui| {
-                        for cue in frame.cues() {
+                        for cue in super::cues_of(frame, &reader) {
                             let text = match cue {
                                 super::FrameCue::Sound(sound) => format!("sound {sound}"),
                                 other => other.label(),
                             };
-                            widgets::chip_colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
+                            chip::colored(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }
                     });
                 });
@@ -358,7 +357,7 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
 fn frame_card(
     ui: &mut Ui,
     sheet: &super::ModelSheet,
-    frame: &StripFrame,
+    frame: &SheetFrame,
     index: usize,
     width: f32,
     selected: bool,

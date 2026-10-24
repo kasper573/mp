@@ -1,0 +1,31 @@
+{
+  "name": "Harbour Guard",
+  "model": "world/areas/island/npcs/guard.model",
+  "stats": {
+    "health": 30.0,
+    "max_health": 30.0,
+    "damage": 3.0,
+    "attack_speed": 1.0,
+    "attack_delay": 500.0,
+    "movement_speed": 1.1,
+    "range": 1.0
+  },
+  "basic_attack": "items-and-skills/skill/strike.skill.json",
+  "modules": [
+    {
+      "type": "nameplate",
+      "role": "Town Watch"
+    },
+    {
+      "type": "loot",
+      "xp": 10
+    },
+    {
+      "type": "script",
+      "script": "story/script/combat_aggressive.script.json",
+      "values": {
+        "aggro": 10.0
+      }
+    }
+  ]
+}

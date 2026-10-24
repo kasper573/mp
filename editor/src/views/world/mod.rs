@@ -13,23 +13,23 @@ pub use inspect::inspect_parts;
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
+use ui::theme;
 
 use atlas::WorldAtlas;
-use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, Fixture, row_file};
+use engine::core::content::{Content, ContentFile, ContentScope, Fixture, rescoped};
 use engine::core::math::{Pos, Size};
 use engine::core::render::TILE;
 use engine::core::tiling::Tiles;
 use engine::systems::area::world_map::{
     AreaCard, Note, Region, RegionColor, WorldMap, WorldMapDef,
 };
-use engine::systems::area::{self, AreaDef, AreaId};
+use engine::systems::area::{AreaDef, AreaId};
 use serde::Deserialize;
+use ui::egui::{Color32, Pos2, Rect, Ui, Vec2};
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection};
-use crate::ui::{sidebar, theme};
-use crate::value;
+use crate::shell::sidebar;
 use crate::views::navigation;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
@@ -162,7 +162,7 @@ impl OpenWorldMap {
         let project = editor.project.as_ref()?;
         let content = project.content.clone()?;
         let atlas = editor.views.world.atlas(project, &content);
-        let layout = laid_out(&atlas, WorldMap::World.get(&content));
+        let layout = laid_out(&atlas, WorldMap::Game.get(&content));
         Some(OpenWorldMap {
             content,
             atlas,
@@ -222,12 +222,17 @@ impl OpenWorldMap {
         self.write(editor, edit, &next)
     }
 
-    pub fn write(&self, editor: &mut Editor, mut edit: ContentEdit, layout: &WorldMapDef) -> bool {
-        let Some(json) = value::untyped(&self.content, layout) else {
+    pub fn write(&self, editor: &mut Editor, edit: ContentEdit, layout: &WorldMapDef) -> bool {
+        let Some(reader) = editor.reader() else {
             return false;
         };
-        edit.write_json(layout_file(), &json);
-        editor.apply(edit)
+        match rescoped(layout, &ContentScope::of(&self.content), reader.scope()) {
+            Ok(layout) => editor.write_content_as(edit, &WorldMap::Game.path(), &layout),
+            Err(error) => {
+                editor.toast(format!("{}: {error}", edit.label));
+                false
+            }
+        }
     }
 }
 
@@ -273,11 +278,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     {
         editor.views.world.look_at(&map, area, look.zoom);
     }
-    sidebar::inspector(ui, "world", |ui| {
+    sidebar::inspector(editor, ui, "world", |editor, ui| {
         let selection = if editor.selection.table == WorldMapDef::TABLE {
             editor.selection.clone()
         } else {
-            RowSelection::row(WorldMapDef::TABLE, WorldMap::World.key())
+            RowSelection::row(WorldMapDef::TABLE, &WorldMap::Game.path())
         };
         inspect::inspect_parts(editor, ui, &selection);
     });
@@ -300,39 +305,9 @@ pub fn selected(editor: &Editor) -> Vec<MapPart> {
 pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
     editor.select(RowSelection::parts(
         WorldMapDef::TABLE,
-        WorldMap::World.key(),
+        &WorldMap::Game.path(),
         parts.iter().map(MapPart::to_string).collect(),
     ));
-}
-
-pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, copy: &str) {
-    let Some(content) = project.content.clone() else {
-        return;
-    };
-    let Some(area) = content.by_key::<AreaDef>(original) else {
-        return;
-    };
-    let Some(card) = WorldMap::World.get(&content).cards.get(&area) else {
-        return;
-    };
-    let size = area::load(&content, area).size;
-    let at = right_of(card_rect(size, card), footprint(size, card.size));
-    let file = layout_file();
-    let Some(mut row) = project.files.json_owned(&file) else {
-        return;
-    };
-    let Ok(beside) = value::json(&AreaCard {
-        size: card.size,
-        ..new_card(at)
-    }) else {
-        return;
-    };
-    row["cards"][copy] = beside;
-    edit.write_json(file, &row);
-}
-
-fn layout_file() -> String {
-    row_file(WorldMapDef::TABLE, WorldMap::World.key())
 }
 
 fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {
@@ -368,6 +343,56 @@ fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {
 
 fn shows_areas(zoom: f32) -> bool {
     zoom * TILE.0 > AREA_PX_PER_TILE
+}
+
+/// Gives every area among `copies`, each the path copied from and the path of its copy, a world
+/// map card of its own beside the card of the area it was copied from, written into `edit`. A
+/// copied folder's areas count, each at its place inside the copy. A world map that doesn't read
+/// takes no cards; the folder's report already says why.
+pub fn cards_beside(
+    project: &Project,
+    edit: &mut ContentEdit,
+    copies: &[(String, String)],
+) -> Result<(), String> {
+    let after = project.reader_after(edit);
+    let path = WorldMap::Game.path();
+    let Ok(mut layout) = after.read::<WorldMapDef>(&path) else {
+        return Ok(());
+    };
+    let mut placed = false;
+    for (from, to) in copies {
+        let inside = format!("{from}/");
+        for original in after.paths_of::<AreaDef>() {
+            let copy = match original.strip_prefix(&inside) {
+                Some(rest) => format!("{to}/{rest}"),
+                None if original == from => to.clone(),
+                None => continue,
+            };
+            let (Some(area), Some(copied)) = (
+                after.id_of::<AreaDef>(original),
+                after.id_of::<AreaDef>(&copy),
+            ) else {
+                continue;
+            };
+            let (Some(card), Ok(def)) = (layout.cards.get(&area), after.read::<AreaDef>(original))
+            else {
+                continue;
+            };
+            let map = def.blueprint.map.size;
+            let size = Size::new(map.width as f32, map.height as f32);
+            let at = right_of(card_rect(size, card), footprint(size, card.size));
+            let beside = AreaCard {
+                size: card.size,
+                ..new_card(at)
+            };
+            layout.cards.insert(copied, beside);
+            placed = true;
+        }
+    }
+    if placed {
+        edit.write_content_in(&after, &path, &layout)?;
+    }
+    Ok(())
 }
 
 fn card_at(card: &AreaCard) -> Pos2 {

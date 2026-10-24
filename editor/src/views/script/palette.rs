@@ -1,8 +1,13 @@
 use std::collections::HashSet;
+use ui::egui;
+use ui::input;
+use ui::paint;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Align2, Pos2, Ui};
-use engine::core::script::OwnerKindDef;
+use engine::core::script::RunnerKindDef;
+use ui::egui::{Align2, Pos2, Ui};
+use ui::glyph::Mark;
 
 use super::graph::NodePaletteOpen;
 use super::nodes::{self, NodeCatalogue, NodeEntry};
@@ -10,7 +15,6 @@ use super::{ScriptDoc, add_node};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::catalogue_of;
-use crate::ui::{theme, widgets};
 
 pub struct NodePalette {
     open: NodePaletteOpen,
@@ -54,7 +58,7 @@ struct Refused<'a> {
 }
 
 pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
-    let owner = doc.owner.clone();
+    let owner = doc.at.clone();
     let Some(mut palette) = editor
         .views
         .script
@@ -142,13 +146,13 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
         palette.open.at.y.max(ui.max_rect().top() + 4.0),
     );
     let owner_word = doc.kind.name();
-    let article = widgets::article(owner_word);
+    let article = words::article(owner_word);
     let mut clicked_row: Option<usize> = None;
     let list_height = ui.max_rect().height() * 0.55;
     let hint = match &palette.open.link {
-        Some((from, field)) => format!(
+        Some((from, exit)) => format!(
             "add after {from} {}",
-            nodes::port_label(doc.nodes(), catalogue, from, field)
+            nodes::port_label(doc.nodes(), from, *exit)
         ),
         None => "type to search".to_owned(),
     };
@@ -182,11 +186,11 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                 .stroke(egui::Stroke::new(1.0, theme::BORDER))
                 .corner_radius(6.0)
                 .inner_margin(egui::Margin::same(8))
-                .shadow(design_tokens::slip::SHADOW)
+                .shadow(ui::slip::SHADOW)
                 .show(ui, |ui| {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
-                    let response = widgets::search_box(ui, &mut palette.search, &hint, None);
+                    let response = input::search(ui, &mut palette.search, &hint, None);
                     if palette.frames == 0 {
                         response.request_focus();
                     }
@@ -432,19 +436,19 @@ fn group_row(
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 22.0), egui::Sense::click());
     if selected {
-        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+        paint::row_wash(ui.painter(), rect);
     } else if response.hovered() {
         ui.painter().rect_filled(rect, 4.0, theme::RAISED);
     }
     let font = egui::FontId::monospace(12.5);
     let ink = if selected { theme::TEXT } else { theme::MUTED };
-    glyph::paint(
+    (if open {
+        Mark::CaretDown
+    } else {
+        Mark::CaretRight
+    })
+    .paint(
         ui.painter(),
-        if open {
-            Mark::ChevronDown
-        } else {
-            Mark::ChevronRight
-        },
         egui::Rect::from_min_size(
             rect.left_center() + egui::vec2(6.0, -4.5),
             egui::vec2(9.0, 9.0),
@@ -466,7 +470,7 @@ fn group_row(
         theme::FAINT,
     );
     if !open {
-        widgets::text_within(
+        paint::text_within(
             ui.painter(),
             egui::pos2(name.max.x + 12.0, rect.center().y),
             Align2::LEFT_CENTER,
@@ -489,7 +493,7 @@ fn entry_row(
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 36.0), egui::Sense::click());
     if selected {
-        ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
+        paint::row_wash(ui.painter(), rect);
     } else if response.hovered() {
         ui.painter().rect_filled(rect, 4.0, theme::RAISED);
     }

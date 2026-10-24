@@ -14,7 +14,7 @@ use crate::systems::npc::NpcId;
 use crate::systems::player::{ClientId, PlayedBy};
 use crate::systems::script::event::NPC;
 use crate::systems::script::{
-    Condition, EffectCall, OwnerKind, Reach, RiftScripting, effect as effects,
+    Condition, EffectCall, Reach, RiftScripting, RunnerKind, effect as effects,
 };
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
@@ -63,6 +63,7 @@ pub enum ShownFor {
 #[schemars(extend("x-system" = "npc"))]
 pub struct Despawn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("default" = {"type": "subject"}))]
     pub who: Option<Condition>,
     #[serde(default, skip_serializing_if = "Arrow::is_none")]
     pub done: Arrow,
@@ -77,15 +78,13 @@ pub struct Summoned {
 }
 
 impl EffectDef<RiftScripting> for SetAttitude {
-    fn owners(&self) -> &'static [OwnerKind] {
+    fn owners(&self) -> &'static [RunnerKind] {
         NPC
     }
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let attitude = self.attitude;
         Ok(Box::new(move |world, _, cx| {
@@ -109,9 +108,7 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![(NEXT, &self.next)]
-    }
+    crate::outputs!(NEXT => next);
     fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
             return Err(ScriptFault::new(
@@ -155,9 +152,7 @@ impl EffectDef<RiftScripting> for Despawn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(&'static str, &Arrow)> {
-        vec![("done", &self.done), (REFUSED, &self.refused)]
-    }
+    crate::outputs!("done" => done, REFUSED => refused);
     fn compile<'c>(
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,

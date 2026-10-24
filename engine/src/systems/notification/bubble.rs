@@ -1,9 +1,10 @@
 use std::time::Duration;
+use ui::egui;
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
-use egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
+use ui::egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
 
 use super::rows::{self, Clock, Fades, Look, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
@@ -24,6 +25,7 @@ use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::NpcId;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
+use ui::paint;
 
 const LINES: usize = 2;
 const FULL: usize = 3;
@@ -641,10 +643,7 @@ fn fold_text(speakers: u32) -> String {
 }
 
 fn body_size(gui: &egui::Context, world: &World, draw: &BubbleDraw) -> egui::Vec2 {
-    let label = |text: &str| {
-        gui.fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), rows::label_font(), INK))
-            .size()
-    };
+    let label = |text: &str| paint::text_size(gui, text, rows::label_font());
     let mut parts: Vec<egui::Vec2> = Vec::new();
     parts.extend(draw.header.as_deref().map(label));
     if !draw.lines.is_empty() {

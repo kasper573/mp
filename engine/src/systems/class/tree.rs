@@ -3,13 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use bevy_ecs::prelude::*;
-use egui::{Pos2, Rect, Vec2};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
+use ui::egui::{Pos2, Rect, Vec2};
 
 use crate::core::assets::ImageRef;
-use crate::core::content::{Content, ContentProblem, RowCheck, id};
+use crate::core::content::{ContentNames, ContentProblem, RowCheck, id};
 use crate::systems::script::{Condition, condition};
 use crate::systems::skill::{Rank, SkillId};
 
@@ -336,12 +336,12 @@ impl AccessRequirement {
         })
     }
 
-    pub fn describe(&self, content: &Content, tree: &SkillTree) -> String {
+    pub fn describe(&self, content: &impl ContentNames, tree: &SkillTree) -> String {
         match self {
             AccessRequirement::Skill { node, rank } => {
                 let name = tree
                     .node(node)
-                    .map(|node| node.skill.get(content).name.clone())
+                    .map(|node| content.name_of(node.skill))
                     .unwrap_or_else(|| node.to_string());
                 format!("{name} rank {}", rank.0)
             }

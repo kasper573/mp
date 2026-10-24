@@ -1,13 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
+use ui::controls;
+use ui::egui;
+use ui::form;
+use ui::input;
+use ui::panel;
+use ui::sheet;
+use ui::theme;
+use ui::words;
 
-use design_tokens::glyph::{self, Mark};
-use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
-use engine::core::content::{ContentRow, Fixture};
-use engine::systems::area::world_map::{
-    MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap, WorldMapDef,
-};
+use engine::core::content::{ContentFile, Fixture, name_of};
+use engine::systems::area::world_map::{MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColor, WorldMap};
 use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
+use ui::egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
+use ui::glyph::{self, Mark};
 
 use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use super::canvas::{line_badge, viridis};
@@ -16,11 +22,12 @@ use super::{MapPart, OpenWorldMap, region_color, region_color_name, select};
 use crate::app::Editor;
 use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
-use crate::tabs::EditorTab;
-use crate::ui::browser::{self, BrowserAction};
-use crate::ui::{sidebar, theme, widgets};
+use crate::shell::browser::{self, BrowserAction};
+use crate::shell::widgets;
+use crate::tabs::{EditorTab, shown_path};
+use crate::value;
 use crate::views::area as area_view;
-use crate::{forms, value};
+use ui::input::{InputField, NumberField};
 
 fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     let Some(map) = OpenWorldMap::of(editor) else {
@@ -36,7 +43,7 @@ fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     } else if !view.lenses.is_empty() {
         lens_panel(editor, ui, &map.atlas);
     } else {
-        sidebar::nothing_selected(
+        form::nothing_selected(
             ui,
             "Select cards, a warp, a region or a note, or lay a route, colouring or filter over the map, to inspect it here.",
         );
@@ -80,7 +87,7 @@ fn open(editor: &mut Editor, opens: &OpenTarget) {
         OpenTarget::Area {
             key,
             module: Some(module),
-        } => area_view::open_area_at(editor, key, None, Some(format!("/modules/{module}"))),
+        } => area_view::open_area_at(editor, key, None, Some(module.clone())),
         OpenTarget::Area { key, module: None } => {
             browser::act(editor, area::AreaDef::TABLE, key, BrowserAction::Open)
         }
@@ -116,7 +123,7 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
                 .or_default()
                 .entry(source)
                 .or_default()
-                .push(atlas.key(*area));
+                .push(atlas.file_name(*area));
         }
     }
     if by_kind.is_empty() {
@@ -130,13 +137,13 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         } else {
             sources.len()
         };
-        widgets::section(
+        sheet::section(
             ui,
             &format!(
                 "{} · {count} {}{}",
                 kind.title(),
                 kind.noun(),
-                widgets::plural(count)
+                words::plural(count)
             ),
         );
         for (source, areas) in sources {
@@ -185,8 +192,8 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     let ranges = ColorRanges::of(atlas, &project.files, &color);
     let fields = ColorField::all(editor);
     let mut next = color.clone();
-    widgets::kv(ui, "value", |ui| {
-        widgets::combo("color-value")
+    form::kv(ui, "value", |ui| {
+        controls::combo("color-value")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.field.text()).size(12.5))
             .show_ui(ui, |ui| {
@@ -197,8 +204,8 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             });
     });
     if next.field.table == ColorTable::Npc {
-        widgets::kv(ui, "of", |ui| {
-            widgets::combo("color-of")
+        form::kv(ui, "of", |ui| {
+            controls::combo("color-of")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(next.of.label()).size(12.5))
                 .show_ui(ui, |ui| {
@@ -208,8 +215,8 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
                 });
         });
     }
-    widgets::kv(ui, "show", |ui| {
-        widgets::combo("color-show")
+    form::kv(ui, "show", |ui| {
+        controls::combo("color-show")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.show.label()).size(12.5))
             .show_ui(ui, |ui| {
@@ -221,7 +228,7 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     ui.add_space(6.0);
     color_bar(ui, &ranges, color.field.name());
     ui.add_space(8.0);
-    widgets::section(ui, "By distance from the initial spawn");
+    sheet::section(ui, "By distance from the initial spawn");
     let mut rows: Vec<DistanceRow> = ranges
         .areas
         .iter()
@@ -252,11 +259,13 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             ui.label(theme::faint(color.field.name()).size(11.0));
             ui.end_row();
             for (row, bump) in rows.iter().zip(&bumps) {
-                ui.label(
-                    theme::mono(format!("{}{}", row.key, if *bump { " ▲" } else { "" }))
-                        .size(12.5)
-                        .color(if *bump { theme::WARN } else { theme::TEXT }),
-                );
+                ui.horizontal(|ui| {
+                    let ink = if *bump { theme::WARN } else { theme::TEXT };
+                    ui.label(theme::mono(name_of(row.key)).size(12.5).color(ink));
+                    if *bump {
+                        ui.label(Mark::Raise.text(12.0).color(ink));
+                    }
+                });
                 ui.label(
                     theme::mono(
                         row.distance
@@ -270,7 +279,10 @@ fn color_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         });
     if bumps.contains(&true) {
         ui.add_space(6.0);
-        ui.label(theme::muted("▲ above the curve: stronger than areas further out.").size(12.0));
+        ui.horizontal(|ui| {
+            ui.label(Mark::Raise.text(12.0).color(theme::WARN));
+            ui.label(theme::muted("above the curve: stronger than areas further out.").size(12.0));
+        });
     }
     if next != color {
         editor.views.world.color = Some(next);
@@ -314,7 +326,7 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
         .iter()
         .find(|line| line.category == category)
         .map_or(0, |line| line.quests.len());
-    widgets::section(ui, &format!("{category} · {quests} quests"));
+    sheet::section(ui, &format!("{category} · {quests} quests"));
     let mut go: Option<AreaId> = None;
     for step in atlas.line_steps(&category) {
         ui.horizontal_top(|ui| {
@@ -325,9 +337,10 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                 ui.label(RichText::new(&step.label).size(12.5));
                 ui.label(theme::faint("·").size(12.0));
                 for &area in &step.areas {
-                    let label =
-                        egui::Label::new(theme::faint(atlas.key(area)).monospace().size(12.0))
-                            .sense(Sense::click());
+                    let label = egui::Label::new(
+                        theme::faint(atlas.file_name(area)).monospace().size(12.0),
+                    )
+                    .sense(Sense::click());
                     if ui.add(label).clicked() {
                         go = Some(area);
                     }
@@ -336,16 +349,22 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
         });
     }
     ui.add_space(8.0);
-    widgets::section(ui, "Other quest lines");
+    sheet::section(ui, "Other quest lines");
     for line in atlas.lines.iter().filter(|line| line.category != category) {
         let name = egui::Label::new(RichText::new(&line.category).size(12.5)).sense(Sense::click());
         if ui.add(name).clicked() {
             editor.views.world.quest_line = Some(line.category.clone());
         }
         ui.label(
-            theme::mono(line.quests.join(" → "))
-                .size(11.5)
-                .color(theme::MUTED),
+            theme::mono(
+                line.quests
+                    .iter()
+                    .map(|quest| name_of(quest))
+                    .collect::<Vec<_>>()
+                    .join(" → "),
+            )
+            .size(11.5)
+            .color(theme::MUTED),
         );
         ui.add_space(4.0);
     }
@@ -363,13 +382,13 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         .id(&route.from)
         .zip(atlas.id(&route.to))
         .and_then(|(from, to)| atlas.route(from, to));
-    let heading = format!("{} → {}", route.from, route.to);
+    let heading = format!("{} → {}", name_of(&route.from), name_of(&route.to));
     match hops {
         Some(hops) => {
-            widgets::section(ui, &format!("{heading} · {} warps", hops.len()));
+            sheet::section(ui, &format!("{heading} · {} warps", hops.len()));
             for hop in hops {
                 ui.horizontal(|ui| {
-                    ui.label(theme::mono(atlas.key(hop.from)).size(12.5));
+                    ui.label(theme::mono(atlas.file_name(hop.from)).size(12.5));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
                             theme::faint(&atlas.owners[hop.owner].name)
@@ -381,17 +400,17 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
             }
         }
         None => {
-            widgets::section(ui, &heading);
+            sheet::section(ui, &heading);
             ui.label(theme::muted("No chain of warps leads there."));
         }
     }
     ui.add_space(8.0);
-    widgets::section(ui, "Reach");
+    sheet::section(ui, "Reach");
     let unreached: Vec<&str> = atlas
         .areas
         .iter()
         .filter(|(area, _)| !atlas.distances.contains_key(area))
-        .map(|(_, info)| info.key.as_str())
+        .map(|(_, info)| name_of(&info.key))
         .collect();
     check(
         ui,
@@ -413,7 +432,13 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         .warps
         .iter()
         .filter(|warp| !atlas.both_ways(warp))
-        .map(|warp| format!("{} → {}", atlas.key(warp.from), atlas.key(warp.to)))
+        .map(|warp| {
+            format!(
+                "{} → {}",
+                atlas.file_name(warp.from),
+                atlas.file_name(warp.to)
+            )
+        })
         .collect();
     check(
         ui,
@@ -430,7 +455,7 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
 fn check(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
         if ok {
-            glyph::show(ui, Mark::Tick, 14.0, theme::OK)
+            glyph::show(ui, Mark::Check, 14.0, theme::OK)
         } else {
             ui.label(RichText::new("·").color(theme::WARN))
         };
@@ -445,7 +470,10 @@ fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas, a: &str, b
     };
     let mut opened: Option<OpenTarget> = None;
     for (from, to) in [(a, b), (b, a)] {
-        widgets::section(ui, &format!("{} → {}", atlas.key(from), atlas.key(to)));
+        sheet::section(
+            ui,
+            &format!("{} → {}", atlas.file_name(from), atlas.file_name(to)),
+        );
         let mut any = false;
         for warp in atlas.warps_between(from, to) {
             any = true;
@@ -480,66 +508,56 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     let atlas = &map.atlas;
     let first = cards[0];
     let first_key = atlas.key(first);
+    let first_name = atlas.file_name(first);
     let card = map.layout.cards[&first];
     let title = match cards.len() {
-        1 => first_key.to_owned(),
+        1 => first_name.to_owned(),
         n => format!("{n} cards"),
     };
     crumb(
         ui,
         &match cards.len() {
-            1 => format!("card · {first_key}"),
+            1 => format!("card · {first_name}"),
             _ => title.clone(),
         },
     );
     let mut next = map.layout.clone();
     let mut label: Option<String> = None;
     let mut open_area = false;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &title);
+        panel::title(ui, &title);
         if cards.len() == 1 {
-            widgets::kv(ui, "area", |ui| {
-                open_area = widgets::keyed_button(ui, &format!("area/ {first_key} →"), None, true)
-                    .clicked();
+            form::kv(ui, "area", |ui| {
+                open_area =
+                    controls::keyed(ui, &format!("{} →", shown_path(first_key)), None, true)
+                        .clicked();
             });
-            widgets::kv(ui, "at", |ui| {
+            form::kv(ui, "at", |ui| {
                 let (mut x, mut y) = (card.at.x, card.at.y);
-                let response = forms::boxed_input(ui, Some("canvas"), |ui| {
-                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        let a = ui.add(egui::DragValue::new(&mut x).speed(1.0).fixed_decimals(0));
-                        ui.label(theme::faint(","));
-                        let b = ui.add(egui::DragValue::new(&mut y).speed(1.0).fixed_decimals(0));
-                        a | b
-                    })
-                    .inner
-                });
-                if response.changed()
+                if NumberField::of([&mut x, &mut y]).unit("canvas").show(ui)
                     && let Some(moved) = next.cards.get_mut(&first)
                 {
                     super::move_card(moved, egui::pos2(x, y));
-                    label = Some(format!("Move {first_key} on the world map"));
+                    label = Some(format!("Move {first_name} on the world map"));
                 }
             });
         }
-        widgets::kv(ui, "size", |ui| {
+        form::kv(ui, "size", |ui| {
             let mut size = card.size;
             let by: i32 = match (
-                ui.small_button("−").clicked(),
-                ui.small_button("+").clicked(),
+                glyph::button(ui, Mark::Minus, 18.0, theme::MUTED, "Smaller").clicked(),
+                glyph::button(ui, Mark::Plus, 18.0, theme::MUTED, "Larger").clicked(),
             ) {
                 (true, _) => -10,
                 (_, true) => 10,
                 _ => 0,
             };
-            let response = forms::boxed_input(ui, Some("%"), |ui| {
-                ui.add(
-                    egui::DragValue::new(&mut size)
-                        .range(MIN_SIZE..=MAX_SIZE)
-                        .speed(1.0),
-                )
-            });
-            if response.changed() || by != 0 {
+            let typed = NumberField::new(&mut size)
+                .range(MIN_SIZE..=MAX_SIZE)
+                .unit("%")
+                .show(ui);
+            if typed || by != 0 {
                 let size = size.saturating_add_signed(by).clamp(MIN_SIZE, MAX_SIZE);
                 for area in cards {
                     if let Some(resized) = next.cards.get_mut(area) {
@@ -549,7 +567,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
                 label = Some(format!("Resize {title} on the world map"));
             }
         });
-        widgets::kv(ui, "pinned", |ui| {
+        form::kv(ui, "pinned", |ui| {
             let mut pinned = cards.iter().all(|area| map.layout.cards[area].pinned);
             if ui.checkbox(&mut pinned, "").changed() {
                 for area in cards {
@@ -567,7 +585,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
             .iter()
             .find(|region| region.cards.contains(&first))
         {
-            widgets::kv_text(ui, "region", region.name.clone());
+            form::kv_text(ui, "region", region.name.clone());
         }
     });
     if let Some(label) = label {
@@ -578,7 +596,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
             key: first_key.to_owned(),
         });
     }
-    widgets::section(ui, "Keys");
+    sheet::section(ui, "Keys");
     for (keys, text) in [
         (
             &[EditorKey::Shrink, EditorKey::Grow][..],
@@ -591,18 +609,14 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     ] {
         ui.horizontal(|ui| {
             for key in keys {
-                widgets::key_chip(ui, *key);
+                controls::key_hint(ui, &key.name());
             }
             ui.label(theme::muted(text));
         });
     }
-    widgets::section(
+    sheet::section(
         ui,
-        &format!(
-            "Stored in {}/{}.json",
-            WorldMapDef::TABLE,
-            WorldMap::World.key()
-        ),
+        &format!("Stored in {}", shown_path(&WorldMap::Game.path())),
     );
     let stored: serde_json::Map<String, serde_json::Value> = cards
         .iter()
@@ -638,13 +652,13 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
     let region = &map.layout.regions[index];
     let mut next = map.layout.clone();
     let mut label: Option<String> = None;
-    widgets::card_frame(true).show(ui, |ui| {
+    panel::card(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &region.name);
-        widgets::kv(ui, "name", |ui| {
+        panel::title(ui, &region.name);
+        form::kv(ui, "name", |ui| {
             let id = ui.id().with(("region-name", index));
-            let typed = forms::drafted(ui, id, &region.name, |ui, draft| {
-                ui.add(egui::TextEdit::singleline(draft).desired_width(ui.available_width() - 8.0))
+            let typed = input::drafted(ui, id, &region.name, |ui, draft| {
+                InputField::new(draft).show(ui)
             });
             if let Some(typed) = typed
                 && !typed.trim().is_empty()
@@ -654,10 +668,10 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
                 label = Some(format!("Rename region to {}", typed.trim()));
             }
         });
-        widgets::kv(ui, "color", |ui| {
+        form::kv(ui, "color", |ui| {
             let mut picked = region.color;
             let current = region_color_name(picked);
-            widgets::combo(("region-color", index))
+            controls::combo(("region-color", index))
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(current).size(12.5).color(region_color(picked)))
                 .show_ui(ui, |ui| {
@@ -680,9 +694,9 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
         let holds: Vec<&str> = region
             .cards
             .iter()
-            .map(|area| map.atlas.key(*area))
+            .map(|area| map.atlas.file_name(*area))
             .collect();
-        widgets::kv_text(
+        form::kv_text(
             ui,
             "holds",
             format!("{} cards: {}", holds.len(), holds.join(", ")),
@@ -693,7 +707,7 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
         return;
     }
     ui.add_space(8.0);
-    if widgets::danger(ui, "Delete region").clicked() {
+    if controls::danger(ui, "Delete region").clicked() {
         let label = format!("Delete region {}", region.name);
         if map.change(editor, ContentEdit::new(label), |layout| {
             layout.regions.remove(index);
@@ -706,16 +720,11 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
 fn inspect_note(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: usize) {
     crumb(ui, "note");
     let note = &map.layout.notes[index];
-    widgets::section(ui, "Note");
+    sheet::section(ui, "Note");
     let id = ui.id().with(("note-text", index));
     let mut count = note.text.chars().count();
-    let typed = forms::drafted(ui, id, &note.text, |ui, draft| {
-        let response = ui.add(
-            egui::TextEdit::multiline(draft)
-                .desired_rows(4)
-                .desired_width(ui.available_width())
-                .char_limit(MAX_NOTE),
-        );
+    let typed = input::drafted(ui, id, &note.text, |ui, draft| {
+        let response = InputField::new(draft).rows(4).char_limit(MAX_NOTE).show(ui);
         count = draft.chars().count();
         response
     });
@@ -729,7 +738,7 @@ fn inspect_note(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: usi
         return;
     }
     ui.add_space(8.0);
-    if widgets::danger(ui, "Delete note").clicked()
+    if controls::danger(ui, "Delete note").clicked()
         && map.change(editor, ContentEdit::new("Delete a note"), |layout| {
             layout.notes.remove(index);
         })

@@ -1,0 +1,12 @@
+{
+  "name": "The chapel",
+  "blueprint": {
+    "map": {
+      "size": {
+        "width": 24,
+        "height": 16
+      },
+      "tile": 16
+    }
+  }
+}

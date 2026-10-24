@@ -5,22 +5,29 @@ pub mod surfaces;
 pub mod terrain;
 
 use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
+use ui::chip;
+use ui::egui;
+use ui::form;
+use ui::menu;
+use ui::theme;
+use ui::words;
 
 use animation::OffsetUnit;
-use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
-use engine::core::content::{Content, ContentRow, row_file};
+use engine::core::content::{ContentFile, FolderReader, fields_file};
 use engine::systems::area::tileset::{MAX_TILE_PX, TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
-use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};
+use ui::egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
 
 use crate::app::{BottomTab, Editor};
+use crate::import;
 use crate::project::{ContentEdit, RowSelection};
+use crate::shell::{row_form, sidebar};
+use crate::tabs::shown_path;
 use crate::thumbs::{self, Thumbnail};
-use crate::ui::{row_form, sidebar, theme, widgets};
 use crate::views::model::preview::StripPreview;
 use crate::views::model::sounds;
-use crate::{import, value};
 
 pub const TERRAINS_PART: &str = "/terrains";
 const TILES_PART: &str = "/tiles/";
@@ -68,7 +75,7 @@ impl SurfaceUse {
     pub fn text(&self) -> String {
         format!(
             "{} tiles in {} tilesets",
-            widgets::thousands(self.tiles),
+            words::thousands(self.tiles),
             self.tilesets.len()
         )
     }
@@ -423,20 +430,20 @@ impl SheetLayout {
 
 pub struct OpenTileset {
     pub key: String,
-    pub def: TilesetDef,
-    pub content: Content,
+    pub def: Arc<TilesetDef>,
+    pub reader: Arc<FolderReader>,
     pub sheet: TilesetSheet,
 }
 
 impl OpenTileset {
     pub fn read(editor: &mut Editor, ctx: &egui::Context, key: &str) -> Option<OpenTileset> {
-        let content = editor.loaded()?;
-        let def = typed_def(editor, &content, key)?;
+        let reader = editor.reader()?;
+        let def = editor.read::<TilesetDef>(key)?.ok()?;
         let sheet = TilesetSheet::of(editor, ctx, &def);
         Some(OpenTileset {
             key: key.to_owned(),
             def,
-            content,
+            reader,
             sheet,
         })
     }
@@ -444,7 +451,7 @@ impl OpenTileset {
     pub fn surface(&self, tile: u32) -> Option<&str> {
         self.def
             .surface(tile)
-            .map(|surface| surface.key(&self.content))
+            .and_then(|surface| self.reader.path_of(surface))
     }
 
     pub fn terrains(&self, set: &str) -> &[String] {
@@ -464,7 +471,7 @@ pub fn change_tileset(
     editor: &mut Editor,
     key: &str,
     edit: ContentEdit,
-    change: impl FnOnce(&mut TilesetDef),
+    change: impl FnOnce(&mut TilesetDef, &FolderReader),
 ) -> bool {
     try_change_tileset(editor, key, edit, change).is_ok()
 }
@@ -473,14 +480,15 @@ pub fn try_change_tileset(
     editor: &mut Editor,
     key: &str,
     mut edit: ContentEdit,
-    change: impl FnOnce(&mut TilesetDef),
+    change: impl FnOnce(&mut TilesetDef, &FolderReader),
 ) -> Result<(), String> {
-    let content = editor.loaded().ok_or("the folder does not load")?;
-    let mut def = typed_def(editor, &content, key).ok_or_else(|| unreadable(editor, key))?;
-    change(&mut def);
+    let project = editor.project.as_ref().ok_or("no folder is open")?;
+    let reader = project.reader();
+    let read = project.read::<TilesetDef>(key);
+    let mut def = Arc::unwrap_or_clone(read.map_err(|_| unreadable(editor, key))?);
+    change(&mut def, &reader);
     def.tiles.retain(|_, data| !is_blank(data));
-    let json = value::untyped(&content, &def).ok_or("the tileset does not write")?;
-    edit.write_json(row_file(TilesetDef::TABLE, key), &json);
+    edit.write_content_in(&reader, key, &def)?;
     editor.try_apply(edit)
 }
 
@@ -488,17 +496,20 @@ pub fn tile_mut(def: &mut TilesetDef, tile: u32) -> &mut TileData {
     def.tiles.entry(tile).or_default()
 }
 
-pub fn tile_size(row: &Value) -> Result<u32, String> {
-    u32::deserialize(&row["tile"])
-        .ok()
+pub fn tile_size(tileset: &TilesetDef) -> Result<u32, String> {
+    Some(tileset.tile)
         .filter(|tile| (1..=MAX_TILE_PX).contains(tile))
         .ok_or_else(|| format!("the tileset's tile is not 1 to {MAX_TILE_PX} px"))
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {
-    if editor.views.tileset.views.contains_key(key) {
-        return;
+    if !editor.views.tileset.views.contains_key(key) {
+        reset_view(editor, key);
     }
+}
+
+/// Starts the view of the tileset at `key` afresh: nothing picked, at its first mode and zoom.
+pub fn reset_view(editor: &mut Editor, key: &str) {
     let surface = sounds::surfaces(editor)
         .into_iter()
         .next()
@@ -523,14 +534,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let reimporting = editor.views.tileset.reimports.contains_key(key);
     let selection = editor.selection.clone();
-    sidebar::inspector(ui, "tileset", |ui| {
+    sidebar::inspector(editor, ui, "tileset", |editor, ui| {
         if selection.table == TilesetDef::TABLE
             && selection.keys.first().is_some_and(|k| k == key)
             && !selection.parts.is_empty()
         {
             inspect_parts(editor, ui, &selection);
         } else {
-            sidebar::nothing_selected(
+            form::nothing_selected(
                 ui,
                 "Select tiles, a terrain or an animation to inspect it here.",
             );
@@ -627,10 +638,6 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
     }
 }
 
-fn typed_def(editor: &Editor, content: &Content, key: &str) -> Option<TilesetDef> {
-    value::typed(content, editor.row_value(TilesetDef::TABLE, key)?)
-}
-
 fn is_blank(data: &TileData) -> bool {
     data.walk.is_none()
         && data.surface.is_none()
@@ -639,10 +646,17 @@ fn is_blank(data: &TileData) -> bool {
 }
 
 fn unreadable(editor: &Editor, key: &str) -> String {
-    if editor.row(TilesetDef::TABLE, key).is_none() {
-        format!("tileset/{key} is gone")
+    let present = editor
+        .project
+        .as_ref()
+        .is_some_and(|project| project.files.contains(&fields_file(key)));
+    if !present {
+        format!("{} is gone", shown_path(key))
     } else {
-        format!("tileset/{key} does not read as a tileset; its row on the left shows why")
+        format!(
+            "{} does not read as a tileset; its row on the left shows why",
+            shown_path(key)
+        )
     }
 }
 
@@ -652,34 +666,36 @@ fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let mut picked = None;
     let mut import = None;
     ui.horizontal(|ui| {
-        ui.label(theme::mono(format!("tileset/{key}")).color(theme::CODE));
-        ui.add_space(8.0);
-        for option in TilesetMode::VARIANTS {
-            if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
-                picked = Some(*option);
-            }
-        }
-        ui.add_space(12.0);
-        match mode {
-            TilesetMode::Walk => sheet::walk_legend(editor, ui, key),
-            TilesetMode::Surface => sheet::surface_legend(editor, ui, key),
-            TilesetMode::Terrain => terrain::legend(editor, ui, tileset),
-            TilesetMode::Animation => animation::legend(ui),
-        }
-        if ui.available_width() > 120.0 {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.menu_button("Import", |ui| {
-                    if ui.button("Onto this tileset…").clicked() {
-                        import = Some(Reimport::Tiles);
-                        ui.close();
-                    }
-                    if ui.button("An animation onto its tiles…").clicked() {
-                        import = Some(Reimport::Animation);
-                        ui.close();
-                    }
-                });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            menu::dropdown(ui, "Import", |ui| {
+                if ui.button("Onto this tileset…").clicked() {
+                    import = Some(Reimport::Tiles);
+                    ui.close();
+                }
+                if ui.button("An animation onto its tiles…").clicked() {
+                    import = Some(Reimport::Animation);
+                    ui.close();
+                }
             });
-        }
+            ui.add_space(8.0);
+            for option in TilesetMode::VARIANTS.iter().rev() {
+                if chip::mode(ui, option.label(), *option == mode).clicked() {
+                    picked = Some(*option);
+                }
+            }
+            ui.add_space(8.0);
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::Label::new(theme::mono(shown_path(key)).color(theme::CODE)).truncate(),
+                );
+            });
+        });
+    });
+    ui.horizontal_wrapped(|ui| match mode {
+        TilesetMode::Walk => sheet::walk_legend(editor, ui, key),
+        TilesetMode::Surface => sheet::surface_legend(editor, ui, key),
+        TilesetMode::Terrain => terrain::legend(editor, ui, tileset),
+        TilesetMode::Animation => animation::legend(ui),
     });
     if let Some(mode) = picked {
         set_mode(editor, key, mode);
@@ -715,7 +731,7 @@ fn refresh_counts(editor: &mut Editor) {
     let mut surfaces: HashMap<String, SurfaceUse> = HashMap::new();
     let mut with_surface = 0;
     for id in content.ids::<TilesetDef>() {
-        let tileset = id.key(&content);
+        let tileset = id.path(&content);
         for surface in id
             .get(&content)
             .tiles
@@ -724,7 +740,7 @@ fn refresh_counts(editor: &mut Editor) {
         {
             with_surface += 1;
             let entry = surfaces
-                .entry(surface.key(&content).to_owned())
+                .entry(surface.path(&content).to_owned())
                 .or_default();
             entry.tiles += 1;
             entry.tilesets.insert(tileset.to_owned());
@@ -775,7 +791,7 @@ fn status(editor: &mut Editor, tileset: &OpenTileset) {
             left.push(format!(
                 "{} surfaces · {} tiles have one",
                 sounds::surfaces(editor).len(),
-                widgets::thousands(with_surface)
+                words::thousands(with_surface)
             ));
         }
         TilesetMode::Terrain => {

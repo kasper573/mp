@@ -14,7 +14,7 @@ use engine::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
 use crate::content::{from_json, to_json};
 use crate::recording::{Footage, Recording};
-use crate::seen::area_key;
+use crate::seen::area_name;
 use crate::server::Server;
 
 /// The machine a desktop client plays on: a screen and speakers of its own, recorded, and a probe
@@ -86,7 +86,10 @@ impl Desktop {
         let mut client = Command::new(binary)
             .envs(launch::env_of(CLIENT_ENV_PREFIX, &config))
             .env("DISPLAY", &screen.display)
+            // Under PipeWire the client plays through its ALSA plugin, which reads only
+            // PIPEWIRE_NODE; PULSE_SINK alone would leave it on the machine's speakers.
             .env("PULSE_SINK", &speakers.sink)
+            .env("PIPEWIRE_NODE", &speakers.sink)
             .stdin(Stdio::piped())
             .stdout(log.try_clone().expect("a second handle on the client log"))
             .stderr(log)
@@ -373,7 +376,7 @@ impl Desktop {
             "frame {}: {step} | claim {:?} | area {:?} | me {me:?} | stage {:?}",
             snapshot.frame,
             snapshot.claim,
-            area_key(snapshot),
+            area_name(snapshot),
             snapshot.stage.as_ref().map(|stage| &stage.node),
         );
     }
@@ -490,7 +493,16 @@ impl Screen {
         await_ready(&notices, &mut compositor.0, folder);
         let mut x = ScreenServer(
             Command::new("Xwayland")
-                .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
+                // An X server resets once its last client leaves, and weston's kiosk shell crashes
+                // on the rootful window that reset tears down.
+                .args([
+                    "-noreset",
+                    "-displayfd",
+                    "1",
+                    "-nolisten",
+                    "tcp",
+                    "-geometry",
+                ])
                 .arg(format!("{}x{}", size.0, size.1))
                 .env("WAYLAND_DISPLAY", &name)
                 .stdout(Stdio::piped())

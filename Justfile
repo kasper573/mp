@@ -83,7 +83,7 @@ stack: build wasm (up "--profile dev")
 # The stack, rebuilding the wasm and the website on every change: reload the page to pick one up.
 dev: stack
     source docker/.env.test && echo "sign in and play at https://$RIFT_DOMAIN/play"
-    cargo watch -w engine -w design_tokens -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
+    cargo watch -w engine -w ui -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
 
 # Tears the stack down and wipes its data, so keycloak imports its realm again on the next start.
 reset:
@@ -163,6 +163,22 @@ bench mode="":
     RIFT_BENCH_CONTENT_DIR=example_game cargo run --release -p engine --bin bench -- {{mode}}
     cargo bench -p engine --bench client
 
+# Frame pointers give perf whole call stacks without copying each sampled stack.
+[doc("The server's ticks near the bench's budget, sampled by perf into target/profile/perf.data: CPU by function, then by system, then allocations.")]
+profile mode="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    RUSTFLAGS="-C force-frame-pointers=yes" cargo build --profile profiling --features profiling -p engine --bin profile
+    out=target/profile
+    mkdir -p "$out"
+    rm -f "$out/control" "$out/ack"
+    mkfifo "$out/control" "$out/ack"
+    RIFT_BENCH_CONTENT_DIR=example_game RIFT_BENCH_PERF_CONTROL="$out/control" RIFT_BENCH_PERF_ACK="$out/ack" \
+      perf record --quiet -F 999 --call-graph fp --delay=-1 --control="fifo:$out/control,$out/ack" -o "$out/perf.data" \
+      -- target/profiling/profile {{mode}}
+    perf report -i "$out/perf.data" --no-children --sort symbol --stdio --percent-limit 1 -g none 2>/dev/null | grep -E '^ +[0-9]' | sed 's/ *$//' | cut -c1-160
+    perf report -i "$out/perf.data" --children --sort symbol --stdio --percent-limit 2 -g none 2>/dev/null | grep -E '^ +[0-9].*engine::(systems|core)::' | sed 's/ *$//' | cut -c1-160
+
 loadtest count="dyn":
     RIFT_LOADTEST_HTTP_URL=http://127.0.0.1:9998 RIFT_LOADTEST_WS_URL=ws://127.0.0.1:9999 \
       cargo run --release -p engine --bin loadtest -- {{count}}
@@ -191,7 +207,7 @@ record out title seconds input hook +command:
     module=$(pactl load-module module-null-sink "sink_name=$sink")
     trap 'pactl unload-module "$module"' EXIT
     xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
-      PULSE_SINK="$sink" "$@" & app=$!
+      PULSE_SINK="$sink" PIPEWIRE_NODE="$sink" "$@" & app=$!
       window=$(xdotool search --sync --name "$title" | head -1)
       xdotool windowmove --sync "$window" 0 0
       xdotool windowfocus --sync "$window"

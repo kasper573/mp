@@ -15,7 +15,7 @@ editor grow by building it: every feature is made for it and proven on it.
 | [`engine/`](engine) | The engine: the simulation the server and clients share, the game server, the browser (wasm) and desktop clients, and the bench, load test and lint tools. |
 | [`editor/`](editor) | The editor: opens a game folder, edits it through the engine's own loader and writer, and play-tests it on the engine's binaries. |
 | [`example_game/`](example_game) | The example game: a game folder like any other, and what production runs. |
-| [`design_tokens/`](design_tokens) | The look the editor and the game share: colors, shapes, text roles, fonts and themed egui helpers. |
+| [`ui/`](ui) | The interface the editor and the game share: colors, shapes, text roles, fonts and every general-purpose egui component, so both look and behave alike. |
 | [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and a server-authoritative terminal. |
 | [`testkit/`](testkit), [`driver/`](driver), [`showcase/`](showcase) | Testing and showing the game: small games declared in code and a bare world of only the systems a test runs, and real clients driven by real input for the showcase's recorded chapters. |
 | [`website/`](website), [`service/`](service), [`docker/`](docker), [`e2e/`](e2e) | The hosted game: the website, the stack it runs in, and the browser suite that tests it. |
@@ -65,7 +65,7 @@ certificate to get past the browser's warning.
 
 `just test` runs every crate's tests, in seconds once built: unit and integration tests of the
 engine's mechanics and the editor, none of which starts a server, a client or the stack. A test
-declares the small game it needs in code, with [`testkit`](testkit)'s `Game` (only the rows it reads,
+declares the small game it needs in code, with [`testkit`](testkit)'s `Game` (only the files it reads,
 loaded through the engine's own loader), and plays it out in `testkit`'s `Sim`: a bare world holding
 that game, stepped tick by tick through only the engine systems the test adds, in the server's order.
 No test reads [`example_game/`](example_game) or the editor's templates; `just lint` checks that those
@@ -80,9 +80,13 @@ the game at the spawn location (compared against the reference image beside it i
 
 ## A game is a folder
 
-A game is a folder: `game.json` for its settings, one JSON row per file under `tables/<table>/`, and
-`assets/`. [`example_game/`](example_game) is one. The server loads the folder at start and serves it;
-clients sync it and keep it on the device; the same binaries run any folder that fits their build.
+A game is a folder of folders, arranged however the game likes, in which each file says what it is
+by its name: `fire_priestess.npc.json` is an npc, and the folder `emberfall_shrine.area/` is an area
+whose scene and grids are its parts. The game's settings are `fixtures/game.config.json`, and the content
+the engine itself asks for has fixed places under `fixtures/`; everything else is found by its path,
+so folders only organize. [`example_game/`](example_game) is one. The server loads the folder at
+start and serves it; clients sync it and keep it on the device; the same binaries run any folder that
+fits their build.
 
 ```sh
 just editor               # build editor, game-server and desktop-client, open the editor on example_game/
@@ -90,11 +94,11 @@ just editor ~/my-game     # …or on another folder
 just archive              # the release: the three binaries and the example content, in target/archive
 ```
 
-The editor edits the folder in place, with undo across every row, and plays it through the two game
+The editor edits the folder in place, with undo across every file, and plays it through the two game
 binaries it finds beside itself (or in the folder its settings name). New games start from the
 templates built into the editor. Art comes in through the import dialogs: drop an Aseprite or
 TexturePacker export, a sheet, a numbered sequence, a GIF or an APNG onto a model or a tileset, and
-the editor maps it onto the row, keeps the cues and tile data that still fit, and watches the file
+the editor maps it onto the model or tileset, keeps the cues and tile data that still fit, and watches the file
 for changes.
 
 A content deploy needs no client build: the server restarts on the new folder, and players reconnect,

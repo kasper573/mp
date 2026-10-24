@@ -1,6 +1,7 @@
-use egui::{Pos2, Rect, Response, Ui, Vec2};
 use engine::core::math::{Offset, Pos, Rect as TileRect};
 use engine::core::render::TILE;
+use ui::egui;
+use ui::egui::{Pos2, Rect, Response, Ui, Vec2};
 
 use crate::keymap::EditorKey;
 

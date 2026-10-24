@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use engine::core::content::{Content, ContentId, ContentRow};
+use engine::core::content::{Content, ContentFile, ContentId};
 use engine::core::math::Pos;
 use engine::core::script::Value;
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
@@ -25,7 +25,7 @@ use engine::systems::stat::{StatKind, Stats};
 use engine::systems::text::LineText;
 use engine::systems::{GameSettings, dialogue};
 use serde_json::json;
-use testkit::{Game, Map, Sim};
+use testkit::{Declared, Game, Map, Sim};
 
 #[test]
 fn a_character_joined_from_a_row_is_that_character() {
@@ -174,8 +174,8 @@ fn returning_to(area: &str) -> Sim {
                 "blurb": "Bring five tusks, and the chief down.",
                 "xp": 120,
                 "modules": [
-                    { "type": "hold", "item": "tusk", "count": 5 },
-                    { "type": "defeat", "npc": "chief", "count": 1 },
+                    { "type": "hold", "item": "tusk.item.json", "count": 5 },
+                    { "type": "defeat", "npc": "chief.npc.json", "count": 1 },
                     { "type": "hand_over", "text": ["Done."] },
                 ],
             }),
@@ -189,7 +189,7 @@ fn returning_to(area: &str) -> Sim {
                 "blurb": "Hold on to this.",
                 "xp": 40,
                 "modules": [
-                    { "type": "hold", "item": "bone", "count": 1 },
+                    { "type": "hold", "item": "bone.item.json", "count": 1 },
                     { "type": "hand_over", "text": ["Here."] },
                 ],
             }),
@@ -199,21 +199,17 @@ fn returning_to(area: &str) -> Sim {
             "wares",
             json!({
                 "title": "Wares",
-                "mark": "merchant",
+                "mark": "merchant.attention.json",
                 "modules": [{
                     "type": "sells",
-                    "item": "bone",
-                    "price": [{ "item": "gold", "count": 2 }],
+                    "item": "bone.item.json",
+                    "price": [{ "item": "gold.item.json", "count": 2 }],
                     "stock": { "type": "unlimited" },
                 }],
             }),
         )
         .mark("merchant")
-        .row(
-            "memory",
-            "taunted",
-            json!({ "label": "Taunted", "type": "boolean", "resets": "never" }),
-        )
+        .memory("taunted", "never")
         .load();
     let mut sim = Sim::new(content);
     sim.serve(area);
@@ -289,8 +285,8 @@ fn sale(content: &Content) -> Sale {
     }
 }
 
-fn id<Row: ContentRow>(content: &Content, key: &str) -> ContentId<Row> {
+fn id<Row: ContentFile>(content: &Content, key: &str) -> ContentId<Row> {
     content
-        .by_key::<Row>(key)
+        .declared::<Row>(key)
         .unwrap_or_else(|| panic!("no {} row `{key}`", Row::TABLE))
 }

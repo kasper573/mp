@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use engine::core::content::{ContentRow, row_file};
+use engine::core::content::serial::TypeTag;
+use engine::core::content::{ContentFile, MODULES, fields_file};
 use engine::systems::area::{AreaDef, AreaId, AreaModuleKind};
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
@@ -14,6 +15,7 @@ use super::atlas::{AtlasSource, AtlasSourceKind, OpenTarget, WorldAtlas};
 use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::schema;
+use crate::tabs::shown_path;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MapLens {
@@ -25,7 +27,7 @@ pub enum MapLens {
 impl MapLens {
     pub fn chip(&self) -> String {
         match self {
-            MapLens::Row { table, key } => format!("{table}: {key}"),
+            MapLens::Row { key, .. } => shown_path(key).to_owned(),
             MapLens::Module(kind) => format!("module: {}", kind.tag()),
             MapLens::Text(text) => format!("text: {text}"),
         }
@@ -33,7 +35,7 @@ impl MapLens {
 
     pub fn crumb(&self) -> String {
         match self {
-            MapLens::Row { table, key } => format!("{table}/{key}"),
+            MapLens::Row { key, .. } => shown_path(key).to_owned(),
             MapLens::Module(kind) => format!("module/{}", kind.tag()),
             MapLens::Text(text) => format!("text/{text}"),
         }
@@ -329,7 +331,7 @@ fn range_in(
     };
     let mut range = None;
     for key in keys {
-        let Some(row) = files.json(&row_file(table.table(), key)) else {
+        let Some(row) = files.json(&fields_file(key)) else {
             continue;
         };
         for value in numbers_at(&row, &color.field.path) {
@@ -351,11 +353,11 @@ fn numbers_at(value: &Value, path: &[String]) -> Vec<f64> {
         Value::Object(fields) => match fields.get(head) {
             Some(field) => numbers_at(field, rest),
             None => fields
-                .get("modules")
+                .get(MODULES)
                 .and_then(Value::as_array)
                 .into_iter()
                 .flatten()
-                .filter(|module| module["type"] == *head)
+                .filter(|module| TypeTag::of_json(module).as_ref() == Some(head))
                 .flat_map(|module| numbers_at(module, rest))
                 .collect(),
         },

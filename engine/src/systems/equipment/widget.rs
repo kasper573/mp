@@ -1,11 +1,13 @@
 use bevy::prelude::*;
-use design_tokens::face::TextRole;
-use design_tokens::{ink, sheet};
-use egui::{Sense, Ui, Vec2};
 use strum::VariantArray;
+use ui::drag;
+use ui::egui;
+use ui::egui::{Sense, Ui, Vec2};
+use ui::face::TextRole;
+use ui::float;
+use ui::{ink, sheet};
 
 use crate::core::content::Content;
-use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::equipment::{EquipmentSlot, UnequipRequest};
 use crate::systems::hud::{self, Carried, HudWindow};
@@ -66,7 +68,7 @@ fn worn(world: &World) -> Vec<(EquipmentSlot, Option<ItemId>)> {
 
 fn empty_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot) {
     let response = slot(ui, world, SlotLook::EMPTY, Sense::hover());
-    gui::tooltip(&response, |ui| {
+    float::tooltip(&response, |ui| {
         ui.label(kind.label());
     });
 }
@@ -76,7 +78,7 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
     let def = item.get(&content);
     let look = SlotLook {
         icon: Some(&def.icon),
-        faded: hud::carried(ui.ctx()) == Some(Carried::Worn(kind)),
+        faded: drag::carried::<Carried>(ui.ctx()) == Some(Carried::Worn(kind)),
         ..SlotLook::EMPTY
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
@@ -92,7 +94,7 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
     } else if map::clicked(world, InputAction::InspectItem, &response) {
         card::open(world, item, Some(response.rect));
     } else if map::drag_started(world, InputAction::CarryItem, &response) {
-        hud::carry(ui.ctx(), Carried::Worn(kind));
+        drag::carry(ui.ctx(), Carried::Worn(kind));
     }
     let hint = StyledLine::new(
         card::inspect_hint()

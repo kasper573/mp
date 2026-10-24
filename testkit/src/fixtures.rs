@@ -1,12 +1,13 @@
-use engine::core::content::Fixture;
 use engine::core::content::fixture::FixtureLock;
+use engine::core::content::{ContentFile, Fixture};
 use engine::core::vfx::{ParamKind, ShaderParam};
 use engine::systems::area::world_map::WorldMap;
 use engine::systems::attention::AttentionMark;
-use engine::systems::input::map::InputAction;
+use engine::systems::input::map::{BoundAction, InputAction, InputDef, InputFixture};
 use engine::systems::interface::{CursorShape, InterfaceIcon, InterfaceSound};
 use engine::systems::vfx::{VfxFixture, VfxShaderFixture};
 use serde_json::{Value, json};
+use strum::VariantArray;
 
 use crate::Game;
 use crate::art::png;
@@ -16,8 +17,22 @@ impl Game {
     /// reads from it, so a game of only the rows a test declares loads as a whole one. A row the
     /// test declares after replaces the plain one.
     pub fn engine_rows(self) -> Game {
-        let game = each::<InputAction>(self, |game, key, _| {
-            game.row("input", key, json!({ "label": key, "bindings": [] }))
+        let unbound = InputDef {
+            actions: InputAction::VARIANTS
+                .iter()
+                .map(|&action| {
+                    let label = <&str>::from(action).to_owned();
+                    let bound = BoundAction {
+                        label,
+                        bindings: Vec::new(),
+                    };
+                    (action, bound)
+                })
+                .collect(),
+        };
+        let unbound = serde_json::to_value(unbound).expect("an input file");
+        let game = each::<InputFixture>(self, |game, key, _| {
+            game.row(InputDef::TABLE, key, unbound.clone())
         });
         let game = each::<AttentionMark>(game, |game, key, _| game.mark(key));
         let game = each::<InterfaceSound>(game, |game, key, _| game.sfx(key));
@@ -47,7 +62,7 @@ impl Game {
 
 fn each<F: Fixture>(game: Game, add: impl Fn(Game, &str, Vec<FixtureLock>) -> Game) -> Game {
     F::VARIANTS.iter().fold(game, |game, fixture| {
-        add(game, fixture.key(), fixture.locks())
+        add(game, fixture.name(), fixture.locks())
     })
 }
 

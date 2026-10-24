@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use ui::egui;
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, IntoStaticStr, VariantArray};
 
 use crate::core::content::fixture::FixtureLock;
-use crate::core::content::{Content, ContentRow, Fixture, serial};
+use crate::core::content::{Content, ContentFile, Fixture, Nearby, RowCheck, serial};
 use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
 
 #[derive(
@@ -20,10 +21,13 @@ use crate::core::text::{InputRef, KeyCap, KeyNames, TextPiece};
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     IntoStaticStr,
     VariantArray,
 )]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum InputAction {
     Interact,
@@ -75,25 +79,56 @@ pub enum InputAction {
     SlotOptions,
 }
 
-impl Fixture for InputAction {
+/// The one file that binds every action, a fixture every game provides.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum InputFixture {
+    Game,
+}
+
+impl Fixture for InputFixture {
     type Row = InputDef;
+    const FOLDER: Option<&'static str> = None;
     const WHOLE_TABLE: bool = true;
 
     fn locks(self) -> Vec<FixtureLock> {
-        let variants = self
-            .gestures()
+        InputAction::VARIANTS
             .iter()
-            .flat_map(|gesture| gesture.bindings())
-            .map(|kind| <&'static str>::from(*kind).to_owned())
-            .collect();
-        vec![FixtureLock::Variants {
-            list: "/bindings".to_owned(),
-            variants,
-        }]
+            .map(|&action| FixtureLock::Variants {
+                list: format!("{}/bindings", action.pointer()),
+                variants: action
+                    .gestures()
+                    .iter()
+                    .flat_map(|gesture| gesture.bindings())
+                    .map(|kind| <&'static str>::from(*kind).to_owned())
+                    .collect(),
+            })
+            .collect()
+    }
+
+    fn fresh(self, _: &Nearby) -> Result<InputDef, String> {
+        Ok(InputDef {
+            actions: InputAction::VARIANTS
+                .iter()
+                .map(|&action| {
+                    let label = <&'static str>::from(action).replace('_', " ");
+                    let bound = BoundAction {
+                        label,
+                        bindings: Vec::new(),
+                    };
+                    (action, bound)
+                })
+                .collect(),
+        })
     }
 }
 
 impl InputAction {
+    /// Where the action sits in the input file.
+    pub fn pointer(self) -> String {
+        format!("/actions/{}", <&'static str>::from(self))
+    }
+
     pub fn gestures(self) -> &'static [GestureKind] {
         match self {
             InputAction::Advance | InputAction::PickChoice => {
@@ -142,14 +177,55 @@ impl GestureKind {
     }
 }
 
+/// What every action is called and bound to. The engine fixes which actions there are; content
+/// words them for the player and picks their bindings, of the kinds each action reads.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InputDef {
+    #[schemars(schema_with = "actions_schema")]
+    pub actions: BTreeMap<InputAction, BoundAction>,
+}
+
+/// An action as the player reads it and binds it.
+#[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoundAction {
     pub label: String,
     pub bindings: Vec<InputBinding>,
 }
 
-impl ContentRow for InputDef {
+impl ContentFile for InputDef {
     const TABLE: &'static str = "input";
+
+    fn fresh(near: &Nearby) -> Result<InputDef, String> {
+        InputFixture::Game.fresh(near)
+    }
+
+    fn check(&self, cx: &mut RowCheck) {
+        for &action in InputAction::VARIANTS {
+            match self.actions.get(&action) {
+                Some(bound) => cx.text(format!("{}/label", action.pointer()), &bound.label, 1, 80),
+                None => cx.error(
+                    action.pointer(),
+                    "missing input",
+                    "no such action",
+                    "every action the engine reads",
+                ),
+            }
+        }
+    }
+}
+
+/// Every action keys a row of its own: a sheet lists them, and none is added, removed or renamed.
+fn actions_schema(generator: &mut SchemaGenerator) -> Schema {
+    let actions = generator.subschema_for::<InputAction>();
+    let bound = generator.subschema_for::<BoundAction>();
+    json_schema!({
+        "type": "object",
+        "propertyNames": actions,
+        "additionalProperties": bound,
+        "x-fixed-rows": true,
+    })
 }
 
 #[derive(
@@ -245,10 +321,14 @@ pub struct InputMap(HashMap<InputAction, Vec<InputBinding>>);
 
 impl InputMap {
     pub fn new(content: &Content) -> InputMap {
+        let file = InputFixture::Game.get(content);
         InputMap(
             InputAction::VARIANTS
                 .iter()
-                .map(|&action| (action, action.get(content).bindings.to_vec()))
+                .map(|&action| {
+                    let bound = file.actions.get(&action).cloned().unwrap_or_default();
+                    (action, bound.bindings)
+                })
                 .collect(),
         )
     }

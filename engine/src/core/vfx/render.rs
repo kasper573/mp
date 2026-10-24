@@ -3,6 +3,7 @@
 //! pieces and presenters are public so the editor's stage draws a vfx exactly as the game does.
 
 use std::collections::HashSet;
+use ui::egui;
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::mesh::MeshVertexBufferLayoutRef;
@@ -16,8 +17,8 @@ use bevy::sprite::Anchor;
 use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dKey, Material2dPipeline};
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
-use egui::Color32;
-use egui::load::SizedTexture;
+use ui::egui::Color32;
+use ui::egui::load::SizedTexture;
 
 use super::shader::PARAMS_BYTES;
 use super::{
@@ -810,7 +811,7 @@ fn load_shaders(
         .0
         .iter()
         .map(|(id, source)| {
-            let path = format!("vfx_shader/{}-{generation}.wgsl", id.key(&content));
+            let path = format!("vfx_shader/{}-{generation}.wgsl", id.path(&content));
             (*id, assets.add(Shader::from_wgsl(source.clone(), path)))
         })
         .collect();

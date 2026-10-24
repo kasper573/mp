@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use engine::core::content::ContentRow;
+use engine::core::content::ContentFile;
 use engine::systems::actor::model::ModelDef;
 use engine::systems::area::blueprint::BlueprintDef;
 use engine::systems::area::tileset::TilesetDef;
@@ -11,17 +11,17 @@ use engine::systems::script::ScriptDef;
 use serde::Deserialize;
 use strum::VariantNames;
 
-use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
+use crate::app::{BottomTab, Clipboard, Editor, ModalDialog, SceneClip};
 use crate::import::ImportStep;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::views::area::resize::ResizeDialog;
-use crate::views::area::{blueprint, shapes};
+use crate::views::area::{self as area_view, blueprint};
 use crate::views::character::CharacterSection;
 use crate::views::class;
 use crate::views::model::strip::TimingSetBy;
 use crate::views::model::{self, FrameCueKind, ModelPage, ModelStrip, busts};
-use crate::views::script::{PendingScriptAction, ScriptOwner};
+use crate::views::script::{PendingScriptAction, ScriptRow};
 use crate::views::tileset::{
     self, NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
     TilesetMode, WalkBrush,
@@ -29,7 +29,7 @@ use crate::views::tileset::{
 use crate::views::world::{
     self, ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::{rows, ui};
+use crate::{rows, shell};
 
 #[derive(Clone, Debug, Deserialize, VariantNames)]
 #[serde(rename_all = "snake_case")]
@@ -49,7 +49,7 @@ pub enum SceneStep {
     Part {
         table: String,
         key: String,
-        modules: Vec<usize>,
+        nodes: Vec<String>,
     },
     Fold {
         table: String,
@@ -59,26 +59,27 @@ pub enum SceneStep {
         table: String,
         modules: Vec<usize>,
     },
+    /// Asks to delete `key`, pointing whatever names it at `repoint` when one is given.
     Delete {
         table: String,
         key: String,
+        #[serde(default)]
+        repoint: Option<String>,
     },
     Duplicate {
         table: String,
         key: String,
     },
     Clipboard {
-        table: String,
         key: String,
-        module: usize,
+        node: String,
     },
-    Script(ScriptTarget),
+    Script(String),
     Node(Vec<String>),
-    MakeShared,
-    MakeInline,
+    /// Links the output of `from` labelled `output` to `to`.
     Connect {
         from: String,
-        field: String,
+        output: String,
         to: String,
     },
     Bottom(BottomTab),
@@ -96,19 +97,6 @@ pub enum SceneStep {
     Dialog(DialogName),
     Game,
     Asset(String),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ScriptTarget {
-    Shared {
-        key: String,
-    },
-    Inline {
-        table: String,
-        key: String,
-        pointer: String,
-    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -289,16 +277,11 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
             editor.select(RowSelection::row(BlueprintDef::TABLE, key));
             editor.open_tab(EditorTab::Blueprint { key: key.clone() });
         }
-        SceneStep::Part {
-            table,
-            key,
-            modules,
-        } => {
-            let parts: Vec<String> = modules.iter().map(|i| format!("/modules/{i}")).collect();
+        SceneStep::Part { table, key, nodes } => {
             editor.select(RowSelection {
                 table: table.clone(),
                 keys: vec![key.clone()],
-                parts,
+                parts: nodes.clone(),
             });
             editor.open_tab(EditorTab::for_row(table, key));
         }
@@ -307,10 +290,10 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
                 .project
                 .as_ref()
                 .and_then(|p| p.content.clone())
-                .and_then(|c| c.by_key::<AreaDef>(key).map(|id| area::load(&c, id).size));
+                .and_then(|c| c.by_path::<AreaDef>(key).map(|id| area::load(&c, id).size));
             editor.open_tab(EditorTab::Area { key: key.clone() });
             editor.dialogs.push(ModalDialog::Resize(ResizeDialog {
-                area: key.clone(),
+                bundle: key.clone(),
                 width: size.map_or(0, |s| s.width as u32),
                 height: size.map_or(0, |s| s.height as u32),
                 anchor: (-1, -1),
@@ -329,39 +312,56 @@ fn open_one(editor: &mut Editor, step: &SceneStep) {
         }
         SceneStep::Fold { table, modules } => fold(editor, table, modules, true),
         SceneStep::Unfold { table, modules } => fold(editor, table, modules, false),
-        SceneStep::Delete { table, key } => rows::delete_dialog(editor, table, vec![key.clone()]),
-        SceneStep::Duplicate { table, key } => rows::duplicate(editor, table, key),
-        SceneStep::Clipboard { table, key, module } => {
-            let Some(module_value) = editor
-                .row_value(table, key)
-                .and_then(|value| value["modules"].get(*module).cloned())
-            else {
-                return;
-            };
-            let origin = blueprint::selection_origin(std::slice::from_ref(&module_value))
-                .unwrap_or_default();
-            let mut relative = module_value;
-            shapes::shift(&mut relative, -origin.x, -origin.y);
-            editor.clipboard = Some(Clipboard {
-                from: key.clone(),
-                modules: vec![relative],
-                origin: Some(origin),
-            });
-        }
-        SceneStep::Script(target) => open_script(editor, target),
-        SceneStep::Node(names) => {
-            if let Some(owner) = last_script_owner(editor) {
-                let parts = names.iter().map(|name| format!("node:{name}")).collect();
-                editor.select(RowSelection::parts(owner.table(), owner.key(), parts));
+        SceneStep::Delete { key, repoint, .. } => {
+            rows::delete_dialog(editor, vec![key.clone()]);
+            if let (Some(target), Some(ModalDialog::Delete(dialog))) =
+                (repoint, editor.dialogs.last_mut())
+            {
+                for group in &mut dialog.groups {
+                    group.decision = rows::UsageDecision::Repoint(target.clone());
+                }
             }
         }
-        SceneStep::MakeShared => set_pending(editor, PendingScriptAction::MakeShared),
-        SceneStep::MakeInline => set_pending(editor, PendingScriptAction::MakeInline),
-        SceneStep::Connect { from, field, to } => set_pending(
+        SceneStep::Duplicate { key, .. } => {
+            if let Err(error) = rows::duplicate(editor, key) {
+                editor.toast(error);
+            }
+        }
+        SceneStep::Clipboard { key, node } => {
+            let (Some(reader), Some(mut copied)) = (
+                editor.reader(),
+                area_view::nodes::node(&area_view::nodes::scene_of(editor, key), node).cloned(),
+            ) else {
+                return;
+            };
+            let origin =
+                blueprint::selection_origin(std::slice::from_ref(&copied)).unwrap_or_default();
+            blueprint::shift_tree(&mut copied, -origin.x, -origin.y);
+            let Some(nodes) = area_view::nodes::CopiedNodes::of(&reader, &[copied]) else {
+                return;
+            };
+            editor.clipboard = Some(Clipboard::Scene(SceneClip {
+                from: key.clone(),
+                nodes,
+                count: 1,
+                origin,
+            }));
+        }
+        SceneStep::Script(key) => {
+            editor.select(RowSelection::row(ScriptDef::TABLE, key));
+            editor.open_tab(EditorTab::Script(ScriptRow::new(key.clone())));
+        }
+        SceneStep::Node(names) => {
+            if let Some(script) = last_script(editor) {
+                let parts = names.iter().map(|name| format!("node:{name}")).collect();
+                editor.select(RowSelection::parts(ScriptDef::TABLE, &script.key, parts));
+            }
+        }
+        SceneStep::Connect { from, output, to } => set_pending(
             editor,
             PendingScriptAction::Connect {
                 from: from.clone(),
-                field: format!("/{field}"),
+                output: output.clone(),
                 to: to.clone(),
             },
         ),
@@ -413,39 +413,20 @@ fn fold(editor: &mut Editor, table: &str, modules: &[usize], folded: bool) {
     }
 }
 
-fn open_script(editor: &mut Editor, target: &ScriptTarget) {
-    match target {
-        ScriptTarget::Shared { key } => {
-            editor.select(RowSelection::row(ScriptDef::TABLE, key));
-            editor.open_tab(EditorTab::Script(ScriptOwner::Shared { key: key.clone() }));
-        }
-        ScriptTarget::Inline {
-            table,
-            key,
-            pointer,
-        } => {
-            if let Some(owner) = ScriptOwner::inline(table, key, pointer) {
-                editor.select(RowSelection::row(table, key));
-                editor.open_tab(EditorTab::Script(owner));
-            }
-        }
-    }
-}
-
 fn set_pending(editor: &mut Editor, action: PendingScriptAction) {
-    if let Some(owner) = last_script_owner(editor) {
-        editor.views.script.set_pending(&owner, action);
+    if let Some(script) = last_script(editor) {
+        editor.views.script.set_pending(&script, action);
     }
 }
 
-fn last_script_owner(editor: &Editor) -> Option<ScriptOwner> {
+fn last_script(editor: &Editor) -> Option<ScriptRow> {
     editor
         .open_tabs
         .iter()
         .map(|(tab, _)| tab)
         .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
         .filter_map(|tab| match tab {
-            EditorTab::Script(owner) => Some(owner.clone()),
+            EditorTab::Script(script) => Some(script.clone()),
             _ => None,
         })
         .last()
@@ -466,7 +447,7 @@ fn sheet_step(editor: &mut Editor, step: &SheetStep) {
             EditorTab::Spreadsheet { table } => Some(table.clone()),
             _ => None,
         });
-    let active = match ui::active_tab(editor) {
+    let active = match shell::active_tab(editor) {
         Some(EditorTab::Spreadsheet { table }) => Some(table),
         _ => None,
     };
@@ -512,7 +493,7 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
         editor.open_tab(EditorTab::Model { key: key.clone() });
         return;
     }
-    let key = match ui::active_tab(editor) {
+    let key = match shell::active_tab(editor) {
         Some(EditorTab::Model { key }) => key,
         _ if editor.selection.table == ModelDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
@@ -531,15 +512,15 @@ fn model_step(editor: &mut Editor, step: &ModelStep) {
             view.page = ModelPage::Busts;
             if let Some(face) = face {
                 view.face = Some(face.clone());
-                if let Some(row) = editor.row_value(ModelDef::TABLE, &key)
-                    && let Some(found) = busts::faces(&row)
+                if let Some(Ok(model)) = editor.read::<ModelDef>(&key)
+                    && let Some(found) = busts::faces(&model)
                         .into_iter()
                         .find(|found| found.name == *face)
                 {
                     editor.select(RowSelection {
                         table: ModelDef::TABLE.to_owned(),
                         keys: vec![key.clone()],
-                        parts: vec![found.pointer],
+                        parts: vec![found.part()],
                     });
                 }
             }
@@ -581,7 +562,7 @@ fn tileset_step(editor: &mut Editor, step: &TilesetStep) {
         editor.open_tab(EditorTab::Tileset { key: key.clone() });
         return;
     }
-    let key = match ui::active_tab(editor) {
+    let key = match shell::active_tab(editor) {
         Some(EditorTab::Tileset { key }) => key,
         _ if editor.selection.table == TilesetDef::TABLE && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()

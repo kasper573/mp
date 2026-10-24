@@ -1,9 +1,10 @@
 use std::time::Duration;
+use ui::egui;
 
 use bevy::prelude::*;
-use design_tokens::dusk;
-use egui::emath::TSTransform;
-use egui::{Rect, Vec2};
+use ui::dusk;
+use ui::egui::emath::TSTransform;
+use ui::egui::{Rect, Vec2};
 
 use super::rows::{self, Clock, Fades, Move, Presence, Swell};
 use super::{Notification, NotificationSent, window_visible};
