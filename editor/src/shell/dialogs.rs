@@ -72,8 +72,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
         if copy_source.is_some() { 600.0 } else { 1080.0 },
         |ui| {
             pressed = dialog::keys(ui);
-            ui.label(RichText::new(&title).strong().size(18.0));
-            ui.add_space(8.0);
+            dialog::title(ui, &title);
             match &mut dialog.source {
                 NewGameSource::Template(picked) => {
                     ui.horizontal_top(|ui| {
@@ -327,8 +326,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 },
                 |ui| {
                     pressed = dialog::keys(ui);
-                    ui.label(RichText::new(&confirm.title).strong().size(18.0));
-                    ui.add_space(6.0);
+                    dialog::title(ui, &confirm.title);
                     ui.label(theme::muted(&confirm.body));
                     if let Some(compare) = &confirm.compare {
                         ui.add_space(8.0);
@@ -426,12 +424,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 "conflict",
                 if compare { 1100.0 } else { 560.0 },
                 |ui| {
-                    ui.label(
-                        RichText::new(format!("{name} changed on disk"))
-                            .strong()
-                            .size(18.0),
-                    );
-                    ui.add_space(6.0);
+                    dialog::title(ui, &format!("{name} changed on disk"));
                     ui.label(
                         theme::muted(
                             "You have unsaved edits to this row, and the file on disk changed too.",
@@ -534,11 +527,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                 pressed = dialog::keys(ui);
                 ui.horizontal(|ui| {
                     glyph::show(ui, Mark::Cross, 16.0, theme::DANGER);
-                    ui.label(
-                        RichText::new(rows::delete_title(&dialog))
-                            .strong()
-                            .size(18.0),
-                    );
+                    dialog::title(ui, &rows::delete_title(&dialog));
                 });
                 ui.add_space(4.0);
                 rows::delete_body(editor, ui, &mut dialog);
@@ -610,7 +599,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
             dialog::card(ctx, "keys", 1200.0, |ui| {
                 pressed = dialog::keys(ui);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Keys").strong().size(18.0));
+                    dialog::title(ui, "Keys");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("Done").clicked() {
                             open = false;

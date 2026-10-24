@@ -5,6 +5,7 @@ use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 use ui::chip;
+use ui::dialog;
 use ui::egui;
 use ui::form;
 use ui::sheet;
@@ -746,7 +747,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         } else {
             glyph::show(ui, Mark::Warning, 18.0, theme::WARN);
         }
-        ui.label(RichText::new("Game binaries").strong().size(18.0));
+        dialog::title(ui, "Game binaries");
     });
     ui.add_space(8.0);
     form::kv(ui, "folder", |ui| {

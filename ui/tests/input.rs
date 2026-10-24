@@ -95,13 +95,15 @@ fn key(key: Key, modifiers: Modifiers) -> Event {
 #[test]
 fn a_number_field_takes_what_is_typed_only_once_it_reads_and_is_confirmed() {
     struct Case {
+        start: &'static [f32],
         text: &'static str,
         range: Option<std::ops::RangeInclusive<f32>>,
         then: Key,
-        expected: f32,
+        expected: &'static [f32],
         taken: bool,
     }
-    let case = |text, range, then, expected, taken| Case {
+    let case = |start, text, range, then, expected, taken| Case {
+        start,
         text,
         range,
         then,
@@ -109,13 +111,16 @@ fn a_number_field_takes_what_is_typed_only_once_it_reads_and_is_confirmed() {
         taken,
     };
     let cases = [
-        case("7.5", None, Key::Enter, 7.5, true),
-        case("99", Some(0.0..=10.0), Key::Enter, 10.0, true),
-        case("-3", Some(0.0..=10.0), Key::Enter, 0.0, true),
-        case("seven", None, Key::Enter, 1.0, false),
-        case("7", None, Key::Escape, 1.0, false),
+        case(&[1.0], "7.5", None, Key::Enter, &[7.5], true),
+        case(&[1.0], "99", Some(0.0..=10.0), Key::Enter, &[10.0], true),
+        case(&[1.0], "-3", Some(0.0..=10.0), Key::Enter, &[0.0], true),
+        case(&[1.0], "seven", None, Key::Enter, &[1.0], false),
+        case(&[1.0], "7", None, Key::Escape, &[1.0], false),
+        case(&[1.0, 2.0], "3, 4", None, Key::Enter, &[3.0, 4.0], true),
+        case(&[1.0, 2.0], "5", None, Key::Enter, &[1.0, 2.0], false),
     ];
     for Case {
+        start,
         text,
         range,
         then,
@@ -123,23 +128,18 @@ fn a_number_field_takes_what_is_typed_only_once_it_reads_and_is_confirmed() {
         taken,
     } in cases
     {
-        let mut value = 1.0;
-        let took = Typing::new().types([&mut value], range, text, then);
+        let mut values = start.to_vec();
+        let took = match values.as_mut_slice() {
+            [x] => Typing::new().types([x], range, text, then),
+            [x, y] => Typing::new().types([x, y], range, text, then),
+            _ => unreachable!("cases hold one number or two"),
+        };
         assert_eq!(
-            (value, took),
+            (values.as_slice(), took),
             (expected, taken),
-            "typing {text:?} then {then:?}"
+            "typing {text:?} then {then:?} over {start:?}"
         );
     }
-}
-
-#[test]
-fn a_field_of_several_numbers_takes_them_all_or_none() {
-    let (mut x, mut y) = (1.0, 2.0);
-    assert!(Typing::new().types([&mut x, &mut y], None, "3, 4", Key::Enter));
-    assert_eq!((x, y), (3.0, 4.0));
-    assert!(!Typing::new().types([&mut x, &mut y], None, "5", Key::Enter));
-    assert_eq!((x, y), (3.0, 4.0));
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn a_slider_keeps_a_value_outside_its_range_until_slid_then_takes_a_plain_one() 
         };
         let mut moved = false;
         let mut slider = Rect::NOTHING;
-        let _ = ctx.run_ui(input, |ui| {
+        let mut output = ctx.run_ui(input, |ui| {
             moved = SliderField::new(value, 0.0..=1.0).show(ui);
             let room = ui.min_rect();
             slider = Rect::from_min_size(
@@ -162,6 +162,7 @@ fn a_slider_keeps_a_value_outside_its_range_until_slid_then_takes_a_plain_one() 
                 Vec2::new(ui.spacing().slider_width, room.height()),
             );
         });
+        output.textures_delta.clear();
         (moved, slider)
     };
     let mut value = 3.0;

@@ -9,6 +9,7 @@ use editor::views::class::inspect as class_inspect;
 use editor::views::{character, spreadsheet};
 use engine::core::audio::playback::{SfxDef, SfxScalar};
 use engine::core::content::Fixture;
+use engine::core::vfx::{ParamFill, ParamValue, VfxDef, VfxLayer};
 use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 use engine::systems::class::{AccessRequirement, ClassDef, NodeKey};
 use engine::systems::item::{ItemDef, ItemKind, ItemModule};
@@ -415,6 +416,42 @@ fn a_script_module_added_to_a_row_runs_a_script_of_its_kind_made_for_it_when_non
             "{named} starts with every value it asks for"
         );
     }
+
+    for (table, kind) in [
+        ("npc", RunnerKind::Npc),
+        ("item", RunnerKind::Item),
+        ("status_effect", RunnerKind::StatusEffect),
+        ("quest", RunnerKind::Quest),
+        ("shop", RunnerKind::Shop),
+    ] {
+        let scratch = tempfile::tempdir().expect("scratch");
+        let game = support::game()
+            .file("icons/cap.png", testkit::png(16, 16))
+            .npc("orc", 10.0, json!([]));
+        let mut editor = support::open(game, &scratch);
+        let row = editor::rows::new_file(&mut editor, "", table)
+            .unwrap_or_else(|why| panic!("a fresh {table}: {why}"));
+        support::files(&mut editor);
+
+        let made = editor::rows::new_script_module(&mut editor, table, &row)
+            .unwrap_or_else(|why| panic!("a fresh {table} takes a script: {why}"));
+        support::files(&mut editor);
+
+        let taken_back = editor
+            .project
+            .as_mut()
+            .and_then(|project| project.take_refused());
+        assert!(
+            taken_back.is_none(),
+            "a fresh {table} holds with its script: {:?}",
+            taken_back.map(|taken| taken.refusal.sentence())
+        );
+        let script = editor
+            .read::<ScriptDef>(&made)
+            .expect("a project")
+            .expect("the script reads");
+        assert_eq!(script.runs_on, kind, "the script made for a fresh {table}");
+    }
 }
 
 #[test]
@@ -492,11 +529,16 @@ fn a_layers_shader_parameter_lands_in_its_file_as_it_was_typed() {
 
     form.type_into(&mut editor, amplitude, "0.05");
 
-    let file = editor.fields_json(&jolt).expect("the effect's file");
+    let vfx = editor
+        .read::<VfxDef>(&jolt)
+        .expect("a project")
+        .expect("the effect reads");
+    let Some(VfxLayer::Shader { params, .. }) = vfx.layers.first() else {
+        panic!("a shader layer");
+    };
     assert_eq!(
-        file.pointer("/layers/0/params/amplitude"),
-        Some(&json!(0.05)),
-        "{file}"
+        params.get("amplitude"),
+        Some(&ParamFill::Value(ParamValue::Number(0.05)))
     );
 }
 
@@ -772,36 +814,6 @@ fn a_skills_target_and_area_change_together_from_either_side() {
         assert_eq!(skill.target, Targeting::AreaEnemy, "{click_first}");
         assert!(skill.area.is_some(), "{click_first}");
     }
-}
-
-#[test]
-fn a_fresh_row_of_any_kind_that_runs_scripts_takes_a_script_made_for_it() {
-    let tables = ["npc", "item", "status_effect", "quest", "shop"];
-    let mut refused = Vec::new();
-    for table in tables {
-        let scratch = tempfile::tempdir().expect("scratch");
-        let game = support::game()
-            .file("icons/cap.png", testkit::png(16, 16))
-            .npc("orc", 10.0, json!([]));
-        let mut editor = support::open(game, &scratch);
-        let row = editor::rows::new_file(&mut editor, "", table)
-            .unwrap_or_else(|why| panic!("a fresh {table}: {why}"));
-        support::files(&mut editor);
-
-        let made = editor::rows::new_script_module(&mut editor, table, &row);
-        support::files(&mut editor);
-
-        let taken_back = editor
-            .project
-            .as_mut()
-            .and_then(|project| project.take_refused());
-        match (made, taken_back) {
-            (Ok(_), None) => {}
-            (Err(why), _) => refused.push(format!("{table}: {why}")),
-            (_, Some(taken)) => refused.push(format!("{table}: {}", taken.refusal.sentence())),
-        }
-    }
-    assert!(refused.is_empty(), "{refused:#?}");
 }
 
 #[test]

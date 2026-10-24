@@ -254,20 +254,6 @@ fn new_makes_the_type_at_once_numbered_past_a_taken_name_with_its_name_up_for_ty
 fn a_file_may_share_its_name_with_a_file_of_another_kind_beside_it_but_not_of_its_own() {
     let scratch = tempfile::tempdir().expect("scratch");
     let mut editor = support::open(camp(), &scratch);
-
-    content_tree::new_file(&mut editor, "icons", "npc");
-    rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect("an npc beside cap.png");
-    content_tree::new_file(&mut editor, "icons", "npc");
-    let refused = rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect_err("taken");
-
-    assert!(refused.contains("cap.npc.json"), "{refused}");
-    assert!(support::files(&mut editor).contains("icons/cap.npc.json"));
-}
-
-#[test]
-fn a_name_refused_as_a_file_is_made_stays_in_its_edit_box_to_be_put_right() {
-    let scratch = tempfile::tempdir().expect("scratch");
-    let mut editor = support::open(camp(), &scratch);
     content_tree::new_file(&mut editor, "icons", "npc");
     rows::rename(&mut editor, "icons/npc.npc.json", "cap").expect("an npc beside cap.png");
     content_tree::new_file(&mut editor, "icons", "npc");
@@ -290,12 +276,18 @@ fn a_name_refused_as_a_file_is_made_stays_in_its_edit_box_to_be_put_right() {
         tree(&mut editor, events);
     }
 
+    let files = support::files(&mut editor);
+    assert!(files.contains("icons/cap.npc.json"));
+    assert!(
+        files.contains("icons/npc.npc.json"),
+        "the second npc keeps its name"
+    );
     assert_eq!(
         editor.content_tree.tree.renaming(),
-        Some("icons/npc.npc.json")
+        Some("icons/npc.npc.json"),
+        "the refused name stays in its edit box to be put right"
     );
     assert!(tree(&mut editor, Vec::new()).any(|text| text == "cap"));
-    assert!(support::files(&mut editor).contains("icons/npc.npc.json"));
 }
 
 #[test]

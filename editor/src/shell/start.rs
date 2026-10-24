@@ -192,8 +192,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
     dialog::card(ctx, "recover", 520.0, |ui| {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
-        ui.label(RichText::new("Recover unsaved work?").strong().size(18.0));
-        ui.add_space(6.0);
+        dialog::title(ui, "Recover unsaved work?");
         ui.label(
             theme::muted(format!(
                 "The editor closed at {when} with {} unsaved row{} of {}, kept in its journal outside the content folder.",

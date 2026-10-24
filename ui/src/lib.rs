@@ -19,6 +19,7 @@ pub mod ink;
 pub mod input;
 pub mod keys;
 pub mod menu;
+pub mod meter;
 pub mod motion;
 pub mod paint;
 pub mod panel;
